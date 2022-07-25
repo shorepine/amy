@@ -904,10 +904,10 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
 
 void parse_task() {
     uint8_t mode = 0;
-    int16_t client = -1;
-    int64_t sync = -1;
-    int8_t sync_index = -1;
-    uint8_t ipv4 = 0; 
+    //int16_t client = -1;
+    //int64_t sync = -1;
+    //int8_t sync_index = -1;
+    //uint8_t ipv4 = 0; 
     uint16_t start = 0;
     uint16_t c = 0;
     char * message = message_start_pointer;
@@ -915,7 +915,7 @@ void parse_task() {
 
     struct event e = default_event();
     int64_t sysclock = get_sysclock();
-    uint8_t sync_response = 0;
+    //uint8_t sync_response = 0;
 
     // Cut the OSC cruft Max etc add, they put a 0 and then more things after the 0
     int new_length = length; 
@@ -928,7 +928,7 @@ void parse_task() {
 
     while(c < length+1) {
         uint8_t b = message[c];
-        if(b == '_' && c==0) sync_response = 1;
+        //if(b == '_' && c==0) sync_response = 1;
         if( ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) || b == 0) {  // new mode or end
             if(mode=='t') {
                 e.time=atol(message + start);
@@ -944,7 +944,7 @@ void parse_task() {
             if(mode=='B') parse_breakpoint(&e, message+start, 1);
             if(mode=='b') e.feedback=atof(message+start);
             if(mode=='C') parse_breakpoint(&e, message+start, 2);
-            if(mode=='c') client = atoi(message + start); 
+            //if(mode=='c') client = atoi(message + start); 
             if(mode=='d') e.duty=atof(message + start);
             if(mode=='D') {
                 uint8_t type = atoi(message + start);
@@ -955,7 +955,7 @@ void parse_task() {
             if(mode=='F') e.filter_freq=atof(message + start);
             if(mode=='G') e.filter_type=atoi(message + start);
             if(mode=='g') e.mod_target = atoi(message + start); 
-            if(mode=='i') sync_index = atoi(message + start);
+            //if(mode=='i') sync_index = atoi(message + start);
             if(mode=='I') e.ratio = atof(message + start);
             if(mode=='l') e.velocity=atof(message + start);
             if(mode=='L') e.mod_source=atoi(message + start);
@@ -965,9 +965,9 @@ void parse_task() {
             if(mode=='O') parse_algorithm(&e, message+start);
             if(mode=='p') e.patch=atoi(message + start);
             if(mode=='P') e.phase=atof(message + start);
-            if(mode=='r') ipv4=atoi(message + start);
+            //if(mode=='r') ipv4=atoi(message + start);
             if(mode=='R') e.resonance=atof(message + start);
-            if(mode=='s') sync = atol(message + start); 
+            //if(mode=='s') sync = atol(message + start); 
             if(mode=='S') { 
                 uint8_t osc = atoi(message + start); 
                 if(osc > OSCS-1) { reset_oscs(); } else { reset_osc(osc); }
@@ -987,13 +987,21 @@ void parse_task() {
         }
         c++;
     }
+    /*
     if(sync_response) {
         // If this is a sync response, let's update our local map of who is booted
         update_map(client, ipv4, sync);
         length = 0; // don't need to do the rest
     }
+    */
     // Only do this if we got some data
     if(length >0) {
+        e.time = sysclock + global.latency_ms;
+        add_event(e);
+    }
+
+    // This is all Alles stuff below, we'll pull it out here and make a thing in alles that adds in 
+    /*
         // Now adjust time in some useful way:
         // if we have a delta & got a time in this message, use it schedule it properly
         if((computed_delta_set && e.time > 0)) {
@@ -1038,7 +1046,8 @@ void parse_task() {
             }
             if(for_me) add_event(e);
         }
-    }
+
+    }*/
 }
 
 void stop_amy() {

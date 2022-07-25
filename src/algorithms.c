@@ -29,7 +29,6 @@ typedef struct  {
 
 
 #include "fm.h"
-extern uint8_t debug_on;
 // Thank you MFSA for the DX7 op structure , borrowed here \/ \/ \/ 
 enum FmOperatorFlags {
     OUT_BUS_ONE = 1 << 0,
@@ -107,12 +106,6 @@ void copy(float *a, float*b) {
 
 void render_mod(float *in, float*out, uint8_t osc, float feedback_level, uint8_t algo_osc) {
 
-    /*if(osc == 1) {
-        debug_on = 1;
-    } else {
-        debug_on = 0;
-    }
-    */
     hold_and_modify(osc);
 
     // out = buf
@@ -209,7 +202,6 @@ void algo_setup_patch(uint8_t osc) {
 }
 
 void algo_note_on(uint8_t osc) {    
-    //debug_on = 1;
     // trigger all the source operator voices
     if(synth[osc].patch >= 0) { 
         algo_setup_patch(osc);
@@ -245,84 +237,58 @@ void render_algo(float * buf, uint8_t osc) {
     zero(scratch[4]);
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
-            if(debug_on) {
-                printf("------------------ Algorithm A-%d \n",synth[osc].algorithm );
-                printf("op %d ", 6-op);
-                if(algo.ops[op] & FB_IN) printf(" FB_IN");
-                if(algo.ops[op] & IN_BUS_ONE) printf(" IN_BUS_ONE");
-                if(algo.ops[op] & IN_BUS_TWO) printf(" IN_BUS_TWO");
-                if(algo.ops[op] & OUT_BUS_ONE) printf(" OUT_BUS_ONE");
-                if(algo.ops[op] & OUT_BUS_TWO) printf(" OUT_BUS_TWO");
-                if(algo.ops[op] & OUT_BUS_ADD) printf(" OUT_BUS_ADD");
-                printf("\n");
-            }
             float feedback_level = 0;
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
-                if(debug_on)printf("op %d fb is %f\n", 6-op, feedback_level);
             } // main algo voice stores feedback, not the op 
             
             if(algo.ops[op] & IN_BUS_ONE) { 
                 in_buf = scratch[0]; 
-                if(debug_on)printf("op %d in_buf = s0\n", 6-op);
             } else if(algo.ops[op] & IN_BUS_TWO) { 
                 in_buf = scratch[1]; 
-                if(debug_on)printf("op %d in_buf = s1\n", 6-op);
             } else {
                 // no in_buf
                 in_buf = zeros;
-                if(debug_on)printf("op %d in_buf = zeros\n", 6-op);
             }
 
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
                 if(algo.ops[op] & OUT_BUS_ONE) { 
                     zero(scratch[2]);
                     out_buf = scratch[2]; 
-                    if(debug_on)printf("op %d out_buf = zerod out s2\n", 6-op);
                 }
                 if(algo.ops[op] & OUT_BUS_TWO) { 
                     zero(scratch[3]);
                     out_buf = scratch[3]; 
-                    if(debug_on)printf("op %d out_buf = zerod out s3\n", 6-op);
                 }
             } else {
                 zero(scratch[4]);
                 out_buf = scratch[4]; 
-                if(debug_on)printf("op %d out_buf = zerod out s4\n", 6-op);
             }
 
-            if(debug_on)printf("op %d rendering a sine modded with in_buf into out_buf.\n", 6-op);
             render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
 
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
                 if((algo.ops[op] & OUT_BUS_ONE) ) {
-                    if(debug_on)printf("op %d copy out_buf into s0\n", 6-op);
                     copy(out_buf, scratch[0]);
                 }
 
                 if((algo.ops[op] & OUT_BUS_TWO) ) {
-                    if(debug_on)printf("op %d copy out_buf into s1\n", 6-op);
                     copy(out_buf, scratch[1]);
                 }
             } else {
                 if(algo.ops[op] & OUT_BUS_ONE) {
                     add(scratch[4], scratch[0]);
-                    if(debug_on)printf("op %d s0 = s4 + s0\n", 6-op) ;
                 } else if(algo.ops[op] & OUT_BUS_TWO) {
                     add(scratch[4], scratch[1]); 
-                    if(debug_on)printf("op %d s1 = s4 + s1\n", 6-op) ;
                 } else {
                     add(scratch[4], buf);
-                    if(debug_on)printf("op %d audio_buf = s4 + audio_buf\n", 6-op) ;
                 }
 
 
             }
         }
     }
-    if(debug_on)printf("transmitting buf out. algo osc %d amp is %f\n", osc, msynth[osc].amp);
     for(uint16_t i=0;i<BLOCK_SIZE;i++) {
         buf[i] = buf[i] * msynth[osc].amp;
     }
-    //debug_on = 0;
 }

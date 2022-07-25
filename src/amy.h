@@ -10,14 +10,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../alles.h"
-
 
 // Constants you can change if you want
 #define OSCS 64              // # of simultaneous oscs to keep track of 
 #define BLOCK_SIZE 256       // buffer block size in samples
 
-#define DEFAULT_LATENCY_MS 1000      // fixed latency in milliseconds
+#define DEFAULT_LATENCY_MS 0      // fixed latency in milliseconds
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
