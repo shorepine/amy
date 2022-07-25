@@ -981,21 +981,9 @@ void parse_message(char * message) {
         }
         c++;
     }
-    /*
-    if(sync_response) {
-        // If this is a sync response, let's update our local map of who is booted
-        update_map(client, ipv4, sync);
-        length = 0; // don't need to do the rest
-    }
-    */
+
     // Only do this if we got some data
     if(length >0) {
-        e.time = sysclock + global.latency_ms;
-        add_event(e);
-    }
-
-    // This is all Alles stuff below, we'll pull it out here and make a thing in alles that adds in 
-    /*
         // Now adjust time in some useful way:
         // if we have a delta & got a time in this message, use it schedule it properly
         if((computed_delta_set && e.time > 0)) {
@@ -1007,41 +995,12 @@ void parse_message(char * message) {
                 fprintf(stderr,"computed delta now %lld\n", computed_delta);
             }
             e.time = (e.time - computed_delta) + global.latency_ms;
-
         } else { // else play it asap 
             e.time = sysclock + global.latency_ms;
         }
         e.status = SCHEDULED;
-
-        // TODO -- not that it matters, but the below could probably be one or two lines long instead
-        // Don't add sync messages to the event queue
-        if(sync >= 0 && sync_index >= 0) {
-            handle_sync(sync, sync_index);
-        } else {
-            // Assume it's for me
-            uint8_t for_me = 1;
-            // But wait, they specified, so don't assume
-            if(client >= 0) {
-                for_me = 0;
-                if(client <= 255) {
-                    // If they gave an individual client ID check that it exists
-                    if(alive>0) { // alive may get to 0 in a bad situation
-                        if(client >= alive) {
-                            client = client % alive;
-                        } 
-                    }
-                }
-                // It's actually precisely for me
-                if(client == client_id) for_me = 1;
-                if(client > 255) {
-                    // It's a group message, see if i'm in the group
-                    if(client_id % (client-255) == 0) for_me = 1;
-                }
-            }
-            if(for_me) add_event(e);
-        }
-
-    }*/
+        add_event(e);
+    }
 }
 
 void stop_amy() {

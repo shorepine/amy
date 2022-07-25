@@ -60,6 +60,15 @@ def preset(which,osc=0, **kwargs):
         send(wave=ALGO, vel=0, patch=62,filter_freq=2000,resonance=2.5,filter_type=FILTER_LPF, bp0_target=TARGET_FILTER_FREQ,bp0="1,1,500,0,0,0")
 
 
+
+def millis():
+    import datetime
+    # Timestamp to send over to synths for global sync
+    # This is a suggestion. I use ms since today started
+    d = datetime.datetime.now()
+    return int((datetime.datetime.utcnow() - datetime.datetime(d.year, d.month, d.day)).total_seconds()*1000)
+
+
 # Removes trailing 0s and x.0000s 
 def trunc(number):
     return ('%.10f' % number).rstrip('0').rstrip('.')
