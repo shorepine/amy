@@ -233,7 +233,7 @@ void parse_breakpoint(struct event * e, char* message, uint8_t bp_set) ;
 void parse_algorithm(struct event * e, char* message) ;
 void hold_and_modify(uint8_t osc) ;
 int16_t * fill_audio_buffer_task();
-void parse_task();
+void parse_message(char * message);
 void start_amy();
 void stop_amy();
 int32_t ms_to_samples(int32_t ms) ;

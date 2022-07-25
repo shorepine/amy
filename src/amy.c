@@ -902,17 +902,11 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
     }
 }
 
-void parse_task() {
+void parse_message(char * message) {
     uint8_t mode = 0;
-    //int16_t client = -1;
-    //int64_t sync = -1;
-    //int8_t sync_index = -1;
-    //uint8_t ipv4 = 0; 
     uint16_t start = 0;
     uint16_t c = 0;
-    char * message = message_start_pointer;
-    int16_t length = message_length;
-
+    int16_t length = strlen(message);
     struct event e = default_event();
     int64_t sysclock = get_sysclock();
     //uint8_t sync_response = 0;
