@@ -1,5 +1,4 @@
-# amy
-AMY - the Additive Music synthesizer librarY
+# AMY - the Additive Music synthesizer librarY
 
 AMY is a fast, small and accurate audio synthesizer library that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, and more to come. 
 
