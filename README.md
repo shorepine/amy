@@ -1,9 +1,11 @@
 # amy
 AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer library that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. 
+AMY is a fast, small and accurate audio synthesizer library that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, and more to come. 
 
-AMY powers the multi-speaker mesh synthesizer Alles, as well as the Tulip Creative Computer. 
+AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the forthcoming Tulip Creative Computer. Let us know if you use AMY for your own projects and we'll add it here!
+
+AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogr.am), and would love your contributions.
 
 It supports
 
@@ -83,9 +85,9 @@ void main() {
 }
 ```
 
-AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. 
+AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over javascript, in MAX/MSP, in Python, C, Micropython and many more! 
 
-AMY accepts ommands in ASCII, each command separated with a `Z` (you can group multiple messages in one, to avoid network overhead if that's your transport). Like so:
+AMY accepts commands in ASCII, each command separated with a `Z` (you can group multiple messages in one, to avoid network overhead if that's your transport). Like so:
 
 ```
 v0w4f440.0l0.9Z
