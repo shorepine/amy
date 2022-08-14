@@ -7,8 +7,8 @@ MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL = (1, 2, 4, 8, 16, 32, 64, 128, 256)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF = range(4)
-ALLES_LATENCY_MS = 1000
-ALLES_MAX_DRIFT_MS = 20000
+AMY_LATENCY_MS = 1000
+AMY_MAX_DRIFT_MS = 20000
 
 sock = 0
 
@@ -124,7 +124,7 @@ def reset(osc=None):
     if(osc is not None):
         send(reset=osc)
     else:
-        send(reset=100) # reset > ALLES_OSCS resets all oscs
+        send(reset=100) # reset > AMY_OSCS resets all oscs
 
 def volume(volume, client = -1):
     send(client=client, volume=volume)
@@ -158,7 +158,7 @@ def play_patches(wait=0.500, patch_total = 100, **kwargs):
             send(osc=i % OSCS, vel=0)
 
 """
-    Play up to ALLES_OSCS patches at once
+    Play up to AMY_OSCS patches at once
 """
 def polyphony(max_voices=OSCS,**kwargs):
     note = 0

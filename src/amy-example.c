@@ -62,8 +62,30 @@ int main(int argc, char ** argv) {
         } 
     }
     live_start();
-    usleep(1000*1000);
     reset_oscs();
+    
+    // Make a bleep noise, two sine waves in a row
+    struct event e = default_event();
+    int64_t sysclock = get_sysclock();
+    // First a 220hz sine
+    e.time = sysclock;
+    e.wave = SINE;
+    e.freq = 220;
+    add_event(e);
+    e.velocity = 1;
+    add_event(e);
+    // 440hz wave 150ms later
+    e.time = sysclock + 150;
+    e.freq = 440;
+    add_event(e);
+    // Turn off the wave
+    e.time = sysclock + 300;
+    e.velocity = 0;
+    e.amp = 0;
+    e.freq = 0;
+    add_event(e);
+
+    // Now just spin forever 
     while(1) {
         usleep(THREAD_USLEEP);
     }

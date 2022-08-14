@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer library that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the forthcoming Tulip Creative Computer. Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -20,10 +20,12 @@ It supports
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
  * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves, including amplitude modulated noise
  * Oscillators can be specified by frequency in floating point or midi note 
- * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance
+ * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band parametric EQ
  * Built in patches for PCM, FM and partials
+ * Built-in clock for short term sequencing of events
+ * Can use multi-core (including on ESP32 multicontrollers) for rendering if available
 
  The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
 
@@ -117,7 +119,6 @@ O = algorithn source oscillators, choose which oscillators make up the algorithm
 p = patch, uint, choose a preloaded PCM sample, partial patch or FM patch number for FM waveforms. See fm.h, pcm.h, partials.h. default 0
 P = phase, float 0-1. where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0
 R = q factor / "resonance" of biquad filter. float. in practice, 0 to 10.0. default 0.7.
-s = sync, int64, same as time but used alone to do an enumeration / sync, see alles.py
 S = reset oscillator, uint 0-63 or for all oscillators, anything >63, which also resets speaker gain and EQ.
 T = breakpoint0 target mask. Which parameter the breakpoints controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. Add 64 to indicate linear ramp, otherwise exponential
 t = time, int64: ms since some fixed start point on your host. you should always give this if you can.

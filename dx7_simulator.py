@@ -1,7 +1,6 @@
 """Simulates the DX7 FM algorithms fully in Python."""
 
 import numpy as np
-
 import fm
 
 # We add a (1 - z^-1)/(1 - 0.995 z^-1) HPF to remove low-frequency excursions.
@@ -22,7 +21,7 @@ except ImportError:
         return y
 
 
-#### Pure-python DX7 simulation (emulates what Alles does).
+#### Pure-python DX7 simulation (emulates what AMY does).
 # import matplotlib.pyplot as plt
 # import fm
 # import dx7_simulator

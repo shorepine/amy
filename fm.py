@@ -1,8 +1,6 @@
 # fm.py
 # Some code to try to convert dx7 patches into AMY commands
 # Use the dx7 module if you want to A/B test AMY's FM mode against a dx7 emulation.
-# AMY is not a dx7 emulator, so it's not going to be perfect or even close, especially for some of the weirder modes of the dx7
-# but fun to play with!
 # Get the dx7 module from https://github.com/bwhitman/learnfm
 import amy, dx7
 import numpy as np

@@ -8,17 +8,6 @@ extern struct mod_event* msynth;
 extern struct mod_state mglobal;
 
 
-// Breakpoints as/well (?) instead of adsr
-// user defines BP as time(ms), ratio, time, ratio
-// but also needs to ID a BP for key release 
-// and each BP curve can be for any # of targets, there can be multiple
-// (for now) the last BP is the release bp, default 0,0 (0ms after release, go to 0)
-
-// how do i get aribitrary length BPs in alles?
-
-
-
-// modulation scale is not like bp scale, it can also make a thing bigger, so return range is between -1 and 1, where 1 = 2x and 0 = 1x
 float compute_mod_scale(uint8_t osc) {
     int8_t source = synth[osc].mod_source;
     if(synth[osc].mod_target >= 1 && source >= 0) {
