@@ -116,6 +116,65 @@ def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1,
     return m+'Z'
 
 
+# Send an AMY message to amy
+def send(**kwargs):
+    import libamy
+    libamy.send(message(**kwargs))
+
+# Plots a time domain and spectra of audio
+def show(data):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    fftsize = len(data)
+    windowlength = fftsize
+    window = np.hanning(windowlength)
+    wavepart = data[:len(window)]
+    logspecmag = 20 * np.log10(np.maximum(1e-10, 
+        np.abs(np.fft.fft(wavepart * window)))[:(fftsize // 2 + 1)])
+    freqs = SAMPLE_RATE * np.arange(len(logspecmag)) / fftsize
+    plt.subplot(211)
+    times = np.arange(len(wavepart)) / SAMPLE_RATE
+    plt.plot(times, wavepart, '.')
+    plt.subplot(212)
+    plt.plot(freqs, logspecmag, '.-')
+    plt.ylim(np.array([-100, 0]) + np.max(logspecmag))
+    plt.show()
+
+# Writes a WAV file of rendered data
+def write(data, filename):
+    import scipy.io.wavfile as wav
+    import numpy as np
+    wav.write(filename, int(SAMPLE_RATE), (32768.0 * data).astype(np.int16))
+
+# Play a rendered sound out of default sounddevice
+def play(samples):
+    import sounddevice as sd
+    sd.play(samples)
+
+# Render AMY's internal buffer to a numpy array of floats
+def render(seconds):
+    import numpy as np
+    import libamy
+    # Output a npy array of samples
+    frame_count = int((seconds*SAMPLE_RATE)/BLOCK_SIZE)
+    frames = []
+    for f in range(frame_count):
+        frames.append( np.array(libamy.render())/32767.0 )
+    return np.hstack(frames)
+
+
+# Starts a live mode, with audio playing out default sounddevice
+def live():
+    import libamy
+    libamy.start()
+    libamy.live()
+
+# Stops live mode
+def stop():
+    import libamy
+    libamy.stop()
+
+
 """
     Convenience functions
 """

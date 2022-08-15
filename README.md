@@ -4,14 +4,14 @@ AMY is a fast, small and accurate audio synthesizer C library with Python bindin
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the forthcoming Tulip Creative Computer. Let us know if you use AMY for your own projects and we'll add it here!
 
-AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogr.am), and would love your contributions.
+AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogram.com), and would love your contributions.
 
 It supports
 
  * An arbitrary number (compile-time option) of band-limited oscillators, each with adjustable frequency and amplitude:
    * pulse (+ adjustable duty cycle)
    * sine
-   * saw
+   * saw (up and down)
    * triangle
    * noise
    * PCM, reading from a baked-in buffer of percussive and misc samples
@@ -27,9 +27,11 @@ It supports
  * Built-in clock for short term sequencing of events
  * Can use multi-core (including on ESP32 multicontrollers) for rendering if available
 
- The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
+The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
 
- The partial tone synthesizer also provides `partials.py`, where you can mode the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+The partial tone synthesizer also provides `partials.py`, where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py` to be able to `import libamy` in Python to generate audio signals. 
 
 
 ## Controlling AMY
@@ -46,6 +48,16 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> amy.send(m)
 >>> audio = amy.render(5.0)
 ```
+
+You can also start a thread playing live audio (using libsoundio):
+
+```python
+>>> import amy
+>>> amy.live()
+>>> amy.send(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
+>>> amy.stop()
+```
+
 
 In C, using the high level structures directly:
 
