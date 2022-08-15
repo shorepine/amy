@@ -16,8 +16,7 @@ extern void print_devices();
 char *raw_file;
 
 int main(int argc, char ** argv) {
-    start_amy();
-    reset_oscs();
+    amy_start();
 
     raw_file = (char*)malloc(sizeof(char)*1025);
     raw_file[0] = 0;
@@ -61,8 +60,8 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
-    live_start();
-    reset_oscs();
+    amy_live_start();
+    amy_reset_oscs();
     
     // Make a bleep noise, two sine waves in a row
     struct event e = default_event();

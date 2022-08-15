@@ -190,7 +190,6 @@ void add_event(struct event e);
 void render_task(uint8_t start, uint8_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
-void reset_oscs() ;
 int64_t get_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
@@ -233,15 +232,17 @@ void parse_breakpoint(struct event * e, char* message, uint8_t bp_set) ;
 void parse_algorithm(struct event * e, char* message) ;
 void hold_and_modify(uint8_t osc) ;
 int16_t * fill_audio_buffer_task();
-void parse_message(char * message);
-void start_amy();
-void stop_amy();
 int32_t ms_to_samples(int32_t ms) ;
 
 
+// external functions
+void amy_parse_message(char * message);
+void amy_start();
+void amy_stop();
+void amy_live_start();
+void amy_live_stop();
+void amy_reset_oscs() ;
 
-void live_start();
-void live_stop();
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();

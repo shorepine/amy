@@ -264,7 +264,7 @@ void reset_osc(uint8_t i ) {
     synth[i].last_two[1] = 0;
 }
 
-void reset_oscs() {
+void amy_reset_oscs() {
     for(uint8_t i=0;i<OSCS;i++) reset_osc(i);
     // Also reset filters and volume
     global.volume = 1;
@@ -288,7 +288,7 @@ int8_t oscs_init() {
 
     block = (i2s_sample_type *) malloc(sizeof(i2s_sample_type) * BLOCK_SIZE);//dbl_block[0];
     // Set all oscillators to their default values
-    reset_oscs();
+    amy_reset_oscs();
 
     // Make a fencepost last event with no next, time of end-1, and call it start for now, all other events get inserted before it
     events[0].next = NULL;
@@ -563,9 +563,6 @@ int16_t leftover_buf[BLOCK_SIZE];
 uint16_t leftover_samples = 0;
 int16_t channel = -1;
 int16_t device_id = -1;
-uint8_t file_write = 0;
-FILE * raw = NULL;
-extern char * raw_file;
 
 void print_devices() {
     struct SoundIo *soundio2 = soundio_create();
@@ -605,7 +602,6 @@ static void soundio_callback(struct SoundIoOutStream *outstream, int frame_count
         for(uint8_t c=0;c<layout->channel_count;c++) {
             if(c==channel || channel<0) {
                 *((int16_t*)areas[c].ptr) = leftover_buf[frame];
-                if(file_write) fwrite(&leftover_buf[frame], 2, 1, raw);
             } else {
                 *((int16_t*)areas[c].ptr) = 0;
             }
@@ -622,7 +618,6 @@ static void soundio_callback(struct SoundIoOutStream *outstream, int frame_count
             for(uint8_t c=0;c<layout->channel_count;c++) {
                 if(c==channel || channel < 0) {
                     *((int16_t*)areas[c].ptr) = buf[frame];
-                    if(file_write) fwrite(&buf[frame], 2, 1, raw);
                 } else {
                     *((int16_t*)areas[c].ptr) = 0;
                 }
@@ -639,7 +634,6 @@ static void soundio_callback(struct SoundIoOutStream *outstream, int frame_count
             for(uint8_t c=0;c<layout->channel_count;c++) {
                 if(c==channel || channel < 0) {
                     *((int16_t*)areas[c].ptr) = buf[frame];
-                    if(file_write) fwrite(&buf[frame], 2, 1, raw);
                 } else {
                     *((int16_t*)areas[c].ptr) = 0;
                 }
@@ -748,18 +742,14 @@ void *soundio_run(void *vargp) {
     }
 }
 
-void live_start() {
+void amy_live_start() {
     // kick off a thread running soundio_run
-    if(strlen(raw_file) > 0) {
-        file_write = 1;
-        raw = fopen(raw_file, "wb");
-    }
     pthread_t thread_id;
     pthread_create(&thread_id, NULL, soundio_run, NULL);
 }
 
 
-void live_stop() {
+void amy_live_stop() {
     soundio_destroy(soundio);
 }
 
@@ -902,7 +892,7 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
     }
 }
 
-void parse_message(char * message) {
+void amy_parse_message(char * message) {
     uint8_t mode = 0;
     uint16_t start = 0;
     uint16_t c = 0;
@@ -964,7 +954,7 @@ void parse_message(char * message) {
             //if(mode=='s') sync = atol(message + start); 
             if(mode=='S') { 
                 uint8_t osc = atoi(message + start); 
-                if(osc > OSCS-1) { reset_oscs(); } else { reset_osc(osc); }
+                if(osc > OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); }
             }
             if(mode=='T') e.breakpoint_target[0] = atoi(message + start); 
             if(mode=='W') e.breakpoint_target[1] = atoi(message + start); 
@@ -1003,13 +993,13 @@ void parse_message(char * message) {
     }
 }
 
-void stop_amy() {
+void amy_stop() {
     oscs_deinit();
 }
 
-void start_amy() {
+void amy_start() {
     global_init();
     oscs_init();
-    reset_oscs();
+    amy_reset_oscs();
 }
 

@@ -49,7 +49,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> audio = amy.render(5.0)
 ```
 
-You can also start a thread playing live audio (using libsoundio):
+You can also start a thread playing live audio (uses libsoundio):
 
 ```python
 >>> import amy
@@ -82,7 +82,7 @@ void bleep() {
 }
 
 void main() {
-    live_start();
+    live_start(); // uses libsoundio to render live audio
     bleep();
 }
 ```
@@ -93,8 +93,8 @@ Or in C, sending the wire protocol directly:
 #include "amy.h"
 
 void main() {
-    live_start();
-    parse_message("t76555951v0w8n50p30l1Z");
+    amy_live_start();
+    amy_parse_message("t76555951v0w8n50p30l1Z");
 }
 ```
 
