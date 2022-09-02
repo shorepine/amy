@@ -15,7 +15,7 @@
 #define OSCS 64              // # of simultaneous oscs to keep track of 
 #define BLOCK_SIZE 256       // buffer block size in samples
 
-#define DEFAULT_LATENCY_MS 0      // fixed latency in milliseconds
+#define DEFAULT_LATENCY_MS 0      // fixed DEFAULT latency in milliseconds, can change
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
@@ -185,25 +185,14 @@ struct mod_event {
     float feedback;
 };
 
-struct event default_event();
-void add_event(struct event e);
+struct event amy_default_event();
+void amy_add_event(struct event e);
 void render_task(uint8_t start, uint8_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
-int64_t get_sysclock();
+int64_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
-
-
-// sync
-extern void update_map(uint8_t client, uint8_t ipv4, int64_t time);
-extern void handle_sync(int64_t time, int8_t index);
-extern void ping(int64_t sysclock);
-extern amy_err_t sync_init();
-
-extern uint8_t alive;
-extern int16_t client_id;
-extern uint8_t DEBUG;
 
 
 // global synth state

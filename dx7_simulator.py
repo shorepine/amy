@@ -33,8 +33,8 @@ except ImportError:
 # fm.play_np_array(0.1*wave)
 
 def calc_loglin_eg_env(breakpoints, keyup_time=0.5, frame_rate=1000, do_exp=True, dx7_attacks=True):
-    """Take alles breakpoints derived from DX7 rate,level parameters and generate the actual envelope."""
-    # This is what alles has to do to reconstruct DX7 envelopes from the set of breakpoints.
+    """Take AMY breakpoints derived from DX7 rate,level parameters and generate the actual envelope."""
+    # This is what amy has to do to reconstruct DX7 envelopes from the set of breakpoints.
     if dx7_attacks:
         lin_to_level_fn = fm.linear_to_dx7level
         level_to_lin_fn = fm.dx7level_to_linear

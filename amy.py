@@ -1,4 +1,4 @@
-import socket, struct, datetime, os, time
+import time
 
 BLOCK_SIZE = 256
 SAMPLE_RATE = 44100.0
@@ -7,10 +7,8 @@ MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL = (1, 2, 4, 8, 16, 32, 64, 128, 256)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF = range(4)
-AMY_LATENCY_MS = 1000
+AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
-
-sock = 0
 
 """
     A bunch of useful presets
@@ -63,13 +61,15 @@ def preset(which,osc=0, **kwargs):
 
 def millis():
     import datetime
-    # Timestamp to send over to synths for global sync
+    # Timestamp to send over to synths
     # This is a suggestion. I use ms since today started
     d = datetime.datetime.now()
     return int((datetime.datetime.utcnow() - datetime.datetime(d.year, d.month, d.day)).total_seconds()*1000)
 
 
-# Removes trailing 0s and x.0000s 
+# Removes trailing 0s and x.0000s from floating point numbers to trim wire message size
+# Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
+# https://github.com/micropython/micropython/pull/8905
 def trunc(number):
     return ('%.10f' % number).rstrip('0').rstrip('.')
 
@@ -116,10 +116,15 @@ def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1,
     return m+'Z'
 
 
+def send_raw(m):
+    import libamy
+    libamy.send(m)
+
 # Send an AMY message to amy
 def send(**kwargs):
-    import libamy
-    libamy.send(message(**kwargs))
+    m = message(**kwargs)
+    send_raw(m)
+
 
 # Plots a time domain and spectra of audio
 def show(data):
@@ -166,13 +171,12 @@ def render(seconds):
 # Starts a live mode, with audio playing out default sounddevice
 def live():
     import libamy
-    libamy.start()
     libamy.live()
 
 # Stops live mode
 def stop():
     import libamy
-    libamy.stop()
+    libamy.pause()
 
 
 """

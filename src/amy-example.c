@@ -1,5 +1,5 @@
 // amy-example.c
-// a simple C example that plays audio using AMY out your speaker or a raw file
+// a simple C example that plays audio using AMY out your speaker 
 
 #include "amy.h"
 #include <pthread.h>
@@ -39,16 +39,11 @@ int main(int argc, char ** argv) {
                 print_devices();
                 return 0;
                 break;
-            case 'g':
-                DEBUG = 1;
-                break;
             case 'h':
-                printf("usage: alles\n");
+                printf("usage: amy-example\n");
                 printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
                 printf("\t[-c sound channel, default -1 for all channels on device]\n");
                 printf("\t[-l list all sound devices and exit]\n");
-                printf("\t[-g show debug info]\n");
-                printf("\t[-r output audio to specified raw file (1-channel 16-bit signed int, 44100Hz)\n");
                 printf("\t[-h show this help and exit]\n");
                 return 0;
                 break;
@@ -63,26 +58,22 @@ int main(int argc, char ** argv) {
     amy_live_start();
     amy_reset_oscs();
     
-    // Make a bleep noise, two sine waves in a row
-    struct event e = default_event();
-    int64_t sysclock = get_sysclock();
-    // First a 220hz sine
-    e.time = sysclock;
-    e.wave = SINE;
-    e.freq = 220;
-    add_event(e);
+    // Play a few notes in FM
+    struct event e = amy_default_event();
+    e.time = amy_sysclock();
     e.velocity = 1;
-    add_event(e);
-    // 440hz wave 150ms later
-    e.time = sysclock + 150;
-    e.freq = 440;
-    add_event(e);
-    // Turn off the wave
-    e.time = sysclock + 300;
-    e.velocity = 0;
-    e.amp = 0;
-    e.freq = 0;
-    add_event(e);
+    e.wave = ALGO;
+    e.patch = 15;
+    e.midi_note = 60;
+    amy_add_event(e);
+    e.time = amy_sysclock() + 500;
+    e.osc = 8; // remember that an FM patch takes up 7 oscillators
+    e.midi_note = 64;
+    amy_add_event(e);
+    e.time = amy_sysclock() + 1000;
+    e.osc = 16;
+    e.midi_note = 68;
+    amy_add_event(e);
 
     // Now just spin forever 
     while(1) {

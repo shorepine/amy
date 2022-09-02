@@ -14,6 +14,7 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 }
 
 
+// TODO, take an optional arg for sound device ID
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     amy_live_start();
     return Py_None;

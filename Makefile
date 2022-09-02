@@ -16,7 +16,7 @@ HEADERS = $(wildcard src/*.h)
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-	LIBS += -L/opt/homebrew/lib -framework Cocoa -lstdc++ 
+	LIBS += -L/opt/homebrew/lib -lstdc++ 
 	CFLAGS += -I/opt/homebrew/include
 endif
 
@@ -32,6 +32,5 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
 
 clean:
-	-rm -f *.o
-	-rm -f amy/*.o
+	-rm -f src/*.o
 	-rm -f $(TARGET)

@@ -17,7 +17,6 @@ extern TaskHandle_t renderTask[2]; // one per core
 struct SoundIo *soundio;
 #endif
 
-uint8_t DEBUG = 0;
 
 // Global state 
 struct state global;
@@ -80,7 +79,7 @@ float freq_for_midi_note(uint8_t midi_note) {
 
 
 // Create a new default event -- mostly -1 or no change
-struct event default_event() {
+struct event amy_default_event() {
     struct event e;
     e.status = EMPTY;
     e.time = 0;
@@ -172,7 +171,7 @@ void add_delta_to_queue(struct delta d) {
 }
 
 
-void add_event(struct event e) {
+void amy_add_event(struct event e) {
     // make delta objects out of the UDP event and add them to the queue
     struct delta d;
     d.osc = e.osc;
@@ -284,7 +283,6 @@ int8_t oscs_init() {
     events = (struct delta*)malloc(sizeof(struct delta) * EVENT_FIFO_LEN);
     synth = (struct event*) malloc(sizeof(struct event) * OSCS);
     msynth = (struct mod_event*) malloc(sizeof(struct mod_event) * OSCS);
-    //for(uint8_t i=0;i<I2S_BUFFERS;i++) dbl_block[i] = (i2s_sample_type *) malloc(sizeof(i2s_sample_type) * BLOCK_SIZE);
 
     block = (i2s_sample_type *) malloc(sizeof(i2s_sample_type) * BLOCK_SIZE);//dbl_block[0];
     // Set all oscillators to their default values
@@ -362,7 +360,6 @@ void show_debug(uint8_t type) {
 
    
 void oscs_deinit() {
-    //for(uint8_t i=0;i<I2S_BUFFERS;i++) free(dbl_block[i]); 
     free(block);
     free(fbl[0]);
     free(fbl[1]);
@@ -479,7 +476,7 @@ void play_event(struct delta d) {
         else {
             // osc note off, start release
             synth[d.osc].note_on_clock = -1;
-            synth[d.osc].note_off_clock = total_samples; // esp_timer_get_time() / 1000;    
+            synth[d.osc].note_off_clock = total_samples;    
         }
     }
 
@@ -553,7 +550,7 @@ void render_task(uint8_t start, uint8_t end, uint8_t core) {
 }
 
 // On all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
-int64_t get_sysclock() {
+int64_t amy_sysclock() {
     return (int64_t)((total_samples / (float)SAMPLE_RATE) * 1000);
 }
 
@@ -750,6 +747,8 @@ void amy_live_start() {
 
 
 void amy_live_stop() {
+    // TODO, join the thread first!!!
+
     soundio_destroy(soundio);
 }
 
@@ -768,7 +767,7 @@ void decrease_volume() {
 // This takes scheduled events and plays them at the right time
 int16_t * fill_audio_buffer_task() {
     // Check to see which sounds to play 
-    int64_t sysclock = get_sysclock(); 
+    int64_t sysclock = amy_sysclock(); 
 
 #ifdef ESP_PLATFORM
     // put a mutex around this so that the mcastTask doesn't touch these while i'm running  
@@ -897,9 +896,8 @@ void amy_parse_message(char * message) {
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
-    struct event e = default_event();
-    int64_t sysclock = get_sysclock();
-    //uint8_t sync_response = 0;
+    struct event e = amy_default_event();
+    int64_t sysclock = amy_sysclock();
 
     // Cut the OSC cruft Max etc add, they put a 0 and then more things after the 0
     int new_length = length; 
@@ -907,8 +905,6 @@ void amy_parse_message(char * message) {
         if(message[d] == 0) { new_length = d; d = length + 1;  } 
     }
     length = new_length;
-
-    if(DEBUG)fprintf(stderr,"received message ###%s### len %d\n", message, length);
 
     while(c < length+1) {
         uint8_t b = message[c];
@@ -939,7 +935,6 @@ void amy_parse_message(char * message) {
             if(mode=='F') e.filter_freq=atof(message + start);
             if(mode=='G') e.filter_type=atoi(message + start);
             if(mode=='g') e.mod_target = atoi(message + start); 
-            //if(mode=='i') sync_index = atoi(message + start);
             if(mode=='I') e.ratio = atof(message + start);
             if(mode=='l') e.velocity=atof(message + start);
             if(mode=='L') e.mod_source=atoi(message + start);
@@ -949,9 +944,7 @@ void amy_parse_message(char * message) {
             if(mode=='O') parse_algorithm(&e, message+start);
             if(mode=='p') e.patch=atoi(message + start);
             if(mode=='P') e.phase=atof(message + start);
-            //if(mode=='r') ipv4=atoi(message + start);
             if(mode=='R') e.resonance=atof(message + start);
-            //if(mode=='s') sync = atol(message + start); 
             if(mode=='S') { 
                 uint8_t osc = atoi(message + start); 
                 if(osc > OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); }
@@ -980,16 +973,16 @@ void amy_parse_message(char * message) {
             // OK, so check for potentially negative numbers here (or really big numbers-sysclock) 
             int64_t potential_time = (e.time - computed_delta) + global.latency_ms;
             if(potential_time < 0 || (potential_time > sysclock + global.latency_ms + MAX_DRIFT_MS)) {
-                fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
+                //fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
                 computed_delta = e.time - sysclock;
-                fprintf(stderr,"computed delta now %lld\n", computed_delta);
+                //fprintf(stderr,"computed delta now %lld\n", computed_delta);
             }
             e.time = (e.time - computed_delta) + global.latency_ms;
         } else { // else play it asap 
             e.time = sysclock + global.latency_ms;
         }
         e.status = SCHEDULED;
-        add_event(e);
+        amy_add_event(e);
     }
 }
 

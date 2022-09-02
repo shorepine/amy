@@ -25,14 +25,17 @@ It supports
  * Control of overall gain and 3-band parametric EQ
  * Built in patches for PCM, FM and partials
  * Built-in clock for short term sequencing of events
- * Can use multi-core (including on ESP32 multicontrollers) for rendering if available
+ * Can use multi-core (including on ESP32 microcontrollers) for rendering if available
 
 The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
 
 The partial tone synthesizer also provides `partials.py`, where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py` to be able to `import libamy` in Python to generate audio signals. 
+## Using AMY in your software
 
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
+
+To run a simple C example, make sure `libsoundio` (`brew install libsoundio` or `apt-get install libsoundio`) is installed (to access audio output devices) and run `make`. 
 
 ## Controlling AMY
 
@@ -45,11 +48,11 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> m = amy.message(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
 >>> print(m) # Show the wire protocol message
 't76555951v0w8n50p30l1Z'
->>> amy.send(m)
+>>> amy.send_raw(m)
 >>> audio = amy.render(5.0)
 ```
 
-You can also start a thread playing live audio (uses libsoundio):
+You can also start a thread playing live audio (requires libsoundio):
 
 ```python
 >>> import amy
@@ -64,25 +67,26 @@ In C, using the high level structures directly:
 ```c
 #include "amy.h"
 void bleep() {
-    struct event e = default_event();
-    int64_t sysclock = get_sysclock();
+    struct event e = amy_default_event();
+    int64_t sysclock = amy_sysclock();
     e.time = sysclock;
     e.wave = SINE;
     e.freq = 220;
     e.velocity = 1;
-    add_event(e);
+    amy_add_event(e);
     e.time = sysclock + 150;
     e.freq = 440;
-    add_event(e);
+    amy_add_event(e);
     e.time = sysclock + 300;
     e.velocity = 0;
     e.amp = 0;
     e.freq = 0;
-    add_event(e);
+    amy_add_event(e);
 }
 
 void main() {
-    live_start(); // uses libsoundio to render live audio
+    amy_start(); // initializes amy 
+    amy_live_start(); // uses libsoundio to render live audio
     bleep();
 }
 ```
@@ -93,6 +97,7 @@ Or in C, sending the wire protocol directly:
 #include "amy.h"
 
 void main() {
+    amy_start();
     amy_live_start();
     amy_parse_message("t76555951v0w8n50p30l1Z");
 }
