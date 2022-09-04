@@ -19,6 +19,7 @@
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
+
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 // dx7
 #define MAX_BREAKPOINTS 8
@@ -33,7 +34,6 @@ typedef int16_t i2s_sample_type;
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.
 #define CLIP_D 0.1
-#define MAX_RECEIVE_LEN 512  // max length of each message
 #define MAX_VOLUME 11.0
 #define MINIMUM_SCALE 0.000190 // computed from TRUE_EXPONENTIAL's end point after a while 
 #define BREAKPOINT_EPS 0.0002
@@ -230,7 +230,8 @@ void amy_start();
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();
-void amy_reset_oscs() ;
+void amy_reset_oscs();
+void amy_print_devices(); 
 
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);

@@ -12,23 +12,15 @@ extern uint32_t message_counter;
 extern int16_t channel;
 extern int16_t device_id;
 
-extern void print_devices();
-char *raw_file;
 
 int main(int argc, char ** argv) {
     amy_start();
 
-    raw_file = (char*)malloc(sizeof(char)*1025);
-    raw_file[0] = 0;
-
     int opt;
-    while((opt = getopt(argc, argv, ":d:c:r:lgh")) != -1) 
+    while((opt = getopt(argc, argv, ":d:c:lh")) != -1) 
     { 
         switch(opt) 
         { 
-            case 'r': 
-                strcpy(raw_file, optarg);
-                break; 
             case 'd': 
                 device_id = atoi(optarg);
                 break;
@@ -36,7 +28,7 @@ int main(int argc, char ** argv) {
                 channel = atoi(optarg);
                 break; 
             case 'l':
-                print_devices();
+                amy_print_devices();
                 return 0;
                 break;
             case 'h':
@@ -60,23 +52,26 @@ int main(int argc, char ** argv) {
     
     // Play a few notes in FM
     struct event e = amy_default_event();
-    e.time = amy_sysclock();
+    int64_t start = amy_sysclock();
+    e.time = start;
     e.velocity = 1;
     e.wave = ALGO;
     e.patch = 15;
     e.midi_note = 60;
     amy_add_event(e);
-    e.time = amy_sysclock() + 500;
-    e.osc = 8; // remember that an FM patch takes up 7 oscillators
+
+    e.time = start + 500;
+    e.osc += 9; // remember that an FM patch takes up 9 oscillators
     e.midi_note = 64;
     amy_add_event(e);
-    e.time = amy_sysclock() + 1000;
-    e.osc = 16;
+    
+    e.time = start + 1000;
+    e.osc += 9;
     e.midi_note = 68;
     amy_add_event(e);
 
-    // Now just spin forever 
-    while(1) {
+    // Now just spin for 5s
+    while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
 

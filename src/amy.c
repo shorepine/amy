@@ -561,7 +561,7 @@ uint16_t leftover_samples = 0;
 int16_t channel = -1;
 int16_t device_id = -1;
 
-void print_devices() {
+void amy_print_devices() {
     struct SoundIo *soundio2 = soundio_create();
     soundio_connect(soundio2);
     soundio_flush_events(soundio2);
