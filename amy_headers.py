@@ -7,8 +7,7 @@ def generate_amy_pcm_header(sample_set, name, pcm_sample_rate=22050):
     import resampy
     import numpy as np
     import struct
-    # These are the indexes that we liked and fit into the flash on ESP32. 
-    # I've put them in the repo, but they were sourced from:
+    # These are the indexes that we liked and fit into the flash on ESP32. You can download the sf2 files here:
     # https://github.com/vigliensoni/soundfonts/blob/master/hs_tr808/HS-TR-808-Drums.sf2
     # https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/MuseScore_General.sf2
     fns = ( ("sounds/HS-TR-808-Drums.sf2", False), ('sounds/MuseScore_General.sf2', True))
@@ -20,7 +19,10 @@ def generate_amy_pcm_header(sample_set, name, pcm_sample_rate=22050):
     my_sample_counter = 0
     orig_map = {}
     for (fn, is_inst) in fns:
-        sf2 = Sf2File(open(fn, 'rb'))
+            sf2 = Sf2File(open(fn, 'rb'))
+        except:
+            print("For PCM patches, download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
+            return
         if is_inst:
             for i,inst in enumerate(sf2.instruments[:-1]):
                 b = inst.bags[int(len(inst.bags)/2)]
