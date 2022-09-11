@@ -1,6 +1,12 @@
 amy-example
 sounds/HS-TR-808-Drums.sf2
 sounds/MuseScore_General.sf2
+.DS_Store
+__pycache__/
+src/dist/
+src/libamy.egg-info/
+src/pcm_large.bin
+src/pcm_small.bin
 
 # Prerequisites
 *.d
