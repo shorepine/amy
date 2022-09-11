@@ -15,6 +15,7 @@
 #define BLOCK_SIZE 256       // buffer block size in samples
 #define AMY_CORES 2          // on ESP platform, use dual cores
 #define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
+#define PCM_PATCHES_SIZE_LARGE 1 // use the large PCM set (comment this out on flash constrained devices)
 
 #define DEFAULT_LATENCY_MS 0 // fixed default latency in milliseconds, can change
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store

@@ -136,11 +136,11 @@ O = algorithn source oscillators, choose which oscillators make up the algorithm
 p = patch, uint, choose a preloaded PCM sample, partial patch or FM patch number for FM waveforms. See fm.h, pcm.h, partials.h. default 0
 P = phase, float 0-1. where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0
 R = q factor / "resonance" of biquad filter. float. in practice, 0 to 10.0. default 0.7.
-S = reset oscillator, uint 0-63 or for all oscillators, anything >63, which also resets speaker gain and EQ.
+S = reset oscillator, uint 0-63 or for all oscillators, anything >63, which also resets gain and EQ.
 T = breakpoint0 target mask. Which parameter the breakpoints controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. Add 64 to indicate linear ramp, otherwise exponential
 t = time, int64: ms since some fixed start point on your host. you should always give this if you can.
 v = oscillator, uint, 0 to 63. default: 0
-V = volume, float 0 to about 10 in practice. volume knob for the entire synth / speaker. default 1.0
+V = volume, float 0 to about 10 in practice. volume knob for the entire synth. default 1.0
 w = waveform, uint: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE
 W = breakpoint1 target mask. 
 x = "low" EQ amount for the entire synth (Fc=800Hz). float, in dB, -15 to 15. 0 is off. default: 0
@@ -151,6 +151,17 @@ z = "high" EQ amount for the entire synth (Fc=7500Hz). float, in dB, -15 to 15. 
 ```
 
 # Synthesizer details
+
+We'll use Python for showing examples of AMY, make sure you've installed `libamy` and are running a live AMY first by 
+
+```bash
+$ cd src
+$ python setup.py install
+$ cd ..
+$ python
+>>> import amy
+>>> amy.live()
+```
 
 ## AMY and timestamps
 
@@ -240,7 +251,7 @@ You see we first set up the modulation oscillator (a saw wave at 0.5Hz, with amp
 
 ```python
 amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=0.25)
-amy.send(osc=0, wave=amy.PULSE, duty=0.5, freq=110, mod_source=1, mod_target=amy.TARGET_DUTY+alles.TARGET_FREQ)
+amy.send(osc=0, wave=amy.PULSE, duty=0.5, freq=110, mod_source=1, mod_target=amy.TARGET_DUTY+amy.TARGET_FREQ)
 amy.send(osc=0, vel=0.5)
 ```
 
@@ -352,7 +363,7 @@ Additive synthesis is simply adding together oscillators to make more complex to
 
 ![Partials](https://raw.githubusercontent.com/bwhitman/alles/main/pics/partials.png)
 
-We have analyzed the partials of a group of instruments and stored them as presets baked into the speaker. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
+We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
 
 ```python
 amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=5) # a nice organ tone
@@ -367,6 +378,7 @@ amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0) # no bandwidt
 amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0.5) # more bandwidth
 ```
 
+The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
 
 ```bash
 brew install python3 swig libsoundio ffmpeg
@@ -379,10 +391,11 @@ sudo make install
 cd ..
 ```
 
+And then in python:
 
 ```python
 import partials
-(m,s) = partials.sequence("sleepwalk.mp3")
+(m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
 109 partials and 1029 breakpoints, max oscs used at once was 8
 
 partials.play(s, amp_ratio=2, bw_ratio=0)
@@ -391,7 +404,7 @@ partials.play(s, amp_ratio=2, bw_ratio=0)
 https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4
 
 
-You can see, given any audio file, you can hear a sine wave decomposition version of it across Alles. This particular sound emitted 109 partials, with a total of 1029 breakpoints among them to play back to the mesh. Of those 109 partials, only 8 are active at once. `partials.sequence()` performs voice stealing to ensure we use as few oscillators as necessary to play back a set. 
+You can see, given any audio file, you can hear a sine wave decomposition version of in AMY. This particular sound emitted 109 partials, with a total of 1029 breakpoints among them to play back to the mesh. Of those 109 partials, only 8 are active at once. `partials.sequence()` performs voice stealing to ensure we use as few oscillators as necessary to play back a set. 
 
 There's a lot of parameters you can (and should!) play with in Loris. `partials.sequence`  and `partials.play`takes the following with their defaults:
 
@@ -414,7 +427,6 @@ def play(sequence, # from partials.sequence
                 pitch_ratio = 1, # frequency scale, 0.5 , half freq
                 amp_ratio = 1, # amplitude scale,
                 bw_ratio = 1, # bandwidth / noise scale
-                round_robin=True # play back one partial per speaker in a round robin
                 )
 ```
 
@@ -422,7 +434,7 @@ def play(sequence, # from partials.sequence
 
 ## PCM
 
-Alles comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the PCM sample bank using `amy_headers.py`. 
+AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the PCM sample bank using `amy_headers.py`. 
 
 
 ```python
