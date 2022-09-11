@@ -178,7 +178,6 @@ def stop():
     import libamy
     libamy.pause()
 
-
 """
     Convenience functions
 """

@@ -6,6 +6,8 @@
 
 
 struct SoundIo *soundio;
+struct SoundIoDevice *device;
+ struct SoundIoOutStream *outstream;
 int16_t leftover_buf[BLOCK_SIZE]; 
 uint16_t leftover_samples = 0;
 int16_t amy_channel = -1;
@@ -135,7 +137,7 @@ amy_err_t soundio_init() {
         return 1;
     }
 
-    struct SoundIoDevice *device = soundio_get_output_device(soundio, selected_device_index);
+    device = soundio_get_output_device(soundio, selected_device_index);
     if(amy_channel > device->layouts[0].channel_count-1) {
         printf("Requested channel number more than available, setting to -1\n");
         amy_channel = -1;
@@ -153,7 +155,7 @@ amy_err_t soundio_init() {
         return 1;
     }
 
-    struct SoundIoOutStream *outstream = soundio_outstream_create(device);
+    outstream = soundio_outstream_create(device);
     if (!outstream) {
         fprintf(stderr, "out of memory\n");
         return 1;
@@ -205,7 +207,10 @@ void amy_live_start() {
 void amy_live_stop() {
     amy_running = 0;
     pthread_join(amy_live_thread, NULL);
+    soundio_outstream_destroy(outstream);
+    soundio_device_unref(device);
     soundio_destroy(soundio);
+
 }
 
 #endif
