@@ -152,6 +152,28 @@ z = "high" EQ amount for the entire synth (Fc=7500Hz). float, in dB, -15 to 15. 
 
 # Synthesizer details
 
+## AMY and timestamps
+
+AMY is meant to receive messages in real time. It, on its own, is not a sequencer where you can schedule notes to play in the future. However, it does maintain a window of (configurable) 20 seconds in advance of its clock where events can be scheduled. This is very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
+
+For example, to play two notes, one a second after the first, you could do:
+
+```python
+amy.send(osc=0,note=50,vel=1)
+time.sleep(1)
+amy.send(osc=0,note=52,vel=1)
+```
+
+But you'd be at the mercy of Python's internal timing, or your OS. A more precise way is to send the messages at the same time, but to indicate the intended time of the playback:
+
+```python
+start = amy.millis() # arbitrary start timestamp
+amy.send(osc=0,note=50,vel=1,timestamp=start)
+amy.send(osc=0,note=52,vel=1,timestamp=start+1000)
+```
+
+Both `amy.send()`s will return immediately, but you'll hear the second note play precisely a second after the first. AMY uses this internal clock to schedule step changes in breakpoints as well. 
+
 
 ## Examples
 
@@ -272,16 +294,16 @@ You can set a completely separate breakpoints using the second and third breakpo
 Try default DX7 patches:
 
 ```python
-alles.send(wave=alles.ALGO,osc=0,patch=0,note=50,vel=1)
-alles.send(wave=alles.ALGO,osc=0,patch=1,note=50,vel=1)
+amy.send(wave=amy.ALGO,osc=0,patch=0,note=50,vel=1)
+amy.send(wave=amy.ALGO,osc=0,patch=1,note=50,vel=1)
 ```
 
 The `patch` lets you set which preset. It can be from 0 to 1024. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
 
 ```python
-alles.send(wave=alles.ALGO,osc=0,note=40,vel=1,ratio=0.5,patch=8) # half speed
-alles.send(wave=alles.ALGO,osc=0,note=40,vel=1,ratio=0.05,patch=8)  # reaaall sloooow
-alles.send(wave=alles.ALGO,osc=0,note=30,vel=1,ratio=0.1,patch=14) # love this one
+amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.5,patch=8) # half speed
+amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.05,patch=8)  # reaaall sloooow
+amy.send(wave=amy.ALGO,osc=0,note=30,vel=1,ratio=0.1,patch=590) 
 ```
 
 Let's make the classic FM bell tone ourselves, without a preset. We'll just be using two operators (two sine waves), one modulating the other. 
@@ -292,35 +314,35 @@ When building your own algorithm sets, assign a separate oscillator as wave=`ALG
 
 
 ```python
-alles.reset()
-alles.send(wave=alles.SINE,ratio=0.2,amp=0.1,osc=0,bp0_target=alles.TARGET_AMP,bp0="1000,0,0,0")
-alles.send(wave=alles.SINE,ratio=1,amp=1,osc=1)
-alles.send(wave=alles.ALGO,algorithm=0,algo_source="-1,-1,-1,-1,1,0",osc=2)
+amy.reset()
+amy.send(wave=amy.SINE,ratio=0.2,amp=0.1,osc=0,bp0_target=amy.TARGET_AMP,bp0="1000,0,0,0")
+amy.send(wave=amy.SINE,ratio=1,amp=1,osc=1)
+amy.send(wave=amy.ALGO,algorithm=1,algo_source="-1,-1,-1,-1,1,0",osc=2)
 ```
 
-Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1 (but we count from 0, so it's algorithm 0). And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operators 2 and 1, and have oscillator 1 modulate oscillator 0. 
+Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operators 2 and 1, and have oscillator 1 modulate oscillator 0. 
 
 What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator and the base note. So oscillator 0 will be played a 20% of the base note, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using a breakpoint. That's key to the "bell ringing out" effect. 
 
 Ok, we've set up the oscillators. Now, let's hear it!
 
 ```python
-alles.send(osc=2, note=60, vel=3)
+amy.send(osc=2, note=60, vel=3)
 ```
 
 You should hear a bell-like tone. Nice. Another classic two operator tone is to instead modulate the higher tone with the lower one, to make a filter sweep. Let's do it over 5 seconds.
 
 ```python
-alles.reset()
-alles.send(osc=0,ratio=0.2,amp=0.5,bp0_target=alles.TARGET_AMP,bp0="0,0,5000,1,0,0")
-alles.send(osc=1,ratio=1)
-alles.send(osc=2,algorithm=0,wave=alles.ALGO,algo_source="-1,-1,-1,-1,0,1")
+amy.reset()
+amy.send(osc=0,ratio=0.2,amp=0.5,bp0_target=amy.TARGET_AMP,bp0="0,0,5000,1,0,0")
+amy.send(osc=1,ratio=1)
+amy.send(osc=2,algorithm=1,wave=amy.ALGO,algo_source="-1,-1,-1,-1,0,1")
 ```
 
 Just a refresher on breakpoints; here we are saying to set the beta parameter (amplitude of the modulating tone) to 0.5 but have it start at 0 at time 0, then be at 1.0x of 0.5 (so, 0.5) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
 
 ```python
-alles.send(osc=2,vel=2,note=50)
+amy.send(osc=2,vel=2,note=50)
 ```
 
 
@@ -333,16 +355,16 @@ Additive synthesis is simply adding together oscillators to make more complex to
 We have analyzed the partials of a group of instruments and stored them as presets baked into the speaker. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
 
 ```python
-alles.send(osc=0,vel=1,note=50,wave=alles.PARTIALS,patch=5) # a nice organ tone
-alles.send(osc=0,vel=1,note=55,wave=alles.PARTIALS,patch=5) # change the frequency
-alles.send(osc=0,vel=1,note=50,wave=alles.PARTIALS,patch=6,ratio=0.2) # ratio slows down the partial playback
+amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=5) # a nice organ tone
+amy.send(osc=0,vel=1,note=55,wave=amy.PARTIALS,patch=5) # change the frequency
+amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,ratio=0.2) # ratio slows down the partial playback
 ```
 
 Our partial breakpoint analyzer also emits "noise-excited bandwidth enhancement", which means it tries to emulate tones that are hard to generate with sine waves alone by modulating the amplitude of a sine wave with a filtered noise signal. You can try that out on the patches by adding `feedback`, like so:
 
 ```python
-alles.send(osc=0,vel=1,note=50,wave=alles.PARTIALS,patch=6,feedback=0) # no bandwidth
-alles.send(osc=0,vel=1,note=50,wave=alles.PARTIALS,patch=6,feedback=0.5) # more bandwidth
+amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0) # no bandwidth
+amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0.5) # more bandwidth
 ```
 
 
@@ -404,17 +426,17 @@ Alles comes with a set of 67 drum-like and instrument PCM samples to use as well
 
 
 ```python
-alles.send(osc=0, wave=alles.PCM, vel=1, patch=10) # cowbell
-alles.send(osc=0, wave=alles.PCM, vel=1, patch=10, note=70) # higher cowbell! 
+amy.send(osc=0, wave=amy.PCM, vel=1, patch=10) # cowbell
+amy.send(osc=0, wave=amy.PCM, vel=1, patch=10, note=70) # higher cowbell! 
 ```
 
 You can turn on sample looping, helpful for instruments, using `feedback`:
 
 ```python
-alles.send(wave=alles.PCM,vel=1,patch=21,feedback=0) # clean guitar string, no looping
-alles.send(wave=alles.PCM,vel=1,patch=21,feedback=1) # loops forever until note off
-alles.send(vel=0) # note off
-alles.send(wave=alles.PCM,vel=1,patch=35,feedback=1) # nice violin
+amy.send(wave=amy.PCM,vel=1,patch=21,feedback=0) # clean guitar string, no looping
+amy.send(wave=amy.PCM,vel=1,patch=21,feedback=1) # loops forever until note off
+amy.send(vel=0) # note off
+amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 ```
 
 
