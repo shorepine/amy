@@ -69,7 +69,7 @@ float render_lut_fm_osc(float * buf, float phase, float step, float incoming_amp
     float past1 = last_two[1];
     for(uint16_t i=0;i<BLOCK_SIZE;i++) {
         float scaled_phase = lut_size *
-	  (phase + mod[i] + feedback_level * (past1 + past0) /2.0f);
+      (phase + mod[i] + feedback_level * (past1 + past0) /2.0f);
         int base_index = (int)scaled_phase;
         float frac = scaled_phase - base_index;
         float b = lut[base_index & lut_mask];
@@ -438,7 +438,7 @@ void render_sine(float * buf, uint8_t osc) {
 
     float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
     synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, msynth[osc].amp, 
-				 synth[osc].lut, synth[osc].lut_size);
+                 synth[osc].lut, synth[osc].lut_size);
     synth[osc].last_amp = msynth[osc].amp;
     //printf("sysclock %d amp %f\n", get_sysclock(), msynth[osc].amp);
 }

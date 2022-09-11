@@ -48,7 +48,7 @@ float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
     if(bp_r<0) {
         float scale = 1;
         if(synth[osc].note_off_clock >= 0) scale = 0;
-    	synth[osc].last_scale[bp_set] = scale;
+        synth[osc].last_scale[bp_set] = scale;
         return scale; 
     }// no breakpoints
 
@@ -61,9 +61,9 @@ float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
         // We didn't find anything, so set it to the one before bp_r
         if(found<0) {
             found = bp_r - 1; // sustain
-    	    float scale = synth[osc].breakpoint_values[bp_set][found];
-	        synth[osc].last_scale[bp_set] = scale;
-	        return scale;
+            float scale = synth[osc].breakpoint_values[bp_set][found];
+            synth[osc].last_scale[bp_set] = scale;
+            return scale;
         }
     } else if(synth[osc].note_off_clock >= 0) {
         release = 1;
@@ -72,8 +72,8 @@ float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
         found = bp_r;
         int8_t bp_rx = 0;
         t0 = 0; // start the elapsed clock again
-    	// Release starts from wherever we got to
-	    v0 = synth[osc].last_scale[bp_set];
+        // Release starts from wherever we got to
+        v0 = synth[osc].last_scale[bp_set];
         if(elapsed > synth[osc].breakpoint_times[bp_set][bp_r]) {
             // are there multiple bp_sets? only turn off the note if it's the last one
             int32_t my_bt = synth[osc].breakpoint_times[bp_set][bp_r];
@@ -84,27 +84,27 @@ float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
                     bp_rx = 0; while(synth[osc].breakpoint_times[test_bp_set][bp_rx] >= 0 && bp_rx < MAX_BREAKPOINTS) bp_rx++; bp_rx--;
                     if(bp_rx >= 0) {
                         // If my breakpoint time is less than another breakpoint time from a different set, return 1.0 and don't end the note
-        		        if(my_bt < synth[osc].breakpoint_times[test_bp_set][bp_rx]) {
-                			float scale = 1;
-                			synth[osc].last_scale[bp_set] = scale;
-                			return scale;
-		                  }
-        		    }
+                        if(my_bt < synth[osc].breakpoint_times[test_bp_set][bp_rx]) {
+                            float scale = 1;
+                            synth[osc].last_scale[bp_set] = scale;
+                            return scale;
+                          }
+                    }
                 }
             }
             // OK. partials (et al) need a frame to fade out to avoid clicks. This is in conflict with the breakpoint release, 
             // which will set it to the bp end value before the fade out, often 0 so the fadeout never gets to hit. 
             // I'm not sure i love this solution, but PARTIAL is such a weird type that i guess having it called out like this is fine.
-    	    if(synth[osc].wave==PARTIAL) {
+            if(synth[osc].wave==PARTIAL) {
                 float scale = 1;
                 synth[osc].last_scale[bp_set] = scale;
                 return scale;
-    	    }
+            }
             synth[osc].status=OFF;
             synth[osc].note_off_clock = -1;
             float scale = synth[osc].breakpoint_values[bp_set][bp_r];
-	        synth[osc].last_scale[bp_set] = scale;
-    	    return scale;
+            synth[osc].last_scale[bp_set] = scale;
+            return scale;
         }
     }
 
@@ -125,7 +125,7 @@ float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
         float time_ratio = ((float)(elapsed - t0) / (float)(t1 - t0));
         // Compute scale based on which type we have
         if(synth[osc].breakpoint_target[bp_set] & TARGET_LINEAR) {
-	        scale = v0 + ((v1-v0) * time_ratio);
+            scale = v0 + ((v1-v0) * time_ratio);
         } else if(synth[osc].breakpoint_target[bp_set] & TARGET_TRUE_EXPONENTIAL) {
             v0 = MAX(v0, BREAKPOINT_EPS);
             v1 = MAX(v1, BREAKPOINT_EPS);

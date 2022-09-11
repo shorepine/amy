@@ -282,7 +282,7 @@ def generate_all():
 
 
 def main():
-    print("Generating all headers needed for AMY...")
+    print("Generating all headers needed for AMY (except for partials patches, see partials.py if you want to DIY...")
     generate_all()
     print("Done.")
 
