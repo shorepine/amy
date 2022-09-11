@@ -229,9 +229,11 @@ def make_clipping_lut(filename):
 
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// Clipping lookup table\n")
-        f.write("#define LIN_MAX %d\n" % LIN_MAX)
+        f.write("#ifndef __CLIPPING_TABLE\n#define __CLIPPING_TABLE\n")
+        f.write("#define FIRST_NONLIN %d\n" % LIN_MAX)
         f.write("#define NONLIN_RANGE %d\n" % NONLIN_RANGE)
-        f.write("#define NONLIN_MAX (LIN_MAX + NONLIN_RANGE)\n")
+        f.write("// First sample value beyond end of table (just clip to max).\n")
+        f.write("#define FIRST_HARDCLIP (FIRST_NONLIN + NONLIN_RANGE)\n")
         f.write("const uint16_t clipping_lookup_table[NONLIN_RANGE] = {\n")
         samples_per_row = 8
         for row_start in range(0, NONLIN_RANGE, samples_per_row):
@@ -239,6 +241,7 @@ def make_clipping_lut(filename):
                 f.write("%d," % clipping_lookup_table[LIN_MAX + sample])
             f.write("\n")
         f.write("};\n")
+        f.write("#endif\n")
     print("wrote", filename)
 
 
