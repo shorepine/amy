@@ -35,7 +35,7 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
 
-To run a simple C example, make sure `libsoundio` (`brew install libsoundio` or `apt-get install libsoundio`) is installed (to access audio output devices) and run `make`. 
+To run a simple C example, make sure `libsoundio` (`brew install libsoundio` or `apt-get install libsoundio`) is installed (to access audio output devices) and run `make`. Then run `./amy-example`. 
 
 ## Controlling AMY
 
