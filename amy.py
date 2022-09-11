@@ -169,11 +169,15 @@ def render(seconds):
 
 
 # Starts a live mode, with audio playing out default sounddevice
+def start():
+    live()
 def live():
     import libamy
     libamy.live()
 
 # Stops live mode
+def pause():
+    stop()
 def stop():
     import libamy
     libamy.pause()
