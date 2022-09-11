@@ -2,44 +2,12 @@
 # Some code to try to convert dx7 patches into AMY commands
 # Use the dx7 module if you want to A/B test AMY's FM mode against a dx7 emulation.
 # Get the dx7 module from https://github.com/bwhitman/learnfm
-import amy, dx7
+import amy
 import numpy as np
 import time
 
 from dataclasses import dataclass
 from typing import List
-
-""" Howto
-
-# git clone https://github.com/bwhitman/alles.git
-# git clone https://github.com/bwhitman/learnfm.git
-# cd learnfm/dx7core
-# [edit line 129 of learnfm/dx7core/pydx7.cc to point to the folder you cloned learnfm into for compact.bin]
-# make
-# python setup.py install
-
-    [ If you get an error and are on an older macOS, try:
-    ARCHFLAGS="-arch x86_64" python setup.py install  ]
-
-# cd ../../alles/main
-
-    [ install homebrew if you haven't yet:
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ] 
-
-# brew install libsoundio
-# make
-# ./alles -i 127.0.0.1 [you should hear the alles bleep, if not, change your speaker settings]
-# [open a new terminal]
-# python
->>> import fm
->>> fm.alles.connect(local_ip='127.0.0.1')
->>> fm.play_patch(234) # any number up to 31000
-# You should hear Alles play it, then Raph L play it
-# Or, you can grab a patch and modify it
->>> piano = fm.DX7Patch.from_patch_number(29978)
->>> piano.algo = 2 # change DX7 algorithm from 5 to 2 
->>> fm.play_patch(piano) # plays modified patch on both types
-"""
 
 @dataclass
 class DX7Operator:
@@ -212,7 +180,7 @@ class AMYPatch:
     lfo_ampmoddepth: float = 0
     lfo_waveform: int = 0
     name: str = ""
-    exp_type: float = alles.TARGET_DX7_EXPONENTIAL
+    exp_type: float = amy.TARGET_DX7_EXPONENTIAL
     amp_lfo_amp: float = 0 
     pitch_lfo_amp: float = 0
 
@@ -239,9 +207,9 @@ class AMYPatch:
     
     def send_to_AMY(self):
         # Take a FM patch and output AMY commands to set up the patch.
-        # Send alles.send(vel=0,osc=6,note=50) after
+        # Send amy.send(vel=0,osc=6,note=50) after
     
-        alles.reset()
+        amy.reset()
         pitch_levels, pitch_times = self.pitch_levels, self.pitch_times
         pitchbp = "%d,%f,%d,%f,%d,%f,%d,%f,%d,%f" % (
             pitch_times[0], pitch_levels[0], pitch_times[1], pitch_levels[1],
@@ -269,7 +237,7 @@ class AMYPatch:
 
             # Make them all in cosine phase, to be like DX7.  Important for slow oscs
             args = {"osc":i,
-                    "bp0_target":alles.TARGET_AMP+alles.TARGET_DX7_EXPONENTIAL,
+                    "bp0_target":amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
                     "bp0":oscbp, "amp":osc.op_amp, "phase":0.25}
             if osc.freq_is_ratio:
                 args["ratio"] = osc.frequency
@@ -277,24 +245,24 @@ class AMYPatch:
                 args["freq"] = osc.frequency
             if(osc.ampmodsens > 0):
                 # TODO: we ignore intensity of amp mod sens, just on/off
-                args.update({"mod_source": 7, "mod_target":alles.TARGET_AMP})
+                args.update({"mod_source": 7, "mod_target":amy.TARGET_AMP})
 
             # We are _NOT_ updating operators with pitch bp, per dan tuesday 7/5 morning (but not monday 7/4 morning)
             #args.update({"bp1": pitchbp,
-            #             "bp1_target": alles.TARGET_FREQ+alles.TARGET_TRUE_EXPONENTIAL})
+            #             "bp1_target": amy.TARGET_FREQ+amy.TARGET_TRUE_EXPONENTIAL})
 
-            alles.send(**args)
+            amy.send(**args)
 
         # Set up the amp LFO 
         print("osc 7 amp lfo wave %d freq %f amp %f" % (
             self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
-        alles.send(osc=7, wave=self.lfo_waveform, freq=self.lfo_freq,
+        amy.send(osc=7, wave=self.lfo_waveform, freq=self.lfo_freq,
                    amp=self.amp_lfo_amp)
 
         # and the pitch one
         print("osc 8 pitch lfo wave %d freq %f amp %f" % (
             self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
-        alles.send(osc=8, wave=self.lfo_waveform, freq=self.lfo_freq,
+        amy.send(osc=8, wave=self.lfo_waveform, freq=self.lfo_freq,
                    amp=self.pitch_lfo_amp)
 
         print("not used: lfo delay %d " % self.lfo_delay)
@@ -302,11 +270,11 @@ class AMYPatch:
         ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
         print("osc 6 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
             self.algo, self.feedback, pitchbp, ampbp))
-        alles.send(osc=6, wave=alles.ALGO, algorithm=self.algo, feedback=self.feedback,
+        amy.send(osc=6, wave=amy.ALGO, algorithm=self.algo, feedback=self.feedback,
                    algo_source="0,1,2,3,4,5",
-                   bp0=ampbp, bp0_target=alles.TARGET_AMP+alles.TARGET_DX7_EXPONENTIAL,
-                   bp1=pitchbp, bp1_target=alles.TARGET_FREQ+alles.TARGET_TRUE_EXPONENTIAL,
-                   mod_target=alles.TARGET_FREQ, mod_source=8)
+                   bp0=ampbp, bp0_target=amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
+                   bp1=pitchbp, bp1_target=amy.TARGET_FREQ+amy.TARGET_TRUE_EXPONENTIAL,
+                   mod_target=amy.TARGET_FREQ, mod_source=8)
 
 def dx7level_to_linear(dx7level):
     """Map the dx7 0..99 levels to linear amplitude."""
@@ -337,12 +305,12 @@ def ratio_to_pitchval(ratio):
 
 def calc_loglin_eg_breakpoints(rates, levels, dx7_attacks=True, 
                                rate_double_interval=6, rate_scale=0.5, rate_offset=0.5):
-    """Convert the DX7 rates/levels into (time, target) pairs (for alles)"""
+    """Convert the DX7 rates/levels into (time, target) pairs (for amy)"""
     if dx7_attacks:
         level_to_lin_fn = dx7level_to_linear
     else:
         level_to_lin_fn = pitchval_to_ratio
-    # This is the part we precompute in fm.py to get breakpoints to send to alles.
+    # This is the part we precompute in fm.py to get breakpoints to send to amy.
     current_level = levels[-1]
     cumulated_time = 0
     breakpoints = [(cumulated_time, level_to_lin_fn(current_level))]
@@ -371,7 +339,7 @@ def calc_loglin_eg_breakpoints(rates, levels, dx7_attacks=True,
             t0 = level_to_attack_time(effective_start_level, t_const)
             segment_duration = level_to_attack_time(target_level, t_const) - t0
             #print("eff_st=", effective_start_level, "t_c=", t_const, "t0=", t0, "dur=", segment_duration)
-            # Now alles's task will be to recover t0 and t_const from (time, target) pairs
+            # Now amy's task will be to recover t0 and t_const from (time, target) pairs
         else:
             # Decay segment, or TRUE_EXPONENTIAL attack segment.
             direction = 1 if target_level > current_level else -1
@@ -432,8 +400,8 @@ def lfo_wave(byte):
     if byte > 5:
         return None
     return [
-        alles.TRIANGLE, alles.SAW_DOWN, alles.SAW_UP, 
-        alles.PULSE, alles.SINE, alles.NOISE
+        amy.TRIANGLE, amy.SAW_DOWN, amy.SAW_UP, 
+        amy.PULSE, amy.SINE, amy.NOISE
     ][byte]
 
 
@@ -476,7 +444,7 @@ def tx802_patch(patch_data):
 
 
 # Play a numpy array on a mac without having to use an external library
-def play_np_array(np_array, samplerate=alles.SAMPLE_RATE):
+def play_np_array(np_array, samplerate=amy.SAMPLE_RATE):
     import wave, tempfile , os, struct
     tf = tempfile.NamedTemporaryFile()
     obj = wave.open(tf,'wb')
@@ -517,18 +485,18 @@ def play_patch(patch, midinote=50, length_s = 4, keyup_s = 2, vel=2):
     print("AMY:")
     p.send_to_AMY()
 
-    alles.send(osc=6,vel=vel,note=midinote,timestamp=alles.millis())
-    alles.send(osc=6,vel=0,timestamp=alles.millis() + (length_s-keyup_s)*1000)
+    amy.send(osc=6,vel=vel,note=midinote,timestamp=amy.millis())
+    amy.send(osc=6,vel=0,timestamp=amy.millis() + (length_s-keyup_s)*1000)
     # Catch up to latency
-    time.sleep(length_s + alles.ALLES_LATENCY_MS/1000)
-    alles.reset()
+    time.sleep(length_s + amy.AMY_LATENCY_MS/1000)
+    amy.reset()
     time.sleep(0.5)
     # Render Raph
     print("MSFA:")
     them_samples = dx7_render(dx7_patch.get_bytestream(),
                               midinote, 90,
-                              int(length_s*alles.SAMPLE_RATE),
-                              int(keyup_s*alles.SAMPLE_RATE))
+                              int(length_s*amy.SAMPLE_RATE),
+                              int(keyup_s*amy.SAMPLE_RATE))
     play_np_array(them_samples)
 
 
@@ -556,7 +524,7 @@ def generate_fm_header(patch_nums=None):
             all_patches.append(p)
     pitch_fix = 0
     amp_fix = 0
-    out = open("main/amy/fm.h", "w")
+    out = open("src/fm.h", "w")
     out.write("// Automatically generated by fm.generate_fm_header()\n#ifndef __FM_H\n#define __FM_H\n#define ALGO_PATCHES %d\n" % (len(all_patches)))
     out.write("const algorithms_parameters_t fm_patches[ALGO_PATCHES] = {\n")
     for idx, p in enumerate(all_patches):
@@ -572,7 +540,7 @@ def generate_fm_header(patch_nums=None):
             p.lfo_freq, p.lfo_waveform, p.amp_lfo_amp, p.pitch_lfo_amp))
         for i, osc in enumerate(p.oscs):
             if osc.ampmodsens > 0:
-                lfo_target = alles.TARGET_AMP
+                lfo_target = amy.TARGET_AMP
             else:
                 lfo_target = 0
             if osc.freq_is_ratio:

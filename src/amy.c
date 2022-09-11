@@ -6,15 +6,11 @@
 #include "amy.h"
 #include "clipping_lookup_table.h"
 
-// TODO -- refactor this to make this not so reliant, maybe a callback for rendering
+
 #ifdef ESP_PLATFORM
+// Defined in amy-example-esp32
 extern SemaphoreHandle_t xQueueSemaphore;
-extern TaskHandle_t renderTask[2]; // one per core
-#else
-// Local rendering
-#include <soundio/soundio.h>
-#include <pthread.h>
-struct SoundIo *soundio;
+extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 #endif
 
 
@@ -29,10 +25,10 @@ struct mod_event * msynth;
 
 // Two float mixing blocks, one per core of rendering
 float ** fbl;
-float per_osc_fb[2][BLOCK_SIZE];
+float per_osc_fb[AMY_CORES][BLOCK_SIZE];
 
-// block -- what gets sent to the DAC -- -32768...32767 (wave file, int16 LE)
-i2s_sample_type * block;
+// block -- what gets sent to the DAC -- -32768...32767 (int16 LE)
+output_sample_type * block;
 int64_t total_samples;
 uint32_t event_counter ;
 uint32_t message_counter ;
@@ -284,7 +280,7 @@ int8_t oscs_init() {
     synth = (struct event*) malloc(sizeof(struct event) * OSCS);
     msynth = (struct mod_event*) malloc(sizeof(struct mod_event) * OSCS);
 
-    block = (i2s_sample_type *) malloc(sizeof(i2s_sample_type) * BLOCK_SIZE);//dbl_block[0];
+    block = (output_sample_type *) malloc(sizeof(output_sample_type) * BLOCK_SIZE);//dbl_block[0];
     // Set all oscillators to their default values
     amy_reset_oscs();
 
@@ -321,9 +317,6 @@ int8_t oscs_init() {
 
 
 void show_debug(uint8_t type) { 
-#ifdef ESP_PLATFORM
-    esp_show_debug(type);
-#endif
     if(type>1) {
         struct delta * ptr = global.event_start;
         uint16_t q = global.event_qsize;
@@ -555,205 +548,6 @@ int64_t amy_sysclock() {
 }
 
 
-#ifndef ESP_PLATFORM
-int16_t leftover_buf[BLOCK_SIZE]; 
-uint16_t leftover_samples = 0;
-int16_t channel = -1;
-int16_t device_id = -1;
-
-void amy_print_devices() {
-    struct SoundIo *soundio2 = soundio_create();
-    soundio_connect(soundio2);
-    soundio_flush_events(soundio2);
-
-    int output_count = soundio_output_device_count(soundio2);
-    int default_output = soundio_default_output_device_index(soundio2);
-    for (int i = 0; i < output_count; i += 1) {
-        struct SoundIoDevice *device = soundio_get_output_device(soundio2, i);
-        const char *default_str = (i==default_output) ? " (default)" : "";
-        const char *raw_str = device->is_raw ? " (raw)" : "";
-        int chans = device->layouts[0].channel_count;
-        fprintf(stderr,"[%d]\t%s%s%s\t%d output channels\n", i, device->name, default_str, raw_str, chans);
-        soundio_device_unref(device);
-    }
-}
-
-static void soundio_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max) {
-    const struct SoundIoChannelLayout *layout = &outstream->layout;
-    struct SoundIoChannelArea *areas;
-    int err;
-
-
-    int frame_count = frame_count_max; // on mac they're always the same. on linux i guess it doesn't matter to choose max
-    if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count))) {
-        fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
-        exit(1);
-    }
-
-    // Different audio devices on mac have wildly different frame_count_maxes, so we have to be ok with 
-    // an audio buffer that is not an even multiple of BLOCK_SIZE. my iMac's speakers were always 512 frames, but
-    // external headphones on a MBP is 432 or 431, and airpods were something like 1440.
-
-    // First send over the leftover samples, if any
-    for(uint16_t frame=0;frame<leftover_samples;frame++) {
-        for(uint8_t c=0;c<layout->channel_count;c++) {
-            if(c==channel || channel<0) {
-                *((int16_t*)areas[c].ptr) = leftover_buf[frame];
-            } else {
-                *((int16_t*)areas[c].ptr) = 0;
-            }
-            areas[c].ptr += areas[c].step;
-        }
-    }
-    frame_count -= leftover_samples;
-    leftover_samples = 0;
-
-    // Now send the bulk of the frames
-    for(uint8_t i=0;i<(uint8_t)(frame_count / BLOCK_SIZE);i++) {
-        int16_t *buf = fill_audio_buffer_task();
-        for(uint16_t frame=0;frame<BLOCK_SIZE;frame++) {
-            for(uint8_t c=0;c<layout->channel_count;c++) {
-                if(c==channel || channel < 0) {
-                    *((int16_t*)areas[c].ptr) = buf[frame];
-                } else {
-                    *((int16_t*)areas[c].ptr) = 0;
-                }
-                areas[c].ptr += areas[c].step;
-            }
-        }
-    } 
-
-    // If any leftover, let's put those in the outgoing buf and the rest in leftover_samples
-    uint16_t still_need = frame_count % BLOCK_SIZE;
-    if(still_need != 0) {
-        int16_t * buf = fill_audio_buffer_task();
-        for(uint16_t frame=0;frame<still_need;frame++) {
-            for(uint8_t c=0;c<layout->channel_count;c++) {
-                if(c==channel || channel < 0) {
-                    *((int16_t*)areas[c].ptr) = buf[frame];
-                } else {
-                    *((int16_t*)areas[c].ptr) = 0;
-                }
-                areas[c].ptr += areas[c].step;
-            }
-        }
-        memcpy(leftover_buf, buf+still_need, (BLOCK_SIZE - still_need)*2);
-        leftover_samples = BLOCK_SIZE - still_need;
-    }
-    if ((err = soundio_outstream_end_write(outstream))) {
-        if (err == SoundIoErrorUnderflow)
-            return;
-        fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
-        exit(1);
-    }
-}
-
-static void underflow_callback(struct SoundIoOutStream *outstream) {
-    static int count = 0;
-    fprintf(stderr, "underflow %d\n", count++);
-}
-
-// start soundio
-amy_err_t soundio_init() {
-    soundio = soundio_create();
-    if (!soundio) {
-        fprintf(stderr, "out of memory\n");
-        return 1;
-    }
-    int err = soundio_connect(soundio);
-    if (err) {
-        fprintf(stderr, "Unable to connect to backend: %s\n", soundio_strerror(err));
-        return 1;
-    }
-
-    soundio_flush_events(soundio);
-    int selected_device_index;
-    if(device_id < 0)  {
-        selected_device_index = soundio_default_output_device_index(soundio);
-    } else {
-        selected_device_index = device_id;
-    }
-
-
-    if (selected_device_index < 0) {
-        fprintf(stderr, "Output device not found\n");
-        return 1;
-    }
-
-    struct SoundIoDevice *device = soundio_get_output_device(soundio, selected_device_index);
-    if(channel > device->layouts[0].channel_count-1) {
-        printf("Requested channel number more than available, setting to -1\n");
-        channel = -1;
-    }
-    if (!device) {
-        fprintf(stderr, "out of memory\n");
-        return 1;
-    } else {
-        const char *all_str = (channel<0) ? " (all)" : "";
-        fprintf(stderr,"Using device ID %d, device %s, channel %d %s\n", selected_device_index, device->name, channel, all_str);
-    }
-
-    if (device->probe_error) {
-        fprintf(stderr, "Cannot probe device: %s\n", soundio_strerror(device->probe_error));
-        return 1;
-    }
-
-    struct SoundIoOutStream *outstream = soundio_outstream_create(device);
-    if (!outstream) {
-        fprintf(stderr, "out of memory\n");
-        return 1;
-    }
-
-    outstream->write_callback = soundio_callback;
-    outstream->underflow_callback = underflow_callback;
-    outstream->name = NULL;
-    outstream->software_latency = 0.0;
-    outstream->sample_rate = SAMPLE_RATE;
-
-    if (soundio_device_supports_format(device, SoundIoFormatS16NE)) {
-        outstream->format = SoundIoFormatS16NE;
-    } else {
-        fprintf(stderr, "No suitable device format available.\n");
-        return 1;
-    }
-    
-    if ((err = soundio_outstream_open(outstream))) {
-        fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
-        return 1;
-    }
-    if (outstream->layout_error)
-        fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(outstream->layout_error));
-
-    if ((err = soundio_outstream_start(outstream))) {
-        fprintf(stderr, "unable to start device: %s\n", soundio_strerror(err));
-        return 1;
-    }
-    return AMY_OK;
-}
-
-void *soundio_run(void *vargp) {
-    soundio_init();
-    for(;;) {
-        soundio_flush_events(soundio);
-        usleep(THREAD_USLEEP);
-    }
-}
-
-void amy_live_start() {
-    // kick off a thread running soundio_run
-    pthread_t thread_id;
-    pthread_create(&thread_id, NULL, soundio_run, NULL);
-}
-
-
-void amy_live_stop() {
-    // TODO, join the thread first!!!
-
-    soundio_destroy(soundio);
-}
-
-#endif // ifndef ESP_PLATFORM
-
 void increase_volume() {
     global.volume += 0.5;
     if(global.volume > MAX_VOLUME) global.volume = MAX_VOLUME;    
@@ -770,7 +564,7 @@ int16_t * fill_audio_buffer_task() {
     int64_t sysclock = amy_sysclock(); 
 
 #ifdef ESP_PLATFORM
-    // put a mutex around this so that the mcastTask doesn't touch these while i'm running  
+    // put a mutex around this so that the event parser doesn't touch these while i'm running  
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
 
@@ -785,15 +579,15 @@ int16_t * fill_audio_buffer_task() {
     // Give the mutex back
     xSemaphoreGive(xQueueSemaphore);
 
-    //gpio_set_level(CPU_MONITOR_1, 1);
     // Tell the rendering threads to start rendering
-    xTaskNotifyGive(renderTask[0]);
-    xTaskNotifyGive(renderTask[1]);
+    xTaskNotifyGive(amy_render_handle[0]);
+    if(AMY_CORES == 2) xTaskNotifyGive(amy_render_handle[1]);
 
     // And wait for each of them to come back
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-    ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+    if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 #else
+    // TODO -- there's no reason we can't multicore render on other platforms
     render_task(0, OSCS, 0);        
 #endif
 
@@ -851,15 +645,15 @@ int32_t ms_to_samples(int32_t ms) {
 void parse_algorithm(struct event * e, char *message) {
     uint8_t idx = 0;
     uint16_t c = 0;
-    uint16_t stop = MAX_RECEIVE_LEN;
-    for(uint16_t i=0;i<MAX_RECEIVE_LEN;i++) {
-        if(message[i] >= 'A' || message[i] == 0) { stop =i; i = MAX_RECEIVE_LEN; }
+    uint16_t stop = MAX_MESSAGE_LEN;
+    for(uint16_t i=0;i<MAX_MESSAGE_LEN;i++) {
+        if(message[i] >= 'A' || message[i] == 0) { stop =i; i = MAX_MESSAGE_LEN; }
     }
     while(c < stop) {
         if(message[c]!=',') {
             e->algo_source[idx] = atoi(message+c);
         }
-        while(message[c]!=',' && message[c]!=0 && c < MAX_RECEIVE_LEN) c++;
+        while(message[c]!=',' && message[c]!=0 && c < MAX_MESSAGE_LEN) c++;
         c++; idx++;
     }
 
@@ -874,9 +668,9 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
         e->breakpoint_times[which_bpset][i] = -1;
         e->breakpoint_values[which_bpset][i] = -1;
     }
-    uint16_t stop = MAX_RECEIVE_LEN;
-    for(uint16_t i=0;i<MAX_RECEIVE_LEN;i++) {
-        if(message[i] >= 'A' || message[i] == 0) { stop =i; i = MAX_RECEIVE_LEN; }
+    uint16_t stop = MAX_MESSAGE_LEN;
+    for(uint16_t i=0;i<MAX_MESSAGE_LEN;i++) {
+        if(message[i] >= 'A' || message[i] == 0) { stop =i; i = MAX_MESSAGE_LEN; }
     }
     while(c < stop) {
         if(message[c]!=',') {
@@ -886,7 +680,7 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
                 e->breakpoint_values[which_bpset][(idx-1) / 2] = atof(message+c);
             }
         }
-        while(message[c]!=',' && message[c]!=0 && c < MAX_RECEIVE_LEN) c++;
+        while(message[c]!=',' && message[c]!=0 && c < MAX_MESSAGE_LEN) c++;
         c++; idx++;
     }
 }

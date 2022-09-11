@@ -10,26 +10,25 @@
 #include <string.h>
 #include <unistd.h>
 
-
 // Constants you can change if you want
 #define OSCS 64              // # of simultaneous oscs to keep track of 
 #define BLOCK_SIZE 256       // buffer block size in samples
+#define AMY_CORES 2          // on ESP platform, use dual cores
+#define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
 
-#define DEFAULT_LATENCY_MS 0      // fixed DEFAULT latency in milliseconds, can change
+#define DEFAULT_LATENCY_MS 0 // fixed default latency in milliseconds, can change
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
 
 #define SAMPLE_MAX 32767
-#define MAX_ALGO_OPS 6 // dx7
+#define MAX_ALGO_OPS 6 
 #define MAX_BREAKPOINTS 8
 #define MAX_BREAKPOINT_SETS 3
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
 
-// This can be 32 bit, int32_t -- helpful for digital output to a i2s->USB teensy3 board
-#define I2S_SAMPLE_TYPE I2S_BITS_PER_SAMPLE_16BIT
-typedef int16_t i2s_sample_type;
+typedef int16_t output_sample_type;
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.
@@ -38,17 +37,18 @@ typedef int16_t i2s_sample_type;
 #define MINIMUM_SCALE 0.000190 // computed from TRUE_EXPONENTIAL's end point after a while 
 #define BREAKPOINT_EPS 0.0002
 
-
-#define LINEAR_INTERP        // use linear interp for oscs
-// "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
-//#define CUBIC_INTERP         // use cubic interpolation for oscs
-// Sample values for modulation sources
-#define UP    32767
-#define DOWN -32768
 // center frequencies for the EQ
 #define EQ_CENTER_LOW 800.0
 #define EQ_CENTER_MED 2500.0
 #define EQ_CENTER_HIGH 7000.0
+
+#define LINEAR_INTERP        // use linear interp for oscs
+// "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
+//#define CUBIC_INTERP         // use cubic interpolation for oscs
+
+// Sample values for modulation sources
+#define UP    32767
+#define DOWN -32768
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -60,6 +60,8 @@ typedef int16_t i2s_sample_type;
 #define TARGET_LINEAR 0x40 // default exp, linear as an option
 #define TARGET_TRUE_EXPONENTIAL 0x80 // default exp, "true exp" for FM as an option
 #define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
+
+#define MAX_MESSAGE_LEN 4096
 
 #define FILTER_LPF 1
 #define FILTER_BPF 2
@@ -84,7 +86,6 @@ typedef int16_t i2s_sample_type;
 #define AUDIBLE 3
 #define IS_MOD_SOURCE 4
 #define IS_ALGO_SOURCE 5
-
 
 #define AMY_OK 0
 typedef int amy_err_t;
@@ -149,7 +150,6 @@ struct event {
     int8_t filter_type;
     int8_t algo_source[MAX_ALGO_OPS];
 
-    // TODO -- this may be too much for Alles, to have per osc. Could have a fixed stack of EGs that get assigned to oscs, maybe 32 of them 
     int64_t note_on_clock;
     int64_t note_off_clock;
     int16_t breakpoint_target[MAX_BREAKPOINT_SETS];

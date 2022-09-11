@@ -40,7 +40,7 @@ void partials_note_on(uint8_t osc) {
     // Now let's start the oscillators (silently)
     uint8_t oscs = patch.oscs_alloc;
     if(osc + 1 + oscs > OSCS) {
-        printf("Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
+        fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
     }
 }
 

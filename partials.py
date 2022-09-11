@@ -45,14 +45,14 @@ def loris_synth(filename, freq_res=150, analysis_window=100,amp_floor=-30, max_l
     loris.scaleNoiseRatio(partials, noise_ratio)
     return loris.synthesize(partials,44100)
 
-def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=alles.OSCS, freq_res = 10, freq_drift=20, analysis_window = 100):
+def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=amy.OSCS, freq_res = 10, freq_drift=20, analysis_window = 100):
     # my job: take a file, analyze it, output a sequence + some metadata
     # i do voice stealing to keep maximum partials at once to max_oscs 
     # my sequence is an ordered list of partials/oscillators, a list with (ms, osc, freq, amp, bw, phase, time_delta, amp_delta, freq_delta, bw_delta)
     audio = pydub.AudioSegment.from_file(filename)
     audio = audio[:int(max_len_s*1000.0)]
     y = np.array(audio.get_array_of_samples())
-    if int(audio.frame_rate) != int(alles.SAMPLE_RATE):
+    if int(audio.frame_rate) != int(amy.SAMPLE_RATE):
         print("SR mismatch, todo")
         return (None, None)
     if audio.channels == 2:
@@ -69,7 +69,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=al
             if(w.midiUnityNote>0):
                 metadata["midi_note"] = w.midiUnityNote
             if(w.loopstart >= 0 and w.loopend >= 0):
-                metadata["sustain_ms"] = int(((w.loopstart + ((w.loopend-w.loopstart)/2.0)) / alles.SAMPLE_RATE) * 1000.0)
+                metadata["sustain_ms"] = int(((w.loopstart + ((w.loopend-w.loopstart)/2.0)) / amy.SAMPLE_RATE) * 1000.0)
         except AttributeError:
             pass # No wav metadata
 
@@ -156,13 +156,13 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=al
 
 def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1, bw_ratio = 1, round_robin=False):
     # i take a sequence and play it to AMY, just like native AMY will do from a .h file
-    my_start_time = alles.millis()
+    my_start_time = amy.millis()
 
     if(round_robin):
         next_client = 0
         osc_to_client_map = {}
         print("Syncing mesh....")
-        clients = len(alles.sync())
+        clients = len(amy.sync())
         # After a sync, we don't want to immediately spam the mesh, so let's wait 2000ms
         time.sleep(2)
         print("Ready to play among %d speakers" % (clients))
@@ -175,14 +175,14 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
 
     for i,s in enumerate(sequence):
         # Wait for the item in the sequence to be close, so I don't overflow the synthesizers' state
-        while(my_start_time + (s[0] / time_ratio) > (alles.millis() - 500)):
+        while(my_start_time + (s[0] / time_ratio) > (amy.millis() - 500)):
             time.sleep(0.01)
 
         # Make envelope strings
-        bp0 = "%d,%s,0,0" % (s[6] / time_ratio, alles.trunc(s[7]))
-        bp1 = "%d,%s,0,0" % (s[6] / time_ratio, alles.trunc(s[8]))
+        bp0 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[7]))
+        bp1 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[8]))
         if(bw_ratio > 0):
-            bp2 = "%d,%s,0,0" % (s[6] / time_ratio, alles.trunc(s[9]))
+            bp2 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[9]))
         else:
             bp2 = ""
         if(sustain_ms > 0 and sustain_offset == 0):
@@ -201,21 +201,21 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
 
         partial_args.update({"timestamp":my_start_time + (s[0]/time_ratio + sustain_offset),
             "osc":s[1]+osc_offset,
-            "wave":alles.PARTIAL,
+            "wave":amy.PARTIAL,
             "amp":s[3]*amp_ratio,
             "freq":s[2]*pitch_ratio,
             "feedback":s[4]*bw_ratio,
             "bp0":bp0, "bp1":bp1, "bp2":bp2,
-            "bp0_target":alles.TARGET_AMP+alles.TARGET_LINEAR,
-            "bp1_target":alles.TARGET_FREQ+alles.TARGET_LINEAR,
-            "bp2_target":alles.TARGET_FEEDBACK+alles.TARGET_LINEAR})
+            "bp0_target":amy.TARGET_AMP+amy.TARGET_LINEAR,
+            "bp1_target":amy.TARGET_FREQ+amy.TARGET_LINEAR,
+            "bp2_target":amy.TARGET_FEEDBACK+amy.TARGET_LINEAR})
 
         if(s[5]==-2): #end, add note off
-            alles.send(**partial_args, vel=0)
+            amy.send(**partial_args, vel=0)
         elif(s[5]==-1): # continue
-            alles.send(**partial_args)
+            amy.send(**partial_args)
         else: #start, add phase and note on
-            alles.send(**partial_args, vel=s[3]*amp_ratio, phase=s[5])
+            amy.send(**partial_args, vel=s[3]*amp_ratio, phase=s[5])
 
     return sequence[-1][0]/time_ratio
 
@@ -260,8 +260,9 @@ def test(   filename="/Users/bwhitman/sounds/billboard/0157/0157.mp4", \
                     sustain_len_ms = 0, \
                     **kwargs):
     import sounddevice as sd
-    alles.stop()
-    alles.start(immediate=False)
+    amy.stop()
+    amy.live()
     m,s = sequence(filename, max_len_s = max_len_s, freq_res = freq_res, analysis_window = analysis_window, amp_floor=amp_floor, hop_time=hop_time, max_oscs=max_oscs)
     ms = play(s, sustain_ms = m.get("sustain_ms", -1), time_ratio=time_ratio, pitch_ratio=pitch_ratio, amp_ratio=amp_ratio, bw_ratio = bw_ratio, sustain_len_ms = sustain_len_ms)
-    sd.play(alles.render(ms/1000.0))
+    sd.play(amy.render(ms/1000.0))
+

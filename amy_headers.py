@@ -93,12 +93,12 @@ def generate_amy_pcm_header(sample_set, name, pcm_sample_rate=22050):
 
 
 def generate_both_pcm_headers():
-    good = [0, 3, 8, 11, 14, 16, 17, 18, 20, 23, 25, 26, 29, 30, 31, 32, 37, 39, 40, 42, 47, 49, 50, 52, 58, 63, 69, 74, 76, 80, 83, \
+    large = [0, 3, 8, 11, 14, 16, 17, 18, 20, 23, 25, 26, 29, 30, 31, 32, 37, 39, 40, 42, 47, 49, 50, 52, 58, 63, 69, 74, 76, 80, 83, \
         85, 86, 95, 96, 99, 100, 101, 107, 108, 109, 112, 116, 117, 118, 120, 127, \
         130, 134, 136, 145, 149, 155, 161, 165, 166, 170, 171, 175, 177, 178, 183, 192, 197, 198, 200, 204]
-    # The small set is for flash contained devices (Tulip CC)
+    # The small set is for flash constrained devices (Tulip CC)
     small = [0, 3, 8, 11, 14, 16, 17, 18, 20, 23, 25, 26, 29, 30, 31, 32, 37, 39, 58, 83, 85, 86, 116, 117, 118, 120, 127, 130, 136]
-    generate_amy_pcm_header(good, "large")
+    generate_amy_pcm_header(large, "large")
     generate_amy_pcm_header(small, "small")
 
 

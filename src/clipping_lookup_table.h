@@ -1,6 +1,7 @@
 // Automatically generated, then edited by hand to use better names.
 // Clipping lookup table.
-
+#ifndef __CLIPPING_TABLE
+#define __CLIPPING_TABLE
 // Sample value at which we start reading from table.
 #define FIRST_NONLIN 29491
 // Table length.
@@ -625,3 +626,5 @@ const uint16_t clipping_lookup_table[NONLIN_RANGE] = {
 32767,32767,32767,32767,32767,32767,32767,32767,
 32767,32767,32767
 };
+
+#endif

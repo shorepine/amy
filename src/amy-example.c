@@ -2,19 +2,10 @@
 // a simple C example that plays audio using AMY out your speaker 
 
 #include "amy.h"
-#include <pthread.h>
-#include <unistd.h>
-
-// AMY synth states
-extern struct state global;
-extern uint32_t event_counter;
-extern uint32_t message_counter;
-extern int16_t channel;
-extern int16_t device_id;
+#include "libsoundio-audio.h"
 
 
 int main(int argc, char ** argv) {
-    amy_start();
 
     int opt;
     while((opt = getopt(argc, argv, ":d:c:lh")) != -1) 
@@ -22,10 +13,10 @@ int main(int argc, char ** argv) {
         switch(opt) 
         { 
             case 'd': 
-                device_id = atoi(optarg);
+                amy_device_id = atoi(optarg);
                 break;
             case 'c': 
-                channel = atoi(optarg);
+                amy_channel = atoi(optarg);
                 break; 
             case 'l':
                 amy_print_devices();
@@ -47,9 +38,11 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
+
+    amy_start();
     amy_live_start();
     amy_reset_oscs();
-    
+
     // Play a few notes in FM
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();
@@ -74,6 +67,8 @@ int main(int argc, char ** argv) {
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
+    
+    amy_live_stop();
 
     return 0;
 }
