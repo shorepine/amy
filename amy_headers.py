@@ -23,7 +23,7 @@ def generate_amy_pcm_header(sample_set, name, pcm_sample_rate=22050):
         try:
             sf2 = Sf2File(open(fn, 'rb'))
         except:
-            print("Download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
+            print("For PCM patches, download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
             return
         if is_inst:
             for i,inst in enumerate(sf2.instruments[:-1]):
@@ -245,7 +245,11 @@ def make_clipping_lut(filename):
     print("wrote", filename)
 
 
+""" 
+    Generate all the headers except for the partials headers
+"""
 def generate_all():
+    import fm
     import numpy as np
     import collections
     # Implement the multiple lookup tables.
@@ -272,10 +276,20 @@ def generate_all():
     # Clipping LUT
     make_clipping_lut('src/clipping_lookup_table.h')
 
-    # PCM
+    # PCM patches
     generate_both_pcm_headers()
 
-    # Partials and FM are now in partials.py and fm.py
+    # FM patches
+    fm.generate_fm_header()
+
+
+def main():
+    print("Generating all headers needed for AMY...")
+    generate_all()
+    print("Done.")
+
+if __name__ == '__main__':
+    main()
 
 
 
