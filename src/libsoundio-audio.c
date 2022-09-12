@@ -146,8 +146,8 @@ amy_err_t soundio_init() {
         fprintf(stderr, "out of memory\n");
         return 1;
     } else {
-        const char *all_str = (amy_channel<0) ? " (all)" : "";
-        fprintf(stderr,"Using device ID %d, device %s, channel %d %s\n", selected_device_index, device->name, amy_channel, all_str);
+        //const char *all_str = (amy_channel<0) ? " (all)" : "";
+        //fprintf(stderr,"Using device ID %d, device %s, channel %d %s\n", selected_device_index, device->name, amy_channel, all_str);
     }
 
     if (device->probe_error) {
