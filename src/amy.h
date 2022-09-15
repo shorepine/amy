@@ -17,7 +17,9 @@
 #define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
 #define PCM_PATCHES_SIZE_LARGE 1 // use the large PCM set (comment this out on flash constrained devices)
 
+#ifndef DEFAULT_LATENCY_MS
 #define DEFAULT_LATENCY_MS 0 // fixed default latency in milliseconds, can change
+#endif
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
