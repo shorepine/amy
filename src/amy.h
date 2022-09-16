@@ -195,6 +195,8 @@ void oscs_deinit() ;
 int64_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
+void amy_increase_volume();
+void amy_decrease_volume();
 
 
 // global synth state

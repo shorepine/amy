@@ -9,6 +9,9 @@
 
 #ifdef ESP_PLATFORM
 // Defined in amy-example-esp32
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 extern SemaphoreHandle_t xQueueSemaphore;
 extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 #endif
@@ -554,12 +557,12 @@ int64_t amy_sysclock() {
 }
 
 
-void increase_volume() {
+void amy_increase_volume() {
     global.volume += 0.5;
     if(global.volume > MAX_VOLUME) global.volume = MAX_VOLUME;    
 }
 
-void decrease_volume() {
+void amy_decrease_volume() {
     global.volume -= 0.5;
     if(global.volume < 0) global.volume = 0;    
 }
