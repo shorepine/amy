@@ -66,7 +66,7 @@ int8_t global_init() {
     global.event_start = NULL;
     global.event_qsize = 0;
     global.volume = 1;
-    global.latency_ms = DEFAULT_LATENCY_MS;
+    global.latency_ms = 0;
     global.eq[0] = 0;
     global.eq[1] = 0;
     global.eq[2] = 0;

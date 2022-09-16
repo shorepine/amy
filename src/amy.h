@@ -10,27 +10,11 @@
 #include <string.h>
 #include <unistd.h>
 
-// Constants you can change if you want
-#ifndef OSCS
 #define OSCS 64              // # of simultaneous oscs to keep track of 
-#endif
-
-#ifndef AMY_CORES
 #define AMY_CORES 2         
-#endif
-
 #define PCM_LARGE 2
 #define PCM_SMALL 1
-
-#ifndef PCM_PATCHES_SIZE 
 #define PCM_PATCHES_SIZE PCM_LARGE
-#endif
-
-#ifndef DEFAULT_LATENCY_MS
-#define DEFAULT_LATENCY_MS 0 // fixed default latency in milliseconds, can change
-#endif
-
-
 #define BLOCK_SIZE 256       // buffer block size in samples
 #define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store

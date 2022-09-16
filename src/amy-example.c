@@ -1,17 +1,10 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
 
+
+
 #include "amy.h"
 #include "libsoundio-audio.h"
-
-
-// Example of overriding the parser callback to add your own methods to the wire protocol
-void example_amy_parse_callback(char mode, char * message) {
-    if(mode=='c') {
-        printf("got message with my new mode c: %s\n", message);
-    }
-}
-
 
 int main(int argc, char ** argv) {
 
@@ -48,7 +41,6 @@ int main(int argc, char ** argv) {
     }
 
     amy_start();
-    amy_parse_callback = &example_amy_parse_callback;
     amy_live_start();
     amy_reset_oscs();
 
