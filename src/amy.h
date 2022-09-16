@@ -11,19 +11,31 @@
 #include <unistd.h>
 
 // Constants you can change if you want
+#ifndef OSCS
 #define OSCS 64              // # of simultaneous oscs to keep track of 
-#define BLOCK_SIZE 256       // buffer block size in samples
-#define AMY_CORES 2          // on ESP platform, use dual cores
-#define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
-#define PCM_PATCHES_SIZE_LARGE 1 // use the large PCM set (comment this out on flash constrained devices)
+#endif
+
+#ifndef AMY_CORES
+#define AMY_CORES 2         
+#endif
+
+#define PCM_LARGE 2
+#define PCM_SMALL 1
+
+#ifndef PCM_PATCHES_SIZE 
+#define PCM_PATCHES_SIZE PCM_LARGE
+#endif
 
 #ifndef DEFAULT_LATENCY_MS
 #define DEFAULT_LATENCY_MS 0 // fixed default latency in milliseconds, can change
 #endif
+
+
+#define BLOCK_SIZE 256       // buffer block size in samples
+#define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
 #define EVENT_FIFO_LEN 3000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
-
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
 #define MAX_BREAKPOINTS 8
@@ -188,6 +200,9 @@ struct mod_event {
     float feedback;
 };
 
+// Callbacks, override if you'd like after calling amy_start()
+void (*amy_parse_callback)(char,char*);
+
 struct event amy_default_event();
 void amy_add_event(struct event e);
 void render_task(uint8_t start, uint8_t end, uint8_t core);
@@ -228,7 +243,8 @@ int32_t ms_to_samples(int32_t ms) ;
 
 
 // external functions
-void amy_parse_message(char * message);
+void amy_play_message(char *message);
+struct event amy_parse_message(char * message);
 void amy_start();
 void amy_stop();
 void amy_live_start();

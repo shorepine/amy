@@ -99,16 +99,16 @@ Or in C, sending the wire protocol directly:
 void main() {
     amy_start();
     amy_live_start();
-    amy_parse_message("t76555951v0w8n50p30l1Z");
+    amy_play_message("t76555951v0w8n50p30l1Z");
 }
 ```
 
 AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over javascript, in MAX/MSP, in Python, C, Micropython and many more! 
 
-AMY accepts commands in ASCII, each command separated with a `Z` (you can group multiple messages in one, to avoid network overhead if that's your transport). Like so:
+AMY accepts commands in ASCII, like so:
 
 ```
-v0w4f440.0l0.9Z
+v0w4f440.0l0.9
 ```
 
 Here's the full list:

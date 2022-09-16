@@ -9,7 +9,7 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
     if (! PyArg_ParseTuple(args, "s", &arg1)) {
         return NULL;
     }
-    amy_parse_message(arg1);
+    amy_play_message(arg1);
     return Py_None;
 }
 

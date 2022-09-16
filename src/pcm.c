@@ -2,7 +2,7 @@
 
 #include "amy.h"
 
-#ifdef PCM_PATCHES_SIZE_LARGE
+#if PCM_PATCHES_SIZE == PCM_LARGE
 #include "pcm_samples_large.h"
 #else
 #include "pcm_samples_small.h"
@@ -17,7 +17,7 @@ typedef struct {
 } pcm_map_t;
 
 
-#ifdef PCM_PATCHES_SIZE_LARGE
+#if PCM_PATCHES_SIZE == PCM_LARGE
 #include "pcm_large.h"
 #else
 #include "pcm_small.h"
@@ -25,7 +25,7 @@ typedef struct {
 
 void pcm_init() {
 /*
-    // For ESP, we mmap the PCM blob on the luts partition 
+    // For ESP, we can mmap the PCM blob on the luts partition -- do this if you are using OTA 
 #ifdef ESP_PLATFORM
     spi_flash_mmap_handle_t mmap_handle;
     const esp_partition_t * pcm_part  = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, "luts");

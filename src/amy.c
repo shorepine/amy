@@ -55,7 +55,13 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 }
 
 
+void default_amy_parse_callback(char mode, char * message) {
+    // do nothing
+}
+
 int8_t global_init() {
+    // function pointers
+    amy_parse_callback = &default_amy_parse_callback;
     global.next_event_write = 0;
     global.event_start = NULL;
     global.event_qsize = 0;
@@ -685,8 +691,10 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
     }
 }
 
-void amy_parse_message(char * message) {
+// given a string return an event
+struct event amy_parse_message(char * message) {
     uint8_t mode = 0;
+    uint8_t osc = 0;
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
@@ -712,47 +720,49 @@ void amy_parse_message(char * message) {
                     //fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, MAX_DRIFT_MS, global.latency_ms);
                     computed_delta_set = 1;
                 }
+            } else {
+                if(mode >= 'A' && mode <= 'z') {
+                    switch(mode) {
+                        case 'a': e.amp=atof(message+start); break;
+                        case 'A': parse_breakpoint(&e, message+start, 0); break;
+                        case 'B': parse_breakpoint(&e, message+start, 1); break;
+                        case 'b': e.feedback=atof(message+start); break; 
+                        case 'C': parse_breakpoint(&e, message+start, 2); break; 
+                        case 'd': e.duty=atof(message + start); break; 
+                        case 'D': show_debug(atoi(message + start)); break; 
+                        // reminder: don't use "E" or "e", lol 
+                        case 'f': e.freq=atof(message + start);  break; 
+                        case 'F': e.filter_freq=atof(message + start); break; 
+                        case 'G': e.filter_type=atoi(message + start); break; 
+                        case 'g': e.mod_target = atoi(message + start);  break; 
+                        case 'I': e.ratio = atof(message + start); break; 
+                        case 'l': e.velocity=atof(message + start); break; 
+                        case 'L': e.mod_source=atoi(message + start); break; 
+                        case 'N': e.latency_ms = atoi(message + start);  break; 
+                        case 'n': e.midi_note=atoi(message + start); break; 
+                        case 'o': e.algorithm=atoi(message+start); break; 
+                        case 'O': parse_algorithm(&e, message+start); break; 
+                        case 'p': e.patch=atoi(message + start); break; 
+                        case 'P': e.phase=atof(message + start); break; 
+                        case 'R': e.resonance=atof(message + start); break; 
+                        case 'S': osc = atoi(message + start); if(osc > OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); } break; 
+                        case 'T': e.breakpoint_target[0] = atoi(message + start);  break; 
+                        case 'W': e.breakpoint_target[1] = atoi(message + start);  break; 
+                        case 'v': e.osc=(atoi(message + start) % OSCS);  break; // allow osc wraparound
+                        case 'V': e.volume = atof(message + start); break; 
+                        case 'X': e.breakpoint_target[2] = atoi(message + start); break; 
+                        case 'w': e.wave=atoi(message + start); break; 
+                        case 'x': e.eq_l = atof(message+start); break; 
+                        case 'y': e.eq_m = atof(message+start); break; 
+                        case 'z': e.eq_h = atof(message+start); break; 
+                        default:
+                            break;
+                            // If a parse callback function is declared, call it to see if there's something else to parse
+                            //(*amy_parse_callback)(mode, message+start);
+                            //break;
+                    }
+                }
             }
-            if(mode=='a') e.amp=atof(message+start); 
-            if(mode=='A') parse_breakpoint(&e, message+start, 0);
-            if(mode=='B') parse_breakpoint(&e, message+start, 1);
-            if(mode=='b') e.feedback=atof(message+start);
-            if(mode=='C') parse_breakpoint(&e, message+start, 2);
-            //if(mode=='c') client = atoi(message + start); 
-            if(mode=='d') e.duty=atof(message + start);
-            if(mode=='D') {
-                uint8_t type = atoi(message + start);
-                show_debug(type); 
-            }
-            // reminder: don't use "E" or "e", lol 
-            if(mode=='f') e.freq=atof(message + start); 
-            if(mode=='F') e.filter_freq=atof(message + start);
-            if(mode=='G') e.filter_type=atoi(message + start);
-            if(mode=='g') e.mod_target = atoi(message + start); 
-            if(mode=='I') e.ratio = atof(message + start);
-            if(mode=='l') e.velocity=atof(message + start);
-            if(mode=='L') e.mod_source=atoi(message + start);
-            if(mode=='N') e.latency_ms = atoi(message + start); 
-            if(mode=='n') e.midi_note=atoi(message + start);
-            if(mode=='o') e.algorithm=atoi(message+start);
-            if(mode=='O') parse_algorithm(&e, message+start);
-            if(mode=='p') e.patch=atoi(message + start);
-            if(mode=='P') e.phase=atof(message + start);
-            if(mode=='R') e.resonance=atof(message + start);
-            if(mode=='S') { 
-                uint8_t osc = atoi(message + start); 
-                if(osc > OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); }
-            }
-            if(mode=='T') e.breakpoint_target[0] = atoi(message + start); 
-            if(mode=='W') e.breakpoint_target[1] = atoi(message + start); 
-            if(mode=='v') e.osc=(atoi(message + start) % OSCS); // allow osc wraparound
-            if(mode=='V') {  e.volume = atof(message + start); }
-            if(mode=='X') e.breakpoint_target[2] = atoi(message + start);
-            if(mode=='w') e.wave=atoi(message + start);
-            if(mode=='x') e.eq_l = atof(message+start);
-            if(mode=='y') e.eq_m = atof(message+start);
-            if(mode=='z') e.eq_h = atof(message+start);
-            // can't use Z
             mode=b;
             start=c+1;
         }
@@ -761,6 +771,8 @@ void amy_parse_message(char * message) {
 
     // Only do this if we got some data
     if(length >0) {
+        // TODO -- should time adjustment happen during parsing or playback?
+
         // Now adjust time in some useful way:
         // if we have a delta & got a time in this message, use it schedule it properly
         if((computed_delta_set && e.time > 0)) {
@@ -776,6 +788,15 @@ void amy_parse_message(char * message) {
             e.time = sysclock + global.latency_ms;
         }
         e.status = SCHEDULED;
+        return e;
+    }
+    return amy_default_event();
+}
+
+// given a string play / schedule the event directly 
+void amy_play_message(char *message) {
+    struct event e = amy_parse_message(message);
+    if(e.status == SCHEDULED) {
         amy_add_event(e);
     }
 }
