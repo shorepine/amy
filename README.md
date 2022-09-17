@@ -113,6 +113,21 @@ v0w4f440.0l0.9
 
 Here's the full list:
 
+| Code | Python | Parameter    | Range      | Notes                                 |
+| ---- | ------ | ------------ | ---------- | ------------------------------------- |
+| a    | amp    | amplitude    | float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
+| A    | bp0    | breakpoint 0 | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
+| B    | bp1    | breakpoint 1 | string     | set the second breakpoint generator. see breakpoint 0 |
+| b    | feedback | feedback     | float 0-1  | use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| C    | bp2    | breakpoint 2 | string     | 3rd breakpoint generator |
+| d    | duty   | duty cycle   | float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
+| D    | debug  | debug        | uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
+| f    | freq   | frequency    | float      | frequency of oscillator |
+| F    | filter_freq | center frequency | float  | center frequency for biquad filter |
+| g    | mod_target | mod target | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
+
+
+
 ```
 a = amplitude, float 0-1+. use after a note on is triggered with velocity to adjust amplitude without re-triggering the note
 A = breakpoint0, string, in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off
