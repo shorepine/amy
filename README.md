@@ -47,7 +47,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> import amy
 >>> m = amy.message(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
 >>> print(m) # Show the wire protocol message
-'t76555951v0w8n50p30l1Z'
+'t76555951v0w8n50p30l1'
 >>> amy.send_raw(m)
 >>> audio = amy.render(5.0)
 ```
@@ -99,7 +99,7 @@ Or in C, sending the wire protocol directly:
 void main() {
     amy_start();
     amy_live_start();
-    amy_play_message("t76555951v0w8n50p30l1Z");
+    amy_play_message("t76555951v0w8n50p30l1");
 }
 ```
 
