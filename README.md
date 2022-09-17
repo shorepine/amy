@@ -124,7 +124,7 @@ Here's the full list:
 | D    | debug  | debug        | uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
 | f    | freq   | frequency    | float      | frequency of oscillator |
 | F    | filter_freq | center frequency | float  | center frequency for biquad filter |
-| g    | mod_target | mod target | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
+| g    | mod_target | mod target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
 
 
 
