@@ -113,57 +113,42 @@ v0w4f440.0l0.9
 
 Here's the full list:
 
-| Code | Python | Parameter    | Range      | Notes                                 |
-| ---- | ------ | ------------ | ---------- | ------------------------------------- |
-| a    | amp    | amplitude    | float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
-| A    | bp0    | breakpoint 0 | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
-| B    | bp1    | breakpoint 1 | string     | set the second breakpoint generator. see breakpoint 0 |
-| b    | feedback | feedback     | float 0-1  | use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
-| C    | bp2    | breakpoint 2 | string     | 3rd breakpoint generator |
-| d    | duty   | duty cycle   | float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
-| D    | debug  | debug        | uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| f    | freq   | frequency    | float      | frequency of oscillator |
-| F    | filter_freq | center frequency | float  | center frequency for biquad filter |
-| g    | mod_target | mod target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
+| Code | Python |  Type-range      | Notes                                 |
+| ---- | ------ |  ---------- | ------------------------------------- |
+| a    | amp    |  float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
+| A    | bp0    | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
+| B    | bp1    |  string     | set the second breakpoint generator. see breakpoint 0 |
+| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| C    | bp2    |  string     | 3rd breakpoint generator |
+| d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
+| D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
+| f    | freq   |  float      | frequency of oscillator |
+| F    | filter_freq | float  | center frequency for biquad filter |
+| g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
+| G    | filter_type | 0-3 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass. |
+| I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the ALGO base note and PARTIALS base note, where the ratio controls the speed of the playback |
+| L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
+| l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude | 
+| N    | latency_ms | uint | sets latency in ms. default 0 | 
+| n    | note | uint 0-127 | midi note, sets frequency | 
+| o    | algorithm | uint 1-32 | DX7 algorith to use for ALGO type | 
+| O    | algo_source | string | which oscillators to use for the algorithm. list of six, use -1 for not used, e.g 0,1,2,-1,-1-1 |
+| p    | patch | uint | choose a preloaded PCM sample, partial patch or FM patch number for ALGO waveforms. |
+| P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
+| R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
+| S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
+| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential | 
+| t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
+| v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
+| V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
+| w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
+| W    | bp1_target | uint mask | see bp0_target |
+| x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
+| X    | bp2_target | uint mask | see bp0_target |
+| y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
+| z    | eq_h | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. | 
 
 
-
-```
-a = amplitude, float 0-1+. use after a note on is triggered with velocity to adjust amplitude without re-triggering the note
-A = breakpoint0, string, in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off
-B = breakpoint1, set the second breakpoint generator. see breakpoint0
-b = feedback, float 0-1. use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on)
-C = breakpoint2, set the third breakpoint generator. see breakpoint0
-c = client, uint, 0-255 indicating a single client, 256-510 indicating (client_id % (x-255) == 0) for groups, default all clients
-d = duty cycle, float 0.001-0.999. duty cycle for pulse wave, default 0.5
-D = debug, uint, 2-4. 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio!
-f = frequency, float 0-44100 (and above). default 0. Sampling rate of synth is 44,100Hz but higher numbers can be used for PCM waveforms
-F = center frequency of biquad filter. default 0. 
-g = modulation target mask. Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together
-G = filter type. 0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass. 
-I = ratio. for ALGO types, where the base note frequency controls the modulators, or for the ALGO base note and PARTIALS base note, where the ratio controls the speed of the playback
-L = modulation source oscillator. 0-63. Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. 
-l = velocity (amplitude), float 0-1+, >0 to trigger note on, 0 to trigger note off.  
-N = latency (ms.) 0-5000 (in practice). default 1000 for mesh use. change to 0 if using locally
-n = midinote, uint, 0-127 (this will also set f). default 0
-o = algorithm, choose which algorithm for the ALGO type, uint, 1-32. mirrors DX7 algorithms 
-O = algorithn source oscillators, choose which oscillators make up the algorithm oscillator, like "0,1,2,3,4,5" for algorithm 0
-p = patch, uint, choose a preloaded PCM sample, partial patch or FM patch number for FM waveforms. See fm.h, pcm.h, partials.h. default 0
-P = phase, float 0-1. where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0
-R = q factor / "resonance" of biquad filter. float. in practice, 0 to 10.0. default 0.7.
-S = reset oscillator, uint 0-63 or for all oscillators, anything >63, which also resets gain and EQ.
-T = breakpoint0 target mask. Which parameter the breakpoints controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. Add 64 to indicate linear ramp, otherwise exponential
-t = time, int64: ms since some fixed start point on your host. you should always give this if you can.
-v = oscillator, uint, 0 to 63. default: 0
-V = volume, float 0 to about 10 in practice. volume knob for the entire synth. default 1.0
-w = waveform, uint: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE
-W = breakpoint1 target mask. 
-x = "low" EQ amount for the entire synth (Fc=800Hz). float, in dB, -15 to 15. 0 is off. default: 0
-X = breakpoint2 target mask. 
-y = "mid" EQ amount for the entire synth (Fc=2500Hz). float, in dB, -15 to 15. 0 is off. default: 0
-z = "high" EQ amount for the entire synth (Fc=7500Hz). float, in dB, -15 to 15. 0 is off. default: 0
-
-```
 
 # Synthesizer details
 
