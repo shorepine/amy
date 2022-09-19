@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Javascript and Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the web, the microcontrollers ESP32 and ESP32S3, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the forthcoming Tulip Creative Computer. Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -33,9 +33,20 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in your software
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
+C / C++ / etc: simply copy the .c and .h files in `src` to your program and compile them.
+
+Python: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
+
+Javascript: You can run `make web` to generate an `amy.wasm` file that runs in browsers. (We keep a compiled version in this repository, too.)
+
+No other libraries should be required to synthesize audio in AMY. 
+
+## Quick test of AMY 
 
 To run a simple C example, make sure `libsoundio` (`brew install libsoundio` on macOS or `apt-get install libsoundio-dev` on Linux) is installed (to access audio output devices) and run `make`. Then run `./amy-example`. 
+
+To try a simple Javascript example, copy the contents of `src/www` to a web server. 
+
 
 ## Controlling AMY
 
@@ -101,6 +112,15 @@ void main() {
     amy_live_start();
     amy_play_message("t76555951v0w8n50p30l1");
 }
+```
+
+In Javascript, using the wire protocol:
+
+```js
+function startAudio() {
+  amy_start_web();
+  amy_play_message("v0n50p18l0.3w8t0");
+  //...
 ```
 
 AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over javascript, in MAX/MSP, in Python, C, Micropython and many more! 
