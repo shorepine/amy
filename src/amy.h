@@ -184,8 +184,6 @@ struct mod_event {
     float feedback;
 };
 
-// Callbacks, override if you'd like after calling amy_start()
-void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
@@ -302,6 +300,9 @@ extern int8_t dsps_biquad_f32_ansi(const float *input, float *output, int len, f
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
 esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
+#else
+int web_audio_buffer(float *samples, int length);
+void amy_start_web(uint8_t);
 #endif
 
 

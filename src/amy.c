@@ -58,13 +58,9 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 }
 
 
-void default_amy_parse_callback(char mode, char * message) {
-    // do nothing
-}
 
 int8_t global_init() {
     // function pointers
-    amy_parse_callback = &default_amy_parse_callback;
     global.next_event_write = 0;
     global.event_start = NULL;
     global.event_qsize = 0;
@@ -567,6 +563,17 @@ void amy_decrease_volume() {
     if(global.volume < 0) global.volume = 0;    
 }
 
+#ifndef ESP_PLATFORM
+// Shim for webaudio callback
+int web_audio_buffer(float *samples, int length) {
+    int16_t *s = fill_audio_buffer_task();
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+        samples[i] = (float)s[i]/32767.0f;
+    }
+    return BLOCK_SIZE;
+}
+#endif
+
 // This takes scheduled events and plays them at the right time
 int16_t * fill_audio_buffer_task() {
     // Check to see which sounds to play 
@@ -760,9 +767,6 @@ struct event amy_parse_message(char * message) {
                         case 'z': e.eq_h = atof(message+start); break; 
                         default:
                             break;
-                            // If a parse callback function is declared, call it to see if there's something else to parse
-                            //(*amy_parse_callback)(mode, message+start);
-                            //break;
                     }
                 }
             }
@@ -806,6 +810,12 @@ void amy_play_message(char *message) {
 
 void amy_stop() {
     oscs_deinit();
+}
+
+void amy_start_web(uint8_t t) {
+    global_init();
+    oscs_init();
+    amy_reset_oscs();
 }
 
 void amy_start() {

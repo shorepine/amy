@@ -1,0 +1,120 @@
+<!-- thank you to https://github.com/elf-audio/cpp-to-webaudio-example -->
+<!doctype html>
+<html lang="en-us">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>AMY web example</title>
+        <link href="https://fonts.googleapis.com/css?family=Quicksand:500" rel="stylesheet">
+        <link href="style.css" rel="stylesheet">
+        <script type="text/javascript" src="amy.js"></script>
+        <script language="javascript">
+    
+    var web_audio_buffer = null;
+    var amy_play_message = null;
+    var amy_start_web = null;
+
+    // you can only start calling c++ functions once emscripten's "runtime" has started
+    Module.onRuntimeInitialized = function() {
+        web_audio_buffer = Module.cwrap(
+            'web_audio_buffer', 'number', ['number', 'number']
+        );
+        amy_play_message = Module.cwrap(
+            'amy_play_message', null, ['string']
+        );
+        amy_start_web = Module.cwrap(
+            'amy_start_web', null, ['number']
+        );
+    }
+
+
+    var dataHeap = null;
+    var dataPtr = null;
+
+    var data = new Float32Array();
+
+    // l and r are float arrays for the left and right channels that need to be filled
+    function audioCallback(l) {
+        // lazy loading of the audio buffer we use to talk to c++/emscripten
+        if(dataHeap == null) {
+            data = new Float32Array(l.length);
+            // Get data byte size, allocate memory on Emscripten heap, and get pointer
+            var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+            dataPtr = Module._malloc(nDataBytes);
+
+            // Copy data to Emscripten heap (directly accessed from Module.HEAPU8)
+            dataHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+            dataHeap.set(new Uint8Array(data.buffer));
+        }
+
+        // now we actually call the C++
+        web_audio_buffer(dataHeap.byteOffset, l.length);
+
+        // turn the emscripten heap array to something we can work with in javascript
+        // allocating on the audio thread, I know!
+        var result = new Float32Array(dataHeap.buffer, dataHeap.byteOffset, data.length);
+
+        // deinterleave the result
+        for(i = 0; i < l.length; i++) {
+            l[i] = result[i];
+        }
+    }
+
+
+var audioRunning = false;
+var scriptNode = null;
+var source = null;
+var audioCtx = null;
+
+function setupAudio(fn) {
+  // Create AudioContext and buffer source
+  var AudioContext = window.AudioContext // Default
+    || window.webkitAudioContext // Safari and old versions of Chrome
+    || false; 
+    
+    if (!AudioContext) {
+        // Do whatever you want using the Web Audio API
+        alert("Sorry, but the Web Audio API is not supported by your browser.");
+    }
+  audioCtx = new AudioContext();
+  source = audioCtx.createBufferSource();
+
+  // buff size, ins, outs
+  scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+  scriptNode.onaudioprocess = function(audioProcessingEvent) {
+    fn(audioProcessingEvent.outputBuffer.getChannelData(0)); 
+  };
+}
+
+function startAudio() {
+  amy_start_web();
+  amy_play_message("v0n50p18l0.3w8t0");
+  amy_play_message("v9n52p18l0.3w8t500");
+  amy_play_message("v18n54p18l0.3w8t1000");
+  if(audioRunning) return;
+  setupAudio(audioCallback);
+  scriptNode.connect(audioCtx.destination);
+  source.start();
+  audioRunning = true;
+  document.getElementById("startStop").innerHTML = "stop &#x23F9;";
+  document.getElementById("startStop").href = "javascript: stopAudio();";
+}
+
+function stopAudio() {
+    audioRunning = false;
+    audioCtx.suspend().then(function() { 
+        document.getElementById("startStop").innerHTML = "start &#x25b6;";
+        document.getElementById("startStop").href = "javascript: startAudio();";
+    });
+
+}
+    </script>
+    </head>
+    <body>
+    <h1>AMY example</h1>
+    <div id="content">
+        <center><a id="startStop" href="javascript: startAudio()">start &#x25b6;</a></center>
+    </div>
+  </body>
+</html>
