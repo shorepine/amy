@@ -45,7 +45,7 @@ No other libraries should be required to synthesize audio in AMY.
 
 To run a simple C example, make sure `libsoundio` (`brew install libsoundio` on macOS or `apt-get install libsoundio-dev` on Linux) is installed (to access audio output devices) and run `make`. Then run `./amy-example`. 
 
-To try a simple Javascript example, copy the contents of `src/www` to a web server. 
+To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that here](https://notes.variogram.com/amy/) too.
 
 
 ## Controlling AMY
