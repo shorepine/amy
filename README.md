@@ -45,7 +45,7 @@ To run a simple C example, make sure `libsoundio` (`brew install libsoundio` on 
 
 To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that example here too](https://notes.variogram.com/amy/).
 
-[![AMY example](https://github.com/bwhitman/amy/raw/main/pics/drum.png)](https://notes.variogram.com/amy/)
+<a href="https://notes.variogram.com/amy"><img src="https://github.com/bwhitman/amy/raw/main/pics/drum.png" width="500" title="AMY example"></a>
 
 ## Controlling AMY
 
