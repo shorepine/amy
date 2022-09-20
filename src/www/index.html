@@ -127,6 +127,7 @@ function startAudio() {
 
 function stopAudio() {
     audioRunning = false;
+    amy_started = false;
     audioCtx.suspend().then(function() { 
         document.getElementById("startStop").innerHTML = "start the synth &#x25b6;";
         document.getElementById("startStop").href = "javascript: startAudio();";
@@ -169,7 +170,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n50p14' id='code0'/><a href="javascript:send(0)">send</a>
+    <input type='text' value='w8n50p14I4' id='code0'/><a href="javascript:send(0)">send</a>
 
 
   </div>
