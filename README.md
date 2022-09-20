@@ -33,19 +33,17 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in your software
 
-C / C++ / etc: simply copy the .c and .h files in `src` to your program and compile them.
+*C / C++ / etc*: simply copy the .c and .h files in `src` to your program and compile them.
 
-Python: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
+*Python*: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
 
-Javascript: You can run `make web` to generate an `amy.wasm` file that runs in browsers. (We keep a compiled version in this repository, too.)
-
-No other libraries should be required to synthesize audio in AMY. 
+*Javascript*: You can run `make web` (after installing emscripten, `brew / apt install emscripten`) to generate an `amy.wasm` file that runs in browsers. 
 
 ## Quick test of AMY 
 
 To run a simple C example, make sure `libsoundio` (`brew install libsoundio` on macOS or `apt-get install libsoundio-dev` on Linux) is installed (to access audio output devices) and run `make`. Then run `./amy-example`. 
 
-To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that here](https://notes.variogram.com/amy/) too.
+To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that example here too](https://notes.variogram.com/amy/).
 
 
 ## Controlling AMY

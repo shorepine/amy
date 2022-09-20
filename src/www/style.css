@@ -4,6 +4,7 @@ body {
     margin:0;
 }
 
+/*
 h1, h2 {
     font-family: 'Quicksand', Helvetica, Sans-serif;
     background-color:#D90268;
@@ -11,7 +12,7 @@ h1, h2 {
     margin:0;
     color:white;
 }
-
+*/
 #startStop {
     text-align: center;
     border-radius: 0.5em;
@@ -43,10 +44,10 @@ img {
   display: flex;
 }
 .seqtitle {
-  width:60px;
+  width:10px;
 }
 .LEDTitle {
-  width:58.5px;
+  width:10px;
 }
 
 .LEDrow {
