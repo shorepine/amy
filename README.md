@@ -413,10 +413,11 @@ cd ..
 And then in python:
 
 ```python
-import partials
+import partials, amy
 (m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
 109 partials and 1029 breakpoints, max oscs used at once was 8
 
+amy.live()
 partials.play(s, amp_ratio=2, bw_ratio=0)
 ```
 

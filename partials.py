@@ -1,6 +1,8 @@
 import amy, sys
-
 import pydub
+# I will fix this eventually, loris is v py2.0 and hard to install
+sys.path.append('/usr/local/lib/python3.9/site-packages')
+
 import loris
 import time
 import numpy as np
@@ -145,19 +147,10 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     return (metadata, sequence)
 
 
-def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1, bw_ratio = 1, round_robin=False):
+def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1, bw_ratio = 1):
     # i take a sequence and play it to AMY, just like native AMY will do from a .h file
     my_start_time = amy.millis()
 
-    if(round_robin):
-        next_client = 0
-        osc_to_client_map = {}
-        print("Syncing mesh....")
-        clients = len(amy.sync())
-        # After a sync, we don't want to immediately spam the mesh, so let's wait 2000ms
-        time.sleep(2)
-        print("Ready to play among %d speakers" % (clients))
-    
     sustain_offset = 0
     if(sustain_ms > 0):
         if(sustain_ms > sequence[-1][0]):
@@ -183,12 +176,6 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
         osc = s[1]+osc_offset
 
         partial_args = {}
-
-        if(round_robin):
-            if(osc_to_client_map.get(osc,None) is None):
-                osc_to_client_map[osc] = (next_client % clients)
-                next_client += 1
-            partial_args["client"] = osc_to_client_map[osc]
 
         partial_args.update({"timestamp":my_start_time + (s[0]/time_ratio + sustain_offset),
             "osc":s[1]+osc_offset,
