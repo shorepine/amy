@@ -14,7 +14,8 @@
     var web_audio_buffer = null;
     var amy_play_message = null;
     var amy_start_web = null;
-
+    var startDate = new Date();
+    var startTime = startDate.getTime();
     // you can only start calling c++ functions once emscripten's "runtime" has started
     Module.onRuntimeInitialized = function() {
         web_audio_buffer = Module.cwrap(
@@ -86,12 +87,35 @@ function setupAudio(fn) {
     fn(audioProcessingEvent.outputBuffer.getChannelData(0)); 
   };
 }
+function millis() {
+    var date_now = new Date (); 
+    var time_now = date_now.getTime (); 
+    var time_diff = time_now - startTime; 
+    return time_diff;
+    //var seconds_elapsed = Math.floor ( time_diff  );
+}
+function reset() {
+    if(amy_started) {
+        var code = "S65";
+        amy_play_message(code); //+"t"+millis());
+    }
+}
 
+function send(osc) {
+    if(amy_started) {
+        var code = document.getElementById("code"+osc).value;
+        amy_play_message("v"+osc+code);//+"t"+millis());
+    }
+}
+var amy_started = false;
 function startAudio() {
+
   amy_start_web();
-  amy_play_message("v0n50p18l0.3w8t0");
-  amy_play_message("v9n52p18l0.3w8t500");
-  amy_play_message("v18n54p18l0.3w8t1000");
+  amy_started = true;
+  beatID = setTimeout(beat, bpm_ms);
+  //amy_play_message("v0n50p18l0.3w8t"+millis());
+  //amy_play_message("v9n52p18l0.3w8t500t"+(millis()+500));
+  //amy_play_message("v18n54p18l0.3w8t"+(millis()+1000));
   if(audioRunning) return;
   setupAudio(audioCallback);
   scriptNode.connect(audioCtx.destination);
@@ -104,17 +128,182 @@ function startAudio() {
 function stopAudio() {
     audioRunning = false;
     audioCtx.suspend().then(function() { 
-        document.getElementById("startStop").innerHTML = "start &#x25b6;";
+        document.getElementById("startStop").innerHTML = "start the synth &#x25b6;";
         document.getElementById("startStop").href = "javascript: startAudio();";
     });
 
 }
+
+
     </script>
     </head>
     <body>
-    <h1>AMY example</h1>
     <div id="content">
-        <center><a id="startStop" href="javascript: startAudio()">start &#x25b6;</a></center>
+        <center><a id="startStop" href="javascript: startAudio()">start the synth &#x25b6;</a></center>
+        <P>
+            <a id="startStop" href="javascript: reset()">reset</a>
+
+        </P>
+
+        <h2>AMY drum blaster</h2>
+<div>
+  <div class="seqrow">
+    <div class="seqtitle">
+      osc 0:
+    </div>
+    <div id="row0">
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+    </div>
+    <input type='text' value='w8n50p14' id='code0'/><a href="javascript:send(0)">send</a>
+
+
+  </div>
+  <div class="seqrow">
+    <div class="seqtitle">
+      osc 9:
+    </div>
+    <div id="row1">
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+    </div>
+    <input type='text' value='w7p5' id='code9'/><a href="javascript:send(9)">send</a>
+
+  </div>
+  <div class="seqrow">
+    <div class="seqtitle">
+      osc 18:
+    </div>
+    <div id="row2">
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+      <input type="checkbox"></input>
+    </div>
+    <input type='text' value='w7p2n60' id='code18'/><a href="javascript:send(18)">send</a>
+
+  </div>
+<div class="seqrow">
+    <div class="LEDTitle">
+      
+    </div>
+    <div class="LEDrow" id="LED-row">
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      <div class="LED"></div>
+      
+    </div>
+  </div>
+</div>
+<br>
+<button id="reset">Clear</button>
+<br> 
+<input id="bpm" type="range" min="21" max="240" step="1" value="120">
+<span id="bpmText">120</span> bpm
+</div>
     </div>
   </body>
+  <script language ="javascript"> 
+
+const row0 = document.getElementById("row0").children;
+const row1 = document.getElementById("row1").children;
+const row2 = document.getElementById("row2").children;
+const LEDRow = document.getElementById("LED-row").children;
+const btnReset = document.getElementById("reset").addEventListener("click", e => {
+  for(let i = 0; i<=15; i++){
+    row0[i].checked=false;
+    row1[i].checked=false;
+    row2[i].checked=false;
+  }
+}); 
+var bpm_ms = 125;
+const rngBpm = document.getElementById("bpm");
+rngBpm.oninput = function(){
+  bpm_ms = 1000.0 / 4 / ((this.value)/60.0)
+  txtBpm.innerText = this.value;
+};
+const txtBpm = document.getElementById("bpmText");
+
+// set up
+let audioInitialised = false;
+let index = 0;
+LEDRow[0].style = "background: red";
+
+
+var beatID;
+var beat_counter = 0;
+function beat() {
+    if(amy_started) {
+        beatID = setTimeout(beat, bpm_ms);
+        for(let i = 0; i <= 15; i++){
+            LEDRow[i].style.background = "lightgray";
+        }
+        LEDRow[beat_counter].style.background = "red";
+        beat_counter = (beat_counter + 1) % 16
+        if(row0[beat_counter].checked) {
+            amy_play_message("v0l1")
+        }
+        if(row1[beat_counter].checked) {
+            amy_play_message("v9l1")        
+        }
+        if(row2[beat_counter].checked) {
+            amy_play_message("v18l1")
+        }
+    }
+}
+
+</script>
 </html>

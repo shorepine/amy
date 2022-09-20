@@ -235,8 +235,10 @@ void render_algo(float * buf, uint8_t osc) {
     zero(scratch[2]);
     zero(scratch[3]);
     zero(scratch[4]);
+    uint8_t ops_used = 0;
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
+            ops_used++;
             float feedback_level = 0;
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
@@ -289,6 +291,6 @@ void render_algo(float * buf, uint8_t osc) {
         }
     }
     for(uint16_t i=0;i<BLOCK_SIZE;i++) {
-        buf[i] = buf[i] * msynth[osc].amp;
+        buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
     }
 }

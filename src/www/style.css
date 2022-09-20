@@ -38,3 +38,26 @@ img {
     width: 100%;
     text-align: center;
 }
+
+.seqrow {
+  display: flex;
+}
+.seqtitle {
+  width:60px;
+}
+.LEDTitle {
+  width:58.5px;
+}
+
+.LEDrow {
+  display: flex;
+}
+
+.LED {
+  border: 0.5px solid gray;
+  border-radius: 2px;
+  width: 16px;
+  height: 10px;
+  margin: 1.7px;
+  background: lightgray;
+}
