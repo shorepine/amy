@@ -240,10 +240,10 @@ def test(   filename="/Users/bwhitman/sounds/billboard/0157/0157.mp4", \
                     hop_time = 0.04, \
                     sustain_len_ms = 0, \
                     **kwargs):
-    import sounddevice as sd
     amy.stop()
     amy.live()
     m,s = sequence(filename, max_len_s = max_len_s, freq_res = freq_res, analysis_window = analysis_window, amp_floor=amp_floor, hop_time=hop_time, max_oscs=max_oscs)
     ms = play(s, sustain_ms = m.get("sustain_ms", -1), time_ratio=time_ratio, pitch_ratio=pitch_ratio, amp_ratio=amp_ratio, bw_ratio = bw_ratio, sustain_len_ms = sustain_len_ms)
-    sd.play(amy.render(ms/1000.0))
+
+
 

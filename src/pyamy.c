@@ -5,6 +5,7 @@
 // Python module wrapper for AMY commands
 
 static PyObject * send_wrapper(PyObject *self, PyObject *args) {
+    Py_INCREF(Py_None);
     char *arg1;
     if (! PyArg_ParseTuple(args, "s", &arg1)) {
         return NULL;
@@ -16,11 +17,13 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 
 // TODO, take an optional arg for sound device ID
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
+    Py_INCREF(Py_None);
     amy_live_start();
     return Py_None;
 }
 
 static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
+    Py_INCREF(Py_None);
     amy_live_stop();
     return Py_None;
 }
