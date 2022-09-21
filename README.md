@@ -33,11 +33,11 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in your software
 
-*C / C++ / etc*: simply copy the .c and .h files in `src` to your program and compile them.
+**C / C++ / etc**: simply copy the .c and .h files in `src` to your program and compile them.
 
-*Python*: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
+**Python**: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
 
-*Javascript*: You can run `make web` (after installing emscripten, `brew / apt install emscripten`) to generate an `amy.wasm` file that runs in browsers. 
+**Javascript**: You can run `make web` (after installing emscripten, `brew / apt install emscripten`) to generate an `amy.wasm` file that runs in browsers. 
 
 ## Quick test of AMY 
 
@@ -329,6 +329,8 @@ amy.send(wave=amy.ALGO,osc=0,patch=1,note=50,vel=1)
 ```
 
 The `patch` lets you set which preset. It can be from 0 to 1024. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
+
+**DX7 FM patches take up 9 AMY oscillators** -- the 6 operators, the base note, and two modulation oscillators. Keep this in mind when using multiple. You can do polyphony by just using every 9th oscillator (0, 9, 18 etc).
 
 ```python
 amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.5,patch=8) # half speed
