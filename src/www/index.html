@@ -142,13 +142,19 @@ function stopAudio() {
 
     <body>
     <div id="content">
-        <P>
+                <h2>AMY examples</h2>
+        <P>Click "start AMY" to run the AMY synthesizer. Use "reset voices" to reset all the voices to default.
+            <p>
         <a id="startStop" href="javascript: startAudio()">start AMY</a>
         <a id="startStop" href="javascript: reset()">reset voices</a>
 
         </P>
-
+        &nbsp;
+        <p>
+</p>
+<hr/>
         <h2>AMY drum blaster</h2>
+        <P>Hear AMY messages played back as a drum machine. Each row is a different AMY voice, preloaded with some patches. To update a voice, just edit the AMY message for that row and click "send". 
 <div>
   <div class="seqrow">
     <div class="seqtitle">
@@ -321,11 +327,62 @@ function stopAudio() {
   </div>
 </div>
 <br>
-<button id="reset">Clear</button>
-<br> 
-<input id="bpm" type="range" min="21" max="240" step="1" value="120">
+<button id="reset">Clear</button> <input id="bpm" type="range" min="21" max="240" step="1" value="120">
 <span id="bpmText">120</span> bpm
 </div>
+<hr/>
+<h2>AMY message creator</h2>
+<P>Construct your own AMY messages. Hover over a parameter to see a longer description. The message will be generated as you type. Paste the message into the drum machine above to hear it there, or just click "send message to AMY" to directly hear it without the drum machine.
+<table>
+    <tr>
+        <td title="0-63. Choose which voice to modify. (Note: the drum machine will use its own voice number.)">voice</td><td><input type=text id="e-v"/></td>
+        <td title="0.0 to X. Amplitude of the voice. Note: velocity overrides amplitude for note ons.">amplitude</td><td><input type=text id="e-a"/></td>
+        <td title="String determining the breakpoint 0 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint0</td><td><input type=text id="e-A"/></td>
+    </tr><tr>
+        <td title="String determining the breakpoint 1 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint1</td><td><input type=text id="e-B"/></td>
+        <td title="use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on)">feedback</td><td><input type=text id="e-b"/></td>
+        <td title="String determining the breakpoint 2 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint2</td><td><input type=text id="e-C"/></td>
+    </tr>
+    </tr><tr>
+        <td>duty (0.0-1.0)</td><td><input type=text id="e-d"/></td>
+        <td>frequency (0.0-22050.0)</td><td><input type=text id="e-f"/></td>
+        <td>filter center freq (0.0-22050.0)</td><td><input type=text id="e-F"/></td>
+    </tr>
+    </tr><tr>
+        <td>mod target</td><td><input type=text id="e-g"/></td>
+        <td>filter type</td><td><input type=text id="e-G"/></td>
+        <td>ratio</td><td><input type=text id="e-I"/></td>
+    </tr>
+    </tr><tr>
+        <td>mod source</td><td><input type=text id="e-L"/></td>
+        <td>velocity</td><td><input type=text id="e-l"/></td>
+        <td>midi note</td><td><input type=text id="e-n"/></td>
+    </tr>
+    </tr><tr>
+        <td>algorithm</td><td><input type=text id="e-o"/></td>
+        <td>algo source</td><td><input type=text id="e-O"/></td>
+        <td>patch</td><td><input type=text id="e-p"/></td>
+    </tr>
+    </tr><tr>
+        <td>phase</td><td><input type=text id="e-P"/></td>
+        <td>resonance</td><td><input type=text id="e-R"/></td>
+        <td>breakpoint 0 target</td><td><input type=text id="e-T"/></td>
+    </tr>
+    </tr><tr>
+        <td>volume</td><td><input type=text id="e-V"/></td>
+        <td>wave</td><td><input type=text id="e-w"/></td>
+        <td>breakpoint 1 target</td><td><input type=text id="e-W"/></td>
+    </tr>
+    </tr><tr>
+        <td>eq L</td><td><input type=text id="e-x"/></td>
+        <td>breakpoint 2 target</td><td><input type=text id="e-X"/></td>
+        <td>eq M</td><td><input type=text id="e-y"/></td>
+    </tr>
+    </tr><tr>
+        <td>eq H</td><td><input type=text id="e-z"/></td>
+    </tr>
+</table>
+
 <P>Powered by <A href="https://github.com/bwhitman/amy">AMY - the additive music synthesizer library</A>. Thanks to <a href="https://github.com/elf-audio/cpp-to-webaudio-example">elf-audio/cpp-to-webaudio-example</a>.
     </div>
   </body>
