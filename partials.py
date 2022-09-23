@@ -227,8 +227,8 @@ def generate_partials_header(filenames=None, **kwargs):
     out.close()
 
 # OK defaults here
-def test(   filename="/Users/bwhitman/sounds/billboard/0157/0157.mp4", \
-                    max_len_s=60, \
+def test(   filename="sounds/sleepwalk_original_45s.mp3", \
+                    max_len_s=40, \
                     freq_res = 10, \
                     analysis_window = 100, \
                     time_ratio = 1, \
