@@ -608,14 +608,14 @@ int16_t * fill_audio_buffer_task() {
 #endif
 
     // Global volume is supposed to max out at 10, so scale by 0.1.
-    float volume_scale = 0.1 * global.volume;
+    float volume_scale = 0.1f * global.volume;
     //uint8_t nonzero = 0;
     for(int16_t i=0; i < BLOCK_SIZE; ++i) {
         // Mix all the oscillator buffers into one
-        float fsample = volume_scale * (fbl[0][i] + fbl[1][i]) * 32767.0;
+        float fsample = volume_scale * (fbl[0][i] + fbl[1][i]) * 32767.0f;
         // One-pole high-pass filter to remove large low-frequency excursions from
         // some FM patches. b = [1 -1]; a = [1 -0.995]
-        float new_state = fsample + 0.995 * global.hpf_state;
+        float new_state = fsample + 0.995f * global.hpf_state;
         fsample = new_state - global.hpf_state;
         global.hpf_state = new_state;
     

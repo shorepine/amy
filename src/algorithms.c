@@ -125,7 +125,7 @@ void algo_note_off(uint8_t osc) {
         if(synth[osc].algo_source[i] >=0 ) {
             uint8_t o = synth[osc].algo_source[i];
             synth[o].note_on_clock = -1;
-            synth[o].note_off_clock = total_samples; 
+            synth[o].note_off_clock = total_samples;
         }
     }
     // osc note off, start release
@@ -290,6 +290,8 @@ void render_algo(float * buf, uint8_t osc) {
             }
         }
     }
+    // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
+    if(ops_used == 0) ops_used = 1;
     for(uint16_t i=0;i<BLOCK_SIZE;i++) {
         buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
     }

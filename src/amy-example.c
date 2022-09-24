@@ -44,6 +44,7 @@ int main(int argc, char ** argv) {
     amy_live_start();
     amy_reset_oscs();
 
+  
     // Play a few notes in FM
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();

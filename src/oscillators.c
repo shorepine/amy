@@ -440,7 +440,7 @@ void render_sine(float * buf, uint8_t osc) {
     synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, msynth[osc].amp, 
                  synth[osc].lut, synth[osc].lut_size);
     synth[osc].last_amp = msynth[osc].amp;
-    //printf("sysclock %d amp %f\n", get_sysclock(), msynth[osc].amp);
+    //fprintf(stderr,"sysclock %lld amp %f buffer in middle is %f\n", amy_sysclock(), msynth[osc].amp, buf[128]);
 }
 
 
