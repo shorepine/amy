@@ -122,10 +122,15 @@ amy_err_t soundio_init() {
         fprintf(stderr, "out of memory\n");
         return 1;
     }
+#ifdef __linux__
+    int err;
+    err = soundio_connect_backend(soundio, SoundIoBackendPulseAudio);
+#else
     int err = soundio_connect(soundio);
+#endif
     if (err) {
         fprintf(stderr, "Unable to connect to backend: %s\n", soundio_strerror(err));
-        return 1;
+        exit(1);
     }
 
     soundio_flush_events(soundio);
