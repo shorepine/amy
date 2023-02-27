@@ -45,7 +45,9 @@ SemaphoreHandle_t xQueueSemaphore;
 TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 TaskHandle_t amy_fill_buffer_handle;
 
-
+void delay_ms(uint32_t ms) {
+    vTaskDelay(ms / portTICK_PERIOD_MS);
+}
 
 // Wrap AMY's renderer into 2 FreeRTOS tasks, one per core
 void esp_render_task( void * pvParameters) {
