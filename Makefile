@@ -16,7 +16,7 @@ all: default
 
 SOURCES = src/algorithms.c src/amy.c src/envelope.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c
-OBJECTS = $(patsubst %.c, %.o, src/amy-example.c src/algorithms.c src/amy.c src/envelope.c \
+OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/libminiaudio-audio.c src/amy-example-esp32.c)
 HEADERS = $(wildcard src/*.h)
 
@@ -28,8 +28,11 @@ HEADERS = $(wildcard src/*.h)
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
+amy-example: $(OBJECTS) src/amy-example.o
+	$(CC) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
+
+amy-message: $(OBJECTS) src/amy-message.o
+	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 web: $(TARGET)
 	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o src/www/amy.js
