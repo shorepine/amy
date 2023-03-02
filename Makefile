@@ -1,7 +1,7 @@
 # Makefile for libamy , including an example
 
 TARGET = amy-example amy-message
-LIBS = -lpthread  -lm 
+LIBS = -lpthread  -lm  -ldl  -latomic
 CC = gcc
 CFLAGS = -g -Wall -Wno-strict-aliasing 
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
