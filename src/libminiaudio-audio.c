@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 #define DEVICE_FORMAT       ma_format_s16
-#define DEVICE_CHANNELS     1
+#define DEVICE_CHANNELS     0
 #define DEVICE_SAMPLE_RATE  SAMPLE_RATE
 
 int16_t leftover_buf[BLOCK_SIZE]; 
@@ -66,7 +66,15 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     // First send over the leftover samples, if any
     int ptr = 0;
 
-    for(uint16_t frame=0;frame<leftover_samples;frame++) poke[ptr++] = leftover_buf[frame];
+    for(uint16_t frame=0;frame<leftover_samples;frame++) {
+        for(uint8_t c=0;c<pDevice->playback.channels;c++) {
+            if(c==amy_channel || amy_channel<0) {
+                poke[ptr++] = leftover_buf[frame];
+            } else {
+                poke[ptr++] = 0;                
+            }
+        }
+    }
 
     frame_count -= leftover_samples;
     leftover_samples = 0;
@@ -74,14 +82,30 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     // Now send the bulk of the frames
     for(uint8_t i=0;i<(uint8_t)(frame_count / BLOCK_SIZE);i++) {
         int16_t *buf = fill_audio_buffer_task();
-        for(uint16_t frame=0;frame<BLOCK_SIZE;frame++) poke[ptr++] = buf[frame];
+        for(uint16_t frame=0;frame<BLOCK_SIZE;frame++) {
+            for(uint8_t c=0;c<pDevice->playback.channels;c++) {
+                if(c==amy_channel || amy_channel<0) {
+                    poke[ptr++] = buf[frame];
+                } else {
+                    poke[ptr++] = 0;                
+                }
+            }
+        }
     } 
 
     // If any leftover, let's put those in the outgoing buf and the rest in leftover_samples
     uint16_t still_need = frame_count % BLOCK_SIZE;
     if(still_need != 0) {
         int16_t *buf = fill_audio_buffer_task();
-        for(uint16_t frame=0;frame<still_need;frame++) poke[ptr++] = buf[frame];
+        for(uint16_t frame=0;frame<still_need;frame++) {
+            for(uint8_t c=0;c<pDevice->playback.channels;c++) {
+                if(c==amy_channel || amy_channel<0) {
+                    poke[ptr++] = buf[frame];
+                } else {
+                    poke[ptr++] = 0;
+                }
+            }
+        }
         memcpy(leftover_buf, buf+still_need, (BLOCK_SIZE - still_need)*2);
         leftover_samples = BLOCK_SIZE - still_need;
     }
@@ -137,6 +161,7 @@ amy_err_t miniaudio_init() {
         ma_device_uninit(&device);
         exit(1);
     }
+    fprintf(stderr, "device has %d channels\n", device.playback.channels);
     return AMY_OK;
 }
 
