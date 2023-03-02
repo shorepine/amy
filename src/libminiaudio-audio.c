@@ -161,7 +161,6 @@ amy_err_t miniaudio_init() {
         ma_device_uninit(&device);
         exit(1);
     }
-    fprintf(stderr, "device has %d channels\n", device.playback.channels);
     return AMY_OK;
 }
 

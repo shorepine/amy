@@ -4,7 +4,7 @@
 
 
 #include "amy.h"
-#include "libsoundio-audio.h"
+#include "libminiaudio-audio.h"
 
 int main(int argc, char ** argv) {
 
