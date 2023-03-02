@@ -1,10 +1,10 @@
-// amy-example.c
-// a simple C example that plays audio using AMY out your speaker 
-
-
+// amy-message.c
+// hacked from amy-example.c, this code shows using miniaudio and allows entry it AMY ASCII commands.
 
 #include "amy.h"
 #include "libminiaudio-audio.h"
+
+//#include <math.h>
 
 int main(int argc, char ** argv) {
 
@@ -44,30 +44,25 @@ int main(int argc, char ** argv) {
     amy_live_start();
     amy_reset_oscs();
 
-  
-    // Play a few notes in FM
-    struct event e = amy_default_event();
-    int64_t start = amy_sysclock();
-    e.time = start;
-    e.velocity = 1;
-    e.wave = ALGO;
-    e.patch = 15;
-    e.midi_note = 60;
-    amy_add_event(e);
-
-    e.time = start + 500;
-    e.osc += 9; // remember that an FM patch takes up 9 oscillators
-    e.midi_note = 64;
-    amy_add_event(e);
-    
-    e.time = start + 1000;
-    e.osc += 9;
-    e.midi_note = 68;
-    amy_add_event(e);
-
-    // Now just spin for 5s
-    while(amy_sysclock() - start < 5000) {
-        usleep(THREAD_USLEEP);
+    while (1) {
+        char input[1024];
+        fprintf(stdout, "#;\n");
+        if (fgets(input, sizeof(input)-1, stdin) == NULL) break;
+        if (input[0] == '?') {
+            switch (input[1]) {
+                case 'c':
+                    fprintf(stdout, "%ld\n", amy_sysclock());
+                    break;
+                case 's':
+                    fprintf(stdout, "%ld\n", total_samples);
+                    break;
+                default:
+                    fprintf(stdout, "?\n");
+                    break;
+            }
+        } else {
+            amy_play_message(input);
+        }
     }
     
     amy_live_stop();

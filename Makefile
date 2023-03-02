@@ -1,7 +1,7 @@
 # Makefile for libamy , including an example
 
-TARGET = amy-example
-LIBS = -lpthread -lsoundio -lm 
+TARGET = amy-example amy-message
+LIBS = -lpthread  -lm 
 CC = gcc
 CFLAGS = -g -Wall -Wno-strict-aliasing 
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
@@ -17,14 +17,8 @@ all: default
 SOURCES = src/algorithms.c src/amy.c src/envelope.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c
 OBJECTS = $(patsubst %.c, %.o, src/amy-example.c src/algorithms.c src/amy.c src/envelope.c \
-	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/libsoundio-audio.c src/amy-example-esp32.c)
+	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/libminiaudio-audio.c src/amy-example-esp32.c)
 HEADERS = $(wildcard src/*.h)
-
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-	LIBS += -L/opt/homebrew/lib -lstdc++ 
-	CFLAGS += -I/opt/homebrew/include
-endif
 
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
