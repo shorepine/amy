@@ -1,0 +1,241 @@
+<!-- thank you to https://github.com/elf-audio/cpp-to-webaudio-example -->
+<!doctype html>
+<html lang="en-us">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMY web example</title>
+  <link href="style.css" rel="stylesheet">
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <script src="https://unpkg.com/@vueuse/shared"></script>
+  <script src="https://unpkg.com/@vueuse/core"></script>
+  <script language="javascript" type="module">
+    var web_audio_buffer = null;
+    var amy_play_message = null;
+    var amy_start_web = null;
+    var startDate = new Date();
+    var startTime = startDate.getTime();
+    var callback = null
+
+    import('./amy-module.js').then(amy => {
+      const {Module} = amy
+      Module.onRuntimeInitialized = function () {
+        web_audio_buffer = Module.cwrap(
+          'web_audio_buffer', 'number', ['number', 'number']
+        );
+        amy_play_message = Module.cwrap(
+          'amy_play_message', null, ['string']
+        );
+        amy_start_web = Module.cwrap(
+          'amy_start_web', null, ['number']
+        );
+      }
+
+      // you can only start calling c++ functions once emscripten's "runtime" has started
+
+      var dataHeap = null;
+      var dataPtr = null;
+
+      var data = new Float32Array();
+
+      // l and r are float arrays for the left and right channels that need to be filled
+      callback = function audioCallback(l) {
+        // lazy loading of the audio buffer we use to talk to c++/emscripten
+        if (dataHeap == null) {
+          data = new Float32Array(l.length);
+          // Get data byte size, allocate memory on Emscripten heap, and get pointer
+          var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+          let dataPtr = Module._malloc(nDataBytes);
+
+          // Copy data to Emscripten heap (directly accessed from Module.HEAPU8)
+          dataHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+          dataHeap.set(new Uint8Array(data.buffer));
+        }
+
+        // now we actually call the C++
+        web_audio_buffer(dataHeap.byteOffset, l.length);
+
+        // turn the emscripten heap array to something we can work with in javascript
+        // allocating on the audio thread, I know!
+        var result = new Float32Array(dataHeap.buffer, dataHeap.byteOffset, data.length);
+
+        // deinterleave the result
+        for (let i = 0; i < l.length; i++) {
+          l[i] = result[i];
+        }
+      }
+
+    })
+
+
+    Vue.createApp({
+      setup() {
+
+        const started = Vue.ref(true)
+        const buttonText = Vue.ref('')
+
+        var audioRunning = false;
+        var scriptNode = null;
+        var source = null;
+        var audioCtx = null;
+
+        function setupAudio(fn) {
+          var AudioContext = window.AudioContext // Default
+            || window.webkitAudioContext // Safari and old versions of Chrome
+            || false;
+
+          if (!AudioContext) {
+            alert("Sorry, but the Web Audio API is not supported by your browser.");
+          }
+
+          audioCtx = new AudioContext();
+          source = audioCtx.createBufferSource();
+
+          scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+          scriptNode.onaudioprocess = function (audioProcessingEvent) {
+            fn(audioProcessingEvent.outputBuffer.getChannelData(0));
+          };
+        }
+        function millis() {
+          var date_now = new Date();
+          var time_now = date_now.getTime();
+          var time_diff = time_now - startTime;
+          return time_diff;
+          //var seconds_elapsed = Math.floor ( time_diff  );
+        }
+        function reset() {
+          if (amy_started) {
+            var code = "S65";
+            amy_play_message(code); //+"t"+millis());
+          }
+        }
+
+        function send(osc) {
+          if (amy_started) {
+            if (osc < 0) {
+              amy_play_message('w7p2n60');
+            } else {
+
+              amy_play_message("v" + osc + 'w7p6');//+"t"+millis());
+            }
+          }
+        }
+        var amy_started = false;
+
+        function startAudio() {
+
+          amy_start_web();
+          amy_started = true;
+
+          if (audioRunning) return;
+          setupAudio(callback);
+          scriptNode.connect(audioCtx.destination);
+          source.start();
+          audioRunning = true;
+          started.value = true
+        }
+
+        function stopAudio() {
+          audioRunning = false;
+          amy_started = false;
+          audioCtx.suspend().then(function () {
+            started.value = false
+          });
+
+        }
+
+        const rngPatch = Vue.ref(498)
+        const rngRatio = Vue.ref(1.0)
+
+        function piano_down(note) {
+          startAudio()
+          let mess = "v54l1w8n" + note + "p" + rngPatch.value + "I" + rngRatio.value;
+          if (amy_started) amy_play_message(mess);
+        }
+        function piano_up(note) {
+          startAudio()
+          let mess = "v54l0";
+          if (amy_started) amy_play_message(mess);
+        }
+
+        VueUse.onKeyDown('a', () => {
+          piano_down(80)
+        })
+
+        VueUse.onKeyUp('a', () => {
+          piano_up(80)
+        })
+        return {
+          startAudio, stopAudio, piano_up, piano_down, rngPatch, rngRatio, started
+        }
+      }
+    }).mount('#content')
+
+  </script>
+</head>
+
+<body>
+  <div id="content">
+
+    <h2>AMY DX7 patch player</h2>
+    <P>Play any of AMY's built in 1024 DX7 patches. They're very accurate! If you want to generate your own FM patches,
+      see AMY's fm.py module.</P>
+    <input v-model="rngPatch" type="range" min="0" max="1023" step="1">
+    Patch #: <span id="patchText">{{rngPatch}}</span>
+    <P>
+      <input v-model="rngRatio" type="range" min="0.01" max="4" step="0.01">
+      Playback time ratio: {{rngRatio}}
+
+      <a @click="startAudio()">Start AMY</a>
+      <a @click="reset()">reset voices</a>
+
+    <ul class="set">
+      <a @mousedown="piano_down(53)" @mouseup="piano_up(53)">
+        <li class="white b"></li>
+      </a>
+      <a @mousedown="piano_down(54)" @mouseup="piano_up(54)">
+        <li class="black as"></li>
+      </a>
+      <a @mousedown="piano_down(55)" @mouseup="piano_up(55)">
+        <li class="white a"></li>
+      </a>
+      <a @mousedown="piano_down(56)" @mouseup="piano_up(56)">
+        <li class="black gs"></li>
+      </a>
+      <a @mousedown="piano_down(57)" @mouseup="piano_up(57)">
+        <li class="white g"></li>
+      </a>
+      <a @mousedown="piano_down(58)" @mouseup="piano_up(58)">
+        <li class="black fs"></li>
+      </a>
+      <a @mousedown="piano_down(59)" @mouseup="piano_up(59)">
+        <li class="white f"></li>
+      </a>
+      <a @mousedown="piano_down(60)" @mouseup="piano_up(60)">
+        <li class="white e"></li>
+      </a>
+      <a @mousedown="piano_down(61)" @mouseup="piano_up(61)">
+        <li class="black ds"></li>
+      </a>
+      <a @mousedown="piano_down(62)" @mouseup="piano_up(62)">
+        <li class="white d"></li>
+      </a>
+      <a @mousedown="piano_down(63)" @mouseup="piano_up(63)">
+        <li class="black cs"></li>
+      </a>
+      <a @mousedown="piano_down(64)" @mouseup="piano_up(64)">
+        <li class="white c"></li>
+      </a>
+    </ul>
+
+    </table>
+  </div>
+</body>
+
+
+
+</html>
