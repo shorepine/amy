@@ -2,9 +2,12 @@
 
 TARGET = amy-example amy-message
 LIBS = -lpthread  -lm
+
+# on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
 ifeq ($(shell uname -m), armv7l)
 LIBS += -ldl  -latomic
 endif
+
 CC = gcc
 CFLAGS = -g -Wall -Wno-strict-aliasing 
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
