@@ -10,70 +10,71 @@
   <link href="style.css" rel="stylesheet">
 
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-
   <script src="https://unpkg.com/@vueuse/shared"></script>
   <script src="https://unpkg.com/@vueuse/core"></script>
   <script language="javascript" type="module">
-    var web_audio_buffer = null;
-    var amy_play_message = null;
-    var amy_start_web = null;
-    var startDate = new Date();
-    var startTime = startDate.getTime();
-    var callback = null
 
-    import('./amy-module.js').then(amy => {
-      const {Module} = amy
-      Module.onRuntimeInitialized = function () {
-        web_audio_buffer = Module.cwrap(
-          'web_audio_buffer', 'number', ['number', 'number']
-        );
-        amy_play_message = Module.cwrap(
-          'amy_play_message', null, ['string']
-        );
-        amy_start_web = Module.cwrap(
-          'amy_start_web', null, ['number']
-        );
-      }
-
-      // you can only start calling c++ functions once emscripten's "runtime" has started
-
-      var dataHeap = null;
-      var dataPtr = null;
-
-      var data = new Float32Array();
-
-      // l and r are float arrays for the left and right channels that need to be filled
-      callback = function audioCallback(l) {
-        // lazy loading of the audio buffer we use to talk to c++/emscripten
-        if (dataHeap == null) {
-          data = new Float32Array(l.length);
-          // Get data byte size, allocate memory on Emscripten heap, and get pointer
-          var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
-          let dataPtr = Module._malloc(nDataBytes);
-
-          // Copy data to Emscripten heap (directly accessed from Module.HEAPU8)
-          dataHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
-          dataHeap.set(new Uint8Array(data.buffer));
-        }
-
-        // now we actually call the C++
-        web_audio_buffer(dataHeap.byteOffset, l.length);
-
-        // turn the emscripten heap array to something we can work with in javascript
-        // allocating on the audio thread, I know!
-        var result = new Float32Array(dataHeap.buffer, dataHeap.byteOffset, data.length);
-
-        // deinterleave the result
-        for (let i = 0; i < l.length; i++) {
-          l[i] = result[i];
-        }
-      }
-
-    })
 
 
     Vue.createApp({
       setup() {
+
+        var web_audio_buffer = null;
+        var amy_play_message = null;
+        var amy_start_web = null;
+        var startDate = new Date();
+        var startTime = startDate.getTime();
+        var callback = null
+
+        import('./amy-module.js').then(amy => {
+          const {Module} = amy
+          Module.onRuntimeInitialized = function () {
+            web_audio_buffer = Module.cwrap(
+              'web_audio_buffer', 'number', ['number', 'number']
+            );
+            amy_play_message = Module.cwrap(
+              'amy_play_message', null, ['string']
+            );
+            amy_start_web = Module.cwrap(
+              'amy_start_web', null, ['number']
+            );
+          }
+
+          // you can only start calling c++ functions once emscripten's "runtime" has started
+
+          var dataHeap = null;
+          var dataPtr = null;
+
+          var data = new Float32Array();
+
+          // l and r are float arrays for the left and right channels that need to be filled
+          callback = function audioCallback(l) {
+            // lazy loading of the audio buffer we use to talk to c++/emscripten
+            if (dataHeap == null) {
+              data = new Float32Array(l.length);
+              // Get data byte size, allocate memory on Emscripten heap, and get pointer
+              var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+              let dataPtr = Module._malloc(nDataBytes);
+
+              // Copy data to Emscripten heap (directly accessed from Module.HEAPU8)
+              dataHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+              dataHeap.set(new Uint8Array(data.buffer));
+            }
+
+            // now we actually call the C++
+            web_audio_buffer(dataHeap.byteOffset, l.length);
+
+            // turn the emscripten heap array to something we can work with in javascript
+            // allocating on the audio thread, I know!
+            var result = new Float32Array(dataHeap.buffer, dataHeap.byteOffset, data.length);
+
+            // deinterleave the result
+            for (let i = 0; i < l.length; i++) {
+              l[i] = result[i];
+            }
+          }
+
+        })
 
         const started = Vue.ref(true)
         const buttonText = Vue.ref('')
@@ -181,7 +182,7 @@
 <body>
   <div id="content">
 
-    <h2>AMY DX7 patch player</h2>
+    <h2>AMY DX7 patch player - Vue 3 version</h2>
     <P>Play any of AMY's built in 1024 DX7 patches. They're very accurate! If you want to generate your own FM patches,
       see AMY's fm.py module.</P>
     <input v-model="rngPatch" type="range" min="0" max="1023" step="1">
