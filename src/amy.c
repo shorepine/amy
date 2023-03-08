@@ -552,6 +552,9 @@ int64_t amy_sysclock() {
     return (int64_t)((total_samples / (float)SAMPLE_RATE) * 1000);
 }
 
+int amy_sample_rate(int n) {
+    return SAMPLE_RATE;
+}
 
 void amy_increase_volume() {
     global.volume += 0.5;
