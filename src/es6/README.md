@@ -13,3 +13,23 @@ The stopAudio() function stops the BufferSource and suspends the AudioContext.
 The reset() function sends a message string to the amy_play_message() function to reset the C++ code's internal state.
 
 The three buttons in the HTML document call startAudio(), stopAudio(), and reset() when clicked.
+
+## what is the role of this part? 
+
+```js
+  source = audioCtx.createBufferSource();
+
+  // buff size, ins, outs
+  scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+  scriptNode.onaudioprocess = function (audioProcessingEvent) {
+    fn(audioProcessingEvent.outputBuffer.getChannelData(0));
+  };
+```
+
+This part of the code sets up the Web Audio API components that will be used to process and output audio.
+
+The createBufferSource() method creates a new AudioBufferSourceNode object, which is used to play audio data that is stored in an AudioBuffer object. This is essentially the source of the audio data that will be played back.
+
+The createScriptProcessor() method creates a new ScriptProcessorNode object, which is used to process audio data. In this case, the script node is set up with a buffer size of 256 samples, no input channels, and a single output channel. The onaudioprocess property of the script node is then set to a callback function that will be called every time the script node needs to process audio data.
+
+Inside the callback function, the getChannelData() method of the outputBuffer object is used to get a Float32Array representing the output channel of the script node. This output channel is then passed to the fn function provided as an argument to the setupAudio() function. In this code, fn is set to the callback function defined earlier, which will process the audio data using Emscripten and the C++ functions provided by the amy-module.js module.
