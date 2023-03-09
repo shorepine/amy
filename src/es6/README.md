@@ -33,3 +33,122 @@ The createBufferSource() method creates a new AudioBufferSourceNode object, whic
 The createScriptProcessor() method creates a new ScriptProcessorNode object, which is used to process audio data. In this case, the script node is set up with a buffer size of 256 samples, no input channels, and a single output channel. The onaudioprocess property of the script node is then set to a callback function that will be called every time the script node needs to process audio data.
 
 Inside the callback function, the getChannelData() method of the outputBuffer object is used to get a Float32Array representing the output channel of the script node. This output channel is then passed to the fn function provided as an argument to the setupAudio() function. In this code, fn is set to the callback function defined earlier, which will process the audio data using Emscripten and the C++ functions provided by the amy-module.js module.
+
+
+## Could you rewrite this code to use AudioWorklet instead of ScriptProcessor?
+
+In the main script:
+
+```javascript
+
+var amy_started = false;
+var web_audio_buffer = null;
+var amy_play_message = null;
+var amy_start_web = null;
+
+// you can only start calling c++ functions once emscripten's "runtime" has started
+import('./amy-module.js').then(amy => {
+  const { Module } = amy;
+  Module.onRuntimeInitialized = function () {
+    web_audio_buffer = Module.cwrap(
+      'web_audio_buffer', 'number', ['number', 'number']
+    );
+    amy_play_message = Module.cwrap(
+      'amy_play_message', null, ['string']
+    );
+    amy_start_web = Module.cwrap(
+      'amy_start_web', null, ['number']
+    );
+  }
+});
+
+var audioRunning = false;
+var audioCtx = new AudioContext({
+  sampleRate: 48000
+});
+
+function startAudio() {
+  amy_start_web();
+  amy_started = true;
+  if (audioRunning) return;
+
+  // Create AudioWorkletNode and connect it to destination
+  audioCtx.audioWorklet.addModule('amy-worklet.js').then(() => {
+    const workletNode = new AudioWorkletNode(audioCtx, 'amy-processor');
+    workletNode.connect(audioCtx.destination);
+
+    // Send callback to AudioWorkletNode
+    workletNode.port.postMessage({ command: 'start', callback: audioCallback });
+    audioRunning = true;
+
+    // Trigger play message after 500ms
+    setTimeout(() => {
+      console.log(amy_play_message)
+      let mess = "v54l1w8n70p30";
+      amy_play_message(mess);
+    }, 500);
+  });
+}
+
+function stopAudio() {
+  audioRunning = false;
+  amy_started = false;
+  audioCtx.suspend().then(function () {
+    console.log('stopped')
+  });
+}
+
+function reset() {
+  if (amy_started) {
+    var code = "S65";
+    amy_play_message(code); //+"t"+millis());
+    console.log('reset')
+  }
+}
+
+document.getElementById("Start").addEventListener('click', () => startAudio())
+document.getElementById("Stop").addEventListener('click', () => stopAudio())
+document.getElementById("Reset").addEventListener('click', () => reset())
+
+function audioCallback(buffer) {
+  const dataHeap = new Uint8Array(Module.HEAPU8.buffer, buffer.byteOffset, buffer.length * 4);
+  web_audio_buffer(dataHeap.byteOffset, buffer.length);
+
+  const result = new Float32Array(Module.HEAPU8.buffer, dataHeap.byteOffset, buffer.length);
+  buffer.set(result);
+}
+```
+
+In the amy-worklet.js file:
+
+```javascript
+
+class AmyProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [];
+  }
+
+  constructor() {
+    super();
+    this.port.onmessage = this.handleMessage_.bind(this);
+    this.callback_ = null;
+  }
+
+  handleMessage_(event) {
+    if (event.data.command === 'start') {
+      this.callback_ = event.data.callback;
+    }
+  }
+
+  process(inputs, outputs) {
+    if (this.callback_) {
+      this.callback_(outputs[0][0]);
+    }
+    return true;
+  }
+}
+
+registerProcessor('amy-processor', AmyProcessor);
+```
+
+Note that in the audioCallback function, we need to use Uint8Array instead of Float32Array to access the memory buffer that is shared between the main script and the AudioWorkletNode. Also note that we no longer need to create a ScriptProcessorNode, and instead create an AudioWorkletNode and pass the audioCallback
