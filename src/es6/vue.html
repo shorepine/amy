@@ -14,17 +14,18 @@
   <script src="https://unpkg.com/@vueuse/core"></script>
   <script language="javascript" type="module">
 
+    var web_audio_buffer = null;
+    var amy_play_message = null;
+    var amy_start_web = null;
+    var startDate = new Date();
+    var startTime = startDate.getTime();
+    var callback = null
 
 
     Vue.createApp({
       setup() {
 
-        var web_audio_buffer = null;
-        var amy_play_message = null;
-        var amy_start_web = null;
-        var startDate = new Date();
-        var startTime = startDate.getTime();
-        var callback = null
+
 
         import('./amy-module.js').then(amy => {
           const {Module} = amy

@@ -1,0 +1,137 @@
+<html lang="en-us">
+
+<head>
+  <script language="javascript" type="module">
+
+    var amy_started = false;
+    var web_audio_buffer = null;
+    var amy_play_message = null;
+    var amy_start_web = null;
+    var callback = null
+
+    // you can only start calling c++ functions once emscripten's "runtime" has started
+    import('./amy-module.js').then(amy => {
+      const {Module} = amy
+      Module.onRuntimeInitialized = function () {
+        web_audio_buffer = Module.cwrap(
+          'web_audio_buffer', 'number', ['number', 'number']
+        );
+        amy_play_message = Module.cwrap(
+          'amy_play_message', null, ['string']
+        );
+        amy_start_web = Module.cwrap(
+          'amy_start_web', null, ['number']
+        );
+      }
+
+      var dataHeap = null;
+      var dataPtr = null;
+
+      var data = new Float32Array();
+
+      // l and r are float arrays for the left and right channels that need to be filled
+      callback = function audioCallback(l) {
+
+        // lazy loading of the audio buffer we use to talk to c++/emscripten
+        if (dataHeap == null || dataHeap.length == 0) {
+          data = new Float32Array(l.length);
+          // Get data byte size, allocate memory on Emscripten heap, and get pointer
+          var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
+          dataPtr = Module._malloc(nDataBytes);
+
+          // Copy data to Emscripten heap (directly accessed from Module.HEAPU8)
+          dataHeap = new Uint8Array(Module.HEAPU8.buffer, dataPtr, nDataBytes);
+          dataHeap.set(new Uint8Array(data.buffer));
+        }
+
+        // now we actually call the C++
+        web_audio_buffer(dataHeap.byteOffset, l.length);
+
+        // turn the emscripten heap array to something we can work with in javascript
+        // allocating on the audio thread, I know!
+        var result = new Float32Array(dataHeap.buffer, dataHeap.byteOffset, data.length);
+
+        // deinterleave the result
+        for (let i = 0; i < l.length; i++) {
+          l[i] = result[i];
+        }
+      }
+    })
+
+    var audioRunning = false;
+    var scriptNode = null;
+    var source = null;
+    var audioCtx = null;
+    let sts = 0
+
+    function setupAudio(fn) {
+      // Create AudioContext and buffer source
+      var AudioContext = window.AudioContext // Default
+        || window.webkitAudioContext // Safari and old versions of Chrome
+        || false;
+
+      if (!AudioContext) {
+        // Do whatever you want using the Web Audio API
+        alert("Sorry, but the Web Audio API is not supported by your browser.");
+      }
+      audioCtx = new AudioContext({
+        sampleRate: 48000
+      });
+      source = audioCtx.createBufferSource();
+
+      // buff size, ins, outs
+      scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+      scriptNode.onaudioprocess = function (audioProcessingEvent) {
+        fn(audioProcessingEvent.outputBuffer.getChannelData(0));
+      };
+    }
+
+    function startAudio() {
+      amy_start_web();
+      amy_started = true;
+      if (audioRunning) return;
+      setupAudio(callback);
+      scriptNode.connect(audioCtx.destination);
+      source.start();
+      audioRunning = true;
+      setTimeout(() => {
+        console.log(amy_play_message)
+        let mess = "v54l1w8n70p30";
+        amy_play_message(mess)
+      }, 500)
+    }
+
+    function stopAudio() {
+      audioRunning = false;
+      amy_started = false;
+      audioCtx.suspend().then(function () {
+        console.log('stopped')
+      });
+
+    }
+    function reset() {
+      if (amy_started) {
+        var code = "S65";
+        amy_play_message(code); //+"t"+millis());
+        console.log('reset')
+      }
+    }
+
+    document.getElementById("Start").addEventListener('click', () => startAudio())
+    document.getElementById("Stop").addEventListener('click', () => stopAudio())
+    document.getElementById("Reset").addEventListener('click', () => reset())
+
+  </script>
+</head>
+
+<body>
+  <div id="content">
+    <p>
+      <button id="Start">start AMY!</button>
+      <button id="Stop">Stop AMY!</button>
+      <button id="Reset">reset voices</button>
+    </P>
+  </div>
+</body>
+
+</html>
