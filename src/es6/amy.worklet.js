@@ -2,18 +2,20 @@
   An in-place replacement for ScriptProcessorNode using AudioWorklet
   //TODO Now it's just an example from the link below:
   - https://gist.github.com/louisgv/f210a1139d955baf511ff35f58fc8db1
-  - https://github.com/Tonejs/Tone.js/issues/712
+  - READ https://github.com/Tonejs/Tone.js/issues/712
 */
 class AmyProcessor extends AudioWorkletProcessor {
   // 0. Determine the buffer size (this is the same as the 1st argument of ScriptProcessor)
-  bufferSize = 4096
+  bufferSize = 256
   // 1. Track the current buffer fill level
   _bytesWritten = 0
 
   // 2. Create a buffer of fixed size
   _buffer = new Float32Array(this.bufferSize)
 
+
   constructor() {
+    super()
     this.initBuffer()
   }
 

@@ -51,7 +51,7 @@
     var audioCtx = null;
     let sts = 0
 
-    function setupAudio(fn) {
+    async function setupAudio(fn) {
 
       var AudioContext = window.AudioContext
         || window.webkitAudioContext
@@ -64,6 +64,16 @@
       audioCtx = new AudioContext({
         sampleRate: 48000
       });
+
+      await audioCtx.audioWorklet.addModule("./amy.worklet.js")
+
+      const processor = new AudioWorkletNode(
+        audioCtx,
+        "amy.worklet"
+      )
+
+      processor.connect(audioCtx.destination)
+
       source = audioCtx.createBufferSource();
       scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
       scriptNode.onaudioprocess = function (audioProcessingEvent) {
@@ -71,16 +81,16 @@
       };
     }
 
-    function startAudio() {
+    async function startAudio() {
       amy_start_web();
       amy_started = true;
       if (audioRunning) return;
-      setupAudio(callback);
+      await setupAudio(callback);
       scriptNode.connect(audioCtx.destination);
       source.start();
       audioRunning = true;
       setTimeout(() => {
-        console.log('started')
+        console.log(amy_play_message)
         let mess = "v54l1w8n70p30";
         amy_play_message(mess)
       }, 500)
@@ -92,6 +102,7 @@
       audioCtx.suspend().then(function () {
         console.log('stopped')
       });
+
     }
 
     document.getElementById("Start").addEventListener('click', () => startAudio())
