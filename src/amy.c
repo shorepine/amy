@@ -373,11 +373,22 @@ void oscs_deinit() {
 
 
 // Play an event, now -- tell the audio loop to start making noise
+// TODO , this should be a case or if/else ladder to save comparison CPU 
+// But remember to always check velocity
 void play_event(struct delta d) {
     uint8_t trig=0;
     // TODO: event-only side effect, remove
     if(d.param == MIDI_NOTE) { synth[d.osc].midi_note = *(uint16_t *)&d.data; synth[d.osc].freq = freq_for_midi_note(*(uint16_t *)&d.data); } 
-    if(d.param == WAVE) synth[d.osc].wave = *(int16_t *)&d.data; 
+    // Wave switching logic. If you change a waveform in mid note, we have to reset the pointers
+    if(d.param == WAVE) {
+        int16_t new_wave = *(int16_t *)&d.data;
+        if(synth[d.osc].wave != new_wave) {
+            synth[d.osc].wave = new_wave;
+            // Set velocity to the existing velocity, to trigger a new note on at this new wave
+            d.data = *(uint32_t *)&synth[d.osc].velocity;
+            d.param = VELOCITY;
+        }
+    }
     if(d.param == PHASE) synth[d.osc].phase = *(float *)&d.data;
     if(d.param == PATCH) synth[d.osc].patch = *(int16_t *)&d.data;
     if(d.param == DUTY) synth[d.osc].duty = *(float *)&d.data;
