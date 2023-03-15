@@ -191,6 +191,7 @@ void render_task(uint8_t start, uint8_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 int64_t amy_sysclock();
+int amy_sample_rate(int);
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();

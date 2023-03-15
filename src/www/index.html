@@ -13,6 +13,7 @@
     
     var web_audio_buffer = null;
     var amy_play_message = null;
+    var amy_sample_rate = null;
     var amy_start_web = null;
     var startDate = new Date();
     var startTime = startDate.getTime();
@@ -23,6 +24,9 @@
         );
         amy_play_message = Module.cwrap(
             'amy_play_message', null, ['string']
+        );
+        amy_sample_rate = Module.cwrap(
+            'amy_sample_rate', 'number', ['number']
         );
         amy_start_web = Module.cwrap(
             'amy_start_web', null, ['number']
@@ -78,7 +82,8 @@ function setupAudio(fn) {
         // Do whatever you want using the Web Audio API
         alert("Sorry, but the Web Audio API is not supported by your browser.");
     }
-  audioCtx = new AudioContext();
+  // create a context with the sample rate compiled into amy.wasm
+  audioCtx = new AudioContext({sampleRate: amy_sample_rate()});
   source = audioCtx.createBufferSource();
 
   // buff size, ins, outs
