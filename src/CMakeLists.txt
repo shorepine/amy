@@ -9,6 +9,7 @@ include(pico_extras_import.cmake)
 project(amy_example C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+
 # Initialize the Pico SDK
 pico_sdk_init()
 
@@ -39,7 +40,6 @@ if (TARGET tinyusb_device)
         )
 
     target_compile_definitions(amy_example PRIVATE
-            PICO_DEFAULT_FLOAT_IMPL=pico
             # compile time configuration of I2S
             PICO_AUDIO_I2S_MONO_INPUT=1
             #define for our example code
@@ -61,4 +61,3 @@ elseif(PICO_ON_DEVICE)
 endif()
 
 
-pico_set_float_implementation(amy_example pico)
