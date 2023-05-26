@@ -110,13 +110,13 @@ int main() {
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();
     e.time = start;
-    e.velocity = 0.75;
-    e.wave = ALGO;
+    e.velocity = 0.25;
+    e.wave = SINE;
     e.patch = 15;
     e.midi_note = 70;
     amy_add_event(e);
 
-/*    e.time = start + 500;
+    e.time = start + 500;
     e.osc += 9; // remember that an FM patch takes up 9 oscillators
     e.midi_note = 64;
     amy_add_event(e);
@@ -125,7 +125,13 @@ int main() {
     e.osc += 9;
     e.midi_note = 68;
     amy_add_event(e);
-*/
+
+    e.time = start + 1500;
+    e.osc += 9;
+    e.midi_note = 72;
+    amy_add_event(e);
+
+
 /*
     uint32_t step = 0x200000;
     uint32_t pos = 0;
