@@ -131,6 +131,10 @@ int main() {
     e.midi_note = 72;
     amy_add_event(e);
 
+    e.time = start + 2000;
+    e.osc += 9;
+    e.midi_note = 58;
+    amy_add_event(e);
 
 /*
     uint32_t step = 0x200000;
