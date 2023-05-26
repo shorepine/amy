@@ -16,12 +16,16 @@
 
 #include "pico/stdlib.h"
 #include "pico/audio_i2s.h"
+/*
+#define AMY_I2S_DATA_PIN 8
+#define AMY_I2S_BCK_PIN 9
+#define AMY_I2S_LRC_PIN 10
+*/
 
 #if PICO_ON_DEVICE
 #include "pico/binary_info.h"
 bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
 #endif
-
 
 #define SINE_WAVE_TABLE_LEN 2048
 #define SAMPLES_PER_BUFFER 256
@@ -33,11 +37,24 @@ static inline uint32_t _millis(void)
     return to_ms_since_boot(get_absolute_time());
 }
 
+
 void delay_ms(uint32_t ms) {
     uint32_t now = _millis();
     while(_millis() < now+ms) {}
 }
 
+
+void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
+    int16_t *block = fill_audio_buffer_task();
+    size_t written = 0;
+    struct audio_buffer *buffer = take_audio_buffer(ap, true);
+    int16_t *samples = (int16_t *) buffer->buffer->bytes;
+    for (uint i = 0; i < BLOCK_SIZE; i++) {
+        samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
+    }
+    buffer->sample_count = BLOCK_SIZE;
+    give_audio_buffer(ap, buffer);
+}
 
 struct audio_buffer_pool *init_audio() {
 
@@ -52,8 +69,7 @@ struct audio_buffer_pool *init_audio() {
             .sample_stride = 2
     };
 
-    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3,
-                                                                      SAMPLES_PER_BUFFER); // todo correct size
+    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, BLOCK_SIZE); 
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
@@ -77,18 +93,50 @@ struct audio_buffer_pool *init_audio() {
 int main() {
 
     stdio_init_all();
-    amy_start();
 
+    printf("Clock is set to %d\n", clock_get_hz(clk_sys));
+    set_sys_clock_khz(250000000 / 1000, false); //
+
+    amy_start();
+    /*
     for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
         sine_wave_table[i] = 32767 * cosf(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
     }
-
+    */
     struct audio_buffer_pool *ap = init_audio();
+
+
+    // Play a few notes in FM
+    struct event e = amy_default_event();
+    int64_t start = amy_sysclock();
+    e.time = start;
+    e.velocity = 0.75;
+    e.wave = ALGO;
+    e.patch = 15;
+    e.midi_note = 70;
+    amy_add_event(e);
+
+/*    e.time = start + 500;
+    e.osc += 9; // remember that an FM patch takes up 9 oscillators
+    e.midi_note = 64;
+    amy_add_event(e);
+
+    e.time = start + 1000;
+    e.osc += 9;
+    e.midi_note = 68;
+    amy_add_event(e);
+*/
+/*
     uint32_t step = 0x200000;
     uint32_t pos = 0;
     uint32_t pos_max = 0x10000 * SINE_WAVE_TABLE_LEN;
-    uint vol = 128;
+    uint vol = 16;
+*/
     while (true) {
+        rp2040_fill_audio_buffer(ap);
+    }
+
+/*
         int c = getchar_timeout_us(0);
         if (c >= 0) {
             if (c == '-' && vol) vol -= 4;
@@ -109,31 +157,7 @@ int main() {
         give_audio_buffer(ap, buffer);
     }
     puts("\n");
-
-
-    // Play a few notes in FM
-    struct event e = amy_default_event();
-    int64_t start = amy_sysclock();
-    e.time = start;
-    e.velocity = 1;
-    e.wave = ALGO;
-    e.patch = 15;
-    e.midi_note = 60;
-    amy_add_event(e);
-
-    e.time = start + 500;
-    e.osc += 9; // remember that an FM patch takes up 9 oscillators
-    e.midi_note = 64;
-    amy_add_event(e);
-    
-    e.time = start + 1000;
-    e.osc += 9;
-    e.midi_note = 68;
-    amy_add_event(e);
-
-    while(1) {
-        delay_ms(10);
-    }
+    */
 
     return 0;
 }

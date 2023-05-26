@@ -45,9 +45,9 @@ if (TARGET tinyusb_device)
             #define for our example code
             USE_AUDIO_I2S=1
 #DIN
-            PICO_AUDIO_I2S_DATA_PIN=22
+            PICO_AUDIO_I2S_DATA_PIN=8
 #LRC is BCK+1 always
-            PICO_AUDIO_I2S_CLOCK_PIN_BASE=23
+            PICO_AUDIO_I2S_CLOCK_PIN_BASE=9
     )
 
     # enable usb output, disable uart output
