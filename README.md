@@ -1,8 +1,8 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Javascript and Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the web, the microcontrollers ESP32 and ESP32S3, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've built AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the RP2040 and more to come. 
 
-AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
+AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the forthcoming Tulip Creative Computer. Let us know if you use AMY for your own projects and we'll add it here!
 
 AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogram.com), and would love your contributions.
 
@@ -18,6 +18,8 @@ It supports
    * karplus-strong string with adjustable feedback 
    * An operator / algorithm-based frequency modulation (FM) synth
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
+ * Reverb and chorus effects, set globally
+ * Stereo pan or mono operation 
  * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves, including amplitude modulated noise
  * Oscillators can be specified by frequency in floating point or midi note 
  * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
@@ -33,19 +35,9 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in your software
 
-**C / C++ / etc**: simply copy the .c and .h files in `src` to your program and compile them.
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy.h` is set up for your application. 
 
-**Python**: You can run `cd src; setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. 
-
-**Javascript**: You can run `make web` (after installing emscripten, `brew / apt install emscripten`) to generate an `amy.wasm` file that runs in browsers. 
-
-## Quick test of AMY 
-
-Run `make`. Then run `./amy-example`. 
-
-To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that example here too](https://notes.variogram.com/amy/).
-
-<a href="https://notes.variogram.com/amy"><img src="https://github.com/bwhitman/amy/raw/main/pics/drum.png" width="500" title="AMY example"></a>
+To run a simple C example, run `make`. Then run `./amy-example`. 
 
 ## Controlling AMY
 
@@ -57,7 +49,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> import amy
 >>> m = amy.message(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
 >>> print(m) # Show the wire protocol message
-'t76555951v0w8n50p30l1'
+'t76555951v0w8n50p30l1Z'
 >>> amy.send_raw(m)
 >>> audio = amy.render(5.0)
 ```
@@ -66,7 +58,7 @@ You can also start a thread playing live audio:
 
 ```python
 >>> import amy
->>> amy.live()
+>>> amy.live() # can optinally pass in audio device ID, amy.live(2) 
 >>> amy.send(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
 >>> amy.stop()
 ```
@@ -109,17 +101,8 @@ Or in C, sending the wire protocol directly:
 void main() {
     amy_start();
     amy_live_start();
-    amy_play_message("t76555951v0w8n50p30l1");
+    amy_play_message("t76555951v0w8n50p30l1Z");
 }
-```
-
-In Javascript, using the wire protocol:
-
-```js
-function startAudio() {
-  amy_start_web();
-  amy_play_message("v0n50p18l0.3w8t0");
-  //...
 ```
 
 AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over javascript, in MAX/MSP, in Python, C, Micropython and many more! 
@@ -145,15 +128,22 @@ Here's the full list:
 | F    | filter_freq | float  | center frequency for biquad filter |
 | g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
 | G    | filter_type | 0-3 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass. |
+| H    | reverb_liveness | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
+| h    | reverb_level | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
 | I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the ALGO base note and PARTIALS base note, where the ratio controls the speed of the playback |
+| j    | reverb_damping  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
+| J    | reverb_xover_hz | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
+| k    | chorus_level | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
-| l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude | 
+| l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
+| m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
 | N    | latency_ms | uint | sets latency in ms. default 0 | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
 | o    | algorithm | uint 1-32 | DX7 algorith to use for ALGO type | 
 | O    | algo_source | string | which oscillators to use for the algorithm. list of six, use -1 for not used, e.g 0,1,2,-1,-1-1 |
 | p    | patch | uint | choose a preloaded PCM sample, partial patch or FM patch number for ALGO waveforms. |
 | P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
+| Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
 | T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential | 
@@ -330,8 +320,6 @@ amy.send(wave=amy.ALGO,osc=0,patch=1,note=50,vel=1)
 
 The `patch` lets you set which preset. It can be from 0 to 1024. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
 
-**DX7 FM patches take up 9 AMY oscillators** -- the 6 operators, the base note, and two modulation oscillators. Keep this in mind when using multiple. You can do polyphony by just using every 9th oscillator (0, 9, 18 etc).
-
 ```python
 amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.5,patch=8) # half speed
 amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.05,patch=8)  # reaaall sloooow
@@ -415,11 +403,10 @@ cd ..
 And then in python:
 
 ```python
-import partials, amy
+import partials
 (m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
 109 partials and 1029 breakpoints, max oscs used at once was 8
 
-amy.live()
 partials.play(s, amp_ratio=2, bw_ratio=0)
 ```
 
