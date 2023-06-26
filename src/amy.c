@@ -829,7 +829,7 @@ int16_t * fill_audio_buffer_task() {
 #endif
 
     // global volume is supposed to max out at 10, so scale by 0.1.
-    float volume_scale = 0.1 * global.volume;
+    float volume_scale = 0.1f * global.volume;
     //uint8_t nonzero = 0;
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
