@@ -9,15 +9,17 @@
 #include <math.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
+#include "polyfills.h"
 
 #define OSCS 64              // # of simultaneous oscs to keep track of 
-#define AMY_CORES 2         
+#define AMY_CORES 2
 #define PCM_LARGE 2
 #define PCM_SMALL 1
 #define PCM_PATCHES_SIZE PCM_SMALL
 #define BLOCK_SIZE 256       // buffer block size in samples
 #define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
-#define EVENT_FIFO_LEN 3000  // number of events the queue can store
+#define EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define SAMPLE_RATE 44100    // playback sample rate
 #define SAMPLE_MAX 32767
@@ -26,6 +28,10 @@
 #define MAX_BREAKPOINT_SETS 3
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
+
+//#define NCHANS 1             // Mono output, 'Q' (pan) ignored, saves memory.
+#define NCHANS 2             // Enable 2-channel output, pan, etc.
+
 
 typedef int16_t output_sample_type;
 
@@ -59,8 +65,9 @@ typedef int16_t output_sample_type;
 #define TARGET_LINEAR 0x40 // default exp, linear as an option
 #define TARGET_TRUE_EXPONENTIAL 0x80 // default exp, "true exp" for FM as an option
 #define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
+#define TARGET_PAN 0x200
 
-#define MAX_MESSAGE_LEN 4096
+#define MAX_MESSAGE_LEN 255
 
 #define FILTER_LPF 1
 #define FILTER_BPF 2
@@ -99,7 +106,8 @@ typedef int amy_err_t;
 
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, FILTER_FREQ, RATIO, RESONANCE, 
+    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ,
+    RATIO, RESONANCE, 
     MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
     ALGO_SOURCE_START=30, 
     ALGO_SOURCE_END=30+MAX_ALGO_OPS,
@@ -139,12 +147,13 @@ struct event {
     float substep;
     float sample;
     float volume;
+    float pan;   // Pan parameters.
     int16_t latency_ms;
     float filter_freq;
     float ratio;
     float resonance;
     int8_t mod_source;
-    int8_t mod_target;
+    int16_t mod_target;
     int8_t algorithm;
     int8_t filter_type;
     int8_t algo_source[MAX_ALGO_OPS];
@@ -177,6 +186,8 @@ struct event {
 // events, but only the things that mods/env can change. one per osc
 struct mod_event {
     float amp;
+    float pan;
+    float last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
     float filter_freq;
@@ -184,6 +195,8 @@ struct mod_event {
     float feedback;
 };
 
+// Callbacks, override if you'd like after calling amy_start()
+//void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
@@ -191,7 +204,6 @@ void render_task(uint8_t start, uint8_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 int64_t amy_sysclock();
-int amy_sample_rate(int);
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();
@@ -301,9 +313,6 @@ extern int8_t dsps_biquad_f32_ansi(const float *input, float *output, int len, f
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
 esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
-#else
-int web_audio_buffer(float *samples, int length);
-void amy_start_web(uint8_t);
 #endif
 
 
@@ -311,8 +320,8 @@ void amy_start_web(uint8_t);
 // envelopes
 extern float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set);
 extern float compute_mod_scale(uint8_t osc);
+extern float compute_mod_value(uint8_t mod_osc);
 extern void retrigger_mod_source(uint8_t osc);
-
 
 
 #endif

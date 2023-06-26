@@ -4,7 +4,7 @@
 
 
 #include "amy.h"
-#include "libminiaudio-audio.h"
+#include "libsoundio-audio.h"
 
 int main(int argc, char ** argv) {
 
@@ -43,7 +43,7 @@ int main(int argc, char ** argv) {
     amy_start();
     amy_live_start();
     amy_reset_oscs();
-  
+
     // Play a few notes in FM
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();

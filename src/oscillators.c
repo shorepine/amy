@@ -89,37 +89,55 @@ float render_lut_fm_osc(float * buf, float phase, float step, float incoming_amp
     return phase;// - (int)phase;
 }
 
+static float FRACTIONAL_SAMPLE(float step, const float *lut, int lut_mask) {
+    // Interpolate a value at a real-valued index <step> in a circular buffer <lut> with <lut_mask> + 1 points.
+    // Floor is very slow on the esp32, so we just cast. Dan told me to add this comment. -- baw
+    //uint16_t base_index = (uint16_t)floor(step);
+    uint32_t base_index = (uint32_t)step;
+    float frac = step - (float)base_index;
+    float b = lut[(base_index + 0) & lut_mask];
+    float c = lut[(base_index + 1) & lut_mask];
+#ifdef LINEAR_INTERP
+    // linear interpolation.
+    float sample = b + ((c - b) * frac);
+#else /* !LINEAR_INTERP => CUBIC_INTERP */
+    float a = lut[(base_index - 1) & lut_mask];
+    float d = lut[(base_index + 2) & lut_mask];
+    // cubic interpolation (TTEM p.46).
+    //      float sample = 
+    //    - frac * (frac - 1) * (frac - 2) / 6.0 * a
+    //    + (frac + 1) * (frac - 1) * (frac - 2) / 2.0 * b
+    //    - (frac + 1) * frac * (frac - 2) / 2.0 * c
+    //    + (frac + 1) * frac * (frac - 1) / 6.0 * d;
+    // Miller's optimization - https://github.com/pure-data/pure-data/blob/master/src/d_array.c#L440
+    float cminusb = c - b;
+    float sample = b + frac * (cminusb - 0.1666667f * (1.0f-frac) * ((d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b)));
+#endif /* LINEAR_INTERP */
+    return sample;
+}
+
 // TODO -- move this render_LUT to use the "New terminology" that render_lut_fm_osc uses
 // pass in unscaled phase, use step instead of skip, etc
-float render_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int32_t lut_size) { 
+float render_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int32_t lut_size, float dc_offset) { 
     // We assume lut_size == 2^R for some R, so (lut_size - 1) consists of R '1's in binary.
     int lut_mask = lut_size - 1;
     for(uint16_t i=0;i<BLOCK_SIZE;i++) {
-        // Floor is very slow on the esp32, so we just cast. Dan told me to add this comment. -- baw
-        //uint16_t base_index = (uint16_t)floor(step);
-        uint32_t base_index = (uint32_t)step;
-        float frac = step - (float)base_index;
-        float b = lut[(base_index + 0) & lut_mask];
-        float c = lut[(base_index + 1) & lut_mask];
-#ifdef LINEAR_INTERP
-        // linear interpolation.
-        float sample = b + ((c - b) * frac);
-#else /* !LINEAR_INTERP => CUBIC_INTERP */
-        float a = lut[(base_index - 1) & lut_mask];
-        float d = lut[(base_index + 2) & lut_mask];
-        // cubic interpolation (TTEM p.46).
-        //      float sample = 
-        //    - frac * (frac - 1) * (frac - 2) / 6.0 * a
-        //    + (frac + 1) * (frac - 1) * (frac - 2) / 2.0 * b
-        //    - (frac + 1) * frac * (frac - 2) / 2.0 * c
-        //    + (frac + 1) * frac * (frac - 1) / 6.0 * d;
-        // Miller's optimization - https://github.com/pure-data/pure-data/blob/master/src/d_array.c#L440
-        float cminusb = c - b;
-        float sample = b + frac * (cminusb - 0.1666667f * (1.0f-frac) * ((d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b)));
-#endif /* LINEAR_INTERP */
+        // dc_offset optionally allows us to precompensate for later integration of the waveform.
+        float sample = FRACTIONAL_SAMPLE(step, lut, lut_mask) + dc_offset;
         float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)BLOCK_SIZE);
         buf[i] += sample * scaled_amp;
 
+        step += skip;
+        if(step >= lut_size) step -= lut_size;
+    }
+    return step;
+}
+
+float render_lut_nosum_noamp(float * buf, float step, float skip, const float* lut, int32_t lut_size) { 
+    // Like render_lut, but the output is overwritten, not summed up, and there's no amp scaling.
+    int lut_mask = lut_size - 1;
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+        *buf++ = FRACTIONAL_SAMPLE(step, lut, lut_mask);
         step += skip;
         if(step >= lut_size) step -= lut_size;
     }
@@ -146,11 +164,12 @@ float render_am_lut(float * buf, float step, float skip, float incoming_amp, flo
 
 void lpf_buf(float *buf, float decay, float *state) {
     // Implement first-order low-pass (leaky integrator).
+    float s = *state;
     for (uint16_t i = 0; i < BLOCK_SIZE; ++i) {
-        float s = *state;
-        buf[i] = decay * s + buf[i];
-        *state = buf[i];
+        *buf += decay * s;
+        s = *buf++;
     }
+    *state = s;
 }
 
 
@@ -180,8 +199,8 @@ void render_pulse(float * buf, uint8_t osc) {
     float amp = msynth[osc].amp * skip * 4.0f / synth[osc].lut_size;
     float pwm_step = synth[osc].step + duty * synth[osc].lut_size;
     if (pwm_step >= synth[osc].lut_size)  pwm_step -= synth[osc].lut_size;
-    synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size);
-    render_lut(buf, pwm_step, skip, -synth[osc].last_amp, -amp, synth[osc].lut, synth[osc].lut_size);
+    synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size, 0.0f);
+    render_lut(buf, pwm_step, skip, -synth[osc].last_amp, -amp, synth[osc].lut, synth[osc].lut_size, 0.0f);
     lpf_buf(buf, synth[osc].lpf_alpha, &synth[osc].lpf_state);
     synth[osc].last_amp = amp;
 }
@@ -222,9 +241,10 @@ void saw_note_on(uint8_t osc, int8_t direction) {
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
     synth[osc].lpf_state = 0;
     // Tune the initial integrator state to compensate for mid-sample alignment of table.
-    float skip = synth[osc].lut_size / period_samples;
-    float amp = ((float)direction*synth[osc].amp) * skip * 4.0f  / synth[osc].lut_size;
-    synth[osc].lpf_state = -0.5 * amp * synth[osc].lut[0];
+    //float skip = synth[osc].lut_size / period_samples;
+    //float amp = ((float)direction*synth[osc].amp) * skip * 4.0f  / synth[osc].lut_size;
+    synth[osc].last_amp = 0; //amp;
+    synth[osc].lpf_state = 0; //-0.5f * amp * synth[osc].lut[0];
     // Calculate the mean of the LUT.
     float lut_sum = 0;
     for (int i = 0; i < synth[osc].lut_size; ++i) {
@@ -247,13 +267,11 @@ void render_saw(float * buf, uint8_t osc, int8_t direction) {
     float skip = synth[osc].lut_size / period_samples;
     // Scale the impulse proportional to the skip so its integral remains ~constant.
     float amp = ((float)direction*msynth[osc].amp) * skip * 4.0f / synth[osc].lut_size;
+    float last_amp = synth[osc].last_amp;
     synth[osc].step = render_lut(
-          buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size);
-    // Give the impulse train a negative bias so that it integrates to zero mean.
-    float offset = amp * synth[osc].dc_offset;
-    for (int i = 0; i < BLOCK_SIZE; ++i) {
-        buf[i] += offset;
-    }
+        buf, synth[osc].step, skip, last_amp, amp, synth[osc].lut, synth[osc].lut_size,
+        /* dc_offset= */ synth[osc].dc_offset);
+    // lpf_buf performs leaky integration to convert impulses into sawteeth.
     lpf_buf(buf, synth[osc].lpf_alpha, &synth[osc].lpf_state);
     synth[osc].last_amp = amp;
 }
@@ -315,7 +333,7 @@ void render_triangle(float * buf, uint8_t osc) {
     float period_samples = (float)SAMPLE_RATE / msynth[osc].freq;
     float skip = synth[osc].lut_size / period_samples;
     float amp = msynth[osc].amp;
-    synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size);
+    synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size, 0.0f);
     synth[osc].last_amp = amp;
 }
 
@@ -341,8 +359,7 @@ float compute_mod_triangle(uint8_t osc) {
         }
     }
     synth[osc].step++;
-    return (synth[osc].sample * msynth[osc].amp); // -1 .. 1
-    
+    return (synth[osc].sample * msynth[osc].amp); // -1 .. 1    
 }
 
 extern int64_t total_samples;
@@ -365,6 +382,9 @@ void render_fm_sine(float *buf, uint8_t osc, float *mod, float feedback_level, u
     }
     float step = msynth[osc].freq / (float)SAMPLE_RATE;
     float amp = msynth[osc].amp;
+    //if(synth[osc].lut_size != 256) { 
+    //    fprintf(stderr, "xx osc %d algo_osc %d lut_size %d\n", osc, algo_osc, synth[osc].lut_size);
+    //}
     synth[osc].phase = render_lut_fm_osc(buf, synth[osc].phase, step, synth[osc].last_amp, amp, 
                  synth[osc].lut, synth[osc].lut_size, mod, feedback_level, synth[osc].last_two);
     synth[osc].last_amp = amp;
@@ -378,6 +398,14 @@ void sine_note_on(uint8_t osc) {
     synth[osc].lut = sine_lutable_0; //choose_from_lutset(period_samples, sine_lutset, &synth[osc].lut_size);
     synth[osc].lut_size = 256;
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
+}
+
+const float* find_sine_lutable(void) {
+    return sine_lutable_0;
+}
+
+const float* find_triangle_lutable(void) {
+    return triangle_lutable_0;
 }
 
 void render_partial(float * buf, uint8_t osc) {
@@ -398,7 +426,7 @@ void render_partial(float * buf, uint8_t osc) {
         float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
         float amp = msynth[osc].amp;
         synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
-                    synth[osc].lut, synth[osc].lut_size);
+                                     synth[osc].lut, synth[osc].lut_size, 0.0f);
     }
     synth[osc].last_amp = msynth[osc].amp;
     if(synth[osc].substep==1) {
@@ -438,9 +466,9 @@ void render_sine(float * buf, uint8_t osc) {
 
     float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
     synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, msynth[osc].amp, 
-                 synth[osc].lut, synth[osc].lut_size);
+                                 synth[osc].lut, synth[osc].lut_size, 0.0f);
     synth[osc].last_amp = msynth[osc].amp;
-    //fprintf(stderr,"sysclock %lld amp %f buffer in middle is %f\n", amy_sysclock(), msynth[osc].amp, buf[128]);
+    //printf("sysclock %d amp %f\n", get_sysclock(), msynth[osc].amp);
 }
 
 
