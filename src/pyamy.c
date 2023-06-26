@@ -1,11 +1,11 @@
 #include <Python.h>
 #include <math.h>
 #include "amy.h"
+#include "libminiaudio-audio.h"
 
 // Python module wrapper for AMY commands
 
 static PyObject * send_wrapper(PyObject *self, PyObject *args) {
-    Py_INCREF(Py_None);
     char *arg1;
     if (! PyArg_ParseTuple(args, "s", &arg1)) {
         return NULL;
@@ -17,13 +17,17 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 
 // TODO, take an optional arg for sound device ID
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
-    Py_INCREF(Py_None);
+    int arg1 = -1;
+    if(! PyArg_ParseTuple(args, "i", &arg1)) {
+        amy_device_id = -1;
+    } else {
+        amy_device_id = arg1;
+    }
     amy_live_start();
     return Py_None;
 }
 
 static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
-    Py_INCREF(Py_None);
     amy_live_stop();
     return Py_None;
 }
@@ -32,8 +36,8 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
 static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     int16_t * result = fill_audio_buffer_task();
     // Create a python list of ints (they are signed shorts that come back)
-    PyObject* ret = PyList_New(BLOCK_SIZE); 
-    for (int i = 0; i < BLOCK_SIZE; i++) {
+    PyObject* ret = PyList_New(AMY_BLOCK_SIZE); 
+    for (int i = 0; i < AMY_BLOCK_SIZE; i++) {
         PyObject* python_int = Py_BuildValue("i", result[i]);
         PyList_SetItem(ret, i, python_int);
     }

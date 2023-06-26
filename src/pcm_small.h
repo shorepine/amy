@@ -3,7 +3,7 @@
 #define __PCM_H
 #define PCM_SAMPLES 29
 #define PCM_LENGTH 358336
-#define PCM_SAMPLE_RATE 22050
+#define PCM_AMY_SAMPLE_RATE 22050
 const pcm_map_t pcm_map[29] = {
     /* [0] 0 */ {0, 707, 342, 684, 89}, /* 808-MARACA-D */
     /* [1] 3 */ {707, 8186, 4282, 7439, 39}, /* 808-KIK 4-D */

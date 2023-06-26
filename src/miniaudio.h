@@ -235,7 +235,7 @@ enumerating devices. The example below shows how to enumerate devices.
     config.playback.pDeviceID = &pPlaybackInfos[chosenPlaybackDeviceIndex].id;
     config.playback.format    = MY_FORMAT;
     config.playback.channels  = MY_CHANNEL_COUNT;
-    config.sampleRate         = MY_SAMPLE_RATE;
+    config.sampleRate         = MY_AMY_SAMPLE_RATE;
     config.dataCallback       = data_callback;
     config.pUserData          = pMyCustomData;
 
@@ -404,7 +404,7 @@ required. Note that scheduling a start time still requires an explicit call to `
 before anything will play:
 
     ```c
-    ma_sound_set_start_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_sample_rate(&engine) * 2);
+    ma_sound_set_start_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_AMY_SAMPLE_RATE(&engine) * 2);
     ma_sound_start(&sound);
     ```
 
@@ -1420,10 +1420,10 @@ can be useful to schedule a sound to start or stop:
 
     ```c
     // Start the sound in 1 second from now.
-    ma_sound_set_start_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_sample_rate(&engine) * 1));
+    ma_sound_set_start_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_AMY_SAMPLE_RATE(&engine) * 1));
 
     // Stop the sound in 2 seconds from now.
-    ma_sound_set_stop_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_sample_rate(&engine) * 2));
+    ma_sound_set_stop_time_in_pcm_frames(&sound, ma_engine_get_time(&engine) + (ma_engine_get_AMY_SAMPLE_RATE(&engine) * 2));
     ```
 
 Note that scheduling a start time still requires an explicit call to `ma_sound_start()` before
@@ -2614,7 +2614,7 @@ delivered via callbacks with `ma_encoder_init()`. Below is an example for initia
 to output to a file.
 
     ```c
-    ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, FORMAT, CHANNELS, SAMPLE_RATE);
+    ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, FORMAT, CHANNELS, AMY_SAMPLE_RATE);
     ma_encoder encoder;
     ma_result result = ma_encoder_init_file("my_file.wav", &config, &encoder);
     if (result != MA_SUCCESS) {
@@ -3284,7 +3284,7 @@ with the `ma_waveform` API. Example:
     ma_waveform_config config = ma_waveform_config_init(
         FORMAT,
         CHANNELS,
-        SAMPLE_RATE,
+        AMY_SAMPLE_RATE,
         ma_waveform_type_sine,
         amplitude,
         frequency);
@@ -3302,7 +3302,7 @@ with the `ma_waveform` API. Example:
 
 The amplitude, frequency, type, and sample rate can be changed dynamically with
 `ma_waveform_set_amplitude()`, `ma_waveform_set_frequency()`, `ma_waveform_set_type()`, and
-`ma_waveform_set_sample_rate()` respectively.
+`ma_waveform_set_AMY_SAMPLE_RATE()` respectively.
 
 You can invert the waveform by setting the amplitude to a negative value. You can use this to
 control whether or not a sawtooth has a positive or negative ramp, for example.
@@ -4128,29 +4128,29 @@ typedef enum
 typedef enum
 {
     /* Standard rates need to be in priority order. */
-    ma_standard_sample_rate_48000  = 48000,     /* Most common */
-    ma_standard_sample_rate_44100  = 44100,
+    ma_standard_AMY_SAMPLE_RATE_48000  = 48000,     /* Most common */
+    ma_standard_AMY_SAMPLE_RATE_44100  = 44100,
 
-    ma_standard_sample_rate_32000  = 32000,     /* Lows */
-    ma_standard_sample_rate_24000  = 24000,
-    ma_standard_sample_rate_22050  = 22050,
+    ma_standard_AMY_SAMPLE_RATE_32000  = 32000,     /* Lows */
+    ma_standard_AMY_SAMPLE_RATE_24000  = 24000,
+    ma_standard_AMY_SAMPLE_RATE_22050  = 22050,
 
-    ma_standard_sample_rate_88200  = 88200,     /* Highs */
-    ma_standard_sample_rate_96000  = 96000,
-    ma_standard_sample_rate_176400 = 176400,
-    ma_standard_sample_rate_192000 = 192000,
+    ma_standard_AMY_SAMPLE_RATE_88200  = 88200,     /* Highs */
+    ma_standard_AMY_SAMPLE_RATE_96000  = 96000,
+    ma_standard_AMY_SAMPLE_RATE_176400 = 176400,
+    ma_standard_AMY_SAMPLE_RATE_192000 = 192000,
 
-    ma_standard_sample_rate_16000  = 16000,     /* Extreme lows */
-    ma_standard_sample_rate_11025  = 11250,
-    ma_standard_sample_rate_8000   = 8000,
+    ma_standard_AMY_SAMPLE_RATE_16000  = 16000,     /* Extreme lows */
+    ma_standard_AMY_SAMPLE_RATE_11025  = 11250,
+    ma_standard_AMY_SAMPLE_RATE_8000   = 8000,
 
-    ma_standard_sample_rate_352800 = 352800,    /* Extreme highs */
-    ma_standard_sample_rate_384000 = 384000,
+    ma_standard_AMY_SAMPLE_RATE_352800 = 352800,    /* Extreme highs */
+    ma_standard_AMY_SAMPLE_RATE_384000 = 384000,
 
-    ma_standard_sample_rate_min    = ma_standard_sample_rate_8000,
-    ma_standard_sample_rate_max    = ma_standard_sample_rate_384000,
-    ma_standard_sample_rate_count  = 14         /* Need to maintain the count manually. Make sure this is updated if items are added to enum. */
-} ma_standard_sample_rate;
+    ma_standard_AMY_SAMPLE_RATE_min    = ma_standard_AMY_SAMPLE_RATE_8000,
+    ma_standard_AMY_SAMPLE_RATE_max    = ma_standard_AMY_SAMPLE_RATE_384000,
+    ma_standard_AMY_SAMPLE_RATE_count  = 14         /* Need to maintain the count manually. Make sure this is updated if items are added to enum. */
+} ma_standard_AMY_SAMPLE_RATE;
 
 
 typedef enum
@@ -6623,7 +6623,7 @@ typedef struct
         ma_uint32 channels;     /* If set to 0, all channels are supported. */
         ma_uint32 sampleRate;   /* If set to 0, all sample rates are supported. */
         ma_uint32 flags;        /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
-    } nativeDataFormats[/*ma_format_count * ma_standard_sample_rate_count * MA_MAX_CHANNELS*/ 64];  /* Not sure how big to make this. There can be *many* permutations for virtual devices which can support anything. */
+    } nativeDataFormats[/*ma_format_count * ma_standard_AMY_SAMPLE_RATE_count * MA_MAX_CHANNELS*/ 64];  /* Not sure how big to make this. There can be *many* permutations for virtual devices which can support anything. */
 } ma_device_info;
 
 struct ma_device_config
@@ -7112,7 +7112,7 @@ struct ma_context
             ma_proc jack_set_process_callback;
             ma_proc jack_set_buffer_size_callback;
             ma_proc jack_on_shutdown;
-            ma_proc jack_get_sample_rate;
+            ma_proc jack_get_AMY_SAMPLE_RATE;
             ma_proc jack_get_buffer_size;
             ma_proc jack_get_ports;
             ma_proc jack_activate;
@@ -9159,7 +9159,7 @@ This is safe to call within the data callback, but there is no reason to ever do
 Remarks
 -------
 If `nativeSampleRate` is zero, this function will fall back to `pDescriptor->sampleRate`. If that
-is also zero, `MA_DEFAULT_SAMPLE_RATE` will be used instead.
+is also zero, `MA_DEFAULT_AMY_SAMPLE_RATE` will be used instead.
 */
 MA_API ma_uint32 ma_calculate_buffer_size_in_frames_from_descriptor(const ma_device_descriptor* pDescriptor, ma_uint32 nativeSampleRate, ma_performance_profile performanceProfile);
 
@@ -9899,7 +9899,7 @@ MA_API ma_result ma_waveform_seek_to_pcm_frame(ma_waveform* pWaveform, ma_uint64
 MA_API ma_result ma_waveform_set_amplitude(ma_waveform* pWaveform, double amplitude);
 MA_API ma_result ma_waveform_set_frequency(ma_waveform* pWaveform, double frequency);
 MA_API ma_result ma_waveform_set_type(ma_waveform* pWaveform, ma_waveform_type type);
-MA_API ma_result ma_waveform_set_sample_rate(ma_waveform* pWaveform, ma_uint32 sampleRate);
+MA_API ma_result ma_waveform_set_AMY_SAMPLE_RATE(ma_waveform* pWaveform, ma_uint32 sampleRate);
 
 typedef enum
 {
@@ -10951,7 +10951,7 @@ MA_API ma_node* ma_engine_get_endpoint(ma_engine* pEngine);
 MA_API ma_uint64 ma_engine_get_time(const ma_engine* pEngine);
 MA_API ma_result ma_engine_set_time(ma_engine* pEngine, ma_uint64 globalTime);
 MA_API ma_uint32 ma_engine_get_channels(const ma_engine* pEngine);
-MA_API ma_uint32 ma_engine_get_sample_rate(const ma_engine* pEngine);
+MA_API ma_uint32 ma_engine_get_AMY_SAMPLE_RATE(const ma_engine* pEngine);
 
 MA_API ma_result ma_engine_start(ma_engine* pEngine);
 MA_API ma_result ma_engine_stop(ma_engine* pEngine);
@@ -11754,8 +11754,8 @@ static MA_INLINE void ma_restore_denormals(unsigned int prevState)
 #endif
 
 /* The default sample rate to use when 0 is used when initializing a device. */
-#ifndef MA_DEFAULT_SAMPLE_RATE
-#define MA_DEFAULT_SAMPLE_RATE                              48000
+#ifndef MA_DEFAULT_AMY_SAMPLE_RATE
+#define MA_DEFAULT_AMY_SAMPLE_RATE                              48000
 #endif
 
 /* Default periods when none is specified in ma_device_init(). More periods means more work on the CPU. */
@@ -11790,27 +11790,27 @@ static MA_INLINE void ma_restore_denormals(unsigned int prevState)
 
 /* Standard sample rates, in order of priority. */
 static ma_uint32 g_maStandardSampleRatePriorities[] = {
-    (ma_uint32)ma_standard_sample_rate_48000,
-    (ma_uint32)ma_standard_sample_rate_44100,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_48000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_44100,
 
-    (ma_uint32)ma_standard_sample_rate_32000,
-    (ma_uint32)ma_standard_sample_rate_24000,
-    (ma_uint32)ma_standard_sample_rate_22050,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_32000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_24000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_22050,
 
-    (ma_uint32)ma_standard_sample_rate_88200,
-    (ma_uint32)ma_standard_sample_rate_96000,
-    (ma_uint32)ma_standard_sample_rate_176400,
-    (ma_uint32)ma_standard_sample_rate_192000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_88200,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_96000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_176400,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_192000,
 
-    (ma_uint32)ma_standard_sample_rate_16000,
-    (ma_uint32)ma_standard_sample_rate_11025,
-    (ma_uint32)ma_standard_sample_rate_8000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_16000,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_11025,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_8000,
 
-    (ma_uint32)ma_standard_sample_rate_352800,
-    (ma_uint32)ma_standard_sample_rate_384000
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_352800,
+    (ma_uint32)ma_standard_AMY_SAMPLE_RATE_384000
 };
 
-static MA_INLINE ma_bool32 ma_is_standard_sample_rate(ma_uint32 sampleRate)
+static MA_INLINE ma_bool32 ma_is_standard_AMY_SAMPLE_RATE(ma_uint32 sampleRate)
 {
     ma_uint32 iSampleRate;
 
@@ -17786,7 +17786,7 @@ MA_API ma_proc ma_dlsym(ma_context* pContext, ma_handle handle, const char* symb
 
 
 #if 0
-static ma_uint32 ma_get_closest_standard_sample_rate(ma_uint32 sampleRateIn)
+static ma_uint32 ma_get_closest_standard_AMY_SAMPLE_RATE(ma_uint32 sampleRateIn)
 {
     ma_uint32 closestRate = 0;
     ma_uint32 closestDiff = 0xFFFFFFFF;
@@ -18795,7 +18795,7 @@ static ma_result ma_device_init__null(ma_device* pDevice, const ma_device_config
     if (pConfig->deviceType == ma_device_type_capture || pConfig->deviceType == ma_device_type_duplex) {
         pDescriptorCapture->format     = (pDescriptorCapture->format     != ma_format_unknown) ? pDescriptorCapture->format     : MA_DEFAULT_FORMAT;
         pDescriptorCapture->channels   = (pDescriptorCapture->channels   != 0)                 ? pDescriptorCapture->channels   : MA_DEFAULT_CHANNELS;
-        pDescriptorCapture->sampleRate = (pDescriptorCapture->sampleRate != 0)                 ? pDescriptorCapture->sampleRate : MA_DEFAULT_SAMPLE_RATE;
+        pDescriptorCapture->sampleRate = (pDescriptorCapture->sampleRate != 0)                 ? pDescriptorCapture->sampleRate : MA_DEFAULT_AMY_SAMPLE_RATE;
 
         if (pDescriptorCapture->channelMap[0] == MA_CHANNEL_NONE) {
             ma_channel_map_init_standard(ma_standard_channel_map_default, pDescriptorCapture->channelMap, ma_countof(pDescriptorCapture->channelMap), pDescriptorCapture->channels);
@@ -18807,7 +18807,7 @@ static ma_result ma_device_init__null(ma_device* pDevice, const ma_device_config
     if (pConfig->deviceType == ma_device_type_playback || pConfig->deviceType == ma_device_type_duplex) {
         pDescriptorPlayback->format     = (pDescriptorPlayback->format     != ma_format_unknown) ? pDescriptorPlayback->format     : MA_DEFAULT_FORMAT;
         pDescriptorPlayback->channels   = (pDescriptorPlayback->channels   != 0)                 ? pDescriptorPlayback->channels   : MA_DEFAULT_CHANNELS;
-        pDescriptorPlayback->sampleRate = (pDescriptorPlayback->sampleRate != 0)                 ? pDescriptorPlayback->sampleRate : MA_DEFAULT_SAMPLE_RATE;
+        pDescriptorPlayback->sampleRate = (pDescriptorPlayback->sampleRate != 0)                 ? pDescriptorPlayback->sampleRate : MA_DEFAULT_AMY_SAMPLE_RATE;
 
         if (pDescriptorPlayback->channelMap[0] == MA_CHANNEL_NONE) {
             ma_channel_map_init_standard(ma_standard_channel_map_default, pDescriptorPlayback->channelMap, ma_countof(pDescriptorCapture->channelMap), pDescriptorPlayback->channels);
@@ -21323,7 +21323,7 @@ static ma_result ma_device_init_internal__wasapi(ma_context* pContext, ma_device
     */
     nativeSampleRate = wf.Format.nSamplesPerSec;
     if (streamFlags & MA_AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM) {
-        wf.Format.nSamplesPerSec = (pData->sampleRateIn != 0) ? pData->sampleRateIn : MA_DEFAULT_SAMPLE_RATE;
+        wf.Format.nSamplesPerSec = (pData->sampleRateIn != 0) ? pData->sampleRateIn : MA_DEFAULT_AMY_SAMPLE_RATE;
         wf.Format.nAvgBytesPerSec = wf.Format.nSamplesPerSec * wf.Format.nBlockAlign;
     }
 
@@ -23007,14 +23007,14 @@ typedef HRESULT (WINAPI   * ma_DirectSoundEnumerateAProc)       (ma_DSEnumCallba
 typedef HRESULT (WINAPI   * ma_DirectSoundCaptureCreateProc)    (const GUID* pcGuidDevice, ma_IDirectSoundCapture** ppDSC8, LPUNKNOWN pUnkOuter);
 typedef HRESULT (WINAPI   * ma_DirectSoundCaptureEnumerateAProc)(ma_DSEnumCallbackAProc pDSEnumCallback, LPVOID pContext);
 
-static ma_uint32 ma_get_best_sample_rate_within_range(ma_uint32 sampleRateMin, ma_uint32 sampleRateMax)
+static ma_uint32 ma_get_best_AMY_SAMPLE_RATE_within_range(ma_uint32 sampleRateMin, ma_uint32 sampleRateMax)
 {
     /* Normalize the range in case we were given something stupid. */
-    if (sampleRateMin < (ma_uint32)ma_standard_sample_rate_min) {
-        sampleRateMin = (ma_uint32)ma_standard_sample_rate_min;
+    if (sampleRateMin < (ma_uint32)ma_standard_AMY_SAMPLE_RATE_min) {
+        sampleRateMin = (ma_uint32)ma_standard_AMY_SAMPLE_RATE_min;
     }
-    if (sampleRateMax > (ma_uint32)ma_standard_sample_rate_max) {
-        sampleRateMax = (ma_uint32)ma_standard_sample_rate_max;
+    if (sampleRateMax > (ma_uint32)ma_standard_AMY_SAMPLE_RATE_max) {
+        sampleRateMax = (ma_uint32)ma_standard_AMY_SAMPLE_RATE_max;
     }
     if (sampleRateMin > sampleRateMax) {
         sampleRateMin = sampleRateMax;
@@ -23538,7 +23538,7 @@ static ma_result ma_config_to_WAVEFORMATEXTENSIBLE(ma_format format, ma_uint32 c
     }
 
     if (sampleRate == 0) {
-        sampleRate = MA_DEFAULT_SAMPLE_RATE;
+        sampleRate = MA_DEFAULT_AMY_SAMPLE_RATE;
     }
 
     switch (format)
@@ -23761,7 +23761,7 @@ static ma_result ma_device_init__dsound(ma_device* pDevice, const ma_device_conf
         if (pDescriptorPlayback->sampleRate == 0) {
             /* We base the sample rate on the values returned by GetCaps(). */
             if ((caps.dwFlags & MA_DSCAPS_CONTINUOUSRATE) != 0) {
-                wf.Format.nSamplesPerSec = ma_get_best_sample_rate_within_range(caps.dwMinSecondarySampleRate, caps.dwMaxSecondarySampleRate);
+                wf.Format.nSamplesPerSec = ma_get_best_AMY_SAMPLE_RATE_within_range(caps.dwMinSecondarySampleRate, caps.dwMaxSecondarySampleRate);
             } else {
                 wf.Format.nSamplesPerSec = caps.dwMaxSecondarySampleRate;
             }
@@ -26375,8 +26375,8 @@ static void ma_context_iterate_rates_and_add_native_data_format__alsa(ma_context
     ((ma_snd_pcm_hw_params_get_rate_max_proc)pContext->alsa.snd_pcm_hw_params_get_rate_max)(pHWParams, &maxSampleRate, &sampleRateDir);
 
     /* Make sure our sample rates are clamped to sane values. Stupid devices like "pulse" will reports rates like "1" which is ridiculus. */
-    minSampleRate = ma_clamp(minSampleRate, (unsigned int)ma_standard_sample_rate_min, (unsigned int)ma_standard_sample_rate_max);
-    maxSampleRate = ma_clamp(maxSampleRate, (unsigned int)ma_standard_sample_rate_min, (unsigned int)ma_standard_sample_rate_max);
+    minSampleRate = ma_clamp(minSampleRate, (unsigned int)ma_standard_AMY_SAMPLE_RATE_min, (unsigned int)ma_standard_AMY_SAMPLE_RATE_max);
+    maxSampleRate = ma_clamp(maxSampleRate, (unsigned int)ma_standard_AMY_SAMPLE_RATE_min, (unsigned int)ma_standard_AMY_SAMPLE_RATE_max);
 
     for (iSampleRate = 0; iSampleRate < ma_countof(g_maStandardSampleRatePriorities); iSampleRate += 1) {
         ma_uint32 standardSampleRate = g_maStandardSampleRatePriorities[iSampleRate];
@@ -26387,11 +26387,11 @@ static void ma_context_iterate_rates_and_add_native_data_format__alsa(ma_context
     }
 
     /* Now make sure our min and max rates are included just in case they aren't in the range of our standard rates. */
-    if (!ma_is_standard_sample_rate(minSampleRate)) {
+    if (!ma_is_standard_AMY_SAMPLE_RATE(minSampleRate)) {
         ma_context_test_rate_and_add_native_data_format__alsa(pContext, pPCM, pHWParams, format, channels, minSampleRate, flags, pDeviceInfo);
     }
 
-    if (!ma_is_standard_sample_rate(maxSampleRate) && maxSampleRate != minSampleRate) {
+    if (!ma_is_standard_AMY_SAMPLE_RATE(maxSampleRate) && maxSampleRate != minSampleRate) {
         ma_context_test_rate_and_add_native_data_format__alsa(pContext, pPCM, pHWParams, format, channels, maxSampleRate, flags, pDeviceInfo);
     }
 }
@@ -26726,7 +26726,7 @@ static ma_result ma_device_init_by_type__alsa(ma_device* pDevice, const ma_devic
 
         sampleRate = pDescriptor->sampleRate;
         if (sampleRate == 0) {
-            sampleRate = MA_DEFAULT_SAMPLE_RATE;
+            sampleRate = MA_DEFAULT_AMY_SAMPLE_RATE;
         }
 
         resultALSA = ((ma_snd_pcm_hw_params_set_rate_near_proc)pDevice->pContext->alsa.snd_pcm_hw_params_set_rate_near)(pPCM, pHWParams, &sampleRate, 0);
@@ -29332,7 +29332,7 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
             ma_log_postf(ma_device_get_log(pDevice), MA_LOG_LEVEL_INFO, "[PulseAudio] sample_spec.format not supported by miniaudio. Defaulting to PA_SAMPLE_FLOAT32.\n");
         }
         if (ss.rate == 0) {
-            ss.rate = MA_DEFAULT_SAMPLE_RATE;
+            ss.rate = MA_DEFAULT_AMY_SAMPLE_RATE;
             ma_log_postf(ma_device_get_log(pDevice), MA_LOG_LEVEL_INFO, "[PulseAudio] sample_spec.rate = 0. Defaulting to %d.\n", ss.rate);
         }
         if (ss.channels == 0) {
@@ -29473,7 +29473,7 @@ static ma_result ma_device_init__pulse(ma_device* pDevice, const ma_device_confi
             ma_log_postf(ma_device_get_log(pDevice), MA_LOG_LEVEL_INFO, "[PulseAudio] sample_spec.format not supported by miniaudio. Defaulting to PA_SAMPLE_FLOAT32.\n");
         }
         if (ss.rate == 0) {
-            ss.rate = MA_DEFAULT_SAMPLE_RATE;
+            ss.rate = MA_DEFAULT_AMY_SAMPLE_RATE;
             ma_log_postf(ma_device_get_log(pDevice), MA_LOG_LEVEL_INFO, "[PulseAudio] sample_spec.rate = 0. Defaulting to %d.\n", ss.rate);
         }
         if (ss.channels == 0) {
@@ -30096,7 +30096,7 @@ typedef int               (* ma_jack_client_name_size_proc)        (void);
 typedef int               (* ma_jack_set_process_callback_proc)    (ma_jack_client_t* client, ma_JackProcessCallback process_callback, void* arg);
 typedef int               (* ma_jack_set_buffer_size_callback_proc)(ma_jack_client_t* client, ma_JackBufferSizeCallback bufsize_callback, void* arg);
 typedef void              (* ma_jack_on_shutdown_proc)             (ma_jack_client_t* client, ma_JackShutdownCallback function, void* arg);
-typedef ma_jack_nframes_t (* ma_jack_get_sample_rate_proc)         (ma_jack_client_t* client);
+typedef ma_jack_nframes_t (* ma_jack_get_AMY_SAMPLE_RATE_proc)         (ma_jack_client_t* client);
 typedef ma_jack_nframes_t (* ma_jack_get_buffer_size_proc)         (ma_jack_client_t* client);
 typedef const char**      (* ma_jack_get_ports_proc)               (ma_jack_client_t* client, const char* port_name_pattern, const char* type_name_pattern, unsigned long flags);
 typedef int               (* ma_jack_activate_proc)                (ma_jack_client_t* client);
@@ -30199,7 +30199,7 @@ static ma_result ma_context_get_device_info__jack(ma_context* pContext, ma_devic
         return result;
     }
 
-    pDeviceInfo->nativeDataFormats[0].sampleRate = ((ma_jack_get_sample_rate_proc)pContext->jack.jack_get_sample_rate)((ma_jack_client_t*)pClient);
+    pDeviceInfo->nativeDataFormats[0].sampleRate = ((ma_jack_get_AMY_SAMPLE_RATE_proc)pContext->jack.jack_get_AMY_SAMPLE_RATE)((ma_jack_client_t*)pClient);
     pDeviceInfo->nativeDataFormats[0].channels   = 0;
 
     ppPorts = ((ma_jack_get_ports_proc)pContext->jack.jack_get_ports)((ma_jack_client_t*)pClient, NULL, MA_JACK_DEFAULT_AUDIO_TYPE, ma_JackPortIsPhysical | ((deviceType == ma_device_type_playback) ? ma_JackPortIsInput : ma_JackPortIsOutput));
@@ -30402,7 +30402,7 @@ static ma_result ma_device_init__jack(ma_device* pDevice, const ma_device_config
 
         pDescriptorCapture->format     = ma_format_f32;
         pDescriptorCapture->channels   = 0;
-        pDescriptorCapture->sampleRate = ((ma_jack_get_sample_rate_proc)pDevice->pContext->jack.jack_get_sample_rate)((ma_jack_client_t*)pDevice->jack.pClient);
+        pDescriptorCapture->sampleRate = ((ma_jack_get_AMY_SAMPLE_RATE_proc)pDevice->pContext->jack.jack_get_AMY_SAMPLE_RATE)((ma_jack_client_t*)pDevice->jack.pClient);
         ma_channel_map_init_standard(ma_standard_channel_map_alsa, pDescriptorCapture->channelMap, ma_countof(pDescriptorCapture->channelMap), pDescriptorCapture->channels);
 
         ppPorts = ((ma_jack_get_ports_proc)pDevice->pContext->jack.jack_get_ports)((ma_jack_client_t*)pDevice->jack.pClient, NULL, MA_JACK_DEFAULT_AUDIO_TYPE, ma_JackPortIsPhysical | ma_JackPortIsOutput);
@@ -30453,7 +30453,7 @@ static ma_result ma_device_init__jack(ma_device* pDevice, const ma_device_config
 
         pDescriptorPlayback->format     = ma_format_f32;
         pDescriptorPlayback->channels   = 0;
-        pDescriptorPlayback->sampleRate = ((ma_jack_get_sample_rate_proc)pDevice->pContext->jack.jack_get_sample_rate)((ma_jack_client_t*)pDevice->jack.pClient);
+        pDescriptorPlayback->sampleRate = ((ma_jack_get_AMY_SAMPLE_RATE_proc)pDevice->pContext->jack.jack_get_AMY_SAMPLE_RATE)((ma_jack_client_t*)pDevice->jack.pClient);
         ma_channel_map_init_standard(ma_standard_channel_map_alsa, pDescriptorPlayback->channelMap, ma_countof(pDescriptorPlayback->channelMap), pDescriptorPlayback->channels);
 
         ppPorts = ((ma_jack_get_ports_proc)pDevice->pContext->jack.jack_get_ports)((ma_jack_client_t*)pDevice->jack.pClient, NULL, MA_JACK_DEFAULT_AUDIO_TYPE, ma_JackPortIsPhysical | ma_JackPortIsInput);
@@ -30627,7 +30627,7 @@ static ma_result ma_context_init__jack(ma_context* pContext, const ma_context_co
     pContext->jack.jack_set_process_callback     = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_set_process_callback");
     pContext->jack.jack_set_buffer_size_callback = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_set_buffer_size_callback");
     pContext->jack.jack_on_shutdown              = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_on_shutdown");
-    pContext->jack.jack_get_sample_rate          = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_get_sample_rate");
+    pContext->jack.jack_get_AMY_SAMPLE_RATE          = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_get_AMY_SAMPLE_RATE");
     pContext->jack.jack_get_buffer_size          = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_get_buffer_size");
     pContext->jack.jack_get_ports                = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_get_ports");
     pContext->jack.jack_activate                 = (ma_proc)ma_dlsym(pContext, pContext->jack.jackSO, "jack_activate");
@@ -30648,7 +30648,7 @@ static ma_result ma_context_init__jack(ma_context* pContext, const ma_context_co
     ma_jack_set_process_callback_proc     _jack_set_process_callback     = jack_set_process_callback;
     ma_jack_set_buffer_size_callback_proc _jack_set_buffer_size_callback = jack_set_buffer_size_callback;
     ma_jack_on_shutdown_proc              _jack_on_shutdown              = jack_on_shutdown;
-    ma_jack_get_sample_rate_proc          _jack_get_sample_rate          = jack_get_sample_rate;
+    ma_jack_get_AMY_SAMPLE_RATE_proc          _jack_get_AMY_SAMPLE_RATE          = jack_get_AMY_SAMPLE_RATE;
     ma_jack_get_buffer_size_proc          _jack_get_buffer_size          = jack_get_buffer_size;
     ma_jack_get_ports_proc                _jack_get_ports                = jack_get_ports;
     ma_jack_activate_proc                 _jack_activate                 = jack_activate;
@@ -30665,7 +30665,7 @@ static ma_result ma_context_init__jack(ma_context* pContext, const ma_context_co
     pContext->jack.jack_set_process_callback     = (ma_proc)_jack_set_process_callback;
     pContext->jack.jack_set_buffer_size_callback = (ma_proc)_jack_set_buffer_size_callback;
     pContext->jack.jack_on_shutdown              = (ma_proc)_jack_on_shutdown;
-    pContext->jack.jack_get_sample_rate          = (ma_proc)_jack_get_sample_rate;
+    pContext->jack.jack_get_AMY_SAMPLE_RATE          = (ma_proc)_jack_get_AMY_SAMPLE_RATE;
     pContext->jack.jack_get_buffer_size          = (ma_proc)_jack_get_buffer_size;
     pContext->jack.jack_get_ports                = (ma_proc)_jack_get_ports;
     pContext->jack.jack_activate                 = (ma_proc)_jack_activate;
@@ -31417,7 +31417,7 @@ static ma_result ma_get_AudioObject_channel_map(ma_context* pContext, AudioObjec
 }
 #endif
 
-static ma_result ma_get_AudioObject_sample_rates(ma_context* pContext, AudioObjectID deviceObjectID, ma_device_type deviceType, UInt32* pSampleRateRangesCount, AudioValueRange** ppSampleRateRanges)   /* NOTE: Free the returned pointer with ma_free(). */
+static ma_result ma_get_AudioObject_AMY_SAMPLE_RATEs(ma_context* pContext, AudioObjectID deviceObjectID, ma_device_type deviceType, UInt32* pSampleRateRangesCount, AudioValueRange** ppSampleRateRanges)   /* NOTE: Free the returned pointer with ma_free(). */
 {
     AudioObjectPropertyAddress propAddress;
     UInt32 dataSize;
@@ -31458,7 +31458,7 @@ static ma_result ma_get_AudioObject_sample_rates(ma_context* pContext, AudioObje
 }
 
 #if 0
-static ma_result ma_get_AudioObject_get_closest_sample_rate(ma_context* pContext, AudioObjectID deviceObjectID, ma_device_type deviceType, ma_uint32 sampleRateIn, ma_uint32* pSampleRateOut)
+static ma_result ma_get_AudioObject_get_closest_AMY_SAMPLE_RATE(ma_context* pContext, AudioObjectID deviceObjectID, ma_device_type deviceType, ma_uint32 sampleRateIn, ma_uint32* pSampleRateOut)
 {
     UInt32 sampleRateRangeCount;
     AudioValueRange* pSampleRateRanges;
@@ -31469,7 +31469,7 @@ static ma_result ma_get_AudioObject_get_closest_sample_rate(ma_context* pContext
 
     *pSampleRateOut = 0;    /* Safety. */
 
-    result = ma_get_AudioObject_sample_rates(pContext, deviceObjectID, deviceType, &sampleRateRangeCount, &pSampleRateRanges);
+    result = ma_get_AudioObject_AMY_SAMPLE_RATEs(pContext, deviceObjectID, deviceType, &sampleRateRangeCount, &pSampleRateRanges);
     if (result != MA_SUCCESS) {
         return result;
     }
@@ -32105,7 +32105,7 @@ static ma_result ma_context_get_device_info__coreaudio(ma_context* pContext, ma_
                 uniqueFormatCount += 1;
 
                 /* Sample Rates */
-                result = ma_get_AudioObject_sample_rates(pContext, deviceObjectID, deviceType, &sampleRateRangeCount, &pSampleRateRanges);
+                result = ma_get_AudioObject_AMY_SAMPLE_RATEs(pContext, deviceObjectID, deviceType, &sampleRateRangeCount, &pSampleRateRanges);
                 if (result != MA_SUCCESS) {
                     return result;
                 }
@@ -34022,7 +34022,7 @@ typedef int                (* ma_sio_start_proc)  (struct ma_sio_hdl*);
 typedef int                (* ma_sio_stop_proc)   (struct ma_sio_hdl*);
 typedef int                (* ma_sio_initpar_proc)(struct ma_sio_par*);
 
-static ma_uint32 ma_get_standard_sample_rate_priority_index__sndio(ma_uint32 sampleRate)   /* Lower = higher priority */
+static ma_uint32 ma_get_standard_AMY_SAMPLE_RATE_priority_index__sndio(ma_uint32 sampleRate)   /* Lower = higher priority */
 {
     ma_uint32 i;
     for (i = 0; i < ma_countof(g_maStandardSampleRatePriorities); ++i) {
@@ -34172,7 +34172,7 @@ static ma_uint32 ma_find_best_channels_from_sio_cap__sndio(struct ma_sio_cap* ca
     return maxChannels;
 }
 
-static ma_uint32 ma_find_best_sample_rate_from_sio_cap__sndio(struct ma_sio_cap* caps, ma_device_type deviceType, ma_format requiredFormat, ma_uint32 requiredChannels)
+static ma_uint32 ma_find_best_AMY_SAMPLE_RATE_from_sio_cap__sndio(struct ma_sio_cap* caps, ma_device_type deviceType, ma_format requiredFormat, ma_uint32 requiredChannels)
 {
     ma_uint32 firstSampleRate;
     ma_uint32 bestSampleRate;
@@ -34248,12 +34248,12 @@ static ma_uint32 ma_find_best_sample_rate_from_sio_cap__sndio(struct ma_sio_cap*
                     }
 
                     /* Disregard this rate if it's not a standard one. */
-                    ratePriority = ma_get_standard_sample_rate_priority_index__sndio(rate);
+                    ratePriority = ma_get_standard_AMY_SAMPLE_RATE_priority_index__sndio(rate);
                     if (ratePriority == (ma_uint32)-1) {
                         continue;
                     }
 
-                    if (ma_get_standard_sample_rate_priority_index__sndio(bestSampleRate) > ratePriority) {   /* Lower = better. */
+                    if (ma_get_standard_AMY_SAMPLE_RATE_priority_index__sndio(bestSampleRate) > ratePriority) {   /* Lower = better. */
                         bestSampleRate = rate;
                     }
                 }
@@ -34512,7 +34512,7 @@ static ma_result ma_device_init_handle__sndio(ma_device* pDevice, const ma_devic
     }
 
     if (sampleRate == 0) {
-        sampleRate = ma_find_best_sample_rate_from_sio_cap__sndio(&caps, pConfig->deviceType, format, channels);
+        sampleRate = ma_find_best_AMY_SAMPLE_RATE_from_sio_cap__sndio(&caps, pConfig->deviceType, format, channels);
     }
 
 
@@ -35018,10 +35018,10 @@ static ma_result ma_context_get_device_info_from_fd__audio4(ma_context* pContext
 
         if (deviceType == ma_device_type_playback) {
             channels   = fdInfo.play.channels;
-            sampleRate = fdInfo.play.sample_rate;
+            sampleRate = fdInfo.play.AMY_SAMPLE_RATE;
         } else {
             channels   = fdInfo.record.channels;
-            sampleRate = fdInfo.record.sample_rate;
+            sampleRate = fdInfo.record.AMY_SAMPLE_RATE;
         }
 
         /* Supported formats. We get this by looking at the encodings. */
@@ -35278,7 +35278,7 @@ static ma_result ma_device_init_fd__audio4(ma_device* pDevice, const ma_device_c
             }
 
             if (pDescriptor->sampleRate != 0) {
-                fdInfo.record.sample_rate = ma_clamp(pDescriptor->sampleRate, 1000, 192000);    /* From the documentation: `frequency` ranges from 1000Hz to 192000Hz. (They mean `sample_rate` instead of `frequency`.) */
+                fdInfo.record.AMY_SAMPLE_RATE = ma_clamp(pDescriptor->sampleRate, 1000, 192000);    /* From the documentation: `frequency` ranges from 1000Hz to 192000Hz. (They mean `AMY_SAMPLE_RATE` instead of `frequency`.) */
             }
         } else {
             fdInfo.mode = AUMODE_PLAY;
@@ -35289,7 +35289,7 @@ static ma_result ma_device_init_fd__audio4(ma_device* pDevice, const ma_device_c
             }
 
             if (pDescriptor->sampleRate != 0) {
-                fdInfo.play.sample_rate = ma_clamp(pDescriptor->sampleRate, 1000, 192000);    /* From the documentation: `frequency` ranges from 1000Hz to 192000Hz. (They mean `sample_rate` instead of `frequency`.) */
+                fdInfo.play.AMY_SAMPLE_RATE = ma_clamp(pDescriptor->sampleRate, 1000, 192000);    /* From the documentation: `frequency` ranges from 1000Hz to 192000Hz. (They mean `AMY_SAMPLE_RATE` instead of `frequency`.) */
             }
         }
 
@@ -35308,11 +35308,11 @@ static ma_result ma_device_init_fd__audio4(ma_device* pDevice, const ma_device_c
         if (deviceType == ma_device_type_capture) {
             internalFormat     = ma_format_from_prinfo__audio4(&fdInfo.record);
             internalChannels   = fdInfo.record.channels;
-            internalSampleRate = fdInfo.record.sample_rate;
+            internalSampleRate = fdInfo.record.AMY_SAMPLE_RATE;
         } else {
             internalFormat     = ma_format_from_prinfo__audio4(&fdInfo.play);
             internalChannels   = fdInfo.play.channels;
-            internalSampleRate = fdInfo.play.sample_rate;
+            internalSampleRate = fdInfo.play.AMY_SAMPLE_RATE;
         }
 
         if (internalFormat == ma_format_unknown) {
@@ -35975,7 +35975,7 @@ static ma_result ma_device_init_fd__oss(ma_device* pDevice, const ma_device_conf
     shareMode     = pDescriptor->shareMode;
     ossFormat     = ma_format_to_oss((pDescriptor->format != ma_format_unknown) ? pDescriptor->format : ma_format_s16); /* Use s16 by default because OSS doesn't like floating point. */
     ossChannels   = (int)(pDescriptor->channels   > 0) ? pDescriptor->channels   : MA_DEFAULT_CHANNELS;
-    ossSampleRate = (int)(pDescriptor->sampleRate > 0) ? pDescriptor->sampleRate : MA_DEFAULT_SAMPLE_RATE;
+    ossSampleRate = (int)(pDescriptor->sampleRate > 0) ? pDescriptor->sampleRate : MA_DEFAULT_AMY_SAMPLE_RATE;
 
     result = ma_context_open_device__oss(pDevice->pContext, deviceType, pDeviceID, shareMode, &fd);
     if (result != MA_SUCCESS) {
@@ -36554,7 +36554,7 @@ static ma_result ma_create_and_configure_AAudioStreamBuilder__aaudio(ma_context*
         retrieve the actual sample rate until after you've opened the stream. But you need to configure
         the buffer capacity before you open the stream... :/
 
-        To solve, we're just going to assume MA_DEFAULT_SAMPLE_RATE (48000) and move on.
+        To solve, we're just going to assume MA_DEFAULT_AMY_SAMPLE_RATE (48000) and move on.
         */
         bufferCapacityInFrames = ma_calculate_buffer_size_in_frames_from_descriptor(pDescriptor, pDescriptor->sampleRate, pConfig->performanceProfile) * pDescriptor->periodCount;
 
@@ -37372,7 +37372,7 @@ static void ma_channel_mask_to_channel_map__opensl(SLuint32 channelMask, ma_uint
     }
 }
 
-static SLuint32 ma_round_to_standard_sample_rate__opensl(SLuint32 samplesPerSec)
+static SLuint32 ma_round_to_standard_AMY_SAMPLE_RATE__opensl(SLuint32 samplesPerSec)
 {
     if (samplesPerSec <= SL_SAMPLINGRATE_8) {
         return SL_SAMPLINGRATE_8;
@@ -37579,8 +37579,8 @@ static void ma_context_add_data_format__opensl(ma_context* pContext, ma_format f
 {
     ma_uint32 minChannels   = 1;
     ma_uint32 maxChannels   = 2;
-    ma_uint32 minSampleRate = (ma_uint32)ma_standard_sample_rate_8000;
-    ma_uint32 maxSampleRate = (ma_uint32)ma_standard_sample_rate_48000;
+    ma_uint32 minSampleRate = (ma_uint32)ma_standard_AMY_SAMPLE_RATE_8000;
+    ma_uint32 maxSampleRate = (ma_uint32)ma_standard_AMY_SAMPLE_RATE_48000;
     ma_uint32 iChannel;
     ma_uint32 iSampleRate;
 
@@ -37810,7 +37810,7 @@ static ma_result ma_SLDataFormat_PCM_init__opensl(ma_format format, ma_uint32 ch
         channels = MA_DEFAULT_CHANNELS;
     }
     if (sampleRate == 0) {
-        sampleRate = MA_DEFAULT_SAMPLE_RATE;
+        sampleRate = MA_DEFAULT_AMY_SAMPLE_RATE;
     }
 
 #if defined(MA_ANDROID) && __ANDROID_API__ >= 21
@@ -37825,7 +37825,7 @@ static ma_result ma_SLDataFormat_PCM_init__opensl(ma_format format, ma_uint32 ch
 #endif
 
     pDataFormat->numChannels   = channels;
-    ((SLDataFormat_PCM*)pDataFormat)->samplesPerSec = ma_round_to_standard_sample_rate__opensl(sampleRate * 1000);  /* In millihertz. Annoyingly, the sample rate variable is named differently between SLAndroidDataFormat_PCM_EX and SLDataFormat_PCM */
+    ((SLDataFormat_PCM*)pDataFormat)->samplesPerSec = ma_round_to_standard_AMY_SAMPLE_RATE__opensl(sampleRate * 1000);  /* In millihertz. Annoyingly, the sample rate variable is named differently between SLAndroidDataFormat_PCM_EX and SLDataFormat_PCM */
     pDataFormat->bitsPerSample = ma_get_bytes_per_sample(format) * 8;
     pDataFormat->channelMask   = ma_channel_map_to_channel_mask__opensl(channelMap, channels);
     pDataFormat->endianness    = (ma_is_little_endian()) ? SL_BYTEORDER_LITTLEENDIAN : SL_BYTEORDER_BIGENDIAN;
@@ -38701,7 +38701,7 @@ static ma_result ma_device_init_by_type__webaudio(ma_device* pDevice, const ma_d
 
     /* We're going to calculate some stuff in C just to simplify the JS code. */
     channels           = (pDescriptor->channels   > 0) ? pDescriptor->channels   : MA_DEFAULT_CHANNELS;
-    sampleRate         = (pDescriptor->sampleRate > 0) ? pDescriptor->sampleRate : MA_DEFAULT_SAMPLE_RATE;
+    sampleRate         = (pDescriptor->sampleRate > 0) ? pDescriptor->sampleRate : MA_DEFAULT_AMY_SAMPLE_RATE;
     periodSizeInFrames = ma_calculate_period_size_in_frames_from_descriptor__webaudio(pDescriptor, sampleRate, pConfig->performanceProfile);
 
     ma_log_postf(ma_device_get_log(pDevice), MA_LOG_LEVEL_DEBUG, "periodSizeInFrames = %d\n", (int)periodSizeInFrames);
@@ -41124,13 +41124,13 @@ MA_API ma_uint32 ma_calculate_buffer_size_in_frames_from_descriptor(const ma_dev
     We must have a non-0 native sample rate, but some backends don't allow retrieval of this at the
     time when the size of the buffer needs to be determined. In this case we need to just take a best
     guess and move on. We'll try using the sample rate in pDescriptor first. If that's not set we'll
-    just fall back to MA_DEFAULT_SAMPLE_RATE.
+    just fall back to MA_DEFAULT_AMY_SAMPLE_RATE.
     */
     if (nativeSampleRate == 0) {
         nativeSampleRate = pDescriptor->sampleRate;
     }
     if (nativeSampleRate == 0) {
-        nativeSampleRate = MA_DEFAULT_SAMPLE_RATE;
+        nativeSampleRate = MA_DEFAULT_AMY_SAMPLE_RATE;
     }
 
     MA_ASSERT(nativeSampleRate != 0);
@@ -61382,7 +61382,7 @@ static ma_result ma_stbvorbis_post_init(ma_stbvorbis* pVorbis)
     info = stb_vorbis_get_info(pVorbis->stb);
 
     pVorbis->channels   = info.channels;
-    pVorbis->sampleRate = info.sample_rate;
+    pVorbis->sampleRate = info.AMY_SAMPLE_RATE;
 
     return MA_SUCCESS;
 }
@@ -63793,7 +63793,7 @@ MA_API ma_result ma_waveform_set_type(ma_waveform* pWaveform, ma_waveform_type t
     return MA_SUCCESS;
 }
 
-MA_API ma_result ma_waveform_set_sample_rate(ma_waveform* pWaveform, ma_uint32 sampleRate)
+MA_API ma_result ma_waveform_set_AMY_SAMPLE_RATE(ma_waveform* pWaveform, ma_uint32 sampleRate)
 {
     if (pWaveform == NULL) {
         return MA_INVALID_ARGS;
@@ -71666,7 +71666,7 @@ static void ma_engine_node_update_pitch_if_required(ma_engine_node* pEngineNode)
     }
 
     if (isUpdateRequired) {
-        float basePitch = (float)pEngineNode->sampleRate / ma_engine_get_sample_rate(pEngineNode->pEngine);
+        float basePitch = (float)pEngineNode->sampleRate / ma_engine_get_AMY_SAMPLE_RATE(pEngineNode->pEngine);
         ma_linear_resampler_set_rate_ratio(&pEngineNode->resampler, basePitch * pEngineNode->oldPitch * pEngineNode->oldDopplerPitch);
     }
 }
@@ -72181,7 +72181,7 @@ MA_API ma_result ma_engine_node_init_preallocated(const ma_engine_node_config* p
     MA_ZERO_MEMORY(pHeap, heapLayout.sizeInBytes);
 
     pEngineNode->pEngine                  = pConfig->pEngine;
-    pEngineNode->sampleRate               = (pConfig->sampleRate > 0) ? pConfig->sampleRate : ma_engine_get_sample_rate(pEngineNode->pEngine);
+    pEngineNode->sampleRate               = (pConfig->sampleRate > 0) ? pConfig->sampleRate : ma_engine_get_AMY_SAMPLE_RATE(pEngineNode->pEngine);
     pEngineNode->monoExpansionMode        = pConfig->monoExpansionMode;
     pEngineNode->pitch                    = 1;
     pEngineNode->oldPitch                 = 1;
@@ -72215,7 +72215,7 @@ MA_API ma_result ma_engine_node_init_preallocated(const ma_engine_node_config* p
     */
 
     /* We'll always do resampling first. */
-    resamplerConfig = ma_linear_resampler_config_init(ma_format_f32, baseNodeConfig.pInputChannels[0], pEngineNode->sampleRate, ma_engine_get_sample_rate(pEngineNode->pEngine));
+    resamplerConfig = ma_linear_resampler_config_init(ma_format_f32, baseNodeConfig.pInputChannels[0], pEngineNode->sampleRate, ma_engine_get_AMY_SAMPLE_RATE(pEngineNode->pEngine));
     resamplerConfig.lpfOrder = 0;    /* <-- Need to disable low-pass filtering for pitch shifting for now because there's cases where the biquads are becoming unstable. Need to figure out a better fix for this. */
 
     result = ma_linear_resampler_init_preallocated(&resamplerConfig, ma_offset_ptr(pHeap, heapLayout.resamplerOffset), &pEngineNode->resampler);
@@ -72225,7 +72225,7 @@ MA_API ma_result ma_engine_node_init_preallocated(const ma_engine_node_config* p
 
 
     /* After resampling will come the fader. */
-    faderConfig = ma_fader_config_init(ma_format_f32, baseNodeConfig.pInputChannels[0], ma_engine_get_sample_rate(pEngineNode->pEngine));
+    faderConfig = ma_fader_config_init(ma_format_f32, baseNodeConfig.pInputChannels[0], ma_engine_get_AMY_SAMPLE_RATE(pEngineNode->pEngine));
 
     result = ma_fader_init(&faderConfig, &pEngineNode->fader);
     if (result != MA_SUCCESS) {
@@ -72578,7 +72578,7 @@ MA_API ma_result ma_engine_init(const ma_engine_config* pConfig, ma_engine* pEng
             gainSmoothTimeInMilliseconds = 8;
         }
 
-        pEngine->gainSmoothTimeInFrames = (gainSmoothTimeInMilliseconds * ma_engine_get_sample_rate(pEngine)) / 1000;  /* 8ms by default. */
+        pEngine->gainSmoothTimeInFrames = (gainSmoothTimeInMilliseconds * ma_engine_get_AMY_SAMPLE_RATE(pEngine)) / 1000;  /* 8ms by default. */
     }
 
 
@@ -72598,7 +72598,7 @@ MA_API ma_result ma_engine_init(const ma_engine_config* pConfig, ma_engine* pEng
             resourceManagerConfig.pLog              = pEngine->pLog;    /* Always use the engine's log for internally-managed resource managers. */
             resourceManagerConfig.decodedFormat     = ma_format_f32;
             resourceManagerConfig.decodedChannels   = 0;  /* Leave the decoded channel count as 0 so we can get good spatialization. */
-            resourceManagerConfig.decodedSampleRate = ma_engine_get_sample_rate(pEngine);
+            resourceManagerConfig.decodedSampleRate = ma_engine_get_AMY_SAMPLE_RATE(pEngine);
             ma_allocation_callbacks_init_copy(&resourceManagerConfig.allocationCallbacks, &pEngine->allocationCallbacks);
             resourceManagerConfig.pVFS              = engineConfig.pResourceManagerVFS;
 
@@ -72815,7 +72815,7 @@ MA_API ma_uint32 ma_engine_get_channels(const ma_engine* pEngine)
     return ma_node_graph_get_channels(&pEngine->nodeGraph);
 }
 
-MA_API ma_uint32 ma_engine_get_sample_rate(const ma_engine* pEngine)
+MA_API ma_uint32 ma_engine_get_AMY_SAMPLE_RATE(const ma_engine* pEngine)
 {
     if (pEngine == NULL) {
         return 0;
@@ -73980,7 +73980,7 @@ MA_API void ma_sound_set_start_time_in_milliseconds(ma_sound* pSound, ma_uint64 
         return;
     }
 
-    ma_sound_set_start_time_in_pcm_frames(pSound, absoluteGlobalTimeInMilliseconds * ma_engine_get_sample_rate(ma_sound_get_engine(pSound)) / 1000);
+    ma_sound_set_start_time_in_pcm_frames(pSound, absoluteGlobalTimeInMilliseconds * ma_engine_get_AMY_SAMPLE_RATE(ma_sound_get_engine(pSound)) / 1000);
 }
 
 MA_API void ma_sound_set_stop_time_in_pcm_frames(ma_sound* pSound, ma_uint64 absoluteGlobalTimeInFrames)
@@ -73998,7 +73998,7 @@ MA_API void ma_sound_set_stop_time_in_milliseconds(ma_sound* pSound, ma_uint64 a
         return;
     }
 
-    ma_sound_set_stop_time_in_pcm_frames(pSound, absoluteGlobalTimeInMilliseconds * ma_engine_get_sample_rate(ma_sound_get_engine(pSound)) / 1000);
+    ma_sound_set_stop_time_in_pcm_frames(pSound, absoluteGlobalTimeInMilliseconds * ma_engine_get_AMY_SAMPLE_RATE(ma_sound_get_engine(pSound)) / 1000);
 }
 
 MA_API ma_bool32 ma_sound_is_playing(const ma_sound* pSound)
@@ -74608,8 +74608,8 @@ DRWAV_API const char* drwav_version_string(void)
 {
     return DRWAV_VERSION_STRING;
 }
-#ifndef DRWAV_MAX_SAMPLE_RATE
-#define DRWAV_MAX_SAMPLE_RATE       384000
+#ifndef DRWAV_MAX_AMY_SAMPLE_RATE
+#define DRWAV_MAX_AMY_SAMPLE_RATE       384000
 #endif
 #ifndef DRWAV_MAX_CHANNELS
 #define DRWAV_MAX_CHANNELS          256
@@ -75946,7 +75946,7 @@ DRWAV_PRIVATE drwav_bool32 drwav_init__internal(drwav* pWav, drwav_chunk_proc on
     if (!drwav__read_fmt(pWav->onRead, pWav->onSeek, pWav->pUserData, pWav->container, &cursor, &fmt)) {
         return DRWAV_FALSE;
     }
-    if ((fmt.sampleRate    == 0 || fmt.sampleRate    > DRWAV_MAX_SAMPLE_RATE)     ||
+    if ((fmt.sampleRate    == 0 || fmt.sampleRate    > DRWAV_MAX_AMY_SAMPLE_RATE)     ||
         (fmt.channels      == 0 || fmt.channels      > DRWAV_MAX_CHANNELS)        ||
         (fmt.bitsPerSample == 0 || fmt.bitsPerSample > DRWAV_MAX_BITS_PER_SAMPLE) ||
         fmt.blockAlign == 0) {
@@ -88009,8 +88009,8 @@ DRMP3_API const char* drmp3_version_string(void)
 #define DRMP3_HDR_GET_STEREO_MODE_EXT(h)  (((h[3]) >> 4) & 3)
 #define DRMP3_HDR_GET_LAYER(h)            (((h[1]) >> 1) & 3)
 #define DRMP3_HDR_GET_BITRATE(h)          ((h[2]) >> 4)
-#define DRMP3_HDR_GET_SAMPLE_RATE(h)      (((h[2]) >> 2) & 3)
-#define DRMP3_HDR_GET_MY_SAMPLE_RATE(h)   (DRMP3_HDR_GET_SAMPLE_RATE(h) + (((h[1] >> 3) & 1) + ((h[1] >> 4) & 1))*3)
+#define DRMP3_HDR_GET_AMY_SAMPLE_RATE(h)      (((h[2]) >> 2) & 3)
+#define DRMP3_HDR_GET_MY_AMY_SAMPLE_RATE(h)   (DRMP3_HDR_GET_AMY_SAMPLE_RATE(h) + (((h[1] >> 3) & 1) + ((h[1] >> 4) & 1))*3)
 #define DRMP3_HDR_IS_FRAME_576(h)         ((h[1] & 14) == 2)
 #define DRMP3_HDR_IS_LAYER_1(h)           ((h[1] & 6) == 6)
 #define DRMP3_BITS_DEQUANTIZER_OUT        -1
@@ -88212,7 +88212,7 @@ static int drmp3_hdr_valid(const drmp3_uint8 *h)
         ((h[1] & 0xF0) == 0xf0 || (h[1] & 0xFE) == 0xe2) &&
         (DRMP3_HDR_GET_LAYER(h) != 0) &&
         (DRMP3_HDR_GET_BITRATE(h) != 15) &&
-        (DRMP3_HDR_GET_SAMPLE_RATE(h) != 3);
+        (DRMP3_HDR_GET_AMY_SAMPLE_RATE(h) != 3);
 }
 static int drmp3_hdr_compare(const drmp3_uint8 *h1, const drmp3_uint8 *h2)
 {
@@ -88229,10 +88229,10 @@ static unsigned drmp3_hdr_bitrate_kbps(const drmp3_uint8 *h)
     };
     return 2*halfrate[!!DRMP3_HDR_TEST_MPEG1(h)][DRMP3_HDR_GET_LAYER(h) - 1][DRMP3_HDR_GET_BITRATE(h)];
 }
-static unsigned drmp3_hdr_sample_rate_hz(const drmp3_uint8 *h)
+static unsigned drmp3_hdr_AMY_SAMPLE_RATE_hz(const drmp3_uint8 *h)
 {
     static const unsigned g_hz[3] = { 44100, 48000, 32000 };
-    return g_hz[DRMP3_HDR_GET_SAMPLE_RATE(h)] >> (int)!DRMP3_HDR_TEST_MPEG1(h) >> (int)!DRMP3_HDR_TEST_NOT_MPEG25(h);
+    return g_hz[DRMP3_HDR_GET_AMY_SAMPLE_RATE(h)] >> (int)!DRMP3_HDR_TEST_MPEG1(h) >> (int)!DRMP3_HDR_TEST_NOT_MPEG25(h);
 }
 static unsigned drmp3_hdr_frame_samples(const drmp3_uint8 *h)
 {
@@ -88240,7 +88240,7 @@ static unsigned drmp3_hdr_frame_samples(const drmp3_uint8 *h)
 }
 static int drmp3_hdr_frame_bytes(const drmp3_uint8 *h, int free_format_size)
 {
-    int frame_bytes = drmp3_hdr_frame_samples(h)*drmp3_hdr_bitrate_kbps(h)*125/drmp3_hdr_sample_rate_hz(h);
+    int frame_bytes = drmp3_hdr_frame_samples(h)*drmp3_hdr_bitrate_kbps(h)*125/drmp3_hdr_AMY_SAMPLE_RATE_hz(h);
     if (DRMP3_HDR_IS_LAYER_1(h))
     {
         frame_bytes &= ~3;
@@ -88270,7 +88270,7 @@ static const drmp3_L12_subband_alloc *drmp3_L12_subband_alloc_table(const drmp3_
     } else
     {
         static const drmp3_L12_subband_alloc g_alloc_L2M1[] = { { 0, 4, 3 }, { 16, 4, 8 }, { 32, 3, 12 }, { 40, 2, 7 } };
-        int sample_rate_idx = DRMP3_HDR_GET_SAMPLE_RATE(hdr);
+        int AMY_SAMPLE_RATE_idx = DRMP3_HDR_GET_AMY_SAMPLE_RATE(hdr);
         unsigned kbps = drmp3_hdr_bitrate_kbps(hdr) >> (int)(mode != DRMP3_MODE_MONO);
         if (!kbps)
         {
@@ -88282,8 +88282,8 @@ static const drmp3_L12_subband_alloc *drmp3_L12_subband_alloc_table(const drmp3_
         {
             static const drmp3_L12_subband_alloc g_alloc_L2M1_lowrate[] = { { 44, 4, 2 }, { 44, 3, 10 } };
             alloc = g_alloc_L2M1_lowrate;
-            nbands = sample_rate_idx == 2 ? 12 : 8;
-        } else if (kbps >= 96 && sample_rate_idx != 1)
+            nbands = AMY_SAMPLE_RATE_idx == 2 ? 12 : 8;
+        } else if (kbps >= 96 && AMY_SAMPLE_RATE_idx != 1)
         {
             nbands = 30;
         }
@@ -88440,7 +88440,7 @@ static int drmp3_L3_read_side_info(drmp3_bs *bs, drmp3_L3_gr_info *gr, const drm
     unsigned tables, scfsi = 0;
     int main_data_begin, part_23_sum = 0;
     int gr_count = DRMP3_HDR_IS_MONO(hdr) ? 1 : 2;
-    int sr_idx = DRMP3_HDR_GET_MY_SAMPLE_RATE(hdr); sr_idx -= (sr_idx != 0);
+    int sr_idx = DRMP3_HDR_GET_MY_AMY_SAMPLE_RATE(hdr); sr_idx -= (sr_idx != 0);
     if (DRMP3_HDR_TEST_MPEG1(hdr))
     {
         gr_count *= 2;
@@ -89116,7 +89116,7 @@ static void drmp3_L3_decode(drmp3dec *h, drmp3dec_scratch *s, drmp3_L3_gr_info *
     for (ch = 0; ch < nch; ch++, gr_info++)
     {
         int aa_bands = 31;
-        int n_long_bands = (gr_info->mixed_block_flag ? 2 : 0) << (int)(DRMP3_HDR_GET_MY_SAMPLE_RATE(h->header) == 2);
+        int n_long_bands = (gr_info->mixed_block_flag ? 2 : 0) << (int)(DRMP3_HDR_GET_MY_AMY_SAMPLE_RATE(h->header) == 2);
         if (gr_info->n_short_sfb)
         {
             aa_bands = n_long_bands - 1;
@@ -89573,7 +89573,7 @@ DRMP3_API int drmp3dec_decode_frame(drmp3dec *dec, const drmp3_uint8 *mp3, int m
     DRMP3_COPY_MEMORY(dec->header, hdr, DRMP3_HDR_SIZE);
     info->frame_bytes = i + frame_size;
     info->channels = DRMP3_HDR_IS_MONO(hdr) ? 1 : 2;
-    info->hz = drmp3_hdr_sample_rate_hz(hdr);
+    info->hz = drmp3_hdr_AMY_SAMPLE_RATE_hz(hdr);
     info->layer = 4 - DRMP3_HDR_GET_LAYER(hdr);
     info->bitrate_kbps = drmp3_hdr_bitrate_kbps(hdr);
     drmp3_bs_init(bs_frame, hdr + DRMP3_HDR_SIZE, frame_size - DRMP3_HDR_SIZE);

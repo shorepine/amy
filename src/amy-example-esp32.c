@@ -45,19 +45,17 @@ SemaphoreHandle_t xQueueSemaphore;
 TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 TaskHandle_t amy_fill_buffer_handle;
 
-void delay_ms(uint32_t ms) {
-    vTaskDelay(ms / portTICK_PERIOD_MS);
-}
+
 
 // Wrap AMY's renderer into 2 FreeRTOS tasks, one per core
 void esp_render_task( void * pvParameters) {
     uint8_t which = *((uint8_t *)pvParameters);
     uint8_t start = 0; 
-    uint8_t end = OSCS;
+    uint8_t end = AMY_OSCS;
     if (AMY_CORES == 2) {
-        start = (OSCS/2); 
-        end = OSCS;
-        if(which == 0) { start = 0; end = (OSCS/2); } 
+        start = (AMY_OSCS/2); 
+        end = AMY_OSCS;
+        if(which == 0) { start = 0; end = (AMY_OSCS/2); } 
     }
     fprintf(stderr,"I'm renderer #%d on core #%d and i'm handling oscs %d up until %d\n", which, xPortGetCoreID(), start, end);
     while(1) {
@@ -72,9 +70,9 @@ void esp_fill_audio_buffer_task() {
     while(1) {
         int16_t *block = fill_audio_buffer_task();
         size_t written = 0;
-        i2s_write((i2s_port_t)CONFIG_I2S_NUM, block, BLOCK_SIZE * BYTES_PER_SAMPLE, &written, portMAX_DELAY); 
-        if(written != BLOCK_SIZE*BYTES_PER_SAMPLE) {
-            fprintf(stderr,"i2s underrun: %d vs %d\n", written, BLOCK_SIZE*BYTES_PER_SAMPLE);
+        i2s_write((i2s_port_t)CONFIG_I2S_NUM, block, AMY_BLOCK_SIZE * BYTES_PER_SAMPLE, &written, portMAX_DELAY); 
+        if(written != AMY_BLOCK_SIZE*BYTES_PER_SAMPLE) {
+            fprintf(stderr,"i2s underrun: %d vs %d\n", written, AMY_BLOCK_SIZE*BYTES_PER_SAMPLE);
         }
     }
 }
@@ -105,7 +103,7 @@ amy_err_t setup_i2s(void) {
     //i2s configuration
     i2s_config_t i2s_config = {
          .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-         .sample_rate = SAMPLE_RATE,
+         .AMY_SAMPLE_RATE = AMY_SAMPLE_RATE,
          .bits_per_sample = I2S_SAMPLE_TYPE,
          .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, 
          .communication_format = I2S_COMM_FORMAT_STAND_MSB,
@@ -124,7 +122,7 @@ amy_err_t setup_i2s(void) {
 
     i2s_driver_install((i2s_port_t)CONFIG_I2S_NUM, &i2s_config, 0, NULL);
     i2s_set_pin((i2s_port_t)CONFIG_I2S_NUM, &pin_config);
-    i2s_set_sample_rates((i2s_port_t)CONFIG_I2S_NUM, SAMPLE_RATE);
+    i2s_set_AMY_SAMPLE_RATEs((i2s_port_t)CONFIG_I2S_NUM, AMY_SAMPLE_RATE);
     return AMY_OK;
 }
 

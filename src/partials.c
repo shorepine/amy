@@ -39,7 +39,7 @@ void partials_note_on(uint8_t osc) {
     synth[osc].substep = synth[osc].step + patch.bp_length;
     // Now let's start the oscillators (silently)
     uint8_t oscs = patch.oscs_alloc;
-    if(osc + 1 + oscs > OSCS) {
+    if(osc + 1 + oscs > AMY_OSCS) {
         fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
     }
 }
@@ -57,7 +57,7 @@ void render_partials(float *buf, uint8_t osc) {
     // If ratio is set (not 0 or -1), use it for a time stretch
     float time_ratio = 1;
     if(synth[osc].ratio > 0) time_ratio = synth[osc].ratio;
-    uint32_t ms_since_started = (uint32_t) ((((total_samples - synth[osc].note_on_clock) / (float)SAMPLE_RATE)*1000.0)*time_ratio);
+    uint32_t ms_since_started = (uint32_t) ((((total_samples - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
     if(synth[osc].step >= 0) {
         // do we either have no sustain, or are we past sustain? 
         // TODO: sustain is likely more complicated --we want to bounce between the closest bps for loopstart & loopend
@@ -66,7 +66,7 @@ void render_partials(float *buf, uint8_t osc) {
             partial_breakpoint_t pb = partial_breakpoints[(uint32_t)synth[osc].step];
             if(ms_since_started >= pb.ms_offset ) {
                 // set up this oscillator
-                uint8_t o = (pb.osc + 1 + osc) % OSCS; // just in case
+                uint8_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
                 #ifdef ESP_PLATFORM
                     if(o % 2) o = o + 32; // scale
@@ -123,9 +123,9 @@ void render_partials(float *buf, uint8_t osc) {
     }
     // now, render everything, add it up
     uint8_t oscs = patch.oscs_alloc;
-    float pbuf[BLOCK_SIZE];
+    float pbuf[AMY_BLOCK_SIZE];
     for(uint8_t i=osc+1;i<osc+1+oscs;i++) {
-        uint8_t o = i % OSCS;
+        uint8_t o = i % AMY_OSCS;
         #ifdef ESP_PLATFORM
             if(o % 2) o = o + 32; // scale
         #endif
@@ -133,10 +133,10 @@ void render_partials(float *buf, uint8_t osc) {
             hold_and_modify(o);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
-            for(uint16_t j=0;j<BLOCK_SIZE;j++) pbuf[j] = 0;
+            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
             if(synth[o].wave==SINE) render_sine(pbuf, o);
             if(synth[o].wave==PARTIAL) render_partial(pbuf, o); 
-            for(uint16_t j=0;j<BLOCK_SIZE;j++) buf[j] = buf[j] + (pbuf[j] * msynth[osc].amp);
+            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (pbuf[j] * msynth[osc].amp);
         }
     }
 }

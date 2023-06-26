@@ -13,7 +13,6 @@ typedef struct {
     int8_t lfo_target;
 } operator_parameters_t;
 
-
 typedef struct  {
     uint8_t algo;
     float feedback;
@@ -79,12 +78,13 @@ struct FmAlgorithm algorithms[33] = {
 };
 // End of MSFA stuff
 
-float zeros[BLOCK_SIZE];
+//float zeros0[AMY_BLOCK_SIZE];
+//float zeros1[AMY_BLOCK_SIZE];
 
 
 // a = 0
 void zero(float *a) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         a[i] = 0;
     }
 }
@@ -92,14 +92,14 @@ void zero(float *a) {
 
 // b = a + b
 void add(float *a, float*b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = (a[i] + b[i]);
     }
 }
 
 // b = a 
 void copy(float *a, float*b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = a[i];
     }
 }
@@ -213,16 +213,17 @@ void algo_note_on(uint8_t osc) {
     }            
 }
 
+
 void algo_init() {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) zeros[i] = 0;
+//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros0[i] = 0;
+//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros1[i] = 0;
 }
 
 
 
 
 void render_algo(float * buf, uint8_t osc) { 
-    float scratch[5][BLOCK_SIZE];
-
+    float scratch[6][AMY_BLOCK_SIZE];
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6
@@ -230,14 +231,13 @@ void render_algo(float * buf, uint8_t osc) {
     float *out_buf = NULL;
 
     // TODO, i think i need at most 2 of these buffers, maybe 3?? 
-    zero(scratch[0]);
-    zero(scratch[1]);
-    zero(scratch[2]);
-    zero(scratch[3]);
-    zero(scratch[4]);
+    for(uint8_t i=0;i<6;i++) {
+        zero(scratch[i]);
+    }
     uint8_t ops_used = 0;
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
+
             ops_used++;
             float feedback_level = 0;
             if(algo.ops[op] & FB_IN) { 
@@ -250,7 +250,8 @@ void render_algo(float * buf, uint8_t osc) {
                 in_buf = scratch[1]; 
             } else {
                 // no in_buf
-                in_buf = zeros;
+                in_buf = scratch[5];
+                //if(osc>31) { in_buf = zeros1; } else { in_buf = zeros0; }
             }
 
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
@@ -292,7 +293,7 @@ void render_algo(float * buf, uint8_t osc) {
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     if(ops_used == 0) ops_used = 1;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
     }
 }

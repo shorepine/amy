@@ -1,7 +1,7 @@
 import time
 
 BLOCK_SIZE = 256
-SAMPLE_RATE = 44100.0
+AMY_SAMPLE_RATE = 44100.0
 OSCS = 64
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
@@ -9,6 +9,7 @@ TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARG
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF = range(4)
 AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
+CHORUS_OSC = 63
 
 override_send = None
 
@@ -73,12 +74,13 @@ def millis():
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
-    return ('%.10f' % number).rstrip('0').rstrip('.')
+    return ('%.6f' % number).rstrip('0').rstrip('.')
 
 # Construct an AMY message
-def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1, feedback=-1, timestamp=None, reset=-1, phase=-1, \
+def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1, feedback=-1, timestamp=None, reset=-1, phase=-1, pan=-1, \
         client=-1, retries=1, volume=-1, filter_freq = -1, resonance = -1, bp0="", bp1="", bp2="", bp0_target=-1, bp1_target=-1, bp2_target=-1, mod_target=-1, \
-        debug=-1, mod_source=-1, eq_l = -1, eq_m = -1, eq_h = -1, filter_type= -1, algorithm=-1, ratio = -1, latency_ms = -1, algo_source=None):
+        debug=-1, mod_source=-1, eq_l = -1, eq_m = -1, eq_h = -1, filter_type= -1, algorithm=-1, ratio = -1, latency_ms = -1, algo_source=None, chorus_level=-1, \
+        chorus_delay=-1, reverb_level=-1, reverb_liveness=-1, reverb_damping=-1, reverb_xover=-1):
 
     m = ""
     if(timestamp is None): timestamp = millis()
@@ -91,6 +93,7 @@ def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1,
     if(note>=0): m = m + "n" + str(note)
     if(patch>=0): m = m + "p" + str(patch)
     if(phase>=0): m = m + "P" + trunc(phase)
+    if(pan>=0): m = m + "Q" + trunc(pan)
     if(client>=0): m = m + "c" + str(client)
     if(amp>=0): m = m + "a" + trunc(amp)
     if(vel>=0): m = m + "l" + trunc(vel)
@@ -115,6 +118,15 @@ def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1,
     if(eq_m>=0): m = m + "y" + trunc(eq_m)
     if(eq_h>=0): m = m + "z" + trunc(eq_h)
     if(filter_type>=0): m = m + "G" + str(filter_type)
+    if(chorus_level>=0): m = m + "k" + str(chorus_level)
+    if(chorus_delay>=0): m = m + "m" + str(chorus_delay)
+    if(reverb_level>=0): m = m + "h" + str(reverb_level)
+    if(reverb_liveness>=0): m = m + "H" + str(reverb_liveness)
+    if(reverb_damping>=0): m = m + "j" + str(reverb_damping)
+    if(reverb_xover>=0): m = m + "J" + str(reverb_xover)
+    #print("message " + m)
+    return m+'Z'
+
     return m+'Z'
 
 
@@ -142,9 +154,9 @@ def show(data):
     wavepart = data[:len(window)]
     logspecmag = 20 * np.log10(np.maximum(1e-10, 
         np.abs(np.fft.fft(wavepart * window)))[:(fftsize // 2 + 1)])
-    freqs = SAMPLE_RATE * np.arange(len(logspecmag)) / fftsize
+    freqs = AMY_SAMPLE_RATE * np.arange(len(logspecmag)) / fftsize
     plt.subplot(211)
-    times = np.arange(len(wavepart)) / SAMPLE_RATE
+    times = np.arange(len(wavepart)) / AMY_SAMPLE_RATE
     plt.plot(times, wavepart, '.')
     plt.subplot(212)
     plt.plot(freqs, logspecmag, '.-')
@@ -155,7 +167,7 @@ def show(data):
 def write(data, filename):
     import scipy.io.wavfile as wav
     import numpy as np
-    wav.write(filename, int(SAMPLE_RATE), (32768.0 * data).astype(np.int16))
+    wav.write(filename, int(AMY_SAMPLE_RATE), (32768.0 * data).astype(np.int16))
 
 # Play a rendered sound out of default sounddevice
 def play(samples):
@@ -167,7 +179,7 @@ def render(seconds):
     import numpy as np
     import libamy
     # Output a npy array of samples
-    frame_count = int((seconds*SAMPLE_RATE)/BLOCK_SIZE)
+    frame_count = int((seconds*AMY_SAMPLE_RATE)/BLOCK_SIZE)
     frames = []
     for f in range(frame_count):
         frames.append( np.array(libamy.render())/32767.0 )
@@ -177,13 +189,15 @@ def render(seconds):
 # Starts a live mode, with audio playing out default sounddevice
 def start():
     live()
-def live():
+
+def live(audio_device=-1):
     import libamy
-    libamy.live()
+    libamy.live(audio_device)
 
 # Stops live mode
 def pause():
     stop()
+
 def stop():
     import libamy
     libamy.pause()
@@ -192,11 +206,11 @@ def stop():
     Convenience functions
 """
 
-def reset(osc=None):
+def reset(osc=None, **kwargs):
     if(osc is not None):
-        send(reset=osc)
+        send(reset=osc, **kwargs)
     else:
-        send(reset=100) # reset > AMY_OSCS resets all oscs
+        send(reset=100, **kwargs) # reset > AMY_OSCS resets all oscs
 
 def volume(volume, client = -1):
     send(client=client, volume=volume)
@@ -277,8 +291,8 @@ def sweep(speed=0.100, res=0.5, loops = -1):
 def drums(bpm=120, loops=-1, **kwargs):
     preset(13, osc=0, **kwargs) # sample bass drum
     preset(8, osc=3, **kwargs) # sample hat
-    preset(9, osc=4, **kwargs) # sample cow
-    preset(10, osc=5, **kwargs) # sample hi cow
+    preset(9, osc=4, pan=1, **kwargs) # sample cow
+    preset(10, osc=5, pan=0, **kwargs) # sample hi cow
     preset(11, osc=2, **kwargs) # sample snare
     preset(1, osc=7, **kwargs) # filter bass
     [bass, snare, hat, cow, hicow, silent] = [1, 2, 4, 8, 16, 32]
@@ -311,6 +325,45 @@ def c_major(octave=2,wave=SINE, **kwargs):
     send(osc=0, freq=220.5*octave, wave=wave, vel=1, **kwargs)
     send(osc=1, freq=138.5*octave, wave=wave, vel=1, **kwargs)
     send(osc=2, freq=164.5*octave, wave=wave, vel=1, **kwargs)
+
+"""
+    Chorus control
+"""
+def chorus(level=-1, max_delay=-1, freq=-1, amp=-1, wave=-1):
+    args = {}
+    if (freq >= 0):
+        args['freq'] = freq
+    if (amp >= 0):
+        args['amp'] = amp
+    if (wave >= 0):
+        args['wave'] = wave
+    if len(args) > 0:
+        # We are sending oscillator commands.
+        args['osc'] = CHORUS_OSC
+    # These ones don't relate to CHORUS_OSC.
+    if (level >= 0):
+        args['chorus_level'] = level
+    if (max_delay >= 0):
+        args['chorus_delay'] = max_delay
+    send(**args)
+
+"""
+    Reverb control
+"""
+def reverb(level=-1, liveness=-1, damping=-1, xover_hz=-1):
+    args = {}
+    if (level >= 0):
+        args['reverb_level'] = level
+    if (liveness >= 0):
+        args['reverb_liveness'] = liveness
+    if (damping >= 0):
+        args['reverb_damping'] = damping
+    if (xover_hz >= 0):
+        args['reverb_xover'] = xover_hz
+    send(**args)
+
+
+
 
 
 

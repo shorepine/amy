@@ -9,16 +9,13 @@
 int main(int argc, char ** argv) {
 
     int opt;
-    while((opt = getopt(argc, argv, ":d:c:lh")) != -1) 
+    while((opt = getopt(argc, argv, ":d:lh")) != -1) 
     { 
         switch(opt) 
         { 
             case 'd': 
                 amy_device_id = atoi(optarg);
                 break;
-            case 'c': 
-                amy_channel = atoi(optarg);
-                break; 
             case 'l':
                 amy_print_devices();
                 return 0;
@@ -26,7 +23,6 @@ int main(int argc, char ** argv) {
             case 'h':
                 printf("usage: amy-example\n");
                 printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
-                printf("\t[-c sound channel, default -1 for all channels on device]\n");
                 printf("\t[-l list all sound devices and exit]\n");
                 printf("\t[-h show this help and exit]\n");
                 return 0;
@@ -43,11 +39,20 @@ int main(int argc, char ** argv) {
     amy_start();
     amy_live_start();
     amy_reset_oscs();
-  
+
     // Play a few notes in FM
+    #ifdef AMY_HAS_REVERB
+    config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
+    #endif
+
+    #ifdef AMY_HAS_CHORUS
+    config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
+    #endif
+    
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();
     e.time = start;
+
     e.velocity = 1;
     e.wave = ALGO;
     e.patch = 15;
