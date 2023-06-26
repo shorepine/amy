@@ -43,7 +43,7 @@ void pcm_note_on(uint8_t osc) {
 	// if no freq given, just play it at midinote
 	if(synth[osc].patch<0) synth[osc].patch = 0;
 	pcm_map_t patch = pcm_map[synth[osc].patch];
-    if(synth[osc].freq <= 0) synth[osc].freq = PCM_SAMPLE_RATE; // / freq_for_midi_note(patch.midinote);
+    if(synth[osc].freq <= 0) synth[osc].freq = PCM_AMY_SAMPLE_RATE; // / freq_for_midi_note(patch.midinote);
     synth[osc].step = (patch.offset/(float)PCM_SAMPLES); // normalized start sample
     // Use substep here as "end sample" so we don't have to add another field to the struct
     // and lpf_state for loopstart, and lpf_alpha for loopend.
@@ -70,13 +70,13 @@ void pcm_note_off(uint8_t osc) {
 
 void render_pcm(float * buf, uint8_t osc) {
     pcm_map_t patch = pcm_map[synth[osc].patch];
-    float playback_freq = PCM_SAMPLE_RATE;
-    if(msynth[osc].freq < PCM_SAMPLE_RATE) { // user adjusted freq 
+    float playback_freq = PCM_AMY_SAMPLE_RATE;
+    if(msynth[osc].freq < PCM_AMY_SAMPLE_RATE) { // user adjusted freq 
         float base_freq = freq_for_midi_note(patch.midinote); 
-        playback_freq = (msynth[osc].freq / base_freq) * PCM_SAMPLE_RATE;
+        playback_freq = (msynth[osc].freq / base_freq) * PCM_AMY_SAMPLE_RATE;
     }
-    float skip = playback_freq / (float)SAMPLE_RATE;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    float skip = playback_freq / (float)AMY_SAMPLE_RATE;
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         float float_index = synth[osc].step;
         uint32_t base_index = (uint32_t) float_index;
         float frac = float_index - (float)base_index;
@@ -101,7 +101,7 @@ void render_pcm(float * buf, uint8_t osc) {
 }
 
 float compute_mod_pcm(uint8_t osc) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     float skip = msynth[osc].freq / mod_sr;
     float sample = pcm[(int)(synth[osc].step)];
     synth[osc].step = (synth[osc].step + skip);

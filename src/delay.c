@@ -1,4 +1,7 @@
 #include "amy.h"
+
+#if defined(AMY_HAS_CHORUS) || defined(AMY_HAS_REVERB)
+
 #include "delay.h"
 
 int is_power_of_two(int val) {
@@ -108,11 +111,11 @@ void delay_line_in_out_fixed_delay(float *in, float *out, int n_samples, float m
 
 
 void apply_variable_delay(float *block, delay_line_t *delay_line, float *delay_mod, float delay_scale, float mix_level, float feedback_level) {
-    delay_line_in_out(block, block, BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
+    delay_line_in_out(block, block, AMY_BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
 }
 
 void apply_fixed_delay(float *block, delay_line_t *delay_line, float delay_mod_val, float mix_level) {
-    delay_line_in_out_fixed_delay(block, block, BLOCK_SIZE, delay_mod_val, delay_line, mix_level);
+    delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_mod_val, delay_line, mix_level);
 }
 
 
@@ -151,7 +154,7 @@ void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
     // liveness (0..1) controls how much energy is preserved (larger = longer reverb).
     liveness = a_liveness;
     // crossover_hz is 3dB point of 1-pole lowpass freq.
-    lpfcoef = 6.2832f * crossover_hz / SAMPLE_RATE;
+    lpfcoef = 6.2832f * crossover_hz / AMY_SAMPLE_RATE;
     if (lpfcoef > 1.f)  lpfcoef = 1.f;
     if (lpfcoef < 0.f)  lpfcoef = 0.f;
     lpfgain = 1.f - damping;
@@ -177,22 +180,20 @@ void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
 #define REF5SAMPS 722   // 16.364 ms
 #define REF6SAMPS 602   // 13.645 ms
 
-// Reverb delays go into SPIRAM.
-#define DELAYRAM MALLOC_CAP_SPIRAM
 
 void init_stereo_reverb(void) {
     if (delay_1 == NULL) {
-        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, DELAYRAM);
-        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, DELAYRAM);
-        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, DELAYRAM);
-        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, DELAYRAM);
+        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, REVERB_RAM_CAPS);
+        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, REVERB_RAM_CAPS);
+        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, REVERB_RAM_CAPS);
+        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, REVERB_RAM_CAPS);
 
-        ref_1 = new_delay_line(4096, REF1SAMPS, DELAYRAM);
-        ref_2 = new_delay_line(2048, REF2SAMPS, DELAYRAM);
-        ref_3 = new_delay_line(2048, REF3SAMPS, DELAYRAM);
-        ref_4 = new_delay_line(1024, REF4SAMPS, DELAYRAM);
-        ref_5 = new_delay_line(1024, REF5SAMPS, DELAYRAM);
-        ref_6 = new_delay_line(1024, REF6SAMPS, DELAYRAM);
+        ref_1 = new_delay_line(4096, REF1SAMPS, REVERB_RAM_CAPS);
+        ref_2 = new_delay_line(2048, REF2SAMPS, REVERB_RAM_CAPS);
+        ref_3 = new_delay_line(2048, REF3SAMPS, REVERB_RAM_CAPS);
+        ref_4 = new_delay_line(1024, REF4SAMPS, REVERB_RAM_CAPS);
+        ref_5 = new_delay_line(1024, REF5SAMPS, REVERB_RAM_CAPS);
+        ref_6 = new_delay_line(1024, REF6SAMPS, REVERB_RAM_CAPS);
         
         config_stereo_reverb(liveness, xover_hz, 1 - lpfgain);
     }
@@ -268,3 +269,5 @@ void stereo_reverb(float *r_in, float *l_in, float *r_out, float *l_out, int n_s
         DEL_IN(delay_4, d1 - d2 - d3 + d4);
     }
 }
+
+#endif

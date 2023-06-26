@@ -10,30 +10,49 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include "polyfills.h"
 
-#define OSCS 64              // # of simultaneous oscs to keep track of 
-#define AMY_CORES 2
-#define PCM_LARGE 2
-#define PCM_SMALL 1
-#define PCM_PATCHES_SIZE PCM_SMALL
-#define BLOCK_SIZE 256       // buffer block size in samples
-#define KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
-#define EVENT_FIFO_LEN 1000  // number of events the queue can store
-#define MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
-#define SAMPLE_RATE 44100    // playback sample rate
-#define SAMPLE_MAX 32767
-#define MAX_ALGO_OPS 6 
-#define MAX_BREAKPOINTS 8
-#define MAX_BREAKPOINT_SETS 3
-#define THREAD_USLEEP 500
-#define BYTES_PER_SAMPLE 2
+// Your AMY configuration goes here
+#define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
+#define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
+#define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
+#define AMY_BLOCK_SIZE 256       // buffer block size in samples
+#define AMY_KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
+#define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
+#define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
+#define AMY_SAMPLE_RATE 44100    // playback sample rate
+#define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
+#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
+#define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
 
-//#define NCHANS 1             // Mono output, 'Q' (pan) ignored, saves memory.
-#define NCHANS 2             // Enable 2-channel output, pan, etc.
+// Are you using an ESP? You'll want to tell us how to allocate ram here. Not used on other platforms.
+#define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
+#define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
+#define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
+#define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
+#define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM // if on ESP, where to alloc chorus ram from
+#define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM // if on ESP, where to alloc reverb ram from
 
+// 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
+#define CHORUS_DEFAULT_LFO_FREQ 0.5
+#define CHORUS_DEFAULT_MOD_DEPTH 0.5
+#define CHORUS_DEFAULT_LEVEL 0
+#define CHORUS_DEFAULT_MAX_DELAY 320
+#define CHORUS_ARATE
+// Chorus control modulator is hardcoded to OSC 63 (NOSCS - 1)
+#define CHORUS_MOD_SOURCE (AMY_OSCS - 1)
 
-typedef int16_t output_sample_type;
+// center frequencies for the EQ
+#define EQ_CENTER_LOW 800.0
+#define EQ_CENTER_MED 2500.0
+#define EQ_CENTER_HIGH 7000.0
+
+// reverb setup
+#define REVERB_DEFAULT_LEVEL 0
+#define REVERB_DEFAULT_LIVENESS 0.85f
+#define REVERB_DEFAULT_DAMPING 0.5f
+#define REVERB_DEFAULT_XOVER_HZ 3000.0f
+
+#define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.
@@ -42,15 +61,17 @@ typedef int16_t output_sample_type;
 #define MINIMUM_SCALE 0.000190 // computed from TRUE_EXPONENTIAL's end point after a while 
 #define BREAKPOINT_EPS 0.0002
 
-// center frequencies for the EQ
-#define EQ_CENTER_LOW 800.0
-#define EQ_CENTER_MED 2500.0
-#define EQ_CENTER_HIGH 7000.0
-
+// Rest of amy setup
+#define SAMPLE_MAX 32767
+#define MAX_ALGO_OPS 6 
+#define MAX_BREAKPOINTS 8
+#define MAX_BREAKPOINT_SETS 3
+#define THREAD_USLEEP 500
+#define BYTES_PER_SAMPLE 2
 #define LINEAR_INTERP        // use linear interp for oscs
 // "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
 //#define CUBIC_INTERP         // use cubic interpolation for oscs
-
+typedef int16_t output_sample_type;
 // Sample values for modulation sources
 #define UP    32767
 #define DOWN -32768
@@ -92,6 +113,9 @@ typedef int16_t output_sample_type;
 #define AUDIBLE 3
 #define IS_MOD_SOURCE 4
 #define IS_ALGO_SOURCE 5
+
+#define true 1
+#define false 0
 
 #define AMY_OK 0
 typedef int amy_err_t;
@@ -208,7 +232,10 @@ float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();
 void amy_decrease_volume();
-
+void * malloc_caps(uint32_t size, uint32_t flags);
+void config_reverb(float level, float liveness, float damping, float xover_hz);
+void config_chorus(float level, int max_delay) ;
+void osc_note_on(uint8_t osc);
 
 // global synth state
 struct state {
@@ -223,8 +250,8 @@ struct state {
 };
 
 // Shared structures
-extern float coeffs[OSCS][5];
-extern float delay[OSCS][2];
+extern float coeffs[AMY_OSCS][5];
+extern float delay[AMY_OSCS][2];
 extern int64_t total_samples;
 extern struct event *synth;
 extern struct mod_event *msynth; // the synth that is being modified by modulations & envelopes
@@ -313,6 +340,9 @@ extern int8_t dsps_biquad_f32_ansi(const float *input, float *output, int len, f
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
 esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
+#else
+#define MALLOC_CAP_SPIRAM 0
+#define MALLOC_CAP_INTERNAL 0
 #endif
 
 

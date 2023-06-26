@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
+#ifdef PICO_ON_DEVICE
 #include <stdio.h>
 #include <math.h>
 #include "amy.h"
@@ -49,10 +49,10 @@ void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
     int16_t *samples = (int16_t *) buffer->buffer->bytes;
-    for (uint i = 0; i < BLOCK_SIZE; i++) {
+    for (uint i = 0; i < AMY_BLOCK_SIZE; i++) {
         samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
     }
-    buffer->sample_count = BLOCK_SIZE;
+    buffer->sample_count = AMY_BLOCK_SIZE;
     give_audio_buffer(ap, buffer);
 }
 
@@ -60,7 +60,7 @@ struct audio_buffer_pool *init_audio() {
 
     static audio_format_t audio_format = {
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-            .sample_freq = SAMPLE_RATE,
+            .sample_freq = AMY_SAMPLE_RATE,
             .channel_count = 1,
     };
 
@@ -69,7 +69,7 @@ struct audio_buffer_pool *init_audio() {
             .sample_stride = 2
     };
 
-    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, BLOCK_SIZE); 
+    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, AMY_BLOCK_SIZE); 
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
@@ -171,4 +171,5 @@ int main() {
 
     return 0;
 }
+#endif
 

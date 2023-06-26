@@ -405,7 +405,7 @@ def lfo_wave(byte):
 
 # Play a numpy array on an Apple Silicon mac without having to use an external library
 # (sounddevice is currently broken on AS macs)
-def play_np_array(np_array, samplerate=amy.SAMPLE_RATE):
+def play_np_array(np_array, samplerate=amy.AMY_SAMPLE_RATE):
     import wave, tempfile , os, struct
     tf = tempfile.NamedTemporaryFile()
     obj = wave.open(tf,'wb')

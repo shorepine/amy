@@ -41,7 +41,7 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Quick test of AMY 
 
-To run a simple C example, make sure `libsoundio` (`brew install libsoundio` on macOS or `apt-get install libsoundio-dev` on Linux) is installed (to access audio output devices) and run `make`. Then run `./amy-example`. 
+Run `make`. Then run `./amy-example`. 
 
 To try a simple Javascript example, copy the contents of `src/www` to a web server. [We've hosted that example here too](https://notes.variogram.com/amy/).
 
@@ -62,7 +62,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 >>> audio = amy.render(5.0)
 ```
 
-You can also start a thread playing live audio (requires libsoundio):
+You can also start a thread playing live audio:
 
 ```python
 >>> import amy
@@ -96,7 +96,7 @@ void bleep() {
 
 void main() {
     amy_start(); // initializes amy 
-    amy_live_start(); // uses libsoundio to render live audio
+    amy_live_start(); // render live audio
     bleep();
 }
 ```
@@ -402,7 +402,7 @@ amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0.5) # more band
 The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
 
 ```bash
-brew install python3 swig libsoundio ffmpeg
+brew install python3 swig ffmpeg
 python3.9 -m pip install pydub numpy --user
 tar xvf loris-1.8.tar
 cd loris-1.8

@@ -45,7 +45,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     audio = pydub.AudioSegment.from_file(filename)
     audio = audio[:int(max_len_s*1000.0)]
     y = np.array(audio.get_array_of_samples())
-    if int(audio.frame_rate) != int(amy.SAMPLE_RATE):
+    if int(audio.frame_rate) != int(amy.AMY_SAMPLE_RATE):
         print("SR mismatch, todo")
         return (None, None)
     if audio.channels == 2:
@@ -62,7 +62,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
             if(w.midiUnityNote>0):
                 metadata["midi_note"] = w.midiUnityNote
             if(w.loopstart >= 0 and w.loopend >= 0):
-                metadata["sustain_ms"] = int(((w.loopstart + ((w.loopend-w.loopstart)/2.0)) / amy.SAMPLE_RATE) * 1000.0)
+                metadata["sustain_ms"] = int(((w.loopstart + ((w.loopend-w.loopstart)/2.0)) / amy.AMY_SAMPLE_RATE) * 1000.0)
         except AttributeError:
             pass # No wav metadata
 

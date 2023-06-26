@@ -9,16 +9,13 @@
 int main(int argc, char ** argv) {
 
     int opt;
-    while((opt = getopt(argc, argv, ":d:c:lh")) != -1) 
+    while((opt = getopt(argc, argv, ":d:lh")) != -1) 
     { 
         switch(opt) 
         { 
             case 'd': 
                 amy_device_id = atoi(optarg);
                 break;
-            case 'c': 
-                amy_channel = atoi(optarg);
-                break; 
             case 'l':
                 amy_print_devices();
                 return 0;
@@ -26,7 +23,6 @@ int main(int argc, char ** argv) {
             case 'h':
                 printf("usage: amy-example\n");
                 printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
-                printf("\t[-c sound channel, default -1 for all channels on device]\n");
                 printf("\t[-l list all sound devices and exit]\n");
                 printf("\t[-h show this help and exit]\n");
                 return 0;
@@ -51,10 +47,10 @@ int main(int argc, char ** argv) {
         if (input[0] == '?') {
             switch (input[1]) {
                 case 'c':
-                    fprintf(stdout, "%ld\n", amy_sysclock());
+                    fprintf(stdout, "%" PRIi64 "\n", amy_sysclock());
                     break;
                 case 's':
-                    fprintf(stdout, "%ld\n", total_samples);
+                    fprintf(stdout, "%" PRIi64 "\n", total_samples);
                     break;
                 default:
                     fprintf(stdout, "?\n");

@@ -67,7 +67,7 @@ float render_lut_fm_osc(float * buf, float phase, float step, float incoming_amp
     int lut_mask = lut_size - 1;
     float past0 = last_two[0];
     float past1 = last_two[1];
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         float scaled_phase = lut_size *
       (phase + mod[i] + feedback_level * (past1 + past0) /2.0f);
         int base_index = (int)scaled_phase;
@@ -76,7 +76,7 @@ float render_lut_fm_osc(float * buf, float phase, float step, float incoming_amp
         float c = lut[(base_index+1) & lut_mask];
         float sample = b + ((c - b) * frac);
 
-        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)BLOCK_SIZE);
+        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)AMY_BLOCK_SIZE);
         //float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i * block_slice);
         buf[i] += sample * scaled_amp;
         phase += step;
@@ -121,10 +121,10 @@ static float FRACTIONAL_SAMPLE(float step, const float *lut, int lut_mask) {
 float render_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int32_t lut_size, float dc_offset) { 
     // We assume lut_size == 2^R for some R, so (lut_size - 1) consists of R '1's in binary.
     int lut_mask = lut_size - 1;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         // dc_offset optionally allows us to precompensate for later integration of the waveform.
         float sample = FRACTIONAL_SAMPLE(step, lut, lut_mask) + dc_offset;
-        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)BLOCK_SIZE);
+        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)AMY_BLOCK_SIZE);
         buf[i] += sample * scaled_amp;
 
         step += skip;
@@ -136,7 +136,7 @@ float render_lut(float * buf, float step, float skip, float incoming_amp, float 
 float render_lut_nosum_noamp(float * buf, float step, float skip, const float* lut, int32_t lut_size) { 
     // Like render_lut, but the output is overwritten, not summed up, and there's no amp scaling.
     int lut_mask = lut_size - 1;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         *buf++ = FRACTIONAL_SAMPLE(step, lut, lut_mask);
         step += skip;
         if(step >= lut_size) step -= lut_size;
@@ -146,7 +146,7 @@ float render_lut_nosum_noamp(float * buf, float step, float skip, const float* l
 
 float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth) { 
     int lut_mask = lut_size - 1;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         uint16_t base_index = (uint16_t)step;
         float frac = step - (float)base_index;
         float b = lut[(base_index + 0) & lut_mask];
@@ -154,7 +154,7 @@ float render_am_lut(float * buf, float step, float skip, float incoming_amp, flo
         float sample = b + ((c - b) * frac);
         float mod_sample = mod[i]; // * (1.0f / bandwidth);
         float am = dsps_sqrtf_f32_ansi(1.0f-bandwidth) + (mod_sample * dsps_sqrtf_f32_ansi(2.0f*bandwidth));
-        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)BLOCK_SIZE);
+        float scaled_amp = incoming_amp + (ending_amp - incoming_amp)*((float)i/(float)AMY_BLOCK_SIZE);
         buf[i] += sample * scaled_amp * am ;
         step += skip;
         if(step >= lut_size) step -= lut_size;
@@ -165,7 +165,7 @@ float render_am_lut(float * buf, float step, float skip, float incoming_amp, flo
 void lpf_buf(float *buf, float decay, float *state) {
     // Implement first-order low-pass (leaky integrator).
     float s = *state;
-    for (uint16_t i = 0; i < BLOCK_SIZE; ++i) {
+    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
         *buf += decay * s;
         s = *buf++;
     }
@@ -178,7 +178,7 @@ void lpf_buf(float *buf, float decay, float *state) {
 /* Pulse wave */
 
 void pulse_note_on(uint8_t osc) {
-    float period_samples = (float)SAMPLE_RATE / synth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, impulse_lutset, &synth[osc].lut_size);
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
     // Tune the initial integrator state to compensate for mid-sample alignment of table.
@@ -189,7 +189,7 @@ void pulse_note_on(uint8_t osc) {
 
 void render_pulse(float * buf, uint8_t osc) {
     // LPF time constant should be ~ 10x osc period, so droop is minimal.
-    float period_samples = (float)SAMPLE_RATE / msynth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     synth[osc].lpf_alpha = 1.0f - 1.0f / (10.0f * period_samples);
     float duty = msynth[osc].duty;
     if (duty < 0.01f) duty = 0.01f;
@@ -206,7 +206,7 @@ void render_pulse(float * buf, uint8_t osc) {
 }
 
 void pulse_mod_trigger(uint8_t osc) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     float period = 1. / (synth[osc].freq/mod_sr);
     synth[osc].step = period * synth[osc].phase;
 }
@@ -214,7 +214,7 @@ void pulse_mod_trigger(uint8_t osc) {
 // dpwe sez to use this method for low-freq mod pulse still 
 float compute_mod_pulse(uint8_t osc) {
     // do BW pulse gen at SR=44100/64
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     if(msynth[osc].duty < 0.001f || msynth[osc].duty > 0.999) msynth[osc].duty = 0.5;
     float period = 1. / (msynth[osc].freq/(float)mod_sr);
     float period2 = msynth[osc].duty * period; // if duty is 0.5, square wave
@@ -236,7 +236,7 @@ float compute_mod_pulse(uint8_t osc) {
 /* Saw waves */
 
 void saw_note_on(uint8_t osc, int8_t direction) {
-    float period_samples = (float)SAMPLE_RATE / synth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, impulse_lutset, &synth[osc].lut_size);
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
     synth[osc].lpf_state = 0;
@@ -262,7 +262,7 @@ void saw_up_note_on(uint8_t osc) {
 
 
 void render_saw(float * buf, uint8_t osc, int8_t direction) {
-    float period_samples = (float)SAMPLE_RATE / msynth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     synth[osc].lpf_alpha = 1.0f - 1.0f / (10.0f * period_samples);
     float skip = synth[osc].lut_size / period_samples;
     // Scale the impulse proportional to the skip so its integral remains ~constant.
@@ -285,7 +285,7 @@ void render_saw_up(float * buf, uint8_t osc) {
 
 
 void saw_mod_trigger(uint8_t osc) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     float period = 1. / (synth[osc].freq/mod_sr);
     synth[osc].step = period * synth[osc].phase;
 }
@@ -299,7 +299,7 @@ void saw_down_mod_trigger(uint8_t osc) {
 
 // TODO -- this should use dpwe code
 float compute_mod_saw(uint8_t osc, int8_t direction) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     float period = 1. / (msynth[osc].freq/mod_sr);
     if(synth[osc].step >= period || synth[osc].step == 0) {
         synth[osc].sample = -1;
@@ -324,13 +324,13 @@ float compute_mod_saw_up(uint8_t osc) {
 /* triangle wave */
 
 void triangle_note_on(uint8_t osc) {
-    float period_samples = (float)SAMPLE_RATE / synth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, triangle_lutset, &synth[osc].lut_size);
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
 }
 
 void render_triangle(float * buf, uint8_t osc) {
-    float period_samples = (float)SAMPLE_RATE / msynth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     float skip = synth[osc].lut_size / period_samples;
     float amp = msynth[osc].amp;
     synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, synth[osc].lut, synth[osc].lut_size, 0.0f);
@@ -339,14 +339,14 @@ void render_triangle(float * buf, uint8_t osc) {
 
 
 void triangle_mod_trigger(uint8_t osc) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     float period = 1. / (synth[osc].freq/mod_sr);
     synth[osc].step = period * synth[osc].phase;
 }
 
 // TODO -- this should use dpwe code 
 float compute_mod_triangle(uint8_t osc) {
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;    
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;    
     float period = 1. / (msynth[osc].freq/mod_sr);
     if(synth[osc].step >= period || synth[osc].step == 0) {
         synth[osc].sample = -1;
@@ -372,7 +372,7 @@ void fm_sine_note_on(uint8_t osc, uint8_t algo_osc) {
     if(synth[osc].ratio >= 0) {
         msynth[osc].freq = (msynth[algo_osc].freq * synth[osc].ratio);
     }
-    float period_samples = (float)SAMPLE_RATE / msynth[osc].freq;
+    float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_lutset, &synth[osc].lut_size);
 }
 
@@ -380,7 +380,7 @@ void render_fm_sine(float *buf, uint8_t osc, float *mod, float feedback_level, u
     if(synth[osc].ratio >= 0) {
         msynth[osc].freq = msynth[algo_osc].freq * synth[osc].ratio;
     }
-    float step = msynth[osc].freq / (float)SAMPLE_RATE;
+    float step = msynth[osc].freq / (float)AMY_SAMPLE_RATE;
     float amp = msynth[osc].amp;
     //if(synth[osc].lut_size != 256) { 
     //    fprintf(stderr, "xx osc %d algo_osc %d lut_size %d\n", osc, algo_osc, synth[osc].lut_size);
@@ -394,7 +394,7 @@ void render_fm_sine(float *buf, uint8_t osc, float *mod, float feedback_level, u
 
 void sine_note_on(uint8_t osc) {
     // There's really only one sine table, but for symmetry with the other ones...
-    //float period_samples = (float)SAMPLE_RATE / synth[osc].freq;
+    //float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = sine_lutable_0; //choose_from_lutset(period_samples, sine_lutset, &synth[osc].lut_size);
     synth[osc].lut_size = 256;
     synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
@@ -410,20 +410,20 @@ const float* find_triangle_lutable(void) {
 
 void render_partial(float * buf, uint8_t osc) {
     if(msynth[osc].feedback > 0) {
-        float scratch[2][BLOCK_SIZE];
-        for(uint16_t i=0;i<BLOCK_SIZE;i++) scratch[0][i] = amy_get_random() *  20.0f;
-        dsps_biquad_gen_lpf_f32(coeffs[osc], 100.0f/SAMPLE_RATE, 0.707);
+        float scratch[2][AMY_BLOCK_SIZE];
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) scratch[0][i] = amy_get_random() *  20.0f;
+        dsps_biquad_gen_lpf_f32(coeffs[osc], 100.0f/AMY_SAMPLE_RATE, 0.707);
         #ifdef ESP_PLATFORM
-            dsps_biquad_f32_ae32(scratch[0], scratch[1], BLOCK_SIZE, coeffs[osc], delay[osc]);
+            dsps_biquad_f32_ae32(scratch[0], scratch[1], AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
         #else
-            dsps_biquad_f32_ansi(scratch[0], scratch[1], BLOCK_SIZE, coeffs[osc], delay[osc]);
+            dsps_biquad_f32_ansi(scratch[0], scratch[1], AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
         #endif
-        float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
+        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut_size;
         float amp = msynth[osc].amp;
         synth[osc].step = render_am_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
                  synth[osc].lut, synth[osc].lut_size, scratch[1], msynth[osc].feedback);
     } else {
-        float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
+        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut_size;
         float amp = msynth[osc].amp;
         synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
                                      synth[osc].lut, synth[osc].lut_size, 0.0f);
@@ -433,13 +433,13 @@ void render_partial(float * buf, uint8_t osc) {
         // fade in
         //printf("%d fading in partial osc %d from 0 to %f\n", total_samples, osc, msynth[osc].amp);
         synth[osc].substep = 0;
-        for(uint16_t i=0;i<BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)i/(float)BLOCK_SIZE);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)i/(float)AMY_BLOCK_SIZE);
     }
     if(synth[osc].substep==2) {
         // fade out
         //printf("%d fading out partial osc %d from %f to 0\n", total_samples, osc, msynth[osc].amp);
         synth[osc].substep = 0;
-        for(uint16_t i=0;i<BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)(BLOCK_SIZE-i)/(float)BLOCK_SIZE);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)(AMY_BLOCK_SIZE-i)/(float)AMY_BLOCK_SIZE);
         synth[osc].status=OFF; 
 
     }
@@ -464,7 +464,7 @@ void partial_note_off(uint8_t osc) {
 
 void render_sine(float * buf, uint8_t osc) { 
 
-    float skip = msynth[osc].freq / (float)SAMPLE_RATE * synth[osc].lut_size;
+    float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut_size;
     synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, msynth[osc].amp, 
                                  synth[osc].lut, synth[osc].lut_size, 0.0f);
     synth[osc].last_amp = msynth[osc].amp;
@@ -474,7 +474,7 @@ void render_sine(float * buf, uint8_t osc) {
 
 // TOOD -- not needed anymore
 float compute_mod_sine(uint8_t osc) { 
-    float mod_sr = (float)SAMPLE_RATE / (float)BLOCK_SIZE;
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     int sinlut_size = sine_lutset[0].table_size;
     const float *sinlut = sine_lutset[0].table;
     float skip = msynth[osc].freq / mod_sr * sinlut_size;
@@ -508,7 +508,7 @@ float amy_get_random() {
 /* noise */
 
 void render_noise(float *buf, uint8_t osc) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         buf[i] = amy_get_random() * msynth[osc].amp; 
     }
 }
@@ -521,8 +521,8 @@ float compute_mod_noise(uint8_t osc) {
 
 void render_ks(float * buf, uint8_t osc) {
     if(msynth[osc].freq >= 55) { // lowest note we can play
-        uint16_t buflen = (uint16_t)(SAMPLE_RATE / msynth[osc].freq);
-        for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+        uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / msynth[osc].freq);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
             uint16_t index = (uint16_t)(synth[osc].step);
             synth[osc].sample = ks_buffer[ks_polyphony_index][index];
             ks_buffer[ks_polyphony_index][index] = (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]) * 0.5f * synth[osc].feedback;
@@ -534,14 +534,14 @@ void render_ks(float * buf, uint8_t osc) {
 
 void ks_note_on(uint8_t osc) {
     if(msynth[osc].freq<=0) msynth[osc].freq = 1;
-    uint16_t buflen = (uint16_t)(SAMPLE_RATE / msynth[osc].freq);
+    uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / msynth[osc].freq);
     if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
     // init KS buffer with noise up to max
     for(uint16_t i=0;i<buflen;i++) {
         ks_buffer[ks_polyphony_index][i] = amy_get_random();
     }
     ks_polyphony_index++;
-    if(ks_polyphony_index == KS_OSCS) ks_polyphony_index = 0;
+    if(ks_polyphony_index == AMY_KS_OSCS) ks_polyphony_index = 0;
 }
 
 void ks_note_off(uint8_t osc) {
@@ -552,11 +552,11 @@ void ks_note_off(uint8_t osc) {
 void ks_init(void) {
     // 6ms buffer
     ks_polyphony_index = 0;
-    ks_buffer = (float**) malloc(sizeof(float*)*KS_OSCS);
-    for(int i=0;i<KS_OSCS;i++) ks_buffer[i] = (float*)malloc(sizeof(float)*MAX_KS_BUFFER_LEN); 
+    ks_buffer = (float**) malloc(sizeof(float*)*AMY_KS_OSCS);
+    for(int i=0;i<AMY_KS_OSCS;i++) ks_buffer[i] = (float*)malloc(sizeof(float)*MAX_KS_BUFFER_LEN); 
 }
 
 void ks_deinit(void) {
-    for(int i=0;i<KS_OSCS;i++) free(ks_buffer[i]);
+    for(int i=0;i<AMY_KS_OSCS;i++) free(ks_buffer[i]);
     free(ks_buffer);
 }

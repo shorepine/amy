@@ -78,13 +78,13 @@ struct FmAlgorithm algorithms[33] = {
 };
 // End of MSFA stuff
 
-//float zeros0[BLOCK_SIZE];
-//float zeros1[BLOCK_SIZE];
+//float zeros0[AMY_BLOCK_SIZE];
+//float zeros1[AMY_BLOCK_SIZE];
 
 
 // a = 0
 void zero(float *a) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         a[i] = 0;
     }
 }
@@ -92,14 +92,14 @@ void zero(float *a) {
 
 // b = a + b
 void add(float *a, float*b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = (a[i] + b[i]);
     }
 }
 
 // b = a 
 void copy(float *a, float*b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = a[i];
     }
 }
@@ -215,15 +215,15 @@ void algo_note_on(uint8_t osc) {
 
 
 void algo_init() {
-//    for(uint16_t i=0;i<BLOCK_SIZE;i++) zeros0[i] = 0;
-//    for(uint16_t i=0;i<BLOCK_SIZE;i++) zeros1[i] = 0;
+//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros0[i] = 0;
+//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros1[i] = 0;
 }
 
 
 
 
 void render_algo(float * buf, uint8_t osc) { 
-    float scratch[6][BLOCK_SIZE];
+    float scratch[6][AMY_BLOCK_SIZE];
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6
@@ -293,7 +293,7 @@ void render_algo(float * buf, uint8_t osc) {
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     if(ops_used == 0) ops_used = 1;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
     }
 }

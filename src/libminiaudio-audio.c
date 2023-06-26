@@ -21,12 +21,9 @@
 #include <unistd.h>
 
 #define DEVICE_FORMAT       ma_format_s16
-#define DEVICE_CHANNELS     0
-#define DEVICE_SAMPLE_RATE  SAMPLE_RATE
 
-int16_t leftover_buf[BLOCK_SIZE]; 
+int16_t leftover_buf[AMY_BLOCK_SIZE*AMY_NCHANS]; 
 uint16_t leftover_samples = 0;
-int16_t amy_channel = -1;
 int16_t amy_device_id = -1;
 uint8_t amy_running = 0;
 pthread_t amy_live_thread;
@@ -68,11 +65,7 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
 
     for(uint16_t frame=0;frame<leftover_samples;frame++) {
         for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-            if(c==amy_channel || amy_channel<0) {
-                poke[ptr++] = leftover_buf[frame];
-            } else {
-                poke[ptr++] = 0;                
-            }
+            poke[ptr++] = leftover_buf[AMY_NCHANS * frame + c];
         }
     }
 
@@ -80,34 +73,26 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     leftover_samples = 0;
 
     // Now send the bulk of the frames
-    for(uint8_t i=0;i<(uint8_t)(frame_count / BLOCK_SIZE);i++) {
+    for(uint8_t i=0;i<(uint8_t)(frame_count / AMY_BLOCK_SIZE);i++) {
         int16_t *buf = fill_audio_buffer_task();
-        for(uint16_t frame=0;frame<BLOCK_SIZE;frame++) {
+        for(uint16_t frame=0;frame<AMY_BLOCK_SIZE;frame++) {
             for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-                if(c==amy_channel || amy_channel<0) {
-                    poke[ptr++] = buf[frame];
-                } else {
-                    poke[ptr++] = 0;                
-                }
+                poke[ptr++] = buf[AMY_NCHANS * frame + c];
             }
         }
     } 
 
     // If any leftover, let's put those in the outgoing buf and the rest in leftover_samples
-    uint16_t still_need = frame_count % BLOCK_SIZE;
+    uint16_t still_need = frame_count % AMY_BLOCK_SIZE;
     if(still_need != 0) {
         int16_t *buf = fill_audio_buffer_task();
         for(uint16_t frame=0;frame<still_need;frame++) {
             for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-                if(c==amy_channel || amy_channel<0) {
-                    poke[ptr++] = buf[frame];
-                } else {
-                    poke[ptr++] = 0;
-                }
+                poke[ptr++] = buf[AMY_NCHANS * frame + c];
             }
         }
-        memcpy(leftover_buf, buf+still_need, (BLOCK_SIZE - still_need)*2);
-        leftover_samples = BLOCK_SIZE - still_need;
+        memcpy(leftover_buf, buf+(still_need*AMY_NCHANS), (AMY_BLOCK_SIZE - still_need)*2*AMY_NCHANS);
+        leftover_samples = AMY_BLOCK_SIZE - still_need;
     }
 }
 
@@ -120,7 +105,7 @@ ma_uint32 playbackCount;
 ma_device_info* pCaptureInfos;
 ma_uint32 captureCount;
 
-// start soundio
+// start 
 
 amy_err_t miniaudio_init() {
     if (amy_device_id < 0) {
@@ -137,7 +122,7 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     
-    if (amy_device_id >= playbackCount) {
+    if (amy_device_id >= (int32_t)playbackCount) {
         printf("invalid playback device\n");
         exit(1);
     }
@@ -146,8 +131,8 @@ amy_err_t miniaudio_init() {
     
     deviceConfig.playback.pDeviceID = &pPlaybackInfos[amy_device_id].id;
     deviceConfig.playback.format   = DEVICE_FORMAT;
-    deviceConfig.playback.channels = DEVICE_CHANNELS;
-    deviceConfig.sampleRate        = DEVICE_SAMPLE_RATE;
+    deviceConfig.playback.channels = AMY_NCHANS;
+    deviceConfig.sampleRate        = AMY_SAMPLE_RATE;
     deviceConfig.dataCallback      = data_callback;
     deviceConfig.pUserData         = _custom;
     

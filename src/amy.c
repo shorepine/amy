@@ -28,48 +28,50 @@ struct mod_event * msynth;
 
 // Two float mixing blocks, one per core of rendering
 float ** fbl;
-float per_osc_fb[AMY_CORES][BLOCK_SIZE];
+float per_osc_fb[AMY_CORES][AMY_BLOCK_SIZE];
+
+void * malloc_caps(uint32_t size, uint32_t flags) {
+#ifdef ESP_PLATFORM
+    //fprintf(stderr, "allocing size %ld flags %ld\n", size, flags);
+    return heap_caps_malloc(size, flags);
+#else
+    // ignore flags
+    return malloc(size);
+#endif
+}
+
 
 // Final output delay lines.
-#define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
-delay_line_t *delay_lines[NCHANS];
+delay_line_t *delay_lines[AMY_NCHANS];
 
+#ifdef AMY_HAS_CHORUS
 // CHORUS_ARATE means that chorus delay is updated at full audio rate and
 // the chorus delay lines have per-sample variable delays.  Otherwise,
 // the chorus oscillator is only evalated once per block (~11ms) and the
 // delay is constant within each block.
-#define CHORUS_ARATE
 #ifdef CHORUS_ARATE
 float *delay_mod = NULL;
 #else
 float delay_mod_val = 0.f;
 #endif // CHORUS_ARATE
 
-// Chorus control modulator is hardcoded to OSC 63 (NOSCS - 1)
-#define CHORUS_MOD_SOURCE (OSCS - 1)
-
 typedef struct chorus_config {
     float level;     // How much of the delayed signal to mix in to the output, typ 0.5.
     int max_delay;   // Max delay when modulating.  Must be <= DELAY_LINE_LEN
 } chorus_config_t;
 
-// 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
-#define CHORUS_DEFAULT_LFO_FREQ 0.5
-#define CHORUS_DEFAULT_MOD_DEPTH 0.5
-#define CHORUS_DEFAULT_LEVEL 0
-#define CHORUS_DEFAULT_MAX_DELAY 320
+
 chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY};
 
 void alloc_delay_lines(void) {
-    for(uint16_t c=0;c<NCHANS;++c) {
-        delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, MALLOC_CAP_SPIRAM);
+    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+        delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
     }
 #ifdef CHORUS_ARATE
-    delay_mod = (float*)malloc_caps(sizeof(float) * BLOCK_SIZE, MALLOC_CAP_SPIRAM);
+    delay_mod = (float*)malloc_caps(sizeof(float) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
 #endif
 }
 
-void osc_note_on(uint8_t osc);
 
 void config_chorus(float level, int max_delay) {
     // we just config mix level and max_delay here.  modulation freq/amp/shape comes from osc 63.
@@ -86,7 +88,7 @@ void config_chorus(float level, int max_delay) {
         }
         // apply max_delay.
         for (int core=0; core<AMY_CORES; ++core) {
-            for (int chan=0; chan<NCHANS; ++chan) {
+            for (int chan=0; chan<AMY_NCHANS; ++chan) {
                 delay_lines[chan]->max_delay = max_delay;
                 delay_lines[chan]->fixed_delay = (int)max_delay / 2;
             }
@@ -95,12 +97,10 @@ void config_chorus(float level, int max_delay) {
     chorus.max_delay = max_delay;
     chorus.level = level;
 }
+#endif // AMY_HAS_CHORUS
 
-#define REVERB_DEFAULT_LEVEL 0
-#define REVERB_DEFAULT_LIVENESS 0.85f
-#define REVERB_DEFAULT_DAMPING 0.5f
-#define REVERB_DEFAULT_XOVER_HZ 3000.0f
 
+#ifdef AMY_HAS_REVERB
 typedef struct reverb_state {
     float level;
     float liveness;
@@ -117,6 +117,7 @@ void config_reverb(float level, float liveness, float damping, float xover_hz) {
     }
     reverb.level = level; reverb.liveness = liveness; reverb.damping = damping; reverb.xover_hz = xover_hz; 
 }
+#endif // AMY_HAS_REVERB
 
 // block -- what gets sent to the dac -- -32768...32767 (int16 le)
 output_sample_type * block;
@@ -217,14 +218,14 @@ void add_delta_to_queue(struct delta d) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
-    if(global.event_qsize < EVENT_FIFO_LEN) {
+    if(global.event_qsize < AMY_EVENT_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
         uint16_t write_location = global.next_event_write;
         int16_t found = -1;
         // guaranteed to find eventually if qsize stays accurate
         while(found<0) {
             if(events[write_location].time == UINT32_MAX) found = write_location;
-            write_location = (write_location + 1) % EVENT_FIFO_LEN;
+            write_location = (write_location + 1) % AMY_EVENT_FIFO_LEN;
         }
         // found a mem location. copy the data in and update the write pointers.
         events[found].time = d.time;
@@ -361,7 +362,7 @@ void reset_osc(uint8_t i ) {
 }
 
 void amy_reset_oscs() {
-    for(uint8_t i=0;i<OSCS;i++) reset_osc(i);
+    for(uint8_t i=0;i<AMY_OSCS;i++) reset_osc(i);
     // also reset filters and volume
     global.volume = 1;
     global.eq[0] = 0;
@@ -372,8 +373,12 @@ void amy_reset_oscs() {
     synth[CHORUS_MOD_SOURCE].amp = CHORUS_DEFAULT_MOD_DEPTH;
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
+    #ifdef AMY_HAS_CHORUS
     config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
+    #endif
+    #ifdef AMY_HAS_REVERB
     config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    #endif
 }
 
 
@@ -384,13 +389,11 @@ int8_t oscs_init() {
     filters_init();
     algo_init();
     pcm_init();
-    // for tulip, we may want to alloc these in spiram
-    events = (struct delta*)malloc_caps(sizeof(struct delta) * EVENT_FIFO_LEN, MALLOC_CAP_SPIRAM);
-    synth = (struct event*) malloc_caps(sizeof(struct event) * OSCS, MALLOC_CAP_SPIRAM);
-    msynth = (struct mod_event*) malloc_caps(sizeof(struct mod_event) * OSCS, MALLOC_CAP_SPIRAM);
 
-    // maybe not this
-    block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * BLOCK_SIZE * NCHANS, MALLOC_CAP_INTERNAL);//dbl_block[0];
+    events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
+    synth = (struct event*) malloc_caps(sizeof(struct event) * AMY_OSCS, SYNTH_RAM_CAPS);
+    msynth = (struct mod_event*) malloc_caps(sizeof(struct mod_event) * AMY_OSCS, SYNTH_RAM_CAPS);
+    block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, BLOCK_RAM_CAPS);
     // set all oscillators to their default values
     amy_reset_oscs();
 
@@ -405,25 +408,25 @@ int8_t oscs_init() {
     global.event_qsize = 1; // queue will always have at least 1 thing in it 
 
     // set all the other events to empty
-    for(uint16_t i=1;i<EVENT_FIFO_LEN;i++) { 
+    for(uint16_t i=1;i<AMY_EVENT_FIFO_LEN;i++) { 
         events[i].time = UINT32_MAX;
         events[i].next = NULL;
         events[i].osc = 0;
         events[i].data = 0;
         events[i].param = NO_PARAM;
     }
-    fbl = (float**) malloc_caps(sizeof(float*) * AMY_CORES, MALLOC_CAP_INTERNAL); // one per core, just core 0 used off esp32
+    fbl = (float**) malloc_caps(sizeof(float*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
-        fbl[core]= (float*)malloc_caps(sizeof(float) * BLOCK_SIZE * NCHANS, MALLOC_CAP_INTERNAL);
-        for(uint16_t c=0;c<NCHANS;++c) {
-            for(uint16_t i=0;i<BLOCK_SIZE;i++) { 
-                fbl[core][BLOCK_SIZE*c + i] = 0; 
+        fbl[core]= (float*)malloc_caps(sizeof(float) * AMY_BLOCK_SIZE * AMY_NCHANS, FBL_RAM_CAPS);
+        for(uint16_t c=0;c<AMY_NCHANS;++c) {
+            for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { 
+                fbl[core][AMY_BLOCK_SIZE*c + i] = 0; 
             }
         }
     }
     // we only alloc delay lines if the chorus is turned on.
-    for (int c = 0; c < NCHANS; ++c)  delay_lines[c] = NULL;
+    for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
 
     //init_stereo_reverb();
     
@@ -451,7 +454,7 @@ void show_debug(uint8_t type) {
         //printf("global: filter %f resonance %f volume %f status %d\n", global.filter_freq, global.resonance, global.volume, global.status);
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, global.eq[0], global.eq[1], global.eq[2]);
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
-        for(uint8_t i=0;i<OSCS;i++) {
+        for(uint8_t i=0;i<AMY_OSCS;i++) {
             fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
                 i, synth[i].status, synth[i].amp, synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
                 synth[i].velocity, synth[i].filter_freq, synth[i].ratio, synth[i].feedback, synth[i].resonance, synth[i].step, synth[i].algorithm, synth[i].pan,
@@ -652,6 +655,7 @@ void hold_and_modify(uint8_t osc) {
 }
 
 
+#if (AMY_NCHANS == 2)
 static inline float lgain_of_pan(float pan) {
     if(pan > 1.f)  pan = 1.f;
     if(pan < 0)  pan = 0;
@@ -663,22 +667,23 @@ static inline float rgain_of_pan(float pan) {
     if(pan < 0)  pan = 0;
     return dsps_sqrtf_f32_ansi(pan);
 }
+#endif
 
 
 void mix_with_pan(float *stereo_dest, float *mono_src, float pan_start, float pan_end) {
     /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan */
-#if NCHANS == 1
+#if AMY_NCHANS == 1
     // actually dest is mono, pan is ignored.
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
 #else
     // stereo 
     float gain_l = lgain_of_pan(pan_start);
     float gain_r = rgain_of_pan(pan_start);
-    float d_gain_l = (lgain_of_pan(pan_end) - gain_l) / BLOCK_SIZE;
-    float d_gain_r = (rgain_of_pan(pan_end) - gain_r) / BLOCK_SIZE;
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    float d_gain_l = (lgain_of_pan(pan_end) - gain_l) / AMY_BLOCK_SIZE;
+    float d_gain_r = (rgain_of_pan(pan_end) - gain_r) / AMY_BLOCK_SIZE;
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         stereo_dest[i] += gain_l * mono_src[i];
-        stereo_dest[BLOCK_SIZE + i] += gain_r * mono_src[i];
+        stereo_dest[AMY_BLOCK_SIZE + i] += gain_r * mono_src[i];
         gain_l += d_gain_l;
         gain_r += d_gain_r;
     }
@@ -687,7 +692,7 @@ void mix_with_pan(float *stereo_dest, float *mono_src, float pan_start, float pa
 
 void render_osc_wave(uint8_t osc, float* buf) {
     // fill buf with next block_size of samples for specified osc.
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) { buf[i] = 0; }
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
     if(synth[osc].wave == NOISE) render_noise(buf, osc);
     if(synth[osc].wave == SAW_DOWN) render_saw_down(buf, osc);
@@ -703,7 +708,7 @@ void render_osc_wave(uint8_t osc, float* buf) {
 }
 
 void render_task(uint8_t start, uint8_t end, uint8_t core) {
-    for(uint16_t i=0;i<BLOCK_SIZE*NCHANS;i++) { fbl[core][i] = 0; }
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     for(uint8_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
             render_osc_wave(osc, per_osc_fb[core]);
@@ -717,15 +722,15 @@ void render_task(uint8_t start, uint8_t end, uint8_t core) {
     }
     // apply the eq filters if set
     if(global.eq[0] != 0 || global.eq[1] != 0 || global.eq[2] != 0) {
-        for (int16_t c=0; c < NCHANS; ++c) {
-            parametric_eq_process(fbl[core] + c * BLOCK_SIZE);
+        for (int16_t c=0; c < AMY_NCHANS; ++c) {
+            parametric_eq_process(fbl[core] + c * AMY_BLOCK_SIZE);
         }
     }
 }
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
 int64_t amy_sysclock() {
-    return (int64_t)((total_samples / (float)SAMPLE_RATE) * 1000);
+    return (int64_t)((total_samples / (float)AMY_SAMPLE_RATE) * 1000);
 }
 
 
@@ -762,16 +767,17 @@ int16_t * fill_audio_buffer_task() {
     xSemaphoreGive(xQueueSemaphore);
 #endif
 
+#ifdef AMY_HAS_CHORUS
     // here's a little fragment of hold_and_modify() for you.
     msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
     msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
     msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
-
 #ifdef CHORUS_ARATE
     if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, delay_mod);
 #else
     delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
 #endif // CHORUS_ARATE
+#endif // AMY_HAS_CHORUS
 
 #ifdef ESP_PLATFORM
     // Tell the rendering threads to start rendering
@@ -783,47 +789,52 @@ int16_t * fill_audio_buffer_task() {
     if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 #else
     // todo -- there's no reason we can't multicore render on other platforms
-    render_task(0, OSCS, 0);        
+    render_task(0, AMY_OSCS, 0);        
 #endif
 
     // mix results from both cores.
 #if AMY_CORES == 2
-    for (int16_t i=0; i < BLOCK_SIZE * NCHANS; ++i)  fbl[0][i] += fbl[1][i];
+    for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
 #endif
 
+#ifdef AMY_HAS_CHORUS
     // apply chorus.
     if(chorus.level > 0 && delay_lines[0] != NULL) {
         // apply time-varying delays to both chans.
         // delay_mod_val, the modulated delay amount, is set up before calling render_*.
         float scale = 1.0f;
-        for (int16_t c=0; c < NCHANS; ++c) {
+        for (int16_t c=0; c < AMY_NCHANS; ++c) {
 #ifdef CHORUS_ARATE
-            apply_variable_delay(fbl[0] + c * BLOCK_SIZE, delay_lines[c],
+            apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
                                  delay_mod, scale, chorus.level, 0.f);
 #else
-            apply_fixed_delay(fbl[0] + c * BLOCK_SIZE, delay_lines[c],
+            apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
                               scale * delay_mod_val, chorus.level);
 #endif // CHORUS_ARATE
             // flip delay direction for alternating channels.
             scale = -scale;
         }
     }
+#endif
 
+#ifdef AMY_HAS_REVERB
     // apply reverb.
     if(reverb.level > 0) {
-#if NCHANS == 1
-        stereo_reverb(fbl[0], NULL, fbl[0], NULL, BLOCK_SIZE, reverb.level);
+#if AMY_NCHANS == 1
+        stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, reverb.level);
 #else
-        stereo_reverb(fbl[0], fbl[0] + BLOCK_SIZE, fbl[0], fbl[0] + BLOCK_SIZE, BLOCK_SIZE, reverb.level);
+        stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, reverb.level);
 #endif
     }
+#endif
+
     // global volume is supposed to max out at 10, so scale by 0.1.
     float volume_scale = 0.1 * global.volume;
     //uint8_t nonzero = 0;
-    for(int16_t i=0; i < BLOCK_SIZE; ++i) {
-        for (int16_t c=0; c < NCHANS; ++c) {
+    for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
+        for (int16_t c=0; c < AMY_NCHANS; ++c) {
             // Convert the mixed sample into the int16 range, applying overall gain.
-            float fsample = volume_scale * (fbl[0][c * BLOCK_SIZE + i]) * 32767.0f;
+            float fsample = volume_scale * (fbl[0][c * AMY_BLOCK_SIZE + i]) * 32767.0f;
             // one-pole high-pass filter to remove large low-frequency excursions from
             // some fm patches. b = [1 -1]; a = [1 -0.995]
             float new_state = fsample + 0.995f * global.hpf_state;
@@ -857,7 +868,7 @@ int16_t * fill_audio_buffer_task() {
             } else {
               sample = -uintval;
             }
-#if NCHANS == 1
+#if AMY_NCHANS == 1
   #ifdef ESP_PLATFORM
             // esp32's i2s driver has this bug
             block[i ^ 0x01] = sample;
@@ -865,16 +876,16 @@ int16_t * fill_audio_buffer_task() {
             block[i] = sample;
   #endif
 #else // stereo
-            block[(NCHANS * i) + c] = sample;
+            block[(AMY_NCHANS * i) + c] = sample;
 #endif
         }
     }
-    total_samples += BLOCK_SIZE;
+    total_samples += AMY_BLOCK_SIZE;
     return block;
 }
 
 int32_t ms_to_samples(int32_t ms) {
-    return (int32_t)(((float)ms / 1000.0) * (float)SAMPLE_RATE);
+    return (int32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
 } 
 
 // helper to parse the list of source voices for an algorithm
@@ -981,7 +992,7 @@ struct event amy_parse_message(char * message) {
                 if(global.latency_ms != 0) {
                     if(!computed_delta_set) {
                         computed_delta = e.time - sysclock;
-                        fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, MAX_DRIFT_MS, global.latency_ms);
+                        fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, AMY_MAX_DRIFT_MS, global.latency_ms);
                         computed_delta_set = 1;
                     }
                 }
@@ -1003,12 +1014,18 @@ struct event amy_parse_message(char * message) {
                         case 'H': config_reverb(reverb.level, atoff(message + start), reverb.damping, reverb.xover_hz); break;
                         case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
                         case 'I': e.ratio = atoff(message + start); break;
+                        #ifdef AMY_HAS_REVERB
                         case 'j': config_reverb(reverb.level, reverb.liveness, atoff(message + start), reverb.xover_hz); break;
                         case 'J': config_reverb(reverb.level, reverb.liveness, reverb.damping, atoff(message + start)); break;
+                        #endif
+                        #ifdef AMY_HAS_CHORUS
                         case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;
+                        #endif
                         case 'l': e.velocity=atoff(message + start); break; 
                         case 'L': e.mod_source=atoi(message + start); break; 
+                        #ifdef AMY_HAS_CHORUS
                         case 'm': config_chorus(chorus.level, atoi(message + start)); break;
+                        #endif
                         case 'N': e.latency_ms = atoi(message + start);  break; 
                         case 'n': e.midi_note=atoi(message + start); break; 
                         case 'o': e.algorithm=atoi(message+start); break; 
@@ -1017,10 +1034,10 @@ struct event amy_parse_message(char * message) {
                         case 'P': e.phase=atoff(message + start); break; 
                         case 'Q': e.pan = atoff(message + start); break;
                         case 'R': e.resonance=atoff(message + start); break; 
-                        case 'S': osc = atoi(message + start); if(osc > OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); } break; 
+                        case 'S': osc = atoi(message + start); if(osc > AMY_OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); } break; 
                         case 'T': e.breakpoint_target[0] = atoi(message + start);  break; 
                         case 'W': e.breakpoint_target[1] = atoi(message + start);  break; 
-                        case 'v': e.osc=(atoi(message + start) % OSCS);  break; // allow osc wraparound
+                        case 'v': e.osc=(atoi(message + start) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break; 
                         case 'X': e.breakpoint_target[2] = atoi(message + start); break; 
                         case 'w': e.wave=atoi(message + start); break; 
@@ -1050,7 +1067,7 @@ struct event amy_parse_message(char * message) {
         if(( (computed_delta_set || global.latency_ms==0) && e.time > 0)) {
             // OK, so check for potentially negative numbers here (or really big numbers-sysclock) 
             int64_t potential_time = (e.time - computed_delta) + global.latency_ms;
-            if(potential_time < 0 || (potential_time > sysclock + global.latency_ms + MAX_DRIFT_MS)) {
+            if(potential_time < 0 || (potential_time > sysclock + global.latency_ms + AMY_MAX_DRIFT_MS)) {
                 fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
                 computed_delta = e.time - sysclock;
                 fprintf(stderr,"computed delta now %lld\n", computed_delta);
