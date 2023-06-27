@@ -53,13 +53,22 @@
 #endif
 
 // Are you using an ESP? You'll want to tell us how to allocate ram here. Not used on other platforms.
+#ifdef ESP_PLATFORM
+#include <esp_heap_caps.h>
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
 #define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
 #define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
 #define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
 #define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
-
+#else
+#define EVENTS_RAM_CAPS 0
+#define SYNTH_RAM_CAPS 0
+#define BLOCK_RAM_CAPS 0
+#define FBL_RAM_CAPS 0
+#define CHORUS_RAM_CAPS 0 
+#define REVERB_RAM_CAPS 0 
+#endif
 // 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
 #define CHORUS_DEFAULT_LFO_FREQ 0.5
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5
