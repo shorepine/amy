@@ -12,25 +12,53 @@
 #include <inttypes.h>
 
 // Your AMY configuration goes here
+#ifndef AMY_OSCS
 #define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
+#endif
+
+#ifndef AMY_CORES
 #define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
+#endif
+
+#ifndef AMY_PCM_PATCHES_SIZE
 #define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
-#define AMY_BLOCK_SIZE 256       // buffer block size in samples
-#define AMY_KS_OSCS 1            // # of Karplus-strong oscillators allowed at once, they're big RAM users so keep it small on esp
+#endif
+
+#ifndef AMY_KS_OSCS
+#define AMY_KS_OSCS 1
+#endif
+
+#ifndef AMY_EVENT_FIFO_LEN
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
+#endif
+
+#ifndef AMY_MAX_DRIFT_MS
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
+#endif
+
+#ifndef AMY_SAMPLE_RATE
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
+#endif
+
+#ifndef AMY_NCHANS
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
+#endif
+
+#ifndef AMY_HAS_CHORUS
 #define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
+#endif
+
+#ifndef AMY_HAS_REVERB
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
+#endif
 
 // Are you using an ESP? You'll want to tell us how to allocate ram here. Not used on other platforms.
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
 #define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
 #define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
-#define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM // if on ESP, where to alloc chorus ram from
-#define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM // if on ESP, where to alloc reverb ram from
+#define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
+#define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
 
 // 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
 #define CHORUS_DEFAULT_LFO_FREQ 0.5
@@ -53,6 +81,9 @@
 #define REVERB_DEFAULT_XOVER_HZ 3000.0f
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
+
+#define AMY_BLOCK_SIZE 256       // buffer block size in samples
+
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.

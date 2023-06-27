@@ -1,6 +1,6 @@
 #include "amy.h"
 
-#if defined(AMY_HAS_CHORUS) || defined(AMY_HAS_REVERB)
+#if (AMY_HAS_CHORUS==1) || (AMY_HAS_REVERB == 1)
 
 #include "delay.h"
 

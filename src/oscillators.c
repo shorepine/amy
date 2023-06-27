@@ -498,11 +498,7 @@ void sine_mod_trigger(uint8_t osc) {
 
 // returns a # between -1 and 1
 float amy_get_random() {
-#ifdef ESP_PLATFORM
-    return (((float)esp_random() / UINT32_MAX) * 2.0f) - 1.0f;
-#else
     return (rand() / (float)RAND_MAX * 2.0f) - 1.0f;
-#endif
 }
 
 /* noise */

@@ -100,7 +100,7 @@ void config_chorus(float level, int max_delay) {
 #endif // AMY_HAS_CHORUS
 
 
-#ifdef AMY_HAS_REVERB
+#if (AMY_HAS_REVERB == 1)
 typedef struct reverb_state {
     float level;
     float liveness;
@@ -373,10 +373,10 @@ void amy_reset_oscs() {
     synth[CHORUS_MOD_SOURCE].amp = CHORUS_DEFAULT_MOD_DEPTH;
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
-    #ifdef AMY_HAS_CHORUS
+    #if ( AMY_HAS_CHORUS == 1)
     config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
     #endif
-    #ifdef AMY_HAS_REVERB
+    #if ( AMY_HAS_REVERB == 1)
     config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
     #endif
 }
@@ -767,7 +767,7 @@ int16_t * fill_audio_buffer_task() {
     xSemaphoreGive(xQueueSemaphore);
 #endif
 
-#ifdef AMY_HAS_CHORUS
+#if AMY_HAS_CHORUS == 1
     // here's a little fragment of hold_and_modify() for you.
     msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
     msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
@@ -797,7 +797,7 @@ int16_t * fill_audio_buffer_task() {
     for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
 #endif
 
-#ifdef AMY_HAS_CHORUS
+#if  AMY_HAS_CHORUS == 1
     // apply chorus.
     if(chorus.level > 0 && delay_lines[0] != NULL) {
         // apply time-varying delays to both chans.
@@ -817,7 +817,7 @@ int16_t * fill_audio_buffer_task() {
     }
 #endif
 
-#ifdef AMY_HAS_REVERB
+#if (AMY_HAS_REVERB == 1)
     // apply reverb.
     if(reverb.level > 0) {
 #if AMY_NCHANS == 1
@@ -1014,16 +1014,16 @@ struct event amy_parse_message(char * message) {
                         case 'H': config_reverb(reverb.level, atoff(message + start), reverb.damping, reverb.xover_hz); break;
                         case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
                         case 'I': e.ratio = atoff(message + start); break;
-                        #ifdef AMY_HAS_REVERB
+                        #if(AMY_HAS_REVERB == 1)
                         case 'j': config_reverb(reverb.level, reverb.liveness, atoff(message + start), reverb.xover_hz); break;
                         case 'J': config_reverb(reverb.level, reverb.liveness, reverb.damping, atoff(message + start)); break;
                         #endif
-                        #ifdef AMY_HAS_CHORUS
+                        #if(AMY_HAS_CHORUS == 1)
                         case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;
                         #endif
                         case 'l': e.velocity=atoff(message + start); break; 
                         case 'L': e.mod_source=atoi(message + start); break; 
-                        #ifdef AMY_HAS_CHORUS
+                        #if (AMY_HAS_CHORUS == 1)
                         case 'm': config_chorus(chorus.level, atoi(message + start)); break;
                         #endif
                         case 'N': e.latency_ms = atoi(message + start);  break; 
