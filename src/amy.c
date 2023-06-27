@@ -30,6 +30,7 @@ struct mod_event * msynth;
 float ** fbl;
 float per_osc_fb[AMY_CORES][AMY_BLOCK_SIZE];
 
+#ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
 #ifdef ESP_PLATFORM
     //fprintf(stderr, "allocing size %ld flags %ld\n", size, flags);
@@ -39,6 +40,8 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
     return malloc(size);
 #endif
 }
+#endif
+
 
 
 // Final output delay lines.
