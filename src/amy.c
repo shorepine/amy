@@ -47,7 +47,7 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 // Final output delay lines.
 delay_line_t *delay_lines[AMY_NCHANS];
 
-#ifdef AMY_HAS_CHORUS
+#if AMY_HAS_CHORUS == 1
 // CHORUS_ARATE means that chorus delay is updated at full audio rate and
 // the chorus delay lines have per-sample variable delays.  Otherwise,
 // the chorus oscillator is only evalated once per block (~11ms) and the
@@ -1014,8 +1014,10 @@ struct event amy_parse_message(char * message) {
                         case 'F': e.filter_freq=atoff(message + start); break; 
                         case 'G': e.filter_type=atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
+                        #if(AMY_HAS_REVERB == 1)
                         case 'H': config_reverb(reverb.level, atoff(message + start), reverb.damping, reverb.xover_hz); break;
                         case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
+                        #endif
                         case 'I': e.ratio = atoff(message + start); break;
                         #if(AMY_HAS_REVERB == 1)
                         case 'j': config_reverb(reverb.level, reverb.liveness, atoff(message + start), reverb.xover_hz); break;
