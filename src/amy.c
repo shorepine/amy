@@ -171,7 +171,7 @@ int8_t global_init() {
 
 
 float freq_for_midi_note(uint8_t midi_note) {
-    return 440.0*pow(2,(midi_note-69.0)/12.0);
+    return 440.0*powf(2,(midi_note-69.0)/12.0);
 }
 
 
