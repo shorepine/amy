@@ -41,11 +41,11 @@ int main(int argc, char ** argv) {
     amy_reset_oscs();
 
     // Play a few notes in FM
-    #ifdef AMY_HAS_REVERB
+    #if AMY_HAS_REVERB == 1
     config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
     #endif
 
-    #ifdef AMY_HAS_CHORUS
+    #if AMY_HAS_CHORUS == 1
     config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
     #endif
     
