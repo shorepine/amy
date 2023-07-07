@@ -171,7 +171,7 @@ int8_t global_init() {
 
 
 float freq_for_midi_note(uint8_t midi_note) {
-    return 440.0*powf(2,(midi_note-69.0)/12.0);
+    return 440.0f*powf(2,(midi_note-69.0f)/12.0f);
 }
 
 
@@ -319,8 +319,8 @@ void reset_osc(uint8_t i ) {
     // set all the synth state to defaults
     synth[i].osc = i; // self-reference to make updating oscs easier
     synth[i].wave = SINE;
-    synth[i].duty = 0.5;
-    msynth[i].duty = 0.5;
+    synth[i].duty = 0.5f;
+    msynth[i].duty = 0.5f;
     synth[i].patch = -1;
     synth[i].midi_note = 0;
     synth[i].freq = 0;
@@ -332,16 +332,16 @@ void reset_osc(uint8_t i ) {
     synth[i].phase = 0;
     synth[i].latency_ms = 0;
     synth[i].volume = 0;
-    synth[i].pan = 0.5;
-    msynth[i].pan = 0.5;
+    synth[i].pan = 0.5f;
+    msynth[i].pan = 0.5f;
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
     synth[i].ratio = -1;
     synth[i].filter_freq = 0;
     msynth[i].filter_freq = 0;
-    synth[i].resonance = 0.7;
-    msynth[i].resonance = 0.7;
+    synth[i].resonance = 0.7f;
+    msynth[i].resonance = 0.7f;
     synth[i].velocity = 0;
     synth[i].step = 0;
     synth[i].sample = DOWN;
@@ -568,9 +568,9 @@ void play_event(struct delta d) {
     // for global changes, just make the change, no need to update the per-osc synth
     if(d.param == VOLUME) global.volume = *(float *)&d.data;
     if(d.param == LATENCY) { global.latency_ms = *(int16_t *)&d.data; computed_delta_set = 0; computed_delta = 0; }
-    if(d.param == EQ_L) global.eq[0] = powf(10, *(float *)&d.data / 20.0);
-    if(d.param == EQ_M) global.eq[1] = powf(10, *(float *)&d.data / 20.0);
-    if(d.param == EQ_H) global.eq[2] = powf(10, *(float *)&d.data / 20.0);
+    if(d.param == EQ_L) global.eq[0] = powf(10, *(float *)&d.data / 20.0f);
+    if(d.param == EQ_M) global.eq[1] = powf(10, *(float *)&d.data / 20.0f);
+    if(d.param == EQ_H) global.eq[2] = powf(10, *(float *)&d.data / 20.0f);
 
     // triggers / envelopes 
     // the only way a sound is made is if velocity (note on) is >0.
@@ -738,12 +738,12 @@ int64_t amy_sysclock() {
 
 
 void amy_increase_volume() {
-    global.volume += 0.5;
+    global.volume += 0.5f;
     if(global.volume > MAX_VOLUME) global.volume = MAX_VOLUME;    
 }
 
 void amy_decrease_volume() {
-    global.volume -= 0.5;
+    global.volume -= 0.5f;
     if(global.volume < 0) global.volume = 0;    
 }
 
@@ -995,7 +995,7 @@ struct event amy_parse_message(char * message) {
                 if(global.latency_ms != 0) {
                     if(!computed_delta_set) {
                         computed_delta = e.time - sysclock;
-                        fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, AMY_MAX_DRIFT_MS, global.latency_ms);
+                        //fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, AMY_MAX_DRIFT_MS, global.latency_ms);
                         computed_delta_set = 1;
                     }
                 }
@@ -1073,9 +1073,9 @@ struct event amy_parse_message(char * message) {
             // OK, so check for potentially negative numbers here (or really big numbers-sysclock) 
             int64_t potential_time = (e.time - computed_delta) + global.latency_ms;
             if(potential_time < 0 || (potential_time > sysclock + global.latency_ms + AMY_MAX_DRIFT_MS)) {
-                fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
+                //fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
                 computed_delta = e.time - sysclock;
-                fprintf(stderr,"computed delta now %lld\n", computed_delta);
+                //fprintf(stderr,"computed delta now %lld\n", computed_delta);
             }
             e.time = (e.time - computed_delta) + global.latency_ms;
         } else { // else play it asap 
