@@ -279,6 +279,8 @@ extern void triangle_mod_trigger(uint8_t osc);
 extern void pulse_mod_trigger(uint8_t osc);
 extern void pcm_mod_trigger(uint8_t osc);
 extern float amy_get_random();
+extern void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs);
+
 
 // filters
 extern void filters_init();
