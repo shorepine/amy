@@ -133,50 +133,51 @@ void algo_note_off(uint8_t osc) {
     synth[osc].note_off_clock = total_samples;          
 }
 
-void algo_setup_patch(uint8_t osc) {
+void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
     // Set up the voices from a DX7 patch.
     // 9 voices total - operators 1,2,3,4,5,6, the root voice (silent), and two LFOs (amp then pitch)
-    // so if we set a patch to osc 0, 
-    // osc0 = root control voice, 
-    // osc1 = op6, osc2 = op5, osc3 = op4, osc4 = op3, osc5 = op2, osc6 = op1, 
-    // osc7 = amp lfo, osc8 = pitch lfo
+    // osc == root osc (the control one with the parameters in it)
+    // target_oscs = list of 8 osc numbers
+    // target_oscs[0] = op6, [1] = op5, [2] = op4, [3] = op3, [4] = op2, [5] = op1, 
+    // [6] = amp lfo, [7] = pitch lfo
     algorithms_parameters_t p = fm_patches[synth[osc].patch % ALGO_PATCHES];
     synth[osc].algorithm = p.algo;
     synth[osc].feedback = p.feedback;
 
-    synth[osc].mod_source = osc+8;
+    synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
     float time_ratio = 1;
     if(synth[osc].ratio >=0 ) time_ratio = synth[osc].ratio;
 
     // amp LFO
-    synth[osc+7].freq = p.lfo_freq * time_ratio;
-    synth[osc+7].wave = p.lfo_wave;
-    synth[osc+7].status = IS_MOD_SOURCE;
-    synth[osc+7].amp = p.lfo_amp_amp;
+    synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
+    synth[target_oscs[6]].wave = p.lfo_wave;
+    synth[target_oscs[6]].status = IS_MOD_SOURCE;
+    synth[target_oscs[6]].amp = p.lfo_amp_amp;
     // pitch LFO
-    synth[osc+8].freq = p.lfo_freq * time_ratio;
-    synth[osc+8].wave = p.lfo_wave;
-    synth[osc+8].status = IS_MOD_SOURCE;
-    synth[osc+8].amp = p.lfo_pitch_amp;
+    synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
+    synth[target_oscs[7]].wave = p.lfo_wave;
+    synth[target_oscs[7]].status = IS_MOD_SOURCE;
+    synth[target_oscs[7]].amp = p.lfo_pitch_amp;
 
 
     float last_release_time= 0;
     float last_release_value = 0;
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        synth[osc].algo_source[i] = osc+i+1;
+        // TODO: ADD PER-OP AMP MOD via MOD SENS (SEE FM.PY)
+        synth[osc].algo_source[i] = target_oscs[i];
         operator_parameters_t op = p.ops[i];
-        synth[osc+i+1].freq = op.freq;
-        if(synth[osc+i+1].freq < 0) synth[osc+i+1].freq = 0;
-        synth[osc+i+1].status = IS_ALGO_SOURCE;
-        synth[osc+i+1].ratio = op.freq_ratio;
-        synth[osc+i+1].amp = op.amp;
-        synth[osc+i+1].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
-        synth[osc+i+1].phase = 0.25;
-        synth[osc+i+1].mod_target = op.lfo_target;
+        synth[target_oscs[i]].freq = op.freq;
+        if(synth[target_oscs[i]].freq < 0) synth[target_oscs[i]].freq = 0;
+        synth[target_oscs[i]].status = IS_ALGO_SOURCE;
+        synth[target_oscs[i]].ratio = op.freq_ratio;
+        synth[target_oscs[i]].amp = op.amp;
+        synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
+        synth[target_oscs[i]].phase = 0.25;
+        synth[target_oscs[i]].mod_target = op.lfo_target;
         for(uint8_t j=0;j<NUM_ALGO_BPS;j++) {
-            synth[osc+i+1].breakpoint_values[0][j] = op.amp_rate[j];
-            synth[osc+i+1].breakpoint_times[0][j] =  ms_to_samples((int)((float)op.amp_time[j]/time_ratio));
+            synth[target_oscs[i]].breakpoint_values[0][j] = op.amp_rate[j];
+            synth[target_oscs[i]].breakpoint_times[0][j] =  ms_to_samples((int)((float)op.amp_time[j]/time_ratio));
         }
         // Calculate the last release time for the root note's amp BP
         if(op.amp_time[4] > last_release_time) {
@@ -199,6 +200,13 @@ void algo_setup_patch(uint8_t osc) {
     }
     synth[osc].breakpoint_target[1] = TARGET_FREQ+TARGET_TRUE_EXPONENTIAL;
 
+}
+
+// The default way is to use consecutive osc #s
+void algo_setup_patch(uint8_t osc) {
+    uint8_t target_oscs[8];
+    for(uint8_t i=0;i<8;i++) target_oscs[i] = osc+i+1;
+    algo_custom_setup_patch(osc, target_oscs);
 }
 
 void algo_note_on(uint8_t osc) {    

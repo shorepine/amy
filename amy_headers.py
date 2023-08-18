@@ -44,7 +44,8 @@ def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
             s["name"] = sample.name
             floaty =(np.frombuffer(bytes(sample.raw_sample_data),dtype='int16'))/32768.0
             resampled = resampy.resample(floaty, sample.AMY_SAMPLE_RATE, pcm_AMY_SAMPLE_RATE)
-            samples_int16 = np.int16(resampled*32768)
+            # Make sure the float value doesn't cause overflow in int.  resampling can cause overshoot.
+            samples_int16 = np.int16(np.minimum(32767.0, np.maximum(-32768.0, resampled*32768.0))
             #floats.append(resampled)
             int16s.append(samples_int16)
             s["offset"] = offset 
