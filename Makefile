@@ -1,7 +1,7 @@
 # Makefile for libamy , including an example
 
 TARGET = amy-example amy-message
-LIBS = -lpthread  -lm
+LIBS = -lpthread  -lm 
 
 # on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
 ifeq ($(shell uname -m), armv7l)
