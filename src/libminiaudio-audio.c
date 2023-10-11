@@ -12,9 +12,14 @@
 #define MA_NO_ENGINE
 #define MA_NO_GENERATION
 //#define MA_DEBUG_OUTPUT
+
+#ifdef __APPLE__
+    #define MA_NO_RUNTIME_LINKING
+#endif
 #define MINIAUDIO_IMPLEMENTATION
 //#define MA_NO_PULSEAUDIO
 //#define MA_NO_JACK
+
 #include "miniaudio.h"
 
 #include <stdio.h>
@@ -32,7 +37,7 @@ pthread_t amy_live_thread;
 void amy_print_devices() {
     ma_context context;
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
-        printf("Failed to setup context for device list.\n");
+        fprintf(stderr,"Failed to setup context for device list.\n");
         exit(1);
     }
 
@@ -41,12 +46,12 @@ void amy_print_devices() {
     ma_device_info* pCaptureInfos;
     ma_uint32 captureCount;
     if (ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount) != MA_SUCCESS) {
-        printf("Failed to get device list.\n");
+        fprintf(stderr,"Failed to get device list.\n");
         exit(1);
     }
 
     for (ma_uint32 iDevice = 0; iDevice < playbackCount; iDevice += 1) {
-        printf("%d - %s\n", iDevice, pPlaybackInfos[iDevice].name);
+        fprintf(stderr,"%d - %s\n", iDevice, pPlaybackInfos[iDevice].name);
     }
 
     ma_context_uninit(&context);
