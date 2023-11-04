@@ -3,6 +3,12 @@
 TARGET = amy-example amy-message
 LIBS = -lpthread  -lm 
 
+
+# on macOS, need to link to AudioUnit, CoreAudio, and CoreFoundation
+ifeq ($(shell uname -s), Darwin)
+LIBS += -framework AudioUnit -framework CoreAudio -framework CoreFoundation
+endif
+
 # on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
 ifeq ($(shell uname -m), armv7l)
 LIBS += -ldl  -latomic
