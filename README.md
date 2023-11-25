@@ -241,15 +241,20 @@ amy.send(osc=0,wave=amy.SAW_DOWN,filter_freq=2500, resonance=5, filter_type=amy.
 amy.send(osc=0, vel=1, note=40)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint! A breakpoint is a simple list of (time, value) - you can have up to 8 of those pairs, and up to 3 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, frequency, duty cycle, feedback, filter frequence, or resonance with a breakpoint. It gets triggered when the note does. So let's make a breakpoint that turns the filter frequency down from its start at 2500 to 1250 after 100 milliseconds. And when the note goes off, taper the frequency to 0 after 25 millseconds. 
+You want to be able to stop the note too by sending a note off:
+```python
+amy.send(osc=0, vel=0)
+```
+
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint! A breakpoint is a simple list of (time, value) - you can have up to 8 of those pairs, and up to 3 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, frequency, duty cycle, feedback, filter frequence, or resonance with a breakpoint. It gets triggered when the note does. So let's make a breakpoint that turns the filter frequency down from its start at 2500 Hz to 500 Hz over 1000 milliseconds. And when the note goes off, taper the frequency to 0 Hz over 200 millseconds. 
 
 ```python
 amy.send(osc=0,wave=amy.SAW_DOWN,filter_freq=2500, resonance=5, filter_type=amy.FILTER_LPF)
-amy.send(osc=0, bp0="100,0.5,25,0", bp0_target=amy.TARGET_FILTER_FREQ)
+amy.send(osc=0, bp0="1000,0.2,200,0", bp0_target=amy.TARGET_FILTER_FREQ)
 amy.send(osc=0, vel=1, note=40)
 ```
 
-Great. You can add multiple targets together, for example, if you want a breakpoint to control both filter frequency and resonance, use `bp0_target=amy.TARGET_FILTER_FREQ+amy.TARGET_RESONANCE`. Give it a go!
+Great. You can add multiple targets together, for example, if you want a breakpoint to control both filter frequency and the note amplitude, use `bp0_target=amy.TARGET_FILTER_FREQ+amy.TARGET_AMP`. Give it a go!
 
 We also have LFOs, which are implemented as one oscillator modulating another. You set the lower-frequency oscillator up, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite: 
 
