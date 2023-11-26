@@ -375,7 +375,7 @@ void amy_reset_oscs() {
     global.eq[2] = 0;
     // also reset chorus oscillator.
     synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
-    synth[CHORUS_MOD_SOURCE].amp = CHORUS_DEFAULT_MOD_DEPTH;
+    synth[CHORUS_MOD_SOURCE].amp = F2S(CHORUS_DEFAULT_MOD_DEPTH);
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
     #if ( AMY_HAS_CHORUS == 1)
@@ -460,7 +460,7 @@ void show_debug(uint8_t type) {
     if(type>2) {
         // print out all the osc data
         //printf("global: filter %f resonance %f volume %f status %d\n", global.filter_freq, global.resonance, global.volume, global.status);
-        fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, global.eq[0], global.eq[1], global.eq[2]);
+        fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint8_t i=0;i<AMY_OSCS;i++) {
             fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",

@@ -170,7 +170,7 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
         synth[target_oscs[i]].ratio = op.freq_ratio;
         synth[target_oscs[i]].amp = F2S(op.amp);
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
-        synth[target_oscs[i]].phase = 0.25;
+        synth[target_oscs[i]].phase = F2P(0.25);
         synth[target_oscs[i]].mod_target = op.lfo_target;
         for(uint8_t j=0;j<NUM_ALGO_BPS;j++) {
             synth[target_oscs[i]].breakpoint_values[0][j] = op.amp_rate[j];
