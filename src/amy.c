@@ -425,7 +425,7 @@ int8_t oscs_init() {
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
-        fbl[core]= (float*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, FBL_RAM_CAPS);
+        fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, FBL_RAM_CAPS);
         for(uint16_t c=0;c<AMY_NCHANS;++c) {
             for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { 
                 fbl[core][AMY_BLOCK_SIZE*c + i] = 0; 
