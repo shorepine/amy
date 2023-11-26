@@ -78,35 +78,32 @@ struct FmAlgorithm algorithms[33] = {
 };
 // End of MSFA stuff
 
-//float zeros0[AMY_BLOCK_SIZE];
-//float zeros1[AMY_BLOCK_SIZE];
-
-
 // a = 0
-void zero(float *a) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+void zero(SAMPLE* a) {
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
         a[i] = 0;
     }
 }
 
 
 // b = a + b
-void add(float *a, float*b) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        b[i] = (a[i] + b[i]);
+void add(SAMPLE* a, SAMPLE* b) {
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+        b[i] += a[i];
     }
 }
 
 // b = a 
-void copy(float *a, float*b) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+void copy(SAMPLE* a, SAMPLE* b) {
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
         b[i] = a[i];
     }
 }
 
-void render_mod(float *in, float*out, uint8_t osc, float feedback_level, uint8_t algo_osc) {
+void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uint8_t algo_osc) {
 
     hold_and_modify(osc);
+    //printf("render_mod: osc %d msynth.amp %f\n", osc, S2F(msynth[osc].amp));
 
     // out = buf
     // in = mod
@@ -142,7 +139,7 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
     // [6] = amp lfo, [7] = pitch lfo
     algorithms_parameters_t p = fm_patches[synth[osc].patch % ALGO_PATCHES];
     synth[osc].algorithm = p.algo;
-    synth[osc].feedback = p.feedback;
+    synth[osc].feedback = F2S(p.feedback);
 
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
@@ -153,12 +150,12 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
     synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[6]].wave = p.lfo_wave;
     synth[target_oscs[6]].status = IS_MOD_SOURCE;
-    synth[target_oscs[6]].amp = p.lfo_amp_amp;
+    synth[target_oscs[6]].amp = F2S(p.lfo_amp_amp);
     // pitch LFO
     synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[7]].wave = p.lfo_wave;
     synth[target_oscs[7]].status = IS_MOD_SOURCE;
-    synth[target_oscs[7]].amp = p.lfo_pitch_amp;
+    synth[target_oscs[7]].amp = F2S(p.lfo_pitch_amp);
 
 
     float last_release_time= 0;
@@ -171,7 +168,7 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
         if(synth[target_oscs[i]].freq < 0) synth[target_oscs[i]].freq = 0;
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
         synth[target_oscs[i]].ratio = op.freq_ratio;
-        synth[target_oscs[i]].amp = op.amp;
+        synth[target_oscs[i]].amp = F2S(op.amp);
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
         synth[target_oscs[i]].phase = 0.25;
         synth[target_oscs[i]].mod_target = op.lfo_target;
@@ -221,33 +218,29 @@ void algo_note_on(uint8_t osc) {
     }            
 }
 
-
 void algo_init() {
-//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros0[i] = 0;
-//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros1[i] = 0;
 }
 
 
 
 
-void render_algo(float * buf, uint8_t osc) { 
-    float scratch[6][AMY_BLOCK_SIZE];
+void render_algo(SAMPLE* buf, uint8_t osc) { 
+    SAMPLE scratch[6][BLOCK_SIZE];
+
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6
-    float *in_buf;
-    float *out_buf = NULL;
+    SAMPLE* in_buf;
+    SAMPLE* out_buf = NULL;
 
     // TODO, i think i need at most 2 of these buffers, maybe 3?? 
-    for(uint8_t i=0;i<6;i++) {
+    for (int i = 0; i < 6; ++i)
         zero(scratch[i]);
-    }
     uint8_t ops_used = 0;
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
-
             ops_used++;
-            float feedback_level = 0;
+            SAMPLE feedback_level = 0;
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
             } // main algo voice stores feedback, not the op 
@@ -258,8 +251,7 @@ void render_algo(float * buf, uint8_t osc) {
                 in_buf = scratch[1]; 
             } else {
                 // no in_buf
-                in_buf = scratch[5];
-                //if(osc>31) { in_buf = zeros1; } else { in_buf = zeros0; }
+                in_buf = scratch[5]; // NULL;
             }
 
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
@@ -277,7 +269,6 @@ void render_algo(float * buf, uint8_t osc) {
             }
 
             render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
-
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
                 if((algo.ops[op] & OUT_BUS_ONE) ) {
                     copy(out_buf, scratch[0]);
@@ -294,14 +285,13 @@ void render_algo(float * buf, uint8_t osc) {
                 } else {
                     add(scratch[4], buf);
                 }
-
-
             }
         }
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     if(ops_used == 0) ops_used = 1;
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
+    SAMPLE amp = MUL0_SS(msynth[osc].amp, F2S(1.0f / (float)ops_used));
+    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+        buf[i] = MUL0_SS(buf[i], amp);
     }
 }
