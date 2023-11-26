@@ -334,8 +334,8 @@ void reset_osc(uint8_t i ) {
     synth[i].phase = F2P(0);
     synth[i].latency_ms = 0;
     synth[i].volume = 0;
-    synth[i].pan = F2S(0.5f);
-    msynth[i].pan = F2S(0.5f);
+    synth[i].pan = 0.5f;
+    msynth[i].pan = 0.5f;
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
@@ -465,7 +465,7 @@ void show_debug(uint8_t type) {
         for(uint8_t i=0;i<AMY_OSCS;i++) {
             fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
                     i, synth[i].status, S2F(synth[i].amp), synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
-                    synth[i].velocity, synth[i].filter_freq, synth[i].ratio, S2F(synth[i].feedback), synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, S2F(synth[i].pan),
+                    synth[i].velocity, synth[i].filter_freq, synth[i].ratio, S2F(synth[i].feedback), synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan,
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             if(type>3) { 
                 for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
@@ -475,7 +475,7 @@ void show_debug(uint8_t type) {
                     }
                     fprintf(stderr,"\n");
                 }
-                fprintf(stderr,"mod osc %d: amp: %f, freq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, S2F(msynth[i].amp), msynth[i].freq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, S2F(msynth[i].feedback), S2F(msynth[i].pan));
+                fprintf(stderr,"mod osc %d: amp: %f, freq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, S2F(msynth[i].amp), msynth[i].freq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, S2F(msynth[i].feedback), msynth[i].pan);
             }
         }
     }
@@ -527,7 +527,7 @@ void play_event(struct delta d) {
         }
     }
     if(d.param == PHASE) synth[d.osc].phase = F2P(*(float *)&d.data);  // PHASOR
-    if(d.param == PAN) { synth[d.osc].pan = F2S(*(float *)&d.data); /*fprintf(stderr, "pan osc %d is now %f\n", d.osc, synth[d.osc].pan);*/ }
+    if(d.param == PAN) { synth[d.osc].pan = *(float *)&d.data; /*fprintf(stderr, "pan osc %d is now %f\n", d.osc, synth[d.osc].pan);*/ }
     if(d.param == PATCH) synth[d.osc].patch = *(int16_t *)&d.data;
     if(d.param == DUTY) synth[d.osc].duty = *(float *)&d.data;
     if(d.param == FEEDBACK) synth[d.osc].feedback = F2S(*(float *)&d.data);  // SAMPLE
@@ -655,7 +655,7 @@ void hold_and_modify(uint8_t osc) {
         SAMPLE scale = compute_breakpoint_scale(osc, i);
         //if (scale != F2S(1.0f)) printf("osc %d scale %f\n", osc, S2F(scale));
         if(synth[osc].breakpoint_target[i] & TARGET_AMP) msynth[osc].amp = MUL4_SS(msynth[osc].amp, scale);
-        if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan = MUL4_SS(msynth[osc].pan, scale);
+        if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan = msynth[osc].pan * S2F(scale);
         if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty = msynth[osc].duty * S2F(scale);
         if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].freq = msynth[osc].freq * S2F(scale);
         if(synth[osc].breakpoint_target[i] & TARGET_FEEDBACK) msynth[osc].feedback = MUL4_SS(msynth[osc].feedback, scale);
@@ -671,7 +671,7 @@ void hold_and_modify(uint8_t osc) {
     // and the mod -- mod scale is (original + (original * scale))
     SAMPLE scale = compute_mod_scale(osc);
     if(synth[osc].mod_target & TARGET_AMP) msynth[osc].amp = msynth[osc].amp + MUL4_SS(msynth[osc].amp, scale);
-    if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan = msynth[osc].pan + MUL4_SS(msynth[osc].pan, scale); 
+    if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan = msynth[osc].pan + (msynth[osc].pan * S2F(scale)); 
     if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty = msynth[osc].duty + (msynth[osc].duty * S2F(scale));
     if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].freq = msynth[osc].freq + (msynth[osc].freq * S2F(scale));
     if(synth[osc].mod_target & TARGET_FEEDBACK) msynth[osc].feedback = msynth[osc].feedback + MUL4_SS(msynth[osc].feedback, scale);
@@ -866,9 +866,8 @@ int16_t * fill_audio_buffer_task() {
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
             // Convert the mixed sample into the int16 range, applying overall gain.
-            SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i] + fbl[1][i]);
+            SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE] + fbl[1][i + c * AMY_BLOCK_SIZE]);
     
-            
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             SAMPLE new_state = fsample + MUL4_SS(F2S(0.995f), global.hpf_state);

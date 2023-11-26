@@ -127,7 +127,7 @@ struct event {
     float substep;
     SAMPLE sample;
     float volume;
-    SAMPLE pan;   // Pan parameters.
+    float pan;   // Pan parameters.
     int16_t latency_ms;
     float filter_freq;
     float ratio;
@@ -165,8 +165,8 @@ struct event {
 // events, but only the things that mods/env can change. one per osc
 struct mod_event {
     SAMPLE amp;
-    SAMPLE pan;
-    SAMPLE last_pan;   // Pan history for interpolation.
+    float pan;
+    float last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
     float filter_freq;

@@ -2,7 +2,7 @@
 
 #include "amy.h"
 
-#if PCM_PATCHES_SIZE == PCM_LARGE
+#if AMY_PCM_PATCHES_SIZE == 2
 #include "pcm_samples_large.h"
 #else
 #include "pcm_samples_small.h"
@@ -17,7 +17,7 @@ typedef struct {
 } pcm_map_t;
 
 
-#if PCM_PATCHES_SIZE == PCM_LARGE
+#if AMY_PCM_PATCHES_SIZE == 2
 #include "pcm_large.h"
 #else
 #include "pcm_small.h"
