@@ -27,10 +27,10 @@ default: $(TARGET)
 all: default
 
 SOURCES = src/algorithms.c src/amy.c src/envelope.c \
-	src/filters.c src/oscillators.c src/pcm.c # src/partials.c src/delay.c 
+	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/delay.c 
 
-OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c \
-	src/filters.c src/oscillators.c src/pcm.c src/libminiaudio-audio.c src/amy-example-esp32.c) # src/delay.c src/partials.c
+OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c src/delay.c src/partials.c \
+	src/filters.c src/oscillators.c src/pcm.c src/libminiaudio-audio.c src/amy-example-esp32.c) 
 
 HEADERS = $(wildcard src/*.h) amy_config.h
 

@@ -33,7 +33,7 @@ struct mod_event * msynth;
 
 // Two mixing blocks, one per core of rendering
 SAMPLE ** fbl;
-SAMPLE per_osc_fb[AMY_CORES][BLOCK_SIZE];
+SAMPLE per_osc_fb[AMY_CORES][AMY_BLOCK_SIZE];
 
 #ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
@@ -390,7 +390,9 @@ void amy_reset_oscs() {
 
 // the synth object keeps held state, whereas events are only deltas/changes
 int8_t oscs_init() {
+    #if AMY_KS_OSCS > 0
     ks_init();
+    #endif
     filters_init();
     algo_init();
     pcm_init();
@@ -431,8 +433,9 @@ int8_t oscs_init() {
         }
     }
     // we only alloc delay lines if the chorus is turned on.
+    #if AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0
     for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
-
+    #endif
     //init_stereo_reverb();
     
     total_samples = 0;
@@ -488,8 +491,9 @@ void oscs_deinit() {
     free(synth);
     free(msynth);
     free(events);
-
+    #if AMY_KS_OSCS > 0
     ks_deinit();
+    #endif
     filters_deinit();
 }
 
@@ -502,11 +506,13 @@ void osc_note_on(uint8_t osc) {
     if(synth[osc].wave==PULSE) pulse_note_on(osc);
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
-    if(synth[osc].wave==PARTIAL) partial_note_on(osc);
+    #if AMY_HAS_PARTIALS == 1
+    if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
     if(synth[osc].wave==PARTIALS) partials_note_on(osc);
+    #endif
 }
 
-extern const float sine_lutable_0[256];
+extern const float sine_fxpt_lutable_0[256];
 
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
@@ -519,7 +525,7 @@ void play_event(struct delta d) {
         // todo: event-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner 
         if(synth[d.osc].wave == SINE) {
-            synth[d.osc].lut = sine_lutable_0;
+            synth[d.osc].lut = sine_fxpt_lutable_0;
             synth[d.osc].lut_size = 256;
         }
     }
@@ -582,8 +588,11 @@ void play_event(struct delta d) {
         synth[d.osc].velocity = *(float *)&d.data;
         synth[d.osc].status = AUDIBLE;
         // take care of fm & ks first -- no special treatment for bp/mod
-        if(synth[d.osc].wave==KS) { ks_note_on(d.osc); } 
-        else {
+        if(synth[d.osc].wave==KS) { 
+            #if AMY_KS_OSCS > 0
+            ks_note_on(d.osc); 
+            #endif
+        }  else {
             // an osc came in with a note on.
             // start the bp clock
             synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
@@ -605,10 +614,22 @@ void play_event(struct delta d) {
         }
     } else if(synth[d.osc].velocity > 0 && d.param == VELOCITY && *(float *)&d.data == 0) { // new note off
         synth[d.osc].velocity = 0;
-        if(synth[d.osc].wave==KS) { ks_note_off(d.osc); }
+        if(synth[d.osc].wave==KS) { 
+            #if AMY_KS_OSCS > 0
+            ks_note_off(d.osc);
+            #endif 
+        }
         else if(synth[d.osc].wave==ALGO) { algo_note_off(d.osc); } 
-        else if(synth[d.osc].wave==PARTIAL) { partial_note_off(d.osc); }
-        else if(synth[d.osc].wave==PARTIALS) { partials_note_off(d.osc); }
+        else if(synth[d.osc].wave==PARTIAL) { 
+            #if AMY_HAS_PARTIALS == 1
+            partial_note_off(d.osc); 
+            #endif
+        }
+        else if(synth[d.osc].wave==PARTIALS) { 
+            #if AMY_HAS_PARTIALS == 1
+            partials_note_off(d.osc); 
+            #endif
+        }
         else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
         else {
             // osc note off, start release
@@ -651,7 +672,7 @@ void hold_and_modify(uint8_t osc) {
     }
 
     // and the mod -- mod scale is (original + (original * scale))
-    float scale = compute_mod_scale(osc);
+    SAMPLE scale = compute_mod_scale(osc);
     if(synth[osc].mod_target & TARGET_AMP) msynth[osc].amp = msynth[osc].amp + MUL4_SS(msynth[osc].amp, scale);
     if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan = msynth[osc].pan + MUL4_SS(msynth[osc].pan, scale); 
     if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty = msynth[osc].duty + (msynth[osc].duty * S2F(scale));
@@ -708,11 +729,17 @@ void render_osc_wave(uint8_t osc, float* buf) {
     if(synth[osc].wave == PULSE) render_pulse(buf, osc);
     if(synth[osc].wave == TRIANGLE) render_triangle(buf, osc);
     if(synth[osc].wave == SINE) render_sine(buf, osc);
-    if(synth[osc].wave == KS) render_ks(buf, osc);
+    if(synth[osc].wave == KS) { 
+        #if AMY_KS_OSCS > 0
+        render_ks(buf, osc);
+        #endif
+    }
     if(synth[osc].wave == PCM) render_pcm(buf, osc);
     if(synth[osc].wave == ALGO) render_algo(buf, osc);
+    #if AMY_HAS_PARTIALS == 1
     if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
     if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
+    #endif
 }
 
 void render_task(uint8_t start, uint8_t end, uint8_t core) {
@@ -837,13 +864,13 @@ int16_t * fill_audio_buffer_task() {
 #endif
 
     // global volume is supposed to max out at 10, so scale by 0.1.
-    float volume_scale = 0.1f * global.volume;
+    SAMPLE volume_scale = F2S(0.1f * global.volume);
     //uint8_t nonzero = 0;
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
             // Convert the mixed sample into the int16 range, applying overall gain.
             SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i] + fbl[1][i]);
-
+    
             
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]

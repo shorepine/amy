@@ -9,13 +9,14 @@ If you're including AMY in your code, make your own AMY config and make sure the
 #define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
 #define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
 #define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
-#define AMY_KS_OSCS 1
+#define AMY_KS_OSCS 0
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
-#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
-#define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
+#define AMY_HAS_CHORUS 0         // 1 = Make chorus available (uses RAM)
+#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
+#define AMY_HAS_PARTIALS 0       // 1 = Make partials available
 
 // Are you using an ESP? You'll want to tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
@@ -57,7 +58,7 @@ If you're including AMY in your code, make your own AMY config and make sure the
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 
 #define AMY_BLOCK_SIZE 256       // buffer block size in samples
-
+#define BLOCK_SIZE_BITS 8    // log_2(BLOCK_SIZE)
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.

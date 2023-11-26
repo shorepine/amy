@@ -80,7 +80,7 @@ struct FmAlgorithm algorithms[33] = {
 
 // a = 0
 void zero(SAMPLE* a) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         a[i] = 0;
     }
 }
@@ -88,14 +88,14 @@ void zero(SAMPLE* a) {
 
 // b = a + b
 void add(SAMPLE* a, SAMPLE* b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] += a[i];
     }
 }
 
 // b = a 
 void copy(SAMPLE* a, SAMPLE* b) {
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = a[i];
     }
 }
@@ -225,7 +225,7 @@ void algo_init() {
 
 
 void render_algo(SAMPLE* buf, uint8_t osc) { 
-    SAMPLE scratch[6][BLOCK_SIZE];
+    SAMPLE scratch[6][AMY_BLOCK_SIZE];
 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
@@ -291,7 +291,7 @@ void render_algo(SAMPLE* buf, uint8_t osc) {
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     if(ops_used == 0) ops_used = 1;
     SAMPLE amp = MUL0_SS(msynth[osc].amp, F2S(1.0f / (float)ops_used));
-    for(uint16_t i=0;i<BLOCK_SIZE;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         buf[i] = MUL0_SS(buf[i], amp);
     }
 }

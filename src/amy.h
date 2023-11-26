@@ -167,7 +167,7 @@ struct event {
 struct mod_event {
     SAMPLE amp;
     SAMPLE pan;
-    float last_pan;   // Pan history for interpolation.
+    SAMPLE last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
     float filter_freq;
@@ -240,7 +240,7 @@ extern void algo_init();
 extern void pcm_init();
 extern void render_ks(SAMPLE * buf, uint8_t osc); 
 extern void render_sine(SAMPLE * buf, uint8_t osc); 
-extern void render_fm_sine(SAMPLE *buf, uint8_t osc, float *SAMPLE, float feedback_level, uint8_t algo_osc);
+extern void render_fm_sine(SAMPLE *buf, uint8_t osc, SAMPLE *mod, SAMPLE feedback_level, uint8_t algo_osc);
 extern void render_pulse(SAMPLE * buf, uint8_t osc); 
 extern void render_saw_down(SAMPLE * buf, uint8_t osc);
 extern void render_saw_up(SAMPLE * buf, uint8_t osc);
@@ -288,12 +288,12 @@ extern void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs);
 // filters
 extern void filters_init();
 extern void filters_deinit();
-extern void filter_process(float * block, uint8_t osc);
-extern void parametric_eq_process(float *block);
+extern void filter_process(SAMPLE * block, uint8_t osc);
+extern void parametric_eq_process(SAMPLE *block);
 extern void update_filter(uint8_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);
-extern int8_t dsps_biquad_gen_lpf_f32(float *coeffs, float f, float qFactor);
-extern int8_t dsps_biquad_f32_ansi(const float *input, float *output, int len, float *coef, float *w);
+extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
+extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
@@ -306,9 +306,9 @@ esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float
 
 
 // envelopes
-extern float compute_breakpoint_scale(uint8_t osc, uint8_t bp_set);
-extern float compute_mod_scale(uint8_t osc);
-extern float compute_mod_value(uint8_t mod_osc);
+extern SAMPLE compute_breakpoint_scale(uint8_t osc, uint8_t bp_set);
+extern SAMPLE compute_mod_scale(uint8_t osc);
+extern SAMPLE compute_mod_value(uint8_t mod_osc);
 extern void retrigger_mod_source(uint8_t osc);
 
 
