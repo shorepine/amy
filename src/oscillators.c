@@ -33,7 +33,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
     //
     // Returns:
     //   One of the LUTs from the lutset, best suited to interpolating to generate
-    //   a waveform of the desired period.  Its size is returned in *plut_size.
+    //   a waveform of the desired period.
     // Use the earliest (i.e., longest, most harmonics) LUT that works
     // (i.e., will not actually cause aliasing).
     // So start with the highest-bandwidth (and longest) LUTs, but skip them
@@ -389,15 +389,15 @@ void render_partial(float * buf, uint8_t osc) {
         #else
             dsps_biquad_f32_ansi(scratch[0], scratch[1], AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
         #endif
-        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut_size;
+        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut->table_size;
         float amp = msynth[osc].amp;
         synth[osc].step = render_am_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
-                 synth[osc].lut, synth[osc].lut_size, scratch[1], msynth[osc].feedback);
+                 synth[osc].lut, synth[osc].lut->table_size, scratch[1], msynth[osc].feedback);
     } else {
-        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut_size;
+        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut->table_size;
         float amp = msynth[osc].amp;
         synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
-                                     synth[osc].lut, synth[osc].lut_size, 0.0f);
+                                     synth[osc].lut, synth[osc].lut->table_size, 0.0f);
     }
     synth[osc].last_amp = msynth[osc].amp;
     if(synth[osc].substep==1) {
@@ -418,10 +418,9 @@ void render_partial(float * buf, uint8_t osc) {
 }
 
 void partial_note_on(uint8_t osc) {
-    synth[osc].lut = sine_lutable_0; //choose_from_lutset(period_samples, sine_lutset, &synth[osc].lut_size);
-    synth[osc].lut_size = 256;
+    synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
     if(synth[osc].phase >= 0) {
-        synth[osc].step = (float)synth[osc].lut_size * synth[osc].phase;
+        synth[osc].step = (float)synth[osc].lut->table_size * synth[osc].phase;
         synth[osc].substep = 1; // use for block fade
     } // else keep the old step / no fade, it's a continuation
 

@@ -155,7 +155,6 @@ struct event {
     SAMPLE last_amp;
     // Selected lookup table and size.
     const LUT *lut;
-    int16_t lut_size;
     float eq_l;
     float eq_m;
     float eq_h;

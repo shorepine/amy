@@ -185,7 +185,7 @@ struct event amy_default_event() {
     e.osc = 0;
     e.step = 0;
     e.substep = 0;
-    e.sample = DOWN;
+    e.sample = F2S(0);
     e.patch = -1;
     e.wave = -1;
     e.phase = -1;
@@ -327,15 +327,15 @@ void reset_osc(uint8_t i ) {
     synth[i].midi_note = 0;
     synth[i].freq = 0;
     msynth[i].freq = 0;
-    synth[i].feedback = 0; //.996; todo ks feedback is v different from fm feedback
-    msynth[i].feedback = 0; //.996; todo ks feedback is v different from fm feedback
-    synth[i].amp = 1;
-    msynth[i].amp = 1;
-    synth[i].phase = 0;
+    synth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
+    msynth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
+    synth[i].amp = F2S(1.0f);
+    msynth[i].amp = F2S(1.0f);
+    synth[i].phase = F2P(0);
     synth[i].latency_ms = 0;
     synth[i].volume = 0;
-    synth[i].pan = 0.5f;
-    msynth[i].pan = 0.5f;
+    synth[i].pan = F2S(0.5f);
+    msynth[i].pan = F2S(0.5f);
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
@@ -346,7 +346,7 @@ void reset_osc(uint8_t i ) {
     msynth[i].resonance = 0.7f;
     synth[i].velocity = 0;
     synth[i].step = 0;
-    synth[i].sample = DOWN;
+    synth[i].sample = F2S(0);
     synth[i].substep = 0;
     synth[i].status = OFF;
     synth[i].mod_source = -1;
@@ -464,9 +464,9 @@ void show_debug(uint8_t type) {
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint8_t i=0;i<AMY_OSCS;i++) {
             fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
-                i, synth[i].status, synth[i].amp, synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
-                synth[i].velocity, synth[i].filter_freq, synth[i].ratio, synth[i].feedback, synth[i].resonance, synth[i].step, synth[i].algorithm, synth[i].pan,
-                synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
+                    i, synth[i].status, S2F(synth[i].amp), synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
+                    synth[i].velocity, synth[i].filter_freq, synth[i].ratio, S2F(synth[i].feedback), synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, S2F(synth[i].pan),
+                    synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             if(type>3) { 
                 for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
                     fprintf(stderr,"bp%d (target %d): ", j, synth[i].breakpoint_target[j]);
@@ -475,7 +475,7 @@ void show_debug(uint8_t type) {
                     }
                     fprintf(stderr,"\n");
                 }
-                fprintf(stderr,"mod osc %d: amp: %f, freq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, msynth[i].amp, msynth[i].freq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, msynth[i].feedback, msynth[i].pan);
+                fprintf(stderr,"mod osc %d: amp: %f, freq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, S2F(msynth[i].amp), msynth[i].freq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, S2F(msynth[i].feedback), S2F(msynth[i].pan));
             }
         }
     }
@@ -512,8 +512,6 @@ void osc_note_on(uint8_t osc) {
     #endif
 }
 
-extern const float sine_fxpt_lutable_0[256];
-
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
     uint8_t trig=0;
@@ -525,8 +523,7 @@ void play_event(struct delta d) {
         // todo: event-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner 
         if(synth[d.osc].wave == SINE) {
-            synth[d.osc].lut = sine_fxpt_lutable_0;
-            synth[d.osc].lut_size = 256;
+            sine_note_on(d.osc);
         }
     }
     if(d.param == PHASE) synth[d.osc].phase = F2P(*(float *)&d.data);  // PHASOR
@@ -699,20 +696,20 @@ static inline float rgain_of_pan(float pan) {
 #endif
 
 
-void mix_with_pan(float *stereo_dest, float *mono_src, float pan_start, float pan_end) {
+void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end) {
     /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan */
 #if AMY_NCHANS == 1
     // actually dest is mono, pan is ignored.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
 #else
     // stereo 
-    float gain_l = lgain_of_pan(pan_start);
-    float gain_r = rgain_of_pan(pan_start);
-    float d_gain_l = (lgain_of_pan(pan_end) - gain_l) / AMY_BLOCK_SIZE;
-    float d_gain_r = (rgain_of_pan(pan_end) - gain_r) / AMY_BLOCK_SIZE;
+    SAMPLE gain_l = F2S(lgain_of_pan(pan_start));
+    SAMPLE gain_r = F2S(rgain_of_pan(pan_start));
+    SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) - lgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
+    SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) - rgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        stereo_dest[i] += gain_l * mono_src[i];
-        stereo_dest[AMY_BLOCK_SIZE + i] += gain_r * mono_src[i];
+        stereo_dest[i] += MUL4_SS(gain_l, mono_src[i]);
+        stereo_dest[AMY_BLOCK_SIZE + i] += MUL4_SS(gain_r, mono_src[i]);
         gain_l += d_gain_l;
         gain_r += d_gain_r;
     }
