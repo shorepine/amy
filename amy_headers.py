@@ -19,6 +19,7 @@ def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
     my_sample_counter = 0
     orig_map = {}
     for (fn, is_inst) in fns:
+        try:
             sf2 = Sf2File(open(fn, 'rb'))
         except:
             print("For PCM patches, download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
@@ -43,15 +44,15 @@ def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
             s = {}
             s["name"] = sample.name
             floaty =(np.frombuffer(bytes(sample.raw_sample_data),dtype='int16'))/32768.0
-            resampled = resampy.resample(floaty, sample.AMY_SAMPLE_RATE, pcm_AMY_SAMPLE_RATE)
+            resampled = resampy.resample(floaty, sample.sample_rate, pcm_AMY_SAMPLE_RATE)
             # Make sure the float value doesn't cause overflow in int.  resampling can cause overshoot.
-            samples_int16 = np.int16(np.minimum(32767.0, np.maximum(-32768.0, resampled*32768.0))
+            samples_int16 = np.int16(np.minimum(32767.0, np.maximum(-32768.0, resampled*32768.0)))
             #floats.append(resampled)
             int16s.append(samples_int16)
             s["offset"] = offset 
             s["length"] = resampled.shape[0]
-            s["loopstart"] = int(float(sample.start_loop) / float(sample.AMY_SAMPLE_RATE / pcm_AMY_SAMPLE_RATE))
-            s["loopend"] = int(float(sample.end_loop) / float(sample.AMY_SAMPLE_RATE / pcm_AMY_SAMPLE_RATE))
+            s["loopstart"] = int(float(sample.start_loop) / float(sample.sample_rate / pcm_AMY_SAMPLE_RATE))
+            s["loopend"] = int(float(sample.end_loop) / float(sample.sample_rate / pcm_AMY_SAMPLE_RATE))
             s["midinote"] = sample.original_pitch
             offset = offset + resampled.shape[0]
             offsets.append(s)
@@ -212,6 +213,63 @@ def write_lutset_to_h(filename, variable_base, lutset):
     print("wrote", filename)
 
 
+def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
+    """Save out a lutset as a C-compatible header file using ints."""
+    import numpy as np
+    import math
+    num_luts = len(lutset)
+    with open(filename, "w") as f:
+        f.write("// Automatically-generated LUTset\n")
+        f.write("#ifndef LUTSET_{:s}_FXPT_DEFINED\n".format(variable_base.upper()))
+        f.write("#define LUTSET_{:s}_FXPT_DEFINED\n".format(variable_base.upper()))
+        f.write("\n")
+        # Define the structure.
+        f.write("#ifndef LUTENTRY_FXPT_DEFINED\n")
+        f.write("#define LUTENTRY_FXPT_DEFINED\n")
+        f.write("typedef struct {\n")
+        f.write("    const int16_t *table;\n")
+        f.write("    int table_size;\n")
+        f.write("    int log_2_table_size;\n")
+        f.write("    int highest_harmonic;\n")
+        f.write("    float scale_factor;\n")
+        f.write("} lut_entry_fxpt;\n")
+        f.write("#endif // LUTENTRY_FXPT_DEFINED\n")
+        f.write("\n")
+        # Define the content of the individual tables.
+        samples_per_row = 8
+        scale_factors = []
+        for i in range(num_luts):
+            table_size = len(lutset[i].table)
+            scale_factor = np.max(np.abs(lutset[i].table))
+            scale_factors.append(scale_factor)
+            f.write("const int16_t {:s}_fxpt_lutable_{:d}[{:d}] = {{\n".format(
+                variable_base, i, table_size))
+            for row_start in range(0, table_size, samples_per_row):
+                for sample_index in range(row_start, 
+                        min(row_start + samples_per_row, table_size)):
+                    f.write("{:d},".format(min(32767, max(-32768, int(round(32768 / scale_factor * lutset[i].table[sample_index]))))))
+                f.write("\n")
+            f.write("};\n")
+            f.write("\n")
+        # Define the table of LUTs.
+        f.write("lut_entry_fxpt {:s}_fxpt_lutset[{:d}] = {{\n".format(
+            variable_base, num_luts + 1))
+        for i in range(num_luts):
+            table_size = len(lutset[i].table)
+            # Provide the shift size corresponding to the lutset.
+            log_2_table_size = int(round(math.log(table_size) / math.log(2.0)))
+            f.write("    {{{:s}_fxpt_lutable_{:d}, {:d}, {:d}, {:d}, {:f}}},\n".format(
+                variable_base, i, table_size, log_2_table_size,
+                lutset[i].highest_harmonic, scale_factors[i]))
+        # Final entry is null to indicate end of table.
+        f.write("    {NULL, 0, 0},\n")
+        f.write("};\n")
+        f.write("\n")
+        f.write("#endif // LUTSET_x_DEFINED\n")
+    print("wrote", filename)
+
+
+
 
 def make_clipping_lut(filename):
     import numpy as np
@@ -260,6 +318,7 @@ def generate_all():
     # Impulses.
     impulse_lutset = create_lutset(LUTentry, np.ones(128))
     write_lutset_to_h('src/impulse_lutset.h', 'impulse', impulse_lutset)
+    write_lutset_to_h_as_fxpt('src/impulse_lutset_fxpt.h', 'impulse', impulse_lutset)
 
     # Triangle wave lutset
     n_harms = 64
@@ -267,10 +326,13 @@ def generate_all():
         np.maximum(1, np.arange(n_harms, dtype=float))**(-2))
     triangle_lutset = create_lutset(LUTentry, coefs, np.arange(len(coefs)) * -np.pi / 2)
     write_lutset_to_h('src/triangle_lutset.h', 'triangle', triangle_lutset)
+    write_lutset_to_h_as_fxpt('src/triangle_lutset_fxpt.h', 'triangle', triangle_lutset)
 
     # Sinusoid "lutset" (only one table)
     sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
     write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
+    write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
+                
 
     # Clipping LUT
     make_clipping_lut('src/clipping_lookup_table.h')
