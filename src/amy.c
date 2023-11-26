@@ -719,7 +719,7 @@ void mix_with_pan(float *stereo_dest, float *mono_src, float pan_start, float pa
 #endif
 }
 
-void render_osc_wave(uint8_t osc, float* buf) {
+void render_osc_wave(uint8_t osc, SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
