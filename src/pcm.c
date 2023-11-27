@@ -48,7 +48,6 @@ void pcm_note_on(uint8_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d freq=%f amp=%f\n",
     //       osc, synth[osc].patch, synth[osc].freq, S2F(synth[osc].amp));
     if(synth[osc].patch < 0) synth[osc].patch = 0;
-    const pcm_map_t *patch = &pcm_map[synth[osc].patch];
     // if no freq given, just play it at midinote
     if(synth[osc].freq <= 0)
         synth[osc].freq = PCM_AMY_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
