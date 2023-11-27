@@ -70,6 +70,7 @@ struct audio_buffer_pool *init_audio() {
     };
 
     struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, AMY_BLOCK_SIZE);
+
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
@@ -87,13 +88,13 @@ struct audio_buffer_pool *init_audio() {
     ok = audio_i2s_connect(producer_pool);
     assert(ok);
     audio_i2s_set_enabled(true);
+
     return producer_pool;
 }
 
 int main() {
 
     stdio_init_all();
-
     set_sys_clock_khz(250000000 / 1000, false); //
 
     sleep_ms(500);
@@ -122,7 +123,6 @@ int main() {
     }
     */
     struct audio_buffer_pool *ap = init_audio();
-
     // Play a few notes in FM
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();
@@ -133,7 +133,7 @@ int main() {
     e.wave = ALGO;
     e.patch = 17;
     osc_inc = 9;
-    
+
     //e.wave = SAW_DOWN;
     //e.filter_freq = 2500.0;
     //e.resonance = 5.0;

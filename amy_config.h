@@ -7,7 +7,7 @@ If you're including AMY in your code, make your own AMY config and make sure the
 
 // Your AMY configuration goes here
 #define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
-#define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
+#define AMY_CORES 1              // If using a multi-core capable device, how many cores to render from
 #define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
 #define AMY_KS_OSCS 0
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store

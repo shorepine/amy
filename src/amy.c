@@ -811,6 +811,7 @@ int16_t * fill_audio_buffer_task() {
 #endif // CHORUS_ARATE
 #endif // AMY_HAS_CHORUS
 
+
 #ifdef ESP_PLATFORM
     // Tell the rendering threads to start rendering
     xTaskNotifyGive(amy_render_handle[0]);
@@ -865,15 +866,20 @@ int16_t * fill_audio_buffer_task() {
     //uint8_t nonzero = 0;
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
+
             // Convert the mixed sample into the int16 range, applying overall gain.
+#if AMY_CORES == 2
             SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE] + fbl[1][i + c * AMY_BLOCK_SIZE]);
-    
+#else
+            SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE]);
+#endif
+
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             SAMPLE new_state = fsample + MUL4_SS(F2S(0.995f), global.hpf_state);
             fsample = new_state - global.hpf_state;
             global.hpf_state = new_state;
-    
+
             // soft clipping.
             int positive = 1; 
             if (fsample < 0) positive = 0;
@@ -909,10 +915,12 @@ int16_t * fill_audio_buffer_task() {
             block[i] = sample;
   #endif
 #else // stereo
+
             block[(AMY_NCHANS * i) + c] = sample;
 #endif
         }
     }
+
     total_samples += AMY_BLOCK_SIZE;
     return block;
 }
