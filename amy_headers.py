@@ -317,7 +317,7 @@ def generate_all():
 
     # Impulses.
     impulse_lutset = create_lutset(LUTentry, np.ones(128))
-    write_lutset_to_h('src/impulse_lutset.h', 'impulse', impulse_lutset)
+    #write_lutset_to_h('src/impulse_lutset.h', 'impulse', impulse_lutset)
     write_lutset_to_h_as_fxpt('src/impulse_lutset_fxpt.h', 'impulse', impulse_lutset)
 
     # Triangle wave lutset
@@ -325,12 +325,12 @@ def generate_all():
     coefs = (np.arange(n_harms) % 2) * (
         np.maximum(1, np.arange(n_harms, dtype=float))**(-2))
     triangle_lutset = create_lutset(LUTentry, coefs, np.arange(len(coefs)) * -np.pi / 2)
-    write_lutset_to_h('src/triangle_lutset.h', 'triangle', triangle_lutset)
+    #write_lutset_to_h('src/triangle_lutset.h', 'triangle', triangle_lutset)
     write_lutset_to_h_as_fxpt('src/triangle_lutset_fxpt.h', 'triangle', triangle_lutset)
 
     # Sinusoid "lutset" (only one table)
     sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
-    write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
+    #write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
     write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
                 
 
