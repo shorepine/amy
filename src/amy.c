@@ -868,11 +868,7 @@ int16_t * fill_audio_buffer_task() {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
 
             // Convert the mixed sample into the int16 range, applying overall gain.
-#if AMY_CORES == 2
-            SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE] + fbl[1][i + c * AMY_BLOCK_SIZE]);
-#else
             SAMPLE fsample = MUL4_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE]);
-#endif
 
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
