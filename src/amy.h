@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-// You provide this. See example_amy_config.h for an example
 #include "amy_config.h"
 
 // Rest of amy setup

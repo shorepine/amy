@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've run AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with around 100KB of RAM. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the RP2040, iOS devices, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -32,15 +32,34 @@ It supports
  * Built-in clock for short term sequencing of events
  * Can use multi-core (including on ESP32 microcontrollers) for rendering if available
 
-The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
+The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
 
 The partial tone synthesizer also provides `partials.py`, where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
 
 ## Using AMY in your software
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy.h` is set up for your application. 
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
 
 To run a simple C example, run `make`. Then run `./amy-example`. 
+
+To build and example for the RP2040:
+
+```
+gh repo clone raspberrypi/pico-extras
+gh repo clone raspberrypi/pico-sdk
+# Do whatever installs you need for the pico-sdk
+gh repo clone bwhitman/amy
+cd amy/src; mkdir build; cd build
+export PICO_SDK_PATH=../../../pico-sdk
+export PICO_EXTRAS_PATH=../../../pico-extras
+cmake ..
+make && picotool load amy_example.elf
+```
+
+To build for the ESP32/ESP32S3/etc:
+```
+TODO
+```
 
 ## Controlling AMY
 
@@ -475,9 +494,6 @@ amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 
 Run `python amy_headers.py` to generate all the LUTs and patch .h files compiled into AMY.
 
-### ESP32
-
-Use `amy-example-esp32.c` for a starting point to booting AMY on an ESP32 chip. Or see the [Alles](https://github.com/bwhitman/alles) project for a more complete setup. 
 
 
 

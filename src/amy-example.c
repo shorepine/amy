@@ -2,7 +2,6 @@
 // a simple C example that plays audio using AMY out your speaker 
 
 
-
 #include "amy.h"
 #include "libminiaudio-audio.h"
 

@@ -3,7 +3,6 @@
 
 #ifdef ESP_PLATFORM
 
-
 #include "amy.h"
 
 

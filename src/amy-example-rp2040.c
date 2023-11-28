@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 #include <math.h>
+
+#include "amy_config_rp2040.h"
 #include "amy.h"
 #if PICO_ON_DEVICE
 

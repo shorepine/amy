@@ -1,18 +1,34 @@
 /* 
 
-This is the amy_config for the AMY example programs only.
-If you're including AMY in your code, make your own AMY config and make sure the compiler can find it!
+Configuration for AMY. We make guesses here based on your arch, but feel free to make changes for your own code.
 
 */
 
 // Your AMY configuration goes here
 #define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
+
+#ifdef PICO_ON_DEVICE
 #define AMY_CORES 1              // If using a multi-core capable device, how many cores to render from
+#elif ESP_PLATFORM
+#define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
+#else
+#define AMY_CORES 1              // If using a multi-core capable device, how many cores to render from
+#endif
+
+#ifdef PICO_ON_DEVICE
 #define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
+#elif ESP_PLATFORM
+#define AMY_PCM_PATCHES_SIZE 2   // 1 == small PCM, 2 == large PCM samples stored in the program
+#else
+#define AMY_PCM_PATCHES_SIZE 2   // 1 == small PCM, 2 == large PCM samples stored in the program
+#endif
+
+// TOOD -- KS in FXP
 #define AMY_KS_OSCS 0
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
+
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
 #define AMY_HAS_CHORUS 0         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
