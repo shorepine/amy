@@ -1,5 +1,5 @@
 // algorithms.c
-// FM2 and partial synths that involve combinations of oscillators
+// FM and partial synths that involve combinations of oscillators
 #include "amy.h"
 
 #define NUM_ALGO_BPS 5

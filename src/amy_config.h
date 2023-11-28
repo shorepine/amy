@@ -1,40 +1,44 @@
 /* 
-
-Configuration for AMY. We make guesses here based on your arch, but feel free to make changes for your own code.
-
+    Configuration for AMY. We make guesses here based on your arch, but feel free to make changes for your own code.
 */
 
-// Your AMY configuration goes here
-#define AMY_OSCS 64              // # of simultaneous oscs to keep track of 
+// # of simultaneous oscs to keep track of 
+#define AMY_OSCS 64 
 
+// If using a multi-core capable device, how many cores to render from
 #ifdef PICO_ON_DEVICE
-#define AMY_CORES 1              // If using a multi-core capable device, how many cores to render from
+#define AMY_CORES 1              
 #elif ESP_PLATFORM
-#define AMY_CORES 2              // If using a multi-core capable device, how many cores to render from
+#define AMY_CORES 2              
 #else
-#define AMY_CORES 1              // If using a multi-core capable device, how many cores to render from
+#define AMY_CORES 1              
 #endif
 
+// 1 == small PCM, 2 == large PCM samples stored in the program
 #ifdef PICO_ON_DEVICE
-#define AMY_PCM_PATCHES_SIZE 1   // 1 == small PCM, 2 == large PCM samples stored in the program
+#define AMY_PCM_PATCHES_SIZE 1   
 #elif ESP_PLATFORM
-#define AMY_PCM_PATCHES_SIZE 2   // 1 == small PCM, 2 == large PCM samples stored in the program
+#define AMY_PCM_PATCHES_SIZE 2
 #else
-#define AMY_PCM_PATCHES_SIZE 2   // 1 == small PCM, 2 == large PCM samples stored in the program
+#define AMY_PCM_PATCHES_SIZE 2
 #endif
 
-// TOOD -- KS in FXP
-#define AMY_KS_OSCS 0
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
-
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
+
+// TOOD -- KS in FXP
+#define AMY_KS_OSCS 0
+
+// TODO -- delay.c in FXP 
 #define AMY_HAS_CHORUS 0         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
+
+// TODO -- partials in FXP
 #define AMY_HAS_PARTIALS 0       // 1 = Make partials available
 
-// Are you using an ESP? You'll want to tell us how to allocate ram here. Not used on other platforms.
+//If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
@@ -51,6 +55,7 @@ Configuration for AMY. We make guesses here based on your arch, but feel free to
 #define CHORUS_RAM_CAPS 0 
 #define REVERB_RAM_CAPS 0 
 #endif
+
 // 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
 #define CHORUS_DEFAULT_LFO_FREQ 0.5
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5

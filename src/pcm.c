@@ -2,12 +2,6 @@
 
 #include "amy.h"
 
-#if AMY_PCM_PATCHES_SIZE == 2
-#include "pcm_samples_large.h"
-#else
-#include "pcm_samples_small.h"
-#endif
-
 typedef struct {
     uint32_t offset;
     uint32_t length;
@@ -16,12 +10,14 @@ typedef struct {
     uint8_t midinote;
 } pcm_map_t;
 
-
 #if AMY_PCM_PATCHES_SIZE == 2
 #include "pcm_large.h"
+#include "pcm_samples_large.h"
 #else
 #include "pcm_small.h"
+#include "pcm_samples_small.h"
 #endif
+
 
 void pcm_init() {
 /*
