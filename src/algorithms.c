@@ -222,20 +222,17 @@ void algo_init() {
 }
 
 
-SAMPLE scratch[AMY_CORES][6][AMY_BLOCK_SIZE];
-
+// We need to keep these in heap for the small stack cortex M0
+SAMPLE scratch[AMY_CORES][3][AMY_BLOCK_SIZE];
 
 void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) { 
-    //SAMPLE scratch[6][AMY_BLOCK_SIZE];
-
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6
     SAMPLE* in_buf;
     SAMPLE* out_buf = NULL;
 
-    // TODO, i think i need at most 2 of these buffers, maybe 3?? 
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 3; ++i)
         zero(scratch[core][i]);
     uint8_t ops_used = 0;
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
@@ -245,29 +242,17 @@ void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) {
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
             } // main algo voice stores feedback, not the op 
-            
+
             if(algo.ops[op] & IN_BUS_ONE) { 
                 in_buf = scratch[core][0]; 
             } else if(algo.ops[op] & IN_BUS_TWO) { 
                 in_buf = scratch[core][1]; 
             } else {
                 // no in_buf
-                in_buf = scratch[core][5]; // NULL;
+                in_buf = NULL;
             }
-
-            if(!(algo.ops[op] & OUT_BUS_ADD)) {
-                if(algo.ops[op] & OUT_BUS_ONE) { 
-                    zero(scratch[core][2]);
-                    out_buf = scratch[core][2]; 
-                }
-                if(algo.ops[op] & OUT_BUS_TWO) { 
-                    zero(scratch[core][3]);
-                    out_buf = scratch[core][3]; 
-                }
-            } else {
-                zero(scratch[core][4]);
-                out_buf = scratch[core][4]; 
-            }
+            zero(scratch[core][2]);
+            out_buf = scratch[core][2];
 
             render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
@@ -280,11 +265,11 @@ void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) {
                 }
             } else {
                 if(algo.ops[op] & OUT_BUS_ONE) {
-                    add(scratch[core][4], scratch[core][0]);
+                    add(scratch[core][2], scratch[core][0]);
                 } else if(algo.ops[op] & OUT_BUS_TWO) {
-                    add(scratch[core][4], scratch[core][1]); 
+                    add(scratch[core][2], scratch[core][1]); 
                 } else {
-                    add(scratch[core][4], buf);
+                    add(scratch[core][2], buf);
                 }
             }
         }
