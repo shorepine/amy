@@ -48,6 +48,35 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 
 
+#ifdef PICO_ON_DEVICE
+#define CPU0_METER 2
+#define CPU1_METER 3
+#include "pico/multicore.h"
+#include "hardware/clocks.h"
+#include "hardware/structs/clocks.h"
+#include "pico/stdlib.h"
+#include "pico/binary_info.h"
+
+// Wait for a 32-bit message and return it.
+int32_t await_message_from_other_core() {
+    while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
+        __wfe();
+    }
+    int32_t msg = sio_hw->fifo_rd;
+    __sev();
+    return msg;
+}
+
+// Send 32-bit message to other core
+void send_message_to_other_core(int32_t t) {
+    while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
+        __wfe();
+    }
+    sio_hw->fifo_wr = t;
+    __sev();
+}
+#endif
+
 
 #if AMY_HAS_CHORUS == 1
 // CHORUS_ARATE means that chorus delay is updated at full audio rate and
@@ -716,8 +745,9 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 #endif
 }
 
-void render_osc_wave(uint8_t osc, SAMPLE* buf) {
+void render_osc_wave(uint8_t osc, uint8_t core) { //SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
+    SAMPLE *buf = per_osc_fb[core];
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
     if(synth[osc].wave == NOISE) render_noise(buf, osc);
@@ -732,7 +762,7 @@ void render_osc_wave(uint8_t osc, SAMPLE* buf) {
         #endif
     }
     if(synth[osc].wave == PCM) render_pcm(buf, osc);
-    if(synth[osc].wave == ALGO) render_algo(buf, osc);
+    if(synth[osc].wave == ALGO) render_algo(buf, osc, core);
     #if AMY_HAS_PARTIALS == 1
     if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
     if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
@@ -743,12 +773,14 @@ void render_task(uint8_t start, uint8_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     for(uint8_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
-            render_osc_wave(osc, per_osc_fb[core]);
+            render_osc_wave(osc, core);
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != OFF) {
                 // apply filter to osc if set
                 if(synth[osc].filter_type != FILTER_NONE) filter_process(per_osc_fb[core], osc);
                 mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
+                //printf("render5 %d %d %d %d\n", osc, start, end, core);
+
             }
         }
     }
@@ -820,7 +852,24 @@ int16_t * fill_audio_buffer_task() {
     // and wait for each of them to come back
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
     if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
+#elif PICO_ON_DEVICE
+    if(AMY_CORES == 2) {
+        // Tell renderer2 it's ok to render
+        send_message_to_other_core(64);
+        // Do renderer1
+        gpio_put(CPU0_METER, 1);
+        render_task(0, AMY_OSCS/2, 0);
+        gpio_put(CPU0_METER, 0);
+
+        // and wait for other core to finish
+        int32_t ret = 0;
+        while(ret!=32) ret = await_message_from_other_core();
+    } else {
+        render_task(0, AMY_OSCS/2, 0);
+    }
+
 #else
+
     // todo -- there's no reason we can't multicore render on other platforms
     render_task(0, AMY_OSCS, 0);        
 #endif

@@ -40,7 +40,7 @@ enum FmOperatorFlags {
     FB_OUT = 1 << 7
 };
 struct FmAlgorithm { uint8_t ops[MAX_ALGO_OPS]; };
-struct FmAlgorithm algorithms[33] = {
+const struct FmAlgorithm algorithms[33] = {
     // 6     5     4     3     2      1   
     { { 0xc1, 0x11, 0x11, 0x14, 0x01, 0x14 } }, // 0 
     { { 0xc1, 0x11, 0x11, 0x14, 0x01, 0x14 } }, // 1
@@ -222,10 +222,11 @@ void algo_init() {
 }
 
 
+SAMPLE scratch[AMY_CORES][6][AMY_BLOCK_SIZE];
 
 
-void render_algo(SAMPLE* buf, uint8_t osc) { 
-    SAMPLE scratch[6][AMY_BLOCK_SIZE];
+void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) { 
+    //SAMPLE scratch[6][AMY_BLOCK_SIZE];
 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
@@ -235,7 +236,7 @@ void render_algo(SAMPLE* buf, uint8_t osc) {
 
     // TODO, i think i need at most 2 of these buffers, maybe 3?? 
     for (int i = 0; i < 6; ++i)
-        zero(scratch[i]);
+        zero(scratch[core][i]);
     uint8_t ops_used = 0;
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
@@ -246,44 +247,44 @@ void render_algo(SAMPLE* buf, uint8_t osc) {
             } // main algo voice stores feedback, not the op 
             
             if(algo.ops[op] & IN_BUS_ONE) { 
-                in_buf = scratch[0]; 
+                in_buf = scratch[core][0]; 
             } else if(algo.ops[op] & IN_BUS_TWO) { 
-                in_buf = scratch[1]; 
+                in_buf = scratch[core][1]; 
             } else {
                 // no in_buf
-                in_buf = scratch[5]; // NULL;
+                in_buf = scratch[core][5]; // NULL;
             }
 
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
                 if(algo.ops[op] & OUT_BUS_ONE) { 
-                    zero(scratch[2]);
-                    out_buf = scratch[2]; 
+                    zero(scratch[core][2]);
+                    out_buf = scratch[core][2]; 
                 }
                 if(algo.ops[op] & OUT_BUS_TWO) { 
-                    zero(scratch[3]);
-                    out_buf = scratch[3]; 
+                    zero(scratch[core][3]);
+                    out_buf = scratch[core][3]; 
                 }
             } else {
-                zero(scratch[4]);
-                out_buf = scratch[4]; 
+                zero(scratch[core][4]);
+                out_buf = scratch[core][4]; 
             }
 
             render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
             if(!(algo.ops[op] & OUT_BUS_ADD)) {
                 if((algo.ops[op] & OUT_BUS_ONE) ) {
-                    copy(out_buf, scratch[0]);
+                    copy(out_buf, scratch[core][0]);
                 }
 
                 if((algo.ops[op] & OUT_BUS_TWO) ) {
-                    copy(out_buf, scratch[1]);
+                    copy(out_buf, scratch[core][1]);
                 }
             } else {
                 if(algo.ops[op] & OUT_BUS_ONE) {
-                    add(scratch[4], scratch[0]);
+                    add(scratch[core][4], scratch[core][0]);
                 } else if(algo.ops[op] & OUT_BUS_TWO) {
-                    add(scratch[4], scratch[1]); 
+                    add(scratch[core][4], scratch[core][1]); 
                 } else {
-                    add(scratch[4], buf);
+                    add(scratch[core][4], buf);
                 }
             }
         }

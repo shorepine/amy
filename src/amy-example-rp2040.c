@@ -12,6 +12,7 @@
 
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
+#include "pico/multicore.h"
 
 #endif
 
@@ -24,6 +25,11 @@
 bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
 #endif
 
+#define CPU0_METER 2
+#define CPU1_METER 3
+
+extern int32_t await_message_from_other_core();
+extern void send_message_to_other_core(int32_t t);
 
 static inline uint32_t _millis(void)
 {
@@ -35,6 +41,8 @@ void delay_ms(uint32_t ms) {
     uint32_t now = _millis();
     while(_millis() < now+ms) {}
 }
+
+
 
 
 void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
@@ -84,21 +92,45 @@ struct audio_buffer_pool *init_audio() {
 
     return producer_pool;
 }
+void core1_main() {
+    while(1) {
+        int32_t ret = 0;
+        while(ret!=64) ret = await_message_from_other_core();
+        gpio_put(CPU1_METER, 1);
+        render_task(AMY_OSCS/2, AMY_OSCS, 1);
+        gpio_put(CPU1_METER, 0);
+        send_message_to_other_core(32);
+    }
+
+}
 
 int main() {
-
-    stdio_init_all();
     set_sys_clock_khz(250000000 / 1000, false); 
+    stdio_init_all();
+    getchar();
+    #if AMY_CORES == 2
+        multicore_launch_core1(core1_main);
+    #endif
 
     sleep_ms(500);
-
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
     amy_start();
 
     const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+
+
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    gpio_init(CPU0_METER);
+    gpio_set_dir(CPU0_METER, GPIO_OUT);
+    gpio_put(CPU0_METER, 0);
+
+    gpio_init(CPU1_METER);
+    gpio_set_dir(CPU1_METER, GPIO_OUT);
+    gpio_put(CPU1_METER, 0);
+
     {
         gpio_put(LED_PIN, 1);
         printf("Clock is set to %d\n", clock_get_hz(clk_sys));
@@ -117,24 +149,22 @@ int main() {
     int osc_inc;
     e.time = start;
     e.osc = 0;
-
     e.wave = ALGO;
-    e.patch = 17;
+    e.patch = 20;
     osc_inc = 9;
-
-    int notes[] = {60, 70, 64, 68, 72, 82, 76};
-
+    int notes[] = {60, 70, 64, 68, 72, 82, 76, 80, 74, 78, 80, 58};
     e.velocity = 0.2;
 
     for (int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
         e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
+        e.patch++;
         amy_add_event(e);
         e.osc += osc_inc;
-        e.time += 500;
+        e.time += 1000;
     }
 
-    for (int i = 0; i < 2000; ++i) {
+    for (int i = 0; i < 100000; ++i) {
         rp2040_fill_audio_buffer(ap);
     }
 

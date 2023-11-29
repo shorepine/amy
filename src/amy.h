@@ -245,7 +245,7 @@ extern void render_saw_up(SAMPLE * buf, uint8_t osc);
 extern void render_triangle(SAMPLE * buf, uint8_t osc); 
 extern void render_noise(SAMPLE * buf, uint8_t osc); 
 extern void render_pcm(SAMPLE * buf, uint8_t osc);
-extern void render_algo(SAMPLE * buf, uint8_t osc) ;
+extern void render_algo(SAMPLE * buf, uint8_t osc, uint8_t core) ;
 extern void render_partial(SAMPLE *buf, uint8_t osc) ;
 extern void partials_note_on(uint8_t osc);
 extern void partials_note_off(uint8_t osc);
