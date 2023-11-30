@@ -88,10 +88,14 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         // total_phase can extend beyond [0, 1) but we apply lut_mask before we use it.
         PHASOR total_phase = phase;
-        // mod, feedback only for FM oscillators.
+
+        // We'll do this for now like it used to -- mod is 0s if not given.
+        // The other option is to not accumulate total_phase at all if mod is not given
+        // But this is the way it was before fxp and we'll keep it that way for now
         SAMPLE mi = 0;
         if(mod != NULL) { mi = mod[i]; }
-        if (mod) total_phase += S2P(mi + MUL4_SS(feedback_level, (past1 + past0) >> 1));
+        total_phase += S2P(mi + MUL4_SS(feedback_level, (past1 + past0) >> 1));
+        
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
         LUTSAMPLE b = lut->table[base_index];
