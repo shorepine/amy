@@ -53,11 +53,12 @@ int main(int argc, char ** argv) {
     e.time = start;
 
     e.velocity = 1;
-    e.wave = ALGO;
+    e.wave = KS;
+    e.feedback = F2S(0.996f);
     e.patch = 15;
     e.midi_note = 60;
     amy_add_event(e);
-
+    /*
     e.time = start + 500;
     e.osc += 9; // remember that an FM patch takes up 9 oscillators
     e.midi_note = 64;
@@ -67,7 +68,7 @@ int main(int argc, char ** argv) {
     e.osc += 9;
     e.midi_note = 68;
     amy_add_event(e);
-
+    */
     // Now just spin for 5s
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);

@@ -251,6 +251,7 @@ void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) {
                 // no in_buf
                 in_buf = NULL;
             }
+            // We could get away with using mod/in_buf as the output buffer to save a scratch
             zero(scratch[core][2]);
             out_buf = scratch[core][2];
 

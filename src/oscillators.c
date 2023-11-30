@@ -1,11 +1,5 @@
 #include "amy.h"
 
-#if AMY_KS_OSCS > 0
-// We only allow a couple of KS oscs as they're RAM hogs 
-#define MAX_KS_BUFFER_LEN 802 // 44100/55  -- 55Hz (A1) lowest we can go for KS
-float ** ks_buffer; 
-uint8_t ks_polyphony_index; 
-#endif
 
 // For checking assumptions about bitwidths.
 #include <assert.h>
@@ -95,7 +89,7 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         SAMPLE mi = 0;
         if(mod != NULL) { mi = mod[i]; }
         total_phase += S2P(mi + MUL4_SS(feedback_level, (past1 + past0) >> 1));
-        
+
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
         LUTSAMPLE b = lut->table[base_index];
@@ -359,12 +353,8 @@ void sine_mod_trigger(uint8_t osc) {
 
 // Returns a SAMPLE between -1 and 1.
 SAMPLE amy_get_random() {
-#ifdef ESP_PLATFORM
-    return esp_random() >> (31 - S_FRAC_BITS);
-#else
     assert(RAND_MAX == 2147483647); // 2^31 - 1
     return rand() >> (31 - S_FRAC_BITS);
-#endif
 }
 
 /* noise */
@@ -442,17 +432,28 @@ void partial_note_off(uint8_t osc) {
 
 #if AMY_KS_OSCS > 0
 
+// We only allow a couple of KS oscs as they're RAM hogs 
+#define MAX_KS_BUFFER_LEN 802 // 44100/55  -- 55Hz (A1) lowest we can go for KS
+SAMPLE ** ks_buffer; 
+uint8_t ks_polyphony_index; 
+
+
 /* karplus-strong */
 
-void render_ks(float * buf, uint8_t osc) {
+void render_ks(SAMPLE * buf, uint8_t osc) {
+    SAMPLE half = F2S(0.5f * 0.996f); //MUL0_SS(F2S(0.5f) ,synth[osc].feedback);
     if(msynth[osc].freq >= 55) { // lowest note we can play
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / msynth[osc].freq);
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
             uint16_t index = (uint16_t)(synth[osc].step);
             synth[osc].sample = ks_buffer[ks_polyphony_index][index];
-            ks_buffer[ks_polyphony_index][index] = (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]) * 0.5f * synth[osc].feedback;
+            ks_buffer[ks_polyphony_index][index] = 
+                ks_buffer[ks_polyphony_index][index] + 
+                MUL4_SS(
+                    (ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
+                    half);
             synth[osc].step = (index + 1) % buflen;
-            buf[i] = synth[osc].sample * msynth[osc].amp;
+            buf[i] = MUL4_SS(synth[osc].sample, msynth[osc].amp);
         }
     }
 }
@@ -477,8 +478,8 @@ void ks_note_off(uint8_t osc) {
 void ks_init(void) {
     // 6ms buffer
     ks_polyphony_index = 0;
-    ks_buffer = (float**) malloc(sizeof(float*)*AMY_KS_OSCS);
-    for(int i=0;i<AMY_KS_OSCS;i++) ks_buffer[i] = (float*)malloc(sizeof(float)*MAX_KS_BUFFER_LEN); 
+    ks_buffer = (SAMPLE**) malloc(sizeof(SAMPLE*)*AMY_KS_OSCS);
+    for(int i=0;i<AMY_KS_OSCS;i++) ks_buffer[i] = (SAMPLE*)malloc(sizeof(float)*MAX_KS_BUFFER_LEN); 
 }
 
 void ks_deinit(void) {
