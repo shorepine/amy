@@ -555,12 +555,12 @@ void play_event(struct delta d) {
             sine_note_on(d.osc);
         }
     }
-    if(d.param == PHASE) synth[d.osc].phase = F2P(*(float *)&d.data);  // PHASOR
+    if(d.param == PHASE) synth[d.osc].phase = *(PHASOR *)&d.data;  // PHASOR
     if(d.param == PAN) { synth[d.osc].pan = *(float *)&d.data; /*fprintf(stderr, "pan osc %d is now %f\n", d.osc, synth[d.osc].pan);*/ }
     if(d.param == PATCH) synth[d.osc].patch = *(int16_t *)&d.data;
     if(d.param == DUTY) synth[d.osc].duty = *(float *)&d.data;
-    if(d.param == FEEDBACK) synth[d.osc].feedback = F2S(*(float *)&d.data);  // SAMPLE
-    if(d.param == AMP) synth[d.osc].amp = F2S(*(float *)&d.data);  // SAMPLE
+    if(d.param == FEEDBACK) synth[d.osc].feedback = *(SAMPLE *)&d.data;  // SAMPLE
+    if(d.param == AMP) synth[d.osc].amp = *(SAMPLE *)&d.data;  // SAMPLE
     if(d.param == FREQ) synth[d.osc].freq = *(float *)&d.data;
 
     

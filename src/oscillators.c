@@ -440,17 +440,18 @@ uint8_t ks_polyphony_index;
 
 /* karplus-strong */
 
+
+
 void render_ks(SAMPLE * buf, uint8_t osc) {
-    SAMPLE half = F2S(0.5f * 0.996f); //MUL0_SS(F2S(0.5f) ,synth[osc].feedback);
+    SAMPLE half = MUL0_SS(F2S(0.5f),synth[osc].feedback); 
     if(msynth[osc].freq >= 55) { // lowest note we can play
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / msynth[osc].freq);
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
             uint16_t index = (uint16_t)(synth[osc].step);
             synth[osc].sample = ks_buffer[ks_polyphony_index][index];
-            ks_buffer[ks_polyphony_index][index] = 
-                ks_buffer[ks_polyphony_index][index] + 
+            ks_buffer[ks_polyphony_index][index] =                 
                 MUL4_SS(
-                    (ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
+                    (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
                     half);
             synth[osc].step = (index + 1) % buflen;
             buf[i] = MUL4_SS(synth[osc].sample, msynth[osc].amp);

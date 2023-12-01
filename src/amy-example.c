@@ -56,6 +56,7 @@ int main(int argc, char ** argv) {
     e.wave = KS;
     e.feedback = F2S(0.996f);
     e.patch = 15;
+    e.osc = 0;
     e.midi_note = 60;
     amy_add_event(e);
     /*

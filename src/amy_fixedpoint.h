@@ -54,7 +54,9 @@
 typedef int16_t s_15;    // s.15 LUT sample
 typedef int32_t s_31;    // s.31 phasor
 typedef int32_t s8_23;  // s8.23 sample
+typedef int32_t s16_15; // s16.15 general
 
+#define GENFXP s16_15 // "65536 Hz should be enough for anyone?" -- dpwe
 #define LUTSAMPLE s_15
 #define PHASOR s_31
 #define SAMPLE s8_23
