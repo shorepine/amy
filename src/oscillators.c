@@ -440,8 +440,6 @@ uint8_t ks_polyphony_index;
 
 /* karplus-strong */
 
-
-
 void render_ks(SAMPLE * buf, uint8_t osc) {
     SAMPLE half = MUL0_SS(F2S(0.5f),synth[osc].feedback); 
     if(msynth[osc].freq >= 55) { // lowest note we can play

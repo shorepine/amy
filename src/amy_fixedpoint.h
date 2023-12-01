@@ -64,6 +64,7 @@ typedef int32_t s16_15; // s16.15 general
 #define L_FRAC_BITS 15
 #define S_FRAC_BITS 23
 #define P_FRAC_BITS 31
+#define G_FRAC_BITS 15
 
 // Convert a SAMPLE to a PHASOR
 #define S2P(s) ((s) << (P_FRAC_BITS - S_FRAC_BITS))
@@ -77,6 +78,10 @@ typedef int32_t s16_15; // s16.15 general
 // Convert between SAMPLE and float
 #define S2F(s) ((float)(s) / (float)(1 << S_FRAC_BITS))
 #define F2S(f) (SAMPLE)((f) * (float)(1 << S_FRAC_BITS))
+
+// Convert between GENFXP and float
+#define G2F(s) ((float)(s) / (float)(1 << G_FRAC_BITS))
+#define F2G(f) (GENFXP)((f) * (float)(1 << G_FRAC_BITS))
 
 // Convert between PHASOR and float
 #define P2F(s) ((float)(s) / (float)(1 << P_FRAC_BITS))
