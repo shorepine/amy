@@ -238,7 +238,7 @@ extern void algo_init();
 extern void pcm_init();
 extern void render_ks(SAMPLE * buf, uint8_t osc); 
 extern void render_sine(SAMPLE * buf, uint8_t osc); 
-extern void render_fm_sine(SAMPLE *buf, uint8_t osc, SAMPLE *mod, SAMPLE feedback_level, uint8_t algo_osc);
+extern void render_fm_sine(SAMPLE *buf, uint8_t osc, SAMPLE *mod, SAMPLE feedback_level, uint8_t algo_osc, SAMPLE mod_amp);
 extern void render_pulse(SAMPLE * buf, uint8_t osc); 
 extern void render_saw_down(SAMPLE * buf, uint8_t osc);
 extern void render_saw_up(SAMPLE * buf, uint8_t osc);

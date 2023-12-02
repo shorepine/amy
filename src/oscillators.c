@@ -83,12 +83,8 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         // total_phase can extend beyond [0, 1) but we apply lut_mask before we use it.
         PHASOR total_phase = phase;
 
-        // We'll do this for now like it used to -- mod is 0s if not given.
-        // The other option is to not accumulate total_phase at all if mod is not given
-        // But this is the way it was before fxp and we'll keep it that way for now
-        SAMPLE mi = 0;
-        if(mod != NULL) { mi = mod[i]; }
-        total_phase += S2P(mi + MUL4_SS(feedback_level, (past1 + past0) >> 1));
+        if(mod) total_phase += S2P(mod[i]);
+        if(feedback_level) total_phase += S2P(MUL4_SS(feedback_level, (past1 + past0) >> 1));
 
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
@@ -301,12 +297,12 @@ void fm_sine_note_on(uint8_t osc, uint8_t algo_osc) {
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
 }
 
-void render_fm_sine(SAMPLE* buf, uint8_t osc, SAMPLE* mod, SAMPLE feedback_level, uint8_t algo_osc) {
+void render_fm_sine(SAMPLE* buf, uint8_t osc, SAMPLE* mod, SAMPLE feedback_level, uint8_t algo_osc, SAMPLE mod_amp) {
     if(synth[osc].ratio >= 0) {
         msynth[osc].freq = msynth[algo_osc].freq * synth[osc].ratio;
     }
     PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
-    SAMPLE amp = msynth[osc].amp;
+    SAMPLE amp = MUL4_SS(msynth[osc].amp, mod_amp);
     synth[osc].phase = render_lut_fm_osc(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp, 
                                          synth[osc].lut,
