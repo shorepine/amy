@@ -7,9 +7,9 @@
 
 // If using a multi-core capable device, how many cores to render from
 #ifdef PICO_ON_DEVICE
-#define AMY_CORES 2              
+#define AMY_CORES 2
 #elif ESP_PLATFORM
-#define AMY_CORES 2              
+#define AMY_CORES 2
 #else
 #define AMY_CORES 1              
 #endif
