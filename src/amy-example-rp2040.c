@@ -242,7 +242,7 @@ int main() {
     }
 
 #if AMY_HAS_REVERB == 1
-    config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    config_reverb(0, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
 #endif
 
 #if AMY_HAS_CHORUS == 1
@@ -278,6 +278,10 @@ int main() {
 
     for (int i = 0; i < 5000; ++i) {
         rp2040_fill_audio_buffer(ap);
+        if (i == 1000) {
+            config_reverb(0.7, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+        }
+
     }
 
     while(true) {

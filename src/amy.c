@@ -1102,13 +1102,13 @@ struct event amy_parse_message(char * message) {
                         case 'G': e.filter_type=atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
                         #if(AMY_HAS_REVERB == 1)
-                        case 'H': config_reverb(reverb.level, atoff(message + start), reverb.damping, reverb.xover_hz); break;
+                        case 'H': config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
                         case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
                         #endif
                         case 'I': e.ratio = atoff(message + start); break;
                         #if(AMY_HAS_REVERB == 1)
-                        case 'j': config_reverb(reverb.level, reverb.liveness, atoff(message + start), reverb.xover_hz); break;
-                        case 'J': config_reverb(reverb.level, reverb.liveness, reverb.damping, atoff(message + start)); break;
+                        case 'j': config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
+                        case 'J': config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
                         #endif
                         #if(AMY_HAS_CHORUS == 1)
                         case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;

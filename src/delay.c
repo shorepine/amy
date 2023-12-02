@@ -134,9 +134,9 @@ static inline void DEL_IN(delay_line_t *delay_line, SAMPLE val) {
 static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain, SAMPLE gain) {
     // 1-pole lowpass filter (exponential smoothing).
     // Smoothing. lpcoef=1 => no smoothing; lpcoef=0.001 => much smoothing.
-    state += MUL4_SS(lpcoef, samp - state);
+    state += MUL0_SS(lpcoef, samp - state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
-    return MUL4_SS(gain >> 1, state + MUL4_SS(lpgain, samp - state));
+    return MUL0_SS(gain >> 1, state + MUL0_SS(lpgain, samp - state));
 }
 
 SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
