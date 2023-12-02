@@ -100,8 +100,8 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         phase = P_WRAPPED_SUM(phase, step);
     }
     if(last_two) {
-        last_two[0] = past0;
-        last_two[1] = past1;
+        last_two[0] = sample;
+        last_two[1] = past0;
     }
     return phase;
 }
