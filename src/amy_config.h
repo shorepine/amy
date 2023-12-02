@@ -32,8 +32,8 @@
 #define AMY_KS_OSCS 1
 
 // TODO -- delay.c in FXP 
-#define AMY_HAS_CHORUS 0         // 1 = Make chorus available (uses RAM)
-#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
+#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
+#define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
 
 // TODO -- partials in FXP
 #define AMY_HAS_PARTIALS 0       // 1 = Make partials available

@@ -21,6 +21,7 @@ if (TARGET tinyusb_device)
             amy-example-rp2040.c
             algorithms.c
             amy.c
+            delay.c
             envelope.c
             filters.c
             oscillators.c
