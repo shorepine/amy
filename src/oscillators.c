@@ -72,10 +72,11 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
     //           S2F(mod[0]), S2F(mod[1]), S2F(mod[2]), S2F(mod[3]), S2F(mod[4]));
     int lut_mask = lut->table_size - 1;
     int lut_bits = lut->log_2_table_size;
-    SAMPLE past0 = 0, past1 = 0;
+    SAMPLE past0 = 0, past1 = 0, sample = 0;
     if(last_two) {  // Only for FM oscillators.
-        past0 = last_two[0];
-        past1 = last_two[1];
+        // Setup so that first pas through feedback_level block moves these into past0 and past1.
+        sample = last_two[0];
+        past0 = last_two[1];
     }
     SAMPLE current_amp = incoming_amp;
     SAMPLE incremental_amp = (ending_amp - incoming_amp) >> BLOCK_SIZE_BITS; // i.e. delta(amp) / BLOCK_SIZE
@@ -84,8 +85,11 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         PHASOR total_phase = phase;
 
         if(mod) total_phase += S2P(mod[i]);
-        if(feedback_level) total_phase += S2P(MUL4_SS(feedback_level, (past1 + past0) >> 1));
-
+        if(feedback_level) {
+            past1 = past0;
+            past0 = sample;   // Feedback is taken before output scaling.
+            total_phase += S2P(MUL4_SS(feedback_level, (past1 + past0) >> 1));
+        }
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
         LUTSAMPLE b = lut->table[base_index];
@@ -94,8 +98,6 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         buf[i] += MUL4_SS(current_amp, sample);
         current_amp += incremental_amp;
         phase = P_WRAPPED_SUM(phase, step);
-        past1 = past0;
-        past0 = sample;   // Feedback is taken before output scaling.
     }
     if(last_two) {
         last_two[0] = past0;
