@@ -194,7 +194,7 @@ SAMPLE compute_mod_pulse(uint8_t osc) {
 
 /* Saw waves */
 void saw_note_on(uint8_t osc, int8_t direction_notused) {
-    printf("saw_note_on: osc %d freq %f\n", osc, synth[osc].freq);
+    //printf("saw_note_on: osc %d freq %f\n", osc, synth[osc].freq);
     float period_samples = ((float)AMY_SAMPLE_RATE / synth[osc].freq);
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
     synth[osc].lpf_state = 0;
@@ -325,7 +325,7 @@ void sine_note_on(uint8_t osc) {
 void render_sine(SAMPLE* buf, uint8_t osc) { 
     PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = msynth[osc].amp;
-    printf("render_sine: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
+    //printf("render_sine: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
     synth[osc].last_amp = amp;
 }

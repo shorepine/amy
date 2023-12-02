@@ -88,6 +88,7 @@ typedef int32_t s16_15; // s16.15 general
 // So make the constant one less and do the last power of 2 in float.
 #define P2F(s) ((float)(s) / (2.0 * (float)(1 << (P_FRAC_BITS - 1))))
 #define F2P(f) ((PHASOR)((f) * 2.0 * (float)(1 << (P_FRAC_BITS - 1))))
+
 // Fixed-point multiply routines
 
 #define FXMUL_TEMPLATE(a, b, a_bitloss, b_bitloss, reqd_bitloss) ((((a) >> a_bitloss) * ((b) >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss))
@@ -106,6 +107,9 @@ typedef int32_t s16_15; // s16.15 general
 
 // Regard PHASOR as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_P(P, B) (int32_t)((((uint32_t)((P) << 1)) >> (P_FRAC_BITS + 1 - (B))))
+// Scale an integer into a phasor, where integer is index into a B-bit table.
+#define I2P(I, B) ((I) << (P_FRAC_BITS - (B)))
+
 // Fractonal part of phasor within B bits, returns a SAMPLE.
 // Add 1 to B shift-up and cast to uint32_t to strip sign bit, pad a zero sign bit on way down.
 #define S_FRAC_OF_P(P, B) (int32_t)(((uint32_t)(((P) << ((B) + 1)))) >> (1 + P_FRAC_BITS - S_FRAC_BITS))

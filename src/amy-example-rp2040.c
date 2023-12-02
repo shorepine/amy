@@ -94,7 +94,7 @@ struct audio_buffer_pool *init_audio() {
 }
 
 // Emulate the Tulip "drums()" example via event calls.
-void drums(int64_t start) {
+void drums(int64_t start, int loops) {
     //int64_t start = amy_sysclock();
     struct event e = amy_default_event();
     e.time = start;
@@ -144,7 +144,6 @@ void drums(int64_t start) {
 
     e = amy_default_event();
     e.time = start;
-    int loops = 2;
     while (loops--) {
         for (int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
@@ -242,7 +241,16 @@ int main() {
         sleep_ms(250);
     }
 
+#if AMY_HAS_REVERB == 1
+    config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+#endif
+
+#if AMY_HAS_CHORUS == 1
+    config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
+#endif
+
     struct audio_buffer_pool *ap = init_audio();
+
     // Play a few notes in FM
     struct event e = amy_default_event();
     int64_t start = amy_sysclock();
@@ -266,7 +274,7 @@ int main() {
         }
     }
  
-    drums(e.time + 500);
+    drums(e.time + 500, 10 /* loops */);
 
     for (int i = 0; i < 5000; ++i) {
         rp2040_fill_audio_buffer(ap);

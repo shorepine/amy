@@ -84,13 +84,13 @@ void send_message_to_other_core(int32_t t) {
 // the chorus oscillator is only evalated once per block (~11ms) and the
 // delay is constant within each block.
 #ifdef CHORUS_ARATE
-float *delay_mod = NULL;
+SAMPLE *delay_mod = NULL;
 #else
-float delay_mod_val = 0.f;
+SAMPLE delay_mod_val = 0;
 #endif // CHORUS_ARATE
 
 typedef struct chorus_config {
-    float level;     // How much of the delayed signal to mix in to the output, typ 0.5.
+    SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
     int max_delay;   // Max delay when modulating.  Must be <= DELAY_LINE_LEN
 } chorus_config_t;
 
@@ -102,7 +102,7 @@ void alloc_delay_lines(void) {
         delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
     }
 #ifdef CHORUS_ARATE
-    delay_mod = (float*)malloc_caps(sizeof(float) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
+    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
 #endif
 }
 
@@ -123,33 +123,38 @@ void config_chorus(float level, int max_delay) {
         // apply max_delay.
         for (int core=0; core<AMY_CORES; ++core) {
             for (int chan=0; chan<AMY_NCHANS; ++chan) {
-                delay_lines[chan]->max_delay = max_delay;
+                //delay_lines[chan]->max_delay = max_delay;
                 delay_lines[chan]->fixed_delay = (int)max_delay / 2;
             }
         }
     }
     chorus.max_delay = max_delay;
-    chorus.level = level;
+    chorus.level = F2S(level);
 }
 #endif // AMY_HAS_CHORUS
 
 
 #if (AMY_HAS_REVERB == 1)
 typedef struct reverb_state {
-    float level;
+    SAMPLE level;
     float liveness;
     float damping;
     float xover_hz;
 } reverb_state_t;
 
-reverb_state_t reverb = {REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ};
+reverb_state_t reverb = {F2S(REVERB_DEFAULT_LEVEL), REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ};
 
 void config_reverb(float level, float liveness, float damping, float xover_hz) {
     if (level > 0) {
+        printf("config_reverb: level %f liveness %f xover %f damping %f\n",
+               level, liveness, xover_hz, damping);
         if (reverb.level == 0) init_stereo_reverb();  // In case it's the first time
         config_stereo_reverb(liveness, xover_hz, damping);
     }
-    reverb.level = level; reverb.liveness = liveness; reverb.damping = damping; reverb.xover_hz = xover_hz; 
+    reverb.level = F2S(level);
+    reverb.liveness = liveness;
+    reverb.damping = damping;
+    reverb.xover_hz = xover_hz;
 }
 #endif // AMY_HAS_REVERB
 
@@ -745,9 +750,8 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 #endif
 }
 
-void render_osc_wave(uint8_t osc, uint8_t core) { //SAMPLE* buf) {
+void render_osc_wave(uint8_t osc, uint8_t core, SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
-    SAMPLE *buf = per_osc_fb[core];
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
     if(synth[osc].wave == NOISE) render_noise(buf, osc);
@@ -773,7 +777,7 @@ void render_task(uint8_t start, uint8_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     for(uint8_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
-            render_osc_wave(osc, core);
+            render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != OFF) {
                 // apply filter to osc if set
@@ -837,7 +841,7 @@ int16_t * fill_audio_buffer_task() {
     msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
     msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
 #ifdef CHORUS_ARATE
-    if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, delay_mod);
+    if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
 #else
     delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
 #endif // CHORUS_ARATE
@@ -884,14 +888,14 @@ int16_t * fill_audio_buffer_task() {
     if(chorus.level > 0 && delay_lines[0] != NULL) {
         // apply time-varying delays to both chans.
         // delay_mod_val, the modulated delay amount, is set up before calling render_*.
-        float scale = 1.0f;
+        SAMPLE scale = F2S(1.0f);
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
 #ifdef CHORUS_ARATE
             apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
-                                 delay_mod, scale, chorus.level, 0.f);
+                                 delay_mod, scale, chorus.level, 0);
 #else
             apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
-                              scale * delay_mod_val, chorus.level);
+                              MUL4_SS(scale, delay_mod_val), chorus.level);
 #endif // CHORUS_ARATE
             // flip delay direction for alternating channels.
             scale = -scale;
@@ -1112,7 +1116,7 @@ struct event amy_parse_message(char * message) {
                         case 'l': e.velocity=atoff(message + start); break; 
                         case 'L': e.mod_source=atoi(message + start); break; 
                         #if (AMY_HAS_CHORUS == 1)
-                        case 'm': config_chorus(chorus.level, atoi(message + start)); break;
+                        case 'm': config_chorus(S2F(chorus.level), atoi(message + start)); break;
                         #endif
                         case 'N': e.latency_ms = atoi(message + start);  break; 
                         case 'n': e.midi_note=atoi(message + start); break; 

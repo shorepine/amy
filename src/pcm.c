@@ -35,7 +35,7 @@ void pcm_init() {
 */
 }
 
-// How many bits used for fractional part of PCM tabel index.
+// How many bits used for fractional part of PCM table index.
 #define PCM_INDEX_FRAC_BITS 15
 // The number of bits used to hold the table index.
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
@@ -99,8 +99,8 @@ void render_pcm(SAMPLE* buf, uint8_t osc) {
         }
         buf[i] += MUL4_SS(msynth[osc].amp, sample);
     }
-    printf("render_pcm: osc %d patch %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
-           osc, synth[osc].patch, patch->length, base_index, P2F(synth[osc].phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc].amp));
+    //printf("render_pcm: osc %d patch %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
+    //       osc, synth[osc].patch, patch->length, base_index, P2F(synth[osc].phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc].amp));
  }
 
 SAMPLE compute_mod_pcm(uint8_t osc) {
