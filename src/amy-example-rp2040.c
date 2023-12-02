@@ -210,7 +210,7 @@ int main() {
 
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
-    getchar();
+    //getchar();
     #if AMY_CORES == 2
         multicore_launch_core1(core1_main);
     #endif
@@ -263,7 +263,7 @@ int main() {
     int notes[] = {60, 70, 64, 68, 72, 82, 76, 80, 74, 78, 80, 58};
     e.velocity = 0.2;
 
-    if (false) {
+    if (true) {
         for (int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
             e.midi_note = notes[i];
             e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
@@ -272,9 +272,9 @@ int main() {
             e.osc += osc_inc;
             e.time += 1000;
         }
+    } else {
+        drums(e.time + 500, 10 /* loops */);
     }
- 
-    drums(e.time + 500, 10 /* loops */);
 
     for (int i = 0; i < 5000; ++i) {
         rp2040_fill_audio_buffer(ap);

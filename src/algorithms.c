@@ -39,6 +39,27 @@ enum FmOperatorFlags {
     FB_IN = 1 << 6,
     FB_OUT = 1 << 7
 };
+
+// We never see 0x?6 (add to bus two)
+// There are just instances of 0x?2 (write to bus two) and they are both 0x02
+// We never see input BUS_ONE output ADD BUS_ONE
+
+// algo   feedback  input    output
+// 0x01             -            BUS_ONE
+// 0x41   IN        -            BUS_ONE
+// 0xc1   IN OUT    -            BUS_ONE
+// 0x11             BUS_ONE      BUS_ONE  // This is the only case when we can't directly accumulate the (possibly zero'd) output because it's the input
+// 0x05             -        ADD BUS_ONE
+// 0xc5   IN OUT    -        ADD BUS_ONE
+// 0x25             BUS_TWO  ADD BUS_ONE
+
+// 0x02             -            BUS_TWO
+
+// 0x04             -        ADD op
+// 0x14             BUS_ONE  ADD op
+// 0x94      OUT    BUS_ONE  ADD op
+// 0xC4   IN OUT    BUS_ONE  ADD op
+
 struct FmAlgorithm { uint8_t ops[MAX_ALGO_OPS]; };
 const struct FmAlgorithm algorithms[33] = {
     // 6     5     4     3     2      1   
@@ -100,7 +121,7 @@ void copy(SAMPLE* a, SAMPLE* b) {
     }
 }
 
-void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uint8_t algo_osc) {
+void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uint8_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
     //printf("render_mod: osc %d msynth.amp %f\n", osc, S2F(msynth[osc].amp));
@@ -108,7 +129,7 @@ void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uin
     // out = buf
     // in = mod
     // so render_mod is mod, buf (out)
-    if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc);
+    if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
 }
 
 void note_on_mod(uint8_t osc, uint8_t algo_osc) {
@@ -232,53 +253,55 @@ void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) {
     SAMPLE* in_buf;
     SAMPLE* out_buf = NULL;
 
+    SAMPLE* const BUS_ONE = scratch[core][0];
+    SAMPLE* const BUS_TWO = scratch[core][1];
+    SAMPLE* const SCRATCH = scratch[core][2];
+
     for (int i = 0; i < 3; ++i)
         zero(scratch[core][i]);
-    uint8_t ops_used = 0;
+    SAMPLE amp = msynth[osc].amp >> 2;  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
-            ops_used++;
             SAMPLE feedback_level = 0;
+            SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
             } // main algo voice stores feedback, not the op 
 
             if(algo.ops[op] & IN_BUS_ONE) { 
-                in_buf = scratch[core][0]; 
+                in_buf = BUS_ONE;
             } else if(algo.ops[op] & IN_BUS_TWO) { 
-                in_buf = scratch[core][1]; 
+                in_buf = BUS_TWO;
             } else {
                 // no in_buf
                 in_buf = NULL;
             }
-            // We could get away with using mod/in_buf as the output buffer to save a scratch
-            zero(scratch[core][2]);
-            out_buf = scratch[core][2];
-
-            render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
-            if(!(algo.ops[op] & OUT_BUS_ADD)) {
-                if((algo.ops[op] & OUT_BUS_ONE) ) {
-                    copy(out_buf, scratch[core][0]);
-                }
-
-                if((algo.ops[op] & OUT_BUS_TWO) ) {
-                    copy(out_buf, scratch[core][1]);
-                }
+            if ( (algo.ops[op] & IN_BUS_ONE)
+                 && (algo.ops[op] & OUT_BUS_ONE)
+                 /* && !(algo.ops[op] & OUT_BUS_ADD) */ ) {  // IN_BUS_ONE + OUT_BUS_ONE is never ADD
+                // Input is BUS_ONE and output overwrites it, use a temp buffer.
+                out_buf = SCRATCH;
+            } else if (algo.ops[op] & OUT_BUS_ONE) {
+                out_buf = BUS_ONE;
+            } else if (algo.ops[op] & OUT_BUS_TWO) {
+                out_buf = BUS_TWO;
             } else {
-                if(algo.ops[op] & OUT_BUS_ONE) {
-                    add(scratch[core][2], scratch[core][0]);
-                } else if(algo.ops[op] & OUT_BUS_TWO) {
-                    add(scratch[core][2], scratch[core][1]); 
-                } else {
-                    add(scratch[core][2], buf);
-                }
+                out_buf = buf;
+                // We apply the mod_amp to every output that goes into the final output buffer.
+                mod_amp = amp;
+            }
+            if (!(algo.ops[op] & OUT_BUS_ADD)) {
+                // Output is not being accumulated, so have to clear it first.
+                zero(out_buf);
+            }
+
+            render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc, mod_amp);
+
+            if (out_buf == SCRATCH) {
+                // We had to invoke the spare buffer, meaning we're overwriting BUS_ONE
+                copy(out_buf, BUS_ONE);
             }
         }
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
-    if(ops_used == 0) ops_used = 1;
-    SAMPLE amp = MUL0_SS(msynth[osc].amp, F2S(1.0f / (float)ops_used));
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        buf[i] = MUL0_SS(buf[i], amp);
-    }
 }

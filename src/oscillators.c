@@ -72,10 +72,11 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
     //           S2F(mod[0]), S2F(mod[1]), S2F(mod[2]), S2F(mod[3]), S2F(mod[4]));
     int lut_mask = lut->table_size - 1;
     int lut_bits = lut->log_2_table_size;
-    SAMPLE past0 = 0, past1 = 0;
+    SAMPLE past0 = 0, past1 = 0, sample = 0;
     if(last_two) {  // Only for FM oscillators.
-        past0 = last_two[0];
-        past1 = last_two[1];
+        // Setup so that first pas through feedback_level block moves these into past0 and past1.
+        sample = last_two[0];
+        past0 = last_two[1];
     }
     SAMPLE current_amp = incoming_amp;
     SAMPLE incremental_amp = (ending_amp - incoming_amp) >> BLOCK_SIZE_BITS; // i.e. delta(amp) / BLOCK_SIZE
@@ -83,13 +84,12 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         // total_phase can extend beyond [0, 1) but we apply lut_mask before we use it.
         PHASOR total_phase = phase;
 
-        // We'll do this for now like it used to -- mod is 0s if not given.
-        // The other option is to not accumulate total_phase at all if mod is not given
-        // But this is the way it was before fxp and we'll keep it that way for now
-        SAMPLE mi = 0;
-        if(mod != NULL) { mi = mod[i]; }
-        total_phase += S2P(mi + MUL4_SS(feedback_level, (past1 + past0) >> 1));
-
+        if(mod) total_phase += S2P(mod[i]);
+        if(feedback_level) {
+            past1 = past0;
+            past0 = sample;   // Feedback is taken before output scaling.
+            total_phase += S2P(MUL4_SS(feedback_level, (past1 + past0) >> 1));
+        }
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
         LUTSAMPLE b = lut->table[base_index];
@@ -98,8 +98,6 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         buf[i] += MUL4_SS(current_amp, sample);
         current_amp += incremental_amp;
         phase = P_WRAPPED_SUM(phase, step);
-        past1 = past0;
-        past0 = sample;   // Feedback is taken before output scaling.
     }
     if(last_two) {
         last_two[0] = past0;
@@ -301,12 +299,12 @@ void fm_sine_note_on(uint8_t osc, uint8_t algo_osc) {
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
 }
 
-void render_fm_sine(SAMPLE* buf, uint8_t osc, SAMPLE* mod, SAMPLE feedback_level, uint8_t algo_osc) {
+void render_fm_sine(SAMPLE* buf, uint8_t osc, SAMPLE* mod, SAMPLE feedback_level, uint8_t algo_osc, SAMPLE mod_amp) {
     if(synth[osc].ratio >= 0) {
         msynth[osc].freq = msynth[algo_osc].freq * synth[osc].ratio;
     }
     PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
-    SAMPLE amp = msynth[osc].amp;
+    SAMPLE amp = MUL4_SS(msynth[osc].amp, mod_amp);
     synth[osc].phase = render_lut_fm_osc(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp, 
                                          synth[osc].lut,
