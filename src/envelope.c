@@ -3,12 +3,12 @@
 
 #include "amy.h"
 
-extern struct event* synth;
+extern struct i_event* synth;
 extern struct mod_event* msynth;
 extern struct mod_state mglobal;
 
 
-SAMPLE compute_mod_value(uint8_t mod_osc) {
+SAMPLE compute_mod_value(uint16_t mod_osc) {
     // Return the modulation-rate value for the specified oscillator.
     // i.e., this oscillator is acting as modulation for something, so
     // just calculate that modulation rate (without knowing what it
@@ -23,8 +23,8 @@ SAMPLE compute_mod_value(uint8_t mod_osc) {
     return 0;
 }
 
-SAMPLE compute_mod_scale(uint8_t osc) {
-    int8_t source = synth[osc].mod_source;
+SAMPLE compute_mod_scale(uint16_t osc) {
+    int16_t source = synth[osc].mod_source;
     if(synth[osc].mod_target >= 1 && source >= 0) {
         if(source != osc) {  // that would be weird
             msynth[source].amp = synth[source].amp;
@@ -39,7 +39,7 @@ SAMPLE compute_mod_scale(uint8_t osc) {
     return 0; // 0 is no change, unlike bp scale
 }
 
-SAMPLE compute_breakpoint_scale(uint8_t osc, uint8_t bp_set) {
+SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
 
     // given a breakpoint list, compute the scale
     // we first see how many BPs are defined, and where we are in them?

@@ -23,7 +23,7 @@ void example_ks(int64_t start) {
 
     e.velocity = 1;
     e.wave = KS;
-    e.feedback = F2S(0.996f);
+    e.feedback = 0.996f;
     e.patch = 15;
     e.osc = 0;
     e.midi_note = 60;
@@ -106,12 +106,10 @@ void example_drums(int64_t start, int loops) {
     e.filter_freq = 2500.0;
     e.resonance = 5.0;
     e.filter_type = FILTER_LPF;
-    e.breakpoint_target[0] = TARGET_AMP + TARGET_FILTER_FREQ;
+    e.bp0_target = TARGET_AMP + TARGET_FILTER_FREQ;
+    strcpy(e.bp0, "0,1,500,0.2,25,0");
     amy_add_event(e);
 
-    char bp0msg[] = "v0A0,1,500,0.2,25,0\0";
-    bp0msg[1] = '0' + e.osc;
-    amy_play_message(bp0msg);
 
     const int bass = 1 << 0;
     const int snare = 1 << 1;

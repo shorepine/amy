@@ -112,7 +112,7 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
     return 0;
 }
 
-void update_filter(uint8_t osc) {
+void update_filter(uint16_t osc) {
     // reset the delay for a filter
     // normal mod / adsr will just change the coeffs
     delay[osc][0] = 0; delay[osc][1] = 0;
@@ -123,7 +123,7 @@ void filters_init() {
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
     dsps_biquad_gen_hpf_f32(eq_coeffs[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
-    for(uint8_t i=0;i<AMY_OSCS;i++) { delay[i][0] = 0; delay[i][1] = 0; }
+    for(uint16_t i=0;i<AMY_OSCS;i++) { delay[i][0] = 0; delay[i][1] = 0; }
     eq_delay[0][0] = 0; eq_delay[0][1] = 0;
     eq_delay[1][0] = 0; eq_delay[1][1] = 0;
     eq_delay[2][0] = 0; eq_delay[2][1] = 0;
@@ -142,7 +142,7 @@ void parametric_eq_process(SAMPLE *block) {
 }
 
 
-void filter_process(SAMPLE * block, uint8_t osc) {
+void filter_process(SAMPLE * block, uint16_t osc) {
     SAMPLE output[AMY_BLOCK_SIZE];
     float ratio = msynth[osc].filter_freq/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;

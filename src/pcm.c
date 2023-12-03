@@ -40,7 +40,7 @@ void pcm_init() {
 // The number of bits used to hold the table index.
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
 
-void pcm_note_on(uint8_t osc) {
+void pcm_note_on(uint16_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d freq=%f amp=%f\n",
     //       osc, synth[osc].patch, synth[osc].freq, S2F(synth[osc].amp));
     if(synth[osc].patch < 0) synth[osc].patch = 0;
@@ -50,11 +50,11 @@ void pcm_note_on(uint8_t osc) {
     synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
 }
 
-void pcm_mod_trigger(uint8_t osc) {
+void pcm_mod_trigger(uint16_t osc) {
     pcm_note_on(osc);
 }
 
-void pcm_note_off(uint8_t osc) {
+void pcm_note_off(uint16_t osc) {
     // if looping set, disable looping; sample should play through to end.
     if(msynth[osc].feedback > 0) {
         msynth[osc].feedback = 0;
@@ -64,7 +64,7 @@ void pcm_note_off(uint8_t osc) {
     }
 }
 
-void render_pcm(SAMPLE* buf, uint8_t osc) {
+void render_pcm(SAMPLE* buf, uint16_t osc) {
     // Patches can be > 32768 samples long.
     // We need s16.15 fixed-point indexing.
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
@@ -103,7 +103,7 @@ void render_pcm(SAMPLE* buf, uint8_t osc) {
     //       osc, synth[osc].patch, patch->length, base_index, P2F(synth[osc].phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc].amp));
  }
 
-SAMPLE compute_mod_pcm(uint8_t osc) {
+SAMPLE compute_mod_pcm(uint16_t osc) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     PHASOR step = F2P((PCM_AMY_SAMPLE_RATE / mod_sr) / (1 << PCM_INDEX_BITS));
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];

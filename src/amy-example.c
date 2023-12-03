@@ -44,8 +44,8 @@ int main(int argc, char ** argv) {
     example_chorus();
     example_multimbral_fm(start);
 
-    // Now just spin for 5s
-    while(amy_sysclock() - start < 5000) {
+    // Now just spin for 20s
+    while(amy_sysclock() - start < 20000) {
         usleep(THREAD_USLEEP);
     }
     

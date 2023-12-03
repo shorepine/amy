@@ -97,8 +97,6 @@ You can also start a thread playing live audio:
 
 
 In C, using the high level structures directly;
-
-(Note that the parameters `amp`, `phase` and `feedback` are special and need to be encoded into fixed point representations if using the structure directly. Use the macro `F2S(float)` for `amp` and `feedback` and `F2P(float)` for `phase` if setting them directly.)
   
 ```c
 #include "amy.h"
@@ -115,7 +113,7 @@ void bleep() {
     amy_add_event(e);
     e.time = sysclock + 300;
     e.velocity = 0;
-    e.amp = F2S(0);
+    e.amp = 0;
     e.freq = 0;
     amy_add_event(e);
 }

@@ -121,7 +121,7 @@ void copy(SAMPLE* a, SAMPLE* b) {
     }
 }
 
-void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uint8_t algo_osc, SAMPLE amp) {
+void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
     //printf("render_mod: osc %d msynth.amp %f\n", osc, S2F(msynth[osc].amp));
@@ -132,16 +132,16 @@ void render_mod(SAMPLE *in, SAMPLE* out, uint8_t osc, SAMPLE feedback_level, uin
     if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
 }
 
-void note_on_mod(uint8_t osc, uint8_t algo_osc) {
+void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     synth[osc].note_on_clock = total_samples;
     synth[osc].status = IS_ALGO_SOURCE; // to ensure it's rendered
     if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 
-void algo_note_off(uint8_t osc) {
+void algo_note_off(uint16_t osc) {
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(synth[osc].algo_source[i] >=0 ) {
-            uint8_t o = synth[osc].algo_source[i];
+            uint16_t o = synth[osc].algo_source[i];
             synth[o].note_on_clock = -1;
             synth[o].note_off_clock = total_samples;
         }
@@ -151,7 +151,7 @@ void algo_note_off(uint8_t osc) {
     synth[osc].note_off_clock = total_samples;          
 }
 
-void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
+void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     // Set up the voices from a DX7 patch.
     // 9 voices total - operators 1,2,3,4,5,6, the root voice (silent), and two LFOs (amp then pitch)
     // osc == root osc (the control one with the parameters in it)
@@ -221,13 +221,13 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
 }
 
 // The default way is to use consecutive osc #s
-void algo_setup_patch(uint8_t osc) {
-    uint8_t target_oscs[8];
+void algo_setup_patch(uint16_t osc) {
+    uint16_t target_oscs[8];
     for(uint8_t i=0;i<8;i++) target_oscs[i] = osc+i+1;
     algo_custom_setup_patch(osc, target_oscs);
 }
 
-void algo_note_on(uint8_t osc) {    
+void algo_note_on(uint16_t osc) {    
     // trigger all the source operator voices
     if(synth[osc].patch >= 0) { 
         algo_setup_patch(osc);
@@ -246,7 +246,7 @@ void algo_init() {
 // We need to keep these in heap for the small stack cortex M0
 SAMPLE scratch[AMY_CORES][3][AMY_BLOCK_SIZE];
 
-void render_algo(SAMPLE* buf, uint8_t osc, uint8_t core) { 
+void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6

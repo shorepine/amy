@@ -25,9 +25,9 @@ extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 // Global state 
 struct state global;
 // set of deltas for the fifo to be played
-struct delta * events;
+struct delta * i_events;
 // state per osc as multi-channel synthesizer that the scheduler renders into
-struct event * synth;
+struct i_event * synth;
 // envelope-modified per-osc state
 struct mod_event * msynth;
 
@@ -210,10 +210,46 @@ float freq_for_midi_note(uint8_t midi_note) {
     return 440.0f*powf(2,(midi_note-69.0f)/12.0f);
 }
 
-
 // create a new default event -- mostly -1 or no change
 struct event amy_default_event() {
     struct event e;
+    e.time = 0;
+    e.osc = 0;
+    e.patch = -1;
+    e.wave = -1;
+    e.phase = -1;
+    e.duty = -1;
+    e.feedback = -1;
+    e.velocity = -1;
+    e.midi_note = -1;
+    e.amp = -1; 
+    e.freq = -1;
+    e.volume = -1;
+    e.pan = -1;
+    e.latency_ms = -1;
+    e.ratio = -1;
+    e.filter_freq = -1;
+    e.resonance = -1;
+    e.filter_type = -1;
+    e.mod_source = -1;
+    e.mod_target = -1;
+    e.eq_l = -1;
+    e.eq_m = -1;
+    e.eq_h = -1;
+    e.algorithm = -1;
+    e.bp0[0] = 0;
+    e.bp1[0] = 0;
+    e.bp2[0] = 0;
+    e.bp0_target = -1;
+    e.bp1_target = -1;
+    e.bp2_target = -1;
+    e.algo_source[0] = 0;
+    return e;
+}
+
+// create a new default event -- mostly -1 or no change
+struct i_event amy_default_i_event() {
+    struct i_event e;
     e.status = EMPTY;
     e.time = 0;
     e.osc = 0;
@@ -245,7 +281,13 @@ struct event amy_default_event() {
     e.eq_h = -1;
     e.algorithm = -1;
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) e.algo_source[i] = -2;
-    for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) { for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) { e.breakpoint_times[i][j] = -1; e.breakpoint_values[i][j] = -1; } e.breakpoint_target[i] = -1; }
+    for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) { 
+        for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) { 
+            e.breakpoint_times[i][j] = -1; 
+            e.breakpoint_values[i][j] = -1; 
+        } 
+        e.breakpoint_target[i] = -1; 
+    }
     return e;
 }
 
@@ -263,22 +305,22 @@ void add_delta_to_queue(struct delta d) {
         int16_t found = -1;
         // guaranteed to find eventually if qsize stays accurate
         while(found<0) {
-            if(events[write_location].time == UINT32_MAX) found = write_location;
+            if(i_events[write_location].time == UINT32_MAX) found = write_location;
             write_location = (write_location + 1) % AMY_EVENT_FIFO_LEN;
         }
         // found a mem location. copy the data in and update the write pointers.
-        events[found].time = d.time;
-        events[found].osc = d.osc;
-        events[found].param = d.param;
-        events[found].data = d.data;
+        i_events[found].time = d.time;
+        i_events[found].osc = d.osc;
+        i_events[found].param = d.param;
+        i_events[found].data = d.data;
         global.next_event_write = write_location;
         global.event_qsize++;
 
         // now insert it into the sorted list for fast playback
         // first, see if it's eariler than the first item, special case
         if(d.time < global.event_start->time) {
-            events[found].next = global.event_start;
-            global.event_start = &events[found];
+            i_events[found].next = global.event_start;
+            global.event_start = &i_events[found];
         } else {
             // or it's got to be found somewhere
             struct delta* ptr = global.event_start; 
@@ -286,8 +328,8 @@ void add_delta_to_queue(struct delta d) {
             while(inserted<0) {
                 if(d.time < ptr->next->time) { 
                     // next should point to me, and my next should point to old next
-                    events[found].next = ptr->next;
-                    ptr->next = &events[found];
+                    i_events[found].next = ptr->next;
+                    ptr->next = &i_events[found];
                     inserted = 1;
                 }
                 ptr = ptr->next;
@@ -304,9 +346,48 @@ void add_delta_to_queue(struct delta d) {
 #endif
 }
 
-
+// Add a API facing event, convert into i_event
 void amy_add_event(struct event e) {
-    // make delta objects out of the udp event and add them to the queue
+    struct i_event i = amy_default_i_event();
+
+    i.time = e.time;
+    i.osc = e.osc;
+    i.wave = e.wave;
+    i.patch = e.patch;
+    i.midi_note = e.midi_note;
+    i.amp = F2S(e.amp);
+    i.duty = e.duty;
+    i.feedback = F2S(e.feedback);
+    i.freq = e.freq;
+    i.velocity = e.velocity;
+    i.phase = F2P(e.phase);
+    i.detune = e.detune;
+    i.volume = e.volume;
+    i.pan = e.pan;
+    i.latency_ms = e.latency_ms;
+    i.filter_freq = e.filter_freq;
+    i.ratio = e.ratio;
+    i.resonance = e.resonance;
+    i.mod_source = e.mod_source;
+    i.mod_target = e.mod_target;
+    i.algorithm = e.algorithm;
+    i.filter_type = e.filter_type;
+    i.eq_l = e.eq_l;
+    i.eq_m = e.eq_m;
+    i.eq_h = e.eq_h;
+    i.breakpoint_target[0] = e.bp0_target;
+    i.breakpoint_target[1] = e.bp0_target;
+    i.breakpoint_target[2] = e.bp0_target;
+    if(e.bp0[0] != 0) parse_breakpoint(&i, e.bp0, 0);
+    if(e.bp1[0] != 0) parse_breakpoint(&i, e.bp1, 1);
+    if(e.bp2[0] != 0) parse_breakpoint(&i, e.bp2, 2);
+    if(e.algo_source[0] != 0) parse_algorithm(&i, e.algo_source);
+    amy_add_i_event(i);
+}
+
+
+void amy_add_i_event(struct i_event e) {
+    // make delta objects out of the event and add them to the queue
     struct delta d;
     d.osc = e.osc;
     d.time = e.time;
@@ -351,7 +432,7 @@ void amy_add_event(struct event e) {
     message_counter++;
 }
 
-void reset_osc(uint8_t i ) {
+void reset_osc(uint16_t i ) {
     // set all the synth state to defaults
     synth[i].osc = i; // self-reference to make updating oscs easier
     synth[i].wave = SINE;
@@ -394,14 +475,20 @@ void reset_osc(uint8_t i ) {
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = -2;
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) { synth[i].breakpoint_times[j][k] =-1; synth[i].breakpoint_values[j][k] = -1; } synth[i].breakpoint_target[j] = 0; }
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { 
+        for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) { 
+            synth[i].breakpoint_times[j][k] =-1; 
+            synth[i].breakpoint_values[j][k] = -1; 
+        } 
+        synth[i].breakpoint_target[j] = 0; 
+    }
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
     synth[i].last_two[1] = 0;
 }
 
 void amy_reset_oscs() {
-    for(uint8_t i=0;i<AMY_OSCS;i++) reset_osc(i);
+    for(uint16_t i=0;i<AMY_OSCS;i++) reset_osc(i);
     // also reset filters and volume
     global.volume = 1;
     global.eq[0] = 0;
@@ -431,30 +518,30 @@ int8_t oscs_init() {
     algo_init();
     pcm_init();
 
-    events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
-    synth = (struct event*) malloc_caps(sizeof(struct event) * AMY_OSCS, SYNTH_RAM_CAPS);
+    i_events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
+    synth = (struct i_event*) malloc_caps(sizeof(struct i_event) * AMY_OSCS, SYNTH_RAM_CAPS);
     msynth = (struct mod_event*) malloc_caps(sizeof(struct mod_event) * AMY_OSCS, SYNTH_RAM_CAPS);
     block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, BLOCK_RAM_CAPS);
     // set all oscillators to their default values
     amy_reset_oscs();
 
     // make a fencepost last event with no next, time of end-1, and call it start for now, all other events get inserted before it
-    events[0].next = NULL;
-    events[0].time = UINT32_MAX - 1;
-    events[0].osc = 0;
-    events[0].data = 0;
-    events[0].param = NO_PARAM;
+    i_events[0].next = NULL;
+    i_events[0].time = UINT32_MAX - 1;
+    i_events[0].osc = 0;
+    i_events[0].data = 0;
+    i_events[0].param = NO_PARAM;
     global.next_event_write = 1;
-    global.event_start = &events[0];
+    global.event_start = &i_events[0];
     global.event_qsize = 1; // queue will always have at least 1 thing in it 
 
     // set all the other events to empty
     for(uint16_t i=1;i<AMY_EVENT_FIFO_LEN;i++) { 
-        events[i].time = UINT32_MAX;
-        events[i].next = NULL;
-        events[i].osc = 0;
-        events[i].data = 0;
-        events[i].param = NO_PARAM;
+        i_events[i].time = UINT32_MAX;
+        i_events[i].next = NULL;
+        i_events[i].osc = 0;
+        i_events[i].data = 0;
+        i_events[i].param = NO_PARAM;
     }
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     // clear out both as local mode won't use fbl[1] 
@@ -496,7 +583,7 @@ void show_debug(uint8_t type) {
         //printf("global: filter %f resonance %f volume %f status %d\n", global.filter_freq, global.resonance, global.volume, global.status);
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
-        for(uint8_t i=0;i<AMY_OSCS;i++) {
+        for(uint16_t i=0;i<AMY_OSCS;i++) {
             fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
                     i, synth[i].status, S2F(synth[i].amp), synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
                     synth[i].velocity, synth[i].filter_freq, synth[i].ratio, S2F(synth[i].feedback), synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan,
@@ -524,7 +611,7 @@ void oscs_deinit() {
     free(fbl);
     free(synth);
     free(msynth);
-    free(events);
+    free(i_events);
     #if AMY_KS_OSCS > 0
     ks_deinit();
     #endif
@@ -532,7 +619,7 @@ void oscs_deinit() {
 }
 
 
-void osc_note_on(uint8_t osc) {
+void osc_note_on(uint16_t osc) {
     if(synth[osc].wave==SINE) sine_note_on(osc);
     if(synth[osc].wave==SAW_DOWN) saw_down_note_on(osc);
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc);
@@ -569,9 +656,9 @@ void play_event(struct delta d) {
     if(d.param == FREQ) synth[d.osc].freq = *(float *)&d.data;
 
     
-    if(d.param == BP0_TARGET) { synth[d.osc].breakpoint_target[0] = *(int16_t *)&d.data; trig=1; }
-    if(d.param == BP1_TARGET) { synth[d.osc].breakpoint_target[1] = *(int16_t *)&d.data; trig=1; }
-    if(d.param == BP2_TARGET) { synth[d.osc].breakpoint_target[2] = *(int16_t *)&d.data; trig=1; }
+    if(d.param == BP0_TARGET) { synth[d.osc].breakpoint_target[0] = *(int8_t *)&d.data; trig=1; }
+    if(d.param == BP1_TARGET) { synth[d.osc].breakpoint_target[1] = *(int8_t *)&d.data; trig=1; }
+    if(d.param == BP2_TARGET) { synth[d.osc].breakpoint_target[2] = *(int8_t *)&d.data; trig=1; }
     // todo, i really should clean this up
     if(d.param >= BP_START && d.param < BP_END) {
         uint8_t pos = d.param - BP_START;
@@ -588,7 +675,7 @@ void play_event(struct delta d) {
     if(trig) synth[d.osc].note_on_clock = total_samples;
 
     // todo: event-only side effect, remove
-    if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(int8_t *)&d.data; synth[*(int8_t *)&d.data].status = IS_MOD_SOURCE; }
+    if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(int16_t *)&d.data; synth[*(int16_t *)&d.data].status = IS_MOD_SOURCE; }
     if(d.param == MOD_TARGET) synth[d.osc].mod_target = *(int16_t *)&d.data; 
 
     if(d.param == RATIO) synth[d.osc].ratio = *(float *)&d.data;
@@ -600,9 +687,9 @@ void play_event(struct delta d) {
     if(d.param == ALGORITHM) synth[d.osc].algorithm = *(int8_t *)&d.data; 
 
     if(d.param >= ALGO_SOURCE_START && d.param < ALGO_SOURCE_END) {
-        uint8_t which_source = d.param - ALGO_SOURCE_START;
-        synth[d.osc].algo_source[which_source] = *(int8_t *)&d.data; 
-        synth[*(int8_t*)&d.data].status=IS_ALGO_SOURCE;
+        uint16_t which_source = d.param - ALGO_SOURCE_START;
+        synth[d.osc].algo_source[which_source] = *(int16_t *)&d.data; 
+        synth[*(int16_t*)&d.data].status=IS_ALGO_SOURCE;
     }
 
     // for global changes, just make the change, no need to update the per-osc synth
@@ -672,7 +759,7 @@ void play_event(struct delta d) {
 }
 
 // apply an mod & bp, if any, to the osc
-void hold_and_modify(uint8_t osc) {
+void hold_and_modify(uint16_t osc) {
     // copy all the modifier variables
     msynth[osc].amp = synth[osc].amp;
     msynth[osc].last_pan = msynth[osc].pan;
@@ -750,7 +837,7 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 #endif
 }
 
-void render_osc_wave(uint8_t osc, uint8_t core, SAMPLE* buf) {
+void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
@@ -773,9 +860,9 @@ void render_osc_wave(uint8_t osc, uint8_t core, SAMPLE* buf) {
     #endif
 }
 
-void render_task(uint8_t start, uint8_t end, uint8_t core) {
+void render_task(uint16_t start, uint16_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
-    for(uint8_t osc=start; osc<end; osc++) {
+    for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
             render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
@@ -916,7 +1003,6 @@ int16_t * fill_audio_buffer_task() {
 
     // global volume is supposed to max out at 10, so scale by 0.1.
     SAMPLE volume_scale = F2S(0.1f * global.volume);
-    //uint8_t nonzero = 0;
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
 
@@ -979,7 +1065,7 @@ int32_t ms_to_samples(int32_t ms) {
 } 
 
 // helper to parse the list of source voices for an algorithm
-void parse_algorithm(struct event * e, char *message) {
+void parse_algorithm(struct i_event * e, char *message) {
     uint8_t idx = 0;
     uint16_t c = 0;
     uint16_t stop = MAX_MESSAGE_LEN;
@@ -1029,7 +1115,7 @@ float atoff(const char *s) {
 }
 
 // helper to parse the special bp string
-void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
+void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
     uint8_t idx = 0;
     uint16_t c = 0;
     // set the breakpoint to default (-1) first
@@ -1054,14 +1140,14 @@ void parse_breakpoint(struct event * e, char* message, uint8_t which_bpset) {
     }
 }
 
-// given a string return an event
-struct event amy_parse_message(char * message) {
+// given a string return an i_event
+struct i_event amy_parse_message(char * message) {
     uint8_t mode = 0;
-    uint8_t osc = 0;
+    uint16_t osc = 0;
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
-    struct event e = amy_default_event();
+    struct i_event e = amy_default_i_event();
     int64_t sysclock = amy_sysclock();
     
     // cut the osc cruft max etc add, they put a 0 and then more things after the 0
@@ -1171,14 +1257,14 @@ struct event amy_parse_message(char * message) {
         e.status = SCHEDULED;
         return e;
     }
-    return amy_default_event();
+    return amy_default_i_event();
 }
 
 // given a string play / schedule the event directly 
 void amy_play_message(char *message) {
-    struct event e = amy_parse_message(message);
+    struct i_event e = amy_parse_message(message);
     if(e.status == SCHEDULED) {
-        amy_add_event(e);
+        amy_add_i_event(e);
     }
 }
 

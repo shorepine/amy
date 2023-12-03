@@ -10,12 +10,12 @@ typedef struct {
     uint32_t bp_length;
     uint8_t midi_note;
     uint32_t sustain_ms;
-    uint8_t oscs_alloc;
+    uint16_t oscs_alloc;
 } partial_breakpoint_map_t;
 
 typedef struct {
     uint32_t ms_offset;
-    uint8_t osc;
+    uint16_t osc;
     float freq;
     float amp;
     float bw;
@@ -33,19 +33,19 @@ typedef struct {
 
 
 // choose a patch from the .h file
-void partials_note_on(uint8_t osc) {
+void partials_note_on(uint16_t osc) {
     // just like PCM, start & end breakpoint are stored here
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch];
     synth[osc].step = patch.bp_offset;
     synth[osc].substep = synth[osc].step + patch.bp_length;
     // Now let's start the oscillators (silently)
-    uint8_t oscs = patch.oscs_alloc;
+    uint16_t oscs = patch.oscs_alloc;
     if(osc + 1 + oscs > AMY_OSCS) {
         fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
     }
 }
 
-void partials_note_off(uint8_t osc) {
+void partials_note_off(uint16_t osc) {
     // todo; finish the sustain
     synth[osc].step = -1;
 }
@@ -53,7 +53,7 @@ void partials_note_off(uint8_t osc) {
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all patches have sustain point?
-void render_partials(float *buf, uint8_t osc) {
+void render_partials(float *buf, uint16_t osc) {
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];
     // If ratio is set (not 0 or -1), use it for a time stretch
     float time_ratio = 1;
@@ -67,7 +67,7 @@ void render_partials(float *buf, uint8_t osc) {
             partial_breakpoint_t pb = partial_breakpoints[(uint32_t)synth[osc].step];
             if(ms_since_started >= pb.ms_offset ) {
                 // set up this oscillator
-                uint8_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
+                uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
                 #ifdef ESP_PLATFORM
                     if(o % 2) o = o + 32; // scale
@@ -123,10 +123,10 @@ void render_partials(float *buf, uint8_t osc) {
         }
     }
     // now, render everything, add it up
-    uint8_t oscs = patch.oscs_alloc;
+    uint16_t oscs = patch.oscs_alloc;
     float pbuf[AMY_BLOCK_SIZE];
-    for(uint8_t i=osc+1;i<osc+1+oscs;i++) {
-        uint8_t o = i % AMY_OSCS;
+    for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
+        uint16_t o = i % AMY_OSCS;
         #ifdef ESP_PLATFORM
             if(o % 2) o = o + 32; // scale
         #endif
