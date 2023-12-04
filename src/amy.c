@@ -1089,8 +1089,9 @@ float atoff(const char *s) {
     // 'e' as a command prefix.
     float frac = 0;
     float whole = (float)atoi(s);
-    //const char *s_in = s;  // for debug message.
-    s += strspn(s, "0123456789");
+    int is_negative = (s[0] == '-');  // Can't use (whole < 0) because of "-0.xx".
+    const char *s_in = s;  // for debug message.
+    s += strspn(s, "-0123456789");
     if (*s == '.') {
         // Float with a decimal part.
         // Step over dp
@@ -1109,9 +1110,17 @@ float atoff(const char *s) {
         }
         frac = (float)atoi(s);
         frac /= powf(10.f, (float)fraclen);
+        if (is_negative) frac = -frac;
     }
-    //fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
+    fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
     return whole + frac;
+}
+
+void print_bpset(struct event* e, uint8_t which_bpset) {
+    fprintf(stderr, "bpset %d:\n", which_bpset);
+    for (int i = 0; i < MAX_BREAKPOINTS; ++i) {
+        fprintf(stderr, "  t: %d  v: %f\n", e->breakpoint_times[which_bpset][i], e->breakpoint_values[which_bpset][i]);
+    }
 }
 
 // helper to parse the special bp string
@@ -1138,6 +1147,7 @@ void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
         while(message[c]!=',' && message[c]!=0 && c < MAX_MESSAGE_LEN) c++;
         c++; idx++;
     }
+    print_bpset(e, which_bpset);
 }
 
 // given a string return an i_event
