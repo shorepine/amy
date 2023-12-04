@@ -126,7 +126,12 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         v0 = F2S(synth[osc].breakpoint_values[bp_set][found-1]);
     }
     SAMPLE scale = v0;
-    if(t1 < 0 || v1 < 0) {
+    int sign = 1;
+    if (v0 < 0 || v1 < 0) {
+        sign = -1;
+        v0 = -v0; v1 = -v1;
+    }
+    if(t1 < 0) { // || v1 < 0) {
         scale = 0;
     } else if(t1==t0 || elapsed==t1) {
         // This way we return exact zero for v1 at the end of the segment, rather than BREAKPOINT_EPS
@@ -169,6 +174,10 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             //scale = v0 - MUL4_SS(v0 - v1, F2S(scf));
             //printf("false_exponential time_ratio %f scf %f\n", time_ratio, scf);
         }
+    }
+    // If sign is negative, render the env as 1 - ADSR.
+    if (sign < 0) {
+        scale = F2S(1.0f) - scale;
     }
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
