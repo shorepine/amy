@@ -175,7 +175,7 @@ struct i_event {
 
     int64_t note_on_clock;
     int64_t note_off_clock;
-    int8_t breakpoint_target[MAX_BREAKPOINT_SETS];
+    int16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     int32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.

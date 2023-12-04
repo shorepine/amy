@@ -1116,7 +1116,7 @@ float atoff(const char *s) {
     return whole + frac;
 }
 
-void print_bpset(struct event* e, uint8_t which_bpset) {
+void print_bpset(struct i_event* e, uint8_t which_bpset) {
     fprintf(stderr, "bpset %d:\n", which_bpset);
     for (int i = 0; i < MAX_BREAKPOINTS; ++i) {
         fprintf(stderr, "  t: %d  v: %f\n", e->breakpoint_times[which_bpset][i], e->breakpoint_values[which_bpset][i]);
