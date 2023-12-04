@@ -19,7 +19,7 @@ int is_power_of_two(int val) {
 
 delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     // Check that len is a power of 2.
-    printf("new_delay_line: len %d fixed_del %d\n", len, fixed_delay);
+    //printf("new_delay_line: len %d fixed_del %d\n", len, fixed_delay);
     int log_2_len = is_power_of_two(len);
     if (log_2_len < 0) {
         fprintf(stderr, "delay line len must be power of 2, not %d\n", len);
@@ -155,8 +155,8 @@ SAMPLE lpfgain;
 SAMPLE liveness;
 
 void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
-    printf("config_stereo_reverb: liveness %f xover %f damping %f\n",
-           a_liveness, crossover_hz, damping);
+    //printf("config_stereo_reverb: liveness %f xover %f damping %f\n",
+    //       a_liveness, crossover_hz, damping);
     // liveness (0..1) controls how much energy is preserved (larger = longer reverb).
     liveness = F2S(a_liveness);
     // crossover_hz is 3dB point of 1-pole lowpass freq.

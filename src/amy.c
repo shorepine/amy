@@ -146,8 +146,8 @@ reverb_state_t reverb = {F2S(REVERB_DEFAULT_LEVEL), REVERB_DEFAULT_LIVENESS, REV
 
 void config_reverb(float level, float liveness, float damping, float xover_hz) {
     if (level > 0) {
-        printf("config_reverb: level %f liveness %f xover %f damping %f\n",
-               level, liveness, xover_hz, damping);
+        //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
+        //      level, liveness, xover_hz, damping);
         if (reverb.level == 0) init_stereo_reverb();  // In case it's the first time
         config_stereo_reverb(liveness, xover_hz, damping);
     }
