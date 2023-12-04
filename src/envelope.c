@@ -181,7 +181,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     }
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
-    printf("t0 %d t1 %d elapsed %lld v0 %f v1 %f scale %f\n", t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //printf("t0 %d t1 %d elapsed %lld v0 %f v1 %f scale %f\n", t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     return scale;
 }
 
