@@ -1147,7 +1147,7 @@ void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
         while(message[c]!=',' && message[c]!=0 && c < MAX_MESSAGE_LEN) c++;
         c++; idx++;
     }
-    print_bpset(e, which_bpset);
+    //print_bpset(e, which_bpset);
 }
 
 // given a string return an i_event
