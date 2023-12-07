@@ -40,9 +40,10 @@ int main(int argc, char ** argv) {
     amy_live_start();
     amy_reset_oscs();
 
-    example_reverb();
-    example_chorus();
-    example_multimbral_fm(start);
+    //example_reverb();
+    //example_chorus();
+    example_drums(start, 2);
+    //example_multimbral_fm(start);
 
     // Now just spin for 20s
     while(amy_sysclock() - start < 20000) {

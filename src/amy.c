@@ -397,7 +397,7 @@ void amy_add_i_event(struct i_event e) {
     if(e.amp>-1) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
     if(e.duty>-1) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
     if(e.feedback>-1) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(e.freq>-1) { d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
+    if(e.freq>-1) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
     if(e.phase>-1) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
     if(e.volume>-1) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
     if(e.pan>-1) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
@@ -428,7 +428,7 @@ void amy_add_i_event(struct i_event e) {
     if(e.eq_h>-1) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(e.velocity>-1) { d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+    if(e.velocity>-1) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
 }
 
@@ -1112,7 +1112,7 @@ float atoff(const char *s) {
         frac /= powf(10.f, (float)fraclen);
         if (is_negative) frac = -frac;
     }
-    fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
+    //fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
     return whole + frac;
 }
 
@@ -1185,10 +1185,10 @@ struct i_event amy_parse_message(char * message) {
             } else {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
-                        case 'a': e.amp=atoff(message+start); break;
+                        case 'a': e.amp=F2S(atoff(message+start)); break;
                         case 'A': parse_breakpoint(&e, message+start, 0); break;
                         case 'B': parse_breakpoint(&e, message+start, 1); break;
-                        case 'b': e.feedback=atoff(message+start); break; 
+                        case 'b': e.feedback=F2S(atoff(message+start)); break; 
                         case 'C': parse_breakpoint(&e, message+start, 2); break; 
                         case 'd': e.duty=atoff(message + start); break; 
                         case 'D': show_debug(atoi(message + start)); break; 
@@ -1219,7 +1219,7 @@ struct i_event amy_parse_message(char * message) {
                         case 'o': e.algorithm=atoi(message+start); break; 
                         case 'O': parse_algorithm(&e, message+start); break; 
                         case 'p': e.patch=atoi(message + start); break; 
-                        case 'P': e.phase=atoff(message + start); break; 
+                        case 'P': e.phase=F2P(atoff(message + start)); break; 
                         case 'Q': e.pan = atoff(message + start); break;
                         case 'R': e.resonance=atoff(message + start); break; 
                         case 'S': osc = atoi(message + start); if(osc > AMY_OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); } break; 
