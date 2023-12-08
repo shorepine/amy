@@ -83,8 +83,15 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].amp = F2S(pb.amp);
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
-                synth[o].feedback = F2S(pb.bw * msynth[osc].feedback);
-                synth[o].phase = F2P(pb.phase); // this can be a negative # to indicate continuation or end
+                synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
+
+                uint8_t partial_code = 0; // control code for partial patches
+                if(pb.phase >= 0) {
+                    synth[o].phase = F2P(pb.phase);
+                } else {
+                    partial_code = (uint8_t)(fabs(pb.phase*10.0));
+                    synth[o].phase = F2P(0);
+                }
 
                 synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
                 synth[o].breakpoint_values[0][0] = pb.amp_delta; 
@@ -105,11 +112,11 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].breakpoint_values[2][1] = 0; 
                     synth[o].breakpoint_target[2] = TARGET_FEEDBACK + TARGET_LINEAR;
                 }
-                if(synth[o].phase==-1) { // continuation 
+                if(partial_code==1) { // continuation 
                     synth[o].freq = pb.freq * freq_ratio;
-                    synth[o].feedback = F2S(pb.bw * msynth[osc].feedback);
+                    synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
-                } else if(synth[o].phase==-2) { // end partial
+                } else if(partial_code==2) { // end partial
                     partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
