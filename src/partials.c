@@ -36,6 +36,7 @@ typedef struct {
 void partials_note_on(uint16_t osc) {
     // just like PCM, start & end breakpoint are stored here
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch];
+    // s[o].step is used to track which breakpoint we're currently using.
     synth[osc].step = patch.bp_offset;
     synth[osc].substep = synth[osc].step + patch.bp_length;
     // Now let's start the oscillators (silently)
@@ -84,6 +85,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
                 synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
+                synth[o].last_amp = 0;
 
                 uint8_t partial_code = 0; // control code for partial patches
                 if(pb.phase >= 0) {
