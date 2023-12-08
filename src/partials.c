@@ -85,14 +85,14 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
                 synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
-                synth[o].last_amp = 0;
+                //synth[o].last_amp = 0;
 
                 uint8_t partial_code = 0; // control code for partial patches
                 if(pb.phase >= 0) {
-                    synth[o].phase = F2P(pb.phase);
+                    //synth[o].phase = F2P(pb.phase);
                 } else {
                     partial_code = (uint8_t)(fabs(pb.phase*10.0));
-                    synth[o].phase = F2P(0);
+                    //synth[o].phase = F2P(0);
                 }
 
                 synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
