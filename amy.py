@@ -210,7 +210,7 @@ def reset(osc=None, **kwargs):
     if(osc is not None):
         send(reset=osc, **kwargs)
     else:
-        send(reset=100, **kwargs) # reset > AMY_OSCS resets all oscs
+        send(reset=10000, **kwargs) # reset > AMY_OSCS resets all oscs
 
 def volume(volume, client = -1):
     send(client=client, volume=volume)

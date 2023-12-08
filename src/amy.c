@@ -1090,7 +1090,7 @@ float atoff(const char *s) {
     float frac = 0;
     float whole = (float)atoi(s);
     int is_negative = (s[0] == '-');  // Can't use (whole < 0) because of "-0.xx".
-    const char *s_in = s;  // for debug message.
+    //const char *s_in = s;  // for debug message.
     s += strspn(s, "-0123456789");
     if (*s == '.') {
         // Float with a decimal part.

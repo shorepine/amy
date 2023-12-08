@@ -28,15 +28,13 @@
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
 
-// TOOD -- KS in FXP
-#define AMY_KS_OSCS 1
+#define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 
-// TODO -- delay.c in FXP 
 #define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
 
 // TODO -- partials in FXP
-#define AMY_HAS_PARTIALS 0       // 1 = Make partials available
+#define AMY_HAS_PARTIALS 1       // 1 = Make partials available
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM

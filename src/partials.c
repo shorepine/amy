@@ -53,7 +53,7 @@ void partials_note_off(uint16_t osc) {
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all patches have sustain point?
-void render_partials(float *buf, uint16_t osc) {
+void render_partials(SAMPLE *buf, uint16_t osc) {
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];
     // If ratio is set (not 0 or -1), use it for a time stretch
     float time_ratio = 1;
@@ -80,11 +80,11 @@ void render_partials(float *buf, uint16_t osc) {
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
-                synth[o].amp = pb.amp;
+                synth[o].amp = F2S(pb.amp);
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
-                synth[o].feedback = pb.bw * msynth[osc].feedback;
-                synth[o].phase = pb.phase; // this can be a negative # to indicate continuation or end
+                synth[o].feedback = F2S(pb.bw * msynth[osc].feedback);
+                synth[o].phase = F2P(pb.phase); // this can be a negative # to indicate continuation or end
 
                 synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
                 synth[o].breakpoint_values[0][0] = pb.amp_delta; 
@@ -107,7 +107,7 @@ void render_partials(float *buf, uint16_t osc) {
                 }
                 if(synth[o].phase==-1) { // continuation 
                     synth[o].freq = pb.freq * freq_ratio;
-                    synth[o].feedback = pb.bw * msynth[osc].feedback;
+                    synth[o].feedback = F2S(pb.bw * msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(synth[o].phase==-2) { // end partial
                     partial_note_off(o);
@@ -124,7 +124,7 @@ void render_partials(float *buf, uint16_t osc) {
     }
     // now, render everything, add it up
     uint16_t oscs = patch.oscs_alloc;
-    float pbuf[AMY_BLOCK_SIZE];
+    SAMPLE pbuf[AMY_BLOCK_SIZE];
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         #ifdef ESP_PLATFORM
@@ -137,7 +137,7 @@ void render_partials(float *buf, uint16_t osc) {
             for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
             if(synth[o].wave==SINE) render_sine(pbuf, o);
             if(synth[o].wave==PARTIAL) render_partial(pbuf, o); 
-            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (pbuf[j] * msynth[osc].amp);
+            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j] ,msynth[osc].amp));
         }
     }
 }

@@ -32,7 +32,7 @@ SOURCES = src/algorithms.c src/amy.c src/envelope.c src/examples.c \
 OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c src/delay.c src/partials.c \
 	src/examples.c src/filters.c src/oscillators.c src/pcm.c src/libminiaudio-audio.c src/amy-example-esp32.c) 
 
-HEADERS = $(wildcard src/*.h) amy_config.h
+HEADERS = $(wildcard src/*.h) src/amy_config.h
 
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@

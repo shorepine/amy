@@ -373,9 +373,11 @@ SAMPLE compute_mod_noise(uint16_t osc) {
 
 #if AMY_HAS_PARTIALS == 1
 
-void render_partial(float * buf, uint16_t osc) {
-    if(msynth[osc].feedback > 0) {
-        float scratch[2][AMY_BLOCK_SIZE];
+void render_partial(SAMPLE * buf, uint16_t osc) {
+    if(S2F(msynth[osc].feedback) > 0) {
+        #if 0
+        // TODO -- decide if we want noise excitation or not
+        SAMPLE scratch[2][AMY_BLOCK_SIZE];
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) scratch[0][i] = amy_get_random() *  20.0f;
         dsps_biquad_gen_lpf_f32(coeffs[osc], 100.0f/AMY_SAMPLE_RATE, 0.707);
         #ifdef ESP_PLATFORM
@@ -387,24 +389,27 @@ void render_partial(float * buf, uint16_t osc) {
         float amp = msynth[osc].amp;
         synth[osc].step = render_am_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
                  synth[osc].lut, synth[osc].lut->table_size, scratch[1], msynth[osc].feedback);
+        #endif
     } else {
-        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut->table_size;
-        float amp = msynth[osc].amp;
-        synth[osc].step = render_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
-                                     synth[osc].lut, synth[osc].lut->table_size, 0.0f);
+        PHASOR skip = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut->table_size);
+        SAMPLE amp = msynth[osc].amp;
+
+
+        synth[osc].step = render_lut(buf, F2P(synth[osc].step), skip, synth[osc].last_amp, amp, 
+                                     synth[osc].lut); //, synth[osc].lut->table_size, 0.0f);
     }
     synth[osc].last_amp = msynth[osc].amp;
     if(synth[osc].substep==1) {
         // fade in
         //printf("%d fading in partial osc %d from 0 to %f\n", total_samples, osc, msynth[osc].amp);
         synth[osc].substep = 0;
-        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)i/(float)AMY_BLOCK_SIZE);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = MUL4_SS(buf[i] , F2S(((float)i/(float)AMY_BLOCK_SIZE)));
     }
     if(synth[osc].substep==2) {
         // fade out
         //printf("%d fading out partial osc %d from %f to 0\n", total_samples, osc, msynth[osc].amp);
         synth[osc].substep = 0;
-        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = buf[i] * ((float)(AMY_BLOCK_SIZE-i)/(float)AMY_BLOCK_SIZE);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) buf[i] = MUL4_SS(buf[i] , F2S(((float)(AMY_BLOCK_SIZE-i)/(float)AMY_BLOCK_SIZE)));
         synth[osc].status=OFF; 
 
     }
@@ -412,6 +417,7 @@ void render_partial(float * buf, uint16_t osc) {
 }
 
 void partial_note_on(uint16_t osc) {
+    float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
     if(synth[osc].phase >= 0) {
         synth[osc].step = (float)synth[osc].lut->table_size * synth[osc].phase;
