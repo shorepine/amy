@@ -125,6 +125,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         t0 = synth[osc].breakpoint_times[bp_set][found-1];
         v0 = F2S(synth[osc].breakpoint_values[bp_set][found-1]);
     }
+    //printf("found %d bp_r %d release %d v0 %f\n", found, bp_r, release, S2F(v0));
     SAMPLE scale = v0;
     int sign = 1;
     if (v0 < 0 || v1 < 0) {
