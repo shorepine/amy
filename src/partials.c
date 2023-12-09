@@ -118,8 +118,9 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].freq = pb.freq * freq_ratio;
                     //synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
-                } else if(partial_code==2) { // partial is done
-                    partial_note_off(o);
+                } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
+                    synth[o].amp = 0;
+                    //partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
                     synth[o].last_amp = 0;
@@ -150,6 +151,8 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
             //render_partial(pbuf, o);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j] ,msynth[osc].amp));
             render_partial(buf, o);
+            // Deferred termination of this partial, after final ramp-out.
+            if (synth[o].amp == 0)  partial_note_off(o);
         }
     }
 }
