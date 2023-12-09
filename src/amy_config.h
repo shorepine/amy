@@ -3,7 +3,7 @@
 */
 
 // # of simultaneous oscs to keep track of 
-#define AMY_OSCS 108
+#define AMY_OSCS 64
 
 // If using a multi-core capable device, how many cores to render from
 #ifdef PICO_ON_DEVICE
@@ -29,12 +29,21 @@
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
+#ifdef ALLES
+#define AMY_NCHANS 1             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
+#else
 #define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
+#endif
 
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 
+#ifdef ALLES
+#define AMY_HAS_CHORUS 0        // 1 = Make chorus available (uses RAM)
+#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
+#else
 #define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
+#endif
 
 // TODO -- partials in FXP
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
@@ -50,12 +59,12 @@
 #define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
 #define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
 #else
-#define EVENTS_RAM_CAPS MALLOC_CAP_INTERNAL
-#define SYNTH_RAM_CAPS MALLOC_CAP_INTERNAL
-#define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
-#define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
-#define CHORUS_RAM_CAPS MALLOC_CAP_INTERNAL
-#define REVERB_RAM_CAPS MALLOC_CAP_INTERNAL
+#define EVENTS_RAM_CAPS MALLOC_CAP_DEFAULT
+#define SYNTH_RAM_CAPS MALLOC_CAP_DEFAULT
+#define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
+#define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
+#define CHORUS_RAM_CAPS MALLOC_CAP_DEFAULT
+#define REVERB_RAM_CAPS MALLOC_CAP_DEFAULT
 #endif
 #else
 #define EVENTS_RAM_CAPS 0
