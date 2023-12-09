@@ -18,12 +18,10 @@ typedef struct {
     uint16_t osc;
     float freq;
     float amp;
-    float bw;
     float phase;
     uint16_t ms_delta;
     float amp_delta;
     float freq_delta;
-    float bw_delta;
 } partial_breakpoint_t;
 
 // Automatically generated from partials.generate_partials_header()
