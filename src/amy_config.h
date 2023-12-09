@@ -17,11 +17,14 @@
 // 1 == small PCM, 2 == large PCM samples stored in the program
 #ifdef PICO_ON_DEVICE
 #define AMY_PCM_PATCHES_SIZE 1   
-#elif ESP_PLATFORM
+#elif ALLES
+#define AMY_PCM_PATCHES_SIZE 2
+#elif TULIP
 #define AMY_PCM_PATCHES_SIZE 1
 #else
 #define AMY_PCM_PATCHES_SIZE 2
 #endif
+
 
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
@@ -38,6 +41,7 @@
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
+#ifdef TULIP
 #include <esp_heap_caps.h>
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
@@ -45,6 +49,14 @@
 #define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
 #define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
 #define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
+#else
+#define EVENTS_RAM_CAPS MALLOC_CAP_INTERNAL
+#define SYNTH_RAM_CAPS MALLOC_CAP_INTERNAL
+#define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
+#define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
+#define CHORUS_RAM_CAPS MALLOC_CAP_INTERNAL
+#define REVERB_RAM_CAPS MALLOC_CAP_INTERNAL
+#endif
 #else
 #define EVENTS_RAM_CAPS 0
 #define SYNTH_RAM_CAPS 0
