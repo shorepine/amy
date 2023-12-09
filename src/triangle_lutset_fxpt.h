@@ -305,7 +305,7 @@ lut_entry_fxpt triangle_fxpt_lutset[12] = {
     {triangle_fxpt_lutable_8, 32, 5, 3, 1.111111},
     {triangle_fxpt_lutable_9, 16, 4, 2, 1.000000},
     {triangle_fxpt_lutable_10, 8, 3, 1, 1.000000},
-    {NULL, 0, 0},
+    {NULL, 0, 0, 0, 0.0},
 };
 
 #endif // LUTSET_x_DEFINED

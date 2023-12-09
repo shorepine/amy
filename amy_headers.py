@@ -262,7 +262,7 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
                 variable_base, i, table_size, log_2_table_size,
                 lutset[i].highest_harmonic, scale_factors[i]))
         # Final entry is null to indicate end of table.
-        f.write("    {NULL, 0, 0},\n")
+        f.write("    {NULL, 0, 0, 0, 0.0},\n")
         f.write("};\n")
         f.write("\n")
         f.write("#endif // LUTSET_x_DEFINED\n")

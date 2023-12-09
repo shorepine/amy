@@ -62,7 +62,7 @@ void example_multimbral_fm(int64_t start) {
     int notes[] = {60, 70, 64, 68, 72, 82, 76, 80, 74, 78, 80, 58};
     e.velocity = 0.2;
 
-    for (int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
+    for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
         e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
         e.patch++;
@@ -86,7 +86,7 @@ void example_drums(int64_t start, int loops) {
     e.wave = PCM;
     e.freq = 0;
     e.velocity = 0;
-    for (int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
+    for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         e.osc = oscs[i];
         e.patch = patches[i];
         amy_add_event(e);
@@ -123,7 +123,7 @@ void example_drums(int64_t start, int loops) {
     e = amy_default_event();
     e.time = start;
     while (loops--) {
-        for (int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
+        for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
 
             int x = pattern[i];

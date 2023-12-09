@@ -130,8 +130,8 @@ void pulse_note_on(uint16_t osc) {
     float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
     // Tune the initial integrator state to compensate for mid-sample alignment of table.
-    SAMPLE amp = S2F(synth[osc].amp) * synth[osc].freq * 4.0f / AMY_SAMPLE_RATE;
-    synth[osc].lpf_state = MUL4_SS(F2S(-0.5 * amp), L2S(synth[osc].lut->table[0]));
+    float float_amp = S2F(synth[osc].amp) * synth[osc].freq * 4.0f / AMY_SAMPLE_RATE;
+    synth[osc].lpf_state = MUL4_SS(F2S(-0.5 * float_amp), L2S(synth[osc].lut->table[0]));
 }
 
 void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAMPLE dc_offset) {
