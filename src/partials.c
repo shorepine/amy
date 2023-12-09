@@ -86,7 +86,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].amp = F2S(pb.amp);
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
-                synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                 //synth[o].last_amp = 0;
 
                 synth[o].breakpoint_times[0][0] = 0;
@@ -116,7 +115,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 }
                 if(partial_code==1) { // continuation 
                     synth[o].freq = pb.freq * freq_ratio;
-                    //synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
                     synth[o].amp = 0;

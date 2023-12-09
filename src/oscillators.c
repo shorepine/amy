@@ -375,31 +375,12 @@ SAMPLE compute_mod_noise(uint16_t osc) {
 #if AMY_HAS_PARTIALS == 1
 
 void render_partial(SAMPLE * buf, uint16_t osc) {
-    // TODO -- decide if we want noise excitation or not
-    bool we_want_noise_excitation = false;
-    if(we_want_noise_excitation && S2F(msynth[osc].feedback) > 0) {
-#ifdef PLEASE_GOD_NO
-        SAMPLE scratch[2][AMY_BLOCK_SIZE];
-        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) scratch[0][i] = amy_get_random() *  20.0f;
-        dsps_biquad_gen_lpf_f32(coeffs[osc], 100.0f/AMY_SAMPLE_RATE, 0.707);
-        #ifdef ESP_PLATFORM
-            dsps_biquad_f32_ae32(scratch[0], scratch[1], AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
-        #else
-            dsps_biquad_f32_ansi(scratch[0], scratch[1], AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
-        #endif
-        float skip = msynth[osc].freq / (float)AMY_SAMPLE_RATE * synth[osc].lut->table_size;
-        float amp = msynth[osc].amp;
-        synth[osc].step = render_am_lut(buf, synth[osc].step, skip, synth[osc].last_amp, amp, 
-                 synth[osc].lut, synth[osc].lut->table_size, scratch[1], msynth[osc].feedback);
-#endif
-    } else {
-        PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
-        SAMPLE amp = msynth[osc].amp;
-        float efreq = AMY_SAMPLE_RATE * P2F(step);
-        if (efreq > 900)  printf("render_sine: time %f osc %d freq %f amp %f..%f\n", total_samples/(float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(synth[osc].last_amp), S2F(amp));
-        synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
-        synth[osc].last_amp = amp;
-    }
+    PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
+    SAMPLE amp = msynth[osc].amp;
+    //float efreq = AMY_SAMPLE_RATE * P2F(step);
+    //if (efreq > 900)  printf("render_sine: time %f osc %d freq %f amp %f..%f\n", total_samples/(float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(synth[osc].last_amp), S2F(amp));
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].last_amp = amp;
 }
 
 void partial_note_on(uint16_t osc) {

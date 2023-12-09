@@ -431,7 +431,7 @@ brew install python3 swig ffmpeg
 python3.9 -m pip install pydub numpy --user
 tar xvf loris-1.8.tar
 cd loris-1.8
-CPPFLAGS=`python3-config --includes` PYTHON=`which python3.9` ./configure --with-python
+CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python
 make
 sudo make install
 cd ..

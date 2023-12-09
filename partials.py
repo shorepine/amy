@@ -1,7 +1,7 @@
 import amy, sys
 import pydub
 # I will fix this eventually, loris is v py2.0 and hard to install
-sys.path.append('/usr/local/lib/python3.11/site-packages')
+sys.path.append('/usr/local/lib/python3.8/site-packages')
 import loris
 import time
 import numpy as np
@@ -80,9 +80,9 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
         if(len(breakpoints)>1):
             partial_count = partial_count + 1
             for bp_idx, bp in enumerate(breakpoints):
-                phase = -0.1
+                phase = -1
                 # Last breakpoint?
-                if(bp_idx == len(breakpoints)-1): phase = -0.2
+                if(bp_idx == len(breakpoints)-1): phase = -2
                 # First breakpoint
                 if(bp_idx == 0):
                     phase = bp.phase() / (2*pi)
@@ -102,7 +102,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     for i,s in enumerate(time_ordered):
         next_idx = -1
         time_delta, amp_delta, freq_delta, bw_delta = (0,0,0,0)
-        if(s[5] != -0.2): # if not the end of a partial
+        if(s[5] != -2): # if not the end of a partial
             next_idx = i+1
             while(time_ordered[next_idx][1] != s[1]):
                 next_idx = next_idx + 1
@@ -134,7 +134,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
             if(osc is not None):
                 s[1] = osc_map[s[1]]
                 sequence.append(s)
-                if(s[5] == -0.2): # last bp
+                if(s[5] == -2): # last bp
                     # Put the oscillator back
                     osc_q.appendleft(osc)
         if(len(osc_q) < min_q_len): min_q_len = len(osc_q)
@@ -160,10 +160,10 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
         # Wait for the item in the sequence to be close, so I don't overflow the synthesizers' state
         while(my_start_time + (s[0] / time_ratio) > (amy.millis() - 500)):
             time.sleep(0.01)
-
+        
         # Make envelope strings
-        bp0 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[7]))
-        bp1 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[8]))
+        bp0 = "0,1.0,%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[7]))
+        bp1 = "0,1.0,%d,%s,0,1.0" % (s[6] / time_ratio, amy.trunc(s[8]))
         if(bw_ratio > 0):
             bp2 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[9]))
         else:
@@ -187,9 +187,9 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
             "bp1_target":amy.TARGET_FREQ+amy.TARGET_LINEAR,
             "bp2_target":amy.TARGET_FEEDBACK+amy.TARGET_LINEAR})
 
-        if(s[5]==-0.2): #end, add note off
+        if(s[5]==-2): #end, add note off
             amy.send(**partial_args, vel=0)
-        elif(s[5]==-0.1): # continue
+        elif(s[5]==-1): # continue
             amy.send(**partial_args)
         else: #start, add phase and note on
             amy.send(**partial_args, vel=s[3]*amp_ratio, phase=s[5])

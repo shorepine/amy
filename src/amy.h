@@ -142,6 +142,8 @@ struct event {
     int8_t bp0_target;
     int8_t bp1_target;
     int8_t bp2_target;
+    uint8_t status;
+
 
 };
 
