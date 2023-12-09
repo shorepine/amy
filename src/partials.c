@@ -66,17 +66,18 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
         uint32_t sustain_ms = patch.sustain_ms;
         if((sustain_ms > 0 && (ms_since_started < sustain_ms)) || sustain_ms == 0) {
             partial_breakpoint_t pb = partial_breakpoints[(uint32_t)synth[osc].step];
+            // I think the IF should be a WHILE, so we can start more than one oscillator per BUF
             if(ms_since_started >= pb.ms_offset ) {
-                // set up this oscillator
+                // It's time for the next breakpoint!
                 uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
                 #ifdef ESP_PLATFORM
-                    if(o % 2) o = o + 32; // scale
+                if(o % 2) o = o + 32; // scale
                 #endif
-                //printf("[%d %d] new pb: %d %d %f %f %f\n", total_samples, ms_since_started, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase);
-
                 // Find our ratio using the midi note of the analyzed partial
                 float freq_ratio = msynth[osc].freq / freq_for_midi_note(patch.midi_note); 
+
+                //printf("[%lld %d] fr %f new pb: %d %d %f %f %f\n", total_samples, ms_since_started, freq_ratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase);
 
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
@@ -91,10 +92,11 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 if(pb.phase >= 0) {
                     //synth[o].phase = F2P(pb.phase);
                 } else {
-                    partial_code = (uint8_t)(fabs(pb.phase*10.0));
+                    partial_code = (uint8_t)(round(pb.phase * -10.0));
                     //synth[o].phase = F2P(0);
                 }
 
+#ifdef AN_INTERFERING_EFFORT_TO_RECRUIT_ENVELOPE_BREAKPOINTS
                 synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
                 synth[o].breakpoint_values[0][0] = pb.amp_delta; 
                 synth[o].breakpoint_times[0][1] = 0; 
@@ -114,14 +116,17 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].breakpoint_values[2][1] = 0; 
                     synth[o].breakpoint_target[2] = TARGET_FEEDBACK + TARGET_LINEAR;
                 }
+#endif
                 if(partial_code==1) { // continuation 
                     synth[o].freq = pb.freq * freq_ratio;
-                    synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
+                    //synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // end partial
                     partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
+                    synth[o].phase = F2P(pb.phase);
+                    synth[o].last_amp = 0;
                     partial_note_on(o);
                 }
                 synth[osc].step++;
@@ -141,12 +146,13 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
         #endif
         if(synth[o].status ==IS_ALGO_SOURCE) {
             hold_and_modify(o);
+            //printf("synth(%d).freq=%f msynth[o].freq=%f\n", o, synth[o].freq, msynth[o].freq);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
-            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
-            if(synth[o].wave==SINE) render_sine(pbuf, o);
-            if(synth[o].wave==PARTIAL) render_partial(pbuf, o); 
-            for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j] ,msynth[osc].amp));
+            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
+            //render_partial(pbuf, o);
+            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j] ,msynth[osc].amp));
+            render_partial(buf, o);
         }
     }
 }
