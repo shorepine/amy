@@ -395,7 +395,8 @@ void render_partial(SAMPLE * buf, uint16_t osc) {
     } else {
         PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
         SAMPLE amp = msynth[osc].amp;
-        //printf("render_sine: osc %d freq %f amp %f\n", osc, AMY_SAMPLE_RATE * P2F(step), S2F(amp));
+        float efreq = AMY_SAMPLE_RATE * P2F(step);
+        if (efreq > 900)  printf("render_sine: time %f osc %d freq %f amp %f..%f\n", total_samples/(float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(synth[osc].last_amp), S2F(amp));
         synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
         synth[osc].last_amp = amp;
     }
@@ -415,6 +416,7 @@ void partial_note_off(uint16_t osc) {
     synth[osc].note_on_clock = -1;
     synth[osc].note_off_clock = total_samples;   
     synth[osc].last_amp = 0;
+    synth[osc].status=OFF;
 }
 
 #endif

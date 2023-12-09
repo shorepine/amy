@@ -67,7 +67,8 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
         if((sustain_ms > 0 && (ms_since_started < sustain_ms)) || sustain_ms == 0) {
             partial_breakpoint_t pb = partial_breakpoints[(uint32_t)synth[osc].step];
             // I think the IF should be a WHILE, so we can start more than one oscillator per BUF
-            if(ms_since_started >= pb.ms_offset ) {
+            // but that def sounds worse as it rushes and garbles onsets.
+            if (ms_since_started >= pb.ms_offset) {
                 // It's time for the next breakpoint!
                 uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
@@ -88,6 +89,24 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                 //synth[o].last_amp = 0;
 
+                synth[o].breakpoint_times[0][0] = 0;
+                synth[o].breakpoint_values[0][0] = 1.0;
+                synth[o].breakpoint_times[0][1] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
+                synth[o].breakpoint_values[0][1] = pb.amp_delta; 
+                synth[o].breakpoint_times[0][2] = 0;
+                synth[o].breakpoint_values[0][2] = 0.0;  // Release amp target value
+                synth[o].breakpoint_times[0][3] = -1; 
+                synth[o].breakpoint_target[0] = TARGET_AMP + TARGET_LINEAR;
+
+                synth[o].breakpoint_times[1][0] = 0; 
+                synth[o].breakpoint_values[1][0] = 1.0; 
+                synth[o].breakpoint_times[1][1] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
+                synth[o].breakpoint_values[1][1] = pb.freq_delta;
+                synth[o].breakpoint_times[1][2] = 0; 
+                synth[o].breakpoint_values[1][2] = 1.0;  // Release freq mod target value.
+                synth[o].breakpoint_times[1][1] = -1; 
+                synth[o].breakpoint_target[1] = TARGET_FREQ + TARGET_LINEAR;
+                
                 uint8_t partial_code = 0; // control code for partial patches
                 if(pb.phase < 0) {
                     partial_code = (uint8_t)(-pb.phase);
@@ -95,33 +114,11 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     // Only when starting a new partial.
                     synth[o].phase = F2P(pb.phase);
                 }
-                
-#ifdef AN_INTERFERING_EFFORT_TO_RECRUIT_ENVELOPE_BREAKPOINTS
-                synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
-                synth[o].breakpoint_values[0][0] = pb.amp_delta; 
-                synth[o].breakpoint_times[0][1] = 0; 
-                synth[o].breakpoint_values[0][1] = 0; 
-                synth[o].breakpoint_target[0] = TARGET_AMP + TARGET_LINEAR;
-
-                synth[o].breakpoint_times[1][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
-                synth[o].breakpoint_values[1][0] = pb.freq_delta; 
-                synth[o].breakpoint_times[1][1] = 0; 
-                synth[o].breakpoint_values[1][1] = 0; 
-                synth[o].breakpoint_target[1] = TARGET_FREQ + TARGET_LINEAR;
-                
-                if(synth[o].feedback > 0) {
-                    synth[o].breakpoint_times[2][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
-                    synth[o].breakpoint_values[2][0] = pb.bw_delta; 
-                    synth[o].breakpoint_times[2][1] = 0; 
-                    synth[o].breakpoint_values[2][1] = 0; 
-                    synth[o].breakpoint_target[2] = TARGET_FEEDBACK + TARGET_LINEAR;
-                }
-#endif
                 if(partial_code==1) { // continuation 
                     synth[o].freq = pb.freq * freq_ratio;
                     //synth[o].feedback = MUL4_SS(F2S(pb.bw), msynth[osc].feedback);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
-                } else if(partial_code==2) { // end partial
+                } else if(partial_code==2) { // partial is done
                     partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
@@ -131,7 +128,9 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[osc].step++;
                 if(synth[osc].step == synth[osc].substep) {
                     partials_note_off(osc);
+                    // break;  // for the while loop version.
                 }
+                // pb = partial_breakpoints[(uint32_t)synth[osc].step]; // for the while loop version.
             }
         }
     }
