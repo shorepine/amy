@@ -18,7 +18,7 @@
 #ifdef PICO_ON_DEVICE
 #define AMY_PCM_PATCHES_SIZE 1   
 #elif ESP_PLATFORM
-#define AMY_PCM_PATCHES_SIZE 2
+#define AMY_PCM_PATCHES_SIZE 1
 #else
 #define AMY_PCM_PATCHES_SIZE 2
 #endif
