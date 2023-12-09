@@ -569,7 +569,7 @@ lut_entry_fxpt impulse_fxpt_lutset[14] = {
     {impulse_fxpt_lutable_10, 32, 5, 3, 4.000000},
     {impulse_fxpt_lutable_11, 16, 4, 2, 3.000000},
     {impulse_fxpt_lutable_12, 8, 3, 1, 2.000000},
-    {NULL, 0, 0},
+    {NULL, 0, 0, 0, 0.0},
 };
 
 #endif // LUTSET_x_DEFINED

@@ -15,7 +15,8 @@ LIBS += -ldl  -latomic
 endif
 
 CC = gcc
-CFLAGS = -g -Wall -Wno-strict-aliasing 
+CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wfloat-conversion
+# -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \
 -s EXPORTED_FUNCTIONS="['_web_audio_buffer', '_amy_play_message', '_amy_AMY_SAMPLE_RATE', '_amy_start_web', '_malloc', '_free']" \

@@ -50,7 +50,7 @@ const int16_t sine_fxpt_lutable_0[256] = {
 
 lut_entry_fxpt sine_fxpt_lutset[2] = {
     {sine_fxpt_lutable_0, 256, 8, 1, 1.000000},
-    {NULL, 0, 0},
+    {NULL, 0, 0, 0, 0.0},
 };
 
 #endif // LUTSET_x_DEFINED

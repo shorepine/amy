@@ -161,9 +161,9 @@ void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
     liveness = F2S(a_liveness);
     // crossover_hz is 3dB point of 1-pole lowpass freq.
     lpfcoef = F2S(6.2832f * crossover_hz / AMY_SAMPLE_RATE);
-    if (lpfcoef > S2F(1.f))  lpfcoef = S2F(1.f);
+    if (lpfcoef > F2S(1.f))  lpfcoef = F2S(1.f);
     if (lpfcoef < 0)  lpfcoef = 0;
-    lpfgain = S2F(1.f - damping);
+    lpfgain = F2S(1.f - damping);
 }
 
 // Delay 1 is 58.6435 ms
