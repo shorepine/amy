@@ -41,8 +41,8 @@
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
-#ifdef TULIP
 #include <esp_heap_caps.h>
+#ifdef TULIP
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
 #define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
