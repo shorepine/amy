@@ -23,7 +23,7 @@ It supports
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
  * Reverb and chorus effects, set globally
  * Stereo pan or mono operation 
- * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves, including amplitude modulated noise
+ * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves
  * Oscillators can be specified by frequency in floating point or midi note 
  * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
@@ -152,7 +152,7 @@ Here's the full list:
 | a    | amp    |  float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
 | A    | bp0    | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
 | B    | bp1    |  string     | set the second breakpoint generator. see breakpoint 0 |
-| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | C    | bp2    |  string     | 3rd breakpoint generator |
 | d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
@@ -417,13 +417,6 @@ amy.send(osc=0,vel=1,note=55,wave=amy.PARTIALS,patch=5) # change the frequency
 amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,ratio=0.2) # ratio slows down the partial playback
 ```
 
-Our partial breakpoint analyzer also emits "noise-excited bandwidth enhancement", which means it tries to emulate tones that are hard to generate with sine waves alone by modulating the amplitude of a sine wave with a filtered noise signal. You can try that out on the patches by adding `feedback`, like so:
-
-```python
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0) # no bandwidth
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0.5) # more bandwidth
-```
-
 The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
 
 ```bash
@@ -444,7 +437,7 @@ import partials
 (m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
 109 partials and 1029 breakpoints, max oscs used at once was 8
 
-partials.play(s, amp_ratio=2, bw_ratio=0)
+partials.play(s, amp_ratio=2)
 ```
 
 https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4
@@ -471,8 +464,7 @@ def play(sequence, # from partials.sequence
                 sustain_len_ms = 0, # how long to sustain for
                 time_ratio = 1, # playback speed -- 0.5 , half speed
                 pitch_ratio = 1, # frequency scale, 0.5 , half freq
-                amp_ratio = 1, # amplitude scale,
-                bw_ratio = 1, # bandwidth / noise scale
+                amp_ratio = 1, # amplitude scale
                 )
 ```
 
