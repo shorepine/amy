@@ -143,15 +143,16 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
 
 def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1):
     # i take a sequence and play it to AMY, just like native AMY will do from a .h file
-    my_start_time = amy.millis()
     # s[0] - ms
     # s[1] - osc
     # s[2] - freq
     # s[3] - amp
     # s[4] - phase
-    # s[5] time_delta
+    # s[5] - time_delta
     # s[6] - amp_delta
     # s[7] - freq_delta
+
+    my_start_time = amy.millis()
     sustain_offset = 0
     if(sustain_ms > 0):
         if(sustain_ms > sequence[-1][0]):

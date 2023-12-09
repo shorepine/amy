@@ -72,7 +72,6 @@ typedef int16_t output_sample_type;
 #define AMY_OK 0
 typedef int amy_err_t;
 
-typedef uint8_t bool;
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))

@@ -377,8 +377,6 @@ SAMPLE compute_mod_noise(uint16_t osc) {
 void render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = msynth[osc].amp;
-    //float efreq = AMY_SAMPLE_RATE * P2F(step);
-    //if (efreq > 900)  printf("render_sine: time %f osc %d freq %f amp %f..%f\n", total_samples/(float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(synth[osc].last_amp), S2F(amp));
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
     synth[osc].last_amp = amp;
 }
@@ -386,10 +384,6 @@ void render_partial(SAMPLE * buf, uint16_t osc) {
 void partial_note_on(uint16_t osc) {
     float period_samples = (float)AMY_SAMPLE_RATE / msynth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
-    //if(P2F(synth[osc].phase) >= 0) {
-        //synth[osc].step = (float)synth[osc].lut->table_size * P2F(synth[osc].phase);
-        //synth[osc].substep = 1; // use for block fade
-    //} // else keep the old step / no fade, it's a continuation
 }
 
 void partial_note_off(uint16_t osc) {
@@ -404,7 +398,6 @@ void partial_note_off(uint16_t osc) {
 
 #if AMY_KS_OSCS > 0
 
-// We only allow a couple of KS oscs as they're RAM hogs 
 #define MAX_KS_BUFFER_LEN 802 // 44100/55  -- 55Hz (A1) lowest we can go for KS
 SAMPLE ** ks_buffer; 
 uint8_t ks_polyphony_index; 
