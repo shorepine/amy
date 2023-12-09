@@ -89,13 +89,13 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 //synth[o].last_amp = 0;
 
                 uint8_t partial_code = 0; // control code for partial patches
-                if(pb.phase >= 0) {
-                    //synth[o].phase = F2P(pb.phase);
+                if(pb.phase < 0) {
+                    partial_code = (uint8_t)(-pb.phase);
                 } else {
-                    partial_code = (uint8_t)(round(pb.phase * -10.0));
-                    //synth[o].phase = F2P(0);
+                    // Only when starting a new partial.
+                    synth[o].phase = F2P(pb.phase);
                 }
-
+                
 #ifdef AN_INTERFERING_EFFORT_TO_RECRUIT_ENVELOPE_BREAKPOINTS
                 synth[o].breakpoint_times[0][0] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
                 synth[o].breakpoint_values[0][0] = pb.amp_delta; 
@@ -125,7 +125,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
-                    synth[o].phase = F2P(pb.phase);
                     synth[o].last_amp = 0;
                     partial_note_on(o);
                 }
@@ -138,7 +137,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
     }
     // now, render everything, add it up
     uint16_t oscs = patch.oscs_alloc;
-    SAMPLE pbuf[AMY_BLOCK_SIZE];
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         #ifdef ESP_PLATFORM
