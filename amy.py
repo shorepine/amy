@@ -2,6 +2,7 @@ import time
 
 BLOCK_SIZE = 256
 AMY_SAMPLE_RATE = 44100.0
+AMY_NCHANS = 2
 OSCS = 64
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
@@ -183,8 +184,7 @@ def render(seconds):
     frames = []
     for f in range(frame_count):
         frames.append( np.array(libamy.render())/32767.0 )
-    return np.hstack(frames)
-
+    return np.hstack(frames).reshape((-1, AMY_NCHANS))
 
 # Starts a live mode, with audio playing out default sounddevice
 def start():
