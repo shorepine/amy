@@ -16,7 +16,7 @@ float dsps_sqrtf_f32_ansi(float f)
     int* f_ptr = (int*)&f;
     const int result = 0x1fbb4000 + (*f_ptr >> 1);
     float* f_result = (float*)&result;
-    return *f_result;   
+    return *f_result;  
 }
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
