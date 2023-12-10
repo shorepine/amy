@@ -3,7 +3,7 @@
 */
 
 // # of simultaneous oscs to keep track of 
-#define AMY_OSCS 64
+#define AMY_OSCS 120
 
 // If using a multi-core capable device, how many cores to render from
 #ifdef PICO_ON_DEVICE
@@ -38,8 +38,8 @@
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 
 #ifdef ALLES
-#define AMY_HAS_CHORUS 0        // 1 = Make chorus available (uses RAM)
-#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
+#define AMY_HAS_CHORUS 1         // Alles can do chorus
+#define AMY_HAS_REVERB 0         // Alles doesn't have the RAM for reverb
 #else
 #define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
