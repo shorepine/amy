@@ -21,6 +21,7 @@ if (TARGET tinyusb_device)
             amy-example-rp2040.c
             algorithms.c
             amy.c
+            delay.c
             envelope.c
             filters.c
             oscillators.c
@@ -41,7 +42,7 @@ if (TARGET tinyusb_device)
     target_compile_definitions(amy_example PRIVATE
             PICO_DEFAULT_FLOAT_IMPL=pico
             # compile time configuration of I2S
-            PICO_AUDIO_I2S_MONO_INPUT=1
+            #PICO_AUDIO_I2S_MONO_INPUT=0
             #define for our example code
             USE_AUDIO_I2S=1
 #DIN

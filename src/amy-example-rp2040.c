@@ -3,34 +3,34 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-#ifdef PICO_ON_DEVICE
+
 #include <stdio.h>
 #include <math.h>
+
 #include "amy.h"
+#include "examples.h"
 #if PICO_ON_DEVICE
 
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
+#include "pico/multicore.h"
 
 #endif
 
 #include "pico/stdlib.h"
 #include "pico/audio_i2s.h"
-/*
-#define AMY_I2S_DATA_PIN 8
-#define AMY_I2S_BCK_PIN 9
-#define AMY_I2S_LRC_PIN 10
-*/
+
 
 #if PICO_ON_DEVICE
 #include "pico/binary_info.h"
 bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
 #endif
 
-#define SINE_WAVE_TABLE_LEN 2048
-#define SAMPLES_PER_BUFFER 256
+#define CPU0_METER 2
+#define CPU1_METER 3
 
-static int16_t sine_wave_table[SINE_WAVE_TABLE_LEN];
+extern int32_t await_message_from_other_core();
+extern void send_message_to_other_core(int32_t t);
 
 static inline uint32_t _millis(void)
 {
@@ -44,12 +44,14 @@ void delay_ms(uint32_t ms) {
 }
 
 
+
+
 void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
     int16_t *block = fill_audio_buffer_task();
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
     int16_t *samples = (int16_t *) buffer->buffer->bytes;
-    for (uint i = 0; i < AMY_BLOCK_SIZE; i++) {
+    for (uint i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; i++) {
         samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
     }
     buffer->sample_count = AMY_BLOCK_SIZE;
@@ -61,15 +63,16 @@ struct audio_buffer_pool *init_audio() {
     static audio_format_t audio_format = {
             .format = AUDIO_BUFFER_FORMAT_PCM_S16,
             .sample_freq = AMY_SAMPLE_RATE,
-            .channel_count = 1,
+            .channel_count = AMY_NCHANS,
     };
 
     static struct audio_buffer_format producer_format = {
             .format = &audio_format,
-            .sample_stride = 2
+            .sample_stride = sizeof(int16_t) * AMY_NCHANS,
     };
 
-    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, AMY_BLOCK_SIZE); 
+    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, AMY_BLOCK_SIZE);
+
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
@@ -87,89 +90,85 @@ struct audio_buffer_pool *init_audio() {
     ok = audio_i2s_connect(producer_pool);
     assert(ok);
     audio_i2s_set_enabled(true);
+
     return producer_pool;
 }
 
+
+void core1_main() {
+    while(1) {
+        int32_t ret = 0;
+        while(ret!=64) ret = await_message_from_other_core();
+        gpio_put(CPU1_METER, 1);
+        render_task(AMY_OSCS/2, AMY_OSCS, 1);
+        gpio_put(CPU1_METER, 0);
+        send_message_to_other_core(32);
+    }
+
+}
+
+const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+
 int main() {
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+    gpio_put(LED_PIN, 1);
 
+    set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
+    //getchar();
+    #if AMY_CORES == 2
+        multicore_launch_core1(core1_main);
+    #endif
 
+    gpio_put(LED_PIN, 0);
+
+    sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
-    set_sys_clock_khz(250000000 / 1000, false); //
 
     amy_start();
-    /*
-    for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
-        sine_wave_table[i] = 32767 * cosf(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
+
+    gpio_init(CPU0_METER);
+    gpio_set_dir(CPU0_METER, GPIO_OUT);
+    gpio_put(CPU0_METER, 0);
+
+    gpio_init(CPU1_METER);
+    gpio_set_dir(CPU1_METER, GPIO_OUT);
+    gpio_put(CPU1_METER, 0);
+
+    {
+        gpio_put(LED_PIN, 1);
+        printf("Clock is set to %d\n", clock_get_hz(clk_sys));
+        printf("LED ON !\n");
+        sleep_ms(250);
+
+        gpio_put(LED_PIN, 0);
+        printf("LED OFF !\n");
+        sleep_ms(250);
     }
-    */
+
+    example_reverb();
+    example_chorus();
+
     struct audio_buffer_pool *ap = init_audio();
-
-
-    // Play a few notes in FM
-    struct event e = amy_default_event();
     int64_t start = amy_sysclock();
-    e.time = start;
-    e.velocity = 0.25;
-    e.wave = SINE;
-    e.patch = 15;
-    e.midi_note = 70;
-    amy_add_event(e);
+    example_multiimbral_fm(start);
 
-    e.time = start + 500;
-    e.osc += 9; // remember that an FM patch takes up 9 oscillators
-    e.midi_note = 64;
-    amy_add_event(e);
-
-    e.time = start + 1000;
-    e.osc += 9;
-    e.midi_note = 68;
-    amy_add_event(e);
-
-    e.time = start + 1500;
-    e.osc += 9;
-    e.midi_note = 72;
-    amy_add_event(e);
-
-    e.time = start + 2000;
-    e.osc += 9;
-    e.midi_note = 58;
-    amy_add_event(e);
-
-/*
-    uint32_t step = 0x200000;
-    uint32_t pos = 0;
-    uint32_t pos_max = 0x10000 * SINE_WAVE_TABLE_LEN;
-    uint vol = 16;
-*/
-    while (true) {
+    for (int i = 0; i < 5000; ++i) {
         rp2040_fill_audio_buffer(ap);
+        if (i == 1000) {
+            config_reverb(0.7, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+        }
+
     }
 
-/*
-        int c = getchar_timeout_us(0);
-        if (c >= 0) {
-            if (c == '-' && vol) vol -= 4;
-            if ((c == '=' || c == '+') && vol < 255) vol += 4;
-            if (c == '[' && step > 0x10000) step -= 0x10000;
-            if (c == ']' && step < (SINE_WAVE_TABLE_LEN / 16) * 0x20000) step += 0x10000;
-            if (c == 'q') break;
-            printf("vol = %d, step = %d      \r", vol, step >> 16);
-        }
-        struct audio_buffer *buffer = take_audio_buffer(ap, true);
-        int16_t *samples = (int16_t *) buffer->buffer->bytes;
-        for (uint i = 0; i < buffer->max_sample_count; i++) {
-            samples[i] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
-            pos += step;
-            if (pos >= pos_max) pos -= pos_max;
-        }
-        buffer->sample_count = buffer->max_sample_count;
-        give_audio_buffer(ap, buffer);
-    }
-    puts("\n");
-    */
+    while(true) {
+        gpio_put(LED_PIN, 1);
+        sleep_ms(250);
 
+        gpio_put(LED_PIN, 0);
+        sleep_ms(250);
+    }
     return 0;
 }
-#endif
 

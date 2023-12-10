@@ -1,5 +1,6 @@
 amy-example
 amy-message
+src/build/
 sounds/HS-TR-808-Drums.sf2
 sounds/MuseScore_General.sf2
 *.DS_Store*

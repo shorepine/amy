@@ -5,24 +5,32 @@
 #include "delay.h"
 
 int is_power_of_two(int val) {
+    // Returns log_2(val) if val == 2**n, else -1.
+    int log_2_val = 0;
     while(val) {
-        if (val == 1) return true;
-        if (val & 1) return false;
+        if (val == 1) return log_2_val;
+        if (val & 1) return -1;
         val >>= 1;
+        ++log_2_val;
     }
-    return false;  // zero is not a power of 2.
+    return -1;  // zero is not a power of 2.
 }
 
 
 delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     // Check that len is a power of 2.
-    if (!is_power_of_two(len)) { fprintf(stderr, "delay line len must be power of 2, not %d\n", len); abort(); }
+    //printf("new_delay_line: len %d fixed_del %d\n", len, fixed_delay);
+    int log_2_len = is_power_of_two(len);
+    if (log_2_len < 0) {
+        fprintf(stderr, "delay line len must be power of 2, not %d\n", len);
+        abort();
+    }
     delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t), ram_type); 
-    delay_line->samples = (float*)malloc_caps(len * sizeof(float), ram_type);
+    delay_line->samples = (SAMPLE*)malloc_caps(len * sizeof(SAMPLE), ram_type);
     delay_line->len = len;
+    delay_line->log_2_len = log_2_len;
     delay_line->fixed_delay = fixed_delay;
     delay_line->next_in = 0;
-    delay_line->max_delay = len;
     for (int i = 0; i < len; ++i) {
         delay_line->samples[i] = 0;
     }
@@ -34,26 +42,18 @@ void free_delay_line(delay_line_t *delay_line) {
     free(delay_line);
 }
 
-static float FRACTIONAL_SAMPLE(float step, const float *delay, int index_mask) {
+static SAMPLE FRACTIONAL_SAMPLE(PHASOR phase, const SAMPLE *delay, int index_mask, int index_bits) {
     // Interpolated sample copied from oscillators.c:render_lut
-    uint32_t base_index = (uint32_t)step;
-    float frac = step - (float)base_index;
-    float b = delay[(base_index + 0) & index_mask];
-    float c = delay[(base_index + 1) & index_mask];
-#ifdef LINEAR_INTERP
+    uint32_t base_index = INT_OF_P(phase, index_bits);
+    SAMPLE frac = S_FRAC_OF_P(phase, index_bits);
+    SAMPLE b = delay[base_index];
+    SAMPLE c = delay[(base_index + 1) & index_mask];
     // linear interpolation.
-    float sample = b + ((c - b) * frac);
-#else /* !LINEAR_INTERP => CUBIC_INTERP */
-    float a = delay[(base_index - 1) & index_mask];
-    float d = delay[(base_index + 2) & index_mask];
-    // Miller's optimization - https://github.com/pure-data/pure-data/blob/master/src/d_array.c#L440
-    float cminusb = c - b;
-    float sample = b + frac * (cminusb - 0.1666667f * (1.0f-frac) * ((d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b)));
-#endif /* LINEAR_INTERP */
+    SAMPLE sample = b + MUL4_SS((c - b), frac);
     return sample;
 }
 
-void delay_line_in_out(float *in, float *out, int n_samples, float* mod_in, float mod_scale, delay_line_t *delay_line, float mix_level, float feedback_level) {
+void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, SAMPLE mod_scale, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level) {
     // Read and write the next n_samples from/to the delay line.
     // mod_in is a per-sample modulation of the maximum delay, where 1 gives 
     // the max delay, -1 gives no delay, and 0 gives max_delay/2.
@@ -62,47 +62,48 @@ void delay_line_in_out(float *in, float *out, int n_samples, float* mod_in, floa
     // Also supports input feedback from a non-modulated feedback delay output.
     int delay_len = delay_line->len;
     int index_mask = delay_len - 1; // will be all 1s because len is guaranteed 2**n.
+    int index_bits = delay_line->log_2_len;
 
     int index_in = delay_line->next_in;
     int index_feedback = (index_in - delay_line->fixed_delay) & index_mask;
 
-    float *delay = delay_line->samples;
-    float max_delay_on_two = delay_line->max_delay / 2.f;
-    float scaled_mod_scale = max_delay_on_two * mod_scale;
+    SAMPLE *delay = delay_line->samples;
+    SAMPLE half_mod_scale = mod_scale >> 1;
     while(n_samples-- > 0) {
-        float next_in = *in++ + feedback_level * delay[index_feedback++];
+        SAMPLE next_in = *in++ + MUL4_SS(feedback_level,
+                                         delay[index_feedback++]);
         index_feedback &= index_mask;
 
-        float index_out = index_in - max_delay_on_two - scaled_mod_scale * *mod_in++;
+        PHASOR phase_out = I2P(index_in, index_bits)
+            - S2P(F2S(0.5) + MUL4_SS(half_mod_scale, *mod_in++));
         //if(index_out >= delay_len) index_out -= delay_len;
-        if(index_out < 0) index_out += delay_len;
-        float sample = FRACTIONAL_SAMPLE(index_out, delay, index_mask);
-        *out++ += mix_level * sample;  // mix delayed + original.
+        //if(index_out < 0) index_out += delay_len;
+        SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
+        *out++ += MUL4_SS(mix_level, sample);  // mix delayed + original.
         delay[index_in++] = next_in;
         index_in &= index_mask;
     }
     delay_line->next_in = index_in;
 }
 
-void delay_line_in_out_fixed_delay(float *in, float *out, int n_samples, float mod_val, delay_line_t *delay_line, float mix_level) {
+void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE mod_val, delay_line_t *delay_line, SAMPLE mix_level) {
     // Read and write the next n_samples from/to the delay line.
     // Simplified version of delay_line_in_out() that uses a single, fixed (but fractional)
     // mod_val for the whole block.
     int delay_len = delay_line->len;
     int index_mask = delay_len - 1; // will be all 1s because len is guaranteed 2**n.
+    int index_bits = delay_line->log_2_len;
 
     int index_in = delay_line->next_in;
 
-    float *delay = delay_line->samples;
-    float total_delay = delay_line->max_delay * (1.f + mod_val) / 2.f;
+    SAMPLE *delay = delay_line->samples;
+    PHASOR delay_phase = S2P((F2S(1.0f) + mod_val) >> 1);
     while(n_samples-- > 0) {
-        float next_in = *in++;
+        SAMPLE next_in = *in++;
 
-        float index_out = index_in - total_delay;
-        //if(index_out >= delay_len) index_out -= delay_len;
-        if(index_out < 0) index_out += delay_len;
-        float sample = FRACTIONAL_SAMPLE(index_out, delay, index_mask);
-        *out++ += mix_level * sample;  // mix delayed + original.
+        PHASOR phase_out = I2P(index_in, index_bits) - delay_phase;
+        SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
+        *out++ += MUL4_SS(mix_level, sample);  // mix delayed + original.
         delay[index_in++] = next_in;
         index_in &= index_mask;
     }
@@ -110,54 +111,59 @@ void delay_line_in_out_fixed_delay(float *in, float *out, int n_samples, float m
 }
 
 
-void apply_variable_delay(float *block, delay_line_t *delay_line, float *delay_mod, float delay_scale, float mix_level, float feedback_level) {
+void apply_variable_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE *delay_mod, SAMPLE delay_scale, SAMPLE mix_level, SAMPLE feedback_level) {
     delay_line_in_out(block, block, AMY_BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
 }
 
-void apply_fixed_delay(float *block, delay_line_t *delay_line, float delay_mod_val, float mix_level) {
+void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE delay_mod_val, SAMPLE mix_level) {
     delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_mod_val, delay_line, mix_level);
 }
 
 
-static inline float DEL_OUT(delay_line_t *delay_line) {
+static inline SAMPLE DEL_OUT(delay_line_t *delay_line) {
     int out_index =
         (delay_line->next_in - delay_line->fixed_delay) & (delay_line->len - 1);
     return delay_line->samples[out_index];
 }
 
-static inline void DEL_IN(delay_line_t *delay_line, float val) {
+static inline void DEL_IN(delay_line_t *delay_line, SAMPLE val) {
     delay_line->samples[delay_line->next_in++] = val;
     delay_line->next_in &= (delay_line->len - 1);
 }
 
-static inline float LPF(float samp, float state, float lpcoef, float lpgain, float gain) {
+static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain, SAMPLE gain) {
     // 1-pole lowpass filter (exponential smoothing).
     // Smoothing. lpcoef=1 => no smoothing; lpcoef=0.001 => much smoothing.
-    state += lpcoef * (samp - state);
+    state += MUL0_SS(lpcoef, samp - state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
-    return 0.5f * gain * (state + lpgain * (samp - state));
+    return MUL0_SS(gain >> 1, state + MUL0_SS(lpgain, samp - state));
 }
 
-float f1state = 0, f2state = 0, f3state = 0, f4state = 0;
+SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
 
 delay_line_t *delay_1 = NULL, *delay_2 = NULL, *delay_3 = NULL,
     *delay_4 = NULL;
 delay_line_t *ref_1 = NULL, *ref_2 = NULL, *ref_3= NULL,
     *ref_4 = NULL, *ref_5 = NULL, *ref_6 = NULL;
 
-float xover_hz = 3000.0;
-float lpfcoef = 0.4;
-float lpfgain = 0.5;
-float liveness = 0.85;
+#define INITIAL_XOVER_HZ 3000.0
+#define INITIAL_LIVENESS 0.85
+#define INITIAL_DAMPING 0.5
+
+SAMPLE lpfcoef;
+SAMPLE lpfgain;
+SAMPLE liveness;
 
 void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
+    //printf("config_stereo_reverb: liveness %f xover %f damping %f\n",
+    //       a_liveness, crossover_hz, damping);
     // liveness (0..1) controls how much energy is preserved (larger = longer reverb).
-    liveness = a_liveness;
+    liveness = F2S(a_liveness);
     // crossover_hz is 3dB point of 1-pole lowpass freq.
-    lpfcoef = 6.2832f * crossover_hz / AMY_SAMPLE_RATE;
-    if (lpfcoef > 1.f)  lpfcoef = 1.f;
-    if (lpfcoef < 0.f)  lpfcoef = 0.f;
-    lpfgain = 1.f - damping;
+    lpfcoef = F2S(6.2832f * crossover_hz / AMY_SAMPLE_RATE);
+    if (lpfcoef > F2S(1.f))  lpfcoef = F2S(1.f);
+    if (lpfcoef < 0)  lpfcoef = 0;
+    lpfgain = F2S(1.f - damping);
 }
 
 // Delay 1 is 58.6435 ms
@@ -195,11 +201,11 @@ void init_stereo_reverb(void) {
         ref_5 = new_delay_line(1024, REF5SAMPS, REVERB_RAM_CAPS);
         ref_6 = new_delay_line(1024, REF6SAMPS, REVERB_RAM_CAPS);
         
-        config_stereo_reverb(liveness, xover_hz, 1 - lpfgain);
+        config_stereo_reverb(INITIAL_LIVENESS, INITIAL_XOVER_HZ, INITIAL_DAMPING);
     }
 }
 
-void stereo_reverb(float *r_in, float *l_in, float *r_out, float *l_out, int n_samples, float level) {
+void stereo_reverb(SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int n_samples, SAMPLE level) {
     // Stereo reverb.  *{r,l}_in each point to n_samples input samples.
     // n_samples are written to {r,l}_out.
     // Recreate
@@ -208,16 +214,16 @@ void stereo_reverb(float *r_in, float *l_in, float *r_out, float *l_out, int n_s
     // https://www.ee.columbia.edu/~dpwe/e4896/papers/StautP82-reverb.pdf
     while(n_samples--) {
         // Early echo reflections.
-        float in_r = *r_in++;
-        float in_l;
+        SAMPLE in_r = *r_in++;
+        SAMPLE in_l;
         if (l_in)   in_l = *l_in++;
         else   in_l = in_r;
-        float r_acc, l_acc;
-        r_acc = 0.0625f * in_r;
-        l_acc = 0.0625f * in_l;
+        SAMPLE r_acc, l_acc;
+        r_acc = MUL0_SS(F2S(0.0625f), in_r);
+        l_acc = MUL0_SS(F2S(0.0625f), in_l);
 
         DEL_IN(ref_1, l_acc);
-        float d_out = DEL_OUT(ref_1);
+        SAMPLE d_out = DEL_OUT(ref_1);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
@@ -246,20 +252,20 @@ void stereo_reverb(float *r_in, float *l_in, float *r_out, float *l_out, int n_s
         
         
         // Reverb delays & matrix.
-        float d1 = DEL_OUT(delay_1);
+        SAMPLE d1 = DEL_OUT(delay_1);
         d1 = LPF(d1, f1state, lpfcoef, lpfgain, liveness);
         d1 += r_acc;
-        *r_out++ = in_r + level * d1;
+        *r_out++ = in_r + MUL4_SS(level, d1);
 
-        float d2 = DEL_OUT(delay_2);
+        SAMPLE d2 = DEL_OUT(delay_2);
         d2 = LPF(d2, f2state, lpfcoef, lpfgain, liveness);
         d2 += l_acc;
-        if (l_out != NULL)  *l_out++ = in_l + level * d2;
+        if (l_out != NULL)  *l_out++ = in_l + MUL4_SS(level, d2);
 
-        float d3 = DEL_OUT(delay_3);
+        SAMPLE d3 = DEL_OUT(delay_3);
         d3 = LPF(d3, f3state, lpfcoef, lpfgain, liveness);
 
-        float d4 = DEL_OUT(delay_4);
+        SAMPLE d4 = DEL_OUT(delay_4);
         d4 = LPF(d4, f3state, lpfcoef, lpfgain, liveness);
 
         // Mixing and feedback.

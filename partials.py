@@ -1,8 +1,7 @@
 import amy, sys
 import pydub
 # I will fix this eventually, loris is v py2.0 and hard to install
-sys.path.append('/usr/local/lib/python3.9/site-packages')
-
+sys.path.append('/usr/local/lib/python3.8/site-packages')
 import loris
 import time
 import numpy as np
@@ -41,7 +40,7 @@ def loris_synth(filename, freq_res=150, analysis_window=100,amp_floor=-30, max_l
 def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=amy.OSCS, freq_res = 10, freq_drift=20, analysis_window = 100):
     # my job: take a file, analyze it, output a sequence + some metadata
     # i do voice stealing to keep maximum partials at once to max_oscs 
-    # my sequence is an ordered list of partials/oscillators, a list with (ms, osc, freq, amp, bw, phase, time_delta, amp_delta, freq_delta, bw_delta)
+    # my sequence is an ordered list of partials/oscillators, a list with (ms, osc, freq, amp, phase, time_delta, amp_delta, freq_delta)
     audio = pydub.AudioSegment.from_file(filename)
     audio = audio[:int(max_len_s*1000.0)]
     y = np.array(audio.get_array_of_samples())
@@ -89,7 +88,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
                     phase = bp.phase() / (2*pi)
                     if(phase < 0): phase = phase + 1
                 time_ms = int(bp.time() * 1000.0)
-                sequence.append( [time_ms, partial_idx, bp.frequency(), bp.amplitude(), bp.bandwidth(), phase] )
+                sequence.append( [time_ms, partial_idx, bp.frequency(), bp.amplitude(), phase] )
 
     # Now go and order them and figure out which oscillator gets which partial
     time_ordered = sorted(sequence, key=lambda x:x[0])
@@ -102,8 +101,8 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     osc_q = deque(range(max_oscs)) 
     for i,s in enumerate(time_ordered):
         next_idx = -1
-        time_delta, amp_delta, freq_delta, bw_delta = (0,0,0,0)
-        if(s[5] != -2): # if not the end of a partial
+        time_delta, amp_delta, freq_delta = (0,0,0)
+        if(s[4] != -2): # if not the end of a partial
             next_idx = i+1
             while(time_ordered[next_idx][1] != s[1]):
                 next_idx = next_idx + 1
@@ -111,20 +110,15 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
             time_delta = n[0] - s[0]
             amp_delta = n[3]/s[3]
             freq_delta = n[2]/s[2]
-            if(s[4]>0):
-                bw_delta = n[4]/s[4]
-            else:
-                bw_delta = 0
 
         s.append(time_delta)
         s.append(amp_delta)
         s.append(freq_delta)
-        s.append(bw_delta)
 
         # Start the partials at 0
         s[0] = s[0] - first_time
 
-        if(s[5]>=0): #new partial
+        if(s[4]>=0): #new partial
             if(len(osc_q)):
                 osc_map[s[1]] = osc_q.popleft()
                 # Replace the partial_idx with a osc offset
@@ -135,7 +129,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
             if(osc is not None):
                 s[1] = osc_map[s[1]]
                 sequence.append(s)
-                if(s[5] == -2): # last bp
+                if(s[4] == -2): # last bp
                     # Put the oscillator back
                     osc_q.appendleft(osc)
         if(len(osc_q) < min_q_len): min_q_len = len(osc_q)
@@ -147,10 +141,18 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     return (metadata, sequence)
 
 
-def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1, bw_ratio = 1):
+def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1):
     # i take a sequence and play it to AMY, just like native AMY will do from a .h file
-    my_start_time = amy.millis()
+    # s[0] - ms
+    # s[1] - osc
+    # s[2] - freq
+    # s[3] - amp
+    # s[4] - phase
+    # s[5] - time_delta
+    # s[6] - amp_delta
+    # s[7] - freq_delta
 
+    my_start_time = amy.millis()
     sustain_offset = 0
     if(sustain_ms > 0):
         if(sustain_ms > sequence[-1][0]):
@@ -163,12 +165,8 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
             time.sleep(0.01)
 
         # Make envelope strings
-        bp0 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[7]))
-        bp1 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[8]))
-        if(bw_ratio > 0):
-            bp2 = "%d,%s,0,0" % (s[6] / time_ratio, amy.trunc(s[9]))
-        else:
-            bp2 = ""
+        bp0 = "0,1.0,%d,%s,0,0" % (s[5] / time_ratio, amy.trunc(s[6]))
+        bp1 = "0,1.0,%d,%s,0,1.0" % (s[5] / time_ratio, amy.trunc(s[7]))
         if(sustain_ms > 0 and sustain_offset == 0):
             if(s[0]/time_ratio > sustain_ms/time_ratio):
                 sustain_offset = sustain_len_ms/time_ratio
@@ -182,30 +180,29 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
             "wave":amy.PARTIAL,
             "amp":s[3]*amp_ratio,
             "freq":s[2]*pitch_ratio,
-            "feedback":s[4]*bw_ratio,
-            "bp0":bp0, "bp1":bp1, "bp2":bp2,
+            "bp0":bp0, "bp1":bp1,
             "bp0_target":amy.TARGET_AMP+amy.TARGET_LINEAR,
             "bp1_target":amy.TARGET_FREQ+amy.TARGET_LINEAR,
-            "bp2_target":amy.TARGET_FEEDBACK+amy.TARGET_LINEAR})
+        })
 
-        if(s[5]==-2): #end, add note off
+        if(s[4]==-2): #end, add note off
             amy.send(**partial_args, vel=0)
-        elif(s[5]==-1): # continue
+        elif(s[4]==-1): # continue
             amy.send(**partial_args)
         else: #start, add phase and note on
-            amy.send(**partial_args, vel=s[3]*amp_ratio, phase=s[5])
+            amy.send(**partial_args, vel=s[3]*amp_ratio, phase=s[4])
 
     return sequence[-1][0]/time_ratio
 
 #In [6]: partials.generate_partials_header(fns,amp_floor=-40,analysis_window=40,freq_drift=5,hop_time=0.04,freq_res=5)
 def generate_partials_header(filenames=None, **kwargs):
     # given a list of filenames, output a partials.h
-    out = open("main/amy/partials.h", "w")
-    out.write("// Automatically generated by partials.generate_partials_header()\n#ifndef __PARTIALS_H\n#define __PARTIALS_H\n#define PARTIALS_PATCHES %d\n" % (len(filenames)))
-    all_partials = []
     if(filenames is None):
         import glob
         filenames = glob.glob('sounds/partial_sources/*.wav')
+    out = open("src/partials.h", "w")
+    out.write("// Automatically generated by partials.generate_partials_header()\n#ifndef __PARTIALS_H\n#define __PARTIALS_H\n#define PARTIALS_PATCHES %d\n" % (len(filenames)))
+    all_partials = []
     for f in filenames:
         m, s = sequence(f, **kwargs)
         if(m is not None):
@@ -218,10 +215,10 @@ def generate_partials_header(filenames=None, **kwargs):
         start = start + len(p[1])
     out.write("};\n");
     out.write("const partial_breakpoint_t partial_breakpoints[%d] = {\n" % (start))
-    out.write("\t// ms_offset, osc, freq, amp, bw, phase, ms_delta, amp_delta, freq_delta, bw_delta\n")
+    out.write("\t// ms_offset, osc, freq, amp, phase, ms_delta, amp_delta, freq_delta\n")
     for p in all_partials:
         for s in p[1]:
-            out.write("\t { %d, %d, %f, %f, %f, %f, %d, %f, %f, %f }, \n" % tuple(s))
+            out.write("\t { %d, %d, %f, %f, %f, %d, %f, %f }, \n" % tuple(s))
     out.write("};\n")
     out.write("#endif // __PARTIALS_H\n")
     out.close()
@@ -233,7 +230,6 @@ def test(   filename="sounds/sleepwalk_original_45s.mp3", \
                     analysis_window = 100, \
                     time_ratio = 1, \
                     max_oscs = 40, \
-                    bw_ratio = 0,\
                     amp_ratio = 1, \
                     pitch_ratio = 1, \
                     amp_floor = -40, \
@@ -243,7 +239,7 @@ def test(   filename="sounds/sleepwalk_original_45s.mp3", \
     amy.stop()
     amy.live()
     m,s = sequence(filename, max_len_s = max_len_s, freq_res = freq_res, analysis_window = analysis_window, amp_floor=amp_floor, hop_time=hop_time, max_oscs=max_oscs)
-    ms = play(s, sustain_ms = m.get("sustain_ms", -1), time_ratio=time_ratio, pitch_ratio=pitch_ratio, amp_ratio=amp_ratio, bw_ratio = bw_ratio, sustain_len_ms = sustain_len_ms)
+    ms = play(s, sustain_ms = m.get("sustain_ms", -1), time_ratio=time_ratio, pitch_ratio=pitch_ratio, amp_ratio=amp_ratio, sustain_len_ms = sustain_len_ms)
 
 
 

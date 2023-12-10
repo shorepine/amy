@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with an FPU and around 100KB of RAM. We've run AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with around 100KB of RAM. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -23,24 +23,53 @@ It supports
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
  * Reverb and chorus effects, set globally
  * Stereo pan or mono operation 
- * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves, including amplitude modulated noise
+ * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves
  * Oscillators can be specified by frequency in floating point or midi note 
  * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band parametric EQ
  * Built in patches for PCM, FM and partials
  * Built-in clock for short term sequencing of events
- * Can use multi-core (including on ESP32 microcontrollers) for rendering if available
+ * Can use multi-core (including microcontrollers) for rendering if available
 
-The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get in floating point. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
+The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
 
 The partial tone synthesizer also provides `partials.py`, where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
 
 ## Using AMY in your software
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy.h` is set up for your application. 
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
 
-To run a simple C example, run `make`. Then run `./amy-example`. 
+You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
+
+To run a simple C example on many platforms:
+
+```
+gh repo clone bwhitman/amy
+cd amy
+make
+./amy-example # you should hear FM tones out your default speaker, use ./amy-example -h for options
+```
+
+To build an example for the Pi Pico / RP2040:
+
+```
+gh repo clone raspberrypi/pico-extras
+gh repo clone raspberrypi/pico-sdk
+# Do whatever installs you need for the pico-sdk
+gh repo clone bwhitman/amy
+cd amy/src; mkdir build; cd build
+export PICO_SDK_PATH=../../../pico-sdk
+export PICO_EXTRAS_PATH=../../../pico-extras
+cmake ..
+make && picotool load amy_example.elf && picotool reboot
+```
+
+
+To build for the ESP32/ESP32S3/etc:
+```
+TODO
+```
 
 ## Controlling AMY
 
@@ -67,8 +96,8 @@ You can also start a thread playing live audio:
 ```
 
 
-In C, using the high level structures directly:
-
+In C, using the high level structures directly;
+  
 ```c
 #include "amy.h"
 void bleep() {
@@ -96,7 +125,7 @@ void main() {
 }
 ```
 
-Or in C, sending the wire protocol directly:
+Or in C, sending the wire protocol directly: (you don't need to worry about encoding here.)
 
 ```c
 #include "amy.h"
@@ -123,7 +152,7 @@ Here's the full list:
 | a    | amp    |  float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
 | A    | bp0    | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
 | B    | bp1    |  string     | set the second breakpoint generator. see breakpoint 0 |
-| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | C    | bp2    |  string     | 3rd breakpoint generator |
 | d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
@@ -388,13 +417,6 @@ amy.send(osc=0,vel=1,note=55,wave=amy.PARTIALS,patch=5) # change the frequency
 amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,ratio=0.2) # ratio slows down the partial playback
 ```
 
-Our partial breakpoint analyzer also emits "noise-excited bandwidth enhancement", which means it tries to emulate tones that are hard to generate with sine waves alone by modulating the amplitude of a sine wave with a filtered noise signal. You can try that out on the patches by adding `feedback`, like so:
-
-```python
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0) # no bandwidth
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,feedback=0.5) # more bandwidth
-```
-
 The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
 
 ```bash
@@ -402,7 +424,7 @@ brew install python3 swig ffmpeg
 python3.9 -m pip install pydub numpy --user
 tar xvf loris-1.8.tar
 cd loris-1.8
-CPPFLAGS=`python3-config --includes` PYTHON=`which python3.9` ./configure --with-python
+CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python
 make
 sudo make install
 cd ..
@@ -415,7 +437,7 @@ import partials
 (m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
 109 partials and 1029 breakpoints, max oscs used at once was 8
 
-partials.play(s, amp_ratio=2, bw_ratio=0)
+partials.play(s, amp_ratio=2)
 ```
 
 https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4
@@ -442,8 +464,7 @@ def play(sequence, # from partials.sequence
                 sustain_len_ms = 0, # how long to sustain for
                 time_ratio = 1, # playback speed -- 0.5 , half speed
                 pitch_ratio = 1, # frequency scale, 0.5 , half freq
-                amp_ratio = 1, # amplitude scale,
-                bw_ratio = 1, # bandwidth / noise scale
+                amp_ratio = 1, # amplitude scale
                 )
 ```
 
@@ -475,9 +496,6 @@ amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 
 Run `python amy_headers.py` to generate all the LUTs and patch .h files compiled into AMY.
 
-### ESP32
-
-Use `amy-example-esp32.c` for a starting point to booting AMY on an ESP32 chip. Or see the [Alles](https://github.com/bwhitman/alles) project for a more complete setup. 
 
 
 

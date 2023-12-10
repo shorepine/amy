@@ -1,5 +1,5 @@
 // algorithms.c
-// FM2 and partial synths that involve combinations of oscillators
+// FM and partial synths that involve combinations of oscillators
 #include "amy.h"
 
 #define NUM_ALGO_BPS 5
@@ -39,8 +39,29 @@ enum FmOperatorFlags {
     FB_IN = 1 << 6,
     FB_OUT = 1 << 7
 };
+
+// We never see 0x?6 (add to bus two)
+// There are just instances of 0x?2 (write to bus two) and they are both 0x02
+// We never see input BUS_ONE output ADD BUS_ONE
+
+// algo   feedback  input    output
+// 0x01             -            BUS_ONE
+// 0x41   IN        -            BUS_ONE
+// 0xc1   IN OUT    -            BUS_ONE
+// 0x11             BUS_ONE      BUS_ONE  // This is the only case when we can't directly accumulate the (possibly zero'd) output because it's the input
+// 0x05             -        ADD BUS_ONE
+// 0xc5   IN OUT    -        ADD BUS_ONE
+// 0x25             BUS_TWO  ADD BUS_ONE
+
+// 0x02             -            BUS_TWO
+
+// 0x04             -        ADD op
+// 0x14             BUS_ONE  ADD op
+// 0x94      OUT    BUS_ONE  ADD op
+// 0xC4   IN OUT    BUS_ONE  ADD op
+
 struct FmAlgorithm { uint8_t ops[MAX_ALGO_OPS]; };
-struct FmAlgorithm algorithms[33] = {
+const struct FmAlgorithm algorithms[33] = {
     // 6     5     4     3     2      1   
     { { 0xc1, 0x11, 0x11, 0x14, 0x01, 0x14 } }, // 0 
     { { 0xc1, 0x11, 0x11, 0x14, 0x01, 0x14 } }, // 1
@@ -78,12 +99,8 @@ struct FmAlgorithm algorithms[33] = {
 };
 // End of MSFA stuff
 
-//float zeros0[AMY_BLOCK_SIZE];
-//float zeros1[AMY_BLOCK_SIZE];
-
-
 // a = 0
-void zero(float *a) {
+void zero(SAMPLE* a) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         a[i] = 0;
     }
@@ -91,39 +108,40 @@ void zero(float *a) {
 
 
 // b = a + b
-void add(float *a, float*b) {
+void add(SAMPLE* a, SAMPLE* b) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        b[i] = (a[i] + b[i]);
+        b[i] += a[i];
     }
 }
 
 // b = a 
-void copy(float *a, float*b) {
+void copy(SAMPLE* a, SAMPLE* b) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         b[i] = a[i];
     }
 }
 
-void render_mod(float *in, float*out, uint8_t osc, float feedback_level, uint8_t algo_osc) {
+void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
+    //printf("render_mod: osc %d msynth.amp %f\n", osc, S2F(msynth[osc].amp));
 
     // out = buf
     // in = mod
     // so render_mod is mod, buf (out)
-    if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc);
+    if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
 }
 
-void note_on_mod(uint8_t osc, uint8_t algo_osc) {
+void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     synth[osc].note_on_clock = total_samples;
     synth[osc].status = IS_ALGO_SOURCE; // to ensure it's rendered
     if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 
-void algo_note_off(uint8_t osc) {
+void algo_note_off(uint16_t osc) {
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(synth[osc].algo_source[i] >=0 ) {
-            uint8_t o = synth[osc].algo_source[i];
+            uint16_t o = synth[osc].algo_source[i];
             synth[o].note_on_clock = -1;
             synth[o].note_off_clock = total_samples;
         }
@@ -133,7 +151,7 @@ void algo_note_off(uint8_t osc) {
     synth[osc].note_off_clock = total_samples;          
 }
 
-void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
+void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     // Set up the voices from a DX7 patch.
     // 9 voices total - operators 1,2,3,4,5,6, the root voice (silent), and two LFOs (amp then pitch)
     // osc == root osc (the control one with the parameters in it)
@@ -142,7 +160,7 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
     // [6] = amp lfo, [7] = pitch lfo
     algorithms_parameters_t p = fm_patches[synth[osc].patch % ALGO_PATCHES];
     synth[osc].algorithm = p.algo;
-    synth[osc].feedback = p.feedback;
+    synth[osc].feedback = F2S(p.feedback);
 
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
@@ -153,12 +171,12 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
     synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[6]].wave = p.lfo_wave;
     synth[target_oscs[6]].status = IS_MOD_SOURCE;
-    synth[target_oscs[6]].amp = p.lfo_amp_amp;
+    synth[target_oscs[6]].amp = F2S(p.lfo_amp_amp);
     // pitch LFO
     synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[7]].wave = p.lfo_wave;
     synth[target_oscs[7]].status = IS_MOD_SOURCE;
-    synth[target_oscs[7]].amp = p.lfo_pitch_amp;
+    synth[target_oscs[7]].amp = F2S(p.lfo_pitch_amp);
 
 
     float last_release_time= 0;
@@ -171,9 +189,9 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
         if(synth[target_oscs[i]].freq < 0) synth[target_oscs[i]].freq = 0;
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
         synth[target_oscs[i]].ratio = op.freq_ratio;
-        synth[target_oscs[i]].amp = op.amp;
+        synth[target_oscs[i]].amp = F2S(op.amp);
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
-        synth[target_oscs[i]].phase = 0.25;
+        synth[target_oscs[i]].phase = F2P(0.25);
         synth[target_oscs[i]].mod_target = op.lfo_target;
         for(uint8_t j=0;j<NUM_ALGO_BPS;j++) {
             synth[target_oscs[i]].breakpoint_values[0][j] = op.amp_rate[j];
@@ -203,13 +221,13 @@ void algo_custom_setup_patch(uint8_t osc, uint8_t * target_oscs) {
 }
 
 // The default way is to use consecutive osc #s
-void algo_setup_patch(uint8_t osc) {
-    uint8_t target_oscs[8];
+void algo_setup_patch(uint16_t osc) {
+    uint16_t target_oscs[8];
     for(uint8_t i=0;i<8;i++) target_oscs[i] = osc+i+1;
     algo_custom_setup_patch(osc, target_oscs);
 }
 
-void algo_note_on(uint8_t osc) {    
+void algo_note_on(uint16_t osc) {    
     // trigger all the source operator voices
     if(synth[osc].patch >= 0) { 
         algo_setup_patch(osc);
@@ -221,87 +239,69 @@ void algo_note_on(uint8_t osc) {
     }            
 }
 
-
 void algo_init() {
-//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros0[i] = 0;
-//    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) zeros1[i] = 0;
 }
 
 
+// We need to keep these in heap for the small stack cortex M0
+SAMPLE scratch[AMY_CORES][3][AMY_BLOCK_SIZE];
 
-
-void render_algo(float * buf, uint8_t osc) { 
-    float scratch[6][AMY_BLOCK_SIZE];
+void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
 
     // starts at op 6
-    float *in_buf;
-    float *out_buf = NULL;
+    SAMPLE* in_buf;
+    SAMPLE* out_buf = NULL;
 
-    // TODO, i think i need at most 2 of these buffers, maybe 3?? 
-    for(uint8_t i=0;i<6;i++) {
-        zero(scratch[i]);
-    }
-    uint8_t ops_used = 0;
+    SAMPLE* const BUS_ONE = scratch[core][0];
+    SAMPLE* const BUS_TWO = scratch[core][1];
+    SAMPLE* const SCRATCH = scratch[core][2];
+
+    for (int i = 0; i < 3; ++i)
+        zero(scratch[core][i]);
+    SAMPLE amp = msynth[osc].amp >> 2;  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
-
-            ops_used++;
-            float feedback_level = 0;
+            SAMPLE feedback_level = 0;
+            SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 
                 feedback_level = synth[osc].feedback; 
             } // main algo voice stores feedback, not the op 
-            
+
             if(algo.ops[op] & IN_BUS_ONE) { 
-                in_buf = scratch[0]; 
+                in_buf = BUS_ONE;
             } else if(algo.ops[op] & IN_BUS_TWO) { 
-                in_buf = scratch[1]; 
+                in_buf = BUS_TWO;
             } else {
                 // no in_buf
-                in_buf = scratch[5];
-                //if(osc>31) { in_buf = zeros1; } else { in_buf = zeros0; }
+                in_buf = NULL;
+            }
+            if ( (algo.ops[op] & IN_BUS_ONE)
+                 && (algo.ops[op] & OUT_BUS_ONE)
+                 /* && !(algo.ops[op] & OUT_BUS_ADD) */ ) {  // IN_BUS_ONE + OUT_BUS_ONE is never ADD
+                // Input is BUS_ONE and output overwrites it, use a temp buffer.
+                out_buf = SCRATCH;
+            } else if (algo.ops[op] & OUT_BUS_ONE) {
+                out_buf = BUS_ONE;
+            } else if (algo.ops[op] & OUT_BUS_TWO) {
+                out_buf = BUS_TWO;
+            } else {
+                out_buf = buf;
+                // We apply the mod_amp to every output that goes into the final output buffer.
+                mod_amp = amp;
+            }
+            if (!(algo.ops[op] & OUT_BUS_ADD)) {
+                // Output is not being accumulated, so have to clear it first.
+                zero(out_buf);
             }
 
-            if(!(algo.ops[op] & OUT_BUS_ADD)) {
-                if(algo.ops[op] & OUT_BUS_ONE) { 
-                    zero(scratch[2]);
-                    out_buf = scratch[2]; 
-                }
-                if(algo.ops[op] & OUT_BUS_TWO) { 
-                    zero(scratch[3]);
-                    out_buf = scratch[3]; 
-                }
-            } else {
-                zero(scratch[4]);
-                out_buf = scratch[4]; 
-            }
+            render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc, mod_amp);
 
-            render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc);
-
-            if(!(algo.ops[op] & OUT_BUS_ADD)) {
-                if((algo.ops[op] & OUT_BUS_ONE) ) {
-                    copy(out_buf, scratch[0]);
-                }
-
-                if((algo.ops[op] & OUT_BUS_TWO) ) {
-                    copy(out_buf, scratch[1]);
-                }
-            } else {
-                if(algo.ops[op] & OUT_BUS_ONE) {
-                    add(scratch[4], scratch[0]);
-                } else if(algo.ops[op] & OUT_BUS_TWO) {
-                    add(scratch[4], scratch[1]); 
-                } else {
-                    add(scratch[4], buf);
-                }
-
-
+            if (out_buf == SCRATCH) {
+                // We had to invoke the spare buffer, meaning we're overwriting BUS_ONE
+                copy(out_buf, BUS_ONE);
             }
         }
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
-    if(ops_used == 0) ops_used = 1;
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        buf[i] = buf[i] * msynth[osc].amp * (1.0 / (float)ops_used);
-    }
 }
