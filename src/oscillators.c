@@ -117,16 +117,18 @@ PHASOR render_lut(SAMPLE* buf,
 
 void lpf_buf(SAMPLE *buf, SAMPLE decay, SAMPLE *state) {
     // Implement first-order low-pass (leaky integrator).
+    SAMPLE s = *state;
     for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
-        SAMPLE s = *state;
-        buf[i] = MUL4_SS(decay, s) + buf[i];
-        *state = buf[i];
+        buf[i] += MUL4_SS(decay, s);
+        s = buf[i];
     }
+    *state = s;
 }
 
 
 /* Pulse wave */
 void pulse_note_on(uint16_t osc) {
+    //printf("pulse_note_on: time %lld osc %d freq %f amp %f last_amp %f\n", total_samples, osc, synth[osc].freq, S2F(synth[osc].amp), S2F(synth[osc].last_amp));
     float period_samples = (float)AMY_SAMPLE_RATE / synth[osc].freq;
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
     // Tune the initial integrator state to compensate for mid-sample alignment of table.
@@ -143,16 +145,19 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAM
     // Scale the impulse proportional to the phase increment step so its integral remains ~constant.
     const LUT *lut = synth[osc].lut;
     SAMPLE amp = direction * MUL4_SS(msynth[osc].amp, F2S(P2F(step) * 4.0f * lut->scale_factor));
-    //printf("render_lpf_lut: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut);
     if (duty > 0) {  // For pulse only, add a second delayed negative LUT wave.
         PHASOR pwm_phase = P_WRAPPED_SUM(synth[osc].phase, F2P(duty));
         render_lut(buf, pwm_phase, step, -synth[osc].last_amp, -amp, synth[osc].lut);
     }
-    if (dc_offset) {  // For saw only, apply a dc shift so integral is ~0.
-        SAMPLE offset = MUL4_SS(amp, dc_offset);
+    if (dc_offset) {
+        // For saw only, apply a dc shift so integral is ~0.
+        // But we have to apply the linear amplitude env on top as well, copying the way it's done in render_lut.
+        SAMPLE current_amp = synth[osc].last_amp;
+        SAMPLE incremental_amp = (amp - synth[osc].last_amp) >> BLOCK_SIZE_BITS; // i.e. delta(amp) / BLOCK_SIZE
         for (int i = 0; i < AMY_BLOCK_SIZE; ++i) {
-            buf[i] += offset;
+            buf[i] += MUL4_SS(current_amp, dc_offset);
+            current_amp += incremental_amp;
         }
     }        
     // LPF to integrate to convert pair of (+, -) impulses into a rectangular wave.
@@ -180,7 +185,7 @@ void pulse_mod_trigger(uint16_t osc) {
 SAMPLE compute_mod_pulse(uint16_t osc) {
     // do BW pulse gen at SR=44100/64
     if(msynth[osc].duty < 0.001f || msynth[osc].duty > 0.999) msynth[osc].duty = 0.5;
-    if(synth[osc].phase >= msynth[osc].duty) {
+    if(synth[osc].phase >= F2P(msynth[osc].duty)) {
         synth[osc].sample = F2S(1.0f);
     } else {
         synth[osc].sample = F2S(-1.0f);
@@ -193,10 +198,9 @@ SAMPLE compute_mod_pulse(uint16_t osc) {
 
 /* Saw waves */
 void saw_note_on(uint16_t osc, int8_t direction_notused) {
-    //printf("saw_note_on: osc %d freq %f\n", osc, synth[osc].freq);
+    //printf("saw_note_on: time %lld osc %d freq %f amp %f last_amp %f phase %f\n", total_samples, osc, synth[osc].freq, S2F(synth[osc].amp), S2F(synth[osc].last_amp), P2F(synth[osc].phase));
     float period_samples = ((float)AMY_SAMPLE_RATE / synth[osc].freq);
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
-    synth[osc].lpf_state = 0;
     // Calculate the mean of the LUT.
     SAMPLE lut_sum = 0;
     for (int i = 0; i < synth[osc].lut->table_size; ++i) {
@@ -204,6 +208,8 @@ void saw_note_on(uint16_t osc, int8_t direction_notused) {
     }
     int lut_bits = synth[osc].lut->log_2_table_size;
     synth[osc].dc_offset = -(lut_sum >> lut_bits);
+    synth[osc].lpf_state = 0;
+    synth[osc].last_amp = 0;
 }
 
 void saw_down_note_on(uint16_t osc) {
@@ -215,6 +221,8 @@ void saw_up_note_on(uint16_t osc) {
 
 void render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
     render_lpf_lut(buf, osc, 0, direction, synth[osc].dc_offset);
+    //printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
+    //       total_samples, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
 }
 
 void render_saw_down(SAMPLE* buf, uint16_t osc) {
