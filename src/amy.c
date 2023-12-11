@@ -1088,6 +1088,8 @@ float atoff(const char *s) {
     // and will stop parsing there.  Needed for message strings that contain
     // 'e' as a command prefix.
     float frac = 0;
+    // Skip leading spaces.
+    while (*s == ' ') ++s;
     float whole = (float)atoi(s);
     int is_negative = (s[0] == '-');  // Can't use (whole < 0) because of "-0.xx".
     //const char *s_in = s;  // for debug message.
@@ -1126,7 +1128,7 @@ void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
         e->breakpoint_times[which_bpset][i] = -1;
         e->breakpoint_values[which_bpset][i] = -1;
     }
-    uint16_t stop = strspn(message, "0123456789-,.");
+    uint16_t stop = strspn(message, " 0123456789-,.");
     while(c < stop) {
         if(message[c]!=',') {
             if(idx % 2 == 0) {
