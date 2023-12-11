@@ -59,23 +59,30 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     while(synth[osc].breakpoint_times[bp_set][bp_r] >= 0 && bp_r < MAX_BREAKPOINTS) bp_r++;
     bp_r--;
     if(bp_r<0) {
+        // no breakpoints, return key gate.
         SAMPLE scale = F2S(1.0f);
         if(synth[osc].note_off_clock >= 0) scale = 0;
         synth[osc].last_scale[bp_set] = scale;
         return scale; 
-    }// no breakpoints
+    }
 
     // Find out which BP we're in
     if(synth[osc].note_on_clock >=0) {
         elapsed = (total_samples - synth[osc].note_on_clock) + 1; 
-        for(uint8_t i=0;i<bp_r;i++) {
-            if(elapsed < synth[osc].breakpoint_times[bp_set][i]) { found=i; i = bp_r; }
+        for(uint8_t i = 0; i < bp_r; i++) {
+            if(elapsed < synth[osc].breakpoint_times[bp_set][i]) {
+                // We found a segment.
+                found = i;
+                //i = bp_r;
+                break;
+            }
         }
-        // We didn't find anything, so set it to the one before bp_r
-        if(found<0) {
-            found = bp_r - 1; // sustain
+        if(found < 0) {
+            // We didn't find anything, so we are in sustain.
+            found = bp_r - 1; // segment before release defines sustain
             SAMPLE scale = F2S(synth[osc].breakpoint_values[bp_set][found]);
             synth[osc].last_scale[bp_set] = scale;
+            //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", total_samples, bp_set, found, S2F(scale));
             return scale;
         }
     } else if(synth[osc].note_off_clock >= 0) {
@@ -175,7 +182,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
             // so make the target gap a little bit bigger, to ensure we meet v1
             scale = v0 + MUL4_SS(v1 - v0, F2S(exponential_rate_overshoot_factor * (1.0f - expf(-exponential_rate * time_ratio))));
-            //printf("false_exponential time_ratio %f scf %f\n", time_ratio, scf);
+            //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", total_samples, bp_set, found, time_ratio, S2F(scale));
         }
     }
     // If sign is negative, render the env as 1 - ADSR.
@@ -184,7 +191,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     }
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
-    //printf("t0 %d t1 %d elapsed %lld v0 %f v1 %f scale %f\n", t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //printf("env: time %lld bpset %d seg %d t0 %d t1 %d elapsed %lld v0 %f v1 %f scale %f\n", total_samples, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     return scale;
 }
 
