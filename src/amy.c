@@ -1126,10 +1126,7 @@ void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
         e->breakpoint_times[which_bpset][i] = -1;
         e->breakpoint_values[which_bpset][i] = -1;
     }
-    uint16_t stop = MAX_MESSAGE_LEN;
-    for(uint16_t i=0;i<MAX_MESSAGE_LEN;i++) {
-        if(message[i] >= 'a' || message[i] == 0) { stop =i; i = MAX_MESSAGE_LEN; }
-    }
+    uint16_t stop = strspn(message, "0123456789-,.");
     while(c < stop) {
         if(message[c]!=',') {
             if(idx % 2 == 0) {
