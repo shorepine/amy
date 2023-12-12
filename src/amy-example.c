@@ -1,6 +1,7 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
 
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE)
 
 #include "amy.h"
 #include "examples.h"
@@ -55,3 +56,4 @@ int main(int argc, char ** argv) {
     return 0;
 }
 
+#endif

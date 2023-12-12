@@ -1,3 +1,5 @@
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE)
+
 #include <Python.h>
 #include <math.h>
 #include "amy.h"
@@ -72,3 +74,4 @@ PyMODINIT_FUNC PyInit_libamy(void)
     return PyModule_Create(&libamyDef);
 
 }
+#endif

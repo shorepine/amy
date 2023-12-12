@@ -247,7 +247,7 @@ struct state {
 
 // Shared structures
 extern SAMPLE coeffs[AMY_OSCS][5];
-extern SAMPLE delay[AMY_OSCS][2];
+extern SAMPLE filter_delay[AMY_OSCS][2];
 extern int64_t total_samples;
 extern struct i_event *synth;
 extern struct mod_event *msynth; // the synth that is being modified by modulations & envelopes

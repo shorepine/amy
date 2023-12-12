@@ -12,7 +12,7 @@ class AMY
   public:
     AMY();
     void begin();
-    void AMY::send_message(char * message);
+    void send_message(char * message);
     uint16_t * render_block();
   private:
     int _pin;

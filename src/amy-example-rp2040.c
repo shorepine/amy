@@ -1,3 +1,6 @@
+#if PICO_ON_DEVICE
+#ifndef ARDUINO
+
 /**
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -9,22 +12,18 @@
 
 #include "amy.h"
 #include "examples.h"
-#if PICO_ON_DEVICE
 
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
 #include "pico/multicore.h"
 
-#endif
 
 #include "pico/stdlib.h"
 #include "pico/audio_i2s.h"
 
 
-#if PICO_ON_DEVICE
 #include "pico/binary_info.h"
 bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
-#endif
 
 #define CPU0_METER 2
 #define CPU1_METER 3
@@ -171,4 +170,7 @@ int main() {
     }
     return 0;
 }
+
+#endif
+#endif
 

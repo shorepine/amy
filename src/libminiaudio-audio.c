@@ -1,5 +1,6 @@
 // libminiaudio-audio.c
 // functions for running AMY on a computer
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE)
 #include "amy.h"
 
 #define MA_NO_DECODING
@@ -173,4 +174,4 @@ void amy_live_stop() {
     amy_running = 0;
     ma_device_uninit(&device);
 }
-
+#endif
