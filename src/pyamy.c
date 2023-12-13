@@ -1,4 +1,4 @@
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE)
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
 
 #include <Python.h>
 #include <math.h>

@@ -1,6 +1,6 @@
 // libminiaudio-audio.c
 // functions for running AMY on a computer
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE)
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
 #include "amy.h"
 
 #define MA_NO_DECODING

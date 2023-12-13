@@ -48,7 +48,7 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 
 
-#ifdef PICO_ON_DEVICE
+#if defined PICO_ON_DEVICE  || defined ARDUINO_ARCH_RP2040
 #define CPU0_METER 2
 #define CPU1_METER 3
 #include "pico/multicore.h"

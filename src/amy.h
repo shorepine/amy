@@ -82,6 +82,7 @@ typedef int amy_err_t;
 #endif
 
 
+
 #include "amy_fixedpoint.h"
 
 
@@ -232,6 +233,8 @@ void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
 void osc_note_on(uint16_t osc);
+
+
 
 // global synth state
 struct state {

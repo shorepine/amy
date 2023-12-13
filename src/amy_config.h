@@ -22,7 +22,7 @@
 #elif TULIP
 #define AMY_PCM_PATCHES_SIZE 1
 #else
-#define AMY_PCM_PATCHES_SIZE 2
+#define AMY_PCM_PATCHES_SIZE 1
 #endif
 
 
