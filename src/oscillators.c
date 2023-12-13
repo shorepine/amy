@@ -373,7 +373,16 @@ void render_noise(SAMPLE *buf, uint16_t osc) {
 }
 
 SAMPLE compute_mod_noise(uint16_t osc) {
-    return MUL4_SS(amy_get_random(), msynth[osc].amp);
+    float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
+    PHASOR origphase = synth[osc].phase;
+    float fstep = msynth[osc].freq / mod_sr;
+    synth[osc].phase = P_WRAPPED_SUM(synth[osc].phase, F2P(fstep));  // cycles per sec / calls per sec = cycles per call
+    if (fstep > 1.0f || origphase > synth[osc].phase) {
+        // phase wrapped, take new sample.
+        synth[osc].last_two[0] = MUL4_SS(amy_get_random(), msynth[osc].amp);
+    }
+    //printf("mod_noise: time %lld fstep %f samp %f\n", total_samples, fstep, S2F(synth[osc].last_two[0]));
+    return synth[osc].last_two[0];
 }
 
 
