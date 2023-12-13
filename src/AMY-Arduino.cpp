@@ -6,7 +6,7 @@
 
 #ifdef ARDUINO_ARCH_RP2040
 
-bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
+bi_decl(bi_3pins_with_names(8, "I2S DIN", 9, "I2S BCK", 10, "I2S LRCK"));
 
 extern "C" int32_t await_message_from_other_core();
 extern "C" void send_message_to_other_core(int32_t t);
@@ -30,6 +30,7 @@ void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
     }
     buffer->sample_count = AMY_BLOCK_SIZE;
     give_audio_buffer(ap, buffer);
+
 }
 
 struct audio_buffer_pool *init_audio() {
@@ -49,8 +50,8 @@ struct audio_buffer_pool *init_audio() {
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
-            .data_pin = PICO_AUDIO_I2S_DATA_PIN,
-            .clock_pin_base = PICO_AUDIO_I2S_CLOCK_PIN_BASE,
+            .data_pin = 8,
+            .clock_pin_base = 9,
             .dma_channel = 0,
             .pio_sm = 0,
     };
@@ -66,6 +67,19 @@ struct audio_buffer_pool *init_audio() {
 
     return producer_pool;
 }
+
+
+void core1_main() {
+    while(1) {
+        int32_t ret = 0;
+        while(ret !=32) ret = multicore_fifo_pop_blocking();
+        render_task(AMY_OSCS/2, AMY_OSCS, 1);
+        multicore_fifo_push_blocking(64);
+    }
+
+}
+
+
 #endif
 
 #ifdef ESP_PLATFORM
@@ -81,6 +95,14 @@ AMY::AMY()
 
 }
 
+struct event AMY::default_event() {
+    return amy_default_event();
+}
+
+void AMY::add_event(struct event e) {
+    amy_add_event(e);
+}
+
 int64_t AMY::sysclock() {
     return amy_sysclock();
 }
@@ -88,6 +110,10 @@ int64_t AMY::sysclock() {
 void AMY::begin()
 {
     set_sys_clock_khz(250000000 / 1000, false); 
+    #if AMY_CORES == 2
+        multicore_launch_core1(core1_main);
+    #endif   
+    sleep_ms(500);
     amy_start();
     ap = init_audio();
 
@@ -101,15 +127,8 @@ void AMY::send_message(char * message) {
 
 }
 
-void AMY::render(uint8_t core) {
-    int32_t ret = 0;
-    if(core == 0) {
-        rp2040_fill_audio_buffer(ap);
-    } else {
-        while(ret!=64) ret = await_message_from_other_core();
-        render_task(AMY_OSCS/2, AMY_OSCS, 1);
-        send_message_to_other_core(32);
-    }
+void AMY::render() {
+    rp2040_fill_audio_buffer(ap);
 }
 
 

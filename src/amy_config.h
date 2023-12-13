@@ -6,23 +6,21 @@
 #define AMY_OSCS 120
 
 // If using a multi-core capable device, how many cores to render from
-#ifdef PICO_ON_DEVICE
-#define AMY_CORES 2
-#elif ESP_PLATFORM
-#define AMY_CORES 2
+#if defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
+#define AMY_CORES 1
 #else
 #define AMY_CORES 1              
 #endif
 
 // 1 == small PCM, 2 == large PCM samples stored in the program
-#ifdef PICO_ON_DEVICE
+#if defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
 #define AMY_PCM_PATCHES_SIZE 1   
 #elif ALLES
 #define AMY_PCM_PATCHES_SIZE 2
 #elif TULIP
 #define AMY_PCM_PATCHES_SIZE 1
 #else
-#define AMY_PCM_PATCHES_SIZE 1
+#define AMY_PCM_PATCHES_SIZE 2
 #endif
 
 
@@ -40,6 +38,9 @@
 #ifdef ALLES
 #define AMY_HAS_CHORUS 1         // Alles can do chorus
 #define AMY_HAS_REVERB 0         // Alles doesn't have the RAM for reverb
+#elif defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
+#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
+#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
 #else
 #define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)

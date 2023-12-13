@@ -28,7 +28,9 @@ class AMY
     void begin();
     int64_t sysclock();
     void fm(int64_t start);
-    void render(uint8_t core);
+    void render();
+    struct event default_event();
+    void add_event(struct event e);
     void send_message(char * message);
     uint16_t * render_block();
   private:
