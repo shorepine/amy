@@ -183,7 +183,7 @@ def render(seconds):
     frame_count = int((seconds*AMY_SAMPLE_RATE)/BLOCK_SIZE)
     frames = []
     for f in range(frame_count):
-        frames.append( np.array(libamy.render())/32767.0 )
+        frames.append( np.array(libamy.render())/32768.0 )
     return np.hstack(frames).reshape((-1, AMY_NCHANS))
 
 # Starts a live mode, with audio playing out default sounddevice
