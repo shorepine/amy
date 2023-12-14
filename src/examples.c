@@ -161,7 +161,7 @@ void example_drums(int64_t start, int loops) {
                 e.velocity = 0;
             }
             amy_add_event(e);
-            e.midi_note = -1;
+            AMY_UNSET(e.midi_note);
         }
     }
 }

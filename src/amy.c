@@ -445,7 +445,7 @@ void reset_osc(uint16_t i ) {
     synth[i].wave = SINE;
     synth[i].duty = 0.5f;
     msynth[i].duty = 0.5f;
-    synth[i].patch = -1;
+    AMY_UNSET(synth[i].patch);
     synth[i].midi_note = 0;
     synth[i].freq = 0;
     msynth[i].freq = 0;
@@ -461,7 +461,7 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
-    synth[i].ratio = -1;
+    AMY_UNSET(synth[i].ratio);
     synth[i].filter_freq = 0;
     msynth[i].filter_freq = 0;
     synth[i].resonance = 0.7f;
@@ -473,21 +473,21 @@ void reset_osc(uint16_t i ) {
     synth[i].status = OFF;
     AMY_UNSET(synth[i].mod_source);
     synth[i].mod_target = 0; 
-    synth[i].note_on_clock = -1;
-    synth[i].note_off_clock = -1;
+    AMY_UNSET(synth[i].note_on_clock);
+    AMY_UNSET(synth[i].note_off_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_state = 0;
     synth[i].lpf_alpha = 0;
     synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
-    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = -2;
+    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i].algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { 
         for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) { 
-            synth[i].breakpoint_times[j][k] =-1; 
-            synth[i].breakpoint_values[j][k] = -1; 
+            AMY_UNSET(synth[i].breakpoint_times[j][k]); 
+            AMY_UNSET(synth[i].breakpoint_values[j][k]);
         } 
-        synth[i].breakpoint_target[j] = 0; 
+        AMY_UNSET(synth[i].breakpoint_target[j]);
     }
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
@@ -758,7 +758,7 @@ void play_event(struct delta d) {
         else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
         else {
             // osc note off, start release
-            synth[d.osc].note_on_clock = -1;
+            AMY_UNSET(synth[d.osc].note_on_clock);
             synth[d.osc].note_off_clock = total_samples;    
         }
     }
@@ -793,7 +793,7 @@ void hold_and_modify(uint16_t osc) {
     }
     if(all_set_scale == 0) { // all bp sets were 0, which means we are in a note off and nobody is active anymore. time to stop the note.
         synth[osc].status=OFF;
-        synth[osc].note_off_clock = -1;
+        AMY_UNSET(synth[osc].note_off_clock);
     }
 
     // and the mod -- mod scale is (original + (original * scale))
@@ -1131,10 +1131,10 @@ float atoff(const char *s) {
 void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
     uint8_t idx = 0;
     uint16_t c = 0;
-    // set the breakpoint to default (-1) first
+    // set the breakpoint to default first
     for(uint8_t i=0;i<MAX_BREAKPOINTS;i++) {
-        e->breakpoint_times[which_bpset][i] = -1;
-        e->breakpoint_values[which_bpset][i] = -1;
+        AMY_UNSET(e->breakpoint_times[which_bpset][i]);
+        AMY_UNSET(e->breakpoint_values[which_bpset][i]);
     }
     uint16_t stop = strspn(message, " 0123456789-,.");
     while(c < stop) {
