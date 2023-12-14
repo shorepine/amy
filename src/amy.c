@@ -210,83 +210,90 @@ float freq_for_midi_note(uint8_t midi_note) {
     return 440.0f*powf(2,(midi_note-69.0f)/12.0f);
 }
 
-// create a new default event -- mostly -1 or no change
+
+
+
+// create a new default API accessible event
 struct event amy_default_event() {
     struct event e;
-    e.time = 0;
-    e.osc = 0;
-    e.patch = -1;
-    e.wave = -1;
-    e.phase = -1;
-    e.duty = -1;
-    e.feedback = -1;
-    e.velocity = -1;
-    e.midi_note = -1;
-    e.amp = -1; 
-    e.freq = -1;
-    e.volume = -1;
-    e.pan = -1;
-    e.latency_ms = -1;
-    e.ratio = -1;
-    e.filter_freq = -1;
-    e.resonance = -1;
-    e.filter_type = -1;
-    e.mod_source = -1;
-    e.mod_target = -1;
-    e.eq_l = -1;
-    e.eq_m = -1;
-    e.eq_h = -1;
-    e.algorithm = -1;
+    AMY_UNSET(e.time);
+    AMY_UNSET(e.osc);
+    AMY_UNSET(e.patch);
+    AMY_UNSET(e.wave);
+    AMY_UNSET(e.phase);
+    AMY_UNSET(e.duty);
+    AMY_UNSET(e.feedback);
+    AMY_UNSET(e.velocity);
+    AMY_UNSET(e.midi_note);
+    AMY_UNSET(e.amp); 
+    AMY_UNSET(e.freq);
+    AMY_UNSET(e.volume);
+    AMY_UNSET(e.pan);
+    AMY_UNSET(e.latency_ms);
+    AMY_UNSET(e.ratio);
+    AMY_UNSET(e.filter_freq);
+    AMY_UNSET(e.resonance);
+    AMY_UNSET(e.filter_type);
+    AMY_UNSET(e.mod_source);
+    AMY_UNSET(e.mod_target);
+    AMY_UNSET(e.eq_l);
+    AMY_UNSET(e.eq_m);
+    AMY_UNSET(e.eq_h);
+    AMY_UNSET(e.algorithm);
+    AMY_UNSET(e.bp0_target);
+    AMY_UNSET(e.bp1_target);
+    AMY_UNSET(e.bp2_target);
+    e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
     e.bp2[0] = 0;
-    e.bp0_target = -1;
-    e.bp1_target = -1;
-    e.bp2_target = -1;
-    e.algo_source[0] = 0;
     return e;
 }
 
-// create a new default event -- mostly -1 or no change
+// create a new internal default event
 struct i_event amy_default_i_event() {
     struct i_event e;
+
+    // These are not set to unset, but rather to sane defaults that every oscillator shares
     e.status = EMPTY;
     e.time = 0;
     e.osc = 0;
     e.step = 0;
     e.substep = 0;
     e.sample = F2S(0);
-    e.patch = -1;
-    e.wave = -1;
-    e.phase = -1;
-    e.duty = -1;
-    e.feedback = -1;
-    e.velocity = -1;
-    e.midi_note = -1;
-    e.amp = -1; 
-    e.freq = -1;
-    e.volume = -1;
-    e.pan = -1;
-    e.latency_ms = -1;
-    e.ratio = -1;
-    e.filter_freq = -1;
-    e.resonance = -1;
-    e.filter_type = -1;
-    e.mod_source = -1;
-    e.mod_target = -1;
-    e.note_on_clock = -1;
-    e.note_off_clock = -1;
-    e.eq_l = -1;
-    e.eq_m = -1;
-    e.eq_h = -1;
-    e.algorithm = -1;
-    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) e.algo_source[i] = -2;
+
+    // These are set to unset
+    AMY_UNSET(e.patch);
+    AMY_UNSET(e.wave);
+    AMY_UNSET(e.phase);
+    AMY_UNSET(e.duty);
+    AMY_UNSET(e.feedback);
+    AMY_UNSET(e.velocity);
+    AMY_UNSET(e.midi_note);
+    AMY_UNSET(e.amp); 
+    AMY_UNSET(e.freq);
+    AMY_UNSET(e.volume);
+    AMY_UNSET(e.pan);
+    AMY_UNSET(e.latency_ms);
+    AMY_UNSET(e.ratio);
+    AMY_UNSET(e.filter_freq);
+    AMY_UNSET(e.resonance);
+    AMY_UNSET(e.filter_type);
+    AMY_UNSET(e.mod_source);
+    AMY_UNSET(e.mod_target);
+    AMY_UNSET(e.note_on_clock);
+    AMY_UNSET(e.note_off_clock);
+    AMY_UNSET(e.eq_l);
+    AMY_UNSET(e.eq_m);
+    AMY_UNSET(e.eq_h);
+    AMY_UNSET(e.algorithm);
+    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) AMY_UNSET(e.algo_source[i]);
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) { 
         for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) { 
-            e.breakpoint_times[i][j] = -1; 
-            e.breakpoint_values[i][j] = -1; 
+            AMY_UNSET(e.breakpoint_times[i][j]); 
+            AMY_UNSET(e.breakpoint_values[i][j]); 
         } 
-        e.breakpoint_target[i] = -1; 
+        AMY_UNSET(e.breakpoint_target[i]); 
     }
     return e;
 }
@@ -355,12 +362,12 @@ void amy_add_event(struct event e) {
     i.wave = e.wave;
     i.patch = e.patch;
     i.midi_note = e.midi_note;
-    i.amp = F2S(e.amp);
+    if(AMY_IS_SET(e.amp)) i.amp = F2S(e.amp);
     i.duty = e.duty;
-    i.feedback = F2S(e.feedback);
+    if(AMY_IS_SET(e.feedback)) i.feedback = F2S(e.feedback);
     i.freq = e.freq;
     i.velocity = e.velocity;
-    i.phase = F2P(e.phase);
+    if(AMY_IS_SET(e.phase)) i.phase = F2P(e.phase);
     i.detune = e.detune;
     i.volume = e.volume;
     i.pan = e.pan;
@@ -391,44 +398,44 @@ void amy_add_i_event(struct i_event e) {
     struct delta d;
     d.osc = e.osc;
     d.time = e.time;
-    if(e.wave>-1) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
-    if(e.patch>-1) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
-    if(e.midi_note>-1) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
-    if(e.amp>-1) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
-    if(e.duty>-1) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
-    if(e.feedback>-1) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(e.freq>-1) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
-    if(e.phase>-1) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
-    if(e.volume>-1) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
-    if(e.pan>-1) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
-    if(e.latency_ms>-1) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
-    if(e.ratio>-1) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
-    if(e.filter_freq>-1) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
-    if(e.resonance>-1) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
-    if(e.mod_source>-1) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
-    if(e.mod_target>-1) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
-    if(e.breakpoint_target[0]>-1) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[0]; add_delta_to_queue(d); }
-    if(e.breakpoint_target[1]>-1) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[1]; add_delta_to_queue(d); }
-    if(e.breakpoint_target[2]>-1) { d.param=BP2_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[2]; add_delta_to_queue(d); }
-    if(e.filter_type>-1) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
-    if(e.algorithm>-1) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.amp)) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.duty)) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.ratio)) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_freq)) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[0])) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[0]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[1])) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[1]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[2])) { d.param=BP2_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[2]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) 
-        if(e.algo_source[i]>-2) { d.param=ALGO_SOURCE_START+i; d.data = *(uint32_t *)&e.algo_source[i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.algo_source[i])) { d.param=ALGO_SOURCE_START+i; d.data = *(uint32_t *)&e.algo_source[i]; add_delta_to_queue(d); }
     for(uint8_t i=0;i<MAX_BREAKPOINTS;i++) {
-        if(e.breakpoint_times[0][i]>-1) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[0][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_times[1][i]>-1) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[1][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_times[2][i]>-1) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[2][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[0][i]>-1) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[1][i]>-1) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[2][i]>-1) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[0][i])) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[0][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[1][i])) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[1][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[2][i])) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[2][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[0][i])) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[1][i])) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[2][i])) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
     }
 
-    if(e.eq_l>-1) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
-    if(e.eq_m>-1) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
-    if(e.eq_h>-1) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(e.velocity>-1) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
 }
 
@@ -438,7 +445,7 @@ void reset_osc(uint16_t i ) {
     synth[i].wave = SINE;
     synth[i].duty = 0.5f;
     msynth[i].duty = 0.5f;
-    synth[i].patch = -1;
+    AMY_UNSET(synth[i].patch);
     synth[i].midi_note = 0;
     synth[i].freq = 0;
     msynth[i].freq = 0;
@@ -454,7 +461,7 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
-    synth[i].ratio = -1;
+    AMY_UNSET(synth[i].ratio);
     synth[i].filter_freq = 0;
     msynth[i].filter_freq = 0;
     synth[i].resonance = 0.7f;
@@ -464,23 +471,23 @@ void reset_osc(uint16_t i ) {
     synth[i].sample = F2S(0);
     synth[i].substep = 0;
     synth[i].status = OFF;
-    synth[i].mod_source = -1;
+    AMY_UNSET(synth[i].mod_source);
     synth[i].mod_target = 0; 
-    synth[i].note_on_clock = -1;
-    synth[i].note_off_clock = -1;
+    AMY_UNSET(synth[i].note_on_clock);
+    AMY_UNSET(synth[i].note_off_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_state = 0;
     synth[i].lpf_alpha = 0;
     synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
-    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = -2;
+    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i].algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { 
         for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) { 
-            synth[i].breakpoint_times[j][k] =-1; 
-            synth[i].breakpoint_values[j][k] = -1; 
+            AMY_UNSET(synth[i].breakpoint_times[j][k]); 
+            AMY_UNSET(synth[i].breakpoint_values[j][k]);
         } 
-        synth[i].breakpoint_target[j] = 0; 
+        AMY_UNSET(synth[i].breakpoint_target[j]);
     }
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
@@ -720,7 +727,7 @@ void play_event(struct delta d) {
             // restart the waveforms, adjusting for phase if given
             osc_note_on(d.osc);
             // trigger the mod source, if we have one
-            if(synth[d.osc].mod_source >= 0) {
+            if(AMY_IS_SET(synth[d.osc].mod_source)) {
                 if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
@@ -751,7 +758,7 @@ void play_event(struct delta d) {
         else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
         else {
             // osc note off, start release
-            synth[d.osc].note_on_clock = -1;
+            AMY_UNSET(synth[d.osc].note_on_clock);
             synth[d.osc].note_off_clock = total_samples;    
         }
     }
@@ -786,7 +793,7 @@ void hold_and_modify(uint16_t osc) {
     }
     if(all_set_scale == 0) { // all bp sets were 0, which means we are in a note off and nobody is active anymore. time to stop the note.
         synth[osc].status=OFF;
-        synth[osc].note_off_clock = -1;
+        AMY_UNSET(synth[osc].note_off_clock);
     }
 
     // and the mod -- mod scale is (original + (original * scale))
@@ -1124,10 +1131,10 @@ float atoff(const char *s) {
 void parse_breakpoint(struct i_event * e, char* message, uint8_t which_bpset) {
     uint8_t idx = 0;
     uint16_t c = 0;
-    // set the breakpoint to default (-1) first
+    // set the breakpoint to default first
     for(uint8_t i=0;i<MAX_BREAKPOINTS;i++) {
-        e->breakpoint_times[which_bpset][i] = -1;
-        e->breakpoint_values[which_bpset][i] = -1;
+        AMY_UNSET(e->breakpoint_times[which_bpset][i]);
+        AMY_UNSET(e->breakpoint_values[which_bpset][i]);
     }
     uint16_t stop = strspn(message, " 0123456789-,.");
     while(c < stop) {

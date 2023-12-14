@@ -106,6 +106,27 @@ struct delta {
     struct delta * next; // the next event, in time 
 };
 
+#include <limits.h>
+
+
+#define AMY_UNSET_VALUE(var) _Generic((var), \
+    int64_t: LONG_MAX, \
+    float: nanf(""), \
+    int16_t: SHRT_MAX, \
+    int8_t: SCHAR_MAX, \
+    int32_t: INT_MAX \
+)
+
+#define AMY_UNSET(var) var = AMY_UNSET_VALUE(var)
+
+#define AMY_IS_UNSET(var) _Generic((var), \
+    float: isnan(var), \
+    default: var==AMY_UNSET_VALUE(var) \
+)
+
+
+#define AMY_IS_SET(var) !AMY_IS_UNSET(var)
+
 
 // API accessible events
 struct event {
@@ -138,9 +159,9 @@ struct event {
     char bp0[255];
     char bp1[255];
     char bp2[255];
-    int8_t bp0_target;
-    int8_t bp1_target;
-    int8_t bp2_target;
+    int16_t bp0_target;
+    int16_t bp1_target;
+    int16_t bp2_target;
     uint8_t status;
 
 

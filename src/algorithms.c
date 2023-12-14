@@ -140,14 +140,14 @@ void note_on_mod(uint16_t osc, uint16_t algo_osc) {
 
 void algo_note_off(uint16_t osc) {
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(synth[osc].algo_source[i] >=0 ) {
+        if(AMY_IS_SET(synth[osc].algo_source[i])) {
             uint16_t o = synth[osc].algo_source[i];
-            synth[o].note_on_clock = -1;
+            AMY_UNSET(synth[o].note_on_clock);
             synth[o].note_off_clock = total_samples;
         }
     }
     // osc note off, start release
-    synth[osc].note_on_clock = -1;
+    AMY_UNSET(synth[osc].note_on_clock);
     synth[osc].note_off_clock = total_samples;          
 }
 
@@ -165,7 +165,7 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
     float time_ratio = 1;
-    if(synth[osc].ratio >=0 ) time_ratio = synth[osc].ratio;
+    if(AMY_IS_SET(synth[osc].ratio)) time_ratio = synth[osc].ratio;
 
     // amp LFO
     synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
@@ -229,11 +229,11 @@ void algo_setup_patch(uint16_t osc) {
 
 void algo_note_on(uint16_t osc) {    
     // trigger all the source operator voices
-    if(synth[osc].patch >= 0) { 
+    if(AMY_IS_SET(synth[osc].patch)) { 
         algo_setup_patch(osc);
     }
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(synth[osc].algo_source[i] >=0 ) {
+        if(AMY_IS_SET(synth[osc].algo_source[i])) {
             note_on_mod(synth[osc].algo_source[i], osc);
         }
     }            
@@ -261,7 +261,7 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
         zero(scratch[core][i]);
     SAMPLE amp = msynth[osc].amp >> 2;  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
-        if(synth[osc].algo_source[op] >=0 && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
+        if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
             SAMPLE feedback_level = 0;
             SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 

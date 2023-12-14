@@ -92,7 +92,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_values[0][1] = pb.amp_delta; 
                 synth[o].breakpoint_times[0][2] = 0;
                 synth[o].breakpoint_values[0][2] = 0.0;  // Release amp target value
-                synth[o].breakpoint_times[0][3] = -1; 
+                AMY_UNSET(synth[o].breakpoint_times[0][3]);
                 synth[o].breakpoint_target[0] = TARGET_AMP + TARGET_LINEAR;
 
                 synth[o].breakpoint_times[1][0] = 0; 
@@ -101,7 +101,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_values[1][1] = pb.freq_delta;
                 synth[o].breakpoint_times[1][2] = 0; 
                 synth[o].breakpoint_values[1][2] = 1.0;  // Release freq mod target value.
-                synth[o].breakpoint_times[1][1] = -1; 
+                AMY_UNSET(synth[o].breakpoint_times[1][1]);
                 synth[o].breakpoint_target[1] = TARGET_FREQ + TARGET_LINEAR;
                 
                 uint8_t partial_code = 0; // control code for partial patches

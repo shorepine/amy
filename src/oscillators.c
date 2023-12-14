@@ -300,7 +300,7 @@ extern int64_t total_samples;
 /* FM */
 // NB this uses new lingo for step, skip, phase etc
 void fm_sine_note_on(uint16_t osc, uint16_t algo_osc) {
-    if(synth[osc].ratio >= 0) {
+    if(AMY_IS_SET(synth[osc].ratio)) {
         msynth[osc].freq = (msynth[algo_osc].freq * synth[osc].ratio);
     }
     // An empty exercise since there is only one entry in sine_lutset.
@@ -309,7 +309,7 @@ void fm_sine_note_on(uint16_t osc, uint16_t algo_osc) {
 }
 
 void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp) {
-    if(synth[osc].ratio >= 0) {
+    if(AMY_IS_SET(synth[osc].ratio)) {
         msynth[osc].freq = msynth[algo_osc].freq * synth[osc].ratio;
     }
     PHASOR step = F2P(msynth[osc].freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
@@ -396,7 +396,7 @@ void partial_note_on(uint16_t osc) {
 
 void partial_note_off(uint16_t osc) {
     synth[osc].substep = 2;
-    synth[osc].note_on_clock = -1;
+    AMY_UNSET(synth[osc].note_on_clock);
     synth[osc].note_off_clock = total_samples;   
     synth[osc].last_amp = 0;
     synth[osc].status=OFF;
