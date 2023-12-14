@@ -362,12 +362,12 @@ void amy_add_event(struct event e) {
     i.wave = e.wave;
     i.patch = e.patch;
     i.midi_note = e.midi_note;
-    i.amp = F2S(e.amp);
+    if(AMY_IS_SET(e.amp)) i.amp = F2S(e.amp);
     i.duty = e.duty;
-    i.feedback = F2S(e.feedback);
+    if(AMY_IS_SET(e.feedback)) i.feedback = F2S(e.feedback);
     i.freq = e.freq;
     i.velocity = e.velocity;
-    i.phase = F2P(e.phase);
+    if(AMY_IS_SET(e.phase)) i.phase = F2P(e.phase);
     i.detune = e.detune;
     i.volume = e.volume;
     i.pan = e.pan;
