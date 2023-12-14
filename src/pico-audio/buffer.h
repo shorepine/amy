@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#ifdef ARDUINO_ARCH_RP2040
+
 #ifndef _PICO_UTIL_BUFFER_H
 #define _PICO_UTIL_BUFFER_H
 
@@ -95,5 +97,6 @@ inline static mem_buffer_t *pico_buffer_alloc(size_t size) {
 
 #ifdef __cplusplus
 }
+#endif
 #endif
 #endif

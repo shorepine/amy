@@ -1,3 +1,4 @@
+#ifdef ARDUINO_ARCH_RP2040
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -254,3 +255,5 @@ audio_upsample_double:
     bne     3b
 5:
     pop     {r4, r5, r6, r7, pc}
+
+#endif

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#ifdef ARDUINO_ARCH_RP2040
+
 #ifndef _PICO_AUDIO_I2S_H
 #define _PICO_AUDIO_I2S_H
 
@@ -179,3 +181,5 @@ void audio_i2s_set_enabled(bool enabled);
 #endif
 
 #endif //_AUDIO_I2S_H
+#endif
+

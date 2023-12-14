@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
+#ifdef ARDUINO_ARCH_RP2040
 #include <cstring>
 #include "audio.h"
 #include "sample_conversion.h"
@@ -252,3 +252,5 @@ audio_buffer_t *mono_s8_to_stereo_consumer_take(audio_connection_t *connection, 
 void stereo_to_stereo_producer_give(audio_connection_t *connection, audio_buffer_t *buffer) {
     return producer_pool_blocking_give<Stereo<FmtS16>, Stereo<FmtS16>>(connection, buffer);
 }
+#endif
+

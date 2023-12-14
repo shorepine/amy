@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#ifdef ARDUINO_ARCH_RP2040
+
 #ifndef SOFTWARE_SAMPLE_CONVERSION_H
 #define SOFTWARE_SAMPLE_CONVERSION_H
 
@@ -285,3 +287,4 @@ void producer_pool_blocking_give(audio_connection_t *connection, audio_buffer_t 
 }
 
 #endif //SOFTWARE_SAMPLE_CONVERSION_H
+#endif

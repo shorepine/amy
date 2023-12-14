@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+
+#ifdef ARDUINO_ARCH_RP2040
+
 #include <stdio.h>
 
 #include "audio_i2s.h"
@@ -380,3 +383,4 @@ void audio_i2s_set_enabled(bool enabled) {
         audio_enabled = enabled;
     }
 }
+#endif
