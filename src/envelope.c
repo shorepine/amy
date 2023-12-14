@@ -25,7 +25,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
 
 SAMPLE compute_mod_scale(uint16_t osc) {
     int16_t source = synth[osc].mod_source;
-    if(synth[osc].mod_target >= 1 && source >= 0) {
+    if(synth[osc].mod_target != AMY_DEFAULT_INT16 && source != AMY_DEFAULT_INT16) {
         if(source != osc) {  // that would be weird
             msynth[source].amp = synth[source].amp;
             msynth[source].duty = synth[source].duty;
@@ -56,18 +56,18 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
 
     // Find out which one is release (the last one)
     
-    while(synth[osc].breakpoint_times[bp_set][bp_r] >= 0 && bp_r < MAX_BREAKPOINTS) bp_r++;
+    while(synth[osc].breakpoint_times[bp_set][bp_r]!=AMY_DEFAULT_INT32 && bp_r < MAX_BREAKPOINTS) bp_r++;
     bp_r--;
     if(bp_r<0) {
         // no breakpoints, return key gate.
         SAMPLE scale = F2S(1.0f);
-        if(synth[osc].note_off_clock >= 0) scale = 0;
+        if(synth[osc].note_off_clock !=AMY_DEFAULT_INT64) scale = 0;
         synth[osc].last_scale[bp_set] = scale;
         return scale; 
     }
 
     // Find out which BP we're in
-    if(synth[osc].note_on_clock >=0) {
+    if(synth[osc].note_on_clock !=AMY_DEFAULT_INT64) {
         elapsed = (total_samples - synth[osc].note_on_clock) + 1; 
         for(uint8_t i = 0; i < bp_r; i++) {
             if(elapsed < synth[osc].breakpoint_times[bp_set][i]) {
@@ -85,7 +85,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", total_samples, bp_set, found, S2F(scale));
             return scale;
         }
-    } else if(synth[osc].note_off_clock >= 0) {
+    } else if(synth[osc].note_off_clock != AMY_DEFAULT_INT64) {
         release = 1;
         elapsed = (total_samples - synth[osc].note_off_clock) + 1; 
         // Get the last t/v pair , for release
@@ -101,7 +101,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             for(uint8_t test_bp_set=0;test_bp_set<MAX_BREAKPOINT_SETS;test_bp_set++) {
                 if(test_bp_set != bp_set) {
                     // Find the last bp in this bp set
-                    bp_rx = 0; while(synth[osc].breakpoint_times[test_bp_set][bp_rx] >= 0 && bp_rx < MAX_BREAKPOINTS) bp_rx++; bp_rx--;
+                    bp_rx = 0; while(synth[osc].breakpoint_times[test_bp_set][bp_rx] !=AMY_DEFAULT_INT32 && bp_rx < MAX_BREAKPOINTS) bp_rx++; bp_rx--;
                     if(bp_rx >= 0) {
                         // If my breakpoint time is less than another breakpoint time from a different set, return 1.0 and don't end the note
                         if(my_bt < synth[osc].breakpoint_times[test_bp_set][bp_rx]) {
@@ -121,7 +121,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
                 return scale;
             }
             synth[osc].status=OFF;
-            synth[osc].note_off_clock = -1;
+            synth[osc].note_off_clock = AMY_DEFAULT_INT64;
             SAMPLE scale = F2S(synth[osc].breakpoint_values[bp_set][bp_r]);
             synth[osc].last_scale[bp_set] = scale;
             return scale;

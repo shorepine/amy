@@ -106,6 +106,15 @@ struct delta {
     struct delta * next; // the next event, in time 
 };
 
+#include <limits.h>
+
+#define AMY_DEFAULT_FLOAT nanf("")
+#define AMY_DEFAULT_INT64 LONG_MAX
+#define AMY_DEFAULT_INT16 SHRT_MAX
+#define AMY_DEFAULT_INT8 SCHAR_MAX
+#define AMY_DEFAULT_INT32 INT_MAX
+#define AMY_DEFAULT_PHASOR F2P(AMY_DEFAULT_FLOAT)
+#define AMY_DEFAULT_SAMPLE F2S(AMY_DEFAULT_FLOAT)
 
 // API accessible events
 struct event {
@@ -138,9 +147,9 @@ struct event {
     char bp0[255];
     char bp1[255];
     char bp2[255];
-    int8_t bp0_target;
-    int8_t bp1_target;
-    int8_t bp2_target;
+    int16_t bp0_target;
+    int16_t bp1_target;
+    int16_t bp2_target;
     uint8_t status;
 
 
