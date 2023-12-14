@@ -107,6 +107,10 @@ struct delta {
 };
 
 #include <limits.h>
+static inline int isnan_c11(float test)
+{
+    return isnan(test);
+}
 
 
 #define AMY_UNSET_VALUE(var) _Generic((var), \
@@ -120,7 +124,7 @@ struct delta {
 #define AMY_UNSET(var) var = AMY_UNSET_VALUE(var)
 
 #define AMY_IS_UNSET(var) _Generic((var), \
-    float: isnan(var), \
+    float: isnan_c11(var), \
     default: var==AMY_UNSET_VALUE(var) \
 )
 
