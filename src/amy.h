@@ -108,14 +108,24 @@ struct delta {
 
 #include <limits.h>
 
-#define AMY_DEFAULT_FLOAT nanf("")
-#define IS_DEFAULT_FLOAT(f) isnan(f)
-#define AMY_DEFAULT_INT64 LONG_MAX
-#define AMY_DEFAULT_INT16 SHRT_MAX
-#define AMY_DEFAULT_INT8 SCHAR_MAX
-#define AMY_DEFAULT_INT32 INT_MAX
-#define AMY_DEFAULT_PHASOR INT_MAX
-#define AMY_DEFAULT_SAMPLE INT_MAX
+
+#define AMY_UNSET(var) _Generic((var), \
+    int64_t: LONG_MAX, \
+    float: nanf(""), \
+    int16_t: SHRT_MAX, \
+    int8_t: SCHAR_MAX, \
+    int32_t: INT_MAX \
+)
+
+
+#define AMY_IS_UNSET(var) _Generic((var), \
+    float: isnan(var), \
+    default: var==AMY_UNSET(var) \
+)
+
+
+#define AMY_IS_SET(var) !AMY_IS_UNSET(var)
+
 
 // API accessible events
 struct event {

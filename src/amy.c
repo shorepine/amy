@@ -216,80 +216,84 @@ float freq_for_midi_note(uint8_t midi_note) {
 // create a new default API accessible event
 struct event amy_default_event() {
     struct event e;
-    e.time = AMY_DEFAULT_INT64;
-    e.osc = AMY_DEFAULT_INT16;
-    e.patch = AMY_DEFAULT_INT16;
-    e.wave = AMY_DEFAULT_INT16;
-    e.phase = AMY_DEFAULT_FLOAT;
-    e.duty = AMY_DEFAULT_FLOAT;
-    e.feedback = AMY_DEFAULT_FLOAT;
-    e.velocity = AMY_DEFAULT_FLOAT;
-    e.midi_note = AMY_DEFAULT_INT16;
-    e.amp = AMY_DEFAULT_FLOAT; 
-    e.freq = AMY_DEFAULT_FLOAT;
-    e.volume = AMY_DEFAULT_FLOAT;
-    e.pan = AMY_DEFAULT_FLOAT;
-    e.latency_ms = AMY_DEFAULT_INT16;
-    e.ratio = AMY_DEFAULT_FLOAT;
-    e.filter_freq = AMY_DEFAULT_FLOAT;
-    e.resonance = AMY_DEFAULT_FLOAT;
-    e.filter_type = AMY_DEFAULT_INT8;
-    e.mod_source = AMY_DEFAULT_INT16;
-    e.mod_target = AMY_DEFAULT_INT16;
-    e.eq_l = AMY_DEFAULT_FLOAT;
-    e.eq_m = AMY_DEFAULT_FLOAT;
-    e.eq_h = AMY_DEFAULT_FLOAT;
-    e.algorithm = AMY_DEFAULT_INT8;
+    e.time = AMY_UNSET(e.time);
+    e.osc = AMY_UNSET(e.osc);
+    e.patch = AMY_UNSET(e.patch);
+    e.wave = AMY_UNSET(e.wave);
+    e.phase = AMY_UNSET(e.phase);
+    e.duty = AMY_UNSET(e.duty);
+    e.feedback = AMY_UNSET(e.feedback);
+    e.velocity = AMY_UNSET(e.velocity);
+    e.midi_note = AMY_UNSET(e.midi_note);
+    e.amp = AMY_UNSET(e.amp); 
+    e.freq = AMY_UNSET(e.freq);
+    e.volume = AMY_UNSET(e.volume);
+    e.pan = AMY_UNSET(e.pan);
+    e.latency_ms = AMY_UNSET(e.latency_ms);
+    e.ratio = AMY_UNSET(e.ratio);
+    e.filter_freq = AMY_UNSET(e.filter_freq);
+    e.resonance = AMY_UNSET(e.resonance);
+    e.filter_type = AMY_UNSET(e.filter_type);
+    e.mod_source = AMY_UNSET(e.mod_source);
+    e.mod_target = AMY_UNSET(e.mod_target);
+    e.eq_l = AMY_UNSET(e.eq_l);
+    e.eq_m = AMY_UNSET(e.eq_m);
+    e.eq_h = AMY_UNSET(e.eq_h);
+    e.algorithm = AMY_UNSET(e.algorithm);
+    e.bp0_target = AMY_UNSET(e.bp0_target);
+    e.bp1_target = AMY_UNSET(e.bp1_target);
+    e.bp2_target = AMY_UNSET(e.bp2_target);
+    e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
     e.bp2[0] = 0;
-    e.bp0_target = AMY_DEFAULT_INT16;
-    e.bp1_target = AMY_DEFAULT_INT16;
-    e.bp2_target = AMY_DEFAULT_INT16;
-    e.algo_source[0] = 0;
     return e;
 }
 
 // create a new internal default event
 struct i_event amy_default_i_event() {
     struct i_event e;
+
+    // These are not set to unset, but rather to sane defaults that every oscillator shares
     e.status = EMPTY;
     e.time = 0;
     e.osc = 0;
     e.step = 0;
     e.substep = 0;
     e.sample = F2S(0);
-    e.patch = AMY_DEFAULT_INT16;
-    e.wave = AMY_DEFAULT_INT16;
-    e.phase = AMY_DEFAULT_PHASOR;
-    e.duty = AMY_DEFAULT_FLOAT;
-    e.feedback = AMY_DEFAULT_SAMPLE;
-    e.velocity = AMY_DEFAULT_FLOAT;
-    e.midi_note = AMY_DEFAULT_INT16;
-    e.amp = AMY_DEFAULT_SAMPLE; 
-    e.freq = AMY_DEFAULT_FLOAT;
-    e.volume = AMY_DEFAULT_FLOAT;
-    e.pan = AMY_DEFAULT_FLOAT;
-    e.latency_ms = AMY_DEFAULT_INT16;
-    e.ratio = AMY_DEFAULT_FLOAT;
-    e.filter_freq = AMY_DEFAULT_FLOAT;
-    e.resonance = AMY_DEFAULT_FLOAT;
-    e.filter_type = AMY_DEFAULT_INT8;
-    e.mod_source = AMY_DEFAULT_INT16;
-    e.mod_target = AMY_DEFAULT_INT16;
-    e.note_on_clock = AMY_DEFAULT_INT64;
-    e.note_off_clock = AMY_DEFAULT_INT64;
-    e.eq_l = AMY_DEFAULT_FLOAT;
-    e.eq_m = AMY_DEFAULT_FLOAT;
-    e.eq_h = AMY_DEFAULT_FLOAT;
-    e.algorithm = AMY_DEFAULT_INT8;
-    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) e.algo_source[i] = AMY_DEFAULT_INT16;
+
+    // These are set to unset
+    e.patch = AMY_UNSET(e.patch);
+    e.wave = AMY_UNSET(e.wave);
+    e.phase = AMY_UNSET(e.phase);
+    e.duty = AMY_UNSET(e.duty);
+    e.feedback = AMY_UNSET(e.feedback);
+    e.velocity = AMY_UNSET(e.velocity);
+    e.midi_note = AMY_UNSET(e.midi_note);
+    e.amp = AMY_UNSET(e.amp); 
+    e.freq = AMY_UNSET(e.freq);
+    e.volume = AMY_UNSET(e.volume);
+    e.pan = AMY_UNSET(e.pan);
+    e.latency_ms = AMY_UNSET(e.latency_ms);
+    e.ratio = AMY_UNSET(e.ratio);
+    e.filter_freq = AMY_UNSET(e.filter_freq);
+    e.resonance = AMY_UNSET(e.resonance);
+    e.filter_type = AMY_UNSET(e.filter_type);
+    e.mod_source = AMY_UNSET(e.mod_source);
+    e.mod_target = AMY_UNSET(e.mod_target);
+    e.note_on_clock = AMY_UNSET(e.note_on_clock);
+    e.note_off_clock = AMY_UNSET(e.note_off_clock);
+    e.eq_l = AMY_UNSET(e.eq_l);
+    e.eq_m = AMY_UNSET(e.eq_m);
+    e.eq_h = AMY_UNSET(e.eq_h);
+    e.algorithm = AMY_UNSET(e.algorithm);
+    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) e.algo_source[i] = AMY_UNSET(e.algo_source[i]);
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) { 
         for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) { 
-            e.breakpoint_times[i][j] = AMY_DEFAULT_INT32; 
-            e.breakpoint_values[i][j] = AMY_DEFAULT_FLOAT; 
+            e.breakpoint_times[i][j] = AMY_UNSET(e.breakpoint_times[i][j]); 
+            e.breakpoint_values[i][j] = AMY_UNSET(e.breakpoint_values[i][j]); 
         } 
-        e.breakpoint_target[i] = AMY_DEFAULT_INT16; 
+        e.breakpoint_target[i] = AMY_UNSET(e.breakpoint_target[i]); 
     }
     return e;
 }
@@ -394,44 +398,44 @@ void amy_add_i_event(struct i_event e) {
     struct delta d;
     d.osc = e.osc;
     d.time = e.time;
-    if(e.wave!=AMY_DEFAULT_INT16) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
-    if(e.patch!=AMY_DEFAULT_INT16) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
-    if(e.midi_note!=AMY_DEFAULT_INT16) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.amp)) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.duty)) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
-    if(e.latency_ms!=AMY_DEFAULT_INT16) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.ratio)) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.filter_freq)) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
-    if(e.mod_source!=AMY_DEFAULT_INT16) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
-    if(e.mod_target!=AMY_DEFAULT_INT16) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
-    if(e.breakpoint_target[0]!=AMY_DEFAULT_INT16) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[0]; add_delta_to_queue(d); }
-    if(e.breakpoint_target[1]!=AMY_DEFAULT_INT16) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[1]; add_delta_to_queue(d); }
-    if(e.breakpoint_target[2]!=AMY_DEFAULT_INT16) { d.param=BP2_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[2]; add_delta_to_queue(d); }
-    if(e.filter_type!=AMY_DEFAULT_INT8) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
-    if(e.algorithm!=AMY_DEFAULT_INT8) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.amp)) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.duty)) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.ratio)) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_freq)) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[0])) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[0]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[1])) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[1]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.breakpoint_target[2])) { d.param=BP2_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[2]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) 
-        if(e.algo_source[i]!=AMY_DEFAULT_INT16) { d.param=ALGO_SOURCE_START+i; d.data = *(uint32_t *)&e.algo_source[i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.algo_source[i])) { d.param=ALGO_SOURCE_START+i; d.data = *(uint32_t *)&e.algo_source[i]; add_delta_to_queue(d); }
     for(uint8_t i=0;i<MAX_BREAKPOINTS;i++) {
-        if(e.breakpoint_times[0][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[0][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_times[1][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[1][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_times[2][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[2][i]; add_delta_to_queue(d); }
-        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[0][i])) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
-        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[1][i])) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
-        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[2][i])) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[0][i])) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[0][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[1][i])) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[1][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_times[2][i])) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[2][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[0][i])) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[1][i])) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.breakpoint_values[2][i])) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
     }
 
-    if(!IS_DEFAULT_FLOAT(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
-    if(!IS_DEFAULT_FLOAT(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(!IS_DEFAULT_FLOAT(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
 }
 
@@ -467,7 +471,7 @@ void reset_osc(uint16_t i ) {
     synth[i].sample = F2S(0);
     synth[i].substep = 0;
     synth[i].status = OFF;
-    synth[i].mod_source = AMY_DEFAULT_INT16;
+    synth[i].mod_source = AMY_UNSET(synth[i].mod_source);
     synth[i].mod_target = 0; 
     synth[i].note_on_clock = -1;
     synth[i].note_off_clock = -1;
@@ -723,7 +727,7 @@ void play_event(struct delta d) {
             // restart the waveforms, adjusting for phase if given
             osc_note_on(d.osc);
             // trigger the mod source, if we have one
-            if(synth[d.osc].mod_source != AMY_DEFAULT_INT16) {
+            if(AMY_IS_SET(synth[d.osc].mod_source)) {
                 if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
