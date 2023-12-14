@@ -397,17 +397,17 @@ void amy_add_i_event(struct i_event e) {
     if(e.wave!=AMY_DEFAULT_INT16) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
     if(e.patch!=AMY_DEFAULT_INT16) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
     if(e.midi_note!=AMY_DEFAULT_INT16) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
-    if(e.amp!=AMY_DEFAULT_FLOAT) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
-    if(e.duty!=AMY_DEFAULT_FLOAT) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
-    if(e.feedback!=AMY_DEFAULT_FLOAT) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(e.freq!=AMY_DEFAULT_FLOAT) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
-    if(e.phase!=AMY_DEFAULT_FLOAT) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
-    if(e.volume!=AMY_DEFAULT_FLOAT) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
-    if(e.pan!=AMY_DEFAULT_FLOAT) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.amp)) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.duty)) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
     if(e.latency_ms!=AMY_DEFAULT_INT16) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
-    if(e.ratio!=AMY_DEFAULT_FLOAT) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
-    if(e.filter_freq!=AMY_DEFAULT_FLOAT) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
-    if(e.resonance!=AMY_DEFAULT_FLOAT) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.ratio)) { d.param=RATIO; d.data = *(uint32_t *)&e.ratio; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.filter_freq)) { d.param=FILTER_FREQ; d.data = *(uint32_t *)&e.filter_freq; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(e.mod_source!=AMY_DEFAULT_INT16) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(e.mod_target!=AMY_DEFAULT_INT16) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
     if(e.breakpoint_target[0]!=AMY_DEFAULT_INT16) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.breakpoint_target[0]; add_delta_to_queue(d); }
@@ -421,17 +421,17 @@ void amy_add_i_event(struct i_event e) {
         if(e.breakpoint_times[0][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[0][i]; add_delta_to_queue(d); }
         if(e.breakpoint_times[1][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[1][i]; add_delta_to_queue(d); }
         if(e.breakpoint_times[2][i]!=AMY_DEFAULT_INT32) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_times[2][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[0][i]!=AMY_DEFAULT_FLOAT) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[1][i]!=AMY_DEFAULT_FLOAT) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
-        if(e.breakpoint_values[2][i]!=AMY_DEFAULT_FLOAT) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
+        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[0][i])) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[0][i]; add_delta_to_queue(d); }
+        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[1][i])) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[1][i]; add_delta_to_queue(d); }
+        if(!IS_DEFAULT_FLOAT(e.breakpoint_values[2][i])) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&e.breakpoint_values[2][i]; add_delta_to_queue(d); }
     }
 
-    if(e.eq_l!=AMY_DEFAULT_FLOAT) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
-    if(e.eq_m!=AMY_DEFAULT_FLOAT) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
-    if(e.eq_h!=AMY_DEFAULT_FLOAT) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(e.velocity!=AMY_DEFAULT_FLOAT) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+    if(!IS_DEFAULT_FLOAT(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
 }
 
@@ -467,7 +467,7 @@ void reset_osc(uint16_t i ) {
     synth[i].sample = F2S(0);
     synth[i].substep = 0;
     synth[i].status = OFF;
-    synth[i].mod_source = -1;
+    synth[i].mod_source = AMY_DEFAULT_INT16;
     synth[i].mod_target = 0; 
     synth[i].note_on_clock = -1;
     synth[i].note_off_clock = -1;
