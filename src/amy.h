@@ -109,7 +109,7 @@ struct delta {
 #include <limits.h>
 
 
-#define AMY_UNSET(var) _Generic((var), \
+#define AMY_UNSET_VALUE(var) _Generic((var), \
     int64_t: LONG_MAX, \
     float: nanf(""), \
     int16_t: SHRT_MAX, \
@@ -117,10 +117,11 @@ struct delta {
     int32_t: INT_MAX \
 )
 
+#define AMY_UNSET(var) var = AMY_UNSET_VALUE(var)
 
 #define AMY_IS_UNSET(var) _Generic((var), \
     float: isnan(var), \
-    default: var==AMY_UNSET(var) \
+    default: var==AMY_UNSET_VALUE(var) \
 )
 
 

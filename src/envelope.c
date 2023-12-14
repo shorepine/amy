@@ -121,7 +121,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
                 return scale;
             }
             synth[osc].status=OFF;
-            synth[osc].note_off_clock = AMY_UNSET(synth[osc].note_off_clock);
+            AMY_UNSET(synth[osc].note_off_clock);
             SAMPLE scale = F2S(synth[osc].breakpoint_values[bp_set][bp_r]);
             synth[osc].last_scale[bp_set] = scale;
             return scale;
