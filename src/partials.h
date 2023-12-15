@@ -2,7 +2,8 @@
 #ifndef __PARTIALS_H
 #define __PARTIALS_H
 #define PARTIALS_PATCHES 17
-const partial_breakpoint_map_t partial_breakpoint_map[17] = {
+
+const partial_breakpoint_map_t partial_breakpoint_map[17] PROGMEM = {
 	// offset, length, midi_note, sustain_ms, oscs_alloc
 	{ 0, 874, 43, 2909, 14 }, /* sounds/partial_sources/G1.wav */ 
 	{ 874, 83, 69, 0, 12 }, /* sounds/partial_sources/CL SHCI A3.wav */ 
@@ -22,7 +23,7 @@ const partial_breakpoint_map_t partial_breakpoint_map[17] = {
 	{ 6776, 111, 88, 0, 2 }, /* sounds/partial_sources/CHIME E5  -L.wav */ 
 	{ 6887, 413, 69, 0, 6 }, /* sounds/partial_sources/FLS LG F  A3.wav */ 
 };
-const partial_breakpoint_t partial_breakpoints[7300] = {
+const partial_breakpoint_t partial_breakpoints[7300] PROGMEM = {
 	// ms_offset, osc, freq, amp, phase, ms_delta, amp_delta, freq_delta
 	 { 0, 0, 94.934980, 0.007513, 0.125733, 43, 8.091429, 0.985298 }, 
 	 { 1, 1, 49.978264, 0.075507, 0.774680, 40, 1.071503, 0.946724 }, 

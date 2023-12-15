@@ -10,14 +10,16 @@ typedef struct {
     uint8_t midinote;
 } pcm_map_t;
 
-#if AMY_PCM_PATCHES_SIZE == 2
+#if AMY_PCM_PATCHES_SIZE == 3
 #include "pcm_large.h"
 #include "pcm_samples_large.h"
-#else
+#elif AMY_PCM_PATCHES_SIZE == 2
 #include "pcm_small.h"
 #include "pcm_samples_small.h"
+#else
+#include "pcm_tiny.h"
+#include "pcm_samples_tiny.h"
 #endif
-
 
 void pcm_init() {
 /*

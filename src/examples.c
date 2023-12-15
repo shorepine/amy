@@ -80,7 +80,7 @@ void example_drums(int64_t start, int loops) {
     struct event e = amy_default_event();
     e.time = start;
 
-    float volume = 0.2;
+    float volume = 0.5;
 
     int oscs[] = {0, 2, 3, 4, 5, 6};
     int patches[] = {1, 5, 0, 10, 10, 5};

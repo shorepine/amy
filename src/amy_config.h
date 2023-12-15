@@ -14,15 +14,23 @@
 #define AMY_CORES 1              
 #endif
 
-// 1 == small PCM, 2 == large PCM samples stored in the program
-#if defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
-#define AMY_PCM_PATCHES_SIZE 1   
-#elif ALLES
-#define AMY_PCM_PATCHES_SIZE 2
-#elif TULIP
-#define AMY_PCM_PATCHES_SIZE 1
+// 1 == tiny PCM, 2 == small, 3 = large PCM samples stored in the program
+#ifdef ARDUINO
+    #ifdef ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
+        #define AMY_PCM_PATCHES_SIZE 2
+    #else
+        #define AMY_PCM_PATCHES_SIZE 1
+    #endif
 #else
-#define AMY_PCM_PATCHES_SIZE 2
+    #ifdef ALLES
+        #define AMY_PCM_PATCHES_SIZE 3
+    #elif defined TULIP
+        #define AMY_PCM_PATCHES_SIZE 2
+    #elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
+        #define AMY_PCM_PATCHES_SIZE 2
+    #else
+        #define AMY_PCM_PATCHES_SIZE 3
+    #endif
 #endif
 
 
@@ -48,8 +56,7 @@
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
 #endif
 
-// TODO -- partials in FXP
-#define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#define AMY_HAS_PARTIALS 0       // 1 = Make partials available
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM

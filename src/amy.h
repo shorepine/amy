@@ -85,6 +85,11 @@ typedef int amy_err_t;
 
 #include "amy_fixedpoint.h"
 
+#ifdef ARDUINO
+#include "avr/pgmspace.h" // for PROGMEM, DMAMEM, FASTRUN
+#else
+#define PROGMEM 
+#endif
 
 enum params{
     WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ,

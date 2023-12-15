@@ -6,7 +6,7 @@
 #define NONLIN_RANGE 4915
 // First sample value beyond end of table (just clip to max).
 #define FIRST_HARDCLIP (FIRST_NONLIN + NONLIN_RANGE)
-const uint16_t clipping_lookup_table[NONLIN_RANGE] = {
+const uint16_t clipping_lookup_table[NONLIN_RANGE] PROGMEM = {
 29491,29491,29492,29493,29494,29495,29496,29497,
 29498,29499,29500,29501,29502,29503,29504,29505,
 29506,29507,29508,29509,29510,29511,29512,29513,
