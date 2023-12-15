@@ -466,7 +466,7 @@ void reset_osc(uint16_t i ) {
             AMY_UNSET(synth[i].breakpoint_times[j][k]); 
             AMY_UNSET(synth[i].breakpoint_values[j][k]);
         } 
-        AMY_UNSET(synth[i].breakpoint_target[j]);
+        synth[i].breakpoint_target[j] = 0;
     }
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
