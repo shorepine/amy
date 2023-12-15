@@ -56,7 +56,7 @@
 #define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
 #endif
 
-#define AMY_HAS_PARTIALS 0       // 1 = Make partials available
+#define AMY_HAS_PARTIALS 1       // 1 = Make partials available
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
