@@ -105,7 +105,7 @@ In C, using the high level structures directly;
 #include "amy.h"
 void bleep() {
     struct event e = amy_default_event();
-    int64_t sysclock = amy_sysclock();
+    int32_t sysclock = amy_sysclock();
     e.time = sysclock;
     e.wave = SINE;
     e.freq = 220;

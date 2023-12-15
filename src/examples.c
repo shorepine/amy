@@ -17,7 +17,7 @@ void example_chorus() {
 }
 
 // Play a KS tone
-void example_ks(int64_t start) {
+void example_ks(uint32_t start) {
     struct event e = amy_default_event();
     e.time = start;
 
@@ -30,7 +30,7 @@ void example_ks(int64_t start) {
     amy_add_event(e);
 }
 
-void example_fm(int64_t start) {
+void example_fm(uint32_t start) {
     // Play a few notes in FM
     struct event e = amy_default_event();
     e.time = start;
@@ -51,7 +51,7 @@ void example_fm(int64_t start) {
     amy_add_event(e);
 }
 
-void example_multimbral_fm(int64_t start) {
+void example_multimbral_fm(uint32_t start) {
     struct event e = amy_default_event();
     int osc_inc;
     e.time = start;
@@ -75,8 +75,7 @@ void example_multimbral_fm(int64_t start) {
 
 
 // Emulate the Tulip "drums()" example via event calls.
-void example_drums(int64_t start, int loops) {
-    //int64_t start = amy_sysclock();
+void example_drums(uint32_t start, int loops) {
     struct event e = amy_default_event();
     e.time = start;
 

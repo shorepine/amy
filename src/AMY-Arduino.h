@@ -26,9 +26,9 @@ class AMY
   public:
     AMY();
     void begin();
-    int64_t sysclock();
-    void fm(int64_t start);
-    void drums(int64_t start, uint16_t loops);
+    int32_t sysclock();
+    void fm(int32_t start);
+    void drums(int32_t start, uint16_t loops);
     void render(uint8_t core);
     void reset();
     struct event default_event();

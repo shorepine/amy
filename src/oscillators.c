@@ -295,7 +295,7 @@ SAMPLE compute_mod_triangle(uint16_t osc) {
     return MUL4_SS(synth[osc].sample, F2S(msynth[osc].amp));
 }
 
-extern int64_t total_samples;
+extern uint32_t total_samples;
 
 /* FM */
 // NB this uses new lingo for step, skip, phase etc

@@ -150,7 +150,7 @@ int main() {
     example_chorus();
 
     struct audio_buffer_pool *ap = init_audio();
-    int64_t start = amy_sysclock();
+    int32_t start = amy_sysclock();
     example_multiimbral_fm(start);
 
     for (int i = 0; i < 5000; ++i) {

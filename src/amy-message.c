@@ -48,10 +48,10 @@ int main(int argc, char ** argv) {
         if (input[0] == '?') {
             switch (input[1]) {
                 case 'c':
-                    fprintf(stdout, "%" PRIi64 "\n", amy_sysclock());
+                    fprintf(stdout, "%" PRIu32 "\n", amy_sysclock());
                     break;
                 case 's':
-                    fprintf(stdout, "%" PRIi64 "\n", total_samples);
+                    fprintf(stdout, "%" PRIu32 "\n", total_samples);
                     break;
                 default:
                     fprintf(stdout, "?\n");

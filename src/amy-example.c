@@ -36,7 +36,7 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
-    int64_t start =amy_sysclock();
+    int32_t start =amy_sysclock();
     amy_start();
     amy_live_start();
     amy_reset_oscs();
