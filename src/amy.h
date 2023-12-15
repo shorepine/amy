@@ -179,9 +179,9 @@ struct i_event {
     int16_t wave;
     int16_t patch;
     int16_t midi_note;
-    SAMPLE amp;
+    float amp;
     float duty;
-    SAMPLE feedback;
+    float feedback;
     float freq;
     uint8_t status;
     float velocity;
@@ -228,14 +228,14 @@ struct i_event {
 
 // events, but only the things that mods/env can change. one per osc
 struct mod_event {
-    SAMPLE amp;
+    float amp;
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
     float filter_freq;
     float resonance;
-    SAMPLE feedback;
+    float feedback;
 };
 
 // Callbacks, override if you'd like after calling amy_start()
@@ -282,9 +282,10 @@ extern struct mod_event *msynth; // the synth that is being modified by modulati
 extern struct state global; 
 
 
+float atoff(const char *s);
 int8_t oscs_init();
 void parse_breakpoint(struct i_event * e, char* message, uint8_t bp_set) ;
-void parse_algorithm(struct i_event * e, char* message) ;
+void parse_algorithm_source(struct i_event * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
 int16_t * fill_audio_buffer_task();
 int32_t ms_to_samples(int32_t ms) ;

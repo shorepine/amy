@@ -81,7 +81,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
-                synth[o].amp = F2S(pb.amp);
+                synth[o].amp = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].freq = pb.freq * freq_ratio;
                 //synth[o].last_amp = 0;
@@ -145,7 +145,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
             //render_partial(pbuf, o);
-            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j] ,msynth[osc].amp));
+            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j], F2S(msynth[osc].amp)));
             render_partial(buf, o);
             // Deferred termination of this partial, after final ramp-out.
             if (synth[o].amp == 0)  partial_note_off(o);

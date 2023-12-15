@@ -124,7 +124,7 @@ void copy(SAMPLE* a, SAMPLE* b) {
 void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
-    //printf("render_mod: osc %d msynth.amp %f\n", osc, S2F(msynth[osc].amp));
+    //printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc].amp);
 
     // out = buf
     // in = mod
@@ -160,7 +160,7 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     // [6] = amp lfo, [7] = pitch lfo
     algorithms_parameters_t p = fm_patches[synth[osc].patch % ALGO_PATCHES];
     synth[osc].algorithm = p.algo;
-    synth[osc].feedback = F2S(p.feedback);
+    synth[osc].feedback = p.feedback;
 
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
@@ -171,12 +171,12 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[6]].wave = p.lfo_wave;
     synth[target_oscs[6]].status = IS_MOD_SOURCE;
-    synth[target_oscs[6]].amp = F2S(p.lfo_amp_amp);
+    synth[target_oscs[6]].amp = p.lfo_amp_amp;
     // pitch LFO
     synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
     synth[target_oscs[7]].wave = p.lfo_wave;
     synth[target_oscs[7]].status = IS_MOD_SOURCE;
-    synth[target_oscs[7]].amp = F2S(p.lfo_pitch_amp);
+    synth[target_oscs[7]].amp = p.lfo_pitch_amp;
 
 
     float last_release_time= 0;
@@ -189,7 +189,7 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
         if(synth[target_oscs[i]].freq < 0) synth[target_oscs[i]].freq = 0;
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
         synth[target_oscs[i]].ratio = op.freq_ratio;
-        synth[target_oscs[i]].amp = F2S(op.amp);
+        synth[target_oscs[i]].amp = op.amp;
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
         synth[target_oscs[i]].phase = F2P(0.25);
         synth[target_oscs[i]].mod_target = op.lfo_target;
@@ -259,13 +259,13 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
 
     for (int i = 0; i < 3; ++i)
         zero(scratch[core][i]);
-    SAMPLE amp = msynth[osc].amp >> 2;  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
+    SAMPLE amp = F2S(msynth[osc].amp) >> 2;  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
             SAMPLE feedback_level = 0;
             SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 
-                feedback_level = synth[osc].feedback; 
+                feedback_level = F2S(synth[osc].feedback);
             } // main algo voice stores feedback, not the op 
 
             if(algo.ops[op] & IN_BUS_ONE) { 
