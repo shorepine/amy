@@ -288,9 +288,8 @@ void amy_add_event(struct event e) {
     struct delta d;
 
     // Synth defaults if not set, these are required for the delta struct
-    fprintf(stderr, "adding event osc %d time %d wave %d\n", e.osc, e.time, e.wave);
-    if(AMY_IS_UNSET(e.osc)) d.osc = 0;
-    if(AMY_IS_UNSET(e.time)) d.time = 0;
+    if(AMY_IS_UNSET(e.osc)) { d.osc = 0; } else { d.osc = e.osc; }
+    if(AMY_IS_UNSET(e.time)) { d.time = 0; } else { d.time = e.time; }
 
     // Everything else only added to queue if set
     if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
@@ -324,17 +323,16 @@ void amy_add_event(struct event e) {
         for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { if(AMY_IS_SET(t.algo_source[i])) { d.param=ALGO_SOURCE_START+i; d.data = *(uint32_t *)&t.algo_source[i]; add_delta_to_queue(d); } }
     }
 
+
     char * bps[3] = {e.bp0, e.bp1, e.bp2};
     for(uint8_t i=0;i<3;i++) {
         if(bps[i][0] != 0) {
             struct synthinfo t;
             parse_breakpoint(&t, bps[i], i);
-            if(AMY_IS_SET(t.breakpoint_times[0][i])) { d.param=BP_START+(i*2)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[0][i]; add_delta_to_queue(d); }
-            if(AMY_IS_SET(t.breakpoint_times[1][i])) { d.param=BP_START+(i*2)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[1][i]; add_delta_to_queue(d); }
-            if(AMY_IS_SET(t.breakpoint_times[2][i])) { d.param=BP_START+(i*2)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[2][i]; add_delta_to_queue(d); }
-            if(AMY_IS_SET(t.breakpoint_values[0][i])) { d.param=BP_START+(i*2 + 1)+(0*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[0][i]; add_delta_to_queue(d); }
-            if(AMY_IS_SET(t.breakpoint_values[1][i])) { d.param=BP_START+(i*2 + 1)+(1*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[1][i]; add_delta_to_queue(d); }
-            if(AMY_IS_SET(t.breakpoint_values[2][i])) { d.param=BP_START+(i*2 + 1)+(2*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[2][i]; add_delta_to_queue(d); }
+            for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) {
+                if(AMY_IS_SET(t.breakpoint_times[i][j])) { d.param=BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d); }
+                if(AMY_IS_SET(t.breakpoint_values[i][j])) { d.param=BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d); }
+            }
         }
     }
 
@@ -551,7 +549,7 @@ void play_event(struct delta d) {
     if(d.param == MIDI_NOTE) { synth[d.osc].midi_note = *(uint16_t *)&d.data; synth[d.osc].freq = freq_for_midi_note(*(uint16_t *)&d.data); } 
 
     if(d.param == WAVE) {
-        synth[d.osc].wave = *(int16_t *)&d.data; 
+        synth[d.osc].wave = *(uint16_t *)&d.data; 
         // todo: event-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner 
         if(synth[d.osc].wave == SINE) {

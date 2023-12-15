@@ -30,6 +30,16 @@ void example_ks(uint32_t start) {
     amy_add_event(e);
 }
 
+// make a 440hz sine
+void example_sine(uint32_t start) {
+    struct event e = amy_default_event();
+    e.time = start;
+    e.freq = 440;
+    e.wave = SINE;
+    e.velocity = 1;
+    amy_add_event(e);
+}
+
 void example_fm(uint32_t start) {
     // Play a few notes in FM
     struct event e = amy_default_event();

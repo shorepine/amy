@@ -137,7 +137,7 @@ struct delta {
     uint32_t data; // casted to the right thing later
     enum params param; // which parameter is being changed
     uint32_t time; // what time to play / change this parameter
-    int16_t osc; // which oscillator it impacts
+    uint16_t osc; // which oscillator it impacts
     struct delta * next; // the next event, in time 
 };
 
