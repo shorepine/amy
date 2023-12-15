@@ -362,8 +362,8 @@ void amy_add_event(struct event e) {
     i.eq_m = e.eq_m;
     i.eq_h = e.eq_h;
     i.breakpoint_target[0] = e.bp0_target;
-    i.breakpoint_target[1] = e.bp0_target;
-    i.breakpoint_target[2] = e.bp0_target;
+    i.breakpoint_target[1] = e.bp1_target;
+    i.breakpoint_target[2] = e.bp2_target;
     if(e.bp0[0] != 0) parse_breakpoint(&i, e.bp0, 0);
     if(e.bp1[0] != 0) parse_breakpoint(&i, e.bp1, 1);
     if(e.bp2[0] != 0) parse_breakpoint(&i, e.bp2, 2);
