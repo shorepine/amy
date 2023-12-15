@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with around 100KB of RAM. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, the microcontrollers ESP32 and ESP32S3, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with around 100KB of RAM. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -38,9 +38,9 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in Arduino
 
-Copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`, and `#include <AMY-Arduino.h>`. There are examples for the Pi Pico and ESP32 variants in `examples/`. 
+Copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`, and `#include <AMY-Arduino.h>`. There are examples for the Pi Pico, ESP32 (and variants), and Teensy (works on 4.X and 3.6 -- the 3.2 should work but there may be an I2S bug.) Use the File->Examples->AMY Synthesizer menu to find them. 
 
-At this time, we don't support multicore in Arduino, as the board support packages make assumptions that conflict with AMY. You get a buffer a samples back from us and you can do whatever you want with it, including sending over I2S, DACs, modifying it. 
+At this time, we don't support multicore in Arduino like we do for bare metal MCUs, as the board support packages make assumptions that conflict with AMY. You get a buffer a samples back from us and you can do whatever you want with it, including sending over I2S, DACs, modifying it. 
 
 ## Using AMY in your software
 
@@ -57,7 +57,7 @@ make
 ./amy-example # you should hear FM tones out your default speaker, use ./amy-example -h for options
 ```
 
-To build an example in C for the Pi Pico / RP2040:
+To build an example without Arduino, supporting multicore, for the Pi Pico / RP2040:
 
 ```
 gh repo clone raspberrypi/pico-extras
@@ -71,11 +71,12 @@ cmake ..
 make && picotool load amy_example.elf && picotool reboot
 ```
 
-
-To build using ESP-IDF for ESP32 variants:
+To build an example (`amy-example-esp32`) using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), first follow the steps in [Alles Flashing](/bwhitman/alles/alles_flashing.md) to set up your system with ESP-IDF 5.1-rc2. Then:
 
 ```
-TODO
+cd src
+export ~/esp/esp-idf-v5.1rc2/export.sh
+idf.py flash
 ```
 
 ## Controlling AMY
