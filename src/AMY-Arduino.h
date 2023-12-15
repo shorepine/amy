@@ -28,11 +28,13 @@ class AMY
     void begin();
     int64_t sysclock();
     void fm(int64_t start);
-    void render();
+    void drums(int64_t start, uint16_t loops);
+    void render(uint8_t core);
+    void reset();
     struct event default_event();
     void add_event(struct event e);
     void send_message(char * message);
-    uint16_t * render_block();
+    int16_t * get_buffer();
   private:
     int _pin;
     #ifdef ARDUINO_ARCH_RP2040

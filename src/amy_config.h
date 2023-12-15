@@ -6,8 +6,10 @@
 #define AMY_OSCS 120
 
 // If using a multi-core capable device, how many cores to render from
-#if defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
+#ifdef ARDUINO
 #define AMY_CORES 1
+#elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
+#define AMY_CORES 2
 #else
 #define AMY_CORES 1              
 #endif

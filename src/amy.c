@@ -274,7 +274,7 @@ struct i_event amy_default_i_event() {
 
 
 void add_delta_to_queue(struct delta d) {
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
@@ -320,7 +320,7 @@ void add_delta_to_queue(struct delta d) {
         // if there's no room in the queue, just skip the message
         // todo -- report this somehow? 
     }
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM  && !defined ARDUINO
     xSemaphoreGive( xQueueSemaphore );
 #endif
 }
@@ -883,7 +883,7 @@ int16_t * fill_audio_buffer_task() {
     // check to see which sounds to play 
     int64_t sysclock = amy_sysclock(); 
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // put a mutex around this so that the event parser doesn't touch these while i'm running  
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
@@ -896,7 +896,7 @@ int16_t * fill_audio_buffer_task() {
         global.event_start = global.event_start->next;
     }
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // give the mutex back
     xSemaphoreGive(xQueueSemaphore);
 #endif
@@ -914,7 +914,7 @@ int16_t * fill_audio_buffer_task() {
 #endif // AMY_HAS_CHORUS
 
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // Tell the rendering threads to start rendering
     xTaskNotifyGive(amy_render_handle[0]);
     if(AMY_CORES == 2) xTaskNotifyGive(amy_render_handle[1]);
@@ -922,7 +922,7 @@ int16_t * fill_audio_buffer_task() {
     // and wait for each of them to come back
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
     if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-#elif defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
+#elif defined PICO_ON_DEVICE
     if(AMY_CORES == 2) {
         // Tell renderer2 it's ok to render
         multicore_fifo_push_blocking(32);
@@ -938,7 +938,6 @@ int16_t * fill_audio_buffer_task() {
     }
 
 #else
-
     // todo -- there's no reason we can't multicore render on other platforms
     render_task(0, AMY_OSCS, 0);        
 #endif
