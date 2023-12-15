@@ -17,7 +17,7 @@ void AMY::add_event(struct event e) {
     amy_add_event(e);
 }
 
-int64_t AMY::sysclock() {
+int32_t AMY::sysclock() {
     return amy_sysclock();
 }
 
@@ -47,11 +47,11 @@ int16_t * AMY::get_buffer() {
     return fill_audio_buffer_task();
 }
 
-void AMY::fm(int64_t start) {
+void AMY::fm(int32_t start) {
     example_multimbral_fm(start);
 }
 
-void AMY::drums(int64_t start, uint16_t loops) {
+void AMY::drums(int32_t start, uint16_t loops) {
     example_drums(start, loops);
 }
 

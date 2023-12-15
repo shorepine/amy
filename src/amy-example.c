@@ -36,20 +36,22 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
-    int64_t start =amy_sysclock();
+    uint32_t start =amy_sysclock();
     amy_start();
     amy_live_start();
     amy_reset_oscs();
 
     //example_reverb();
     //example_chorus();
-    example_drums(start, 2);
-    example_multimbral_fm(start + 2000);
+    //example_sine(start);
+    //example_drums(start, 4);
+    example_multimbral_fm(start);
 
     // Now just spin for 20s
-    while(amy_sysclock() - start < 20000) {
+    while(amy_sysclock() - start < 10000) {
         usleep(THREAD_USLEEP);
     }
+    show_debug(3);
     
     amy_live_stop();
 

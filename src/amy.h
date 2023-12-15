@@ -41,7 +41,7 @@ typedef int16_t output_sample_type;
 #define TARGET_PAN 0x200
 
 #define MAX_MESSAGE_LEN 255
-
+#define MAX_PARAM_LEN 64
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
@@ -102,15 +102,6 @@ enum params{
     NO_PARAM
 };
 
-// Delta holds the individual changes from an event, it's sorted in order of playback time 
-// this is more efficient in memory than storing entire events per message 
-struct delta {
-    uint32_t data; // casted to the right thing later
-    enum params param; // which parameter is being changed
-    uint32_t time; // what time to play / change this parameter
-    int16_t osc; // which oscillator it impacts
-    struct delta * next; // the next event, in time 
-};
 
 #include <limits.h>
 static inline int isnan_c11(float test)
@@ -120,9 +111,11 @@ static inline int isnan_c11(float test)
 
 
 #define AMY_UNSET_VALUE(var) _Generic((var), \
-    int64_t: LONG_MAX, \
     float: nanf(""), \
+    uint32_t: UINT32_MAX, \
+    uint16_t: UINT16_MAX, \
     int16_t: SHRT_MAX, \
+    uint8_t: UINT8_MAX, \
     int8_t: SCHAR_MAX, \
     int32_t: INT_MAX \
 )
@@ -138,13 +131,24 @@ static inline int isnan_c11(float test)
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
 
-// API accessible events
+// Delta holds the individual changes from an event, it's sorted in order of playback time 
+// this is more efficient in memory than storing entire events per message 
+struct delta {
+    uint32_t data; // casted to the right thing later
+    enum params param; // which parameter is being changed
+    uint32_t time; // what time to play / change this parameter
+    uint16_t osc; // which oscillator it impacts
+    struct delta * next; // the next event, in time 
+};
+
+
+// API accessible events, are converted to delta types for the synth to play back 
 struct event {
-    int64_t time;
-    int16_t osc;
-    int16_t wave;
-    int16_t patch;
-    int16_t midi_note;
+    uint32_t time;
+    uint16_t osc;
+    uint16_t wave;
+    uint16_t patch;
+    uint16_t midi_note;
     float amp;
     float duty;
     float feedback;
@@ -154,36 +158,35 @@ struct event {
     float detune;
     float volume;
     float pan;
-    int16_t latency_ms;
+    uint16_t latency_ms;
     float filter_freq;
     float ratio;
     float resonance;
-    int16_t mod_source;
-    int16_t mod_target;
-    int8_t algorithm;
-    int8_t filter_type;
+    uint16_t mod_source;
+    uint16_t mod_target;
+    uint8_t algorithm;
+    uint8_t filter_type;
     float eq_l;
     float eq_m;
     float eq_h;
-    char algo_source[255];
-    char bp0[255];
-    char bp1[255];
-    char bp2[255];
-    int16_t bp0_target;
-    int16_t bp1_target;
-    int16_t bp2_target;
+    char algo_source[MAX_PARAM_LEN];
+    char bp0[MAX_PARAM_LEN];
+    char bp1[MAX_PARAM_LEN];
+    char bp2[MAX_PARAM_LEN];
+    uint16_t bp0_target;
+    uint16_t bp1_target;
+    uint16_t bp2_target;
     uint8_t status;
 
 
 };
 
-struct i_event {
-    // todo -- clean up types here - many don't need to be signed anymore, and time doesn't need to be int64
-    int64_t time;
-    int16_t osc;
-    int16_t wave;
-    int16_t patch;
-    int16_t midi_note;
+// This is the state of each oscillator, set by the sequencer from deltas
+struct synthinfo {
+    uint16_t osc; // self-reference
+    uint16_t wave;
+    uint16_t patch;
+    uint16_t midi_note;
     float amp;
     float duty;
     float feedback;
@@ -197,20 +200,20 @@ struct i_event {
     SAMPLE sample;
     float volume;
     float pan;   // Pan parameters.
-    int16_t latency_ms;
     float filter_freq;
     float ratio;
     float resonance;
-    int16_t mod_source;
-    int16_t mod_target;
-    int8_t algorithm;
-    int8_t filter_type;
+    uint16_t mod_source;
+    uint16_t mod_target;
+    uint8_t algorithm;
+    uint8_t filter_type;
+    // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
 
-    int64_t note_on_clock;
-    int64_t note_off_clock;
-    int16_t breakpoint_target[MAX_BREAKPOINT_SETS];
-    int32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
+    uint32_t note_on_clock;
+    uint32_t note_off_clock;
+    uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
+    uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
   
@@ -231,8 +234,8 @@ struct i_event {
     SAMPLE last_two[2];
 };
 
-// events, but only the things that mods/env can change. one per osc
-struct mod_event {
+// synthinfo, but only the things that mods/env can change. one per osc
+struct mod_synthinfo {
     float amp;
     float pan;
     float last_pan;   // Pan history for interpolation.
@@ -247,14 +250,12 @@ struct mod_event {
 //void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
-struct i_event amy_default_i_event();
-
 void amy_add_event(struct event e);
-void amy_add_i_event(struct i_event e);
+
 void render_task(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
-int64_t amy_sysclock();
+uint32_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();
@@ -281,24 +282,24 @@ struct state {
 // Shared structures
 extern SAMPLE coeffs[AMY_OSCS][5];
 extern SAMPLE filter_delay[AMY_OSCS][2];
-extern int64_t total_samples;
-extern struct i_event *synth;
-extern struct mod_event *msynth; // the synth that is being modified by modulations & envelopes
+extern uint32_t total_samples;
+extern struct synthinfo *synth;
+extern struct mod_synthinfo *msynth; // the synth that is being modified by modulations & envelopes
 extern struct state global; 
 
 
 float atoff(const char *s);
 int8_t oscs_init();
-void parse_breakpoint(struct i_event * e, char* message, uint8_t bp_set) ;
-void parse_algorithm_source(struct i_event * e, char* message) ;
+void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
+void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
 int16_t * fill_audio_buffer_task();
-int32_t ms_to_samples(int32_t ms) ;
+uint32_t ms_to_samples(uint32_t ms) ;
 
 
 // external functions
 void amy_play_message(char *message);
-struct i_event amy_parse_message(char * message);
+struct event amy_parse_message(char * message);
 void amy_start();
 void amy_stop();
 void amy_live_start();

@@ -3,8 +3,8 @@
 
 #include "amy.h"
 
-extern struct i_event* synth;
-extern struct mod_event* msynth;
+extern struct synthinfo* synth;
+extern struct mod_synthinfo* msynth;
 extern struct mod_state mglobal;
 
 
@@ -24,7 +24,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
 }
 
 SAMPLE compute_mod_scale(uint16_t osc) {
-    int16_t source = synth[osc].mod_source;
+    uint16_t source = synth[osc].mod_source;
     if(AMY_IS_SET(synth[osc].mod_target) && AMY_IS_SET(source)) {
         if(source != osc) {  // that would be weird
             msynth[source].amp = synth[source].amp;
@@ -45,14 +45,14 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     // we first see how many BPs are defined, and where we are in them?
     int8_t found = -1;
     int8_t release = 0;
-    int32_t t1,t0;
+    uint32_t t1,t0;
     SAMPLE v1, v0;
     int8_t bp_r = 0;
     t0 = 0; v0 = 1.0;
     const float exponential_rate = 3.0;
     // We have to aim to overshoot to the desired gap so that we hit the target by exponential_rate time.
     const float exponential_rate_overshoot_factor = 1.0f / (1.0f - expf(-exponential_rate));
-    int64_t elapsed = 0;    
+    uint32_t elapsed = 0;    
 
     // Find out which one is release (the last one)
     
@@ -96,7 +96,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         v0 = synth[osc].last_scale[bp_set];
         if(elapsed > synth[osc].breakpoint_times[bp_set][bp_r]) {
             // are there multiple bp_sets? only turn off the note if it's the last one
-            int32_t my_bt = synth[osc].breakpoint_times[bp_set][bp_r];
+            uint32_t my_bt = synth[osc].breakpoint_times[bp_set][bp_r];
             // This is a mess but works, we could fix 
             for(uint8_t test_bp_set=0;test_bp_set<MAX_BREAKPOINT_SETS;test_bp_set++) {
                 if(test_bp_set != bp_set) {

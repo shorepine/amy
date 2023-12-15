@@ -3,7 +3,6 @@
 #include "amy.h"
 
 #define NUM_ALGO_BPS 5
-
 typedef struct {
     float freq;
     float freq_ratio;
