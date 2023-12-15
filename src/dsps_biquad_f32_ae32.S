@@ -1,3 +1,5 @@
+#if defined(ESP_PLATFORM)
+
 // Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -87,3 +89,5 @@ loop_bq_end_m_ae32:
 	retw.n
 
 //#endif // dsps_biquad_f32_ae32_enabled
+
+#endif

@@ -82,6 +82,7 @@ typedef int amy_err_t;
 #endif
 
 
+
 #include "amy_fixedpoint.h"
 
 
@@ -258,6 +259,8 @@ void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
 void osc_note_on(uint16_t osc);
 
+
+
 // global synth state
 struct state {
     float volume;
@@ -272,7 +275,7 @@ struct state {
 
 // Shared structures
 extern SAMPLE coeffs[AMY_OSCS][5];
-extern SAMPLE delay[AMY_OSCS][2];
+extern SAMPLE filter_delay[AMY_OSCS][2];
 extern int64_t total_samples;
 extern struct i_event *synth;
 extern struct mod_event *msynth; // the synth that is being modified by modulations & envelopes

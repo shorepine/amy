@@ -48,33 +48,12 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 
 
-#ifdef PICO_ON_DEVICE
-#define CPU0_METER 2
-#define CPU1_METER 3
+#if defined PICO_ON_DEVICE  || defined ARDUINO_ARCH_RP2040
 #include "pico/multicore.h"
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
-
-// Wait for a 32-bit message and return it.
-int32_t await_message_from_other_core() {
-    while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
-        __wfe();
-    }
-    int32_t msg = sio_hw->fifo_rd;
-    __sev();
-    return msg;
-}
-
-// Send 32-bit message to other core
-void send_message_to_other_core(int32_t t) {
-    while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
-        __wfe();
-    }
-    sio_hw->fifo_wr = t;
-    __sev();
-}
 #endif
 
 
@@ -302,7 +281,7 @@ struct i_event amy_default_i_event() {
 
 
 void add_delta_to_queue(struct delta d) {
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
@@ -348,7 +327,7 @@ void add_delta_to_queue(struct delta d) {
         // if there's no room in the queue, just skip the message
         // todo -- report this somehow? 
     }
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM  && !defined ARDUINO
     xSemaphoreGive( xQueueSemaphore );
 #endif
 }
@@ -911,7 +890,7 @@ int16_t * fill_audio_buffer_task() {
     // check to see which sounds to play 
     int64_t sysclock = amy_sysclock(); 
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // put a mutex around this so that the event parser doesn't touch these while i'm running  
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
@@ -924,7 +903,7 @@ int16_t * fill_audio_buffer_task() {
         global.event_start = global.event_start->next;
     }
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // give the mutex back
     xSemaphoreGive(xQueueSemaphore);
 #endif
@@ -942,7 +921,7 @@ int16_t * fill_audio_buffer_task() {
 #endif // AMY_HAS_CHORUS
 
 
-#ifdef ESP_PLATFORM
+#if defined ESP_PLATFORM && !defined ARDUINO
     // Tell the rendering threads to start rendering
     xTaskNotifyGive(amy_render_handle[0]);
     if(AMY_CORES == 2) xTaskNotifyGive(amy_render_handle[1]);
@@ -950,24 +929,22 @@ int16_t * fill_audio_buffer_task() {
     // and wait for each of them to come back
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
     if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-#elif PICO_ON_DEVICE
+#elif defined PICO_ON_DEVICE
     if(AMY_CORES == 2) {
         // Tell renderer2 it's ok to render
-        send_message_to_other_core(64);
+        multicore_fifo_push_blocking(32);
         // Do renderer1
-        gpio_put(CPU0_METER, 1);
         render_task(0, AMY_OSCS/2, 0);
-        gpio_put(CPU0_METER, 0);
 
         // and wait for other core to finish
         int32_t ret = 0;
-        while(ret!=32) ret = await_message_from_other_core();
+        while (!multicore_fifo_rvalid());
+        ret = multicore_fifo_pop_blocking();
     } else {
         render_task(0, AMY_OSCS/2, 0);
     }
 
 #else
-
     // todo -- there's no reason we can't multicore render on other platforms
     render_task(0, AMY_OSCS, 0);        
 #endif
