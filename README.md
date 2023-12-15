@@ -40,11 +40,11 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 Copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`, and `#include <AMY-Arduino.h>`. There are examples for the Pi Pico, ESP32 (and variants), and Teensy (works on 4.X and 3.6 -- the 3.2 should work but there may be an I2S bug.) Use the File->Examples->AMY Synthesizer menu to find them. 
 
-At this time, we don't support multicore in Arduino like we do for bare metal MCUs, as the board support packages make assumptions that conflict with AMY. You get a buffer a samples back from us and you can do whatever you want with it, including sending over I2S, DACs, modifying it. 
+At this time, we don't support multicore in Arduino like we do for bare metal MCUs, as the board support packages make assumptions that conflict with AMY. You get a buffer a samples back from us and you can do whatever you want with it, including sending over I2S, DACs, or modifying it. 
 
 ## Using AMY in your software
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `setup.py install` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `cd src; pip install .` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
 
 You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
 
@@ -71,13 +71,8 @@ cmake ..
 make && picotool load amy_example.elf && picotool reboot
 ```
 
-To build an example (`amy-example-esp32`) using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), first follow the steps in [Alles Flashing](/bwhitman/alles/alles_flashing.md) to set up your system with ESP-IDF 5.1-rc2. Then:
+To build an example of AMY using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), try to follow the steps in [Alles Flashing](https://github.com/bwhitman/alles/blob/main/alles-flashing.md#set-up-esp-idf) to set up your system with ESP-IDF 5.1-rc2 and building [Alles](https://github.com/bwhitman/alles) for your board.
 
-```
-cd src
-export ~/esp/esp-idf-v5.1rc2/export.sh
-idf.py flash
-```
 
 ## Controlling AMY
 
