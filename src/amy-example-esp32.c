@@ -2,6 +2,7 @@
 // a minimal example of running AMY from an ESP32
 
 #ifdef ESP_PLATFORM
+#ifndef ARDUINO // don't compile this in the Arduino library
 
 #include "amy.h"
 
@@ -43,6 +44,10 @@
 SemaphoreHandle_t xQueueSemaphore;
 TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 TaskHandle_t amy_fill_buffer_handle;
+
+void delay_ms(uint32_t ms) {
+      vTaskDelay(pdMS_TO_TICKS(ms));
+}
 
 
 
@@ -102,7 +107,7 @@ amy_err_t setup_i2s(void) {
     //i2s configuration
     i2s_config_t i2s_config = {
          .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-         .AMY_SAMPLE_RATE = AMY_SAMPLE_RATE,
+         .sample_rate = AMY_SAMPLE_RATE,
          .bits_per_sample = I2S_SAMPLE_TYPE,
          .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, 
          .communication_format = I2S_COMM_FORMAT_STAND_MSB,
@@ -158,5 +163,5 @@ void app_main() {
     }
 }
 
-
+#endif
 #endif

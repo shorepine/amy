@@ -1,11 +1,13 @@
 #include "amy.h"
-
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
 
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
 #define LOWEST_RATIO 0.0001
 
 SAMPLE coeffs[AMY_OSCS][5];
-SAMPLE delay[AMY_OSCS][2];
+SAMPLE filter_delay[AMY_OSCS][2];
 
 SAMPLE eq_coeffs[3][5];
 SAMPLE eq_delay[3][2];
@@ -119,7 +121,7 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
 void update_filter(uint16_t osc) {
     // reset the delay for a filter
     // normal mod / adsr will just change the coeffs
-    delay[osc][0] = 0; delay[osc][1] = 0;
+    filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
 }
 
 void filters_init() {
@@ -127,7 +129,7 @@ void filters_init() {
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
     dsps_biquad_gen_hpf_f32(eq_coeffs[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
-    for(uint16_t i=0;i<AMY_OSCS;i++) { delay[i][0] = 0; delay[i][1] = 0; }
+    for(uint16_t i=0;i<AMY_OSCS;i++) { filter_delay[i][0] = 0; filter_delay[i][1] = 0; }
     eq_delay[0][0] = 0; eq_delay[0][1] = 0;
     eq_delay[1][0] = 0; eq_delay[1][1] = 0;
     eq_delay[2][0] = 0; eq_delay[2][1] = 0;
@@ -156,7 +158,7 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         dsps_biquad_gen_bpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
     if(synth[osc].filter_type==FILTER_HPF)
         dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
-    dsps_biquad_f32_ansi(block, output, AMY_BLOCK_SIZE, coeffs[osc], delay[osc]);
+    dsps_biquad_f32_ansi(block, output, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         block[i] = output[i];
     }

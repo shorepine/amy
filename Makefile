@@ -15,7 +15,7 @@ LIBS += -ldl  -latomic
 endif
 
 CC = gcc
-CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wfloat-conversion
+CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion 
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \

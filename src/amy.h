@@ -82,6 +82,7 @@ typedef int amy_err_t;
 #endif
 
 
+
 #include "amy_fixedpoint.h"
 
 
@@ -105,6 +106,31 @@ struct delta {
     int16_t osc; // which oscillator it impacts
     struct delta * next; // the next event, in time 
 };
+
+#include <limits.h>
+static inline int isnan_c11(float test)
+{
+    return isnan(test);
+}
+
+
+#define AMY_UNSET_VALUE(var) _Generic((var), \
+    int64_t: LONG_MAX, \
+    float: nanf(""), \
+    int16_t: SHRT_MAX, \
+    int8_t: SCHAR_MAX, \
+    int32_t: INT_MAX \
+)
+
+#define AMY_UNSET(var) var = AMY_UNSET_VALUE(var)
+
+#define AMY_IS_UNSET(var) _Generic((var), \
+    float: isnan_c11(var), \
+    default: var==AMY_UNSET_VALUE(var) \
+)
+
+
+#define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
 
 // API accessible events
@@ -138,9 +164,9 @@ struct event {
     char bp0[255];
     char bp1[255];
     char bp2[255];
-    int8_t bp0_target;
-    int8_t bp1_target;
-    int8_t bp2_target;
+    int16_t bp0_target;
+    int16_t bp1_target;
+    int16_t bp2_target;
     uint8_t status;
 
 
@@ -153,9 +179,9 @@ struct i_event {
     int16_t wave;
     int16_t patch;
     int16_t midi_note;
-    SAMPLE amp;
+    float amp;
     float duty;
-    SAMPLE feedback;
+    float feedback;
     float freq;
     uint8_t status;
     float velocity;
@@ -202,14 +228,14 @@ struct i_event {
 
 // events, but only the things that mods/env can change. one per osc
 struct mod_event {
-    SAMPLE amp;
+    float amp;
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
     float filter_freq;
     float resonance;
-    SAMPLE feedback;
+    float feedback;
 };
 
 // Callbacks, override if you'd like after calling amy_start()
@@ -233,6 +259,8 @@ void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
 void osc_note_on(uint16_t osc);
 
+
+
 // global synth state
 struct state {
     float volume;
@@ -247,16 +275,17 @@ struct state {
 
 // Shared structures
 extern SAMPLE coeffs[AMY_OSCS][5];
-extern SAMPLE delay[AMY_OSCS][2];
+extern SAMPLE filter_delay[AMY_OSCS][2];
 extern int64_t total_samples;
 extern struct i_event *synth;
 extern struct mod_event *msynth; // the synth that is being modified by modulations & envelopes
 extern struct state global; 
 
 
+float atoff(const char *s);
 int8_t oscs_init();
 void parse_breakpoint(struct i_event * e, char* message, uint8_t bp_set) ;
-void parse_algorithm(struct i_event * e, char* message) ;
+void parse_algorithm_source(struct i_event * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
 int16_t * fill_audio_buffer_task();
 int32_t ms_to_samples(int32_t ms) ;

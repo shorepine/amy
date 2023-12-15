@@ -59,12 +59,13 @@ void example_multimbral_fm(int64_t start) {
     e.wave = ALGO;
     e.patch = 20;
     osc_inc = 9;
-    int notes[] = {60, 70, 64, 68, 72, 82, 76, 80, 74, 78, 80, 58};
+    int notes[] = {60, 70, 64, 68, 72, 82};
     e.velocity = 0.2;
 
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
-        e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
+        e.pan = (i%2);
+        //e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
         e.patch++;
         amy_add_event(e);
         e.osc += osc_inc;
@@ -161,7 +162,7 @@ void example_drums(int64_t start, int loops) {
                 e.velocity = 0;
             }
             amy_add_event(e);
-            e.midi_note = -1;
+            AMY_UNSET(e.midi_note);
         }
     }
 }
