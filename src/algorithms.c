@@ -165,7 +165,7 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
     float time_ratio = 1;
-    if(AMY_IS_SET(synth[osc].ratio)) time_ratio = synth[osc].ratio;
+    if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
 
     // amp LFO
     //synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
@@ -195,7 +195,7 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
             synth[target_oscs[i]].logfreq = logfreq_of_freq(op.freq);
         }
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
-        synth[target_oscs[i]].ratio = op.freq_ratio;
+        synth[target_oscs[i]].logratio = log2f(op.freq_ratio);
         synth[target_oscs[i]].amp = op.amp;
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
         synth[target_oscs[i]].phase = F2P(0.25);

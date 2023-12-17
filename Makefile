@@ -1,7 +1,7 @@
 # Makefile for libamy , including an example
 
 TARGET = amy-example amy-message
-LIBS = -L /opt/homebrew/lib -lsndfile -lpthread  -lm 
+LIBS = -lpthread  -lm 
 
 
 # on macOS, need to link to AudioUnit, CoreAudio, and CoreFoundation
@@ -14,7 +14,7 @@ ifeq ($(shell uname -m), armv7l)
 LIBS += -ldl  -latomic
 endif
 
-CC = gcc -I /opt/homebrew/include
+CC = gcc
 CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion 
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \

@@ -198,7 +198,8 @@ struct i_event {
     int16_t latency_ms;
     //float filter_freq;
     float filter_logfreq;
-    float ratio;
+    //float ratio;
+    float logratio;
     float resonance;
     int16_t mod_source;
     int16_t mod_target;
@@ -236,9 +237,9 @@ struct mod_event {
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
-    float freq;
+    //float freq;
     float logfreq;
-    float filter_freq;
+    //float filter_freq;
     float filter_logfreq;
     float resonance;
     float feedback;
@@ -257,6 +258,7 @@ void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 int64_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
+float logfreq_for_midi_note(uint8_t midi_note);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);

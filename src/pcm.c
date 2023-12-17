@@ -73,10 +73,8 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
     float playback_freq = PCM_AMY_SAMPLE_RATE;
     if(msynth[osc].logfreq < PCM_AMY_LOG2_SAMPLE_RATE) { // user adjusted freq 
-        float base_freq = freq_for_midi_note(patch->midinote); 
-        float freq = freq_of_logfreq(msynth[osc].logfreq);
-        playback_freq = (freq / base_freq) * PCM_AMY_SAMPLE_RATE;
-        //printf("freq %f slf %f logfreq %f base_freq %f playback_freq %f\n", freq, synth[osc].logfreq, msynth[osc].logfreq, base_freq, playback_freq);
+        playback_freq = exp2f(msynth[osc].logfreq - logfreq_for_midi_note(patch->midinote)) * PCM_AMY_SAMPLE_RATE;
+        //printf("slf %f logfreq %f notelogfreq %f playback_freq %f\n", synth[osc].logfreq, msynth[osc].logfreq, logfreq_for_midi_note(patch->midinote), playback_freq);
     }
     SAMPLE amp = F2S(msynth[osc].amp);
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));

@@ -311,8 +311,8 @@ extern int64_t total_samples;
 /* FM */
 // NB this uses new lingo for step, skip, phase etc
 void fm_sine_note_on(uint16_t osc, uint16_t algo_osc) {
-    if(AMY_IS_SET(synth[osc].ratio)) {
-        msynth[osc].logfreq = logfreq_of_freq(freq_of_logfreq(msynth[algo_osc].logfreq) * synth[osc].ratio);
+    if(AMY_IS_SET(synth[osc].logratio)) {
+        msynth[osc].logfreq = msynth[algo_osc].logfreq + synth[osc].logratio;
     }
     // An empty exercise since there is only one entry in sine_lutset.
     float freq = freq_of_logfreq(msynth[osc].logfreq);
@@ -321,8 +321,8 @@ void fm_sine_note_on(uint16_t osc, uint16_t algo_osc) {
 }
 
 void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp) {
-    if(AMY_IS_SET(synth[osc].ratio)) {
-        msynth[osc].logfreq = logfreq_of_freq(freq_of_logfreq(msynth[algo_osc].logfreq) * synth[osc].ratio);
+    if(AMY_IS_SET(synth[osc].logratio)) {
+        msynth[osc].logfreq = msynth[algo_osc].logfreq + synth[osc].logratio;
     }
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
@@ -414,6 +414,7 @@ void render_partial(SAMPLE * buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
+    //printf("render_partial: time %lld logfreq %f freq %f amp %f step %f\n", total_samples, msynth[osc].logfreq, freq, S2F(amp), P2F(step) * synth[osc].lut->table_size); 
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
     synth[osc].last_amp = amp;
 }
