@@ -15,22 +15,20 @@
 #endif
 
 // 1 == tiny PCM, 2 == small, 3 = large PCM samples stored in the program
-#ifdef ARDUINO
-    #ifdef ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
+#ifdef TULIP
+    #define AMY_PCM_PATCHES_SIZE 2
+#elif defined ARDUINO
+    #if defined ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
         #define AMY_PCM_PATCHES_SIZE 2
     #else
         #define AMY_PCM_PATCHES_SIZE 1
     #endif
+#elif defined ALLES
+    #define AMY_PCM_PATCHES_SIZE 3
+#elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
+        #define AMY_PCM_PATCHES_SIZE 2
 #else
-    #ifdef ALLES
-        #define AMY_PCM_PATCHES_SIZE 3
-    #elif defined TULIP
-        #define AMY_PCM_PATCHES_SIZE 2
-    #elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
-        #define AMY_PCM_PATCHES_SIZE 2
-    #else
-        #define AMY_PCM_PATCHES_SIZE 3
-    #endif
+    #define AMY_PCM_PATCHES_SIZE 3
 #endif
 
 
