@@ -34,6 +34,11 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
+    amy_stop();
+    amy_start();
+    return Py_None;
+}
 
 static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     int16_t * result = fill_audio_buffer_task();
@@ -56,6 +61,7 @@ static PyMethodDef libAMYMethods[] = {
     {"send", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
+    {"restart", restart_wrapper, METH_VARARGS, "Restart AMY"},
     { NULL, NULL, 0, NULL }
 };
 

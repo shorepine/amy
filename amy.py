@@ -202,6 +202,10 @@ def stop():
     import libamy
     libamy.pause()
 
+def restart():
+    import libamy
+    libamy.restart()
+    
 """
     Convenience functions
 """
