@@ -56,7 +56,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];
     // If ratio is set (not 0 or -1), use it for a time stretch
     float time_ratio = 1;
-    if(synth[osc].ratio > 0) time_ratio = synth[osc].ratio;
+    if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
     uint32_t ms_since_started = (uint32_t) ((((total_samples - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
     if(synth[osc].step >= 0) {
         // do we either have no sustain, or are we past sustain? 
@@ -74,16 +74,16 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 if(o % 2) o = o + 32; // scale
                 #endif
                 // Find our ratio using the midi note of the analyzed partial
-                float freq_ratio = msynth[osc].freq / freq_for_midi_note(patch.midi_note); 
+                float freq_logratio = msynth[osc].logfreq - logfreq_for_midi_note(patch.midi_note);
 
-                //printf("[%lld %d] fr %f new pb: %d %d %f %f %f\n", total_samples, ms_since_started, freq_ratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase);
+                //printf("[%lld %d] freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", total_samples, ms_since_started, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
 
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
                 synth[o].amp = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
-                synth[o].freq = pb.freq * freq_ratio;
+                synth[o].logfreq = logfreq_of_freq(pb.freq) + freq_logratio;
                 //synth[o].last_amp = 0;
 
                 synth[o].breakpoint_times[0][0] = 0;
@@ -112,7 +112,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].phase = F2P(pb.phase);
                 }
                 if(partial_code==1) { // continuation 
-                    synth[o].freq = pb.freq * freq_ratio;
+                    synth[o].logfreq = logfreq_of_freq(pb.freq) + freq_logratio;
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
                     synth[o].amp = 0;
@@ -140,7 +140,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
         #endif
         if(synth[o].status ==IS_ALGO_SOURCE) {
             hold_and_modify(o);
-            //printf("synth(%d).freq=%f msynth[o].freq=%f\n", o, synth[o].freq, msynth[o].freq);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;

@@ -1,4 +1,3 @@
-
 #ifndef __AMY_H
 #define __AMY_H
 
@@ -27,6 +26,9 @@ typedef int16_t output_sample_type;
 // Sample values for modulation sources
 #define UP    32767
 #define DOWN -32768
+
+// Frequency of Midi note 0, used to make logfreq scales.
+#define AMY_MIDI0_HZ 8.175798915643707f
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -92,12 +94,12 @@ typedef int amy_err_t;
 #endif
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ,
+    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ /* 12 */,
     RATIO, RESONANCE, 
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY /* 25 */,
     ALGO_SOURCE_START=30, 
     ALGO_SOURCE_END=30+MAX_ALGO_OPS,
-    BP_START=ALGO_SOURCE_END+1,   
+    BP_START=ALGO_SOURCE_END+1 /* 37 */,   
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
     NO_PARAM
 };
@@ -158,7 +160,7 @@ struct event {
     float detune;
     float volume;
     float pan;
-    uint16_t latency_ms;
+    //uint16_t latency_ms;
     float filter_freq;
     float ratio;
     float resonance;
@@ -177,8 +179,6 @@ struct event {
     uint16_t bp1_target;
     uint16_t bp2_target;
     uint8_t status;
-
-
 };
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -190,7 +190,7 @@ struct synthinfo {
     float amp;
     float duty;
     float feedback;
-    float freq;
+    float logfreq;
     uint8_t status;
     float velocity;
     PHASOR phase;
@@ -200,8 +200,8 @@ struct synthinfo {
     SAMPLE sample;
     float volume;
     float pan;   // Pan parameters.
-    float filter_freq;
-    float ratio;
+    float filter_logfreq;
+    float logratio;
     float resonance;
     uint16_t mod_source;
     uint16_t mod_target;
@@ -240,8 +240,8 @@ struct mod_synthinfo {
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
-    float freq;
-    float filter_freq;
+    float logfreq;
+    float filter_logfreq;
     float resonance;
     float feedback;
 };
@@ -257,6 +257,9 @@ void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
+float logfreq_for_midi_note(uint8_t midi_note);
+float logfreq_of_freq(float freq);
+float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();
 void amy_decrease_volume();
