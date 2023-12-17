@@ -9,7 +9,7 @@
 #include "libminiaudio-audio.h"
 
 int main(int argc, char ** argv) {
-    char output_filename = NULL;
+    char *output_filename = NULL;
 
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
