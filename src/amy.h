@@ -196,7 +196,7 @@ struct i_event {
     float volume;
     float pan;   // Pan parameters.
     int16_t latency_ms;
-    float filter_freq;
+    //float filter_freq;
     float filter_logfreq;
     float ratio;
     float resonance;

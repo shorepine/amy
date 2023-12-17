@@ -5,15 +5,11 @@
 
 #include "amy.h"
 #include "examples.h"
+#include "miniaudio.h"
 #include "libminiaudio-audio.h"
-
-#include <sndfile.h>
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-    SNDFILE *outfile = NULL;
-    SF_INFO sfinfo;
-
     
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
@@ -45,15 +41,17 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
-    int64_t start =amy_sysclock();
+    int64_t start = amy_sysclock();
+
     amy_start();
+
+    ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
+    ma_encoder encoder;
+    ma_result result;
     if (output_filename) {
-	memset (&sfinfo, 0, sizeof (sfinfo));
-	sfinfo.samplerate = AMY_SAMPLE_RATE;
-	sfinfo.channels = AMY_NCHANS;
-	sfinfo.format = (SF_FORMAT_WAV | SF_FORMAT_PCM_16) ;
-        if (! (outfile = sf_open(output_filename, SFM_WRITE, &sfinfo))) {
-            fprintf(stderr, "Error : could not open file : %s\n", output_filename) ;
+        result = ma_encoder_init_file(output_filename, &config, &encoder);
+        if (result != MA_SUCCESS) {
+            fprintf(stderr, "Error : could not open file : %s (%d)\n", output_filename, result) ;
             exit (1) ;
         }
     } else {
@@ -68,16 +66,16 @@ int main(int argc, char ** argv) {
 
     // Now just spin for 20s
     while(amy_sysclock() - start < 20000) {
-        if (outfile) {
-            int16_t *samples = fill_audio_buffer_task();
-            int num_samples = AMY_BLOCK_SIZE * AMY_NCHANS;
-            sf_write_short(outfile, samples, num_samples);
+        if (output_filename) {
+            int16_t *frames = fill_audio_buffer_task();
+            int num_frames = AMY_BLOCK_SIZE;
+            result = ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
         }
         usleep(THREAD_USLEEP);
     }
     
-    if (outfile) {
-        sf_close(outfile);
+    if (output_filename) {
+        ma_encoder_uninit(&encoder);
     } else {
         amy_live_stop();
     }
