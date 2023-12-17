@@ -164,15 +164,17 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     synth[osc].mod_source = target_oscs[7];
     synth[osc].mod_target = TARGET_FREQ;
     float time_ratio = 1;
-    if(AMY_IS_SET(synth[osc].ratio)) time_ratio = synth[osc].ratio;
+    if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
 
     // amp LFO
-    synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
+    //synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
+    synth[target_oscs[6]].logfreq = logfreq_of_freq(p.lfo_freq * time_ratio);
     synth[target_oscs[6]].wave = p.lfo_wave;
     synth[target_oscs[6]].status = IS_MOD_SOURCE;
     synth[target_oscs[6]].amp = p.lfo_amp_amp;
     // pitch LFO
-    synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
+    //synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
+    synth[target_oscs[7]].logfreq = logfreq_of_freq(p.lfo_freq * time_ratio);
     synth[target_oscs[7]].wave = p.lfo_wave;
     synth[target_oscs[7]].status = IS_MOD_SOURCE;
     synth[target_oscs[7]].amp = p.lfo_pitch_amp;
@@ -184,10 +186,15 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
         // TODO: ADD PER-OP AMP MOD via MOD SENS (SEE FM.PY)
         synth[osc].algo_source[i] = target_oscs[i];
         operator_parameters_t op = p.ops[i];
-        synth[target_oscs[i]].freq = op.freq;
-        if(synth[target_oscs[i]].freq < 0) synth[target_oscs[i]].freq = 0;
+        if (op.freq <= 0) {
+            //synth[target_oscs[i]].freq = 0;
+            synth[target_oscs[i]].logfreq = 0;
+        } else {
+            //synth[target_oscs[i]].freq = op.freq;
+            synth[target_oscs[i]].logfreq = logfreq_of_freq(op.freq);
+        }
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
-        synth[target_oscs[i]].ratio = op.freq_ratio;
+        synth[target_oscs[i]].logratio = log2f(op.freq_ratio);
         synth[target_oscs[i]].amp = op.amp;
         synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
         synth[target_oscs[i]].phase = F2P(0.25);

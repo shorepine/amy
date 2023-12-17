@@ -10,7 +10,7 @@
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-
+    
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 
@@ -19,12 +19,12 @@ int main(int argc, char ** argv) {
             case 'd': 
                 amy_device_id = atoi(optarg);
                 break;
-            case 'o':
-                output_filename = strdup(optarg);
-                break;
             case 'l':
                 amy_print_devices();
                 return 0;
+                break;
+            case 'o':
+                output_filename = strdup(optarg);
                 break;
             case 'h':
                 printf("usage: amy-example\n");
@@ -42,6 +42,7 @@ int main(int argc, char ** argv) {
         } 
     }
     uint32_t start = amy_sysclock();
+
     amy_start();
 
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
@@ -62,8 +63,8 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    //example_drums(start, 4);
-    example_multimbral_fm(start);
+    example_drums(start, 4);
+    example_multimbral_fm(start + 2000, /* start_osc= */ 6);
 
     // Now just spin for 10s
     while(amy_sysclock() - start < 10000) {

@@ -150,7 +150,7 @@ void parametric_eq_process(SAMPLE *block) {
 
 void filter_process(SAMPLE * block, uint16_t osc) {
     SAMPLE output[AMY_BLOCK_SIZE];
-    float ratio = msynth[osc].filter_freq/(float)AMY_SAMPLE_RATE;
+    float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
     if(synth[osc].filter_type==FILTER_LPF)
         dsps_biquad_gen_lpf_f32(coeffs[osc], ratio, msynth[osc].resonance);

@@ -3,9 +3,9 @@
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
 #include "amy.h"
 
-#define MA_NO_DECODING
-#define MA_NO_ENCODING
-#define MA_NO_WAV
+//#define MA_NO_DECODING
+//#define MA_NO_ENCODING
+//#define MA_NO_WAV
 #define MA_NO_FLAC
 #define MA_NO_MP3
 #define MA_NO_RESOURCE_MANAGER
