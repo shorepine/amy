@@ -20,9 +20,6 @@ int main(int argc, char ** argv) {
             case 'd': 
                 amy_device_id = atoi(optarg);
                 break;
-            case 'o':
-                output_filename = strdup(optarg);
-                break;
             case 'l':
                 amy_print_devices();
                 return 0;

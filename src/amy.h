@@ -160,7 +160,7 @@ struct event {
     float detune;
     float volume;
     float pan;
-    //uint16_t latency_ms;
+    uint16_t latency_ms;
     float filter_freq;
     float ratio;
     float resonance;
