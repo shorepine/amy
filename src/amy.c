@@ -189,7 +189,21 @@ float freq_for_midi_note(uint8_t midi_note) {
     return 440.0f*powf(2,(midi_note-69.0f)/12.0f);
 }
 
+// Convert to and from the log-frequency scale.
+// A log-frequency scale is good for summing control inputs.
+// Offset to add to scales when taking logs to avoid large neg values.
+#define EPS_FOR_LOG 0.0625
 
+float logfreq_of_freq(float freq) {
+    // logfreq is defined as log_2(freq / 8.18 Hz)
+    if (freq==0) return 0;
+    return log2f(EPS_FOR_LOG + freq / AMY_MIDI0_HZ);
+}
+
+float freq_of_logfreq(float logfreq) {
+    if (logfreq==0) return 0;
+    return AMY_MIDI0_HZ * exp2f(logfreq) - EPS_FOR_LOG;
+}
 
 
 // create a new default API accessible event
@@ -250,12 +264,14 @@ struct i_event amy_default_i_event() {
     AMY_UNSET(e.velocity);
     AMY_UNSET(e.midi_note);
     AMY_UNSET(e.amp); 
-    AMY_UNSET(e.freq);
+    //AMY_UNSET(e.freq);
+    AMY_UNSET(e.logfreq);
     AMY_UNSET(e.volume);
     AMY_UNSET(e.pan);
     AMY_UNSET(e.latency_ms);
     AMY_UNSET(e.ratio);
     AMY_UNSET(e.filter_freq);
+    AMY_UNSET(e.filter_logfreq);
     AMY_UNSET(e.resonance);
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.mod_source);
@@ -285,6 +301,7 @@ void add_delta_to_queue(struct delta d) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #endif
+    //printf("add_delta: time %lld osc %d param %d freq %f\n", total_samples, d.osc, d.param, *(float *)&d.data);
     if(global.event_qsize < AMY_EVENT_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
         uint16_t write_location = global.next_event_write;
@@ -341,17 +358,34 @@ void amy_add_event(struct event e) {
     i.wave = e.wave;
     i.patch = e.patch;
     i.midi_note = e.midi_note;
-    if(AMY_IS_SET(e.amp)) i.amp = F2S(e.amp);
+    if(AMY_IS_SET(e.amp))
+        i.amp = F2S(e.amp);
+    else
+        AMY_UNSET(i.amp);
     i.duty = e.duty;
-    if(AMY_IS_SET(e.feedback)) i.feedback = F2S(e.feedback);
-    i.freq = e.freq;
+    if(AMY_IS_SET(e.feedback))
+        i.feedback = F2S(e.feedback);
+    else
+        AMY_UNSET(i.feedback);
+    //i.freq = e.freq;
+    if(AMY_IS_SET(e.freq))
+        i.logfreq = logfreq_of_freq(e.freq);
+    else
+        AMY_UNSET(i.logfreq);
     i.velocity = e.velocity;
-    if(AMY_IS_SET(e.phase)) i.phase = F2P(e.phase);
+    if(AMY_IS_SET(e.phase))
+        i.phase = F2P(e.phase);
+    else
+        AMY_UNSET(i.phase);
     i.detune = e.detune;
     i.volume = e.volume;
     i.pan = e.pan;
     i.latency_ms = e.latency_ms;
     i.filter_freq = e.filter_freq;
+    if(AMY_IS_SET(e.filter_freq))
+        i.filter_logfreq = logfreq_of_freq(e.filter_freq);
+    else
+        AMY_UNSET(i.filter_logfreq);
     i.ratio = e.ratio;
     i.resonance = e.resonance;
     i.mod_source = e.mod_source;
@@ -362,8 +396,8 @@ void amy_add_event(struct event e) {
     i.eq_m = e.eq_m;
     i.eq_h = e.eq_h;
     i.breakpoint_target[0] = e.bp0_target;
-    i.breakpoint_target[1] = e.bp0_target;
-    i.breakpoint_target[2] = e.bp0_target;
+    i.breakpoint_target[1] = e.bp1_target;
+    i.breakpoint_target[2] = e.bp2_target;
     if(e.bp0[0] != 0) parse_breakpoint(&i, e.bp0, 0);
     if(e.bp1[0] != 0) parse_breakpoint(&i, e.bp1, 1);
     if(e.bp2[0] != 0) parse_breakpoint(&i, e.bp2, 2);
@@ -383,7 +417,7 @@ void amy_add_i_event(struct i_event e) {
     if(AMY_IS_SET(e.amp)) {  d.param=AMP; d.data = *(uint32_t *)&e.amp; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.duty)) { d.param=DUTY; d.data = *(uint32_t *)&e.duty; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
+    //if(AMY_IS_SET(e.freq)) {  d.param=FREQ; d.data = *(uint32_t *)&e.freq; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
@@ -426,8 +460,10 @@ void reset_osc(uint16_t i ) {
     msynth[i].duty = 0.5f;
     AMY_UNSET(synth[i].patch);
     synth[i].midi_note = 0;
-    synth[i].freq = 0;
-    msynth[i].freq = 0;
+    //synth[i].freq = 0;
+    synth[i].logfreq = 0;
+    //msynth[i].freq = 0;
+    msynth[i].logfreq = 0;
     synth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     msynth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     synth[i].amp = 1.0f;
@@ -442,7 +478,9 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_h = 0;
     AMY_UNSET(synth[i].ratio);
     synth[i].filter_freq = 0;
+    synth[i].filter_logfreq = 0;
     msynth[i].filter_freq = 0;
+    msynth[i].filter_logfreq = 0;
     synth[i].resonance = 0.7f;
     msynth[i].resonance = 0.7f;
     synth[i].velocity = 0;
@@ -466,7 +504,7 @@ void reset_osc(uint16_t i ) {
             AMY_UNSET(synth[i].breakpoint_times[j][k]); 
             AMY_UNSET(synth[i].breakpoint_values[j][k]);
         } 
-        AMY_UNSET(synth[i].breakpoint_target[j]);
+        synth[i].breakpoint_target[j] = 0;
     }
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
@@ -481,7 +519,8 @@ void amy_reset_oscs() {
     global.eq[1] = 0;
     global.eq[2] = 0;
     // also reset chorus oscillator.
-    synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
+    //synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
+    synth[CHORUS_MOD_SOURCE].logfreq = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
     synth[CHORUS_MOD_SOURCE].amp = CHORUS_DEFAULT_MOD_DEPTH;
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
@@ -570,8 +609,8 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<AMY_OSCS;i++) {
-            fprintf(stderr,"osc %d: status %d amp %f wave %d freq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
-                    i, synth[i].status, synth[i].amp, synth[i].wave, synth[i].freq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
+            fprintf(stderr,"osc %d: status %d amp %f wave %d logfreq %f duty %f mod_target %d mod source %d velocity %f filter_freq %f ratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
+                    i, synth[i].status, synth[i].amp, synth[i].wave, synth[i].logfreq, synth[i].duty, synth[i].mod_target, synth[i].mod_source, 
                     synth[i].velocity, synth[i].filter_freq, synth[i].ratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan,
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             if(type>3) { 
@@ -582,7 +621,7 @@ void show_debug(uint8_t type) {
                     }
                     fprintf(stderr,"\n");
                 }
-                fprintf(stderr,"mod osc %d: amp: %f, freq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, msynth[i].amp, msynth[i].freq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, msynth[i].feedback, msynth[i].pan);
+                fprintf(stderr,"mod osc %d: amp: %f, logfreq %f duty %f filter_freq %f resonance %f fb/bw %f pan %f \n", i, msynth[i].amp, msynth[i].logfreq, msynth[i].duty, msynth[i].filter_freq, msynth[i].resonance, msynth[i].feedback, msynth[i].pan);
             }
         }
     }
@@ -623,7 +662,12 @@ void osc_note_on(uint16_t osc) {
 void play_event(struct delta d) {
     uint8_t trig=0;
     // todo: event-only side effect, remove
-    if(d.param == MIDI_NOTE) { synth[d.osc].midi_note = *(uint16_t *)&d.data; synth[d.osc].freq = freq_for_midi_note(*(uint16_t *)&d.data); } 
+    if(d.param == MIDI_NOTE) {
+        synth[d.osc].midi_note = *(uint16_t *)&d.data;
+        //synth[d.osc].freq = freq_for_midi_note(*(uint16_t *)&d.data);
+        synth[d.osc].logfreq = logfreq_of_freq(freq_for_midi_note(*(uint16_t *)&d.data));
+        //printf("time %lld osc %d midi_note %d logfreq %f\n", total_samples, d.osc, synth[d.osc].midi_note, synth[d.osc].logfreq);
+    } 
 
     if(d.param == WAVE) {
         synth[d.osc].wave = *(int16_t *)&d.data; 
@@ -639,8 +683,7 @@ void play_event(struct delta d) {
     if(d.param == DUTY) synth[d.osc].duty = *(float *)&d.data;
     if(d.param == FEEDBACK) synth[d.osc].feedback = *(float *)&d.data;
     if(d.param == AMP) synth[d.osc].amp = *(float *)&d.data;
-    if(d.param == FREQ) synth[d.osc].freq = *(float *)&d.data;
-
+    if(d.param == FREQ) synth[d.osc].logfreq = logfreq_of_freq(*(float *)&d.data);
     
     if(d.param == BP0_TARGET) { synth[d.osc].breakpoint_target[0] = *(int8_t *)&d.data; trig=1; }
     if(d.param == BP1_TARGET) { synth[d.osc].breakpoint_target[1] = *(int8_t *)&d.data; trig=1; }
@@ -666,7 +709,13 @@ void play_event(struct delta d) {
 
     if(d.param == RATIO) synth[d.osc].ratio = *(float *)&d.data;
 
-    if(d.param == FILTER_FREQ) synth[d.osc].filter_freq = *(float *)&d.data;
+    if(d.param == FILTER_FREQ) {
+        synth[d.osc].filter_freq = *(float *)&d.data;
+        if (synth[d.osc].filter_freq == 0)
+            synth[d.osc].filter_logfreq = 0;
+        else
+            synth[d.osc].filter_logfreq = logfreq_of_freq(synth[d.osc].filter_freq);
+    }
     if(d.param == FILTER_TYPE) synth[d.osc].filter_type = *(int8_t *)&d.data; 
     if(d.param == RESONANCE) synth[d.osc].resonance = *(float *)&d.data;
 
@@ -751,23 +800,26 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].last_pan = msynth[osc].pan;
     msynth[osc].pan = synth[osc].pan;
     msynth[osc].duty = synth[osc].duty;
-    msynth[osc].freq = synth[osc].freq;
+    //msynth[osc].freq = synth[osc].freq;
+    msynth[osc].logfreq = synth[osc].logfreq;
     msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].filter_freq = synth[osc].filter_freq;
+    msynth[osc].filter_logfreq = synth[osc].filter_logfreq;
     msynth[osc].resonance = synth[osc].resonance;
 
     // modify the synth params by scale -- bp scale is (original * scale)
     int num_nonzero_scales = 0;
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
         float fscale = S2F(compute_breakpoint_scale(osc, i));
+        float logfscale = log2f(EPS_FOR_LOG + fscale);
         num_nonzero_scales += (fscale != 0);
         //if (scale != F2S(1.0f)) printf("osc %d scale %f\n", osc, fscale);
         if(synth[osc].breakpoint_target[i] & TARGET_AMP) msynth[osc].amp *= fscale;
         if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan *= fscale;
         if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty *= fscale;
-        if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].freq *= fscale;
+        if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].logfreq += logfscale;
         if(synth[osc].breakpoint_target[i] & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-        if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_freq *= fscale;
+        if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) { msynth[osc].filter_freq *= fscale; msynth[osc].filter_logfreq += logfscale; }
         if(synth[osc].breakpoint_target[i] & TARGET_RESONANCE) msynth[osc].resonance *= fscale;
     }
     if(num_nonzero_scales == 0) { // all bp sets were 0, which means we are in a note off and nobody is active anymore. time to stop the note.
@@ -777,14 +829,18 @@ void hold_and_modify(uint16_t osc) {
 
     // and the mod -- mod scale is (original + (original * scale))
     float fscale = 1.0f + S2F(compute_mod_scale(osc));
+    float logfscale = log2f(fscale);
     if(synth[osc].mod_target & TARGET_AMP) msynth[osc].amp *= fscale;
     if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan *= fscale;
     if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty *= fscale;
-    if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].freq *= fscale;
+    if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].logfreq += logfscale;
     if(synth[osc].mod_target & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-    if(synth[osc].mod_target & TARGET_FILTER_FREQ) msynth[osc].filter_freq *= fscale;
+    if(synth[osc].mod_target & TARGET_FILTER_FREQ) { msynth[osc].filter_freq *= fscale; msynth[osc].filter_logfreq += logfscale; }
     if(synth[osc].mod_target & RESONANCE) msynth[osc].resonance *= fscale;
 
+    //printf("h&m: osc %d bp_tgt0 %d bp_tgt1 %d mod_targ %d slf %f logfreq %f\n", osc,
+    //       synth[osc].breakpoint_target[0], synth[osc].breakpoint_target[1], synth[osc].mod_target, 
+    //       synth[osc].logfreq, msynth[osc].logfreq);
 }
 
 
@@ -912,7 +968,8 @@ int16_t * fill_audio_buffer_task() {
     // here's a little fragment of hold_and_modify() for you.
     msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
     msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
-    msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
+    //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
+    msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
 #ifdef CHORUS_ARATE
     if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
 #else
@@ -996,10 +1053,12 @@ int16_t * fill_audio_buffer_task() {
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             //SAMPLE new_state = fsample + MUL8_SS(F2S(0.995f), global.hpf_state);  // MUL8 is critical here.
+#ifdef HPF_OUTPUT
             SAMPLE new_state = fsample + global.hpf_state - (global.hpf_state >> 8);  // i.e. 0.9961*hpf_state
             fsample = new_state - global.hpf_state;
             global.hpf_state = new_state;
-
+#endif
+            
             // soft clipping.
             int positive = 1; 
             if (fsample < 0) positive = 0;
@@ -1187,8 +1246,7 @@ struct i_event amy_parse_message(char * message) {
                         case 'C': parse_breakpoint(&e, message+start, 2); break; 
                         case 'd': e.duty=atoff(message + start); break; 
                         case 'D': show_debug(atoi(message + start)); break; 
-                        // reminder: don't use "E" or "e", lol 
-                        case 'f': e.freq=atoff(message + start);  break; 
+                        case 'f': e.logfreq = logfreq_of_freq(atoff(message + start)); break; 
                         case 'F': e.filter_freq=atoff(message + start); break; 
                         case 'G': e.filter_type=atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
@@ -1272,6 +1330,11 @@ void amy_play_message(char *message) {
         amy_add_i_event(e);
     }
 }
+// amy_play_message -> amy_parse_message -> amy_add_i_event -> add_delta_to_queue -> i_events queue -> global event queue
+//                         amy_add_event /
+
+// fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
+
 
 void amy_stop() {
     oscs_deinit();

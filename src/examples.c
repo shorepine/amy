@@ -51,11 +51,11 @@ void example_fm(int64_t start) {
     amy_add_event(e);
 }
 
-void example_multimbral_fm(int64_t start) {
+void example_multimbral_fm(int64_t start, int start_osc) {
     struct event e = amy_default_event();
     int osc_inc;
     e.time = start;
-    e.osc = 0;
+    e.osc = start_osc;
     e.wave = ALGO;
     e.patch = 20;
     osc_inc = 9;
@@ -82,10 +82,11 @@ void example_drums(int64_t start, int loops) {
 
     float volume = 0.2;
 
-    int oscs[] = {0, 2, 3, 4, 5, 6};
-    int patches[] = {1, 5, 0, 10, 10, 5};
+    // bd, snare, hat, cow, hicow
+    int oscs[] = {0, 1, 2, 3, 4};
+    int patches[] = {1, 5, 0, 10, 10};
     e.wave = PCM;
-    e.freq = 0;
+    //e.freq = 0;
     e.velocity = 0;
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         e.osc = oscs[i];
@@ -95,14 +96,14 @@ void example_drums(int64_t start, int loops) {
     // Update high cowbell.
     e = amy_default_event();
     e.time = start;
-    e.osc = 5;
+    e.osc = 4;
     e.midi_note = 70;
     amy_add_event(e);
 
-    // osc 7 : bass
+    // osc 5 : bass
     e = amy_default_event();
     e.time = start;
-    e.osc = 7;
+    e.osc = 5;
     e.wave = SAW_DOWN;
     e.filter_freq = 2500.0;
     e.resonance = 5.0;
@@ -112,13 +113,13 @@ void example_drums(int64_t start, int loops) {
     amy_add_event(e);
 
 
-    const int bass = 1 << 0;
+    const int bd = 1 << 0;
     const int snare = 1 << 1;
     const int hat = 1 << 2;
     const int cow = 1 << 3;
     const int hicow = 1 << 4;
 
-    int pattern[] = {bass+hat, hat+hicow, bass+hat+snare, hat+cow, hat, hat+bass, snare+hat, hat};
+    int pattern[] = {bd+hat, hat+hicow, bd+hat+snare, hat+cow, hat, bd+hat, snare+hat, hat};
     int bassline[] = {50, 0, 0, 0, 50, 52, 51, 0};
 
     e = amy_default_event();
@@ -126,35 +127,36 @@ void example_drums(int64_t start, int loops) {
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
-
+            AMY_UNSET(e.freq);
+            
             int x = pattern[i];
-            if(x & bass) {
+            if(x & bd) {
                 e.osc = 0;
                 e.velocity = 4.0 * volume;
                 amy_add_event(e);
             }
             if(x & snare) {
-                e.osc = 2;
+                e.osc = 1;
                 e.velocity = 1.5 * volume;
                 amy_add_event(e);
             }
             if(x & hat) {
-                e.osc = 3;
+                e.osc = 2;
                 e.velocity = 1 * volume;
                 amy_add_event(e);
             }
             if(x & cow) {
-                e.osc = 4;
+                e.osc = 3;
                 e.velocity = 1 * volume;
                 amy_add_event(e);
             }
             if(x & hicow) {
-                e.osc = 5;
+                e.osc = 4;
                 e.velocity = 1 * volume;
                 amy_add_event(e);
             }
 
-            e.osc = 7;
+            e.osc = 5;
             if(bassline[i]>0) {
                 e.velocity = 0.5 * volume;
                 e.midi_note = bassline[i] - 12;

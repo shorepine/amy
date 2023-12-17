@@ -18,6 +18,7 @@ typedef struct {
 #include "pcm_samples_small.h"
 #endif
 
+#define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
 
 void pcm_init() {
 /*
@@ -41,12 +42,14 @@ void pcm_init() {
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
 
 void pcm_note_on(uint16_t osc) {
-    //printf("pcm_note_on: osc=%d patch=%d freq=%f amp=%f\n",
-    //       osc, synth[osc].patch, synth[osc].freq, synth[osc].amp);
+    //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
+    //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
     if(synth[osc].patch < 0) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
-    if(synth[osc].freq <= 0)
-        synth[osc].freq = PCM_AMY_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
+    if(synth[osc].logfreq <= 0) {
+        synth[osc].logfreq = PCM_AMY_LOG2_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
+        //synth[osc].freq = PCM_AMY_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
+    }
     synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
 }
 
@@ -69,9 +72,11 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
     // We need s16.15 fixed-point indexing.
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
     float playback_freq = PCM_AMY_SAMPLE_RATE;
-    if(msynth[osc].freq < PCM_AMY_SAMPLE_RATE) { // user adjusted freq 
+    if(msynth[osc].logfreq < PCM_AMY_LOG2_SAMPLE_RATE) { // user adjusted freq 
         float base_freq = freq_for_midi_note(patch->midinote); 
-        playback_freq = (msynth[osc].freq / base_freq) * PCM_AMY_SAMPLE_RATE;
+        float freq = freq_of_logfreq(msynth[osc].logfreq);
+        playback_freq = (freq / base_freq) * PCM_AMY_SAMPLE_RATE;
+        //printf("freq %f slf %f logfreq %f base_freq %f playback_freq %f\n", freq, synth[osc].logfreq, msynth[osc].logfreq, base_freq, playback_freq);
     }
     SAMPLE amp = F2S(msynth[osc].amp);
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));

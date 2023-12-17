@@ -1,4 +1,3 @@
-
 #ifndef __AMY_H
 #define __AMY_H
 
@@ -27,6 +26,9 @@ typedef int16_t output_sample_type;
 // Sample values for modulation sources
 #define UP    32767
 #define DOWN -32768
+
+// Frequency of Midi note 0, used to make logfreq scales.
+#define AMY_MIDI0_HZ 8.175798915643707f
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -87,12 +89,12 @@ typedef int amy_err_t;
 
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ,
+    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ /* 12 */,
     RATIO, RESONANCE, 
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY /* 25 */,
     ALGO_SOURCE_START=30, 
     ALGO_SOURCE_END=30+MAX_ALGO_OPS,
-    BP_START=ALGO_SOURCE_END+1,   
+    BP_START=ALGO_SOURCE_END+1 /* 37 */,   
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
     NO_PARAM
 };
@@ -182,7 +184,8 @@ struct i_event {
     float amp;
     float duty;
     float feedback;
-    float freq;
+    //float freq;
+    float logfreq;
     uint8_t status;
     float velocity;
     PHASOR phase;
@@ -194,6 +197,7 @@ struct i_event {
     float pan;   // Pan parameters.
     int16_t latency_ms;
     float filter_freq;
+    float filter_logfreq;
     float ratio;
     float resonance;
     int16_t mod_source;
@@ -233,7 +237,9 @@ struct mod_event {
     float last_pan;   // Pan history for interpolation.
     float duty;
     float freq;
+    float logfreq;
     float filter_freq;
+    float filter_logfreq;
     float resonance;
     float feedback;
 };
@@ -251,6 +257,8 @@ void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 int64_t amy_sysclock();
 float freq_for_midi_note(uint8_t midi_note);
+float logfreq_of_freq(float freq);
+float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void amy_increase_volume();
 void amy_decrease_volume();

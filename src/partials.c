@@ -74,7 +74,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 if(o % 2) o = o + 32; // scale
                 #endif
                 // Find our ratio using the midi note of the analyzed partial
-                float freq_ratio = msynth[osc].freq / freq_for_midi_note(patch.midi_note); 
+                float freq_ratio = freq_of_logfreq(msynth[osc].logfreq) / freq_for_midi_note(patch.midi_note); 
 
                 //printf("[%lld %d] fr %f new pb: %d %d %f %f %f\n", total_samples, ms_since_started, freq_ratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase);
 
@@ -83,7 +83,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].status = IS_ALGO_SOURCE;
                 synth[o].amp = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
-                synth[o].freq = pb.freq * freq_ratio;
+                synth[o].logfreq = logfreq_of_freq(pb.freq * freq_ratio);
                 //synth[o].last_amp = 0;
 
                 synth[o].breakpoint_times[0][0] = 0;
@@ -112,7 +112,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].phase = F2P(pb.phase);
                 }
                 if(partial_code==1) { // continuation 
-                    synth[o].freq = pb.freq * freq_ratio;
+                    synth[o].logfreq = logfreq_of_freq(pb.freq * freq_ratio);
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
                     synth[o].amp = 0;
