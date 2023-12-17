@@ -9,7 +9,6 @@
 #include "libminiaudio-audio.h"
 
 int main(int argc, char ** argv) {
-
     char *output_filename = NULL;
     
     int opt;
