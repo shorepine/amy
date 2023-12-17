@@ -62,15 +62,6 @@ def preset(which,osc=0, **kwargs):
         send(wave=ALGO, vel=0, patch=62,filter_freq=2000,resonance=2.5,filter_type=FILTER_LPF, bp0_target=TARGET_FILTER_FREQ,bp0="1,1,500,0,0,0")
 
 
-
-def millis():
-    import datetime
-    # Timestamp to send over to synths
-    # This is a suggestion. I use ms since today started
-    d = datetime.datetime.now()
-    return int((datetime.datetime.utcnow() - datetime.datetime(d.year, d.month, d.day)).total_seconds()*1000)
-
-
 # Removes trailing 0s and x.0000s from floating point numbers to trim wire message size
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
@@ -78,56 +69,53 @@ def trunc(number):
     return ('%.6f' % number).rstrip('0').rstrip('.')
 
 # Construct an AMY message
-def message(osc=0, wave=-1, patch=-1, note=-1, vel=-1, amp=-1, freq=-1, duty=-1, feedback=-1, timestamp=None, reset=-1, phase=-1, pan=-1, \
-        client=-1, retries=1, volume=-1, filter_freq = -1, resonance = -1, bp0="", bp1="", bp2="", bp0_target=-1, bp1_target=-1, bp2_target=-1, mod_target=-1, \
-        debug=-1, mod_source=-1, eq_l = -1, eq_m = -1, eq_h = -1, filter_type= -1, algorithm=-1, ratio = -1, latency_ms = -1, algo_source=None, chorus_level=-1, \
-        chorus_delay=-1, reverb_level=-1, reverb_liveness=-1, reverb_damping=-1, reverb_xover=-1):
+def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None, \
+        client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp2=None, bp0_target=None, bp1_target=None, bp2_target=None, mod_target=None, \
+        debug=None, mod_source=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, \
+        chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None):
 
     m = ""
-    if(timestamp is None): timestamp = millis()
-    m = m + "t" + str(timestamp)
-    if(osc>=0): m = m + "v" + str(osc)
-    if(wave>=0): m = m + "w" + str(wave)
-    if(duty>=0): m = m + "d" + trunc(duty)
-    if(feedback>=0): m = m + "b" + trunc(feedback)
-    if(freq>=0): m = m + "f" + trunc(freq)
-    if(note>=0): m = m + "n" + str(note)
-    if(patch>=0): m = m + "p" + str(patch)
-    if(phase>=0): m = m + "P" + trunc(phase)
-    if(pan>=0): m = m + "Q" + trunc(pan)
-    if(client>=0): m = m + "c" + str(client)
-    if(amp>=0): m = m + "a" + trunc(amp)
-    if(vel>=0): m = m + "l" + trunc(vel)
-    if(volume>=0): m = m + "V" + trunc(volume)
-    if(latency_ms>=0): m = m + "N" + str(latency_ms)
-    if(resonance>=0): m = m + "R" + trunc(resonance)
-    if(filter_freq>=0): m = m + "F" + trunc(filter_freq)
-    if(ratio>=0): m = m + "I" + trunc(ratio)
-    if(algorithm>=0): m = m + "o" + str(algorithm)
-    if(len(bp0)): m = m +"A%s" % (bp0)
-    if(len(bp1)): m = m +"B%s" % (bp1)
-    if(len(bp2)): m = m +"C%s" % (bp2)
+    if(time is not None): m = m + "t" + str(time)
+    if(osc is not None): m = m + "v" + str(osc)
+    if(wave is not None): m = m + "w" + str(wave)
+    if(duty is not None): m = m + "d" + trunc(duty)
+    if(feedback is not None): m = m + "b" + trunc(feedback)
+    if(freq is not None): m = m + "f" + trunc(freq)
+    if(note is not None): m = m + "n" + str(note)
+    if(patch is not None): m = m + "p" + str(patch)
+    if(phase is not None): m = m + "P" + trunc(phase)
+    if(pan is not None): m = m + "Q" + trunc(pan)
+    if(client is not None): m = m + "c" + str(client)
+    if(amp is not None): m = m + "a" + trunc(amp)
+    if(vel is not None): m = m + "l" + trunc(vel)
+    if(volume is not None): m = m + "V" + trunc(volume)
+    if(latency_ms is not None): m = m + "N" + str(latency_ms)
+    if(resonance is not None): m = m + "R" + trunc(resonance)
+    if(filter_freq is not None): m = m + "F" + trunc(filter_freq)
+    if(ratio is not None): m = m + "I" + trunc(ratio)
+    if(algorithm is not None): m = m + "o" + str(algorithm)
+    if(bp0 is not None): m = m +"A%s" % (bp0)
+    if(bp1 is not None): m = m +"B%s" % (bp1)
+    if(bp2  is not None): m = m +"C%s" % (bp2)
     if(algo_source is not None): m = m +"O%s" % (algo_source)
-    if(bp0_target>=0): m = m + "T" +str(bp0_target)
-    if(bp1_target>=0): m = m + "W" +str(bp1_target)
-    if(bp2_target>=0): m = m + "X" +str(bp2_target)
-    if(mod_target>=0): m = m + "g" + str(mod_target)
-    if(mod_source>=0): m = m + "L" + str(mod_source)
-    if(reset>=0): m = m + "S" + str(reset)
-    if(debug>=0): m = m + "D" + str(debug)
-    if(eq_l>=0): m = m + "x" + trunc(eq_l)
-    if(eq_m>=0): m = m + "y" + trunc(eq_m)
-    if(eq_h>=0): m = m + "z" + trunc(eq_h)
-    if(filter_type>=0): m = m + "G" + str(filter_type)
-    if(chorus_level>=0): m = m + "k" + str(chorus_level)
-    if(chorus_delay>=0): m = m + "m" + str(chorus_delay)
-    if(reverb_level>=0): m = m + "h" + str(reverb_level)
-    if(reverb_liveness>=0): m = m + "H" + str(reverb_liveness)
-    if(reverb_damping>=0): m = m + "j" + str(reverb_damping)
-    if(reverb_xover>=0): m = m + "J" + str(reverb_xover)
+    if(bp0_target is not None): m = m + "T" +str(bp0_target)
+    if(bp1_target is not None): m = m + "W" +str(bp1_target)
+    if(bp2_target is not None): m = m + "X" +str(bp2_target)
+    if(mod_target is not None): m = m + "g" + str(mod_target)
+    if(mod_source is not None): m = m + "L" + str(mod_source)
+    if(reset is not None): m = m + "S" + str(reset)
+    if(debug is not None): m = m + "D" + str(debug)
+    if(eq_l is not None): m = m + "x" + trunc(eq_l)
+    if(eq_m is not None): m = m + "y" + trunc(eq_m)
+    if(eq_h is not None): m = m + "z" + trunc(eq_h)
+    if(filter_type is not None): m = m + "G" + str(filter_type)
+    if(chorus_level is not None): m = m + "k" + str(chorus_level)
+    if(chorus_delay is not None): m = m + "m" + str(chorus_delay)
+    if(reverb_level is not None): m = m + "h" + str(reverb_level)
+    if(reverb_liveness is not None): m = m + "H" + str(reverb_liveness)
+    if(reverb_damping is not None): m = m + "j" + str(reverb_damping)
+    if(reverb_xover is not None): m = m + "J" + str(reverb_xover)
     #print("message " + m)
-    return m+'Z'
-
     return m+'Z'
 
 
@@ -216,10 +204,10 @@ def reset(osc=None, **kwargs):
     else:
         send(reset=10000, **kwargs) # reset > AMY_OSCS resets all oscs
 
-def volume(volume, client = -1):
+def volume(volume, client = None):
     send(client=client, volume=volume)
 
-def latency_ms(latency, client=-1):
+def latency_ms(latency, client=None):
     send(client=client, latency_ms =latency)
 
 """
@@ -260,7 +248,7 @@ def polyphony(max_voices=OSCS,**kwargs):
     while(1):
         osc = oscs[note % max_voices]
         print("osc %d note %d filter %f " % (osc, 30+note, note*50))
-        send(osc=osc, **kwargs, patch=note, filter_type=FILTER_NONE, filter_freq=note*50, note=30+(note), client = -1, vel=1)
+        send(osc=osc, **kwargs, patch=note, filter_type=FILTER_NONE, filter_freq=note*50, note=30+(note), client = None, vel=1)
         time.sleep(0.5)
         note =(note + 1) % 64
 
