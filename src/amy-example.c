@@ -30,6 +30,7 @@ int main(int argc, char ** argv) {
                 printf("usage: amy-example\n");
                 printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
                 printf("\t[-l list all sound devices and exit]\n");
+                printf("\t[-o filename.wav - write to filename.wav instead of playing live]\n");
                 printf("\t[-h show this help and exit]\n");
                 return 0;
                 break;
