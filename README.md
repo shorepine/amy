@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller with around 100KB of RAM. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate audio synthesizer C library with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
