@@ -143,6 +143,24 @@ class TestFilter(AmyTest):
     amy.send(time=500, vel=0)
 
 
+class TestLFO(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, mod_target=amy.TARGET_FREQ)
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=500, vel=0)
+    
+
+class TestPWM(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, mod_target=amy.TARGET_DUTY)
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=500, vel=0)
+    
+
 def main(argv):
   TestSineOsc().test()
   TestPulseOsc().test()
@@ -154,6 +172,8 @@ def main(argv):
   TestPartial().test()
   TestAlgo().test()
   TestFilter().test()
+  TestLFO().test()
+  TestPWM().test()
   
   TestSineEnv().test()
   
