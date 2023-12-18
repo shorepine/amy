@@ -99,6 +99,7 @@ class TestTriangleOsc(AmyTest):
 class TestNoiseOsc(AmyTest):
 
   def run(self):
+    # If this is the first time noise is called, the waveform should be deterministic.
     amy.send(time=0, osc=0, wave=amy.NOISE, freq=1000)
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
@@ -138,8 +139,8 @@ class TestAlgo(AmyTest):
 class TestFilter(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.NOISE, filter_type=amy.FILTER_LPF, resonance=4.0, bp0_target=amy.TARGET_FILTER_FREQ, filter_freq=3000, bp0='0,1,500,0.02')
-    amy.send(time=100, note=70, vel=1)
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, bp0_target=amy.TARGET_FILTER_FREQ, filter_freq=5000, bp0='0,1,500,0.01,100,0.01')
+    amy.send(time=100, note=48, vel=1)
     amy.send(time=500, vel=0)
 
 
@@ -162,20 +163,9 @@ class TestPWM(AmyTest):
     
 
 def main(argv):
-  TestSineOsc().test()
-  TestPulseOsc().test()
-  TestSawDownOsc().test()
-  TestSawUpOsc().test()
-  TestTriangleOsc().test()
-  TestNoiseOsc().test()
-  TestPcm().test()
-  TestPartial().test()
-  TestAlgo().test()
-  TestFilter().test()
-  TestLFO().test()
-  TestPWM().test()
-  
-  TestSineEnv().test()
+  for testClass in AmyTest.__subclasses__():
+    test_object = testClass()
+    test_object.test()
   
 
 if __name__ == "__main__":

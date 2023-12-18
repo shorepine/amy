@@ -46,7 +46,9 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
-    //printf("lpf f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", f, qFactor,
+    //printf("Flpf f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", f * AMY_SAMPLE_RATE, qFactor,
+    //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0);
+    //printf("Slpf f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", f * AMY_SAMPLE_RATE, qFactor,
     //       S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]));
 
     return 0;
