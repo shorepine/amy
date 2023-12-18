@@ -377,7 +377,7 @@ void sine_mod_trigger(uint16_t osc) {
 // Returns a SAMPLE between -1 and 1.
 SAMPLE amy_get_random() {
     assert(RAND_MAX == 2147483647); // 2^31 - 1
-    return rand() >> (31 - S_FRAC_BITS);
+    return (rand() >> (31 - S_FRAC_BITS)) - F2S(0.5);
 }
 
 /* noise */
