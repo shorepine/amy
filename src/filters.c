@@ -12,7 +12,7 @@ SAMPLE coeffs[AMY_OSCS][5];
 SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
 
 SAMPLE eq_coeffs[3][5];
-SAMPLE eq_delay[3][FILT_NUM_DELAYS];
+SAMPLE eq_delay[AMY_NCHANS][3][FILT_NUM_DELAYS];
 
 
 float dsps_sqrtf_f32_ansi(float f)
@@ -161,21 +161,28 @@ void filters_init() {
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
     dsps_biquad_gen_hpf_f32(eq_coeffs[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
     for(uint16_t i=0;i<AMY_OSCS;i++) { filter_delay[i][0] = 0; filter_delay[i][1] = 0; }
-    eq_delay[0][0] = 0; eq_delay[0][1] = 0;
-    eq_delay[1][0] = 0; eq_delay[1][1] = 0;
-    eq_delay[2][0] = 0; eq_delay[2][1] = 0;
+    for (int c = 0; c < AMY_NCHANS; ++c) {
+        for (int b = 0; b < 3; ++b) {
+            for (int d = 0; d < 2; ++d) {
+                eq_delay[c][b][d] = 0;
+            }
+        }
+    }
 }
 
 
 void parametric_eq_process(SAMPLE *block) {
     SAMPLE output[3][AMY_BLOCK_SIZE];
-    dsps_biquad_f32_ansi(block, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[0]);
-    dsps_biquad_f32_ansi(block, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[1]);
-    dsps_biquad_f32_ansi(block, output[2], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[2]);
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++)
-        block[i] = (FILT_MUL_SS(output[0][i], global.eq[0])
-                    - FILT_MUL_SS(output[1][i], global.eq[1])
-                    + FILT_MUL_SS(output[2][i], global.eq[2]));
+    for(int c = 0; c < AMY_NCHANS; ++c) {
+        SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
+        dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
+        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
+        dsps_biquad_f32_ansi(cblock, output[2], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++)
+            cblock[i] = (FILT_MUL_SS(output[0][i], global.eq[0])
+                         - FILT_MUL_SS(output[1][i], global.eq[1])
+                         + FILT_MUL_SS(output[2][i], global.eq[2]));
+    }
 }
 
 

@@ -823,9 +823,7 @@ void render_task(uint16_t start, uint16_t end, uint8_t core) {
     }
     // apply the eq filters if set
     if(global.eq[0] != 0 || global.eq[1] != 0 || global.eq[2] != 0) {
-        for (int16_t c=0; c < AMY_NCHANS; ++c) {
-            parametric_eq_process(fbl[core] + c * AMY_BLOCK_SIZE);
-        }
+        parametric_eq_process(fbl[core]);
     }
 }
 

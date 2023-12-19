@@ -83,8 +83,8 @@ class TestSawDownOsc(AmyTest):
 class TestSawUpOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, freq=1000)
-    amy.send(time=100, vel=1)
+    amy.send(time=0, osc=0, wave=amy.SAW_UP)
+    amy.send(time=100, note=46, vel=1)
     amy.send(time=500, vel=0)
 
 
@@ -161,6 +161,15 @@ class TestPWM(AmyTest):
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
     
+
+class TestGlobalEQ(AmyTest):
+
+  def run(self):
+    amy.send(time=0, eq_l=-10, eq_m=10, eq_h=3)
+    amy.send(time=0, osc=0, wave=amy.SAW_UP)
+    amy.send(time=100, note=46, vel=1)
+    amy.send(time=500, vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
