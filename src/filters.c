@@ -111,7 +111,8 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 }
 
 #define FILT_MUL_SS MUL8F_SS
-#define FILTER_SCALEDOWN_BITS 0  // Reduce resolution of input this much to avoid overflow.
+//#define FILT_MUL_SS MUL8_SS  // Goes unstable for TestFilter
+#define FILTER_SCALEUP_BITS 2  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
 
 int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
     // Zeros then poles - Direct Form I
@@ -121,14 +122,14 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
     SAMPLE y1 = w[2];
     SAMPLE y2 = w[3];
     for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = SHIFTR(input[i], FILTER_SCALEDOWN_BITS);
-        volatile SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
-        volatile SAMPLE y0 = w0 - FILT_MUL_SS(coef[3], y1) - FILT_MUL_SS(coef[4], y2);
+        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS);
+        SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
+        SAMPLE y0 = w0 - FILT_MUL_SS(coef[3], y1) - FILT_MUL_SS(coef[4], y2);
         x2 = x1;
         x1 = x0;
         y2 = y1;
         y1 = y0;
-        output[i] = SHIFTL(y0, FILTER_SCALEDOWN_BITS);
+        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS);
     }
     w[0] = x1;
     w[1] = x2;
