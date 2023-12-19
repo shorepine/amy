@@ -958,7 +958,7 @@ int16_t * fill_audio_buffer_task() {
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             //SAMPLE new_state = fsample + MUL8_SS(F2S(0.995f), global.hpf_state);  // MUL8 is critical here.
 #ifdef HPF_OUTPUT
-            SAMPLE new_state = fsample + global.hpf_state - (global.hpf_state >> 8);  // i.e. 0.9961*hpf_state
+            SAMPLE new_state = fsample + global.hpf_state - SHIFTR(global.hpf_state, 8);  // i.e. 0.9961*hpf_state
             fsample = new_state - global.hpf_state;
             global.hpf_state = new_state;
 #endif

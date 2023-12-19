@@ -51,6 +51,51 @@
 // #define MUL_KK mul4_k12k11(a, b)
 // #define MUL_KKS mul4_k16k7(a, b)  // the second arg is "sensitive".
 
+//#define AMY_USE_FIXEDPOINT
+
+
+#ifndef AMY_USE_FIXEDPOINT
+
+#warning "floating point calc"
+#define ARITH "float"
+
+
+#define GENFXP float
+#define LUTSAMPLE int16_t
+#define PHASOR float
+#define SAMPLE float
+
+#define S2P(s) (s)
+#define P2S(p) (p)
+#define L2S(l) ((l) / 32768.0f)
+#define S2L(s) ((int)floorf(s * 32768.0f))
+#define S2F(s) (s)
+#define F2S(f) (f)
+#define G2F(g) (g)
+#define F2G(f) (f)
+#define P2F(p) (p)
+#define F2P(f) ((f) - floorf(f))
+
+#define MUL0_SS(a, b) ((a) * (b))
+#define MUL4_SS(a, b) ((a) * (b))
+#define MUL8_SS(a, b) ((a) * (b))
+#define MUL8F_SS(a, b) ((a) * (b))
+#define MUL4_SP_S(a, b) ((a) * (b))
+
+#define SHIFTR(s, b) ((s) * exp2f(-(b)))
+#define SHIFTL(s, b) ((s) * exp2f(b))
+
+#define INT_OF_P(p, b) ((int)floorf((p) * (float)(1 << (b))))
+#define I2P(i, b) ((i) / (float)(1 << (b)))
+
+#define S_FRAC_OF_P(p, b) ((p) * (1 << (b)) - floorf((p) * (1 << (b))))
+#define P_WRAPPED_SUM(p, i) ((p) + (i) - floorf((p) + (i)))
+
+#else
+
+//#warning "FIXED point calc"
+#define ARITH "FIXED"
+
 typedef int16_t s_15;    // s.15 LUT sample
 typedef int32_t s_31;    // s.31 phasor
 typedef int32_t s8_23;  // s8.23 sample
@@ -102,8 +147,15 @@ typedef int32_t s16_15; // s16.15 general
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range
 #define MUL8_SS(a, b)  FXMUL_TEMPLATE(a, b, 12, 11, S_FRAC_BITS)  // 12+11 = 23, so no more shift on result.
 
+// Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
+#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+
 // Multiply a SAMPLE (s8.23) by a PHASOR (s.31) yeilding a SAMPLE, so 31 bits to lose.
 #define MUL4_SP_S(s, p) FXMUL_TEMPLATE(s, p, 11, 16, P_FRAC_BITS)  // need to lose 31 bits; 11+16=27, so 4 more on result
+
+// Shifts
+#define SHIFTR(s, b) ((s) >> (b))
+#define SHIFTL(s, b) ((s) << (b))
 
 // Regard PHASOR as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_P(P, B) (int32_t)((((uint32_t)((P) << 1)) >> (P_FRAC_BITS + 1 - (B))))
@@ -115,6 +167,8 @@ typedef int32_t s16_15; // s16.15 general
 #define S_FRAC_OF_P(P, B) (int32_t)(((uint32_t)(((P) << ((B) + 1)))) >> (1 + P_FRAC_BITS - S_FRAC_BITS))
 // Increment phasor but wrap at +1.0
 #define P_WRAPPED_SUM(P, I) (int32_t)(((uint32_t)((((uint32_t)(P)) + ((uint32_t)(I))) << 1)) >> 1)
+
+#endif // AMY_USED_FIXEDPOINT
 
 // Fixed-point lookup table structure (copied from e.g. sine_lutset_fxpt.h).
 #ifndef LUTENTRY_FXPT_DEFINED
@@ -129,3 +183,4 @@ typedef struct {
 #endif // LUTENTRY_FXPT_DEFINED
 
 #define LUT lut_entry_fxpt
+

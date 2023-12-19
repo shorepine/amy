@@ -22,7 +22,9 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s EXPORTED_FUNCTIONS="['_web_audio_buffer', '_amy_play_message', '_amy_AMY_SAMPLE_RATE', '_amy_start_web', '_malloc', '_free']" \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']"
 
-.PHONY: default all clean
+PYTHON = python3
+
+.PHONY: default all clean amy-module test
 
 default: $(TARGET)
 all: default
@@ -48,6 +50,12 @@ amy-example: $(OBJECTS) src/amy-example.o
 
 amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
+
+amy-module: amy-example
+	touch src/amy.c; cd src; ${PYTHON} -m pip install . --force-reinstall; cd ..
+
+test: amy-module
+	${PYTHON} test.py
 
 web: $(TARGET)
 	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o src/www/amy.js

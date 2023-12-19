@@ -6,11 +6,13 @@
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
 #define LOWEST_RATIO 0.0001
 
+#define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
+
 SAMPLE coeffs[AMY_OSCS][5];
-SAMPLE filter_delay[AMY_OSCS][2];
+SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
 
 SAMPLE eq_coeffs[3][5];
-SAMPLE eq_delay[3][2];
+SAMPLE eq_delay[3][FILT_NUM_DELAYS];
 
 
 float dsps_sqrtf_f32_ansi(float f)
@@ -108,9 +110,35 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     return 0;
 }
 
-#define FILT_MUL_SS MUL8_SS
+#define FILT_MUL_SS MUL8F_SS
+#define FILTER_SCALEDOWN_BITS 0  // Reduce resolution of input this much to avoid overflow.
 
 int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    // Zeros then poles - Direct Form I
+    // We need 2 memories for input, and 2 for output.
+    SAMPLE x1 = w[0];
+    SAMPLE x2 = w[1];
+    SAMPLE y1 = w[2];
+    SAMPLE y2 = w[3];
+    for (int i = 0 ; i < len ; i++) {
+        SAMPLE x0 = SHIFTR(input[i], FILTER_SCALEDOWN_BITS);
+        volatile SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
+        volatile SAMPLE y0 = w0 - FILT_MUL_SS(coef[3], y1) - FILT_MUL_SS(coef[4], y2);
+        x2 = x1;
+        x1 = x0;
+        y2 = y1;
+        y1 = y0;
+        output[i] = SHIFTL(y0, FILTER_SCALEDOWN_BITS);
+    }
+    w[0] = x1;
+    w[1] = x2;
+    w[2] = y1;
+    w[3] = y2;
+    return 0;
+}
+
+int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    // poles before zeros, for Direct Form II
     for (int i = 0 ; i < len ; i++) {
         SAMPLE d0 = input[i] - FILT_MUL_SS(coef[3], w[0]) - FILT_MUL_SS(coef[4], w[1]);
         output[i] = FILT_MUL_SS(coef[0], d0) + FILT_MUL_SS(coef[1], w[0]) + FILT_MUL_SS(coef[2], w[1]);
@@ -151,7 +179,6 @@ void parametric_eq_process(SAMPLE *block) {
 
 
 void filter_process(SAMPLE * block, uint16_t osc) {
-    SAMPLE output[AMY_BLOCK_SIZE];
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
     if(synth[osc].filter_type==FILTER_LPF)
@@ -160,10 +187,11 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         dsps_biquad_gen_bpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
     if(synth[osc].filter_type==FILTER_HPF)
         dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
-    dsps_biquad_f32_ansi(block, output, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        block[i] = output[i];
-    }
+    dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+    //    block[i] = output[i];
+    //}
 }
 
 void filters_deinit() {

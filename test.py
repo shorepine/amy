@@ -25,11 +25,11 @@ def dB(level):
   return 20 * np.log10(level + 1e-5)
 
 
-ref_dir = './tests/ref'
-tst_dir = './tests/tst'
-
 
 class AmyTest:
+
+  ref_dir = './tests/ref'
+  test_dir = './tests/tst'
 
   def __init__(self):
     amy.restart()
@@ -42,9 +42,9 @@ class AmyTest:
     self.run()
     
     samples = amy.render(1.0)
-    amy.write(samples, os.path.join(tst_dir, name + '.wav'))
+    amy.write(samples, os.path.join(self.test_dir, name + '.wav'))
 
-    ref_file = os.path.join(ref_dir, name + '.wav')
+    ref_file = os.path.join(self.ref_dir, name + '.wav')
     try:
       expected_samples, _ = wavread(ref_file)
 
@@ -140,7 +140,7 @@ class TestFilter(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, bp0_target=amy.TARGET_FILTER_FREQ, filter_freq=5000, bp0='0,1,500,0.01,100,0.01')
-    amy.send(time=100, note=48, vel=1)
+    amy.send(time=100, note=48, vel=1.0)
     amy.send(time=500, vel=0)
 
 
@@ -163,6 +163,10 @@ class TestPWM(AmyTest):
     
 
 def main(argv):
+  if len(argv) > 1:
+    # Override location of reference files.
+    AmyTest.ref_dir = argv[1]
+
   for testClass in AmyTest.__subclasses__():
     test_object = testClass()
     test_object.test()

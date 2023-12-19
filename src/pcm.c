@@ -66,7 +66,7 @@ void pcm_note_off(uint16_t osc) {
         msynth[osc].feedback = 0;
     } else {
         // Set phase to the end to cause immediate stop.
-        synth[osc].phase = pcm_map[synth[osc].patch].length << PCM_INDEX_FRAC_BITS;
+        synth[osc].phase = F2P(pcm_map[synth[osc].patch].length / (float)(1 << PCM_INDEX_FRAC_BITS));
     }
 }
 
@@ -99,7 +99,7 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
                 if(base_index >= patch->loopend) { // loopend
                     // back to loopstart
                     int32_t loop_len = patch->loopend - patch->loopstart;
-                    synth[osc].phase -= loop_len << PCM_INDEX_FRAC_BITS;
+                    synth[osc].phase -= F2P(loop_len / (float)(1 << PCM_INDEX_FRAC_BITS));
                     base_index -= loop_len;
                 }
             }

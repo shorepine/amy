@@ -80,7 +80,7 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         past0 = last_two[1];
     }
     SAMPLE current_amp = incoming_amp;
-    SAMPLE incremental_amp = (ending_amp - incoming_amp) >> BLOCK_SIZE_BITS; // i.e. delta(amp) / BLOCK_SIZE
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS); // i.e. delta(amp) / BLOCK_SIZE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         // total_phase can extend beyond [0, 1) but we apply lut_mask before we use it.
         PHASOR total_phase = phase;
@@ -89,7 +89,7 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         if(feedback_level) {
             past1 = past0;
             past0 = sample;   // Feedback is taken before output scaling.
-            total_phase += S2P(MUL4_SS(feedback_level, (past1 + past0) >> 1));
+            total_phase += S2P(MUL4_SS(feedback_level, SHIFTR(past1 + past0, 1)));
         }
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
@@ -104,6 +104,10 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         last_two[0] = sample;
         last_two[1] = past0;
     }
+    //printf("render_fm: phase %f step %f a0 %f a1 %f lut_sz %d mod 0x%lx fb %f l2 0x%lx buf %f %f %f %f\n",
+    //       P2F(phase), P2F(step), S2F(incoming_amp), S2F(ending_amp), lut->table_size,
+    //       mod, S2F(feedback_level), last_two,
+    //       S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]));
     return phase;
 }
 
@@ -156,7 +160,7 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAM
         // For saw only, apply a dc shift so integral is ~0.
         // But we have to apply the linear amplitude env on top as well, copying the way it's done in render_lut.
         SAMPLE current_amp = synth[osc].last_amp;
-        SAMPLE incremental_amp = (amp - synth[osc].last_amp) >> BLOCK_SIZE_BITS; // i.e. delta(amp) / BLOCK_SIZE
+        SAMPLE incremental_amp = SHIFTR(amp - synth[osc].last_amp, BLOCK_SIZE_BITS); // i.e. delta(amp) / BLOCK_SIZE
         for (int i = 0; i < AMY_BLOCK_SIZE; ++i) {
             buf[i] += MUL4_SS(current_amp, dc_offset);
             current_amp += incremental_amp;
@@ -212,7 +216,7 @@ void saw_note_on(uint16_t osc, int8_t direction_notused) {
         lut_sum += L2S(synth[osc].lut->table[i]);
     }
     int lut_bits = synth[osc].lut->log_2_table_size;
-    synth[osc].dc_offset = -(lut_sum >> lut_bits);
+    synth[osc].dc_offset = -SHIFTR(lut_sum, lut_bits);
     synth[osc].lpf_state = 0;
     synth[osc].last_amp = 0;
 }
@@ -255,7 +259,7 @@ void saw_down_mod_trigger(uint16_t osc) {
 // TODO -- this should use dpwe code
 SAMPLE compute_mod_saw(uint16_t osc, int8_t direction) {
     // Saw waveform is just the phasor.
-    synth[osc].sample = (P2S(synth[osc].phase) << 1) - F2S(1.0f);
+    synth[osc].sample = SHIFTL(P2S(synth[osc].phase), 1) - F2S(1.0f);
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     synth[osc].phase = P_WRAPPED_SUM(synth[osc].phase, F2P(freq / mod_sr));  // cycles per sec / calls per sec = cycles per call
@@ -297,7 +301,7 @@ void triangle_mod_trigger(uint16_t osc) {
 // TODO -- this should use dpwe code 
 SAMPLE compute_mod_triangle(uint16_t osc) {
     // Saw waveform is just the phasor.
-    SAMPLE sample = P2S(synth[osc].phase) << 2;  // 0..4
+    SAMPLE sample = SHIFTL(P2S(synth[osc].phase), 2);  // 0..4
     if (sample > F2S(2.0f))  sample = F2S(4.0f) - sample;  // 0..2..0
     synth[osc].sample = sample - F2S(1.0f);  // -1 .. 1
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
@@ -376,8 +380,12 @@ void sine_mod_trigger(uint16_t osc) {
 
 // Returns a SAMPLE between -1 and 1.
 SAMPLE amy_get_random() {
+#ifndef AMY_USE_FIXEDPOINT
+    return ((float)rand() / 2147483647.0) - 0.5;
+#else
     assert(RAND_MAX == 2147483647); // 2^31 - 1
-    return (rand() >> (31 - S_FRAC_BITS)) - F2S(0.5);
+    return SHIFTR((SAMPLE)rand(), (31 - S_FRAC_BITS)) - F2S(0.5);
+#endif
 }
 
 /* noise */

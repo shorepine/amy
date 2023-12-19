@@ -68,7 +68,7 @@ void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, S
     int index_feedback = (index_in - delay_line->fixed_delay) & index_mask;
 
     SAMPLE *delay = delay_line->samples;
-    SAMPLE half_mod_scale = mod_scale >> 1;
+    SAMPLE half_mod_scale = SHIFTR(mod_scale, 1);
     while(n_samples-- > 0) {
         SAMPLE next_in = *in++ + MUL4_SS(feedback_level,
                                          delay[index_feedback++]);
@@ -97,7 +97,7 @@ void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, SAMPL
     int index_in = delay_line->next_in;
 
     SAMPLE *delay = delay_line->samples;
-    PHASOR delay_phase = S2P((F2S(1.0f) + mod_val) >> 1);
+    PHASOR delay_phase = SHIFTR(S2P(F2S(1.0f) + mod_val), 1);
     while(n_samples-- > 0) {
         SAMPLE next_in = *in++;
 
@@ -136,7 +136,7 @@ static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain
     // Smoothing. lpcoef=1 => no smoothing; lpcoef=0.001 => much smoothing.
     state += MUL0_SS(lpcoef, samp - state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
-    return MUL0_SS(gain >> 1, state + MUL0_SS(lpgain, samp - state));
+    return MUL0_SS(SHIFTR(gain, 1), state + MUL0_SS(lpgain, samp - state));
 }
 
 SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
