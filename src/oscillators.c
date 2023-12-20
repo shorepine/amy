@@ -151,9 +151,10 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAM
     // Scale the impulse proportional to the phase increment step so its integral remains ~constant.
     const LUT *lut = synth[osc].lut;
     SAMPLE amp = direction * F2S(msynth[osc].amp * P2F(step) * 4.0f * lut->scale_factor);
+    PHASOR pwm_phase = synth[osc].phase;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut);
     if (duty > 0) {  // For pulse only, add a second delayed negative LUT wave.
-        PHASOR pwm_phase = P_WRAPPED_SUM(synth[osc].phase, F2P(duty));
+        pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(duty));
         render_lut(buf, pwm_phase, step, -synth[osc].last_amp, -amp, synth[osc].lut);
     }
     if (dc_offset) {
