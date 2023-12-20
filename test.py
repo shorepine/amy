@@ -157,7 +157,7 @@ class TestPWM(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, mod_target=amy.TARGET_DUTY)
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.5)
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
     

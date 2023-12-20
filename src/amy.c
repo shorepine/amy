@@ -367,6 +367,7 @@ void reset_osc(uint16_t i ) {
     synth[i].wave = SINE;
     synth[i].duty = 0.5f;
     msynth[i].duty = 0.5f;
+    msynth[i].last_duty = 0.5f;
     AMY_UNSET(synth[i].patch);
     synth[i].midi_note = 0;
     //synth[i].freq = 0;

@@ -141,7 +141,7 @@ void pulse_note_on(uint16_t osc) {
     synth[osc].lpf_state = MUL4_SS(F2S(-0.5 * float_amp), L2S(synth[osc].lut->table[0]));
 }
 
-void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAMPLE dc_offset) {
+void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
     // Common function for pulse and saw.
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
@@ -153,9 +153,15 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAM
     SAMPLE amp = direction * F2S(msynth[osc].amp * P2F(step) * 4.0f * lut->scale_factor);
     PHASOR pwm_phase = synth[osc].phase;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut);
-    if (duty > 0) {  // For pulse only, add a second delayed negative LUT wave.
-        pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(duty));
-        render_lut(buf, pwm_phase, step, -synth[osc].last_amp, -amp, synth[osc].lut);
+    if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
+        float duty = msynth[osc].duty;
+        if (duty < 0.01f) duty = 0.01f;
+        if (duty > 0.99f) duty = 0.99f;
+        pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(msynth[osc].last_duty));
+        // Second pulse is given some blockwise-constant FM to maintain phase continuity across blocks.
+        PHASOR delta_phase_per_sample = F2P((duty - msynth[osc].last_duty) / AMY_BLOCK_SIZE);
+        render_lut(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut);
+        msynth[osc].last_duty = duty;
     }
     if (dc_offset) {
         // For saw only, apply a dc shift so integral is ~0.
@@ -175,11 +181,7 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, float duty, int8_t direction, SAM
 
 void render_pulse(SAMPLE* buf, uint16_t osc) {
     // Second (negative) impulse is <duty> cycles later.
-    float duty = msynth[osc].duty;
-    if (duty < 0.01f) duty = 0.01f;
-    if (duty > 0.99f) duty = 0.99f;
-
-    render_lpf_lut(buf, osc, duty, 1, 0);
+    render_lpf_lut(buf, osc, true, 1, 0);
 }
 
 void pulse_mod_trigger(uint16_t osc) {
@@ -230,7 +232,7 @@ void saw_up_note_on(uint16_t osc) {
 }
 
 void render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
-    render_lpf_lut(buf, osc, 0, direction, synth[osc].dc_offset);
+    render_lpf_lut(buf, osc, false, direction, synth[osc].dc_offset);
     //printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
     //       total_samples, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
 }

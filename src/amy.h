@@ -240,6 +240,7 @@ struct mod_synthinfo {
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
+    float last_duty;   // Duty history for interpolation.
     float logfreq;
     float filter_logfreq;
     float resonance;
