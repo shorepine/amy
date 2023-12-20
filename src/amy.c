@@ -177,9 +177,9 @@ int8_t global_init() {
     global.event_qsize = 0;
     global.volume = 1.0f;
     global.latency_ms = 0;
-    global.eq[0] = 0;
-    global.eq[1] = 0;
-    global.eq[2] = 0;
+    global.eq[0] = F2S(1.0f);
+    global.eq[1] = F2S(1.0f);
+    global.eq[2] = F2S(1.0f);
     global.hpf_state = 0;
     return 0;
 }
@@ -423,9 +423,9 @@ void amy_reset_oscs() {
     for(uint16_t i=0;i<AMY_OSCS;i++) reset_osc(i);
     // also reset filters and volume
     global.volume = 1.0f;
-    global.eq[0] = 0;
-    global.eq[1] = 0;
-    global.eq[2] = 0;
+    global.eq[0] = F2S(1.0f);
+    global.eq[1] = F2S(1.0f);
+    global.eq[2] = F2S(1.0f);
     // also reset chorus oscillator.
     //synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
     synth[CHORUS_MOD_SOURCE].logfreq = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
@@ -822,7 +822,7 @@ void render_task(uint16_t start, uint16_t end, uint8_t core) {
         }
     }
     // apply the eq filters if set
-    if(global.eq[0] != 0 || global.eq[1] != 0 || global.eq[2] != 0) {
+    if(global.eq[0] != F2S(1.0f) || global.eq[1] != F2S(1.0f) || global.eq[2] != F2S(1.0f)) {
         parametric_eq_process(fbl[core]);
     }
 }
