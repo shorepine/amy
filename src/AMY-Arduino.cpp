@@ -48,7 +48,7 @@ int16_t * AMY::get_buffer() {
 }
 
 void AMY::fm(int32_t start) {
-    example_multimbral_fm(start);
+    example_multimbral_fm(start, 0);
 }
 
 void AMY::drums(int32_t start, uint16_t loops) {
@@ -56,7 +56,7 @@ void AMY::drums(int32_t start, uint16_t loops) {
 }
 
 void AMY::send_message(char * message) {
-    amy_add_i_event(amy_parse_message(message));
+    amy_add_event(amy_parse_message(message));
 }
 
 
