@@ -711,14 +711,13 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].resonance = synth[osc].resonance;
 
     // modify the synth params by scale -- bp scale is (original * scale)
-    int num_nonzero_scales = 0;
+    int amp_touched = false;
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
         float fscale = S2F(compute_breakpoint_scale(osc, i));
         float logfscale = log2f(EPS_FOR_LOG + fscale);
         //printf("H&M: osc %d bpset %d fscale %f logfscale %f\n", osc, i, fscale, logfscale);
-        num_nonzero_scales += (fscale != 0);
         //if (scale != F2S(1.0f)) printf("osc %d scale %f\n", osc, fscale);
-        if(synth[osc].breakpoint_target[i] & TARGET_AMP) msynth[osc].amp *= fscale;
+        if(synth[osc].breakpoint_target[i] & TARGET_AMP) { msynth[osc].amp *= fscale; amp_touched = true; }
         if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan *= fscale;
         if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty *= fscale;
         if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or logfscale
@@ -726,11 +725,17 @@ void hold_and_modify(uint16_t osc) {
         if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or logfscale
         if(synth[osc].breakpoint_target[i] & TARGET_RESONANCE) msynth[osc].resonance *= fscale;
     }
-    if(num_nonzero_scales == 0) { // all bp sets were 0, which means we are in a note off and nobody is active anymore. time to stop the note.
+    // If nothing has altered the amp, we should apply the keyboard gate.
+    if (!amp_touched && AMY_IS_SET(synth[osc].note_off_clock)) {
+        // No amp envelope and the note is off -> initiate 1-frame ramp down.
+        msynth[osc].amp = 0;
+    }
+    // Stop oscillators if amp is zero for two frames in a row.
+    // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
+    if(msynth[osc].amp == 0 && synth[osc].last_amp == 0) {
         synth[osc].status=OFF;
         AMY_UNSET(synth[osc].note_off_clock);
     }
-
     // and the mod -- mod scale is (original + (original * scale))
     float fscale = 1.0f + S2F(compute_mod_scale(osc));
     float logfscale = log2f(fscale);
