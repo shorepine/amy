@@ -99,25 +99,20 @@ const struct FmAlgorithm algorithms[33] = {
 // End of MSFA stuff
 
 // a = 0
-void zero(SAMPLE* a) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        a[i] = 0;
-    }
+static inline void zero(SAMPLE* a) {
+    bzero((void *)a, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+    //    a[i] = 0;
+    //}
 }
 
-
-// b = a + b
-void add(SAMPLE* a, SAMPLE* b) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        b[i] += a[i];
-    }
-}
 
 // b = a 
-void copy(SAMPLE* a, SAMPLE* b) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        b[i] = a[i];
-    }
+static inline void copy(SAMPLE* a, SAMPLE* b) {
+    bcopy((void *)a, (void *)b, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+    //    b[i] = a[i];
+    //}
 }
 
 void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
@@ -263,8 +258,9 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     SAMPLE* const BUS_TWO = scratch[core][1];
     SAMPLE* const SCRATCH = scratch[core][2];
 
-    for (int i = 0; i < 3; ++i)
-        zero(scratch[core][i]);
+    //for (int i = 0; i < 3; ++i)
+    //    zero(scratch[core][i]);
+    
     SAMPLE amp = SHIFTR(F2S(msynth[osc].amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
