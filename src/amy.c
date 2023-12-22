@@ -202,7 +202,7 @@ float logfreq_for_midi_note(uint8_t midi_note) {
 float logfreq_of_freq(float freq) {
     // logfreq is defined as log_2(freq / 8.18 Hz)
     if (freq==0) return 0;
-    return log2f(EPS_FOR_LOG + freq / AMY_MIDI0_HZ);
+    return log2f(freq / AMY_MIDI0_HZ);
 }
 
 float freq_of_logfreq(float logfreq) {
