@@ -93,9 +93,23 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         }
         int16_t base_index = INT_OF_P(total_phase, lut_bits);
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
-        LUTSAMPLE b = lut->table[base_index];
-        LUTSAMPLE c = lut->table[(base_index + 1) & lut_mask];
-        SAMPLE sample = L2S(b) + MUL0_SS(L2S(c - b), frac);
+        SAMPLE b = L2S(lut->table[base_index]);
+        SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]);
+#ifdef LINEAR_INTERP
+        SAMPLE sample = b + MUL0_SS(c - b, frac);
+#else // CUBIC_INTERP
+        SAMPLE a = L2S(lut->table[(base_index - 1) & lut_mask]);
+        SAMPLE d = L2S(lut->table[(base_index + 2) & lut_mask]);
+        // Miller's optimization - https://github.com/pure-data/pure-data/blob/master/src/d_array.c#L832
+        // outlet_float(x->x_obj.ob_outlet, b + frac * (
+        //    cminusb - 0.1666667f * (1.-frac) * (
+        //        (d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b))));
+        SAMPLE cminusb = c - b;
+        SAMPLE fr_d_ma_m3cmb = MUL0_SS(d - a - cminusb - SHIFTL(cminusb, 1), frac);
+        SAMPLE next_bit = MUL0_SS(fr_d_ma_m3cmb + d + SHIFTL(a - b, 1) - b, MUL0_SS(F2S(1.0f) - frac, F2S(0.16666666666667f)));
+        SAMPLE sample = b + MUL0_SS(cminusb - next_bit, frac);
+#endif /* LINEAR_INTERP */
+
         buf[i] += MUL4_SS(current_amp, sample);
         current_amp += incremental_amp;
         phase = P_WRAPPED_SUM(phase, step);

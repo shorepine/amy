@@ -19,7 +19,8 @@
 #define MAX_BREAKPOINT_SETS 3
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
-#define LINEAR_INTERP        // use linear interp for oscs
+
+//#define LINEAR_INTERP        // use linear interp for oscs
 // "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
 //#define CUBIC_INTERP         // use cubic interpolation for oscs
 typedef int16_t output_sample_type;
