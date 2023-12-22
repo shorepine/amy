@@ -64,9 +64,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
         uint32_t sustain_ms = patch.sustain_ms;
         if((sustain_ms > 0 && (ms_since_started < sustain_ms)) || sustain_ms == 0) {
             partial_breakpoint_t pb = partial_breakpoints[(uint32_t)synth[osc].step];
-            // I think the IF should be a WHILE, so we can start more than one oscillator per BUF
-            // but that def sounds worse as it rushes and garbles onsets.
-            if (ms_since_started >= pb.ms_offset) {
+            while (ms_since_started >= pb.ms_offset) {
                 // It's time for the next breakpoint!
                 uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
@@ -125,9 +123,9 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[osc].step++;
                 if(synth[osc].step == synth[osc].substep) {
                     partials_note_off(osc);
-                    // break;  // for the while loop version.
+                    break;  // for the while loop version.
                 }
-                // pb = partial_breakpoints[(uint32_t)synth[osc].step]; // for the while loop version.
+                pb = partial_breakpoints[(uint32_t)synth[osc].step]; // for the while loop version.
             }
         }
     }
