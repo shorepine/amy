@@ -845,7 +845,7 @@ void amy_decrease_volume() {
 }
 
 // this takes scheduled events and plays them at the right time
-int16_t * fill_audio_buffer_task() {
+void amy_prepare_buffer() {
     // check to see which sounds to play 
     uint32_t sysclock = amy_sysclock(); 
 
@@ -880,6 +880,12 @@ int16_t * fill_audio_buffer_task() {
 #endif // CHORUS_ARATE
 #endif // AMY_HAS_CHORUS
 
+}
+
+// This is a (for now) legacy call that we'll move over to a new style asap
+int16_t * fill_audio_buffer_task() {
+    // First, prepare the bffer
+    amy_prepare_buffer();
 
 #if defined ESP_PLATFORM && !defined ARDUINO
     // Tell the rendering threads to start rendering
@@ -909,11 +915,14 @@ int16_t * fill_audio_buffer_task() {
     render_task(0, AMY_OSCS, 0);        
 #endif
 
+    return amy_fill_buffer();
+}
+
+int16_t * amy_fill_buffer() {
     // mix results from both cores.
 #if AMY_CORES == 2
     for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
 #endif
-
 #if  AMY_HAS_CHORUS == 1
     // apply chorus.
     if(chorus.level > 0 && delay_lines[0] != NULL) {

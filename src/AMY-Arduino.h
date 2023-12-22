@@ -29,12 +29,18 @@ class AMY
     int32_t sysclock();
     void fm(int32_t start);
     void drums(int32_t start, uint16_t loops);
-    void render(uint8_t core);
     void reset();
     struct event default_event();
     void add_event(struct event e);
     void send_message(char * message);
+    void volume(float vol);
+
+#if AMY_CORES == 2
+    void prepare();
+    void render(uint16_t start, uint16_t end, uint8_t core);
+#endif
     int16_t * get_buffer();
+
   private:
     int _pin;
     #ifdef ARDUINO_ARCH_RP2040

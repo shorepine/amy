@@ -7,7 +7,7 @@
 
 // If using a multi-core capable device, how many cores to render from
 #ifdef ARDUINO
-#define AMY_CORES 1
+#define AMY_CORES 2
 #elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
 #define AMY_CORES 2
 #else

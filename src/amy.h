@@ -296,6 +296,9 @@ void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
 int16_t * fill_audio_buffer_task();
+void amy_prepare_buffer();
+int16_t * amy_fill_buffer();
+
 uint32_t ms_to_samples(uint32_t ms) ;
 
 
