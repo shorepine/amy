@@ -100,7 +100,8 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
 #else // CUBIC_INTERP
         SAMPLE a = L2S(lut->table[(base_index - 1) & lut_mask]);
         SAMPLE d = L2S(lut->table[(base_index + 2) & lut_mask]);
-        // Miller's optimization - https://github.com/pure-data/pure-data/blob/master/src/d_array.c#L832
+        // Miller's optimization -
+        // https://github.com/pure-data/pure-data/blob/db777311d808bb3ba728b94ab067f8d333b7d0c2/src/d_array.c#L831C1-L833C76
         // outlet_float(x->x_obj.ob_outlet, b + frac * (
         //    cminusb - 0.1666667f * (1.-frac) * (
         //        (d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b))));
