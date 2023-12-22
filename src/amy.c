@@ -713,17 +713,21 @@ void hold_and_modify(uint16_t osc) {
     // modify the synth params by scale -- bp scale is (original * scale)
     int amp_touched = false;
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
-        float fscale = S2F(compute_breakpoint_scale(osc, i));
-        float logfscale = log2f(EPS_FOR_LOG + fscale);
-        //printf("H&M: osc %d bpset %d fscale %f logfscale %f\n", osc, i, fscale, logfscale);
-        //if (scale != F2S(1.0f)) printf("osc %d scale %f\n", osc, fscale);
-        if(synth[osc].breakpoint_target[i] & TARGET_AMP) { msynth[osc].amp *= fscale; amp_touched = true; }
-        if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan *= fscale;
-        if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty *= fscale;
-        if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or logfscale
-        if(synth[osc].breakpoint_target[i] & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-        if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or logfscale
-        if(synth[osc].breakpoint_target[i] & TARGET_RESONANCE) msynth[osc].resonance *= fscale;
+        if (synth[osc].breakpoint_target[i] & TARGET_AMP)  amp_touched = true;
+        SAMPLE scale = compute_breakpoint_scale(osc, i);
+        if (scale != F2S(1.0f)) {
+            float fscale = S2F(scale);
+            float logfscale = log2f(fscale);
+            //printf("H&M: osc %d bpset %d fscale %f logfscale %f\n", osc, i, fscale, logfscale);
+            //if (scale != F2S(1.0f)) printf("osc %d scale %f\n", osc, fscale);
+            if(synth[osc].breakpoint_target[i] & TARGET_AMP) msynth[osc].amp *= fscale;
+            if(synth[osc].breakpoint_target[i] & TARGET_PAN) msynth[osc].pan *= fscale;
+            if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty *= fscale;
+            if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or logfscale
+            if(synth[osc].breakpoint_target[i] & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
+            if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or logfscale
+            if(synth[osc].breakpoint_target[i] & TARGET_RESONANCE) msynth[osc].resonance *= fscale;
+        }
     }
     // If nothing has altered the amp, we should apply the keyboard gate.
     if (!amp_touched && AMY_IS_SET(synth[osc].note_off_clock)) {
@@ -737,20 +741,23 @@ void hold_and_modify(uint16_t osc) {
         AMY_UNSET(synth[osc].note_off_clock);
     }
     // and the mod -- mod scale is (original + (original * scale))
-    float fscale = 1.0f + S2F(compute_mod_scale(osc));
-    float logfscale = log2f(fscale);
-    //printf("H&M: osc %d modscale fscale %f logfscale %f\n", osc, fscale, logfscale);
-    if(synth[osc].mod_target & TARGET_AMP) msynth[osc].amp *= fscale;
-    if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan *= fscale;
-    if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty *= fscale;
-    if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or fscale
-    if(synth[osc].mod_target & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-    if(synth[osc].mod_target & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or fscale
-    if(synth[osc].mod_target & RESONANCE) msynth[osc].resonance *= fscale;
+    SAMPLE scale = compute_mod_scale(osc);
+    if (scale != 0) {
+        float fscale = S2F(scale + F2S(1.0f));
+        float logfscale = log2f(fscale);
+        //printf("H&M: osc %d modscale fscale %f logfscale %f\n", osc, fscale, logfscale);
+        if(synth[osc].mod_target & TARGET_AMP) msynth[osc].amp *= fscale;
+        if(synth[osc].mod_target & TARGET_PAN) msynth[osc].pan *= fscale;
+        if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty *= fscale;
+        if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or fscale
+        if(synth[osc].mod_target & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
+        if(synth[osc].mod_target & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or fscale
+        if(synth[osc].mod_target & RESONANCE) msynth[osc].resonance *= fscale;
 
-    //printf("h&m: osc %d bp_tgt0 %d bp_tgt1 %d mod_targ %d slf %f logfreq %f\n", osc,
-    //       synth[osc].breakpoint_target[0], synth[osc].breakpoint_target[1], synth[osc].mod_target, 
-    //       synth[osc].logfreq, msynth[osc].logfreq);
+        //printf("h&m: osc %d bp_tgt0 %d bp_tgt1 %d mod_targ %d slf %f logfreq %f\n", osc,
+        //       synth[osc].breakpoint_target[0], synth[osc].breakpoint_target[1], synth[osc].mod_target, 
+        //       synth[osc].logfreq, msynth[osc].logfreq);
+    }
 }
 
 
