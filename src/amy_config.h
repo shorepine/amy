@@ -105,7 +105,7 @@
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 
-#define AMY_BLOCK_SIZE 64       // buffer block size in samples
+#define AMY_BLOCK_SIZE 256       // buffer block size in samples
 #define BLOCK_SIZE_BITS 8    // log_2(BLOCK_SIZE)
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
