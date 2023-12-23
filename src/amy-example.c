@@ -64,11 +64,11 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    example_drums(start, 4);
-    example_multimbral_fm(start + 2000, /* start_osc= */ 6);
+    //example_drums(start, 4);
+    example_multimbral_fm(start + 0, /* start_osc= */ 6);
 
     // Now just spin for 10s
-    while(amy_sysclock() - start < 10000) {
+    while(amy_sysclock() - start < 40000) {
         if (output_filename) {
             int16_t *frames = fill_audio_buffer_task();
             int num_frames = AMY_BLOCK_SIZE;

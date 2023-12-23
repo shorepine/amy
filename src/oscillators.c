@@ -64,7 +64,7 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
                          PHASOR step,
                          SAMPLE incoming_amp, SAMPLE ending_amp,
                          const LUT* lut,
-                         SAMPLE* mod, SAMPLE feedback_level, SAMPLE* last_two) { 
+                         SAMPLE* mod, SAMPLE feedback_level, SAMPLE* last_two, uint8_t cubic) { 
     //printf("render_fm: phase %f step %f a0 %f a1 %f lut_sz %d mod 0x%lx fb %f l2 0x%lx\n",
     //       P2F(phase), P2F(step), S2F(incoming_amp), S2F(ending_amp), lut->table_size,
     //       mod, S2F(feedback_level), last_two);
@@ -95,22 +95,22 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
         SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits);
         SAMPLE b = L2S(lut->table[base_index]);
         SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]);
-#ifdef LINEAR_INTERP
-        SAMPLE sample = b + MUL0_SS(c - b, frac);
-#else // CUBIC_INTERP
-        SAMPLE a = L2S(lut->table[(base_index - 1) & lut_mask]);
-        SAMPLE d = L2S(lut->table[(base_index + 2) & lut_mask]);
-        // Miller's optimization -
-        // https://github.com/pure-data/pure-data/blob/db777311d808bb3ba728b94ab067f8d333b7d0c2/src/d_array.c#L831C1-L833C76
-        // outlet_float(x->x_obj.ob_outlet, b + frac * (
-        //    cminusb - 0.1666667f * (1.-frac) * (
-        //        (d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b))));
-        SAMPLE cminusb = c - b;
-        SAMPLE fr_d_ma_m3cmb = MUL0_SS(d - a - cminusb - SHIFTL(cminusb, 1), frac);
-        SAMPLE next_bit = MUL0_SS(fr_d_ma_m3cmb + d + SHIFTL(a - b, 1) - b, MUL0_SS(F2S(1.0f) - frac, F2S(0.16666666666667f)));
-        SAMPLE sample = b + MUL0_SS(cminusb - next_bit, frac);
-#endif /* LINEAR_INTERP */
-
+        SAMPLE sample;
+        if(!cubic) {
+            sample = b + MUL0_SS(c - b, frac);
+        } else {
+            SAMPLE a = L2S(lut->table[(base_index - 1) & lut_mask]);
+            SAMPLE d = L2S(lut->table[(base_index + 2) & lut_mask]);
+            // Miller's optimization -
+            // https://github.com/pure-data/pure-data/blob/db777311d808bb3ba728b94ab067f8d333b7d0c2/src/d_array.c#L831C1-L833C76
+            // outlet_float(x->x_obj.ob_outlet, b + frac * (
+            //    cminusb - 0.1666667f * (1.-frac) * (
+            //        (d - a - 3.0f * cminusb) * frac + (d + 2.0f*a - 3.0f*b))));
+            SAMPLE cminusb = c - b;
+            SAMPLE fr_d_ma_m3cmb = MUL0_SS(d - a - cminusb - SHIFTL(cminusb, 1), frac);
+            SAMPLE next_bit = MUL0_SS(fr_d_ma_m3cmb + d + SHIFTL(a - b, 1) - b, MUL0_SS(F2S(1.0f) - frac, F2S(0.16666666666667f)));
+            sample = b + MUL0_SS(cminusb - next_bit, frac);
+        }
         buf[i] += MUL4_SS(current_amp, sample);
         current_amp += incremental_amp;
         phase = P_WRAPPED_SUM(phase, step);
@@ -129,9 +129,9 @@ PHASOR render_lut_fm_osc(SAMPLE* buf,
 PHASOR render_lut(SAMPLE* buf,
                   PHASOR phase, PHASOR step,
                   SAMPLE incoming_amp, SAMPLE ending_amp,
-                  const LUT* lut) {
+                  const LUT* lut, uint8_t cubic) {
     return render_lut_fm_osc(buf, phase, step, incoming_amp, ending_amp, lut,
-                             NULL, 0, NULL);
+                             NULL, 0, NULL, cubic);
 }
 
 void lpf_buf(SAMPLE *buf, SAMPLE decay, SAMPLE *state) {
@@ -167,7 +167,7 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
     const LUT *lut = synth[osc].lut;
     SAMPLE amp = direction * F2S(msynth[osc].amp * P2F(step) * 4.0f * lut->scale_factor);
     PHASOR pwm_phase = synth[osc].phase;
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut, 1);
     if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
         float duty = msynth[osc].duty;
         if (duty < 0.01f) duty = 0.01f;
@@ -175,7 +175,7 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
         pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(msynth[osc].last_duty));
         // Second pulse is given some blockwise-constant FM to maintain phase continuity across blocks.
         PHASOR delta_phase_per_sample = F2P((duty - msynth[osc].last_duty) / AMY_BLOCK_SIZE);
-        render_lut(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut);
+        render_lut(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut, 1);
         msynth[osc].last_duty = duty;
     }
     if (dc_offset) {
@@ -305,7 +305,7 @@ void render_triangle(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
@@ -352,7 +352,7 @@ void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_leve
     synth[osc].phase = render_lut_fm_osc(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp, 
                                          synth[osc].lut,
-                                         mod, feedback_level, synth[osc].last_two);
+                                         mod, feedback_level, synth[osc].last_two, 0);
     synth[osc].last_amp = amp;
 }
 
@@ -370,7 +370,7 @@ void render_sine(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //printf("render_sine: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
@@ -441,7 +441,7 @@ void render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //printf("render_partial: time %lld logfreq %f freq %f amp %f step %f\n", total_samples, msynth[osc].logfreq, freq, S2F(amp), P2F(step) * synth[osc].lut->table_size); 
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
