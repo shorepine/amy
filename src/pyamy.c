@@ -54,9 +54,9 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     int16_t * result = fill_audio_buffer_task();
     // Create a python list of ints (they are signed shorts that come back)
     uint16_t bs = AMY_BLOCK_SIZE;
-    #if AMY_NCHANS == 2
-    bs = AMY_BLOCK_SIZE*2;
-    #endif
+    if(AMY_NCHANS == 2) {
+        bs = AMY_BLOCK_SIZE*2;
+    }
     PyObject* ret = PyList_New(bs); 
     for (int i = 0; i < bs; i++) {
         PyObject* python_int = Py_BuildValue("i", result[i]);
