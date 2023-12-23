@@ -133,7 +133,6 @@ static inline int isnan_c11(float test)
 
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
-
 // Delta holds the individual changes from an event, it's sorted in order of playback time 
 // this is more efficient in memory than storing entire events per message 
 struct delta {
