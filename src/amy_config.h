@@ -3,19 +3,7 @@
 */
 
 
-// If you set AMY_DYANMIC_PARAMS, you can override our defaults for these settings by , e.g.:
-/*
-const uint16_t amy_block_size = 256;
-const uint16_t amy_block_size_bits = 8;
-const uint8_t amy_cores = 2;
-const uint8_t amy_nchans = 2;
-const uint16_t amy_oscs = 120;
-const uint16_t amy_sample_rate = 44100;
-const uint8_t amy_has_chorus = 1;
-const uint8_t amy_has_reverb = 1;
-*/
-
-
+// Feel free to override any of these in your code
 extern const uint16_t amy_oscs;
 extern const uint16_t amy_block_size;
 extern const uint8_t amy_block_size_bits;

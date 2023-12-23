@@ -574,7 +574,11 @@ void show_debug(uint8_t type) {
 void oscs_deinit() {
     free(block);
     free(fbl[0]);
-    if(AMY_CORES>1)free(fbl[1]);
+    free(per_osc_fb[0]);
+    if(AMY_CORES>1){ 
+        free(fbl[1]);
+        free(per_osc_fb[1]);
+    }
     free(fbl);
     free(synth);
     free(msynth);
@@ -583,6 +587,7 @@ void oscs_deinit() {
     ks_deinit();
     #endif
     filters_deinit();
+    algo_deinit();
 }
 
 

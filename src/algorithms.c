@@ -242,6 +242,14 @@ void algo_note_on(uint16_t osc) {
 
 SAMPLE *** scratch;
 
+void algo_deinit() {
+    for(uint16_t i=0;i<AMY_CORES;i++) {
+        for(uint16_t j=0;j<3;j++) free(scratch[i][j]);
+        free(scratch[i]);
+    }
+    free(scratch);
+}
+
 void algo_init() {
     scratch = malloc_caps(sizeof(SAMPLE**)*AMY_CORES, FBL_RAM_CAPS);
     for(uint16_t i=0;i<AMY_CORES;i++) {

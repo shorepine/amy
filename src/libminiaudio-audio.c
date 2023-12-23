@@ -174,5 +174,6 @@ void amy_live_start() {
 void amy_live_stop() {
     amy_running = 0;
     ma_device_uninit(&device);
+    free(leftover_buf);
 }
 #endif

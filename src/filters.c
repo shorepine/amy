@@ -155,6 +155,24 @@ void update_filter(uint16_t osc) {
     filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
 }
 
+
+void filters_deinit() {
+    for(uint16_t i=0;i<AMY_NCHANS;i++) {
+        for(uint16_t j=0;j<3;j++) free(eq_delay[i][j]);
+        free(eq_delay[i]);
+    }
+    for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        free(coeffs[i]);
+        free(filter_delay[i]);
+    }
+    free(coeffs);
+    free(eq_coeffs);
+    free(filter_delay);
+    free(eq_delay);
+}
+
+
 void filters_init() {
     coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
     eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
@@ -220,8 +238,5 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
     //    block[i] = output[i];
     //}
-}
-
-void filters_deinit() {
 }
 
