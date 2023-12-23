@@ -240,12 +240,20 @@ void algo_note_on(uint16_t osc) {
     }            
 }
 
+SAMPLE *** scratch;
+
 void algo_init() {
+    scratch = malloc_caps(sizeof(SAMPLE**)*AMY_CORES, FBL_RAM_CAPS);
+    for(uint16_t i=0;i<AMY_CORES;i++) {
+        scratch[i] = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+        for(uint16_t j=0;j<3;j++) {
+            scratch[i][j] = malloc_caps(sizeof(SAMPLE)*AMY_BLOCK_SIZE, FBL_RAM_CAPS);
+        }
+    }
+
 }
 
 
-// We need to keep these in heap for the small stack cortex M0
-SAMPLE scratch[AMY_CORES][3][AMY_BLOCK_SIZE];
 
 void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
@@ -258,9 +266,6 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     SAMPLE* const BUS_TWO = scratch[core][1];
     SAMPLE* const SCRATCH = scratch[core][2];
 
-    //for (int i = 0; i < 3; ++i)
-    //    zero(scratch[core][i]);
-    
     SAMPLE amp = SHIFTR(F2S(msynth[osc].amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
         if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {

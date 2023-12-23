@@ -28,7 +28,7 @@
 
 #define DEVICE_FORMAT       ma_format_s16
 
-int16_t leftover_buf[AMY_BLOCK_SIZE*AMY_NCHANS]; 
+int16_t * leftover_buf;
 uint16_t leftover_samples = 0;
 int16_t amy_device_id = -1;
 uint8_t amy_running = 0;
@@ -114,6 +114,7 @@ ma_uint32 captureCount;
 // start 
 
 amy_err_t miniaudio_init() {
+    leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, FBL_RAM_CAPS);
     if (amy_device_id < 0) {
         amy_device_id = 0;
     }

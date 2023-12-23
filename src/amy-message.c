@@ -8,7 +8,6 @@
 //#include <math.h>
 
 int main(int argc, char ** argv) {
-
     int opt;
     while((opt = getopt(argc, argv, ":d:lh")) != -1) 
     { 

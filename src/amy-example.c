@@ -3,14 +3,17 @@
 
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
 
+
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
+// override one
+const uint16_t amy_oscs = 122;
+
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-    
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 
@@ -45,7 +48,6 @@ int main(int argc, char ** argv) {
     uint32_t start = amy_sysclock();
 
     amy_start();
-
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
     ma_encoder encoder;
     ma_result result;

@@ -4,6 +4,39 @@
 // brian@variogr.am
 
 #include "amy.h"
+
+// Defaults
+__attribute__((weak)) const uint16_t amy_block_size = 256;
+__attribute__((weak)) const uint8_t amy_block_size_bits = 8;
+__attribute__((weak)) const uint16_t amy_oscs = 120;
+__attribute__((weak)) const uint16_t amy_sample_rate = 44100;
+
+#ifdef ARDUINO
+    __attribute__((weak)) const uint8_t amy_cores = 1;
+#elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
+    __attribute__((weak)) const uint8_t amy_cores = 2;
+#else
+    __attribute__((weak)) const uint8_t amy_cores = 1;
+#endif
+
+#ifdef ALLES
+    __attribute__((weak)) const uint8_t amy_nchans = 1;
+#else
+    __attribute__((weak)) const uint8_t amy_nchans = 2;
+#endif
+
+#ifdef ALLES
+    __attribute__((weak)) const uint8_t amy_has_chorus = 1;
+    __attribute__((weak)) const uint8_t amy_has_reverb = 0;
+#elif defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
+    __attribute__((weak)) const uint8_t amy_has_chorus = 1;
+    __attribute__((weak)) const uint8_t amy_has_reverb = 0;
+#else
+    __attribute__((weak)) const uint8_t amy_has_chorus = 1;
+    __attribute__((weak)) const uint8_t amy_has_reverb = 1;
+#endif
+
+
 #include "clipping_lookup_table.h"
 #if AMY_HAS_CHORUS == 1 || AMY_HAS_REVERB == 1
 #include "delay.h"
@@ -33,7 +66,7 @@ struct mod_synthinfo * msynth;
 
 // Two mixing blocks, one per core of rendering
 SAMPLE ** fbl;
-SAMPLE per_osc_fb[AMY_CORES][AMY_BLOCK_SIZE];
+SAMPLE ** per_osc_fb; 
 
 #ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
@@ -451,7 +484,6 @@ int8_t oscs_init() {
     filters_init();
     algo_init();
     pcm_init();
-
     events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
     synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
     msynth = (struct mod_synthinfo*) malloc_caps(sizeof(struct mod_synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
@@ -478,9 +510,11 @@ int8_t oscs_init() {
         events[i].param = NO_PARAM;
     }
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
+    per_osc_fb = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
         fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, FBL_RAM_CAPS);
+        per_osc_fb[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, FBL_RAM_CAPS);
         for(uint16_t c=0;c<AMY_NCHANS;++c) {
             for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { 
                 fbl[core][AMY_BLOCK_SIZE*c + i] = 0; 
@@ -761,7 +795,6 @@ void hold_and_modify(uint16_t osc) {
 }
 
 
-#if (AMY_NCHANS == 2)
 static inline float lgain_of_pan(float pan) {
     if(pan > 1.f)  pan = 1.f;
     if(pan < 0)  pan = 0;
@@ -773,7 +806,6 @@ static inline float rgain_of_pan(float pan) {
     if(pan < 0)  pan = 0;
     return dsps_sqrtf_f32_ansi(pan);
 }
-#endif
 
 
 void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end) {
