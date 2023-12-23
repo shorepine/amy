@@ -324,7 +324,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
     // First freq coef is in Hz, rest are linear.
-    if(AMY_IS_SET(e.filter_freq_coefs[0])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[0]); printf("filter_freq %f logfreq %f\n", e.filter_freq_coefs[0], filter_logfreq); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_freq_coefs[0])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[0]); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
     for (int i = 1; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.filter_freq_coefs[i])) { float filter_logfreq_coef = e.filter_freq_coefs[i]; d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&filter_logfreq_coef; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
