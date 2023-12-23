@@ -58,13 +58,30 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
 
 // Multiple versions of render_lut with different features to avoid branches in sample loop.
 
-#define MOD_PART_MOD total_phase += S2P(mod[i]);
+#define RENDER_LUT_PREAMBLE \
+    int lut_mask = lut->table_size - 1; \
+    int lut_bits = lut->log_2_table_size; \
+    SAMPLE sample = 0; \
+    SAMPLE current_amp = incoming_amp; \
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+
+#define MOD_PART_MOD  \
+            total_phase += S2P(mod[i]);
 
 // Feedback is taken before output scaling.
 #define FEEDBACK_PART_FB  \
             past1 = past0;  \
             past0 = sample;  \
             total_phase += S2P(MUL4_SS(feedback_level, SHIFTR(past1 + past0, 1)));
+
+#define RENDER_LUT_GUTS(MOD_PART, FEEDBACK_PART, INTERP_PART) \
+            MOD_PART \
+            FEEDBACK_PART \
+            int16_t base_index = INT_OF_P(total_phase, lut_bits); \
+            SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits); \
+            SAMPLE b = L2S(lut->table[base_index]); \
+            SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]); \
+            INTERP_PART
 
 #define INTERP_LINEAR \
             sample = b + MUL0_SS(c - b, frac);
@@ -82,26 +99,11 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
             SAMPLE next_bit = MUL0_SS(fr_d_ma_m3cmb + d + SHIFTL(a - b, 1) - b, MUL0_SS(F2S(1.0f) - frac, F2S(0.16666666666667f))); \
             sample = b + MUL0_SS(cminusb - next_bit, frac);
 
-#define RENDER_LUT_PREAMBLE \
-    int lut_mask = lut->table_size - 1; \
-    int lut_bits = lut->log_2_table_size; \
-    SAMPLE sample = 0; \
-    SAMPLE current_amp = incoming_amp; \
-    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
-
-#define RENDER_LUT_GUTS(MOD_PART, FEEDBACK_PART, INTERP_PART) \
-        MOD_PART \
-        FEEDBACK_PART \
-        int16_t base_index = INT_OF_P(total_phase, lut_bits); \
-        SAMPLE frac = S_FRAC_OF_P(total_phase, lut_bits); \
-        SAMPLE b = L2S(lut->table[base_index]); \
-        SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]); \
-        INTERP_PART
-
 #define RENDER_LUT_LOOP_END \
-        buf[i] += MUL4_SS(current_amp, sample); \
-        current_amp += incremental_amp; \
-        phase = P_WRAPPED_SUM(phase, step);
+            buf[i] += MUL4_SS(current_amp, sample); \
+            current_amp += incremental_amp; \
+            phase = P_WRAPPED_SUM(phase, step);
+
 
 #define NOTHING ;
 
