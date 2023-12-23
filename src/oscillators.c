@@ -372,7 +372,7 @@ void render_triangle(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
@@ -453,7 +453,7 @@ void render_sine(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //printf("render_sine: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
@@ -524,7 +524,7 @@ void render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //printf("render_partial: time %lld logfreq %f freq %f amp %f step %f\n", total_samples, msynth[osc].logfreq, freq, S2F(amp), P2F(step) * synth[osc].lut->table_size); 
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, 0);
     synth[osc].last_amp = amp;
 }
 
