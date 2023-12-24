@@ -9,6 +9,8 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
+const uint8_t amy_has_reverb = 1;
+const uint8_t amy_has_chorus = 1;
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
