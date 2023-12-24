@@ -36,9 +36,7 @@ __attribute__((weak)) const uint16_t amy_sample_rate = 44100;
     __attribute__((weak)) const uint8_t amy_has_reverb = 1;
 #endif
 
-extern const int16_t * pcm;
-extern const pcm_map_t * pcm_map;
-
+#include "pcm_weak.h"
 #include "clipping_lookup_table.h"
 #include "delay.h"
 // Final output delay lines.
@@ -483,7 +481,8 @@ int8_t oscs_init() {
         ks_init();
     filters_init();
     algo_init();
-    if(pcm != NULL) {
+
+    if(pcm_samples) {
         pcm_init();
     }
     events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
@@ -600,7 +599,7 @@ void osc_note_on(uint16_t osc) {
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc);
     if(synth[osc].wave==TRIANGLE) triangle_note_on(osc);
     if(synth[osc].wave==PULSE) pulse_note_on(osc);
-    if(pcm != NULL)
+    if(pcm_samples)
         if(synth[osc].wave==PCM) pcm_note_on(osc);
     
     if(synth[osc].wave==ALGO) algo_note_on(osc);
@@ -706,7 +705,7 @@ void play_event(struct delta d) {
                 if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
-                if(pcm != NULL)
+                if(pcm_samples)
                     if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
             }
 
@@ -726,7 +725,7 @@ void play_event(struct delta d) {
             if(AMY_HAS_PARTIALS == 1) 
                 partials_note_off(d.osc);
         } else if(synth[d.osc].wave==PCM) { 
-            if(pcm!=NULL) pcm_note_off(d.osc); 
+            if(pcm_samples) pcm_note_off(d.osc); 
         } else {
             // osc note off, start release
             AMY_UNSET(synth[d.osc].note_on_clock);
@@ -847,7 +846,7 @@ void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_KS_OSCS>0)
             render_ks(buf, osc);
     }
-    if(pcm!=NULL)
+    if(pcm_samples)
         if(synth[osc].wave == PCM) render_pcm(buf, osc);
     if(synth[osc].wave == ALGO) render_algo(buf, osc, core);
     if(AMY_HAS_PARTIALS == 1) {
@@ -1297,7 +1296,9 @@ void amy_stop() {
 }
 
 void amy_start() {
+
     global_init();
+
     oscs_init();
     amy_reset_oscs();
 }

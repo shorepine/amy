@@ -2,7 +2,7 @@
 #ifndef __PCM_H
 #define __PCM_H
 #include "pcm_samples_large.h"
-#define PCM_SAMPLES 67
+const uint16_t pcm_samples=67;
 #define PCM_LENGTH 1176036
 #define PCM_AMY_SAMPLE_RATE 22050
 const pcm_map_t pcm_map[67] PROGMEM = {

@@ -86,7 +86,7 @@ static struct PyModuleDef libamyDef =
 };
 
 PyMODINIT_FUNC PyInit_libamy(void)
-{
+{   
     amy_start();
     return PyModule_Create(&libamyDef);
 

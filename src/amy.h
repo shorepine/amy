@@ -10,6 +10,16 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+
+typedef struct {
+    uint32_t offset;
+    uint32_t length;
+    uint32_t loopstart;
+    uint32_t loopend;
+    uint8_t midinote;
+} pcm_map_t;
+
+
 #include "amy_config.h"
 
 // Rest of amy setup
@@ -246,14 +256,6 @@ struct mod_synthinfo {
     float resonance;
     float feedback;
 };
-
-typedef struct {
-    uint32_t offset;
-    uint32_t length;
-    uint32_t loopstart;
-    uint32_t loopend;
-    uint8_t midinote;
-} pcm_map_t;
 
 
 // Callbacks, override if you'd like after calling amy_start()

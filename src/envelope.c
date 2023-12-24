@@ -6,7 +6,7 @@
 extern struct synthinfo* synth;
 extern struct mod_synthinfo* msynth;
 extern struct mod_state mglobal;
-extern const int16_t * pcm;
+extern const int16_t pcm[];
 
 
 SAMPLE compute_mod_value(uint16_t mod_osc) {
@@ -20,7 +20,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     if(synth[mod_osc].wave == PULSE) return compute_mod_pulse(mod_osc);
     if(synth[mod_osc].wave == TRIANGLE) return compute_mod_triangle(mod_osc);
     if(synth[mod_osc].wave == SINE) return compute_mod_sine(mod_osc);
-    if(pcm!=NULL)
+    if(pcm_samples)
         if(synth[mod_osc].wave == PCM) return compute_mod_pcm(mod_osc);
     return 0;
 }

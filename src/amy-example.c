@@ -7,14 +7,17 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
+// If you want PCM support bigger than 11 samples you have to include one of pcm_{small,large}.h
+#include "pcm_small.h"
+
 // You can override parameters in your implementation like this
-#include "pcm_tiny.h"
 const uint16_t amy_oscs = 122;
 
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-    
+    //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
+
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 
