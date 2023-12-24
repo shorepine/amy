@@ -222,6 +222,7 @@ struct synthinfo {
 
     uint32_t note_on_clock;
     uint32_t note_off_clock;
+    uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
