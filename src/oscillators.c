@@ -256,7 +256,12 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
         }
     }        
     // LPF to integrate to convert pair of (+, -) impulses into a rectangular wave.
-    lpf_buf(buf, synth[osc].lpf_alpha, &synth[osc].lpf_state);
+    SAMPLE alpha = synth[osc].lpf_alpha;
+    if (msynth[osc].amp == 0 && synth[osc].last_amp == 0) {
+        // When amp is zero, decay LPF more rapidly.
+        alpha = F2S(1.0f) - SHIFTL(F2S(1.0f) - alpha, 4);
+    }
+    lpf_buf(buf, alpha, &synth[osc].lpf_state);
     // Remember last_amp.
     synth[osc].last_amp = amp;
 }
@@ -539,7 +544,7 @@ void partial_note_off(uint16_t osc) {
     AMY_UNSET(synth[osc].note_on_clock);
     synth[osc].note_off_clock = total_samples;   
     synth[osc].last_amp = 0;
-    synth[osc].status=OFF;
+    synth[osc].status = OFF;
 }
 
 #endif

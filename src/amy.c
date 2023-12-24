@@ -400,6 +400,7 @@ void reset_osc(uint16_t i ) {
     synth[i].mod_target = 0; 
     AMY_UNSET(synth[i].note_on_clock);
     AMY_UNSET(synth[i].note_off_clock);
+    AMY_UNSET(synth[i].zero_amp_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_state = 0;
     synth[i].lpf_alpha = 0;
@@ -742,12 +743,25 @@ void hold_and_modify(uint16_t osc) {
         // No amp envelope and the note is off -> initiate 1-frame ramp down.
         msynth[osc].amp = 0;
     }
+
     // Stop oscillators if amp is zero for two frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-    if(msynth[osc].amp == 0 && synth[osc].last_amp == 0) {
-        synth[osc].status = OFF;
-        AMY_UNSET(synth[osc].note_off_clock);
+#define MIN_ZERO_AMP_TIME_SAMPS (3 * AMY_BLOCK_SIZE)
+    if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
+        if (msynth[osc].amp > 0)
+            AMY_UNSET(synth[osc].zero_amp_clock);
+        else {
+            if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
+                synth[osc].status = OFF;
+                AMY_UNSET(synth[osc].note_off_clock);
+                AMY_UNSET(synth[osc].zero_amp_clock);
+            }
+        }
+    } else if (msynth[osc].amp == 0) {
+        synth[osc].zero_amp_clock = total_samples;
     }
+
     // and the mod -- mod scale is (original + (original * scale))
     SAMPLE scale = compute_mod_scale(osc);
     msynth[osc].filter_logfreq += synth[osc].filter_logfreq_coefs[5] * S2F(scale);
@@ -889,11 +903,7 @@ void amy_prepare_buffer() {
 #endif
 
 #if AMY_HAS_CHORUS == 1
-    // here's a little fragment of hold_and_modify() for you.
-    msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
-    msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
-    //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
-    msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
+    hold_and_modify(CHORUS_MOD_SOURCE);
 #ifdef CHORUS_ARATE
     if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
 #else
