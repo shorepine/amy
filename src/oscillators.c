@@ -517,7 +517,6 @@ SAMPLE compute_mod_noise(uint16_t osc) {
 
 /* partial */
 
-#if AMY_HAS_PARTIALS == 1
 
 void render_partial(SAMPLE * buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
@@ -542,9 +541,6 @@ void partial_note_off(uint16_t osc) {
     synth[osc].status=OFF;
 }
 
-#endif
-
-#if AMY_KS_OSCS > 0
 
 #define MAX_KS_BUFFER_LEN 802 // 44100/55  -- 55Hz (A1) lowest we can go for KS
 SAMPLE ** ks_buffer;
@@ -601,4 +597,3 @@ void ks_deinit(void) {
     for(int i=0;i<AMY_KS_OSCS;i++) free(ks_buffer[i]);
     free(ks_buffer);
 }
-#endif
