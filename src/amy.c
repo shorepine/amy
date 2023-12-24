@@ -130,10 +130,6 @@ void dealloc_delay_lines(void) {
 void config_chorus(float level, int max_delay) {
     // we just config mix level and max_delay here.  modulation freq/amp/shape comes from osc 63.
     if (level > 0) {
-        // only allocate delay lines if chorus is more than inaudible.
-        if (delay_lines[0] == NULL) {
-            alloc_delay_lines();
-        }
         // if we're turning on for the first time, start the oscillator.
         if (chorus.level == 0) {
 #ifdef CHORUS_ARATE
@@ -525,7 +521,6 @@ int8_t oscs_init() {
     // we only alloc delay lines if the chorus is turned on.
     if(AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0) {
         alloc_delay_lines();
-        for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
     }
     //init_stereo_reverb();
     
@@ -930,7 +925,7 @@ void amy_prepare_buffer() {
         //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
         msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
     #ifdef CHORUS_ARATE
-        if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+        if(chorus.level!=0)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
     #else
         delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
     #endif // CHORUS_ARATE
