@@ -317,6 +317,7 @@ extern float render_am_lut(float * buf, float step, float skip, float incoming_a
 extern void ks_init();
 extern void ks_deinit();
 extern void algo_init();
+extern void algo_deinit();
 extern void pcm_init();
 extern void render_ks(SAMPLE * buf, uint16_t osc); 
 extern void render_sine(SAMPLE * buf, uint16_t osc); 

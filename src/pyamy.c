@@ -40,13 +40,23 @@ static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * config_wrapper(PyObject *self, PyObject *args) {
+    PyObject* ret = PyList_New(5); 
+    PyList_SetItem(ret, 0, Py_BuildValue("i", AMY_BLOCK_SIZE));
+    PyList_SetItem(ret, 1, Py_BuildValue("i", AMY_CORES));
+    PyList_SetItem(ret, 2, Py_BuildValue("i", AMY_NCHANS));
+    PyList_SetItem(ret, 3, Py_BuildValue("i", AMY_SAMPLE_RATE));
+    PyList_SetItem(ret, 4, Py_BuildValue("i", AMY_OSCS));
+    return ret;
+}
+
 static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     int16_t * result = fill_audio_buffer_task();
     // Create a python list of ints (they are signed shorts that come back)
     uint16_t bs = AMY_BLOCK_SIZE;
-    #if AMY_NCHANS == 2
-    bs = AMY_BLOCK_SIZE*2;
-    #endif
+    if(AMY_NCHANS == 2) {
+        bs = AMY_BLOCK_SIZE*2;
+    }
     PyObject* ret = PyList_New(bs); 
     for (int i = 0; i < bs; i++) {
         PyObject* python_int = Py_BuildValue("i", result[i]);
@@ -62,6 +72,7 @@ static PyMethodDef libAMYMethods[] = {
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
     {"restart", restart_wrapper, METH_VARARGS, "Restart AMY"},
+    {"config", config_wrapper, METH_VARARGS, "Return config"},
     { NULL, NULL, 0, NULL }
 };
 

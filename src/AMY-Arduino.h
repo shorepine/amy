@@ -35,10 +35,8 @@ class AMY
     void send_message(char * message);
     void volume(float vol);
 
-#if AMY_CORES == 2
     void prepare();
     void render(uint16_t start, uint16_t end, uint8_t core);
-#endif
     int16_t * get_buffer();
 
   private:

@@ -240,12 +240,26 @@ void algo_note_on(uint16_t osc) {
     }            
 }
 
-void algo_init() {
+SAMPLE *** scratch;
+
+void algo_deinit() {
+    for(uint16_t i=0;i<AMY_CORES;i++) {
+        for(uint16_t j=0;j<3;j++) free(scratch[i][j]);
+        free(scratch[i]);
+    }
+    free(scratch);
 }
 
+void algo_init() {
+    scratch = malloc_caps(sizeof(SAMPLE**)*AMY_CORES, FBL_RAM_CAPS);
+    for(uint16_t i=0;i<AMY_CORES;i++) {
+        scratch[i] = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+        for(uint16_t j=0;j<3;j++) {
+            scratch[i][j] = malloc_caps(sizeof(SAMPLE)*AMY_BLOCK_SIZE, FBL_RAM_CAPS);
+        }
+    }
 
-// We need to keep these in heap for the small stack cortex M0
-SAMPLE scratch[AMY_CORES][3][AMY_BLOCK_SIZE];
+}
 
 void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];

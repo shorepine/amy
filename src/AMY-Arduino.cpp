@@ -31,8 +31,6 @@ void AMY::reset() {
 }
 
 
-// Multicore rendering support
-#if AMY_CORES == 2
 
 // (From either core) prepare to render multicore
 void AMY::prepare() {
@@ -51,19 +49,14 @@ void AMY::render(uint16_t start, uint16_t end, uint8_t core) {
 
 // From either core, combine rendering and output finished audio buffer
 int16_t * AMY::get_buffer() {
-    return amy_fill_buffer();
-}
-
-#else
-
-// Render and return a completed buffer in single core mode.
-int16_t * AMY::get_buffer() {
+    if(AMY_CORES > 1) {
+        return amy_fill_buffer();
+    }
     amy_prepare_buffer();
     render_task(0, AMY_OSCS, 0);
     return amy_fill_buffer();
 }
 
-#endif
 
 void AMY::fm(int32_t start) {
     example_multimbral_fm(start, 0);
