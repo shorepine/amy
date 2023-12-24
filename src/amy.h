@@ -47,6 +47,7 @@ typedef int16_t output_sample_type;
 
 #define MAX_MESSAGE_LEN 255
 #define MAX_PARAM_LEN 64
+#define NUM_COMBO_COEFS 6  // 6 control-mixing params: const, note, gate, env1, env2, mod
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
@@ -98,11 +99,11 @@ typedef int amy_err_t;
 
 enum params{
     WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ /* 12 */,
-    RATIO, RESONANCE, 
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY /* 25 */,
-    ALGO_SOURCE_START=30, 
-    ALGO_SOURCE_END=30+MAX_ALGO_OPS,
-    BP_START=ALGO_SOURCE_END+1 /* 37 */,   
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, RESONANCE,
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
+    ALGO_SOURCE_START=100,
+    ALGO_SOURCE_END=100+MAX_ALGO_OPS,
+    BP_START=ALGO_SOURCE_END + 1,
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
     NO_PARAM
 };
@@ -163,7 +164,7 @@ struct event {
     float volume;
     float pan;
     uint16_t latency_ms;
-    float filter_freq;
+    float filter_freq_coefs[NUM_COMBO_COEFS];
     float ratio;
     float resonance;
     uint16_t mod_source;
@@ -202,7 +203,7 @@ struct synthinfo {
     SAMPLE sample;
     float volume;
     float pan;   // Pan parameters.
-    float filter_logfreq;
+    float filter_logfreq_coefs[NUM_COMBO_COEFS];
     float logratio;
     float resonance;
     uint16_t mod_source;
@@ -291,11 +292,13 @@ extern struct synthinfo *synth;
 extern struct mod_synthinfo *msynth; // the synth that is being modified by modulations & envelopes
 extern struct state global; 
 
+int8_t oscs_init();
 
 float atoff(const char *s);
-int8_t oscs_init();
-void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
+int parse_float_list_message(char *message, float *vals, int max_num_vals);
+int parse_int_list_message(char *message, int16_t *vals, int max_num_vals);
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
+void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void hold_and_modify(uint16_t osc) ;
 int16_t * fill_audio_buffer_task();
 void amy_prepare_buffer();
