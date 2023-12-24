@@ -2,11 +2,15 @@
 // a simple C example that plays audio using AMY out your speaker 
 
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
-
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
+#include "pcm_small.h"
+
+// You can override parameters in your implementation like this
+const uint16_t amy_oscs = 122;
+
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;

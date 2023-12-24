@@ -19,7 +19,9 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     if(synth[mod_osc].wave == PULSE) return compute_mod_pulse(mod_osc);
     if(synth[mod_osc].wave == TRIANGLE) return compute_mod_triangle(mod_osc);
     if(synth[mod_osc].wave == SINE) return compute_mod_sine(mod_osc);
+    #ifdef __PCM_H
     if(synth[mod_osc].wave == PCM) return compute_mod_pcm(mod_osc);
+    #endif
     return 0;
 }
 

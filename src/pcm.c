@@ -1,6 +1,7 @@
 // pcm.c
 
 #include "amy.h"
+#ifdef __PCM_H
 
 typedef struct {
     uint32_t offset;
@@ -10,16 +11,7 @@ typedef struct {
     uint8_t midinote;
 } pcm_map_t;
 
-#if AMY_PCM_PATCHES_SIZE == 3
-#include "pcm_large.h"
-#include "pcm_samples_large.h"
-#elif AMY_PCM_PATCHES_SIZE == 2
-#include "pcm_small.h"
-#include "pcm_samples_small.h"
-#else
-#include "pcm_tiny.h"
-#include "pcm_samples_tiny.h"
-#endif
+
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
 
@@ -126,3 +118,4 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
     }
     return MUL4_SS(F2S(msynth[osc].amp), sample);
 }
+#endif

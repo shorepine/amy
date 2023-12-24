@@ -481,7 +481,9 @@ int8_t oscs_init() {
         ks_init();
     filters_init();
     algo_init();
-    pcm_init();
+    #ifdef __PCM_H
+        pcm_init();
+    #endif
     events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
     synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
     msynth = (struct mod_synthinfo*) malloc_caps(sizeof(struct mod_synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
@@ -596,7 +598,9 @@ void osc_note_on(uint16_t osc) {
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc);
     if(synth[osc].wave==TRIANGLE) triangle_note_on(osc);
     if(synth[osc].wave==PULSE) pulse_note_on(osc);
-    if(synth[osc].wave==PCM) pcm_note_on(osc);
+    #ifdef __PCM_H
+        if(synth[osc].wave==PCM) pcm_note_on(osc);
+    #endif
     if(synth[osc].wave==ALGO) algo_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
@@ -700,7 +704,9 @@ void play_event(struct delta d) {
                 if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
+                #ifdef __PCM_H
+                    if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
+                #endif
             }
 
         }
@@ -719,7 +725,9 @@ void play_event(struct delta d) {
             if(AMY_HAS_PARTIALS == 1) 
                 partials_note_off(d.osc);
         }
-        else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
+        #ifdef __PCM_H
+            else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
+        #endif
         else {
             // osc note off, start release
             AMY_UNSET(synth[d.osc].note_on_clock);
@@ -840,7 +848,9 @@ void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_KS_OSCS>0)
             render_ks(buf, osc);
     }
-    if(synth[osc].wave == PCM) render_pcm(buf, osc);
+    #ifdef __PCM_H
+        if(synth[osc].wave == PCM) render_pcm(buf, osc);
+    #endif
     if(synth[osc].wave == ALGO) render_algo(buf, osc, core);
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
