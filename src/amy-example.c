@@ -6,9 +6,9 @@
 #include "examples.h"
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
-#include "pcm_small.h"
 
 // You can override parameters in your implementation like this
+#include "pcm_tiny.h"
 const uint16_t amy_oscs = 122;
 
 

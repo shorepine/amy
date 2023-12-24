@@ -29,6 +29,7 @@ extern const uint8_t amy_has_reverb;
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#define PCM_AMY_SAMPLE_RATE 22050
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM

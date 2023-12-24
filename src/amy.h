@@ -247,6 +247,15 @@ struct mod_synthinfo {
     float feedback;
 };
 
+typedef struct {
+    uint32_t offset;
+    uint32_t length;
+    uint32_t loopstart;
+    uint32_t loopend;
+    uint8_t midinote;
+} pcm_map_t;
+
+
 // Callbacks, override if you'd like after calling amy_start()
 //void (*amy_parse_callback)(char,char*);
 

@@ -1,16 +1,9 @@
 // pcm.c
 
 #include "amy.h"
-#ifdef __PCM_H
 
-typedef struct {
-    uint32_t offset;
-    uint32_t length;
-    uint32_t loopstart;
-    uint32_t loopend;
-    uint8_t midinote;
-} pcm_map_t;
-
+__attribute__((weak)) const int16_t * pcm = NULL;
+__attribute__((weak)) const pcm_map_t * pcm_map = NULL;
 
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
@@ -29,6 +22,7 @@ void pcm_init() {
     pcm = pcm_desktop;
 #endif
 */
+    fprintf(stderr, "pcm init. # of samples is %d\n", pcm_map[0].offset);
 }
 
 // How many bits used for fractional part of PCM table index.
@@ -118,4 +112,3 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
     }
     return MUL4_SS(F2S(msynth[osc].amp), sample);
 }
-#endif
