@@ -70,7 +70,7 @@ def trunc(number):
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None, \
-        client=None, retries=None, volume=None, filter_freq_coefs = None, resonance = None, bp0=None, bp1=None, bp2=None, bp0_target=None, bp1_target=None, bp2_target=None, mod_target=None, \
+        client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp2=None, bp0_target=None, bp1_target=None, bp2_target=None, mod_target=None, \
         debug=None, mod_source=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, \
         chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None):
 
@@ -91,7 +91,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(volume is not None): m = m + "V" + trunc(volume)
     if(latency_ms is not None): m = m + "N" + str(latency_ms)
     if(resonance is not None): m = m + "R" + trunc(resonance)
-    if(filter_freq_coefs is not None): m = m + "F%s" % (filter_freq_coefs)
+    if(filter_freq is not None): m = m + "F" + trunc(filter_freq)
     if(ratio is not None): m = m + "I" + trunc(ratio)
     if(algorithm is not None): m = m + "o" + str(algorithm)
     if(bp0 is not None): m = m +"A%s" % (bp0)

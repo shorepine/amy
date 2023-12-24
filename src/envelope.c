@@ -32,10 +32,7 @@ SAMPLE compute_mod_scale(uint16_t osc) {
             //msynth[source].freq = synth[source].freq;
             msynth[source].logfreq = synth[source].logfreq;
             //msynth[source].filter_freq = synth[source].filter_freq;
-            //msynth[source].filter_logfreq = synth[source].filter_logfreq;
-            msynth[source].filter_logfreq = synth[source].filter_logfreq_coefs[0]
-                + synth[source].filter_logfreq_coefs[1] * synth[source].logfreq
-                + synth[source].filter_logfreq_coefs[2] * AMY_IS_UNSET(synth[source].note_off_clock);
+            msynth[source].filter_logfreq = synth[source].filter_logfreq;
             msynth[source].feedback = synth[source].feedback;
             msynth[source].resonance = synth[source].resonance;
             return compute_mod_value(source);

@@ -230,7 +230,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.pan);
     AMY_UNSET(e.latency_ms);
     AMY_UNSET(e.ratio);
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) AMY_UNSET(e.filter_freq_coefs[i]);
+    AMY_UNSET(e.filter_freq);
     AMY_UNSET(e.resonance);
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.mod_source);
@@ -323,9 +323,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.pan)) { d.param=PAN; d.data = *(uint32_t *)&e.pan; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
-    // First freq coef is in Hz, rest are linear.
-    if(AMY_IS_SET(e.filter_freq_coefs[0])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[0]); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
-    for (int i = 1; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.filter_freq_coefs[i])) { float filter_logfreq_coef = e.filter_freq_coefs[i]; d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&filter_logfreq_coef; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.filter_freq)) { float filter_logfreq = logfreq_of_freq(e.filter_freq); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
@@ -372,7 +370,9 @@ void reset_osc(uint16_t i ) {
     msynth[i].last_duty = 0.5f;
     AMY_UNSET(synth[i].patch);
     synth[i].midi_note = 0;
+    //synth[i].freq = 0;
     synth[i].logfreq = 0;
+    //msynth[i].freq = 0;
     msynth[i].logfreq = 0;
     synth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     msynth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
@@ -386,8 +386,9 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
     AMY_UNSET(synth[i].logratio);
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].filter_logfreq_coefs[j] = 0;
+    //synth[i].filter_freq = 0;
+    synth[i].filter_logfreq = 0;
+    //msynth[i].filter_freq = 0;
     msynth[i].filter_logfreq = 0;
     synth[i].resonance = 0.7f;
     msynth[i].resonance = 0.7f;
@@ -553,10 +554,6 @@ void oscs_deinit() {
 
 
 void osc_note_on(uint16_t osc) {
-    //printf("Note on: filter_freq_coefs[%d]=%f %f %f %f %f %f\n", osc,
-    //       synth[osc].filter_logfreq_coefs[0], synth[osc].filter_logfreq_coefs[1], synth[osc].filter_logfreq_coefs[2],
-    //       synth[osc].filter_logfreq_coefs[3], synth[osc].filter_logfreq_coefs[4], synth[osc].filter_logfreq_coefs[5]); }
-
     if(synth[osc].wave==SINE) sine_note_on(osc);
     if(synth[osc].wave==SAW_DOWN) saw_down_note_on(osc);
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc);
@@ -621,8 +618,7 @@ void play_event(struct delta d) {
 
     if(d.param == RATIO) synth[d.osc].logratio = *(float *)&d.data;
 
-    if(d.param >= FILTER_FREQ && d.param < FILTER_FREQ + NUM_COMBO_COEFS)
-        synth[d.osc].filter_logfreq_coefs[d.param - FILTER_FREQ] = *(float *)&d.data;
+    if(d.param == FILTER_FREQ) synth[d.osc].filter_logfreq = *(float *)&d.data;
     if(d.param == FILTER_TYPE) synth[d.osc].filter_type = *(uint8_t *)&d.data; 
     if(d.param == RESONANCE) synth[d.osc].resonance = *(float *)&d.data;
 
@@ -702,7 +698,6 @@ void play_event(struct delta d) {
 
 // apply an mod & bp, if any, to the osc
 void hold_and_modify(uint16_t osc) {
-    int key_down = AMY_IS_SET(synth[osc].note_off_clock)? 0 : 1;
     // copy all the modifier variables
     msynth[osc].amp = synth[osc].amp;
     msynth[osc].last_pan = msynth[osc].pan;
@@ -712,9 +707,7 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].logfreq = synth[osc].logfreq;
     msynth[osc].feedback = synth[osc].feedback;
     //msynth[osc].filter_freq = synth[osc].filter_freq;
-    msynth[osc].filter_logfreq = synth[osc].filter_logfreq_coefs[0]
-        + synth[osc].filter_logfreq_coefs[1] * synth[osc].logfreq
-        + synth[osc].filter_logfreq_coefs[2] * key_down;
+    msynth[osc].filter_logfreq = synth[osc].filter_logfreq;
     msynth[osc].resonance = synth[osc].resonance;
 
     // modify the synth params by scale -- bp scale is (original * scale)
@@ -722,7 +715,6 @@ void hold_and_modify(uint16_t osc) {
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
         if (synth[osc].breakpoint_target[i] & TARGET_AMP)  amp_touched = true;
         SAMPLE scale = compute_breakpoint_scale(osc, i);
-        if (i < 2) msynth[osc].filter_logfreq += synth[osc].filter_logfreq_coefs[3 + i] * S2F(scale);
         if (scale != F2S(1.0f)) {
             float fscale = S2F(scale);
             float logfscale = log2f(fscale);
@@ -733,24 +725,23 @@ void hold_and_modify(uint16_t osc) {
             if(synth[osc].breakpoint_target[i] & TARGET_DUTY) msynth[osc].duty *= fscale;
             if(synth[osc].breakpoint_target[i] & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or logfscale
             if(synth[osc].breakpoint_target[i] & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-            //if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or logfscale
+            if(synth[osc].breakpoint_target[i] & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or logfscale
             if(synth[osc].breakpoint_target[i] & TARGET_RESONANCE) msynth[osc].resonance *= fscale;
         }
     }
     // If nothing has altered the amp, we should apply the keyboard gate.
-    if (!amp_touched && !key_down) {
+    if (!amp_touched && AMY_IS_SET(synth[osc].note_off_clock)) {
         // No amp envelope and the note is off -> initiate 1-frame ramp down.
         msynth[osc].amp = 0;
     }
     // Stop oscillators if amp is zero for two frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
     if(msynth[osc].amp == 0 && synth[osc].last_amp == 0) {
-        synth[osc].status = OFF;
+        synth[osc].status=OFF;
         AMY_UNSET(synth[osc].note_off_clock);
     }
     // and the mod -- mod scale is (original + (original * scale))
     SAMPLE scale = compute_mod_scale(osc);
-    msynth[osc].filter_logfreq += synth[osc].filter_logfreq_coefs[5] * S2F(scale);
     if (scale != 0) {
         float fscale = S2F(scale + F2S(1.0f));
         float logfscale = log2f(fscale);
@@ -760,7 +751,7 @@ void hold_and_modify(uint16_t osc) {
         if(synth[osc].mod_target & TARGET_DUTY) msynth[osc].duty *= fscale;
         if(synth[osc].mod_target & TARGET_FREQ) msynth[osc].logfreq += logfscale;  // or fscale
         if(synth[osc].mod_target & TARGET_FEEDBACK) msynth[osc].feedback *= fscale;
-        //if(synth[osc].mod_target & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or fscale
+        if(synth[osc].mod_target & TARGET_FILTER_FREQ) msynth[osc].filter_logfreq += logfscale;  // or fscale
         if(synth[osc].mod_target & RESONANCE) msynth[osc].resonance *= fscale;
 
         //printf("h&m: osc %d bp_tgt0 %d bp_tgt1 %d mod_targ %d slf %f logfreq %f\n", osc,
@@ -1180,7 +1171,7 @@ struct event amy_parse_message(char * message) {
                         case 'd': e.duty=atoff(message + start); break; 
                         case 'D': show_debug(atoi(message + start)); break; 
                         case 'f': e.freq = atoff(message + start); break; 
-                        case 'F': parse_float_list_message(message + start, e.filter_freq_coefs, NUM_COMBO_COEFS); break;
+                        case 'F': e.filter_freq = atoff(message + start); break; 
                         case 'G': e.filter_type = atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
                         #if(AMY_HAS_REVERB == 1)
