@@ -1,7 +1,7 @@
 /* 
     Configuration for AMY. We make guesses here based on your arch, but feel free to make changes for your own code.
 */
-
+#include "amy.h"
 
 // Feel free to override any of these in your code
 extern const uint16_t amy_oscs;
@@ -13,6 +13,10 @@ extern const uint16_t amy_sample_rate;
 extern const uint8_t amy_has_chorus;
 extern const uint8_t amy_has_reverb;
 
+// These are overriden for you if you include pcm_X.h {tiny, small, large}
+extern const int16_t pcm[];
+extern const pcm_map_t pcm_map[];
+extern const uint16_t pcm_samples;
 
 #define AMY_BLOCK_SIZE amy_block_size
 #define AMY_HAS_REVERB amy_has_reverb
@@ -29,6 +33,7 @@ extern const uint8_t amy_has_reverb;
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#define PCM_AMY_SAMPLE_RATE 22050
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM

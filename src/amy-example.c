@@ -2,15 +2,22 @@
 // a simple C example that plays audio using AMY out your speaker 
 
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
-
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
+// If you want PCM support smaller than 67 samples you have to include one of pcm_{small,tiny}.h
+#include "pcm_tiny.h"
+
+// You can override parameters in your implementation like this
+const uint16_t amy_oscs = 122;
+
+
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-    
+    //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
+
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 
@@ -64,7 +71,7 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    //example_drums(start, 4);
+    example_drums(start, 4);
     example_multimbral_fm(start + 0, /* start_osc= */ 6);
 
     // Now just spin for 10s

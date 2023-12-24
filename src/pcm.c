@@ -2,24 +2,7 @@
 
 #include "amy.h"
 
-typedef struct {
-    uint32_t offset;
-    uint32_t length;
-    uint32_t loopstart;
-    uint32_t loopend;
-    uint8_t midinote;
-} pcm_map_t;
 
-#if AMY_PCM_PATCHES_SIZE == 3
-#include "pcm_large.h"
-#include "pcm_samples_large.h"
-#elif AMY_PCM_PATCHES_SIZE == 2
-#include "pcm_small.h"
-#include "pcm_samples_small.h"
-#else
-#include "pcm_tiny.h"
-#include "pcm_samples_tiny.h"
-#endif
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
 
@@ -37,6 +20,7 @@ void pcm_init() {
     pcm = pcm_desktop;
 #endif
 */
+
 }
 
 // How many bits used for fractional part of PCM table index.
@@ -47,7 +31,7 @@ void pcm_init() {
 void pcm_note_on(uint16_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
     //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
-    if(synth[osc].patch < 0) synth[osc].patch = 0;
+    if(synth[osc].patch < 0 || synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
     if(synth[osc].logfreq <= 0) {
         synth[osc].logfreq = PCM_AMY_LOG2_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
