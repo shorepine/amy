@@ -116,9 +116,8 @@ int main() {
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
     //getchar();
-    #if AMY_CORES == 2
+    if(AMY_CORES>1) 
         multicore_launch_core1(core1_main);
-    #endif
 
     gpio_put(LED_PIN, 0);
 

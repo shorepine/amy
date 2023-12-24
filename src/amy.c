@@ -38,11 +38,9 @@ __attribute__((weak)) const uint16_t amy_sample_rate = 44100;
 
 
 #include "clipping_lookup_table.h"
-#if AMY_HAS_CHORUS == 1 || AMY_HAS_REVERB == 1
 #include "delay.h"
 // Final output delay lines.
-delay_line_t *delay_lines[AMY_NCHANS];
-#endif
+delay_line_t **delay_lines; 
 
 
 #ifdef ESP_PLATFORM
@@ -90,7 +88,6 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 
 
-#if AMY_HAS_CHORUS == 1
 // CHORUS_ARATE means that chorus delay is updated at full audio rate and
 // the chorus delay lines have per-sample variable delays.  Otherwise,
 // the chorus oscillator is only evalated once per block (~11ms) and the
@@ -110,12 +107,23 @@ typedef struct chorus_config {
 chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY};
 
 void alloc_delay_lines(void) {
+    delay_lines = (delay_line_t **)malloc_caps(sizeof(delay_line_t*) * AMY_NCHANS, CHORUS_RAM_CAPS);
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
         delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
     }
 #ifdef CHORUS_ARATE
     delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
 #endif
+}
+
+void dealloc_delay_lines(void) {
+#ifdef CHORUS_ARATE
+    free(delay_mod);
+#endif
+    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+        free_delay_line(delay_lines[c]);
+    }    
+    free(delay_lines);
 }
 
 
@@ -143,10 +151,8 @@ void config_chorus(float level, int max_delay) {
     chorus.max_delay = max_delay;
     chorus.level = F2S(level);
 }
-#endif // AMY_HAS_CHORUS
 
 
-#if (AMY_HAS_REVERB == 1)
 typedef struct reverb_state {
     SAMPLE level;
     float liveness;
@@ -168,7 +174,6 @@ void config_reverb(float level, float liveness, float damping, float xover_hz) {
     reverb.damping = damping;
     reverb.xover_hz = xover_hz;
 }
-#endif // AMY_HAS_REVERB
 
 // block -- what gets sent to the dac -- -32768...32767 (int16 le)
 output_sample_type * block;
@@ -466,21 +471,18 @@ void amy_reset_oscs() {
     synth[CHORUS_MOD_SOURCE].amp = CHORUS_DEFAULT_MOD_DEPTH;
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
-    #if ( AMY_HAS_CHORUS == 1)
-    config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
-    #endif
-    #if ( AMY_HAS_REVERB == 1)
-    config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
-    #endif
+    if(AMY_HAS_CHORUS) 
+        config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
+    if(AMY_HAS_REVERB)
+        config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
 }
 
 
 
 // the synth object keeps held state, whereas events are only deltas/changes
 int8_t oscs_init() {
-    #if AMY_KS_OSCS > 0
-    ks_init();
-    #endif
+    if(AMY_KS_OSCS>0)
+        ks_init();
     filters_init();
     algo_init();
     pcm_init();
@@ -522,9 +524,10 @@ int8_t oscs_init() {
         }
     }
     // we only alloc delay lines if the chorus is turned on.
-    #if AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0
-    for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
-    #endif
+    if(AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0) {
+        alloc_delay_lines();
+        for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
+    }
     //init_stereo_reverb();
     
     total_samples = 0;
@@ -584,11 +587,11 @@ void oscs_deinit() {
     free(synth);
     free(msynth);
     free(events);
-    #if AMY_KS_OSCS > 0
-    ks_deinit();
-    #endif
+    if(AMY_KS_OSCS > 0)
+        ks_deinit();
     filters_deinit();
     algo_deinit();
+    dealloc_delay_lines();
 }
 
 
@@ -600,10 +603,10 @@ void osc_note_on(uint16_t osc) {
     if(synth[osc].wave==PULSE) pulse_note_on(osc);
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
-    #if AMY_HAS_PARTIALS == 1
-    if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
-    if(synth[osc].wave==PARTIALS) partials_note_on(osc);
-    #endif
+    if(AMY_HAS_PARTIALS == 1) {
+        if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
+        if(synth[osc].wave==PARTIALS) partials_note_on(osc);
+    }
 }
 
 // play an event, now -- tell the audio loop to start making noise
@@ -684,9 +687,8 @@ void play_event(struct delta d) {
         synth[d.osc].status = AUDIBLE;
         // take care of fm & ks first -- no special treatment for bp/mod
         if(synth[d.osc].wave==KS) { 
-            #if AMY_KS_OSCS > 0
-            ks_note_on(d.osc); 
-            #endif
+            if(AMY_KS_OSCS > 0)
+                ks_note_on(d.osc); 
         }  else {
             // an osc came in with a note on.
             // start the bp clock
@@ -710,20 +712,17 @@ void play_event(struct delta d) {
     } else if(synth[d.osc].velocity > 0 && d.param == VELOCITY && *(float *)&d.data == 0) { // new note off
         synth[d.osc].velocity = 0;
         if(synth[d.osc].wave==KS) { 
-            #if AMY_KS_OSCS > 0
-            ks_note_off(d.osc);
-            #endif 
+            if(AMY_KS_OSCS > 0)
+                ks_note_off(d.osc);
         }
         else if(synth[d.osc].wave==ALGO) { algo_note_off(d.osc); } 
         else if(synth[d.osc].wave==PARTIAL) { 
-            #if AMY_HAS_PARTIALS == 1
-            partial_note_off(d.osc); 
-            #endif
+            if(AMY_HAS_PARTIALS == 1)
+                partial_note_off(d.osc); 
         }
         else if(synth[d.osc].wave==PARTIALS) { 
-            #if AMY_HAS_PARTIALS == 1
-            partials_note_off(d.osc); 
-            #endif
+            if(AMY_HAS_PARTIALS == 1) 
+                partials_note_off(d.osc);
         }
         else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
         else {
@@ -815,22 +814,22 @@ static inline float rgain_of_pan(float pan) {
 
 void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end) {
     /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan */
-#if AMY_NCHANS == 1
-    // actually dest is mono, pan is ignored.
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
-#else
-    // stereo 
-    SAMPLE gain_l = F2S(lgain_of_pan(pan_start));
-    SAMPLE gain_r = F2S(rgain_of_pan(pan_start));
-    SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) - lgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
-    SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) - rgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        stereo_dest[i] += MUL4_SS(gain_l, mono_src[i]);
-        stereo_dest[AMY_BLOCK_SIZE + i] += MUL4_SS(gain_r, mono_src[i]);
-        gain_l += d_gain_l;
-        gain_r += d_gain_r;
+    if(AMY_NCHANS == 1) {
+        // actually dest is mono, pan is ignored.
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
+    } else {
+        // stereo 
+        SAMPLE gain_l = F2S(lgain_of_pan(pan_start));
+        SAMPLE gain_r = F2S(rgain_of_pan(pan_start));
+        SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) - lgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
+        SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) - rgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
+        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+            stereo_dest[i] += MUL4_SS(gain_l, mono_src[i]);
+            stereo_dest[AMY_BLOCK_SIZE + i] += MUL4_SS(gain_r, mono_src[i]);
+            gain_l += d_gain_l;
+            gain_r += d_gain_r;
+        }
     }
-#endif
 }
 
 void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
@@ -844,16 +843,15 @@ void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     if(synth[osc].wave == TRIANGLE) render_triangle(buf, osc);
     if(synth[osc].wave == SINE) render_sine(buf, osc);
     if(synth[osc].wave == KS) { 
-        #if AMY_KS_OSCS > 0
-        render_ks(buf, osc);
-        #endif
+        if(AMY_KS_OSCS>0)
+            render_ks(buf, osc);
     }
     if(synth[osc].wave == PCM) render_pcm(buf, osc);
     if(synth[osc].wave == ALGO) render_algo(buf, osc, core);
-    #if AMY_HAS_PARTIALS == 1
-    if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
-    if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
-    #endif
+    if(AMY_HAS_PARTIALS == 1) {
+        if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
+        if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
+    }
 }
 
 void render_task(uint16_t start, uint16_t end, uint8_t core) {
@@ -916,19 +914,18 @@ void amy_prepare_buffer() {
     xSemaphoreGive(xQueueSemaphore);
 #endif
 
-#if AMY_HAS_CHORUS == 1
-    // here's a little fragment of hold_and_modify() for you.
-    msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
-    msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
-    //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
-    msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
-#ifdef CHORUS_ARATE
-    if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
-#else
-    delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
-#endif // CHORUS_ARATE
-#endif // AMY_HAS_CHORUS
-
+    if(AMY_HAS_CHORUS==1) {
+        // here's a little fragment of hold_and_modify() for you.
+        msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
+        msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
+        //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
+        msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
+    #ifdef CHORUS_ARATE
+        if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+    #else
+        delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
+    #endif // CHORUS_ARATE
+    }
 }
 
 // This is a (for now) legacy call that we'll move over to a new style asap
@@ -969,40 +966,38 @@ int16_t * fill_audio_buffer_task() {
 
 int16_t * amy_fill_buffer() {
     // mix results from both cores.
-#if AMY_CORES == 2
-    for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
-#endif
-#if  AMY_HAS_CHORUS == 1
-    // apply chorus.
-    if(chorus.level > 0 && delay_lines[0] != NULL) {
-        // apply time-varying delays to both chans.
-        // delay_mod_val, the modulated delay amount, is set up before calling render_*.
-        SAMPLE scale = F2S(1.0f);
-        for (int16_t c=0; c < AMY_NCHANS; ++c) {
-#ifdef CHORUS_ARATE
-            apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
-                                 delay_mod, scale, chorus.level, 0);
-#else
-            apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
-                              MUL4_SS(scale, delay_mod_val), chorus.level);
-#endif // CHORUS_ARATE
-            // flip delay direction for alternating channels.
-            scale = -scale;
+    if(AMY_CORES==2) {
+        for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
+    }
+    if(AMY_HAS_CHORUS==1) {
+        // apply chorus.
+        if(chorus.level > 0 && delay_lines[0] != NULL) {
+            // apply time-varying delays to both chans.
+            // delay_mod_val, the modulated delay amount, is set up before calling render_*.
+            SAMPLE scale = F2S(1.0f);
+            for (int16_t c=0; c < AMY_NCHANS; ++c) {
+    #ifdef CHORUS_ARATE
+                apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
+                                     delay_mod, scale, chorus.level, 0);
+    #else
+                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
+                                  MUL4_SS(scale, delay_mod_val), chorus.level);
+    #endif // CHORUS_ARATE
+                // flip delay direction for alternating channels.
+                scale = -scale;
+            }
         }
     }
-#endif
-
-#if (AMY_HAS_REVERB == 1)
-    // apply reverb.
-    if(reverb.level > 0) {
-#if AMY_NCHANS == 1
-        stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, reverb.level);
-#else
-        stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, reverb.level);
-#endif
+    if(AMY_HAS_REVERB) {
+        // apply reverb.
+        if(reverb.level > 0) {
+            if(AMY_NCHANS == 1) {
+                stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, reverb.level);
+            } else {
+                stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, reverb.level);
+            }
+        }
     }
-#endif
-
     // global volume is supposed to max out at 10, so scale by 0.1.
     SAMPLE volume_scale = F2S(0.1f * global.volume);
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
@@ -1039,28 +1034,26 @@ int16_t * amy_fill_buffer() {
             }
             int16_t sample;
             // For some reason, have to drop a bit to stop hard wrapping on esp?
-#ifdef ESP_PLATFORM
-            uintval >>= 1;
-#endif
+            #ifdef ESP_PLATFORM
+                uintval >>= 1;
+            #endif
             if (positive) {
               sample = uintval;
             } else {
               sample = -uintval;
             }
-#if AMY_NCHANS == 1
-  #ifdef ESP_PLATFORM
-            // esp32's i2s driver has this bug
-            block[i ^ 0x01] = sample;
-  #else
-            block[i] = sample;
-  #endif
-#else // stereo
-
-            block[(AMY_NCHANS * i) + c] = sample;
-#endif
+            if(AMY_NCHANS == 1) {
+                #ifdef ESP_PLATFORM
+                    // esp32's i2s driver has this bug
+                    block[i ^ 0x01] = sample;
+                #else
+                    block[i] = sample;
+                #endif
+            } else {
+                block[(AMY_NCHANS * i) + c] = sample;
+            }
         }
     }
-
     total_samples += AMY_BLOCK_SIZE;
     return block;
 }
@@ -1211,23 +1204,23 @@ struct event amy_parse_message(char * message) {
                         case 'F': e.filter_freq = atoff(message + start); break; 
                         case 'G': e.filter_type = atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
-                        #if(AMY_HAS_REVERB == 1)
-                        case 'H': config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
-                        case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
-                        #endif
+                        if(AMY_HAS_REVERB == 1) {
+                            case 'H': config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
+                            case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
+                        }
                         case 'I': e.ratio = atoff(message + start); break;
-                        #if(AMY_HAS_REVERB == 1)
-                        case 'j': config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
-                        case 'J': config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
-                        #endif
-                        #if(AMY_HAS_CHORUS == 1)
-                        case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;
-                        #endif
+                        if(AMY_HAS_REVERB == 1) {
+                            case 'j': config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
+                            case 'J': config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
+                        }
+                        if(AMY_HAS_CHORUS == 1) {
+                            case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;
+                        }
                         case 'l': e.velocity=atoff(message + start); break; 
                         case 'L': e.mod_source=atoi(message + start); break; 
-                        #if (AMY_HAS_CHORUS == 1)
-                        case 'm': config_chorus(S2F(chorus.level), atoi(message + start)); break;
-                        #endif
+                        if (AMY_HAS_CHORUS == 1) {
+                            case 'm': config_chorus(S2F(chorus.level), atoi(message + start)); break;
+                        }
                         case 'N': e.latency_ms = atoi(message + start);  break; 
                         case 'n': e.midi_note=atoi(message + start); break; 
                         case 'o': e.algorithm=atoi(message+start); break; 

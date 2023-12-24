@@ -1,6 +1,5 @@
 #include "amy.h"
 
-#if (AMY_HAS_CHORUS==1) || (AMY_HAS_REVERB == 1)
 
 #include "delay.h"
 
@@ -276,4 +275,3 @@ void stereo_reverb(SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int
     }
 }
 
-#endif
