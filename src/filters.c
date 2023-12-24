@@ -8,11 +8,11 @@
 
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
-SAMPLE coeffs[AMY_OSCS][5];
-SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
+SAMPLE ** coeffs;
+SAMPLE ** filter_delay;
+SAMPLE ** eq_coeffs;
+SAMPLE *** eq_delay;
 
-SAMPLE eq_coeffs[3][5];
-SAMPLE eq_delay[AMY_NCHANS][3][FILT_NUM_DELAYS];
 
 
 float dsps_sqrtf_f32_ansi(float f)
@@ -155,7 +155,45 @@ void update_filter(uint16_t osc) {
     filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
 }
 
+
+void filters_deinit() {
+    for(uint16_t i=0;i<AMY_NCHANS;i++) {
+        for(uint16_t j=0;j<3;j++) free(eq_delay[i][j]);
+        free(eq_delay[i]);
+    }
+    for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        free(coeffs[i]);
+        free(filter_delay[i]);
+    }
+    free(coeffs);
+    free(eq_coeffs);
+    free(filter_delay);
+    free(eq_delay);
+}
+
+
 void filters_init() {
+    coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
+    eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+    filter_delay = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
+    eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, FBL_RAM_CAPS);
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+        filter_delay[i] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+    }
+    for(uint16_t i=0;i<3;i++) {
+        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+    }
+    for(uint16_t i=0;i<AMY_NCHANS;i++) {
+        eq_delay[i] = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+        for(uint16_t j=0;j<3;j++) {
+            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+
+        }
+    }
+
+
     // update the parametric filters 
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
@@ -200,8 +238,5 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
     //    block[i] = output[i];
     //}
-}
-
-void filters_deinit() {
 }
 
