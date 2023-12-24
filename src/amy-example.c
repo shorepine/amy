@@ -7,8 +7,8 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
-// If you want PCM support bigger than 11 samples you have to include one of pcm_{small,large}.h
-#include "pcm_small.h"
+// If you want PCM support smaller than 67 samples you have to include one of pcm_{small,tiny}.h
+#include "pcm_tiny.h"
 
 // You can override parameters in your implementation like this
 const uint16_t amy_oscs = 122;
@@ -71,7 +71,7 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    //example_drums(start, 4);
+    example_drums(start, 4);
     example_multimbral_fm(start + 0, /* start_osc= */ 6);
 
     // Now just spin for 10s

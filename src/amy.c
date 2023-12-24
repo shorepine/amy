@@ -36,7 +36,8 @@ __attribute__((weak)) const uint16_t amy_sample_rate = 44100;
     __attribute__((weak)) const uint8_t amy_has_reverb = 1;
 #endif
 
-#include "pcm_weak.h"
+// This defaults PCM size to large. If you want to be smaller, include "pcm_small.h" or "pcm_tiny.h"
+#include "pcm_large.h"
 #include "clipping_lookup_table.h"
 #include "delay.h"
 // Final output delay lines.
@@ -1296,9 +1297,7 @@ void amy_stop() {
 }
 
 void amy_start() {
-
     global_init();
-
     oscs_init();
     amy_reset_oscs();
 }

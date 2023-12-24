@@ -19,7 +19,7 @@ def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
     my_sample_counter = 0
     orig_map = {}
     weak = ""
-    if(name=='weak'):
+    if(name=='large'):
         weak = "__attribute__((weak)) "
     for (fn, is_inst) in fns:
         try:
@@ -103,10 +103,10 @@ def generate_both_pcm_headers():
     # The small set is for flash constrained devices (Tulip CC)
     small = [0, 3, 8, 11, 14, 16, 17, 18, 20, 23, 25, 26, 29, 30, 31, 32, 37, 39, 58, 83, 85, 86, 116, 117, 118, 120, 127, 130, 136]
     # Tiny set for even more constrained devices 
-    weak = small[0:11]
+    tiny = small[0:11]
     generate_amy_pcm_header(large, "large")
     generate_amy_pcm_header(small, "small")
-    generate_amy_pcm_header(weak, "weak")
+    generate_amy_pcm_header(tiny, "tiny")
 
 
 def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
