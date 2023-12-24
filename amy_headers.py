@@ -2,10 +2,11 @@
 # Generate headers for libAMY
 import sys
 
+import numpy as np
+
 def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
     from sf2utils.sf2parse import Sf2File
     import resampy
-    import numpy as np
     import struct
     # These are the indexes that we liked and fit into the flash on ESP32. You can download the sf2 files here:
     # https://github.com/vigliensoni/soundfonts/blob/master/hs_tr808/HS-TR-808-Drums.sf2
@@ -106,7 +107,6 @@ def generate_both_pcm_headers():
 
 
 def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
-    import numpy as np
     if harmonics_phases is None:
         harmonics_phases = np.zeros(len(harmonics_weights))
     table = np.zeros(table_size)
@@ -117,13 +117,10 @@ def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
     return table
 
 
-
-
 # A LUTset is a list of LUTentries describing downsampled versions of the same
 # basic waveform, sorted with the longest (highest-bandwidth) first.
 def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None, 
-                                    length_factor=8, bandwidth_factor=None):
-    import numpy as np
+                  length_factor=8, bandwidth_factor=None):
     if bandwidth_factor is None:
         bandwidth_factor = np.sqrt(0.5)
     """Create an ordered list of LUTs with decreasing harmonic content.
@@ -170,6 +167,23 @@ def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None,
     return lutsets
 
 
+def make_table(min_val, max_val, fn, table_size=257, dtype=np.int16):
+    # The table includes the final value, so the actual number of steps is table_size - 1.
+    steps = table_size - 1
+    stepsize = (max_val - min_val) / steps
+    return fn(np.arange(min_val, max_val + stepsize, stepsize)).astype(dtype)
+
+
+def create_exp2_lut(npts):
+    exp2_int16_fn = lambda x: np.round(-32768.0 * (np.exp2(x) - 1.0))
+    return make_table(0, 1, exp2_int16_fn, table_size=npts, dtype=np.int16)
+
+
+def create_log2_lut(npts):
+    log2_int16_fn = lambda x: np.round(-32768.0 * (np.log2(x + 1.0)))
+    return make_table(0, 1, log2_int16_fn, table_size=npts, dtype=np.int16)
+
+
 def write_lutset_to_h(filename, variable_base, lutset):
     """Savi out a lutset as a C-compatible header file."""
     num_luts = len(lutset)
@@ -195,7 +209,7 @@ def write_lutset_to_h(filename, variable_base, lutset):
             f.write("const float {:s}_lutable_{:d}[{:d}] PROGMEM = {{\n".format(
                 variable_base, i, table_size))
             for row_start in range(0, table_size, samples_per_row):
-                for sample_index in range(row_start, 
+                for sample_index in range(row_start,
                         min(row_start + samples_per_row, table_size)):
                     f.write("{:f},".format(lutset[i].table[sample_index]))
                 f.write("\n")
@@ -216,9 +230,27 @@ def write_lutset_to_h(filename, variable_base, lutset):
     print("wrote", filename)
 
 
+def write_fxpt_lutable(f, lutable, name, samples_per_row=8):
+    """Write a single lutable to an open file."""
+    table_size = len(lutable)
+    scale_factor = np.max(np.abs(lutable.astype(float)))
+    f.write("const int16_t {:s}[{:d}] PROGMEM = {{\n".format(
+        name, table_size))
+    for row_start in range(0, table_size, samples_per_row):
+        for sample_index in range(row_start,
+                                  min(row_start + samples_per_row, table_size)):
+            f.write("{:d},".format(
+                min(32767,
+                    max(-32768,
+                        int(round(32768 / scale_factor * lutable[sample_index]))))))
+        f.write("\n")
+    f.write("};\n")
+    f.write("\n")
+    return scale_factor
+
+
 def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
     """Save out a lutset as a C-compatible header file using ints."""
-    import numpy as np
     import math
     num_luts = len(lutset)
     with open(filename, "w") as f:
@@ -239,21 +271,13 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
         f.write("#endif // LUTENTRY_FXPT_DEFINED\n")
         f.write("\n")
         # Define the content of the individual tables.
-        samples_per_row = 8
         scale_factors = []
         for i in range(num_luts):
-            table_size = len(lutset[i].table)
-            scale_factor = np.max(np.abs(lutset[i].table))
+            scale_factor = write_fxpt_lutable(
+                f, lutset[i].table,
+                '{:s}_fxpt_lutable_{:d}'.format(variable_base, i)
+            )
             scale_factors.append(scale_factor)
-            f.write("const int16_t {:s}_fxpt_lutable_{:d}[{:d}] PROGMEM = {{\n".format(
-                variable_base, i, table_size))
-            for row_start in range(0, table_size, samples_per_row):
-                for sample_index in range(row_start, 
-                        min(row_start + samples_per_row, table_size)):
-                    f.write("{:d},".format(min(32767, max(-32768, int(round(32768 / scale_factor * lutset[i].table[sample_index]))))))
-                f.write("\n")
-            f.write("};\n")
-            f.write("\n")
         # Define the table of LUTs.
         f.write("lut_entry_fxpt {:s}_fxpt_lutset[{:d}] = {{\n".format(
             variable_base, num_luts + 1))
@@ -272,10 +296,23 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
     print("wrote", filename)
 
 
+def make_log2_exp2_luts(filename):
+    """Write the fixed-point exp2 and log2 lookup tables."""
+    variable_base = 'exp_lut'
+    with open(filename, "w") as f:
+        f.write("// Automatically-generated LUTset\n")
+        f.write("#ifndef LUTSET_{:s}_FXPT_DEFINED\n".format(variable_base.upper()))
+        f.write("#define LUTSET_{:s}_FXPT_DEFINED\n".format(variable_base.upper()))
+        f.write("\n")
+        # Define the content of the individual tables.
+        write_fxpt_lutable(f, create_log2_lut(257), 'log2_fxpt_lutable')
+        write_fxpt_lutable(f, create_exp2_lut(257), 'exp2_fxpt_lutable')
+        f.write("\n")
+        f.write("#endif // LUTSET_x_DEFINED\n")
+    print("wrote", filename)
 
 
 def make_clipping_lut(filename):
-    import numpy as np
     # Soft clipping lookup table scratchpad.
     SAMPLE_MAX = 32767
     LIN_MAX = 29491  #// int(round(0.9 * 32768))
@@ -310,7 +347,6 @@ def make_clipping_lut(filename):
 """
 def generate_all():
     import fm
-    import numpy as np
     import collections
     # Implement the multiple lookup tables.
     # A LUT is stored as an array of values (table) and the harmonic number of the
@@ -335,7 +371,9 @@ def generate_all():
     sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
     #write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
     write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
-                
+
+    # log2/exp2 LUTs
+    make_log2_exp2_luts('src/log2_exp2_fxpt_lutable.h')
 
     # Clipping LUT
     make_clipping_lut('src/clipping_lookup_table.h')

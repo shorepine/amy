@@ -76,6 +76,11 @@
 #define P2F(p) (p)
 #define F2P(f) ((f) - floorf(f))
 
+#define I2S(i, b) ((i) / (float)(1 << (b)))
+// Integer part of s interpreted as a proportion of a b-bit table.
+#define INT_OF_S(s, b) ((int)floorf((s) * (float)(1 << (b))))
+#define S_FRAC_OF_S(s, b) ((s) * (1 << (b)) - floorf((s) * (1 << (b))))
+
 #define MUL0_SS(a, b) ((a) * (b))
 #define MUL4_SS(a, b) ((a) * (b))
 #define MUL8_SS(a, b) ((a) * (b))
@@ -119,6 +124,15 @@ typedef int32_t s16_15; // s16.15 general
 #define L2S(l) (((int32_t)(l)) << (S_FRAC_BITS - L_FRAC_BITS))
 // L is also the format used in the final output.
 #define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
+// Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
+#define I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
+// Convert S and integer-only part.
+// Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
+#define INT_OF_S(S, B) (int32_t)(S >> (S_FRAC_BITS - B))
+// Fractonal part of SAMPLE within B bits, returns a SAMPLE.
+// Add 1 to B shift-up and cast to uint32_t to strip sign bit, pad a zero sign bit on way down.
+#define S_FRAC_OF_S(S, B) (((S) & ((1 << (S_FRAC_BITS - (B))) - 1)) << (B))
+
 
 // Convert between SAMPLE and float
 #define S2F(s) ((float)(s) / (float)(1 << S_FRAC_BITS))

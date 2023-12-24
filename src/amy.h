@@ -271,7 +271,8 @@ void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
 void osc_note_on(uint16_t osc);
 
-
+SAMPLE log2_lut(SAMPLE x);
+SAMPLE exp2_lut(SAMPLE x);
 
 // global synth state
 struct state {
