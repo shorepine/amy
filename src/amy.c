@@ -1072,24 +1072,22 @@ void parse_algorithm_source(struct synthinfo * e, char *message) {
 
 // helper to parse the special bp string
 void parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
-    uint8_t idx = 0;
-    uint16_t c = 0;
-    // set the breakpoint to default first
-    for(uint8_t i=0;i<MAX_BREAKPOINTS;i++) {
-        AMY_UNSET(e->breakpoint_times[which_bpset][i]);
-        AMY_UNSET(e->breakpoint_values[which_bpset][i]);
+    float vals[2 * MAX_BREAKPOINTS];
+    // Read all the values as floats.
+    int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS);
+    // Distribute out to times and vals, casting times to ints.
+    for (int i = 0; i < num_vals; ++i) {
+        if ((i % 2) == 0)
+            e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples((int)vals[i]);
+        else
+            e->breakpoint_values[which_bpset][i >> 1] = vals[i];
     }
-    uint16_t stop = strspn(message, " 0123456789-,.");
-    while(c < stop) {
-        if(message[c]!=',') {
-            if(idx % 2 == 0) {
-                e->breakpoint_times[which_bpset][idx/2] = ms_to_samples(atoi(message+c));
-            } else {
-                e->breakpoint_values[which_bpset][(idx-1) / 2] = atoff(message+c);
-            }
-        }
-        while(message[c]!=',' && message[c]!=0 && c < MAX_MESSAGE_LEN) c++;
-        c++; idx++;
+    // Unset remaining vals.
+    for (int i = num_vals; i < 2 * MAX_BREAKPOINTS; ++i) {
+        if ((i % 2) == 0)
+            AMY_UNSET(e->breakpoint_times[which_bpset][i >> 1]);
+        else
+            AMY_UNSET(e->breakpoint_values[which_bpset][i >> 1]);
     }
 }
 
