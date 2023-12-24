@@ -3,7 +3,6 @@
 
 #include "amy.h"
 
-#if AMY_HAS_PARTIALS == 1
 
 typedef struct {
     uint32_t bp_offset;
@@ -150,4 +149,3 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
     }
 }
 
-#endif

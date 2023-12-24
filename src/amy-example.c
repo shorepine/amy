@@ -9,8 +9,6 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
-// override one
-const uint16_t amy_oscs = 122;
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
