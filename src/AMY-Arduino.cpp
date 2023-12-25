@@ -44,17 +44,16 @@ void AMY::volume(float vol) {
 
 // From each core, render
 void AMY::render(uint16_t start, uint16_t end, uint8_t core) {
-    render_task(start, end, core);
+    amy_render(start, end, core);
 }
 
-// From either core, combine rendering and output finished audio buffer
+// Get the rendered buffer back.
+// If you're in single core, this also renders and prepares, so don't do that as well!
 int16_t * AMY::get_buffer() {
     if(AMY_CORES > 1) {
         return amy_fill_buffer();
     }
-    amy_prepare_buffer();
-    render_task(0, AMY_OSCS, 0);
-    return amy_fill_buffer();
+    return amy_simple_fill_buffer();
 }
 
 

@@ -7,19 +7,6 @@
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
 
 void pcm_init() {
-/*
-    // For ESP, we can mmap the PCM blob on the luts partition -- do this if you are using OTA 
-#ifdef ESP_PLATFORM
-    spi_flash_mmap_handle_t mmap_handle;
-    const esp_partition_t * pcm_part  = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, "luts");
-    esp_err_t err = esp_partition_mmap(pcm_part, 0, PCM_LENGTH*2, SPI_FLASH_MMAP_DATA, (const void**)&pcm, &mmap_handle);
-    if(err != ESP_OK) {
-        printf("err doing pcm mmap: %d %s\n", err, esp_err_to_name(err));
-    }
-#else
-    pcm = pcm_desktop;
-#endif
-*/
 
 }
 

@@ -77,7 +77,7 @@ int main(int argc, char ** argv) {
     // Now just spin for 10s
     while(amy_sysclock() - start < 40000) {
         if (output_filename) {
-            int16_t *frames = fill_audio_buffer_task();
+            int16_t * frames = amy_simple_fill_buffer();
             int num_frames = AMY_BLOCK_SIZE;
             result = ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
         }

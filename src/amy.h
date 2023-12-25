@@ -263,8 +263,8 @@ struct mod_synthinfo {
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
-
-void render_task(uint16_t start, uint16_t end, uint8_t core);
+int16_t * amy_simple_fill_buffer() ;
+void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();
@@ -306,7 +306,6 @@ int8_t oscs_init();
 void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
-int16_t * fill_audio_buffer_task();
 void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
 
