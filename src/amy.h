@@ -230,6 +230,7 @@ struct synthinfo {
   
     // State variable for the impulse-integrating oscs.
     SAMPLE lpf_state;
+    SAMPLE hpf_state[2];
     // Constant offset to add to sawtooth before integrating.
     SAMPLE dc_offset;
     // Decay alpha of LPF filter (e.g. 0.99 or 0.999).
