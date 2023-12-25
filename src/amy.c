@@ -44,16 +44,6 @@ __attribute__((weak)) const uint16_t amy_sample_rate = 44100;
 delay_line_t **delay_lines; 
 
 
-#ifdef ESP_PLATFORM
-// Defined in amy-example-esp32
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-extern SemaphoreHandle_t xQueueSemaphore;
-//extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
-#endif
-
-
 // Global state 
 struct state global;
 // set of deltas for the fifo to be played
@@ -77,15 +67,6 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
     return malloc(size);
 #endif
 }
-#endif
-
-
-#if defined PICO_ON_DEVICE  || defined ARDUINO_ARCH_RP2040
-#include "pico/multicore.h"
-#include "hardware/clocks.h"
-#include "hardware/structs/clocks.h"
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
 #endif
 
 
@@ -188,11 +169,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     fprintf(stderr,"starting %s: ", name);
     const amy_err_t ret = (*fn)();
     if(ret != AMY_OK) {
-#ifdef ESP_PLATFORM
-        fprintf(stderr,"[error:%i (%s)]\n", ret, esp_err_to_name((esp_err_t)ret));
-#else
         fprintf(stderr,"[error:%i]\n", ret);
-#endif
         return -1;
     }
     fprintf(stderr,"[ok]\n");
@@ -285,10 +262,6 @@ struct event amy_default_event() {
 }
 
 void add_delta_to_queue(struct delta d) {
-#if defined ESP_PLATFORM && !defined ARDUINO
-    //  take the queue mutex before starting
-    xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
-#endif
     //printf("add_delta: time %lld osc %d param %d freq %f\n", total_samples, d.osc, d.param, *(float *)&d.data);
     if(global.event_qsize < AMY_EVENT_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
@@ -332,9 +305,6 @@ void add_delta_to_queue(struct delta d) {
         // if there's no room in the queue, just skip the message
         // todo -- report this somehow? 
     }
-#if defined ESP_PLATFORM  && !defined ARDUINO
-    xSemaphoreGive( xQueueSemaphore );
-#endif
 }
 
 // Add a API facing event, convert into delta directly
@@ -856,7 +826,7 @@ void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     }
 }
 
-void render_task(uint16_t start, uint16_t end, uint8_t core) {
+void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
@@ -898,11 +868,6 @@ void amy_prepare_buffer() {
     // check to see which sounds to play 
     uint32_t sysclock = amy_sysclock(); 
 
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // put a mutex around this so that the event parser doesn't touch these while i'm running  
-    xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
-#endif
-
     // find any events that need to be played from the (in-order) queue
     while(sysclock >= global.event_start->time) {
         play_event(*global.event_start);
@@ -911,10 +876,6 @@ void amy_prepare_buffer() {
         global.event_start = global.event_start->next;
     }
 
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // give the mutex back
-    xSemaphoreGive(xQueueSemaphore);
-#endif
 
     if(AMY_HAS_CHORUS==1) {
         // here's a little fragment of hold_and_modify() for you.
@@ -930,39 +891,9 @@ void amy_prepare_buffer() {
     }
 }
 
-// This is a (for now) legacy call that we'll move over to a new style asap
-int16_t * fill_audio_buffer_task() {
-    // First, prepare the bffer
+int16_t * amy_simple_fill_buffer() {
     amy_prepare_buffer();
-
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // Tell the rendering threads to start rendering
-    xTaskNotifyGive(amy_render_handle[0]);
-    if(AMY_CORES == 2) xTaskNotifyGive(amy_render_handle[1]);
-
-    // and wait for each of them to come back
-    ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-    if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-#elif defined PICO_ON_DEVICE
-    if(AMY_CORES == 2) {
-        // Tell renderer2 it's ok to render
-        multicore_fifo_push_blocking(32);
-        // Do renderer1
-        render_task(0, AMY_OSCS/2, 0);
-
-        // and wait for other core to finish
-        int32_t ret = 0;
-        while (!multicore_fifo_rvalid());
-        ret = multicore_fifo_pop_blocking();
-    } else {
-        render_task(0, AMY_OSCS/2, 0);
-    }
-
-#else
-    // todo -- there's no reason we can't multicore render on other platforms
-    render_task(0, AMY_OSCS, 0);        
-#endif
-
+    amy_render(0, AMY_OSCS, 0);
     return amy_fill_buffer();
 }
 
@@ -1035,6 +966,8 @@ int16_t * amy_fill_buffer() {
                 }
             }
             int16_t sample;
+
+            // TODO -- the esp stuff here could sit outside of AMY
             // For some reason, have to drop a bit to stop hard wrapping on esp?
             #ifdef ESP_PLATFORM
                 uintval >>= 1;
