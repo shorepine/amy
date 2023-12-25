@@ -8,11 +8,11 @@
 // Defaults
 __attribute__((weak)) const uint16_t amy_block_size = 256;
 __attribute__((weak)) const uint8_t amy_block_size_bits = 8;
-__attribute__((weak)) const uint16_t amy_oscs = 120;
+__attribute__((weak)) const uint16_t amy_oscs = 160;
 __attribute__((weak)) const uint16_t amy_sample_rate = 44100;
 
 #ifdef ARDUINO
-    __attribute__((weak)) const uint8_t amy_cores = 1;
+    __attribute__((weak)) const uint8_t amy_cores = 2;
 #elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
     __attribute__((weak)) const uint8_t amy_cores = 2;
 #else

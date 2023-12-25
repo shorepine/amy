@@ -76,7 +76,7 @@
 #define P2F(p) (p)
 #define F2P(f) ((f) - floorf(f))
 
-#define I2S(i, b) ((i) / (float)(1 << (b)))
+#define AMY_I2S(i, b) ((i) / (float)(1 << (b)))
 // Integer part of s interpreted as a proportion of a b-bit table.
 #define INT_OF_S(s, b) ((int)floorf((s) * (float)(1 << (b))))
 #define S_FRAC_OF_S(s, b) ((s) * (1 << (b)) - floorf((s) * (1 << (b))))
@@ -125,7 +125,7 @@ typedef int32_t s16_15; // s16.15 general
 // L is also the format used in the final output.
 #define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
 // Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
-#define I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
+#define AMY_I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
 // Convert S and integer-only part.
 // Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_S(S, B) (int32_t)(S >> (S_FRAC_BITS - B))
