@@ -43,9 +43,18 @@ typedef int16_t output_sample_type;
 #define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
 #define TARGET_PAN 0x200
 
+#define NUM_COMBO_COEFS 6  // 6 control-mixing params: const, note, velocity, env1, env2, mod
+enum coefs{
+    COEF_CONST = 0,
+    COEF_NOTE = 1,
+    COEF_VEL = 2,
+    COEF_EG0 = 3,
+    COEF_EG1 = 4,
+    COEF_MOD = 5
+};
+
 #define MAX_MESSAGE_LEN 255
 #define MAX_PARAM_LEN 64
-#define NUM_COMBO_COEFS 6  // 6 control-mixing params: const, note, gate, env1, env2, mod
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
@@ -96,8 +105,17 @@ typedef int amy_err_t;
 #endif
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ /* 12 */,
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, RESONANCE,
+    WAVE, PATCH, MIDI_NOTE,
+    AMP,
+    DUTY=AMP + NUM_COMBO_COEFS,
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,
+    FREQ,
+    VELOCITY=FREQ + NUM_COMBO_COEFS,
+    PHASE, DETUNE, VOLUME,
+    PAN,
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS,
+    RESONANCE,
     MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
     ALGO_SOURCE_START=100,
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,
@@ -152,17 +170,17 @@ struct event {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
-    float amp;
-    float duty;
+    float amp_coefs[NUM_COMBO_COEFS];
+    float freq_coefs[NUM_COMBO_COEFS];
+    float filter_freq_coefs[NUM_COMBO_COEFS];
+    float duty_coefs[NUM_COMBO_COEFS];
+    float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    float freq;
     float velocity;
     float phase;
     float detune;
     float volume;
-    float pan;
     uint16_t latency_ms;
-    float filter_freq_coefs[NUM_COMBO_COEFS];
     float ratio;
     float resonance;
     uint16_t mod_source;
@@ -188,10 +206,12 @@ struct synthinfo {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
-    float amp;
-    float duty;
+    float amp_coefs[NUM_COMBO_COEFS];
+    float logfreq_coefs[NUM_COMBO_COEFS];
+    float filter_logfreq_coefs[NUM_COMBO_COEFS];
+    float duty_coefs[NUM_COMBO_COEFS];
+    float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    float logfreq;
     uint8_t status;
     float velocity;
     PHASOR phase;
@@ -200,8 +220,6 @@ struct synthinfo {
     float substep;
     SAMPLE sample;
     float volume;
-    float pan;   // Pan parameters.
-    float filter_logfreq_coefs[NUM_COMBO_COEFS];
     float logratio;
     float resonance;
     uint16_t mod_source;
@@ -269,7 +287,7 @@ void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
-void osc_note_on(uint16_t osc);
+void osc_note_on(uint16_t osc, float initial_freq);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
@@ -305,6 +323,8 @@ void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
 
 uint32_t ms_to_samples(uint32_t ms) ;
+
+void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 
 
 // external functions
@@ -346,20 +366,20 @@ extern SAMPLE compute_mod_saw_down(uint16_t osc);
 extern SAMPLE compute_mod_triangle(uint16_t osc);
 extern SAMPLE compute_mod_pcm(uint16_t osc);
 
-extern void ks_note_on(uint16_t osc); 
-extern void ks_note_off(uint16_t osc);
-extern void sine_note_on(uint16_t osc); 
+extern void sine_note_on(uint16_t osc, float initial_freq); 
 extern void fm_sine_note_on(uint16_t osc, uint16_t algo_osc); 
-extern void saw_down_note_on(uint16_t osc); 
-extern void saw_up_note_on(uint16_t osc); 
-extern void triangle_note_on(uint16_t osc); 
-extern void pulse_note_on(uint16_t osc); 
+extern void saw_down_note_on(uint16_t osc, float initial_freq); 
+extern void saw_up_note_on(uint16_t osc, float initial_freq); 
+extern void triangle_note_on(uint16_t osc, float initial_freq); 
+extern void pulse_note_on(uint16_t osc, float initial_freq); 
 extern void pcm_note_on(uint16_t osc);
 extern void pcm_note_off(uint16_t osc);
 extern void partial_note_on(uint16_t osc);
 extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc);
-extern void algo_note_off(uint16_t osc) ;
+extern void algo_note_off(uint16_t osc);
+extern void ks_note_on(uint16_t osc); 
+extern void ks_note_off(uint16_t osc);
 extern void sine_mod_trigger(uint16_t osc);
 extern void saw_down_mod_trigger(uint16_t osc);
 extern void saw_up_mod_trigger(uint16_t osc);

@@ -213,13 +213,12 @@ void lpf_buf(SAMPLE *buf, SAMPLE decay, SAMPLE *state) {
 
 
 /* Pulse wave */
-void pulse_note_on(uint16_t osc) {
+void pulse_note_on(uint16_t osc, float freq) {
     //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", total_samples, osc, synth[osc].logfreq, S2F(synth[osc].amp), S2F(synth[osc].last_amp));
-    float freq = freq_of_logfreq(synth[osc].logfreq);
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
     // Tune the initial integrator state to compensate for mid-sample alignment of table.
-    float float_amp = synth[osc].amp * freq * 4.0f / AMY_SAMPLE_RATE;
+    float float_amp = synth[osc].amp_coefs[0] * freq * 4.0f / AMY_SAMPLE_RATE;
     synth[osc].lpf_state = MUL4_SS(F2S(-0.5 * float_amp), L2S(synth[osc].lut->table[0]));
 }
 
@@ -295,8 +294,7 @@ SAMPLE compute_mod_pulse(uint16_t osc) {
 
 
 /* Saw waves */
-void saw_note_on(uint16_t osc, int8_t direction_notused) {
-    float freq = freq_of_logfreq(synth[osc].logfreq);
+void saw_note_on(uint16_t osc, int8_t direction_notused, float freq) {
     //printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", total_samples, osc, freq, synth[osc].logfreq, synth[osc].amp, S2F(synth[osc].last_amp), P2F(synth[osc].phase));
     float period_samples = ((float)AMY_SAMPLE_RATE / freq);
     synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
@@ -311,11 +309,11 @@ void saw_note_on(uint16_t osc, int8_t direction_notused) {
     synth[osc].last_amp = 0;
 }
 
-void saw_down_note_on(uint16_t osc) {
-    saw_note_on(osc, -1);
+void saw_down_note_on(uint16_t osc, float freq) {
+    saw_note_on(osc, -1, freq);
 }
-void saw_up_note_on(uint16_t osc) {
-    saw_note_on(osc, 1);
+void saw_up_note_on(uint16_t osc, float freq) {
+    saw_note_on(osc, 1, freq);
 }
 
 void render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
@@ -367,8 +365,7 @@ SAMPLE compute_mod_saw_up(uint16_t osc) {
 
 
 /* triangle wave */
-void triangle_note_on(uint16_t osc) {
-    float freq = freq_of_logfreq(synth[osc].logfreq);
+void triangle_note_on(uint16_t osc, float freq) {
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, triangle_fxpt_lutset);
 }
@@ -445,10 +442,9 @@ void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_leve
 }
 
 /* sine */
-void sine_note_on(uint16_t osc) {
+void sine_note_on(uint16_t osc, float freq) {
     //printf("sine_note_on: osc %d logfreq %f\n", osc, synth[osc].logfreq);
     // There's really only one sine table, but for symmetry with the other ones...
-    float freq = freq_of_logfreq(synth[osc].logfreq);
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
 }
@@ -481,7 +477,7 @@ SAMPLE compute_mod_sine(uint16_t osc) {
 }
 
 void sine_mod_trigger(uint16_t osc) {
-    sine_note_on(osc);
+    sine_note_on(osc, freq_of_logfreq(msynth[osc].logfreq));
 }
 
 // Returns a SAMPLE between -1 and 1.

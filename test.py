@@ -147,7 +147,7 @@ class TestAlgo2(AmyTest):
 class TestFilter(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, bp0_target=amy.TARGET_FILTER_FREQ, filter_freq_coefs='300,0,0,3', bp0='0,1,800,0.1,50,0.0')
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq_coefs='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=900, vel=0)
 
@@ -156,7 +156,7 @@ class TestFilterLFO(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=1, wave=amy.SINE, freq=6, amp=1.0)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq_coefs='400,0,0,3,0,0.5', bp0='0,1,500,0,100,0')
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq_coefs='400,0,0,0,3,0.5', bp1='0,1,500,0,100,0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=500, vel=0)
 
@@ -164,17 +164,31 @@ class TestFilterLFO(AmyTest):
 class TestLFO(AmyTest):
 
   def run(self):
+    # LFO mod used to be 1+x i.e. 0.9..1.1
+    #amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
+    # With unit-per-octave scaling, that's approx log2(0.9) = -0.152, log2(1.1) = 0.138
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.138)
     amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, mod_target=amy.TARGET_FREQ)
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
+    
+
+class TestDuty(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PULSE, duty=0.1)
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=200, vel=0)
+    amy.send(time=300, osc=0, wave=amy.PULSE, duty=0.9)
+    amy.send(time=300, note=70, vel=1)
+    amy.send(time=400, vel=0)
     
 
 class TestPWM(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, mod_target=amy.TARGET_DUTY)
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.5)
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.25)
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
     
@@ -207,7 +221,7 @@ def main(argv):
   for testClass in AmyTest.__subclasses__():
     test_object = testClass()
     test_object.test()
-  
+
 
 if __name__ == "__main__":
   main(sys.argv)

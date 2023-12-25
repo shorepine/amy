@@ -74,33 +74,40 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 // Find our ratio using the midi note of the analyzed partial
                 float freq_logratio = msynth[osc].logfreq - logfreq_for_midi_note(patch.midi_note);
 
-                //printf("[%lld %d] freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", total_samples, ms_since_started, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
+                //printf("time %f rel %f: freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", total_samples / (float)AMY_SAMPLE_RATE, ms_since_started / (float)AMY_SAMPLE_RATE, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
 
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
-                synth[o].amp = pb.amp;
+                synth[o].amp_coefs[0] = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
-                synth[o].logfreq = logfreq_of_freq(pb.freq) + freq_logratio;
+                synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
                 //synth[o].last_amp = 0;
 
                 synth[o].breakpoint_times[0][0] = 0;
                 synth[o].breakpoint_values[0][0] = 1.0;
                 synth[o].breakpoint_times[0][1] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
-                synth[o].breakpoint_values[0][1] = pb.amp_delta; 
+                synth[o].breakpoint_values[0][1] = pb.amp_delta;  // Proportional delta i.e. amp_final = amp_delta * amp_initial
                 synth[o].breakpoint_times[0][2] = 0;
                 synth[o].breakpoint_values[0][2] = 0.0;  // Release amp target value
                 AMY_UNSET(synth[o].breakpoint_times[0][3]);
                 synth[o].breakpoint_target[0] = TARGET_AMP + TARGET_LINEAR;
+                synth[o].amp_coefs[COEF_VEL] = 0;
+                synth[o].amp_coefs[COEF_EG0] = 1.0;
 
                 synth[o].breakpoint_times[1][0] = 0; 
-                synth[o].breakpoint_values[1][0] = 1.0; 
+                synth[o].breakpoint_values[1][0] = 0.0; 
                 synth[o].breakpoint_times[1][1] = ms_to_samples((int)((float)pb.ms_delta/time_ratio));
-                synth[o].breakpoint_values[1][1] = pb.freq_delta;
+                if (pb.freq_delta <= 0)
+                    synth[o].breakpoint_values[1][1] = 0.0;
+                else
+                    synth[o].breakpoint_values[1][1] = S2F(log2_lut(F2S(pb.freq_delta)));  // f_end = freq_delta * f_start.
                 synth[o].breakpoint_times[1][2] = 0; 
-                synth[o].breakpoint_values[1][2] = 1.0;  // Release freq mod target value.
+                synth[o].breakpoint_values[1][2] = 0.0;  // Release freq mod target value.
                 AMY_UNSET(synth[o].breakpoint_times[1][3]);
                 synth[o].breakpoint_target[1] = TARGET_FREQ + TARGET_LINEAR;
+                synth[o].amp_coefs[COEF_NOTE] = 0;
+                synth[o].logfreq_coefs[COEF_EG1] = 1.0;
                 
                 uint8_t partial_code = 0; // control code for partial patches
                 if(pb.phase < 0) {
@@ -110,10 +117,10 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].phase = F2P(pb.phase);
                 }
                 if(partial_code==1) { // continuation 
-                    synth[o].logfreq = logfreq_of_freq(pb.freq) + freq_logratio;
+                    synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
-                    synth[o].amp = 0;
+                    synth[o].amp_coefs[0] = 0;
                     //partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
@@ -145,7 +152,7 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j], F2S(msynth[osc].amp)));
             render_partial(buf, o);
             // Deferred termination of this partial, after final ramp-out.
-            if (synth[o].amp == 0)  partial_note_off(o);
+            if (synth[o].amp_coefs[0] == 0)  partial_note_off(o);
         }
     }
 }

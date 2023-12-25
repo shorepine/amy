@@ -34,7 +34,7 @@ void example_ks(uint32_t start) {
 void example_sine(uint32_t start) {
     struct event e = amy_default_event();
     e.time = start;
-    e.freq = 440;
+    e.freq_coefs[0] = 440;
     e.wave = SINE;
     e.velocity = 1;
     amy_add_event(e);
@@ -74,7 +74,7 @@ void example_multimbral_fm(int64_t start, int start_osc) {
 
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
-        e.pan = (i%2);
+        e.pan_coefs[0] = (i%2);
         //e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
         e.patch++;
         amy_add_event(e);
@@ -137,7 +137,7 @@ void example_drums(uint32_t start, int loops) {
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
-            AMY_UNSET(e.freq);
+            AMY_UNSET(e.freq_coefs[0]);
             
             int x = pattern[i];
             if(x & bd) {
