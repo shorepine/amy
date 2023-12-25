@@ -42,15 +42,21 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     float a1 = -2 * c;
     float a2 = 1 - alpha;
 
+    // Where exactly are those poles?  Impose minima on (1 - r) and w0.
+    float r = MIN(0.99, sqrtf(a2 / a0));
+    w0 = MAX(0.01, w0);
+    a1 = a0 * (-2 * r * cosf(w0));
+    a2 = a0 * r * r;
+
     coeffs[0] = F2S(b0 / a0);
     coeffs[1] = F2S(b1 / a0);
     coeffs[2] = F2S(b2 / a0);
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
-    //printf("Flpf f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", f * AMY_SAMPLE_RATE, qFactor,
-    //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0);
-    //printf("Slpf f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", f * AMY_SAMPLE_RATE, qFactor,
+    //printf("Flpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
+    //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0, r, w0);
+    //printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
     //       S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]));
 
     return 0;
@@ -186,6 +192,21 @@ void parametric_eq_process(SAMPLE *block) {
 }
 
 
+void hpf_buf(SAMPLE *buf, SAMPLE *state) {
+    // Implement a dc-blocking HPF with a pole at (decay + 0j) and a zero at (1 + 0j).
+    SAMPLE pole = F2S(0.99);
+    SAMPLE xn1 = state[0];
+    SAMPLE yn1 = state[1];
+    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+        SAMPLE w = buf[i] - xn1;
+        xn1 = buf[i];
+        buf[i] = w + MUL4_SS(pole, yn1);
+        yn1 = buf[i];
+    }
+    state[0] = xn1;
+    state[1] = yn1;
+}
+
 void filter_process(SAMPLE * block, uint16_t osc) {
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
@@ -197,9 +218,8 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
     dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
-    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-    //    block[i] = output[i];
-    //}
+    // Final high-pass to remove residual DC offset from sub-fundamental LPF.
+    hpf_buf(block, &synth[osc].hpf_state[0]);
 }
 
 void filters_deinit() {
