@@ -1,6 +1,13 @@
 #include <AMY-Arduino.h>
 #include <I2S.h>
 
+// We have to override the default AMY params for this sketch.
+const uint8_t amy_cores = 2; // Render on two cores
+const uint8_t amy_nchans = 2; // Render stereo 
+const uint8_t amy_has_reverb = 0; // Turn off reverb (RAM) - chorus stil available
+// If you want smaller PCM samples to fit on flash, include it here
+#include "pcm_small.h"
+
 
 // This example renders complex FM tones on both processors of a Pi Pico. 
 // Set this to CPU 250MHz (overclocked) and -O3

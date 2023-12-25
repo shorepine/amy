@@ -50,7 +50,7 @@ delay_line_t **delay_lines;
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 extern SemaphoreHandle_t xQueueSemaphore;
-extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
+//extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 #endif
 
 

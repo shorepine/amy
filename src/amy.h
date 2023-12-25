@@ -98,7 +98,7 @@ typedef int amy_err_t;
 
 #include "amy_fixedpoint.h"
 
-#if defined ARDUINO && !defined TLONG
+#if defined ARDUINO && !defined TLONG && !defined ESP_PLATFORM
 #include "avr/pgmspace.h" // for PROGMEM, DMAMEM, FASTRUN
 #else
 #define PROGMEM 
