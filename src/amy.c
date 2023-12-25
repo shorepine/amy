@@ -891,30 +891,14 @@ void amy_prepare_buffer() {
     }
 
 
-<<<<<<< HEAD
     if(AMY_HAS_CHORUS==1) {
-        // here's a little fragment of hold_and_modify() for you.
-        msynth[CHORUS_MOD_SOURCE].amp = synth[CHORUS_MOD_SOURCE].amp;
-        msynth[CHORUS_MOD_SOURCE].duty = synth[CHORUS_MOD_SOURCE].duty;
-        //msynth[CHORUS_MOD_SOURCE].freq = synth[CHORUS_MOD_SOURCE].freq;
-        msynth[CHORUS_MOD_SOURCE].logfreq = synth[CHORUS_MOD_SOURCE].logfreq;
+        hold_and_modify(CHORUS_MOD_SOURCE);
     #ifdef CHORUS_ARATE
         if(chorus.level!=0)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
     #else
         delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
     #endif // CHORUS_ARATE
     }
-=======
-#if AMY_HAS_CHORUS == 1
-    hold_and_modify(CHORUS_MOD_SOURCE);
-#ifdef CHORUS_ARATE
-    if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
-#else
-    delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
-#endif // CHORUS_ARATE
-#endif // AMY_HAS_CHORUS
-
->>>>>>> d44ebe6 (zero_amp_clock to stop oscs; hold&mod for chorus; chorus test.)
 }
 
 int16_t * amy_simple_fill_buffer() {
