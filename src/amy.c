@@ -408,8 +408,10 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].note_off_clock);
     AMY_UNSET(synth[i].zero_amp_clock);
     synth[i].filter_type = FILTER_NONE;
-    synth[i].lpf_state = 0;
     synth[i].lpf_alpha = 0;
+    synth[i].lpf_state = 0;
+    synth[i].hpf_state[0] = 0;
+    synth[i].hpf_state[1] = 0;
     synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
