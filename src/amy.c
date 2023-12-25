@@ -608,9 +608,9 @@ void play_event(struct delta d) {
     if(d.param == AMP) synth[d.osc].amp = *(float *)&d.data;
     if(d.param == FREQ) synth[d.osc].logfreq = *(float *)&d.data;
     
-    if(d.param == BP0_TARGET) { synth[d.osc].breakpoint_target[0] = *(uint8_t *)&d.data; trig=1; }
-    if(d.param == BP1_TARGET) { synth[d.osc].breakpoint_target[1] = *(uint8_t *)&d.data; trig=1; }
-    if(d.param == BP2_TARGET) { synth[d.osc].breakpoint_target[2] = *(uint8_t *)&d.data; trig=1; }
+    if(d.param == BP0_TARGET) { synth[d.osc].breakpoint_target[0] = *(uint16_t *)&d.data; trig=1; }
+    if(d.param == BP1_TARGET) { synth[d.osc].breakpoint_target[1] = *(uint16_t *)&d.data; trig=1; }
+    if(d.param == BP2_TARGET) { synth[d.osc].breakpoint_target[2] = *(uint16_t *)&d.data; trig=1; }
     // todo, i really should clean this up
     if(d.param >= BP_START && d.param < BP_END) {
         uint8_t pos = d.param - BP_START;
