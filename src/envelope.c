@@ -44,9 +44,11 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     SAMPLE v1, v0;
     int8_t bp_r = 0;
     t0 = 0; v0 = 1.0;
-    const float exponential_rate = 3.0;
+    // exp2(4.328085) = exp(3.0)
+    #define EXP_RATE_VAL -4.328085
+    const SAMPLE exponential_rate = F2S(EXP_RATE_VAL);
     // We have to aim to overshoot to the desired gap so that we hit the target by exponential_rate time.
-    const float exponential_rate_overshoot_factor = 1.0f / (1.0f - expf(-exponential_rate));
+    const SAMPLE exponential_rate_overshoot_factor = F2S(1.0f / (1.0f - exp2f(EXP_RATE_VAL)));
     uint32_t elapsed = 0;    
 
     // Find out which one is release (the last one)
@@ -154,10 +156,16 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             v1 = MAX(v1, F2S(BREAKPOINT_EPS));
             float dx7_exponential_rate = -logf(S2F(v1)/S2F(v0)) / (t1 - t0);
             scale = MUL4_SS(v0, F2S(expf(-dx7_exponential_rate * (elapsed - t0))));
+            // Untested translation to use LUT log/exp
+            //SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v0) - log2_lut(v1))
+            //                                  / (0.001f * (t1 - t0)));
+            //scale = MUL4_SS(v0,
+            //                exp2_lut(MUL0_SS(-dx7_exponential_rate,
+            //                                 F2S(0.001f * (elapsed - t0)))));
         } else if(synth[osc].breakpoint_target[bp_set] & TARGET_DX7_EXPONENTIAL) {
             // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
 #define LINEAR_TO_DX7_LEVEL(linear) (MIN(99.0, logf(MAX(BREAKPOINT_EPS, linear)) * 8.0 + 99.0))
-#define DX7_LEVEL_TO_LINEAR(level) (powf(2.0, (level - 99.0)/8.0))
+#define DX7_LEVEL_TO_LINEAR(level) (exp2f((level - 99.0)/8.0))
 #define MIN_LEVEL 34
 #define ATTACK_RANGE 75
 #define MAP_ATTACK_LEVEL(level) (1 - MAX(level - MIN_LEVEL, 0) / ATTACK_RANGE)
@@ -178,7 +186,12 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         } else { // "false exponential?"
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
             // so make the target gap a little bit bigger, to ensure we meet v1
-            scale = v0 + MUL4_SS(v1 - v0, F2S(exponential_rate_overshoot_factor * (1.0f - expf(-exponential_rate * time_ratio))));
+            //scale = v0 + MUL4_SS(v1 - v0, F2S(exponential_rate_overshoot_factor * (1.0f - exp2f(-exponential_rate * time_ratio))));
+            scale = v0 + MUL4_SS(v1 - v0,
+                                 MUL4_SS(exponential_rate_overshoot_factor,
+                                         F2S(1.0f)
+                                         - exp2_lut(MUL4_SS(exponential_rate,
+                                                            F2S(time_ratio)))));
             //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", total_samples, bp_set, found, time_ratio, S2F(scale));
         }
     }
