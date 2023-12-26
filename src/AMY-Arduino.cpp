@@ -22,7 +22,7 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy_start(1, 0, 0);
+    amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
 }
 
 void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus) {

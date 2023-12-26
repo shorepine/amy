@@ -21,7 +21,7 @@ void setup() {
   Serial.println("Welcome to AMY example");
 
   // Start up AMY
-  amy.begin(1, 0, 0);
+  amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
 
   // Send AMY messages in two ways: first, using the wire protocol:
   // This sends a sine wave at 220Hz on osc 0 with velocity 1

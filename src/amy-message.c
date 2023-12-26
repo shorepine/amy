@@ -37,7 +37,7 @@ int main(int argc, char ** argv) {
 
 
 
-    amy_start(1, 1, 1);
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
     amy_live_start();
     amy_reset_oscs();
 
