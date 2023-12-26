@@ -156,12 +156,12 @@ Here's the full list:
 | A    | bp0    | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
 | B    | bp1    |  string     | set the second breakpoint generator. see breakpoint 0 |
 | b    | feedback | float 0-1  | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
-| C    | bp2    |  string     | 3rd breakpoint generator |
+| c    | chain    |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to the chained oscillator also. |
 | d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| f    | freq   |  float      | frequency of oscillator |
-| F    | filter_freq | float  | center frequency for biquad filter |
-| g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together |
+| f    | freq   |  float[,float...]      | frequency of oscillator, set of Control Coefficients |
+| F    | filter_freq | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
+| g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. **Deprecated**, subsumed by ControlCoefficients. |
 | G    | filter_type | 0-3 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass. |
 | H    | reverb_liveness | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
 | h    | reverb_level | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
@@ -172,7 +172,7 @@ Here's the full list:
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
 | m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
-| N    | latency_ms | uint | sets latency in ms. default 0 | 
+| N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
 | o    | algorithm | uint 1-32 | DX7 algorith to use for ALGO type | 
 | O    | algo_source | string | which oscillators to use for the algorithm. list of six, use -1 for not used, e.g 0,1,2,-1,-1-1 |
@@ -181,14 +181,13 @@ Here's the full list:
 | Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
-| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential | 
+| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefs. | 
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
 | w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
 | W    | bp1_target | uint mask | see bp0_target |
 | x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
-| X    | bp2_target | uint mask | see bp0_target |
 | y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
 | z    | eq_h | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. | 
 
@@ -266,10 +265,10 @@ for i in range(16):
     time.sleep(0.5) # Sleep for 0.5 seconds
 ```
 
-Neat! You can see how simple / powerful it is to have control over lots of oscillators. You have up to 64. Let's make it more interesting. A classic analog tone is the filtered saw wave. Let's make one.
+Neat! You can see how simple / powerful it is to have control over lots of oscillators. You have up to 64 (or more, depending on your platform). Let's make it more interesting. A classic analog tone is the filtered saw wave. Let's make one.
 
 ```python
-amy.send(osc=0,wave=amy.SAW_DOWN,filter_freq=2500, resonance=5, filter_type=amy.FILTER_LPF)
+amy.send(osc=0, wave=amy.SAW_DOWN, filter_freq=3200, resonance=5, filter_type=amy.FILTER_LPF)
 amy.send(osc=0, vel=1, note=40)
 ```
 
@@ -278,30 +277,33 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint! A breakpoint is a simple list of (time, value) - you can have up to 8 of those pairs, and up to 3 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, frequency, duty cycle, feedback, filter frequence, or resonance with a breakpoint. It gets triggered when the note does. So let's make a breakpoint that turns the filter frequency down from its start at 2500 Hz to 500 Hz over 1000 milliseconds. And when the note goes off, taper the frequency to 0 Hz over 200 millseconds. 
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint! A breakpoint is a simple list of (time, value) - you can have up to 8 of those pairs, and 2 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, frequency, duty cycle, feedback, filter frequence, or resonance with a breakpoint. It gets triggered when the note does. So let's make a breakpoint that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, taper the frequency to 50 Hz over 200 millseconds. 
 
 ```python
-amy.send(osc=0,wave=amy.SAW_DOWN,filter_freq=2500, resonance=5, filter_type=amy.FILTER_LPF)
-amy.send(osc=0, bp0="1000,0.2,200,0", bp0_target=amy.TARGET_FILTER_FREQ)
+amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
+amy.send(osc=0, filter_freq="50,0,0,0,1,0", bp1="0,6.0,1000,3.0,200,0")
 amy.send(osc=0, vel=1, note=40)
 ```
 
-Great. You can add multiple targets together, for example, if you want a breakpoint to control both filter frequency and the note amplitude, use `bp0_target=amy.TARGET_FILTER_FREQ+amy.TARGET_AMP`. Give it a go!
+There are two things to note here: (1) The filter frequency modulation is accomplished by a set of **ControlCoefficients**, a set of 6 floats that are applied, respectively, to a constant value of 1, the note pitch, the velocity, the output of breakpoint set 0, the output of breakpoint set 1, and the modulating oscillator.  The set "50,0,0,0,1,0" means that we have a base frequency of 50 Hz, but we also add the output of breakpoint set 1. If you specify fewer than 6 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0"`.  (2) The frequency calculations are done in log2-frequency relative to Midi note 0 (8.18 Hz).  The first, constant term is automatically converted from Hz.  But the envelope values (initially 6.0, falling to 3.0 over 1000ms, then falling to 0 over 200ms on release) are in octave units, so 6.0 corresponds to a *factor* of `2**6 = 64`, giving a net frequency of 3200 Hz when applied to the 50 Hz base.  Then the decay is to `(2**3) * 50 = 400 Hz`, and the final release is down to 50 Hz.
+
+Great. There are 5 oscillator parameters that take **ControlCoefficients**: Amplitude, Frequency, FilterFrequency, PWM Duty, and Pan.  You can use the same breakpoint set to control several at once, for instance by also specifying `freq="0,1,0,0,0.125,0"`, which says to set the note frequency from the same breakpoint set as the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
 
 We also have LFOs, which are implemented as one oscillator modulating another. You set the lower-frequency oscillator up, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite: 
 
 ```python
-amy.send(osc=1, wave=amy.SAW_DOWN, freq=0.5, amp=0.75)
-amy.send(osc=0, wave=amy.PULSE, duty=0.5, freq=220, mod_source=1, mod_target=amy.TARGET_DUTY)
-amy.send(osc=0, vel=0.5)
+amy.reset()  # Clear the state.
+amy.send(osc=1, wave=amy.SINE, freq=0.5, amp=1)
+amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.4", mod_source=1)
+amy.send(osc=0, note=60, vel=0.5)
 ```
 
-You see we first set up the modulation oscillator (a saw wave at 0.5Hz, with amplitude 0.75-- this indicates the "depth" of the LFO). Then we set up the oscillator to be modulated, a pulse wave with mod source of oscillator 1 and mod target of duty cycle. The initial duty cycle will start at 0.5 and be multiplied by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like breakpoints, you can modulate duty cycle, amplitude, frequency, filter frequency, resonance or feedback! And if you want to modulate more than one thing, like frequency and duty, just add them together:
+You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  Then we set up the oscillator to be modulated, a pulse wave with mod source of oscillator 1 and the duty **ControlCoefficients** to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be multiplied by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with breakpoints, you can modulate duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
 
 ```python
-amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=0.25)
-amy.send(osc=0, wave=amy.PULSE, duty=0.5, freq=110, mod_source=1, mod_target=amy.TARGET_DUTY+amy.TARGET_FREQ)
-amy.send(osc=0, vel=0.5)
+amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=1)
+amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.25", freq="0,1,0,0,0,0.5", mod_source=1)
+amy.send(osc=0, note=60, vel=0.5)
 ```
 
 `amy.py` has some helpful presets, if you want to use them, or add to them. To make that filter bass, just do `amy.preset(1, osc=0)` and then `amy.send(osc=0, vel=1, note=40)` to hear it. Here's another one:
@@ -334,7 +336,7 @@ You can set a synth-wide volume (in practice, 0-10), or set the EQ of the entire
 
 ## Breakpoints
 
-AMY allows you to set 3 "breakpoint generators" per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per breakpoint) of time (specified in milliseconds) and ratio. You can specify any amount of pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time in the aggregate from note on, e.g. 10ms, then 100ms is 90ms later, then 250ms is 150ms after the last one. The last "release" pair counts from ms from the note-off. 
+AMY allows you to set 2 "breakpoint generators" per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per breakpoint) of time (specified in milliseconds) and ratio. You can specify any amount of pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time in the aggregate from note on, e.g. 10ms, then 100ms is 90ms later, then 250ms is 150ms after the last one. The last "release" pair counts from ms from the note-off. 
 
 A breakpoint can target amplitude, duty, frequency, filter frequency, resonance or feedback of an oscillator.
 
@@ -375,7 +377,7 @@ When building your own algorithm sets, assign a separate oscillator as wave=`ALG
 
 ```python
 amy.reset()
-amy.send(wave=amy.SINE,ratio=0.2,amp=0.1,osc=0,bp0_target=amy.TARGET_AMP,bp0="1000,0,0,0")
+amy.send(wave=amy.SINE,ratio=0.2,amp="0,0,0.1,1",osc=0,bp0="1000,0,0,0")
 amy.send(wave=amy.SINE,ratio=1,amp=1,osc=1)
 amy.send(wave=amy.ALGO,algorithm=1,algo_source="-1,-1,-1,-1,1,0",osc=2)
 ```
