@@ -22,14 +22,23 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy_start();
+    amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
 }
+
+void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus) {
+    amy_start(cores, reverb, chorus);
+}
+
 
 
 void AMY::reset() {
     amy_reset_oscs();
 }
 
+
+void AMY::restart() {
+    amy_restart();
+}
 
 
 // (From either core) prepare to render multicore
@@ -38,7 +47,7 @@ void AMY::prepare() {
 }
 
 void AMY::volume(float vol) {
-    global.volume = vol;
+    amy_global.volume = vol;
 }
 
 
@@ -47,12 +56,11 @@ void AMY::render(uint16_t start, uint16_t end, uint8_t core) {
     amy_render(start, end, core);
 }
 
-// Get the rendered buffer back.
-// If you're in single core, this also renders and prepares, so don't do that as well!
-int16_t * AMY::get_buffer() {
-    if(AMY_CORES > 1) {
-        return amy_fill_buffer();
-    }
+int16_t * AMY::fill_buffer() {
+    return amy_fill_buffer();
+}
+
+int16_t * AMY::render_to_buffer() {
     return amy_simple_fill_buffer();
 }
 

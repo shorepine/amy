@@ -5,8 +5,6 @@
 #include "amy.h"
 #include "libminiaudio-audio.h"
 
-//#include <math.h>
-
 int main(int argc, char ** argv) {
 
     int opt;
@@ -37,7 +35,9 @@ int main(int argc, char ** argv) {
         } 
     }
 
-    amy_start();
+
+
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
     amy_live_start();
     amy_reset_oscs();
 

@@ -30,9 +30,6 @@ typedef struct {
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
 
-//#define LINEAR_INTERP        // use linear interp for oscs
-// "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
-//#define CUBIC_INTERP         // use cubic interpolation for oscs
 typedef int16_t output_sample_type;
 // Sample values for modulation sources
 #define UP    32767
@@ -287,6 +284,9 @@ SAMPLE exp2_lut(SAMPLE x);
 
 // global synth state
 struct state {
+    uint8_t cores;
+    uint8_t has_reverb;
+    uint8_t has_chorus;
     float volume;
     // State of fixed dc-blocking HPF
     SAMPLE hpf_state;
@@ -301,7 +301,7 @@ struct state {
 extern uint32_t total_samples;
 extern struct synthinfo *synth;
 extern struct mod_synthinfo *msynth; // the synth that is being modified by modulations & envelopes
-extern struct state global; 
+extern struct state amy_global; 
 
 
 float atoff(const char *s);
@@ -318,7 +318,8 @@ uint32_t ms_to_samples(uint32_t ms) ;
 // external functions
 void amy_play_message(char *message);
 struct event amy_parse_message(char * message);
-void amy_start();
+void amy_restart();
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();

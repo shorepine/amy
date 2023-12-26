@@ -122,7 +122,7 @@ void bleep() {
 }
 
 void main() {
-    amy_start(); // initializes amy 
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0); // initializes amy 
     amy_live_start(); // render live audio
     bleep();
 }
@@ -134,7 +134,7 @@ Or in C, sending the wire protocol directly: (you don't need to worry about enco
 #include "amy.h"
 
 void main() {
-    amy_start();
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
     amy_live_start();
     amy_play_message("t76555951v0w8n50p30l1Z");
 }

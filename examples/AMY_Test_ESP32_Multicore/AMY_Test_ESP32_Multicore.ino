@@ -1,10 +1,6 @@
 #include <AMY-Arduino.h>
 #include <I2S.h>
 
-// We have to override the default AMY params for this sketch.
-const uint8_t amy_cores = 2; // Render on two cores
-const uint8_t amy_nchans = 2; // Render stereo 
-const uint8_t amy_has_reverb = 0; // Turn off reverb (RAM) - chorus stil available
 // If you want smaller PCM samples to fit on flash, include it here
 #include "pcm_tiny.h"
 
@@ -39,7 +35,7 @@ void setup() {
   // Set up the rendering tasks on the ESP.
   xTaskCreatePinnedToCore(render_0, "render_0",4096,NULL, configMAX_PRIORITIES-2,&render0,0);                          
   xTaskCreatePinnedToCore(render_1, "render_1",4096,NULL, configMAX_PRIORITIES-2,&render1,1); 
-  amy.begin();
+  amy.begin(2, 0, 0);
 }
 
 void render_0( void * pvParameters ){

@@ -8,10 +8,7 @@
 #include "libminiaudio-audio.h"
 
 // If you want PCM support smaller than 67 samples you have to include one of pcm_{small,tiny}.h
-#include "pcm_tiny.h"
-
-// You can override parameters in your implementation like this
-const uint16_t amy_oscs = 122;
+#include "pcm_small.h"
 
 
 int main(int argc, char ** argv) {
@@ -58,7 +55,10 @@ int main(int argc, char ** argv) {
         printf("log2(%f)=%f, exp2(%f)=%f\n", f, S2F(logf), S2F(logf), S2F(exp2_lut(logf)));
     }
 
-    amy_start();
+
+
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
+
 
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
     ma_encoder encoder;
