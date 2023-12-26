@@ -449,8 +449,11 @@ void amy_reset_oscs() {
     global.eq[2] = F2S(1.0f);
     // also reset chorus oscillator.
     //synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
-    synth[CHORUS_MOD_SOURCE].logfreq_coefs[0] = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
-    synth[CHORUS_MOD_SOURCE].amp_coefs[0] = CHORUS_DEFAULT_MOD_DEPTH;
+    synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
+    synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
+    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = CHORUS_DEFAULT_MOD_DEPTH;
+    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_VEL] = 0;  // Turn off default.
+    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
     synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
     // and the chorus params
     #if ( AMY_HAS_CHORUS == 1)
@@ -788,11 +791,12 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].resonance = synth[osc].resonance;
 
-    if (osc > 999)
-        printf("h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %f %f %f %f %f %f amp %f logfreq %f\n",
+    if (osc == 999)
+        printf("h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
            total_samples / (float)AMY_SAMPLE_RATE, osc,
                ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
                synth[osc].amp_coefs[0], synth[osc].amp_coefs[1], synth[osc].amp_coefs[2], synth[osc].amp_coefs[3], synth[osc].amp_coefs[4], synth[osc].amp_coefs[5], 
+               synth[osc].logfreq_coefs[0], synth[osc].logfreq_coefs[1], synth[osc].logfreq_coefs[2], synth[osc].logfreq_coefs[3], synth[osc].logfreq_coefs[4], synth[osc].logfreq_coefs[5], 
                msynth[osc].amp, msynth[osc].logfreq);
 
     // Stop oscillators if amp is zero for several frames in a row.
