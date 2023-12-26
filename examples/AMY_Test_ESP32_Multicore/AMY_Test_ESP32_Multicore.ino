@@ -35,7 +35,7 @@ void setup() {
   // Set up the rendering tasks on the ESP.
   xTaskCreatePinnedToCore(render_0, "render_0",4096,NULL, configMAX_PRIORITIES-2,&render0,0);                          
   xTaskCreatePinnedToCore(render_1, "render_1",4096,NULL, configMAX_PRIORITIES-2,&render1,1); 
-  amy.begin_multicore();
+  amy.begin(2, 0, 0);
 }
 
 void render_0( void * pvParameters ){

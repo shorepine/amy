@@ -22,11 +22,11 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy_start();
+    amy_start(1, 0, 0);
 }
 
-void AMY::begin_multicore() {
-    amy_start_multicore();
+void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus) {
+    amy_start(cores, reverb, chorus);
 }
 
 

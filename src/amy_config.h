@@ -3,23 +3,23 @@
 */
 #include "amy.h"
 
+// You can edit these here if you want to 
+#define AMY_BLOCK_SIZE 256
+#define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
+#define AMY_OSCS 120
+#define AMY_SAMPLE_RATE 44100 
+#define AMY_NCHANS 2
+
+
+
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
-
 #define AMY_CORES amy_global.cores
-#define AMY_BLOCK_SIZE 64 //amy_block_size
-#define AMY_HAS_REVERB 0 //amy_has_reverb
-#define AMY_HAS_CHORUS 1 //amy_has_chorus
-#define AMY_OSCS 120 //amy_oscs
-#define AMY_SAMPLE_RATE 44100 //amy_sample_rate
-#define AMY_NCHANS 2//amy_nchans
-#define BLOCK_SIZE_BITS 6//amy_block_size_bits
-
-
-
+#define AMY_HAS_REVERB amy_global.has_reverb
+#define AMY_HAS_CHORUS amy_global.has_chorus
 #define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)

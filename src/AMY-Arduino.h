@@ -26,7 +26,7 @@ class AMY
   public:
     AMY();
     void begin();
-    void begin_multicore();
+    void begin(uint8_t cores, uint8_t reverb, uint8_t chorus);
 
     int32_t sysclock();
     void fm(int32_t start);

@@ -57,7 +57,7 @@ int main(int argc, char ** argv) {
 
 
 
-    amy_start();
+    amy_start(1, 1, 1);
 
 
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);

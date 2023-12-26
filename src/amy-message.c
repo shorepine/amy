@@ -37,7 +37,7 @@ int main(int argc, char ** argv) {
 
 
 
-    amy_start();
+    amy_start(1, 1, 1);
     amy_live_start();
     amy_reset_oscs();
 

@@ -36,7 +36,7 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
-    amy_start();
+    amy_start(1, 1, 1);
     return Py_None;
 }
 
@@ -87,7 +87,7 @@ static struct PyModuleDef libamyDef =
 
 PyMODINIT_FUNC PyInit_libamy(void)
 {   
-    amy_start();
+    amy_start(1, 1, 1);
     return PyModule_Create(&libamyDef);
 
 }

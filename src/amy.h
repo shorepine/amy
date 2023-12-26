@@ -284,6 +284,8 @@ SAMPLE exp2_lut(SAMPLE x);
 // global synth state
 struct state {
     uint8_t cores;
+    uint8_t has_reverb;
+    uint8_t has_chorus;
     float volume;
     // State of fixed dc-blocking HPF
     SAMPLE hpf_state;
@@ -316,8 +318,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 void amy_play_message(char *message);
 struct event amy_parse_message(char * message);
 void amy_restart();
-void amy_start();
-void amy_start_multicore();
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();

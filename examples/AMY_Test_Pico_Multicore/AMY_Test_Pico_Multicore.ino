@@ -29,7 +29,7 @@ void setup() {
   i2s.begin(AMY_SAMPLE_RATE);
 
   // Start up AMY
-  amy.begin_multicore();
+  amy.begin(2, 0, 0);
 
   amy.volume(1);
 

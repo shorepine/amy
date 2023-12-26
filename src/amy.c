@@ -166,6 +166,8 @@ int8_t global_init() {
     amy_global.eq[2] = F2S(1.0f);
     amy_global.hpf_state = 0;
     amy_global.cores = 1;
+    amy_global.has_reverb = 1;
+    amy_global.has_chorus = 1;
     return 0;
 }
 
@@ -1207,27 +1209,17 @@ void amy_play_message(char *message) {
 
 // fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
 
-
-void amy_restart() {
-    oscs_deinit();
-    oscs_init();
-    amy_reset_oscs();
-}
-
 void amy_stop() {
     oscs_deinit();
 }
 
-void amy_start_multicore() {
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     global_init();
-    amy_global.cores = 2;
+    amy_global.cores = cores;
+    amy_global.has_chorus = chorus;
+    amy_global.has_reverb = reverb;
     oscs_init();
     amy_reset_oscs();
 
-}
-void amy_start() {
-    global_init();
-    oscs_init();
-    amy_reset_oscs();
 }
 
