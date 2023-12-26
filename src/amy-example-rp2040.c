@@ -120,7 +120,6 @@ int main() {
 
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
-    //getchar();
     if(AMY_CORES>1)
         multicore_launch_core1(core1_main);
 
@@ -129,7 +128,7 @@ int main() {
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
-    amy_start();
+    amy_start_multicore();
 
     gpio_init(CPU0_METER);
     gpio_set_dir(CPU0_METER, GPIO_OUT);

@@ -216,10 +216,10 @@ void parametric_eq_process(SAMPLE *block) {
         dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            output[0][i] = FILT_MUL_SS(output[0][i], global.eq[0]) - FILT_MUL_SS(output[1][i], global.eq[1]);
+            output[0][i] = FILT_MUL_SS(output[0][i], amy_global.eq[0]) - FILT_MUL_SS(output[1][i], amy_global.eq[1]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], global.eq[2]);
+            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
     }
 }
 

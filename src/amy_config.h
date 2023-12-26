@@ -3,29 +3,20 @@
 */
 #include "amy.h"
 
-// Feel free to override any of these in your code
-extern const uint16_t amy_oscs;
-extern const uint16_t amy_block_size;
-extern const uint8_t amy_block_size_bits;
-extern const uint8_t amy_cores;
-extern const uint8_t amy_nchans;
-extern const uint16_t amy_sample_rate;
-extern const uint8_t amy_has_chorus;
-extern const uint8_t amy_has_reverb;
-
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
-#define AMY_BLOCK_SIZE amy_block_size
-#define AMY_HAS_REVERB amy_has_reverb
-#define AMY_HAS_CHORUS amy_has_chorus
-#define AMY_OSCS amy_oscs
-#define AMY_SAMPLE_RATE amy_sample_rate
-#define AMY_NCHANS amy_nchans
-#define AMY_CORES amy_cores
-#define BLOCK_SIZE_BITS amy_block_size_bits
+
+#define AMY_CORES amy_global.cores
+#define AMY_BLOCK_SIZE 64 //amy_block_size
+#define AMY_HAS_REVERB 0 //amy_has_reverb
+#define AMY_HAS_CHORUS 1 //amy_has_chorus
+#define AMY_OSCS 120 //amy_oscs
+#define AMY_SAMPLE_RATE 44100 //amy_sample_rate
+#define AMY_NCHANS 2//amy_nchans
+#define BLOCK_SIZE_BITS 6//amy_block_size_bits
 
 
 

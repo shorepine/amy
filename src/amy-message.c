@@ -5,8 +5,6 @@
 #include "amy.h"
 #include "libminiaudio-audio.h"
 
-//#include <math.h>
-
 int main(int argc, char ** argv) {
 
     int opt;
@@ -36,6 +34,8 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
+
+
 
     amy_start();
     amy_live_start();
