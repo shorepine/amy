@@ -38,24 +38,17 @@ The partial tone synthesizer also provides `partials.py`, where you can model th
 
 ## Using AMY in Arduino
 
-Copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`, and `#include <AMY-Arduino.h>`. There are examples for the Pi Pico, ESP32 (and variants), and Teensy (works on 4.X and 3.6 -- the 3.2 should work but there may be an I2S bug.) Use the File->Examples->AMY Synthesizer menu to find them. 
+Copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`, and `#include <AMY-Arduino.h>`. There are examples for the Pi Pico, ESP32 (and variants), and Teensy (works on 4.X and 3.6) Use the File->Examples->AMY Synthesizer menu to find them. 
 
-At this time, we don't support multicore in Arduino like we do for bare metal MCUs, as the board support packages make assumptions that conflict with AMY. You get a buffer a samples back from us and you can do whatever you want with it, including sending over I2S, DACs, or modifying it. 
+The examples rely on the following board packages and libraries:
+ * RP2040 / Pi Pico: [`arduino-pico`](https://arduino-pico.readthedocs.io/en/latest/install.html#installing-via-arduino-boards-manager)
+ * Teensy: [`teensyduino`](https://www.pjrc.com/teensy/td_download.html)
+ * ESP32/ESP32-S3/etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html) - use a 3.X version when installing
 
-## Using AMY in your software
+ We provide examples for the Pi Pico and ESP32 that also render in multicore, taking full advantage of the chips for more simultaneous oscillators. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. 
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them, or run `cd src; pip install .` to be able to `import amy` in Python to generate audio signals directly in Python. No other libraries should be required to synthesize audio in AMY. 
 
-You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
-
-To run a simple C example on many platforms:
-
-```
-gh repo clone bwhitman/amy
-cd amy
-make
-./amy-example # you should hear FM tones out your default speaker, use ./amy-example -h for options
-```
+## Using AMY on bare-metal RP2040 or ESP-IDF (without Arduino)
 
 To build an example without Arduino, supporting multicore, for the Pi Pico / RP2040:
 
@@ -72,6 +65,22 @@ make && picotool load amy_example.elf && picotool reboot
 ```
 
 To build an example of AMY using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), try to follow the steps in [Alles Flashing](https://github.com/bwhitman/alles/blob/main/alles-flashing.md#set-up-esp-idf) to set up your system with ESP-IDF 5.1-rc2 and building [Alles](https://github.com/bwhitman/alles) for your board.
+
+## Using AMY in Python
+
+You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `libamy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
+
+
+## Using AMY in other software
+
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
+
+To run a simple C example on many platforms:
+
+```
+make
+./amy-example # you should hear FM tones out your default speaker, use ./amy-example -h for options
+```
 
 
 ## Controlling AMY
@@ -196,13 +205,10 @@ Here's the full list:
 
 # Synthesizer details
 
-We'll use Python for showing examples of AMY, make sure you've installed `libamy` and are running a live AMY first by 
+We'll use Python for showing examples of AMY, make sure you've installed `libamy` and are running a live AMY first by running `make test` and then
 
 ```bash
-$ cd src
-$ python setup.py install
-$ cd ..
-$ python
+python
 >>> import amy
 >>> amy.live()
 ```
