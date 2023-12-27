@@ -147,7 +147,7 @@ class TestAlgo2(AmyTest):
 class TestFilter(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq_coefs='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=900, vel=0)
 
@@ -156,7 +156,7 @@ class TestFilterLFO(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=1, wave=amy.SINE, freq=6, amp=1.0)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq_coefs='400,0,0,0,3,0.5', bp1='0,1,500,0,100,0')
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq='400,0,0,0,3,0.5', bp1='0,1,500,0,100,0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=500, vel=0)
 
@@ -208,7 +208,7 @@ class TestChorus(AmyTest):
     # Turn on chorus.
     amy.send(chorus_level=1)
     # Note from TestFilter.
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq_coefs='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=900, vel=0)
 

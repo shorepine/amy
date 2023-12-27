@@ -115,7 +115,7 @@ enum params{
     PAN,
     FILTER_FREQ=PAN + NUM_COMBO_COEFS,
     RATIO=FILTER_FREQ + NUM_COMBO_COEFS,
-    RESONANCE,
+    RESONANCE, CHAINED_OSC,
     MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
     ALGO_SOURCE_START=100,
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,
@@ -183,6 +183,7 @@ struct event {
     uint16_t latency_ms;
     float ratio;
     float resonance;
+    uint16_t chained_osc;
     uint16_t mod_source;
     uint16_t mod_target;
     uint8_t algorithm;
@@ -222,6 +223,7 @@ struct synthinfo {
     float volume;
     float logratio;
     float resonance;
+    uint16_t chained_osc;
     uint16_t mod_source;
     uint16_t mod_target;
     uint8_t algorithm;
@@ -229,6 +231,7 @@ struct synthinfo {
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
 
+    uint32_t last_velocity_event_clock;   // To stop loops in chained_osc onsets.
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
