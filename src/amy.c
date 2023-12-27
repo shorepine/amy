@@ -354,7 +354,7 @@ void amy_add_event(struct event e) {
 
 
     char * bps[MAX_BREAKPOINT_SETS] = {e.bp0, e.bp1};
-    for(uint8_t i=0;i<3;i++) {
+    for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
         if(bps[i][0] != 0) {
             struct synthinfo t;
             parse_breakpoint(&t, bps[i], i);
@@ -411,6 +411,7 @@ void reset_osc(uint16_t i ) {
     synth[i].velocity = 0;
     synth[i].step = 0;
     synth[i].sample = F2S(0);
+    synth[i].mod_value = F2S(0);
     synth[i].substep = 0;
     synth[i].status = OFF;
     AMY_UNSET(synth[i].chained_osc);
@@ -420,6 +421,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].note_off_clock);
     AMY_UNSET(synth[i].zero_amp_clock);
     AMY_UNSET(synth[i].last_velocity_event_clock);
+    AMY_UNSET(synth[i].mod_value_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_alpha = 0;
     synth[i].lpf_state = 0;
@@ -656,7 +658,6 @@ void play_event(struct delta d) {
         uint8_t pos = d.param - BP_START;
         uint8_t bp_set = 0;
         if(pos > (MAX_BREAKPOINTS * 2)) { bp_set = 1; pos = pos - (MAX_BREAKPOINTS * 2); }
-        if(pos > (MAX_BREAKPOINTS * 4)) { bp_set = 2; pos = pos - (MAX_BREAKPOINTS * 2); }
         if(pos % 2 == 0) {
             synth[d.osc].breakpoint_times[bp_set][pos / 2] = *(uint32_t *)&d.data;
         } else {
@@ -1168,6 +1169,17 @@ int parse_int_list_message(char *message, int16_t *vals, int max_num_vals) {
     return num_vals_received;
 }
 
+void copy_param_list_substring(char *dest, const char *src) {
+    // Copy wire command string up to next parameter char.
+    uint16_t c = 0;
+    uint16_t stop = strspn(src, " 0123456789-,.");  // Note space & period.
+    while (c < stop && src[c]) {
+        dest[c] = src[c];
+        c++;
+    }
+    dest[c] = '\0';
+}
+
 // helper to parse the list of source voices for an algorithm
 void parse_algorithm_source(struct synthinfo * e, char *message) {
     parse_int_list_message(message, e->algo_source, MAX_ALGO_OPS);
@@ -1237,8 +1249,8 @@ struct event amy_parse_message(char * message) {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
                         case 'a': parse_coef_message(message + start, e.amp_coefs);break;
-                        case 'A': strcpy(e.bp0, message+start); break;
-                        case 'B': strcpy(e.bp1, message+start); break;
+                        case 'A': copy_param_list_substring(e.bp0, message+start); break;
+                        case 'B': copy_param_list_substring(e.bp1, message+start); break;
                         case 'b': e.feedback=atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
@@ -1267,7 +1279,7 @@ struct event amy_parse_message(char * message) {
                         case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atoi(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
-                        case 'O': strcpy(e.algo_source, message+start); break;
+                        case 'O': copy_param_list_substring(e.algo_source, message+start); break;
                         case 'p': e.patch=atoi(message + start); break;
                         case 'P': e.phase=F2P(atoff(message + start)); break;
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;

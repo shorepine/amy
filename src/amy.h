@@ -217,7 +217,8 @@ struct synthinfo {
     float detune;
     float step;
     float substep;
-    SAMPLE sample;
+    SAMPLE sample;  // Used by KS, otherwise?
+    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE.
     float volume;
     float logratio;
     float resonance;
@@ -229,10 +230,11 @@ struct synthinfo {
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
 
-    uint32_t last_velocity_event_clock;   // To stop loops in chained_osc onsets.
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
+    uint32_t last_velocity_event_clock;   // To stop loops in chained_osc onsets.
+    uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];

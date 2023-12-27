@@ -13,14 +13,21 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     // i.e., this oscillator is acting as modulation for something, so
     // just calculate that modulation rate (without knowing what it
     // modulates).
-    if(synth[mod_osc].wave == NOISE) return compute_mod_noise(mod_osc);
-    if(synth[mod_osc].wave == SAW_DOWN) return compute_mod_saw_down(mod_osc);
-    if(synth[mod_osc].wave == SAW_UP) return compute_mod_saw_up(mod_osc);
-    if(synth[mod_osc].wave == PULSE) return compute_mod_pulse(mod_osc);
-    if(synth[mod_osc].wave == TRIANGLE) return compute_mod_triangle(mod_osc);
-    if(synth[mod_osc].wave == SINE) return compute_mod_sine(mod_osc);
-    if(synth[mod_osc].wave == PCM) return compute_mod_pcm(mod_osc);
-    return 0;
+    // Has this mod value already been calculated this frame?  Can't
+    // recalculate, because compute_mod advance phase internally.
+    if (synth[mod_osc].mod_value_clock == total_samples)
+        return synth[mod_osc].mod_value;
+    synth[mod_osc].mod_value_clock = total_samples;
+    SAMPLE value = 0;
+    if(synth[mod_osc].wave == NOISE) value = compute_mod_noise(mod_osc);
+    if(synth[mod_osc].wave == SAW_DOWN) value = compute_mod_saw_down(mod_osc);
+    if(synth[mod_osc].wave == SAW_UP) value = compute_mod_saw_up(mod_osc);
+    if(synth[mod_osc].wave == PULSE) value = compute_mod_pulse(mod_osc);
+    if(synth[mod_osc].wave == TRIANGLE) value = compute_mod_triangle(mod_osc);
+    if(synth[mod_osc].wave == SINE) value = compute_mod_sine(mod_osc);
+    if(synth[mod_osc].wave == PCM) value = compute_mod_pcm(mod_osc);
+    synth[mod_osc].mod_value = value;
+    return value;
 }
 
 SAMPLE compute_mod_scale(uint16_t osc) {
