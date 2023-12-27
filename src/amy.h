@@ -16,7 +16,7 @@
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
 #define MAX_BREAKPOINTS 8
-#define MAX_BREAKPOINT_SETS 3
+#define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
 
@@ -116,7 +116,7 @@ enum params{
     FILTER_FREQ=PAN + NUM_COMBO_COEFS,
     RATIO=FILTER_FREQ + NUM_COMBO_COEFS,
     RESONANCE, CHAINED_OSC,
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY,
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,
     ALGO_SOURCE_START=100,
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,
     BP_START=ALGO_SOURCE_END + 1,
@@ -194,10 +194,8 @@ struct event {
     char algo_source[MAX_PARAM_LEN];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
-    char bp2[MAX_PARAM_LEN];
     uint16_t bp0_target;
     uint16_t bp1_target;
-    uint16_t bp2_target;
     uint8_t status;
 };
 

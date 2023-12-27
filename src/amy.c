@@ -244,11 +244,9 @@ struct event amy_default_event() {
     AMY_UNSET(e.algorithm);
     AMY_UNSET(e.bp0_target);
     AMY_UNSET(e.bp1_target);
-    AMY_UNSET(e.bp2_target);
     e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
-    e.bp2[0] = 0;
     return e;
 }
 
@@ -342,7 +340,6 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.bp0_target)) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.bp0_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.bp1_target)) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.bp1_target; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.bp2_target)) { d.param=BP2_TARGET; d.data = *(uint32_t *)&e.bp2_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
@@ -356,7 +353,7 @@ void amy_add_event(struct event e) {
     }
 
 
-    char * bps[3] = {e.bp0, e.bp1, e.bp2};
+    char * bps[MAX_BREAKPOINT_SETS] = {e.bp0, e.bp1};
     for(uint8_t i=0;i<3;i++) {
         if(bps[i][0] != 0) {
             struct synthinfo t;
@@ -654,7 +651,6 @@ void play_event(struct delta d) {
         trig=1;
         apply_target_to_coefs(d.osc, synth[d.osc].breakpoint_target[1], COEF_EG1);
     }
-    if(d.param == BP2_TARGET) { synth[d.osc].breakpoint_target[2] = *(uint16_t *)&d.data; trig=1; }
     // todo, i really should clean this up
     if(d.param >= BP_START && d.param < BP_END) {
         uint8_t pos = d.param - BP_START;
@@ -1245,7 +1241,6 @@ struct event amy_parse_message(char * message) {
                         case 'B': strcpy(e.bp1, message+start); break;
                         case 'b': e.feedback=atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
-                        case 'C': strcpy(e.bp2, message+start); break;
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
                         case 'D': show_debug(atoi(message + start)); break;
                         case 'f': parse_coef_message(message + start, e.freq_coefs);break;
@@ -1282,7 +1277,6 @@ struct event amy_parse_message(char * message) {
                         case 'W': e.bp1_target = atoi(message + start);  break;
                         case 'v': e.osc=(atoi(message + start) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
-                        case 'X': e.bp2_target = atoi(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
                         case 'y': e.eq_m = atoff(message+start); break;
