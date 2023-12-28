@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate audio synthesizer C library with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -65,14 +65,13 @@ cmake ..
 make && picotool load amy_example.elf && picotool reboot
 ```
 
-To build an example of AMY using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), try to follow the steps in [Alles Flashing](https://github.com/bwhitman/alles/blob/main/alles-flashing.md#set-up-esp-idf) to set up your system with ESP-IDF 5.1-rc2 and building [Alles](https://github.com/bwhitman/alles) for your board.
+To build an example of AMY using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), follow the steps in [Alles Flashing](https://github.com/bwhitman/alles/blob/main/alles-flashing.md#set-up-esp-idf) to set up your system with ESP-IDF 5.1-rc2 and building [Alles](https://github.com/bwhitman/alles) for your board.
 
-## Using AMY in Python
+## Using AMY in Python on any platform
 
 You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `libamy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
 
-
-## Using AMY in other software
+## Using AMY in any other software
 
 To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
 
@@ -84,7 +83,7 @@ make
 ```
 
 
-## Controlling AMY
+# Using AMY
 
 AMY can be controlled using its wire protocol or by fillng its data structures directly. It's up to what's easier for you and your application. 
 
@@ -150,7 +149,37 @@ void main() {
 }
 ```
 
-AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over javascript, in MAX/MSP, in Python, C, Micropython and many more! 
+If you want to receive buffers of samples, or have more control over the rendering pipeline to support multi-core, instead of using `amy_live_start()`:
+
+```c
+#include "amy.h"
+...
+amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1);
+...
+... {
+    // For each sample block:
+    amy_prepare(); // prepare to render this block
+    amy_render(0, OSCS/2, 0); // render oscillators 0 - OSCS/2 on core 0
+    // on the other core... 
+    amy_render(OSCS/2, OSCS, 1); // render oscillators OSCS/2-OSCS on core 1
+    // when they are both done..
+    int16_t * samples = amy_fill_buffer();
+    // do what you want with samples
+... }
+
+```
+
+On storage connstrained devices, you may want to limit the amount of PCM samples we ship with AMY. To do this, include a smaller set after including `amy.h`, like:
+
+```c
+#include "amy.h"
+#include "pcm_tiny.h" 
+// or, #include "pcm_small.h"
+```
+
+# Wire protocol
+
+AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over Javascript, in Max/MSP, in Python, C, Micropython and many more! 
 
 AMY accepts commands in ASCII, like so:
 
