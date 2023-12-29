@@ -44,13 +44,6 @@ int main(int argc, char ** argv) {
     }
     uint32_t start = amy_sysclock();
 
-    float test_vals[] = {1.0, 1.5, 1.99, 2.0, 2.01, 2.5, 0.01};
-    for (unsigned int i = 0; i < sizeof(test_vals) / sizeof(float); ++i) {
-        float f = test_vals[i];
-        SAMPLE logf = log2_lut(F2S(f));
-        printf("log2(%f)=%f, exp2(%f)=%f\n", f, S2F(logf), S2F(logf), S2F(exp2_lut(logf)));
-    }
-
     amy_start();
 
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
@@ -71,11 +64,11 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    //example_drums(start, 4);
-    example_multimbral_fm(start + 0, /* start_osc= */ 6);
+    example_drums(start, 4);
+    example_multimbral_fm(start + 2000, /* start_osc= */ 6);
 
     // Now just spin for 10s
-    while(amy_sysclock() - start < 40000) {
+    while(amy_sysclock() - start < 4000) {
         if (output_filename) {
             int16_t *frames = fill_audio_buffer_task();
             int num_frames = AMY_BLOCK_SIZE;

@@ -28,8 +28,12 @@ typedef int16_t output_sample_type;
 #define UP    32767
 #define DOWN -32768
 
+// Magic value for "0 Hz" in log-scale.
+#define ZERO_HZ_LOG_VAL -99.0
 // Frequency of Midi note 0, used to make logfreq scales.
-#define AMY_MIDI0_HZ 8.175798915643707f
+// Have 0 be midi 69, A440
+#define ZERO_LOGFREQ_IN_HZ 440.0
+#define ZERO_MIDI_NOTE 69
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -58,6 +62,7 @@ enum coefs{
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
+#define FILTER_LPF24 4
 #define FILTER_NONE 0
 #define SINE 0
 #define PULSE 1
@@ -399,7 +404,7 @@ extern void filters_init();
 extern void filters_deinit();
 extern void filter_process(SAMPLE * block, uint16_t osc);
 extern void parametric_eq_process(SAMPLE *block);
-extern void update_filter(uint16_t osc);
+extern void reset_filter(uint16_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);
 extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
 extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);

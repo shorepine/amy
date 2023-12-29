@@ -44,6 +44,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
         // skipping lut_hop samples per sample, its bandwidth will increase 
         // proportionately.
         float interp_bandwidth = lut_bandwidth * lut_hop;
+        //printf("period=%f freq=%f lut_size=%d interp_bandwidth=%f\n", period, ((float)AMY_SAMPLE_RATE)/period, lut_size, interp_bandwidth);
         if (interp_bandwidth < 0.9) {
             // No aliasing, even with a 10% buffer (i.e., 19.8 kHz).
             break;

@@ -3,14 +3,14 @@ import time
 BLOCK_SIZE = 256
 AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
-OSCS = 64
+AMY_OSCS = 120
+CHORUS_MOD_SOURCE = 119
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
-TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL = (1, 2, 4, 8, 16, 32, 64, 128, 256)
-FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF = range(4)
+TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
+FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
-CHORUS_OSC = 63
 
 override_send = None
 
@@ -230,19 +230,19 @@ def play_patches(wait=0.500, patch_total = 100, **kwargs):
         for i in range(24):
             patch = patch_count % patch_total
             patch_count = patch_count + 1
-            send(osc=i % OSCS, note=i+50, wave=ALGO, patch=patch, vel=1, **kwargs)
+            send(osc=i % AMY_OSCS, note=i+50, wave=ALGO, patch=patch, vel=1, **kwargs)
             time.sleep(wait)
-            send(osc=i % OSCS, vel=0)
+            send(osc=i % AMY_OSCS, vel=0)
 
 """
     Play up to AMY_OSCS patches at once
 """
-def polyphony(max_voices=OSCS,**kwargs):
+def polyphony(max_voices=AMY_OSCS,**kwargs):
     note = 0
     oscs = []
     for i in range(int(max_voices/2)):
         oscs.append(int(i))
-        oscs.append(int(i+(OSCS/2)))
+        oscs.append(int(i+(AMY_OSCS/2)))
     print(str(oscs))
     while(1):
         osc = oscs[note % max_voices]
@@ -330,8 +330,8 @@ def chorus(level=-1, max_delay=-1, freq=-1, amp=-1, wave=-1):
         args['wave'] = wave
     if len(args) > 0:
         # We are sending oscillator commands.
-        args['osc'] = CHORUS_OSC
-    # These ones don't relate to CHORUS_OSC.
+        args['osc'] = CHORUS_MOD_SOURCE
+    # These ones don't relate to CHORUS_MOD_SOURCE osc.
     if (level >= 0):
         args['chorus_level'] = level
     if (max_delay >= 0):

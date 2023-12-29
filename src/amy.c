@@ -185,29 +185,28 @@ int8_t global_init() {
 }
 
 
+// Convert to and from the log-frequency scale.
+// A log-frequency scale is good for summing control inputs.
+
+
+float logfreq_of_freq(float freq) {
+    // logfreq is defined as log_2(freq / 8.18 Hz)
+    if (freq==0) return ZERO_HZ_LOG_VAL;
+    return log2f(freq / ZERO_LOGFREQ_IN_HZ);
+}
+
+float freq_of_logfreq(float logfreq) {
+    if (logfreq==ZERO_HZ_LOG_VAL) return 0;
+    return ZERO_LOGFREQ_IN_HZ * exp2f(logfreq);
+}
+
 float freq_for_midi_note(uint8_t midi_note) {
-    return 440.0f*powf(2,(midi_note-69.0f)/12.0f);
+    return 440.0f*powf(2, (midi_note - 69.0f) / 12.0f);
 }
 
 float logfreq_for_midi_note(uint8_t midi_note) {
     // TODO: Precompensate for EPS_FOR_LOG
-    return midi_note / 12.0f;
-}
-
-// Convert to and from the log-frequency scale.
-// A log-frequency scale is good for summing control inputs.
-// Offset to add to scales when taking logs to avoid large neg values.
-#define EPS_FOR_LOG 0.015625
-
-float logfreq_of_freq(float freq) {
-    // logfreq is defined as log_2(freq / 8.18 Hz)
-    if (freq==0) return 0;
-    return log2f(freq / AMY_MIDI0_HZ);
-}
-
-float freq_of_logfreq(float logfreq) {
-    if (logfreq==0) return 0;
-    return AMY_MIDI0_HZ * exp2f(logfreq) - EPS_FOR_LOG;
+    return (midi_note - ZERO_MIDI_NOTE) / 12.0f;
 }
 
 
@@ -377,7 +376,7 @@ void reset_osc(uint16_t i ) {
     synth[i].wave = SINE;
     msynth[i].last_duty = 0.5f;
     AMY_UNSET(synth[i].patch);
-    synth[i].midi_note = 0;
+    AMY_UNSET(synth[i].midi_note);
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].amp_coefs[j] = 0;
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
@@ -544,10 +543,10 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<AMY_OSCS;i++) {
-            //fprintf(stderr,"osc %d: status %d amp %f wave %d logfreq %f duty %f mod_target %d mod source %d velocity %f filter_logfreq %f logratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
-            //        i, synth[i].status, synth[i].amp_coefs[0], synth[i].wave, synth[i].logfreq_coefs[0], synth[i].duty_coefs[0], synth[i].mod_target, synth[i].mod_source,
-            //        synth[i].velocity, synth[i].filter_logfreq_coefs[0], synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan_coefs[0],
-            //        synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
+            fprintf(stderr,"osc %d: status %d amp %f wave %d logfreq %f duty %f mod_target %d mod source %d velocity %f filter_logfreq %f logratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
+                    i, synth[i].status, synth[i].amp_coefs[0], synth[i].wave, synth[i].logfreq_coefs[0], synth[i].duty_coefs[0], synth[i].mod_target, synth[i].mod_source,
+                    synth[i].velocity, synth[i].filter_logfreq_coefs[0], synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan_coefs[0],
+                    synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             if(type>3) {
                 for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
                     fprintf(stderr,"bp%d (target %d): ", j, synth[i].breakpoint_target[j]);
@@ -667,7 +666,13 @@ void play_event(struct delta d) {
     }
     if(trig) synth[d.osc].note_on_clock = total_samples;
 
-    if(d.param == CHAINED_OSC) synth[d.osc].chained_osc = *(uint16_t *)&d.data;
+    if(d.param == CHAINED_OSC) {
+        int chained_osc = *(int16_t *)&d.data;
+        if (chained_osc >=0 && chained_osc < AMY_OSCS)
+            synth[d.osc].chained_osc = chained_osc;
+        else
+            AMY_UNSET(synth[d.osc].chained_osc);
+    }
     // todo: event-only side effect, remove
     if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(uint16_t *)&d.data; synth[*(uint16_t *)&d.data].status = IS_MOD_SOURCE; }
     if(d.param == MOD_TARGET) {
@@ -716,10 +721,13 @@ void play_event(struct delta d) {
                 synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
 
                 // if there was a filter active for this voice, reset it
-                if(synth[d.osc].filter_type != FILTER_NONE) update_filter(d.osc);
+                if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
                 // restart the waveforms
-                float initial_freq = freq_of_logfreq(synth[d.osc].logfreq_coefs[0]);
-                if (AMY_IS_SET(synth[d.osc].midi_note))  initial_freq += freq_of_logfreq(logfreq_for_midi_note(synth[d.osc].midi_note));
+                // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
+                float initial_logfreq = synth[d.osc].logfreq_coefs[0];
+                if (AMY_IS_SET(synth[d.osc].midi_note))
+                    initial_logfreq += synth[d.osc].logfreq_coefs[1] * logfreq_for_midi_note(synth[d.osc].midi_note);
+                float initial_freq = freq_of_logfreq(initial_logfreq);
                 osc_note_on(d.osc, initial_freq);
                 // trigger the mod source, if we have one
                 if(AMY_IS_SET(synth[d.osc].mod_source)) {
@@ -787,7 +795,7 @@ float combine_controls_mult(float *controls, float *coefs) {
 void hold_and_modify(uint16_t osc) {
     float ctrl_inputs[NUM_COMBO_COEFS];
     ctrl_inputs[COEF_CONST] = 1.0f;
-    ctrl_inputs[COEF_NOTE] = logfreq_for_midi_note(synth[osc].midi_note);;
+    ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc].midi_note)) ? logfreq_for_midi_note(synth[osc].midi_note) : 0;
     ctrl_inputs[COEF_VEL] = synth[osc].velocity;
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0));
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1));
@@ -806,21 +814,22 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].resonance = synth[osc].resonance;
 
-    if (osc == 999)
-        printf("h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
-           total_samples / (float)AMY_SAMPLE_RATE, osc,
-               ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
-               synth[osc].amp_coefs[0], synth[osc].amp_coefs[1], synth[osc].amp_coefs[2], synth[osc].amp_coefs[3], synth[osc].amp_coefs[4], synth[osc].amp_coefs[5],
-               synth[osc].logfreq_coefs[0], synth[osc].logfreq_coefs[1], synth[osc].logfreq_coefs[2], synth[osc].logfreq_coefs[3], synth[osc].logfreq_coefs[4], synth[osc].logfreq_coefs[5],
-               msynth[osc].amp, msynth[osc].logfreq);
+    if (osc == 999) {
+        //fprintf(stderr, "h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
+        //       total_samples / (float)AMY_SAMPLE_RATE, osc,
+        //       ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
+        //       synth[osc].amp_coefs[0], synth[osc].amp_coefs[1], synth[osc].amp_coefs[2], synth[osc].amp_coefs[3], synth[osc].amp_coefs[4], synth[osc].amp_coefs[5],
+        //       synth[osc].logfreq_coefs[0], synth[osc].logfreq_coefs[1], synth[osc].logfreq_coefs[2], synth[osc].logfreq_coefs[3], synth[osc].logfreq_coefs[4], synth[osc].logfreq_coefs[5],
+        //       msynth[osc].amp, msynth[osc].logfreq);
 
     // Stop oscillators if amp is zero for several frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
+    }
 #define MIN_ZERO_AMP_TIME_SAMPS (3 * AMY_BLOCK_SIZE)
     if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
-        if (msynth[osc].amp > 0)
+        if (msynth[osc].amp > 0) {
             AMY_UNSET(synth[osc].zero_amp_clock);
-        else {
+        } else {
             if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                 //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
                 synth[osc].status = OFF;
@@ -1223,6 +1232,8 @@ struct event amy_parse_message(char * message) {
     struct event e = amy_default_event();
     uint32_t sysclock = amy_sysclock();
 
+    //printf("parse_message: %s\n", message);
+    
     // cut the osc cruft max etc add, they put a 0 and then more things after the 0
     int new_length = length;
     for(int d=0;d<length;d++) {

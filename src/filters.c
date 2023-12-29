@@ -10,6 +10,7 @@
 
 SAMPLE coeffs[AMY_OSCS][5];
 SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
+SAMPLE filter_delay2[AMY_OSCS][FILT_NUM_DELAYS];
 
 SAMPLE eq_coeffs[3][5];
 SAMPLE eq_delay[AMY_NCHANS][3][FILT_NUM_DELAYS];
@@ -25,16 +26,24 @@ float dsps_sqrtf_f32_ansi(float f)
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
-    if (qFactor <= 0.0001) {
-        qFactor = 0.0001;
+    if (qFactor < 0.51) {
+        qFactor = 0.51;
+    }
+    if (f > 0.45) {
+        f = 0.45;
     }
     float Fs = 1;
 
     float w0 = 2 * M_PI * f / Fs;
+    w0 = MAX(0.01, w0);
     float c = cosf(w0);
     float s = sinf(w0);
     float alpha = s / (2 * qFactor);
+    // sin w0 / (2 Q) < 1
+    // => sin w0 < 2 Q
+    // If Q >= 0.5, no problem.
 
+    
     float b0 = (1 - c) / 2;
     float b1 = 1 - c;
     float b2 = b0;
@@ -43,10 +52,20 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     float a2 = 1 - alpha;
 
     // Where exactly are those poles?  Impose minima on (1 - r) and w0.
-    float r = MIN(0.99, sqrtf(a2 / a0));
-    w0 = MAX(0.01, w0);
-    a1 = a0 * (-2 * r * cosf(w0));
-    a2 = a0 * r * r;
+    float r = -99, ww = 0;
+    if (false && a2 > 0) { 
+        printf("before: r %f a %f %f %f\n", sqrtf(a2 / a0), a0, a1, a2);
+        // Limit how close complex poles can get to the unit circle.
+        r = MIN(0.99, sqrtf(a2 / a0));
+        float alphadash = (1 - r * r) / (1 + r * r);
+        float cosww = c / sqrtf(1 - alphadash * alphadash);
+        if (fabs(cosww) < 1.0) {
+            ww = acosf(cosww);
+            a1 = a0 * (-2 * r * cosf(ww));
+            a2 = a0 * r * r;
+            printf(" after: r %f a %f %f %f\n", r, a0, a1, a2);
+        }
+    }
 
     coeffs[0] = F2S(b0 / a0);
     coeffs[1] = F2S(b1 / a0);
@@ -54,7 +73,7 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
-    //printf("Flpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
+    //printf("Flpf t=%f f=%f q=%f alpha %f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor, alpha, 
     //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0, r, w0);
     //printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
     //       S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]));
@@ -155,10 +174,11 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-void update_filter(uint16_t osc) {
+void reset_filter(uint16_t osc) {
     // reset the delay for a filter
     // normal mod / adsr will just change the coeffs
     filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
+    filter_delay2[osc][0] = 0; filter_delay2[osc][1] = 0;
 }
 
 void filters_init() {
@@ -210,13 +230,21 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
 void filter_process(SAMPLE * block, uint16_t osc) {
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
-    if(synth[osc].filter_type==FILTER_LPF)
+    if(synth[osc].filter_type==FILTER_LPF || synth[osc].filter_type==FILTER_LPF24)
         dsps_biquad_gen_lpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
-    if(synth[osc].filter_type==FILTER_BPF)
+    else if(synth[osc].filter_type==FILTER_BPF)
         dsps_biquad_gen_bpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
-    if(synth[osc].filter_type==FILTER_HPF)
+    else if(synth[osc].filter_type==FILTER_HPF)
         dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
+    else {
+        fprintf(stderr, "Unrecognized filter type %d\n", synth[osc].filter_type);
+        return;
+    }
     dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    if(synth[osc].filter_type==FILTER_LPF24) {
+        // 24 dB/oct by running the same filter twice.
+        dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay2[osc]);
+    }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.
     hpf_buf(block, &synth[osc].hpf_state[0]);

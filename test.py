@@ -43,18 +43,20 @@ class AmyTest:
     
     samples = amy.render(1.0)
     amy.write(samples, os.path.join(self.test_dir, name + '.wav'))
+    rms_x = dB(rms(samples))
+    message = ('%-16s:' % name) + (' signal=%.1f dB' % rms_x)
 
     ref_file = os.path.join(self.ref_dir, name + '.wav')
     try:
       expected_samples, _ = wavread(ref_file)
 
-      rms_x = dB(rms(samples))
       rms_n = dB(rms(samples - expected_samples))
-      print('%-16s:' % name, 'signal=%.1f dB' % rms_x, 'err=%.1f dB' % rms_n)
+      message += (' err=%.1f dB' % rms_n)
 
     except FileNotFoundError:
-      print('Unable to read', ref_file)
-  
+      message += ' / Unable to read ' + ref_file
+
+    print(message)
 
 class TestSineOsc(AmyTest):
 
@@ -112,6 +114,16 @@ class TestPcm(AmyTest):
     amy.send(time=100, vel=1)
 
 
+class TestPcmShift(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PCM, patch=10)
+    # Cowbell with no note should play at "default" pitch, midi 69 (for that patch)
+    amy.send(time=100, vel=1)
+    # Specifying a note should shift its pitch.
+    amy.send(time=500, note=70, vel=1)
+
+
 class TestPartial(AmyTest):
 
   def run(self):
@@ -123,7 +135,8 @@ class TestSineEnv(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, bp0_target=amy.TARGET_AMP, bp0='50,1,250,0.1,50,0')
+    # amy.send(time=0, osc=0, bp0_target=amy.TARGET_AMP, bp0='50,1,250,0.1,50,0')
+    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,250,0.1,50,0')
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
 
@@ -187,8 +200,8 @@ class TestDuty(AmyTest):
 class TestPWM(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, mod_target=amy.TARGET_DUTY)
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.25)
+    amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, duty='0.5,0,0,0,0,0.25')
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=1)
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
     
@@ -213,14 +226,46 @@ class TestChorus(AmyTest):
     amy.send(time=900, vel=0)
 
 
+class TestBrass(AmyTest):
+  """One of the Juno-6 patches, spelled out."""
+
+  def run(self):
+    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
+    #         resonance=0.167, bp0='60,1,800,0.9,200,0', filter_freq='6000,0.5,0,0,1,0',
+    #         bp1='60,1,800,0.9,200,0')
+    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
+    #         resonance=0.167, bp0='60,1,400,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
+    #         bp1='60,1,400,0.3,200,0')
+    amy.send(time=0, osc=0,
+             wave=amy.TRIANGLE, freq=0.974, amp='1,0,0,1,0,0', bp0='156,1.0,156,1.0,10000,0')
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0.01',
+             amp='0,0,0.85,1,0,0', bp0='30,1,702,0.354,532,0',
+             filter_type=amy.FILTER_LPF24, resonance=0.167,
+             filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,702,0.354,532,0',
+             mod_source=0,
+             )
+    amy.send(time=100, osc=1, note=76, vel=1.0)
+    amy.send(time=700, osc=1, vel=0)
+    # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,702,0.354,232,0'
+
+    
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.
     AmyTest.ref_dir = argv[1]
 
-  for testClass in AmyTest.__subclasses__():
-    test_object = testClass()
-    test_object.test()
+  do_all_tests = True
+
+  if do_all_tests:
+    for testClass in AmyTest.__subclasses__():
+      test_object = testClass()
+      test_object.test()
+  else:
+    TestBrass().test()
+    #TestChorus().test()
+    #TestPcmShift().test()
+
+  print("tests done.")
 
 
 if __name__ == "__main__":
