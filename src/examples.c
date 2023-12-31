@@ -40,6 +40,28 @@ void example_sine(uint32_t start) {
     amy_add_event(e);
 }
 
+// Schedule a bleep now
+void bleep(uint32_t start) {
+    struct event e = amy_default_event();
+    int64_t sysclock = amy_sysclock();
+    e.osc = 0;
+    e.time = start;
+    e.wave = SINE;
+    e.freq_coefs[COEF_CONST] = 220;
+    amy_add_event(e);
+    e.velocity = 1;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    amy_add_event(e);
+    e.time = sysclock + 150;
+    e.freq_coefs[COEF_CONST] = 440;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(e);
+    e.time = sysclock + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
+    amy_add_event(e);
+}
+
 void example_fm(uint32_t start) {
     // Play a few notes in FM
     struct event e = amy_default_event();

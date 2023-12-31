@@ -49,34 +49,39 @@ from typing import List
 # A 0 -> 1ms  1.9 -> 30ms  3.1 -> 57ms  3.7 -> 68ms  5.4  -> 244 ms  6.0 -> 323ms  6.3 -> 462ms  6.5 -> 502ms
 # D 3.3 -> 750ms
 
+# Addendum: See online emulation
+# https://github.com/pendragon-andyh/junox
+# based on set of isolated samples
+# https://github.com/pendragon-andyh/Juno60
+
   
-def to_attack_time(midi):
+def to_attack_time(val):
   """Convert a midi value (0..127) to a time for ADSR."""
   # From regression of sound examples
-  return 6 + 8 * midi
+  return 6 + 8 * val * 127
   # from Arturia video
   #return 12 * np.exp2(0.066 * midi) - 12
 
-def to_decay_time(midi):
+def to_decay_time(val):
   """Convert a midi value (0..127) to a time for ADSR."""
   # time = 12 * np.exp(np.log(120) * midi/100)
   # time is time to decay to 1/2; Amy envelope times are to decay to exp(-3) = 0.05
   # return np.log(0.05) / np.log(0.5) * time
   # from Arturia video
-  return 80*np.exp2(0.066 * midi) - 80
+  return 80*np.exp2(0.066 * val * 127) - 80
   
 
-def to_release_time(midi):
+def to_release_time(val):
   """Convert a midi value (0..127) to a time for ADSR."""
   #time = 100 * np.exp(np.log(16) * midi/100)
   #return np.log(0.05) / np.log(0.5) * time
   # from Arturia video
-  return 70*np.exp2(0.066 * midi) - 70
+  return 70*np.exp2(0.066 * val * 127) - 70
 
 
-def to_level(midi):
+def to_level(val):
   # Map midi to 0..1, linearly.
-  return midi / 127.0
+  return val
 
 
 def level_to_amp(level):
@@ -86,30 +91,31 @@ def level_to_amp(level):
   return float("%.3f" % (0.001 * np.exp(level * np.log(1000.0))))
 
 
-def to_lfo_freq(midi):
+def to_lfo_freq(val):
   # LFO frequency in Hz varies from 0.5 to 30
   # from Arturia video
-  return float("%.3f" % (0.6 * np.exp2(0.042 * midi) - 0.1))
+  return float("%.3f" % (0.6 * np.exp2(0.042 * val * 127) - 0.1))
 
 
-def to_lfo_delay(midi):
+def to_lfo_delay(val):
   """Convert a midi value (0..127) to a time for lfo_delay."""
   #time = 100 * np.exp(np.log(16) * midi/100)
   #return float("%.3f" % (np.log(0.05) / np.log(0.5) * time))
   # from Arturia video
-  return float("%.3f" % (18 * np.exp2(0.066 * midi) - 13))
+  return float("%.3f" % (18 * np.exp2(0.066 * val * 127) - 13))
 
 
-def to_resonance(midi):
+def to_resonance(val):
   # Q goes from 0.5 to 16 exponentially
-  return float("%.3f" % (0.5 * np.exp2(5.0 * midi / 127.0)))
+  return float("%.3f" % (0.5 * np.exp2(5.0 * val)))
 
 
-def to_filter_freq(midi):
+def to_filter_freq(val):
   # filter_freq goes from ? 100 to 6400 Hz with 18 steps/octave
   #return float("%.3f" % (100 * np.exp(np.log(2) * midi / 20.0)))
   # from Arturia video
-  return float("%.3f" % (6.5 * np.exp2(0.11 * midi)))
+  return float("%.3f" % (6.5 * np.exp2(0.11 * val * 127)))
+
 
 def ffmt(val):
   """Format float values as max 3 dp, but less if possible."""
@@ -118,223 +124,228 @@ def ffmt(val):
 
 @dataclass
 class JunoPatch:
-    """Encapsulates information in a Juno Patch."""
-    name: str = ""
-    lfo_rate: int = 0
-    lfo_delay_time: int = 0
-    dco_lfo: int = 0
-    dco_pwm: int = 0
-    dco_noise: int = 0
-    vcf_freq: int = 0
-    vcf_res: int = 0
-    vcf_env: int = 0
-    vcf_lfo: int = 0
-    vcf_kbd: int = 0
-    vca_level: int = 0
-    env_a: int = 0
-    env_d: int = 0
-    env_s: int = 0
-    env_r: int = 0
-    dco_sub: int = 0
-    stop_16: bool = False
-    stop_8: bool = False
-    stop_4: bool = False
-    pulse: bool = False
-    triangle: bool = False
-    chorus: int = 0
-    pwm_manual: bool = False  # else lfo
-    vca_gate: bool = False  # else env
-    vcf_neg: bool = False  # else pos
-    hpf: int = 0
-
-    # These lists name the fields in the order they appear in the sysex.
-    FIELDS = ['lfo_rate', 'lfo_delay_time', 'dco_lfo', 'dco_pwm', 'dco_noise', 
-             'vcf_freq', 'vcf_res', 'vcf_env', 'vcf_lfo', 'vcf_kbd', 'vca_level', 
-             'env_a', 'env_d', 'env_s', 'env_r', 'dco_sub']
-    # After the 16 integer values, there are two bytes of bits.
-    BITS1 = ['stop_16', 'stop_8', 'stop_4', 'pulse', 'triangle']
-    BITS2 = ['pwm_manual', 'vcf_neg', 'vca_gate']
-    
-    @staticmethod
-    def from_patch_number(patch_number):
-      pobj = javaobj.load(open('juno106_factory_patches.ser', 'rb'))
-      patch = pobj.v.elementData[patch_number]
-      return JunoPatch.from_sysex(bytes(patch.sysex), name=patch.name)
-
-    @classmethod
-    def from_sysex(cls, sysexbytes, name=None):
-        """Decode sysex bytestream into JunoPatch fields."""
-        assert len(sysexbytes) == 18
-        result = JunoPatch(name=name)
-        # The first 16 bytes are sliders.
-        for index, field in enumerate(cls.FIELDS):
-            setattr(result, field, int(sysexbytes[index]))
-        # Then there are two bytes of switches.
-        for index, field in enumerate(cls.BITS1):
-            setattr(result, field, (int(sysexbytes[16]) & (1 << index)) > 0)
-        # Chorus has a weird mapping.  Bit 5 is ~Chorus, bit 6 is ChorusI-notII
-        setattr(result, 'chorus', [2, 0, 1, 0][int(sysexbytes[16]) >> 5])
-        for index, field in enumerate(cls.BITS2):
-            setattr(result, field, (int(sysexbytes[17]) & (1 << index)) > 0)
-        # Bits 3 & 4 also have flipped endianness & sense.
-        setattr(result, 'hpf', [3, 2, 1, 0][int(sysexbytes[17]) >> 3])
-        return result
-
-    def _breakpoint_string(self, peak_val):
-      """Format a breakpoint string from the ADSR parameters reaching a peak."""
-      return "%d,%s,%d,%s,%d,0" % (
-        to_attack_time(self.env_a), ffmt(peak_val), to_attack_time(self.env_a) + to_decay_time(self.env_d),
-        ffmt(peak_val * to_level(self.env_s)), to_release_time(self.env_r)
-      )
+  """Encapsulates information in a Juno Patch."""
+  name: str = ""
+  lfo_rate: float = 0
+  lfo_delay_time: float = 0
+  dco_lfo: float = 0
+  dco_pwm: float = 0
+  dco_noise: float = 0
+  vcf_freq: float = 0
+  vcf_res: float = 0
+  vcf_env: float = 0
+  vcf_lfo: float = 0
+  vcf_kbd: float = 0
+  vca_level: float = 0
+  env_a: float = 0
+  env_d: float = 0
+  env_s: float = 0
+  env_r: float = 0
+  dco_sub: float = 0
+  stop_16: bool = False
+  stop_8: bool = False
+  stop_4: bool = False
+  pulse: bool = False
+  triangle: bool = False
+  chorus: int = 0
+  pwm_manual: bool = False  # else lfo
+  vca_gate: bool = False  # else env
+  vcf_neg: bool = False  # else pos
+  hpf: int = 0
+  # Functions to be called after setting params.
+  post_set_fn: dict = {}
+  dispatch_fns: list = []
   
-    def send_to_AMY(self, base_osc=0):
-      """Output AMY commands to set up the patch.
-      Send amy.send(osc=<base_osc + 1>, note=50, vel=1) afterwards."""
-      amy.reset()
-      # osc 0 is lfo
-      # Following oscs are pwm_pulse, saw, suboctave, and noise - each if present.
-      #   env0 is VCA
-      #   env1 is VCF
+  # These lists name the fields in the order they appear in the sysex.
+  FIELDS = ['lfo_rate', 'lfo_delay_time', 'dco_lfo', 'dco_pwm', 'dco_noise',
+           'vcf_freq', 'vcf_res', 'vcf_env', 'vcf_lfo', 'vcf_kbd', 'vca_level',
+           'env_a', 'env_d', 'env_s', 'env_r', 'dco_sub']
+  # After the 16 integer values, there are two bytes of bits.
+  BITS1 = ['stop_16', 'stop_8', 'stop_4', 'pulse', 'triangle']
+  BITS2 = ['pwm_manual', 'vcf_neg', 'vca_gate']
 
-      lfo_osc = base_osc
-      next_osc = lfo_osc + 1
-      # Only one of stop_{16,8,4} should be set.
-      base_freq = 261.63  # The mid note
-      if self.stop_16:
-        base_freq /= 2
-      elif self.stop_4:
-        base_freq *= 2
-      osc_args = {
-        'amp': '0,0,%s,1,0,0' % ffmt(to_level(self.vca_level)),
-        'freq': '%s,1,0,0,0,%s' % (ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo))),
-        'filter_type': amy.FILTER_LPF24,
-        'resonance': to_resonance(self.vcf_res),
-        'mod_source': lfo_osc,
+  @staticmethod
+  def from_patch_number(patch_number):
+    pobj = javaobj.load(open('juno106_factory_patches.ser', 'rb'))
+    patch = pobj.v.elementData[patch_number]
+    return JunoPatch.from_sysex(bytes(patch.sysex), name=patch.name)
+
+  @classmethod
+  def from_sysex(cls, sysexbytes, name=None):
+    """Decode sysex bytestream into JunoPatch fields."""
+    assert len(sysexbytes) == 18
+    result = JunoPatch(name=name)
+    # The first 16 bytes are sliders.
+    for index, field in enumerate(cls.FIELDS):
+      setattr(result, field, int(sysexbytes[index])/127.0)
+    # Then there are two bytes of switches.
+    for index, field in enumerate(cls.BITS1):
+      setattr(result, field, (int(sysexbytes[16]) & (1 << index)) > 0)
+    # Chorus has a weird mapping.  Bit 5 is ~Chorus, bit 6 is ChorusI-notII
+    setattr(result, 'chorus', [2, 0, 1, 0][int(sysexbytes[16]) >> 5])
+    for index, field in enumerate(cls.BITS2):
+      setattr(result, field, (int(sysexbytes[17]) & (1 << index)) > 0)
+    # Bits 3 & 4 also have flipped endianness & sense.
+    setattr(result, 'hpf', [3, 2, 1, 0][int(sysexbytes[17]) >> 3])
+    return result
+
+  def _breakpoint_string(self, peak_val):
+    """Format a breakpoint string from the ADSR parameters reaching a peak."""
+    return "%d,%s,%d,%s,%d,0" % (
+      to_attack_time(self.env_a), ffmt(peak_val), to_attack_time(self.env_a) + to_decay_time(self.env_d),
+      ffmt(peak_val * to_level(self.env_s)), to_release_time(self.env_r)
+    )
+
+  def send_to_AMY(self, base_osc=0):
+    """Output AMY commands to set up the patch.
+    Send amy.send(osc=<base_osc + 1>, note=50, vel=1) afterwards."""
+    amy.reset()
+    # base_osc is pulse/PWM
+    # base_osc + 1 is SAW
+    # base_osc + 2 is SUBOCTAVE
+    # base_osc + 3 is NOISE
+    # base_osc + 4 is LFO
+    #   env0 is VCA
+    #   env1 is VCF
+
+    lfo_osc = base_osc + 4
+    next_osc = base_osc
+    # Only one of stop_{16,8,4} should be set.
+    base_freq = 261.63  # The mid note
+    if self.stop_16:
+      base_freq /= 2
+    elif self.stop_4:
+      base_freq *= 2
+    osc_args = {
+      'amp': '0,0,%s,1,0,0' % ffmt(to_level(self.vca_level)),
+      'freq': '%s,1,0,0,0,%s' % (ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo))),
+      'filter_type': amy.FILTER_LPF24,
+      'resonance': to_resonance(self.vcf_res),
+      'mod_source': lfo_osc,
+    }
+    if not self.vca_gate:
+      osc_args['bp0'] = self._breakpoint_string(1.0)
+    vcf_env_polarity = -1.0 if self.vcf_neg else 1.0
+    osc_args['filter_freq'] = '%s,%s,0,0,%s,%s' % (
+      ffmt(to_filter_freq(self.vcf_freq)),
+      ffmt(to_level(self.vcf_kbd)),
+      ffmt(20 * vcf_env_polarity * to_level(self.vcf_env)),
+      ffmt(5 * to_level(self.vcf_lfo))
+    )
+    osc_args['bp1'] = self._breakpoint_string(1.0)
+
+    lfo_args = {'osc': lfo_osc, 'wave': amy.TRIANGLE, 'freq': to_lfo_freq(self.lfo_rate),
+                'amp': '1,0,0,1,0,0',
+                'bp0': '%i,1.0,%i,1.0,10000,0' % (to_lfo_delay(self.lfo_delay_time), to_lfo_delay(self.lfo_delay_time))}
+    print('about to send lfo:', lfo_args)
+    amy.send(**lfo_args)
+
+    # PWM square wave.
+    pulse_args = {}
+    if self.pulse:
+      const_duty = 0
+      lfo_duty = to_level(self.dco_pwm)
+      if self.pwm_manual:
+        # Swap duty parameters.
+        const_duty, lfo_duty = lfo_duty, const_duty
+      pulse_args = {
+        'osc': next_osc,
+        'wave': amy.PULSE,
+        'duty': '%s,0,0,0,0,%s' % (ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)),
       }
-      if not self.vca_gate:
-        osc_args['bp0'] = self._breakpoint_string(1.0)
-      vcf_env_polarity = -1.0 if self.vcf_neg else 1.0
-      osc_args['filter_freq'] = '%s,%s,0,0,%s,%s' % (
-        ffmt(to_filter_freq(self.vcf_freq)),
-        ffmt(to_level(self.vcf_kbd)),
-        ffmt(20 * vcf_env_polarity * to_level(self.vcf_env)),
-        ffmt(5 * to_level(self.vcf_lfo))
-      )
-      osc_args['bp1'] = self._breakpoint_string(1.0)
-      
-      lfo_args = {'osc': lfo_osc, 'wave': amy.TRIANGLE, 'freq': to_lfo_freq(self.lfo_rate),
-                  'amp': '1,0,0,1,0,0',
-                  'bp0': '%i,1.0,%i,1.0,10000,0' % (to_lfo_delay(self.lfo_delay_time), to_lfo_delay(self.lfo_delay_time))}
-      print('about to send lfo:', lfo_args)
-      amy.send(**lfo_args)
-      
-      # PWM square wave.
-      pulse_args = {}
-      if self.pulse:
-        const_duty = 0
-        lfo_duty = to_level(self.dco_pwm)
-        if self.pwm_manual:
-          # Swap duty parameters.
-          const_duty, lfo_duty = lfo_duty, const_duty
-        pulse_args = {
-          'osc': next_osc,
-          'wave': amy.PULSE,
-          'duty': '%s,0,0,0,0,%s' % (ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)),
-        }
-        next_osc += 1
-        pulse_args |= osc_args
-        if self.triangle or self.dco_sub or self.dco_noise:
-          pulse_args['chained_osc'] = next_osc
-        print('about to send pulse:', pulse_args)
-        amy.send(**pulse_args)
+      next_osc += 1
+      pulse_args |= osc_args
+      if self.triangle or self.dco_sub or self.dco_noise:
+        pulse_args['chained_osc'] = next_osc
+      print('about to send pulse:', pulse_args)
+      amy.send(**pulse_args)
 
-      # Triangle wave.
-      tri_args = {}
-      if self.triangle:
-        tri_args = {
-          'osc': next_osc,
-          'wave': amy.SAW_UP,
-        }
-        next_osc += 1
-        tri_args |= osc_args
-        if self.dco_sub or self.dco_noise:
-          tri_args['chained_osc'] = next_osc
-        print('about to send tri:', tri_args)
-        amy.send(**tri_args)
-        
-      # sub wave.
-      sub_args = {}
-      if self.dco_sub:
-        sub_args = {
-          'osc': next_osc,
-          'wave': amy.PULSE,
-        }
-        next_osc += 1
-        sub_args |= osc_args
-        # Overwrite freq.
-        sub_args['freq'] = '%s,1,0,0,0,%s' % (ffmt(base_freq / 2.0), ffmt(to_level(self.dco_lfo)))
-        # Overwrite amp.
-        sub_args['amp'] = '%s,0,%s,1,0,0' % (ffmt(to_level(self.dco_sub)), ffmt(to_level(self.vca_level)))
-        if self.dco_noise:
-          sub_args['chained_osc'] = next_osc
-        print('about to send sub:', sub_args)
-        amy.send(**sub_args)
+    # Triangle wave.
+    tri_args = {}
+    if self.triangle:
+      tri_args = {
+        'osc': next_osc,
+        'wave': amy.SAW_UP,
+      }
+      next_osc += 1
+      tri_args |= osc_args
+      if self.dco_sub or self.dco_noise:
+        tri_args['chained_osc'] = next_osc
+      print('about to send tri:', tri_args)
+      amy.send(**tri_args)
 
-      # noise.
-      noise_args = {}
+    # sub wave.
+    sub_args = {}
+    if self.dco_sub:
+      sub_args = {
+        'osc': next_osc,
+        'wave': amy.PULSE,
+      }
+      next_osc += 1
+      sub_args |= osc_args
+      # Overwrite freq.
+      sub_args['freq'] = '%s,1,0,0,0,%s' % (ffmt(base_freq / 2.0), ffmt(to_level(self.dco_lfo)))
+      # Overwrite amp.
+      sub_args['amp'] = '%s,0,%s,1,0,0' % (ffmt(to_level(self.dco_sub)), ffmt(to_level(self.vca_level)))
       if self.dco_noise:
-        noise_args = {
-          'osc': next_osc,
-          'wave': amy.NOISE,
-        }
-        next_osc += 1
-        noise_args |= osc_args
-        # Overwrite amp.
-        noise_args['amp'] = '%s,0,%s,1,0,0' % (ffmt(to_level(self.dco_noise)), ffmt(to_level(self.vca_level)))
-        next_osc += 1
-        # Nothing more to chain
-        print('about to send noise:', noise_args)
-        amy.send(**noise_args)
+        sub_args['chained_osc'] = next_osc
+      print('about to send sub:', sub_args)
+      amy.send(**sub_args)
 
-      # Chorus & HPF
-      gen_args = {}
-      eq_l = eq_m = eq_h = 0
-      if self.hpf == 0:
-        eq_l = 10
-      elif self.hpf == 1:
-        pass
-      elif self.hpf == 2:
-        eq_l = -8
-      elif self.hpf == 3:
-        eq_l = -15
-        eq_m = 8
-        eq_h = 8
-      gen_args = {'eq_l': eq_l, 'eq_m': eq_m, 'eq_h': eq_h}
-      if self.chorus == 0:
-        gen_args['chorus_level'] = 0
-      else:
-        gen_args['chorus_level'] = 1
-        gen_args['osc'] = amy.CHORUS_MOD_SOURCE
-        gen_args['amp'] = 0.5
-        if self.chorus == 1:
-          gen_args['freq'] = 0.5
-        elif self.chorus == 2:
-          gen_args['freq'] = 0.83
-        elif self.chorus == 3:
-          gen_args['freq'] = 0.83
-          gen_args['amp'] = 0.05
-      print('about to sent gen:', gen_args)
-      amy.send(**gen_args)
-        
-      # Report what we sent.
-      print(lfo_args, pulse_args, tri_args, sub_args, noise_args, gen_args)
+    # noise.
+    noise_args = {}
+    if self.dco_noise:
+      noise_args = {
+        'osc': next_osc,
+        'wave': amy.NOISE,
+      }
+      next_osc += 1
+      noise_args |= osc_args
+      # Overwrite amp.
+      noise_args['amp'] = '%s,0,%s,1,0,0' % (ffmt(to_level(self.dco_noise)), ffmt(to_level(self.vca_level)))
+      next_osc += 1
+      # Nothing more to chain
+      print('about to send noise:', noise_args)
+      amy.send(**noise_args)
 
+    # Chorus & HPF
+    gen_args = {}
+    eq_l = eq_m = eq_h = 0
+    if self.hpf == 0:
+      eq_l = 10
+    elif self.hpf == 1:
+      pass
+    elif self.hpf == 2:
+      eq_l = -8
+    elif self.hpf == 3:
+      eq_l = -15
+      eq_m = 8
+      eq_h = 8
+    gen_args = {'eq_l': eq_l, 'eq_m': eq_m, 'eq_h': eq_h}
+    if self.chorus == 0:
+      gen_args['chorus_level'] = 0
+    else:
+      gen_args['chorus_level'] = 1
+      gen_args['osc'] = amy.CHORUS_MOD_SOURCE
+      gen_args['amp'] = 0.5
+      if self.chorus == 1:
+        gen_args['freq'] = 0.5
+      elif self.chorus == 2:
+        gen_args['freq'] = 0.83
+      elif self.chorus == 3:
+        gen_args['freq'] = 0.83
+        gen_args['amp'] = 0.05
+    print('about to sent gen:', gen_args)
+    amy.send(**gen_args)
 
-# To do:
-#  - make the filter env be filter_freq * (1 + filter ADSR)
-#    - undo the (1 - env) output for negative envs
-#  - filter ADSR scaling needs to be stretched.  Brass sysex has vcf_freq = 35 (-> 356 Hz) vcf_env = 58 (-> 0.023), actual frequency should be ~3000 to 600
-#    so vcf_env 58 should be 2-3 octaves
-#    and vcf_freq 35 should be ~600 Hz (midi 35 is 62 Hz, so we need a narrower range, e.g. 24 steps/oct, so entire 127 range is 5 octaves = 32x = 100 to 3200 Hz - too small
-#    vcf needs to cover 50 to 8000 Hz, so 160x or 7+ octaves, 18 steps/octave
-#  VCF ADSR wants to be added to VCF base_freq before exponentiation.. convert freq repn to logf internally
+    # Report what we sent.
+    print(lfo_args, pulse_args, tri_args, sub_args, noise_args, gen_args)
+
+  # Setters for each Juno UI control
+  def set_param(self, param, val):
+    set_attr(self, param,  val)
+    if self.post_set_fn[param]:
+      self.post_set_fn[param](param, val)
+    for fn in self.dispatch_fns:
+      fn()
+    self.dispatch_fns = []

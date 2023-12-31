@@ -31,9 +31,9 @@ typedef int16_t output_sample_type;
 // Magic value for "0 Hz" in log-scale.
 #define ZERO_HZ_LOG_VAL -99.0
 // Frequency of Midi note 0, used to make logfreq scales.
-// Have 0 be midi 69, A440
-#define ZERO_LOGFREQ_IN_HZ 440.0
-#define ZERO_MIDI_NOTE 69
+// Have 0 be midi 60, C4, 261.63 Hz
+#define ZERO_LOGFREQ_IN_HZ 261.63
+#define ZERO_MIDI_NOTE 60
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1

@@ -76,12 +76,23 @@ typedef struct chorus_config {
 
 chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY};
 
-void alloc_delay_lines(void) {
+void alloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
         delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
     }
 #ifdef CHORUS_ARATE
     delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
+#endif
+}
+
+void dealloc_chorus_delay_lines(void) {
+    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+        if (delay_lines[c]) free(delay_lines[c]);
+        delay_lines[c] = NULL;
+    }
+#ifdef CHORUS_ARATE
+    free(delay_mod);
+    delay_mod = NULL;
 #endif
 }
 
@@ -91,7 +102,7 @@ void config_chorus(float level, int max_delay) {
     if (level > 0) {
         // only allocate delay lines if chorus is more than inaudible.
         if (delay_lines[0] == NULL) {
-            alloc_delay_lines();
+            alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
         if (chorus.level == 0) {
@@ -150,7 +161,7 @@ int32_t computed_delta; // can be negative no prob, but usually host is larger #
 uint8_t computed_delta_set; // have we set a delta yet?
 
 int8_t check_init(amy_err_t (*fn)(), char *name) {
-    fprintf(stderr,"starting %s: ", name);
+    //fprintf(stderr,"starting %s: ", name);
     const amy_err_t ret = (*fn)();
     if(ret != AMY_OK) {
 #ifdef ESP_PLATFORM
@@ -160,7 +171,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 #endif
         return -1;
     }
-    fprintf(stderr,"[ok]\n");
+    //fprintf(stderr,"[ok]\n");
     return 0;
 }
 
@@ -440,6 +451,7 @@ void reset_osc(uint16_t i ) {
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
     synth[i].last_two[1] = 0;
+    synth[i].lut = NULL;
 }
 
 void amy_reset_oscs() {
@@ -565,7 +577,8 @@ void show_debug(uint8_t type) {
 
 void oscs_deinit() {
     free(block);
-    free(fbl[0]);
+    for(uint16_t core=0;core<AMY_CORES;++core)
+        free(fbl[core]);
     if(AMY_CORES>1)free(fbl[1]);
     free(fbl);
     free(synth);
@@ -575,6 +588,7 @@ void oscs_deinit() {
     ks_deinit();
     #endif
     filters_deinit();
+    dealloc_chorus_delay_lines();
 }
 
 
@@ -1349,8 +1363,7 @@ void amy_play_message(char *message) {
         amy_add_event(e);
     }
 }
-// amy_play_message -> amy_parse_message -> amy_add_i_event -> add_delta_to_queue -> i_events queue -> global event queue
-//                         amy_add_event /
+// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
 
 // fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
 

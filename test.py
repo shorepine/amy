@@ -248,7 +248,17 @@ class TestBrass(AmyTest):
     amy.send(time=700, osc=1, vel=0)
     # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,702,0.354,232,0'
 
-    
+
+class TestBleep(AmyTest):
+  """Test the tulip start-up beep."""
+
+  def run(self):
+    amy.send(time=0, wave=amy.SINE, freq=220)
+    amy.send(time=100, osc=0, pan=0.9, vel=1)
+    amy.send(time=250, osc=0, pan=0.1, freq=440)
+    amy.send(time=300, osc=0, pan=0.5, vel=0)
+
+
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.
@@ -261,9 +271,10 @@ def main(argv):
       test_object = testClass()
       test_object.test()
   else:
-    TestBrass().test()
-    #TestChorus().test()
     #TestPcmShift().test()
+    TestChorus().test()
+    #TestBrass().test()
+    TestBleep().test()
 
   print("tests done.")
 
