@@ -2,7 +2,8 @@
 # Convert juno-106 sysex patches to Amy
 
 import amy
-import javaobj
+
+import json
 import numpy as np
 import time
 
@@ -166,9 +167,18 @@ class JunoPatch:
 
   @staticmethod
   def from_patch_number(patch_number):
-    pobj = javaobj.load(open('juno106_factory_patches.ser', 'rb'))
-    patch = pobj.v.elementData[patch_number]
-    return JunoPatch.from_sysex(bytes(patch.sysex), name=patch.name)
+    # json was created by:
+    # import javaobj, json
+    # pobj = javaobj.load(open('juno106_factory_patches.ser', 'rb'))
+    # patches = [(p.name, list(p.sysex)) for p in pobj.v.elementData if p is not None]
+    # with open('juno106patches.json', 'w') as f:
+    #   f.write(json.dumps(patches))
+    #pobj = javaobj.load(open('juno106_factory_patches.ser', 'rb'))
+    #patch = pobj.v.elementData[patch_number]
+    with open('juno106patches.json', 'r') as f:
+      patches = json.load(f)
+    patch = patches[patch_number]
+    return JunoPatch.from_sysex(bytes(patch[1]), name=patch[0])
 
   @classmethod
   def from_sysex(cls, sysexbytes, name=None):
