@@ -6,8 +6,8 @@ import javaobj
 import numpy as np
 import time
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
 
   # Range is from 10 ms to 12 sec i.e. 1200.
@@ -153,8 +153,8 @@ class JunoPatch:
   vcf_neg: bool = False  # else pos
   hpf: int = 0
   # Functions to be called after setting params.
-  post_set_fn: dict = {}
-  dispatch_fns: list = []
+  post_set_fn: dict = field(default_factory=dict)
+  dispatch_fns: list = field(default_factory=list)
   
   # These lists name the fields in the order they appear in the sysex.
   FIELDS = ['lfo_rate', 'lfo_delay_time', 'dco_lfo', 'dco_pwm', 'dco_noise',
