@@ -4,7 +4,7 @@ BLOCK_SIZE = 256
 AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
-CHORUS_MOD_SOURCE = 119
+CHORUS_OSC = 119
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
@@ -330,8 +330,8 @@ def chorus(level=-1, max_delay=-1, freq=-1, amp=-1, wave=-1):
         args['wave'] = wave
     if len(args) > 0:
         # We are sending oscillator commands.
-        args['osc'] = CHORUS_MOD_SOURCE
-    # These ones don't relate to CHORUS_MOD_SOURCE osc.
+        args['osc'] = CHORUS_OSC
+    # These ones don't relate to CHORUS_OSC osc.
     if (level >= 0):
         args['chorus_level'] = level
     if (max_delay >= 0):

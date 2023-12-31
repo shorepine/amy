@@ -336,7 +336,7 @@ class JunoPatch:
       gen_args['chorus_level'] = 0
     else:
       gen_args['chorus_level'] = 1
-      gen_args['osc'] = amy.CHORUS_MOD_SOURCE
+      gen_args['osc'] = amy.CHORUS_OSC
       gen_args['amp'] = 0.5
       if self.chorus == 1:
         gen_args['freq'] = 0.5
