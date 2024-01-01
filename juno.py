@@ -165,7 +165,7 @@ class JunoPatch:
   post_set_fn = {'lfo': ['lfo_rate', 'lfo_delay_time'],
                  'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub', 'stop_16', 'stop_8', 'stop_4',
                          'pulse', 'saw', 'pwm_manual', 'vca_level'],
-                 'vcf': ['vcf_neg', 'vcf_freq', 'vcf_lfo', 'vcf_res'],
+                 'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
                  'env': ['env_a', 'env_d', 'env_s', 'env_r'],
                  'cho': ['chorus', 'hpf']}
   
@@ -300,11 +300,12 @@ class JunoPatch:
   def update_vcf(self):
     vcf_env_polarity = -1.0 if self.vcf_neg else 1.0
     for osc in self.voice_oscs:
-      amy.send(osc=osc, filter_freq='%s,%s,0,0,%s,%s' % (
-        ffmt(to_filter_freq(self.vcf_freq)),
-        ffmt(to_level(self.vcf_kbd)),
-        ffmt(20 * vcf_env_polarity * to_level(self.vcf_env)),
-        ffmt(5 * to_level(self.vcf_lfo))))
+      amy.send(osc=osc, resonance=to_resonance(self.vcf_res),
+               filter_freq='%s,%s,0,0,%s,%s' % (
+                 ffmt(to_filter_freq(self.vcf_freq)),
+                 ffmt(to_level(self.vcf_kbd)),
+                 ffmt(20 * vcf_env_polarity * to_level(self.vcf_env)),
+                 ffmt(5 * to_level(self.vcf_lfo))))
 
   def update_env(self):
     bp1_coefs = self._breakpoint_string()
@@ -348,4 +349,4 @@ class JunoPatch:
     setattr(self, param,  val)
     for group, params in self.post_set_fn.items():
       if param in params:
-        get_attr(self, 'update_' + group)()
+        getattr(self, 'update_' + group)()
