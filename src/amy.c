@@ -21,6 +21,11 @@ extern SemaphoreHandle_t xQueueSemaphore;
 extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 #endif
 
+#ifdef _POSIX_THREADS
+#include <pthread.h>
+extern pthread_mutex_t amy_queue_lock; 
+#endif
+
 
 // Global state
 struct state global;
@@ -253,8 +258,11 @@ void add_delta_to_queue(struct delta d) {
 #if defined ESP_PLATFORM && !defined ARDUINO
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
+#elif defined _POSIX_THREADS
+    //fprintf(stderr,"add_delta: time %d osc %d param %d, qsize %d\n", total_samples, d.osc, d.param, global.event_qsize);    
+    pthread_mutex_lock(&amy_queue_lock); 
 #endif
-    //printf("add_delta: time %lld osc %d param %d freq %f\n", total_samples, d.osc, d.param, *(float *)&d.data);
+
     if(global.event_qsize < AMY_EVENT_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
         uint16_t write_location = global.next_event_write;
@@ -296,9 +304,12 @@ void add_delta_to_queue(struct delta d) {
     } else {
         // if there's no room in the queue, just skip the message
         // todo -- report this somehow?
+        fprintf(stderr, "AMY queue is full\n");
     }
 #if defined ESP_PLATFORM  && !defined ARDUINO
     xSemaphoreGive( xQueueSemaphore );
+#elif defined _POSIX_THREADS
+    pthread_mutex_unlock(&amy_queue_lock);
 #endif
 }
 
@@ -946,6 +957,8 @@ void amy_prepare_buffer() {
 #if defined ESP_PLATFORM && !defined ARDUINO
     // put a mutex around this so that the event parser doesn't touch these while i'm running
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
+#elif defined _POSIX_THREADS
+    pthread_mutex_lock(&amy_queue_lock);
 #endif
 
     // find any events that need to be played from the (in-order) queue
@@ -959,6 +972,8 @@ void amy_prepare_buffer() {
 #if defined ESP_PLATFORM && !defined ARDUINO
     // give the mutex back
     xSemaphoreGive(xQueueSemaphore);
+#elif defined _POSIX_THREADS
+    pthread_mutex_unlock(&amy_queue_lock);
 #endif
 
 #if AMY_HAS_CHORUS == 1
