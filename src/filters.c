@@ -177,8 +177,12 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
 void reset_filter(uint16_t osc) {
     // reset the delay for a filter
     // normal mod / adsr will just change the coeffs
-    filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
-    filter_delay2[osc][0] = 0; filter_delay2[osc][1] = 0;
+    for (int o = 0; o < AMY_OSCS; ++o) {
+        for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
+            filter_delay[o][d] = 0;
+            filter_delay2[o][d] = 0;
+        }
+    }
 }
 
 void filters_init() {
@@ -186,14 +190,14 @@ void filters_init() {
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
     dsps_biquad_gen_hpf_f32(eq_coeffs[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
-    for(uint16_t i=0;i<AMY_OSCS;i++) { filter_delay[i][0] = 0; filter_delay[i][1] = 0; }
     for (int c = 0; c < AMY_NCHANS; ++c) {
         for (int b = 0; b < 3; ++b) {
-            for (int d = 0; d < 2; ++d) {
+            for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
                 eq_delay[c][b][d] = 0;
             }
         }
     }
+    for(uint16_t i=0;i<AMY_OSCS;i++) reset_filter(i);
 }
 
 
