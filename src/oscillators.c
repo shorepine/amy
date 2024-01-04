@@ -444,7 +444,7 @@ void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_leve
 
 /* sine */
 void sine_note_on(uint16_t osc, float freq) {
-    //printf("sine_note_on: osc %d logfreq %f\n", osc, synth[osc].logfreq);
+    //fprintf(stderr, "sine_note_on: time %f osc %d freq %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc].logfreq_coefs[0]));
     // There's really only one sine table, but for symmetry with the other ones...
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
@@ -454,7 +454,7 @@ void render_sine(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
-    //printf("render_sine: osc %d freq %f amp %f\n", osc, P2F(step), S2F(amp));
+    //fprintf(stderr, "render_sine: time %f osc %d freq %f amp %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(amp));
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
     synth[osc].last_amp = amp;
 }

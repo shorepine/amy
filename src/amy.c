@@ -81,12 +81,23 @@ typedef struct chorus_config {
 
 chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY};
 
-void alloc_delay_lines(void) {
+void alloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
         delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
     }
 #ifdef CHORUS_ARATE
     delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
+#endif
+}
+
+void dealloc_chorus_delay_lines(void) {
+    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+        if (delay_lines[c]) free(delay_lines[c]);
+        delay_lines[c] = NULL;
+    }
+#ifdef CHORUS_ARATE
+    free(delay_mod);
+    delay_mod = NULL;
 #endif
 }
 
@@ -96,7 +107,7 @@ void config_chorus(float level, int max_delay) {
     if (level > 0) {
         // only allocate delay lines if chorus is more than inaudible.
         if (delay_lines[0] == NULL) {
-            alloc_delay_lines();
+            alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
         if (chorus.level == 0) {
@@ -155,7 +166,7 @@ int32_t computed_delta; // can be negative no prob, but usually host is larger #
 uint8_t computed_delta_set; // have we set a delta yet?
 
 int8_t check_init(amy_err_t (*fn)(), char *name) {
-    fprintf(stderr,"starting %s: ", name);
+    //fprintf(stderr,"starting %s: ", name);
     const amy_err_t ret = (*fn)();
     if(ret != AMY_OK) {
 #ifdef ESP_PLATFORM
@@ -165,7 +176,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 #endif
         return -1;
     }
-    fprintf(stderr,"[ok]\n");
+    //fprintf(stderr,"[ok]\n");
     return 0;
 }
 
@@ -431,6 +442,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].note_off_clock);
     AMY_UNSET(synth[i].zero_amp_clock);
     AMY_UNSET(synth[i].last_velocity_event_clock);
+    AMY_UNSET(synth[i].last_note_event_clock);
     AMY_UNSET(synth[i].mod_value_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_alpha = 0;
@@ -451,6 +463,7 @@ void reset_osc(uint16_t i ) {
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
     synth[i].last_two[0] = 0;
     synth[i].last_two[1] = 0;
+    synth[i].lut = NULL;
 }
 
 void amy_reset_oscs() {
@@ -553,14 +566,20 @@ void show_debug(uint8_t type) {
         //printf("global: filter %f resonance %f volume %f status %d\n", global.filter_freq, global.resonance, global.volume, global.status);
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
-        for(uint16_t i=0;i<AMY_OSCS;i++) {
-            fprintf(stderr,"osc %d: status %d amp %f wave %d logfreq %f duty %f mod_target %d mod source %d velocity %f filter_logfreq %f logratio %f feedback %f resonance %f step %f algo %d pan %f source %d,%d,%d,%d,%d,%d  \n",
-                    i, synth[i].status, synth[i].amp_coefs[0], synth[i].wave, synth[i].logfreq_coefs[0], synth[i].duty_coefs[0], synth[i].mod_target, synth[i].mod_source,
-                    synth[i].velocity, synth[i].filter_logfreq_coefs[0], synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].algorithm, synth[i].pan_coefs[0],
+        for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
+            fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %flogratio %f feedback %f resonance %f step %f algo %d source %d,%d,%d,%d,%d,%d  \n",
+                    i, synth[i].status, synth[i].wave, synth[i].mod_target, synth[i].mod_source,
+                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step),
+                    synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
+            fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5]);
+            fprintf(stderr, "  lfr_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].logfreq_coefs[0], synth[i].logfreq_coefs[1], synth[i].logfreq_coefs[2], synth[i].logfreq_coefs[3], synth[i].logfreq_coefs[4], synth[i].logfreq_coefs[5]);
+            fprintf(stderr, "  flf_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].filter_logfreq_coefs[0], synth[i].filter_logfreq_coefs[1], synth[i].filter_logfreq_coefs[2], synth[i].filter_logfreq_coefs[3], synth[i].filter_logfreq_coefs[4], synth[i].filter_logfreq_coefs[5]);
+            fprintf(stderr, "  dut_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].duty_coefs[0], synth[i].duty_coefs[1], synth[i].duty_coefs[2], synth[i].duty_coefs[3], synth[i].duty_coefs[4], synth[i].duty_coefs[5]);
+            fprintf(stderr, "  pan_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].pan_coefs[0], synth[i].pan_coefs[1], synth[i].pan_coefs[2], synth[i].pan_coefs[3], synth[i].pan_coefs[4], synth[i].pan_coefs[5]);
             if(type>3) {
                 for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-                    fprintf(stderr,"bp%d (target %d): ", j, synth[i].breakpoint_target[j]);
+                    fprintf(stderr,"  bp%d (target %d): ", j, synth[i].breakpoint_target[j]);
                     for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) {
                         fprintf(stderr,"%" PRIi32 ": %f ", synth[i].breakpoint_times[j][k], synth[i].breakpoint_values[j][k]);
                     }
@@ -569,6 +588,7 @@ void show_debug(uint8_t type) {
                 fprintf(stderr,"mod osc %d: amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i].amp, msynth[i].logfreq, msynth[i].duty, msynth[i].filter_logfreq, msynth[i].resonance, msynth[i].feedback, msynth[i].pan);
             }
         }
+        fprintf(stderr, "\n");
     }
 }
 
@@ -576,7 +596,8 @@ void show_debug(uint8_t type) {
 
 void oscs_deinit() {
     free(block);
-    free(fbl[0]);
+    for(uint16_t core=0;core<AMY_CORES;++core)
+        free(fbl[core]);
     if(AMY_CORES>1)free(fbl[1]);
     free(fbl);
     free(synth);
@@ -586,6 +607,7 @@ void oscs_deinit() {
     ks_deinit();
     #endif
     filters_deinit();
+    dealloc_chorus_delay_lines();
 }
 
 
@@ -627,7 +649,12 @@ void play_event(struct delta d) {
         //synth[d.osc].logfreq_coefs[0] = logfreq_for_midi_note(*(uint16_t *)&d.data);
         //printf("time %lld osc %d midi_note %d logfreq %f\n", total_samples, d.osc, synth[d.osc].midi_note, synth[d.osc].logfreq);
         // Midi note and Velocity are propagated to chained_osc.
-        if (AMY_IS_SET(synth[d.osc].chained_osc)) synth[synth[d.osc].chained_osc].midi_note = synth[d.osc].midi_note;
+        if (AMY_IS_SET(synth[d.osc].chained_osc) && synth[d.osc].last_note_event_clock != total_samples) {
+            d.osc = synth[d.osc].chained_osc;
+            // Recurse with the new osc.  We have to recurse rather than directly setting so that a complete chain of recursion will work.
+            play_event(d);
+        }
+        synth[d.osc].last_note_event_clock = total_samples;
     }
 
     if(d.param == WAVE) {
@@ -1364,8 +1391,7 @@ void amy_play_message(char *message) {
         amy_add_event(e);
     }
 }
-// amy_play_message -> amy_parse_message -> amy_add_i_event -> add_delta_to_queue -> i_events queue -> global event queue
-//                         amy_add_event /
+// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
 
 // fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
 

@@ -31,9 +31,9 @@ typedef int16_t output_sample_type;
 // Magic value for "0 Hz" in log-scale.
 #define ZERO_HZ_LOG_VAL -99.0
 // Frequency of Midi note 0, used to make logfreq scales.
-// Have 0 be midi 69, A440
-#define ZERO_LOGFREQ_IN_HZ 440.0
-#define ZERO_MIDI_NOTE 69
+// Have 0 be midi 60, C4, 261.63 Hz
+#define ZERO_LOGFREQ_IN_HZ 261.63
+#define ZERO_MIDI_NOTE 60
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -239,6 +239,7 @@ struct synthinfo {
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t last_velocity_event_clock;   // To stop loops in chained_osc onsets.
+    uint32_t last_note_event_clock;   // To stop loops in chained_osc onsets.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
