@@ -45,7 +45,6 @@ int main(int argc, char ** argv) {
     uint32_t start = amy_sysclock();
 
     amy_start();
-
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
     ma_encoder encoder;
     ma_result result;

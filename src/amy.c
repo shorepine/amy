@@ -23,7 +23,7 @@ extern TaskHandle_t amy_render_handle[AMY_CORES]; // one per core
 
 #ifdef _POSIX_THREADS
 #include <pthread.h>
-extern pthread_mutex_t amy_queue_lock; 
+pthread_mutex_t amy_queue_lock; 
 #endif
 
 
@@ -1401,6 +1401,9 @@ void amy_stop() {
 }
 
 void amy_start() {
+    #ifdef _POSIX_THREADS
+        pthread_mutex_init(&amy_queue_lock, NULL);
+    #endif
     global_init();
     oscs_init();
     amy_reset_oscs();
