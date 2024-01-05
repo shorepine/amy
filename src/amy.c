@@ -110,8 +110,15 @@ void config_chorus(float level, int max_delay) {
             alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
-        if (chorus.level == 0) {
+        if (synth[CHORUS_MOD_SOURCE].status == OFF) {  //chorus.level == 0) {
 #ifdef CHORUS_ARATE
+            // Setup chorus oscillator.
+            synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
+            synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = CHORUS_DEFAULT_MOD_DEPTH;
+            synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_VEL] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
             osc_note_on(CHORUS_MOD_SOURCE, freq_of_logfreq(synth[CHORUS_MOD_SOURCE].logfreq_coefs[0]));
 #endif
         }
@@ -473,15 +480,7 @@ void amy_reset_oscs() {
     global.eq[0] = F2S(1.0f);
     global.eq[1] = F2S(1.0f);
     global.eq[2] = F2S(1.0f);
-    // also reset chorus oscillator.
-    //synth[CHORUS_MOD_SOURCE].freq = CHORUS_DEFAULT_LFO_FREQ;
-    synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
-    synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
-    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = CHORUS_DEFAULT_MOD_DEPTH;
-    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_VEL] = 0;  // Turn off default.
-    synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
-    synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
-    // and the chorus params
+    // Reset chorus oscillator
     #if ( AMY_HAS_CHORUS == 1)
     config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
     #endif
@@ -612,10 +611,9 @@ void oscs_deinit() {
 
 
 void osc_note_on(uint16_t osc, float initial_freq) {
-    //printf("Note on: filter_freq_coefs[%d]=%f %f %f %f %f %f\n", osc,
+    //printf("Note on: osc %d wav %d filter_freq_coefs=%f %f %f %f %f %f\n", osc, synth[osc].wave, 
     //       synth[osc].filter_logfreq_coefs[0], synth[osc].filter_logfreq_coefs[1], synth[osc].filter_logfreq_coefs[2],
-    //       synth[osc].filter_logfreq_coefs[3], synth[osc].filter_logfreq_coefs[4], synth[osc].filter_logfreq_coefs[5]); }
-
+    //       synth[osc].filter_logfreq_coefs[3], synth[osc].filter_logfreq_coefs[4], synth[osc].filter_logfreq_coefs[5]);
     if(synth[osc].wave==SINE) sine_note_on(osc, initial_freq);
     if(synth[osc].wave==SAW_DOWN) saw_down_note_on(osc, initial_freq);
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc, initial_freq);
@@ -1006,7 +1004,7 @@ void amy_prepare_buffer() {
 #if AMY_HAS_CHORUS == 1
     hold_and_modify(CHORUS_MOD_SOURCE);
 #ifdef CHORUS_ARATE
-    if(delay_mod)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+    if(chorus.level > 0)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
 #else
     delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
 #endif // CHORUS_ARATE
