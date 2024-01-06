@@ -6,8 +6,8 @@
 #include "amy.h"
 
 
-// This defaults PCM size to large. If you want to be smaller, include "pcm_small.h" or "pcm_tiny.h"
-#include "pcm_large.h"
+// This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
+#include "pcm_small.h"
 
 
 #include "clipping_lookup_table.h"
@@ -1126,23 +1126,15 @@ struct event amy_parse_message(char * message) {
                         case 'F': e.filter_freq = atoff(message + start); break; 
                         case 'G': e.filter_type = atoi(message + start); break; 
                         case 'g': e.mod_target = atoi(message + start);  break; 
-                        if(AMY_HAS_REVERB == 1) {
-                            case 'H': config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
-                            case 'h': config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
-                        }
+                        case 'H': if(AMY_HAS_REVERB == 1) { config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); } break;
+                        case 'h': if(AMY_HAS_REVERB == 1) { config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); } break;
                         case 'I': e.ratio = atoff(message + start); break;
-                        if(AMY_HAS_REVERB == 1) {
-                            case 'j': config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
-                            case 'J': config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
-                        }
-                        if(AMY_HAS_CHORUS == 1) {
-                            case 'k': config_chorus(atoff(message + start), chorus.max_delay); break;
-                        }
+                        case 'j': if(AMY_HAS_REVERB == 1) { config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); } break;
+                        case 'J': if(AMY_HAS_REVERB == 1) { config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); } break;
+                        case 'k': if(AMY_HAS_CHORUS == 1) { config_chorus(atoff(message + start), chorus.max_delay); } break;
                         case 'l': e.velocity=atoff(message + start); break; 
                         case 'L': e.mod_source=atoi(message + start); break; 
-                        if (AMY_HAS_CHORUS == 1) {
-                            case 'm': config_chorus(S2F(chorus.level), atoi(message + start)); break;
-                        }
+                        case 'm': if (AMY_HAS_CHORUS == 1) { config_chorus(S2F(chorus.level), atoi(message + start)); } break;
                         case 'N': e.latency_ms = atoi(message + start);  break; 
                         case 'n': e.midi_note=atoi(message + start); break; 
                         case 'o': e.algorithm=atoi(message+start); break; 

@@ -7,8 +7,6 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
-// If you want PCM support smaller than 67 samples you have to include one of pcm_{small,tiny}.h
-#include "pcm_small.h"
 
 
 int main(int argc, char ** argv) {

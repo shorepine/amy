@@ -18,7 +18,7 @@ void pcm_init() {
 void pcm_note_on(uint16_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
     //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
-    if(synth[osc].patch < 0 || synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
+    if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
     if(synth[osc].logfreq <= 0) {
         synth[osc].logfreq = PCM_AMY_LOG2_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
