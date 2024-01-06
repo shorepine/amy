@@ -687,12 +687,12 @@ void play_event(struct delta d) {
 
     if(d.param == BP0_TARGET) {
         synth[d.osc].breakpoint_target[0] = *(uint16_t *)&d.data;
-        trig = 1;
+        //trig = 1;
         apply_target_to_coefs(d.osc, synth[d.osc].breakpoint_target[0], COEF_EG0);
     }
     if(d.param == BP1_TARGET) {
         synth[d.osc].breakpoint_target[1] = *(uint16_t *)&d.data;
-        trig=1;
+        //trig=1;
         apply_target_to_coefs(d.osc, synth[d.osc].breakpoint_target[1], COEF_EG1);
     }
     // todo, i really should clean this up
@@ -705,7 +705,7 @@ void play_event(struct delta d) {
         } else {
             synth[d.osc].breakpoint_values[bp_set][(pos-1) / 2] = *(float *)&d.data;
         }
-        trig=1;
+        //trig=1;
     }
     if(trig) synth[d.osc].note_on_clock = total_samples;
 

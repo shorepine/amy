@@ -32,7 +32,7 @@
 #endif
 
 
-#define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
+#define AMY_EVENT_FIFO_LEN 2000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_SAMPLE_RATE 44100    // playback sample rate
 #ifdef ALLES
