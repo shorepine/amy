@@ -59,11 +59,13 @@ enum coefs{
 
 #define MAX_MESSAGE_LEN 255
 #define MAX_PARAM_LEN 64
+// synth[].filter_type values
+#define FILTER_NONE 0
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
 #define FILTER_LPF24 4
-#define FILTER_NONE 0
+// synth[].wave values
 #define SINE 0
 #define PULSE 1
 #define SAW_DOWN 2
@@ -75,14 +77,15 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
-#define OFF 11
-
+// synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
 #define PLAYED 2
 #define AUDIBLE 3
 #define IS_MOD_SOURCE 4
 #define IS_ALGO_SOURCE 5
+// Is this for .wave or .status?
+#define OFF 11
 
 #define true 1
 #define false 0
@@ -238,8 +241,6 @@ struct synthinfo {
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
-    uint32_t last_velocity_event_clock;   // To stop loops in chained_osc onsets.
-    uint32_t last_note_event_clock;   // To stop loops in chained_osc onsets.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];

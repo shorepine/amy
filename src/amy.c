@@ -277,7 +277,7 @@ void add_delta_to_queue(struct delta d) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #elif defined _POSIX_THREADS
-    //fprintf(stderr,"add_delta: time %d osc %d param %d, qsize %d\n", total_samples, d.osc, d.param, global.event_qsize);    
+    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
     pthread_mutex_lock(&amy_queue_lock); 
 #endif
 
@@ -306,16 +306,11 @@ void add_delta_to_queue(struct delta d) {
         } else {
             // or it's got to be found somewhere
             struct delta* ptr = global.event_start;
-            int8_t inserted = -1;
-            while(inserted<0) {
-                if(d.time < ptr->next->time) {
-                    // next should point to me, and my next should point to old next
-                    events[found].next = ptr->next;
-                    ptr->next = &events[found];
-                    inserted = 1;
-                }
+            while(d.time >= ptr->next->time)
                 ptr = ptr->next;
-            }
+            // Insert: next should point to me, and my next should point to old next
+            events[found].next = ptr->next;
+            ptr->next = &events[found];
         }
         event_counter++;
 
@@ -448,8 +443,6 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].note_on_clock);
     AMY_UNSET(synth[i].note_off_clock);
     AMY_UNSET(synth[i].zero_amp_clock);
-    AMY_UNSET(synth[i].last_velocity_event_clock);
-    AMY_UNSET(synth[i].last_note_event_clock);
     AMY_UNSET(synth[i].mod_value_clock);
     synth[i].filter_type = FILTER_NONE;
     synth[i].lpf_alpha = 0;
@@ -566,9 +559,9 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", global.volume, S2F(global.eq[0]), S2F(global.eq[1]), S2F(global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
-            fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %flogratio %f feedback %f resonance %f step %f algo %d source %d,%d,%d,%d,%d,%d  \n",
+            fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %flogratio %f feedback %f resonance %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
                     i, synth[i].status, synth[i].wave, synth[i].mod_target, synth[i].mod_source,
-                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step),
+                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].chained_osc, 
                     synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5]);
@@ -637,8 +630,23 @@ void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef) {
 }
 
 
+int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
+    // Check to see if chaining this osc would cause a loop.
+    uint16_t next_osc = chained_osc;
+    do {
+        if (next_osc == osc) {
+            fprintf(stderr, "chaining osc %d to osc %d would cause loop.\n",
+                    chained_osc, osc);
+            return true;
+        }
+        next_osc = synth[next_osc].chained_osc;
+    } while(AMY_IS_SET(next_osc));
+    return false;
+}
+
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
+    //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
     uint8_t trig=0;
     // todo: event-only side effect, remove
     if(d.param == MIDI_NOTE) {
@@ -647,12 +655,11 @@ void play_event(struct delta d) {
         //synth[d.osc].logfreq_coefs[0] = logfreq_for_midi_note(*(uint16_t *)&d.data);
         //printf("time %lld osc %d midi_note %d logfreq %f\n", total_samples, d.osc, synth[d.osc].midi_note, synth[d.osc].logfreq);
         // Midi note and Velocity are propagated to chained_osc.
-        if (AMY_IS_SET(synth[d.osc].chained_osc) && synth[d.osc].last_note_event_clock != total_samples) {
+        if (AMY_IS_SET(synth[d.osc].chained_osc)) {
             d.osc = synth[d.osc].chained_osc;
             // Recurse with the new osc.  We have to recurse rather than directly setting so that a complete chain of recursion will work.
             play_event(d);
         }
-        synth[d.osc].last_note_event_clock = total_samples;
     }
 
     if(d.param == WAVE) {
@@ -704,7 +711,8 @@ void play_event(struct delta d) {
 
     if(d.param == CHAINED_OSC) {
         int chained_osc = *(int16_t *)&d.data;
-        if (chained_osc >=0 && chained_osc < AMY_OSCS)
+        if (chained_osc >=0 && chained_osc < AMY_OSCS &&
+            !chained_osc_would_cause_loop(d.osc, chained_osc))
             synth[d.osc].chained_osc = chained_osc;
         else
             AMY_UNSET(synth[d.osc].chained_osc);
@@ -739,9 +747,7 @@ void play_event(struct delta d) {
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.
     // Ignore velocity events if we've already received one this frame.  This may be due to a loop in chained_oscs.
-    if(d.param == VELOCITY && synth[d.osc].last_velocity_event_clock != total_samples) {
-        // Record the time of this event so we won't respond to it more than once.
-        synth[d.osc].last_velocity_event_clock = total_samples;
+    if(d.param == VELOCITY) {
         if (*(float *)&d.data > 0) { // new note on (even if something is already playing on this osc)
             //synth[d.osc].amp_coefs[COEF_CONST] = *(float *)&d.data; // these could be decoupled, later
             synth[d.osc].velocity = *(float *)&d.data;
