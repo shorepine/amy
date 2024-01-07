@@ -278,7 +278,7 @@ void add_delta_to_queue(struct delta d) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #elif defined _POSIX_THREADS
-    fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
+    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
     pthread_mutex_lock(&amy_queue_lock); 
 #endif
 
@@ -390,8 +390,8 @@ void amy_add_event(struct event e) {
 
 
 void clone_osc(uint16_t i, uint16_t f) {
-    fprintf(stderr, "cloning osc %d from %d\n", i, f);
-    // set all the synth state to the values from another osc.
+    // Set all the synth state to the values from another osc.
+    //fprintf(stderr, "cloning osc %d from %d\n", i, f);
     synth[i].wave = synth[f].wave;
     synth[i].patch = synth[f].patch;
     //synth[i].midi_note = synth[f].midi_note;
