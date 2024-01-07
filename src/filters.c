@@ -228,6 +228,35 @@ SAMPLE scan_max(SAMPLE* block, int len) {
     return max;
 }
 
+int encl_log2(SAMPLE max) {
+    // How many bits can you shift before this max overflows?
+    int bits = 0;
+    while(max < F2S(128.0) && bits < 16) {
+        max = SHIFTL(max, 1);
+        ++bits;
+    }
+    return bits;
+}
+
+void block_norm(SAMPLE* block, int len, int bits) {
+    if (bits > 0) {
+        while(len--) {
+            *block = SHIFTL(*block, bits);
+            ++block;
+        }
+    } else if (bits < 0) {
+        bits = -bits;
+        while(len--) {
+            *block = SHIFTR(*block, bits);
+            ++block;
+        }
+    }
+}
+
+void block_denorm(SAMPLE* block, int len, int bits) {
+    block_norm(block, len, -bits);
+}
+
 void filter_process(SAMPLE * block, uint16_t osc) {
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
@@ -241,12 +270,21 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc].filter_type);
         return;
     }
+    SAMPLE max = scan_max(block, AMY_BLOCK_SIZE);
+    int normbits = MAX(0, encl_log2(max) - 6);
+    //printf("time %f max %f normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), normbits);
+    block_norm(block, AMY_BLOCK_SIZE, normbits);
+    block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
+    //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
         dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay + FILT_NUM_DELAYS);
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
+    synth[osc].last_filt_norm_bits = normbits;
+    block_denorm(block, AMY_BLOCK_SIZE, normbits);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.
     hpf_buf(block, &synth[osc].hpf_state[0]);
 }
@@ -259,5 +297,6 @@ void reset_filter(uint16_t osc) {
     // The LPF has typically accumulated a large DC offset, so you have to reset both
     // the LPF *and* the dc-blocking HPF at the same time.
     for(int i = 0; i < 2 * FILT_NUM_DELAYS; ++i) synth[osc].filter_delay[i] = 0;
+    synth[osc].last_filt_norm_bits = 0;
     synth[osc].hpf_state[0] = 0; synth[osc].hpf_state[1] = 0;
 }

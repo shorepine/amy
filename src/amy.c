@@ -504,6 +504,7 @@ void reset_osc(uint16_t i ) {
     synth[i].hpf_state[0] = 0;
     synth[i].hpf_state[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i].filter_delay[j] = 0;
+    synth[i].last_filt_norm_bits = 0;
     synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;

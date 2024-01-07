@@ -287,7 +287,7 @@ def main(argv):
     #TestChorus().test()
     #TestBleep().test()
     #TestBrass().test()
-    TestBrass().test()
+    TestBrass2().test()
     #TestSineEnv().test()
 
   print("tests done.")

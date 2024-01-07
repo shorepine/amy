@@ -270,6 +270,8 @@ struct synthinfo {
     SAMPLE last_two[2];
     // For filters.  Need 2x because LPF24 uses two instances of filter.
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
+    // The block-floating-point shift of the filter delay values.
+    int last_filt_norm_bits;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
