@@ -923,7 +923,7 @@ void hold_and_modify(uint16_t osc) {
     // Stop oscillators if amp is zero for several frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
     }
-#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
+#define MIN_ZERO_AMP_TIME_SAMPS (5 * AMY_BLOCK_SIZE)
     if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
         if (msynth[osc].amp > 0) {
             AMY_UNSET(synth[osc].zero_amp_clock);

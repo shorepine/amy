@@ -271,8 +271,13 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         return;
     }
     SAMPLE max = scan_max(block, AMY_BLOCK_SIZE);
-    int normbits = MAX(0, encl_log2(max) - 6);
-    //printf("time %f max %f normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), normbits);
+    // Also have to consider the filter state.
+    SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
+    int filtnormbits = synth[osc].last_filt_norm_bits + encl_log2(filtmax);
+#define HEADROOM_BITS 6
+#define STATE_HEADROOM_BITS 2
+    int normbits = MIN(MAX(0, encl_log2(max) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
+    //printf("time %f max %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
     block_norm(block, AMY_BLOCK_SIZE, normbits);
     block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
     block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
@@ -284,8 +289,8 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
     synth[osc].last_filt_norm_bits = normbits;
-    // Final high-pass to remove residual DC offset from sub-fundamental LPF.
-    hpf_buf(block, &synth[osc].hpf_state[0]);
+    // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
+    //hpf_buf(block, &synth[osc].hpf_state[0]);
     block_denorm(block, AMY_BLOCK_SIZE, normbits);
 }
 

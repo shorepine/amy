@@ -102,7 +102,7 @@ typedef int amy_err_t;
 #endif
 
 #ifndef MIN
-#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 

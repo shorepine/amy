@@ -77,9 +77,9 @@ class TestPulseOsc(AmyTest):
 class TestSawDownOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, freq=1000)
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN)
+    amy.send(time=100, note=48, vel=1)
+    amy.send(time=900, vel=0)
 
 
 class TestSawUpOsc(AmyTest):
@@ -300,8 +300,10 @@ def main(argv):
     #TestChorus().test()
     #TestBleep().test()
     #TestBrass().test()
-    TestBrass2().test()
+    #TestBrass2().test()
     #TestSineEnv().test()
+    TestSawDownOsc().test()
+    TestFilter().test()
 
   print("tests done.")
 
