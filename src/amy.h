@@ -252,13 +252,10 @@ struct synthinfo {
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
   
-    // State variable for the impulse-integrating oscs.
-    SAMPLE lpf_state;
+    // State variable for the dc-removal filter.
     SAMPLE hpf_state[2];
     // Constant offset to add to sawtooth before integrating.
     SAMPLE dc_offset;
-    // Decay alpha of LPF filter (e.g. 0.99 or 0.999).
-    SAMPLE lpf_alpha;
     // amplitude smoother
     SAMPLE last_amp;
     // Selected lookup table and size.

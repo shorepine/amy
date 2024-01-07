@@ -427,8 +427,6 @@ void clone_osc(uint16_t i, uint16_t f) {
     //synth[i].zero_amp_clock = synth[f].zero_amp_clock;
     //synth[i].mod_value_clock = synth[f].mod_value_clock;
     synth[i].filter_type = synth[f].filter_type;
-    //synth[i].lpf_alpha = synth[f].lpf_alpha;
-    //synth[i].lpf_state = synth[f].lpf_state;
     //synth[i].hpf_state[0] = synth[f].hpf_state[0];
     //synth[i].hpf_state[1] = synth[f].hpf_state[1];
     //synth[i].last_amp = synth[f].last_amp;
@@ -499,8 +497,6 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].zero_amp_clock);
     AMY_UNSET(synth[i].mod_value_clock);
     synth[i].filter_type = FILTER_NONE;
-    synth[i].lpf_alpha = 0;
-    synth[i].lpf_state = 0;
     synth[i].hpf_state[0] = 0;
     synth[i].hpf_state[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i].filter_delay[j] = 0;
@@ -927,7 +923,7 @@ void hold_and_modify(uint16_t osc) {
     // Stop oscillators if amp is zero for several frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
     }
-#define MIN_ZERO_AMP_TIME_SAMPS (3 * AMY_BLOCK_SIZE)
+#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
     if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
         if (msynth[osc].amp > 0) {
             AMY_UNSET(synth[osc].zero_amp_clock);

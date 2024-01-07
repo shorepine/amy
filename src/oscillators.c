@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "sine_lutset_fxpt.h"
-#include "impulse_lutset_fxpt.h"
+#include "saw_lutset_fxpt.h"
 #include "triangle_lutset_fxpt.h"
 
 // For hardware random on ESP
@@ -202,39 +202,20 @@ PHASOR render_lut_cub(SAMPLE* buf,
     return phase;
 }
 
-void lpf_buf(SAMPLE *buf, SAMPLE decay, SAMPLE *state) {
-    // Implement first-order low-pass (leaky integrator).
-    SAMPLE s = *state;
-    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
-        buf[i] += MUL4_SS(decay, s);
-        s = buf[i];
-    }
-    *state = s;
-}
-
-
 /* Pulse wave */
 void pulse_note_on(uint16_t osc, float freq) {
     //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", total_samples, osc, synth[osc].logfreq, S2F(synth[osc].amp), S2F(synth[osc].last_amp));
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
-    synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
-    // Tune the initial integrator state to compensate for mid-sample alignment of table.
-    float float_amp = synth[osc].amp_coefs[0] * freq * 4.0f / AMY_SAMPLE_RATE;
-    synth[osc].lpf_state = MUL4_SS(F2S(-0.5 * float_amp), L2S(synth[osc].lut->table[0]));
+    synth[osc].lut = choose_from_lutset(period_samples, saw_fxpt_lutset);
 }
 
 void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
     // Common function for pulse and saw.
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
-    // LPF time constant should be ~ 10x osc period, so droop is minimal.
-    // alpha = 1 - 1 / t_const; t_const = 10 / m_freq, so alpha = 1 - m_freq / 10
-    synth[osc].lpf_alpha = F2S(1.0f - freq / (10.0f * AMY_SAMPLE_RATE));
-    // Scale the impulse proportional to the phase increment step so its integral remains ~constant.
-    const LUT *lut = synth[osc].lut;
-    SAMPLE amp = direction * F2S(msynth[osc].amp * P2F(step) * 4.0f * lut->scale_factor);
+    SAMPLE amp = direction * F2S(msynth[osc].amp);
     PHASOR pwm_phase = synth[osc].phase;
-    synth[osc].phase = render_lut_cub(buf, synth[osc].phase, step, synth[osc].last_amp, amp, lut);
+    synth[osc].phase = render_lut_cub(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
     if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
         float duty = msynth[osc].duty;
         if (duty < 0.01f) duty = 0.01f;
@@ -245,23 +226,6 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
         render_lut_cub(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut);
         msynth[osc].last_duty = duty;
     }
-    if (dc_offset != 0) {
-        // For saw only, apply a dc shift so integral is ~0.
-        // But we have to apply the linear amplitude env on top as well, copying the way it's done in render_lut.
-        SAMPLE current_amp = synth[osc].last_amp;
-        SAMPLE incremental_amp = SHIFTR(amp - synth[osc].last_amp, BLOCK_SIZE_BITS); // i.e. delta(amp) / BLOCK_SIZE
-        for (int i = 0; i < AMY_BLOCK_SIZE; ++i) {
-            buf[i] += MUL4_SS(current_amp, dc_offset);
-            current_amp += incremental_amp;
-        }
-    }        
-    // LPF to integrate to convert pair of (+, -) impulses into a rectangular wave.
-    SAMPLE alpha = synth[osc].lpf_alpha;
-    if (msynth[osc].amp == 0 && synth[osc].last_amp == 0) {
-        // When amp is zero, decay LPF more rapidly.
-        alpha = F2S(1.0f) - SHIFTL(F2S(1.0f) - alpha, 4);
-    }
-    lpf_buf(buf, alpha, &synth[osc].lpf_state);
     // Remember last_amp.
     synth[osc].last_amp = amp;
 }
@@ -298,15 +262,8 @@ SAMPLE compute_mod_pulse(uint16_t osc) {
 void saw_note_on(uint16_t osc, int8_t direction_notused, float freq) {
     //printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", total_samples, osc, freq, synth[osc].logfreq, synth[osc].amp, S2F(synth[osc].last_amp), P2F(synth[osc].phase));
     float period_samples = ((float)AMY_SAMPLE_RATE / freq);
-    synth[osc].lut = choose_from_lutset(period_samples, impulse_fxpt_lutset);
-    // Calculate the mean of the LUT.
-    SAMPLE lut_sum = 0;
-    for (int i = 0; i < synth[osc].lut->table_size; ++i) {
-        lut_sum += L2S(synth[osc].lut->table[i]);
-    }
-    int lut_bits = synth[osc].lut->log_2_table_size;
-    synth[osc].dc_offset = -SHIFTR(lut_sum, lut_bits);
-    synth[osc].lpf_state = 0;
+    synth[osc].lut = choose_from_lutset(period_samples, saw_fxpt_lutset);
+    synth[osc].dc_offset = 0;
     synth[osc].last_amp = 0;
 }
 
