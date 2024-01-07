@@ -85,6 +85,7 @@
 #define MUL4_SS(a, b) ((a) * (b))
 #define MUL8_SS(a, b) ((a) * (b))
 #define MUL8F_SS(a, b) ((a) * (b))
+#define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
 
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
@@ -163,6 +164,9 @@ typedef int32_t s16_15; // s16.15 general
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
 #define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+
+// First argument is positive and less that 1/16, i.e. only 19 low-order bits.
+#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+14 = 15, result is >> 8.
 
 // Multiply a SAMPLE (s8.23) by a PHASOR (s.31) yeilding a SAMPLE, so 31 bits to lose.
 #define MUL4_SP_S(s, p) FXMUL_TEMPLATE(s, p, 11, 16, P_FRAC_BITS)  // need to lose 31 bits; 11+16=27, so 4 more on result

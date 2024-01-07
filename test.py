@@ -266,12 +266,12 @@ class TestGuitar(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.756,1', freq='130.815,1',
-             filter_freq='16.23,0.236,0,0,11.181', resonance=0.753, 
+             filter_freq='16.23,0.236,0,0,11.181', resonance=0.753, filter_type=amy.FILTER_LPF24,
              bp0='6,1,57,0.425,153,0',
              bp1='6,1,57,0.425,153,0')
-    amy.send(time=100, osc=0, note=64, vel=4.0)
+    amy.send(time=100, osc=0, note=60, vel=4.0)
     amy.send(time=150, osc=0, vel=0)
-    amy.send(time=500, osc=0, note=64, vel=4.0)
+    amy.send(time=500, osc=0, note=60, vel=4.0)
     amy.send(time=550, osc=0, vel=0)
 
 class TestBleep(AmyTest):
@@ -302,7 +302,8 @@ def main(argv):
     #TestBrass().test()
     #TestBrass2().test()
     #TestSineEnv().test()
-    TestSawDownOsc().test()
+    #TestSawDownOsc().test()
+    TestGuitar().test()
     TestFilter().test()
 
   print("tests done.")

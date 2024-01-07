@@ -65,9 +65,9 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
         }
     }
 
-    coeffs[0] = F2S(b0 / a0);
-    coeffs[1] = F2S(b1 / a0);
-    coeffs[2] = F2S(b2 / a0);
+    coeffs[0] = F2S(-b0 / a0);
+    coeffs[1] = F2S(-b1 / a0);
+    coeffs[2] = F2S(-b2 / a0);
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
@@ -135,7 +135,7 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 
 #define FILT_MUL_SS MUL8F_SS
 //#define FILT_MUL_SS MUL8_SS  // Goes unstable for TestFilter
-#define FILTER_SCALEUP_BITS 2  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
+#define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
 
 int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
     // Zeros then poles - Direct Form I
@@ -153,6 +153,43 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
         y2 = y1;
         y1 = y0;
         output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS);
+    }
+    w[0] = x1;
+    w[1] = x2;
+    w[2] = y1;
+    w[3] = y2;
+    return 0;
+}
+
+
+// Template so we can have the same loop with different MULT functions.
+#define FILTER_LOOP(MULT) \
+    for (int i = 0 ; i < len ; i++) { \
+        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS); \
+        SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2); \
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2; \
+        y0 = y0 - MULT(e, y1) + MULT(f, y2); \
+        x2 = x1; \
+        x1 = x0; \
+        y2 = y1; \
+        y1 = y0; \
+        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS); \
+    }
+
+
+int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
+    SAMPLE x1 = w[0];
+    SAMPLE x2 = w[1];
+    SAMPLE y1 = w[2];
+    SAMPLE y2 = w[3];
+    SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
+    SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
+    //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
+    if (e < F2S(0.0625)) { // 4 zeros at top of 23 bit frac part
+        FILTER_LOOP(MUL4E_SS);
+    } else {
+        FILTER_LOOP(MUL8F_SS);
     }
     w[0] = x1;
     w[1] = x2;
@@ -281,10 +318,10 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     block_norm(block, AMY_BLOCK_SIZE, normbits);
     block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
     block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
-    dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
+    dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay + FILT_NUM_DELAYS);
+        dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay + FILT_NUM_DELAYS);
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
