@@ -245,7 +245,7 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
         render_lut_cub(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut);
         msynth[osc].last_duty = duty;
     }
-    if (dc_offset) {
+    if (dc_offset != 0) {
         // For saw only, apply a dc shift so integral is ~0.
         // But we have to apply the linear amplitude env on top as well, copying the way it's done in render_lut.
         SAMPLE current_amp = synth[osc].last_amp;
@@ -419,12 +419,12 @@ void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_leve
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = MUL4_SS(F2S(msynth[osc].amp), mod_amp);
-    if (feedback_level && mod)
+    if (feedback_level > 0 && mod)
         synth[osc].phase = render_lut_fm_fb(buf, synth[osc].phase, step,
                                             synth[osc].last_amp, amp,
                                             synth[osc].lut,
                                             mod, feedback_level, synth[osc].last_two);
-    else if (feedback_level)
+    else if (feedback_level > 0)
         synth[osc].phase = render_lut_fb(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp,
                                          synth[osc].lut,
