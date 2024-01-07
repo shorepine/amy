@@ -32,7 +32,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
 
 SAMPLE compute_mod_scale(uint16_t osc) {
     uint16_t source = synth[osc].mod_source;
-    if(AMY_IS_SET(synth[osc].mod_target) && AMY_IS_SET(source)) {
+    if(AMY_IS_SET(source)) {
         if(source != osc) {  // that would be weird
             hold_and_modify(source);
             return compute_mod_value(source);
@@ -211,7 +211,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     }
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
-    //printf("env: time %d bpset %d seg %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //printf("env: time %f osc %d bpset %d seg %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     return scale;
 }
 

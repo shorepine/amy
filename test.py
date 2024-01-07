@@ -236,14 +236,14 @@ class TestBrass(AmyTest):
     #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
     #         resonance=0.167, bp0='60,1,400,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,400,0.3,200,0')
-    amy.send(time=0, osc=0,
-             wave=amy.TRIANGLE, freq=0.974, amp='1,0,0,1,0,0', bp0='156,1.0,156,1.0,10000,0')
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0.01',
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0.0',
              amp='0,0,0.85,1,0,0', bp0='30,1,702,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,702,0.354,100,0',
-             mod_source=0,
+             mod_source=2,
              )
+    amy.send(time=0, osc=2,
+             wave=amy.SINE, freq=0.974, bp0='156,1.0,256,1.0,100,0')  # amp='1,0,0,0,0,0') #
     amy.send(time=100, osc=1, note=76, vel=1.0)
     amy.send(time=300, osc=1, vel=0)
     amy.send(time=600, osc=1, note=76, vel=1.0)
@@ -287,8 +287,8 @@ def main(argv):
     #TestChorus().test()
     #TestBleep().test()
     #TestBrass().test()
-    #TestBrass().test()
-    TestSineEnv().test()
+    TestBrass().test()
+    #TestSineEnv().test()
 
   print("tests done.")
 
