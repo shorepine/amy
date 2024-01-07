@@ -258,6 +258,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.resonance);
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.chained_osc);
+    AMY_UNSET(e.clone_osc);
     AMY_UNSET(e.mod_source);
     AMY_UNSET(e.mod_target);
     AMY_UNSET(e.eq_l);
@@ -277,7 +278,7 @@ void add_delta_to_queue(struct delta d) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #elif defined _POSIX_THREADS
-    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
+    fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
     pthread_mutex_lock(&amy_queue_lock); 
 #endif
 
@@ -299,19 +300,12 @@ void add_delta_to_queue(struct delta d) {
         global.event_qsize++;
 
         // now insert it into the sorted list for fast playback
-        // first, see if it's eariler than the first item, special case
-        if(d.time < global.event_start->time) {
-            events[found].next = global.event_start;
-            global.event_start = &events[found];
-        } else {
-            // or it's got to be found somewhere
-            struct delta* ptr = global.event_start;
-            while(d.time >= ptr->next->time)
-                ptr = ptr->next;
-            // Insert: next should point to me, and my next should point to old next
-            events[found].next = ptr->next;
-            ptr->next = &events[found];
-        }
+        struct delta **pptr = &global.event_start;
+        while(d.time >= (*pptr)->time)
+            pptr = &(*pptr)->next;
+        events[found].next = *pptr;
+        *pptr = &events[found];
+
         event_counter++;
 
     } else {
@@ -359,6 +353,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.chained_osc)) { d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.clone_osc)) { d.param=CLONE_OSC; d.data = *(uint32_t *)&e.clone_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.bp0_target)) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.bp0_target; add_delta_to_queue(d); }
@@ -393,6 +388,65 @@ void amy_add_event(struct event e) {
     message_counter++;
 }
 
+
+void clone_osc(uint16_t i, uint16_t f) {
+    fprintf(stderr, "cloning osc %d from %d\n", i, f);
+    // set all the synth state to the values from another osc.
+    synth[i].wave = synth[f].wave;
+    synth[i].patch = synth[f].patch;
+    //synth[i].midi_note = synth[f].midi_note;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
+        synth[i].amp_coefs[j] = synth[f].amp_coefs[j];
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
+        synth[i].logfreq_coefs[j] = synth[f].logfreq_coefs[j];
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
+        synth[i].filter_logfreq_coefs[j] = synth[f].filter_logfreq_coefs[j];
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
+        synth[i].duty_coefs[j] = synth[f].duty_coefs[j];
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
+        synth[i].pan_coefs[j] = synth[f].pan_coefs[j];
+    synth[i].feedback = synth[f].feedback;
+    //synth[i].phase = synth[f].phase;
+    //synth[i].volume = synth[f].volume;
+    synth[i].eq_l = synth[f].eq_l;
+    synth[i].eq_m = synth[f].eq_m;
+    synth[i].eq_h = synth[f].eq_h;
+    synth[i].logratio = synth[f].logratio;
+    synth[i].resonance = synth[f].resonance;
+    //synth[i].velocity = synth[f].velocity;
+    //synth[i].step = synth[f].step;
+    //synth[i].sample = synth[f].sample;
+    //synth[i].mod_value = synth[f].mod_value;
+    //synth[i].substep = synth[f].substep;
+    //synth[i].status = synth[f].status;
+    //synth[i].chained_osc = synth[f].chained_osc;  // RISKY - could make osc loops without knowing.
+    //synth[i].mod_source = synth[f].mod_source;    // It's OK to have multiple oscs with the same mod source.  But if we set it, then clone other params, we overwrite it.
+    synth[i].mod_target = synth[f].mod_target;
+    //synth[i].note_on_clock = synth[f].note_on_clock;
+    //synth[i].note_off_clock = synth[f].note_off_clock;
+    //synth[i].zero_amp_clock = synth[f].zero_amp_clock;
+    //synth[i].mod_value_clock = synth[f].mod_value_clock;
+    synth[i].filter_type = synth[f].filter_type;
+    //synth[i].lpf_alpha = synth[f].lpf_alpha;
+    //synth[i].lpf_state = synth[f].lpf_state;
+    //synth[i].hpf_state[0] = synth[f].hpf_state[0];
+    //synth[i].hpf_state[1] = synth[f].hpf_state[1];
+    //synth[i].last_amp = synth[f].last_amp;
+    //synth[i].dc_offset = synth[f].dc_offset;
+    synth[i].algorithm = synth[f].algorithm;
+    //for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = synth[f].algo_source[j];  // RISKY - end up allocating secondary oscs to multiple mains.
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
+        for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) {
+            synth[i].breakpoint_times[j][k] = synth[f].breakpoint_times[j][k];
+            synth[i].breakpoint_values[j][k] = synth[f].breakpoint_values[j][k];
+        }
+        synth[i].breakpoint_target[j] = synth[f].breakpoint_target[j];
+    }
+    //for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = synth[f].last_scale[j]; }
+    //synth[i].last_two[0] = synth[f].last_two[0];
+    //synth[i].last_two[1] = synth[f].last_two[1];
+    //synth[i].lut = synth[f].lut;
+}
 
 void reset_osc(uint16_t i ) {
     // set all the synth state to defaults
@@ -717,6 +771,7 @@ void play_event(struct delta d) {
         else
             AMY_UNSET(synth[d.osc].chained_osc);
     }
+    if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
     // todo: event-only side effect, remove
     if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(uint16_t *)&d.data; synth[*(uint16_t *)&d.data].status = IS_MOD_SOURCE; }
     if(d.param == MOD_TARGET) {
@@ -993,12 +1048,17 @@ void amy_prepare_buffer() {
 #endif
 
     // find any events that need to be played from the (in-order) queue
-    while(sysclock >= global.event_start->time) {
-        play_event(*global.event_start);
-        global.event_start->time = UINT32_MAX;
-        global.event_qsize--;
-        global.event_start = global.event_start->next;
+    struct delta *event_start = global.event_start;
+    if (global.event_qsize > 1 && event_start->time == UINT32_MAX) {
+        fprintf(stderr, "WARN: time=UINT32_MAX found at qsize=%d\n", global.event_qsize);
     }
+    while(sysclock >= event_start->time) {
+        play_event(*event_start);
+        event_start->time = UINT32_MAX;
+        global.event_qsize--;
+        event_start = event_start->next;
+    }
+    global.event_start = event_start;
 
 #if defined ESP_PLATFORM && !defined ARDUINO
     // give the mutex back
@@ -1310,6 +1370,7 @@ struct event amy_parse_message(char * message) {
                         case 'B': copy_param_list_substring(e.bp1, message+start); break;
                         case 'b': e.feedback=atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
+                        case 'C': e.clone_osc = atoi(message + start); break;
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
                         case 'D': show_debug(atoi(message + start)); break;
                         case 'f': parse_coef_message(message + start, e.freq_coefs);break;
@@ -1390,6 +1451,7 @@ struct event amy_parse_message(char * message) {
 
 // given a string play / schedule the event directly
 void amy_play_message(char *message) {
+    fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_parse_message(message);
     if(e.status == SCHEDULED) {
         amy_add_event(e);

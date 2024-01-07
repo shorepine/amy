@@ -71,7 +71,7 @@ def trunc(number):
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, mod_target=None,
-            debug=None, chained_osc=None, mod_source=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
+            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
             chorus_level=None, chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None):
 
     m = ""
@@ -100,6 +100,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(bp0_target is not None): m = m + "T" +str(bp0_target)
     if(bp1_target is not None): m = m + "W" +str(bp1_target)
     if(chained_osc is not None): m = m + "c" + str(chained_osc)
+    if(clone_osc is not None): m = m + "C" + str(clone_osc)
     if(mod_target is not None): m = m + "g" + str(mod_target)
     if(mod_source is not None): m = m + "L" + str(mod_source)
     if(reset is not None): m = m + "S" + str(reset)
