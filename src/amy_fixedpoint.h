@@ -90,7 +90,7 @@
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
 #define SHIFTL(s, b) ((s) * exp2f(b))
 
-#define INT_OF_P(p, b) ((int)floorf((p) * (float)(1 << (b))))
+#define INT_OF_P(p, b) (((int)floorf((p) * (float)(1 << (b))) + (1 << (b))) % (1 <<(b)))
 #define I2P(i, b) ((i) / (float)(1 << (b)))
 
 #define S_FRAC_OF_P(p, b) ((p) * (1 << (b)) - floorf((p) * (1 << (b))))

@@ -50,7 +50,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     uint32_t t1,t0;
     SAMPLE v1, v0;
     int8_t bp_r = 0;
-    t0 = 0; v0 = 1.0;
+    t0 = 0; v0 = 0;
     // exp2(4.328085) = exp(3.0)
     #define EXP_RATE_VAL -4.328085
     const SAMPLE exponential_rate = F2S(EXP_RATE_VAL);

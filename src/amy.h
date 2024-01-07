@@ -20,6 +20,9 @@
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
 
+// Constants for filters.c, needed for synth structure.
+#define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
+
 //#define LINEAR_INTERP        // use linear interp for oscs
 // "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
 //#define CUBIC_INTERP         // use cubic interpolation for oscs
@@ -265,6 +268,8 @@ struct synthinfo {
     float eq_h;
     // For ALGO feedback ops
     SAMPLE last_two[2];
+    // For filters.  Need 2x because LPF24 uses two instances of filter.
+    SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc

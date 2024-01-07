@@ -6,11 +6,9 @@
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
 #define LOWEST_RATIO 0.0001
 
-#define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
-
 SAMPLE coeffs[AMY_OSCS][5];
-SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
-SAMPLE filter_delay2[AMY_OSCS][FILT_NUM_DELAYS];
+//SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
+//SAMPLE filter_delay2[AMY_OSCS][FILT_NUM_DELAYS];
 
 SAMPLE eq_coeffs[3][5];
 SAMPLE eq_delay[AMY_NCHANS][3][FILT_NUM_DELAYS];
@@ -174,17 +172,6 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-void reset_filter(uint16_t osc) {
-    // reset the delay for a filter
-    // normal mod / adsr will just change the coeffs
-    for (int o = 0; o < AMY_OSCS; ++o) {
-        for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
-            filter_delay[o][d] = 0;
-            filter_delay2[o][d] = 0;
-        }
-    }
-}
-
 void filters_init() {
     // update the parametric filters 
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
@@ -197,7 +184,6 @@ void filters_init() {
             }
         }
     }
-    for(uint16_t i=0;i<AMY_OSCS;i++) reset_filter(i);
 }
 
 
@@ -231,6 +217,17 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
     state[1] = yn1;
 }
 
+SAMPLE scan_max(SAMPLE* block, int len) {
+    // Find the max abs sample value in a block.
+    SAMPLE max = 0;
+    while (len--) {
+        SAMPLE val = *block++;
+        if (val > max) max = val;
+        else if ((-val) > max) max = -val;
+    }
+    return max;
+}
+
 void filter_process(SAMPLE * block, uint16_t osc) {
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
@@ -244,10 +241,10 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc].filter_type);
         return;
     }
-    dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay2[osc]);
+        dsps_biquad_f32_ansi(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay + FILT_NUM_DELAYS);
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.
@@ -257,3 +254,10 @@ void filter_process(SAMPLE * block, uint16_t osc) {
 void filters_deinit() {
 }
 
+void reset_filter(uint16_t osc) {
+    // Reset all the filter state to zero.
+    // The LPF has typically accumulated a large DC offset, so you have to reset both
+    // the LPF *and* the dc-blocking HPF at the same time.
+    for(int i = 0; i < 2 * FILT_NUM_DELAYS; ++i) synth[osc].filter_delay[i] = 0;
+    synth[osc].hpf_state[0] = 0; synth[osc].hpf_state[1] = 0;
+}

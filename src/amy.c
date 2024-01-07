@@ -503,6 +503,7 @@ void reset_osc(uint16_t i ) {
     synth[i].lpf_state = 0;
     synth[i].hpf_state[0] = 0;
     synth[i].hpf_state[1] = 0;
+    for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i].filter_delay[j] = 0;
     synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
@@ -819,6 +820,8 @@ void play_event(struct delta d) {
 
                 // if there was a filter active for this voice, reset it
                 if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
+                // For repeatability, start at zero phase.
+                synth[d.osc].phase = 0;
                 // restart the waveforms
                 // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
                 float initial_logfreq = synth[d.osc].logfreq_coefs[0];
@@ -1451,7 +1454,7 @@ struct event amy_parse_message(char * message) {
 
 // given a string play / schedule the event directly
 void amy_play_message(char *message) {
-    fprintf(stderr, "amy_play_message: %s\n", message);
+    //fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_parse_message(message);
     if(e.status == SCHEDULED) {
         amy_add_event(e);
