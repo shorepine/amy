@@ -560,6 +560,8 @@ int8_t oscs_init() {
         }
     }
     // we only alloc delay lines if the chorus is turned on.
+    if (delay_lines == NULL)
+        delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
     if(AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0) {
         for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
     }
