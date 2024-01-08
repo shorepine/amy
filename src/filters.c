@@ -235,6 +235,26 @@ void filters_deinit() {
 
 
 void filters_init() {
+    coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
+    eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+    filter_delay = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
+    eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, FBL_RAM_CAPS);
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+        filter_delay[i] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+    }
+    for(uint16_t i=0;i<3;i++) {
+        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+    }
+    for(uint16_t i=0;i<AMY_NCHANS;i++) {
+        eq_delay[i] = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+        for(uint16_t j=0;j<3;j++) {
+            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+
+        }
+    }
+
+
     // update the parametric filters 
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
     dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
