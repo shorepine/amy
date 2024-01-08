@@ -2,41 +2,12 @@
 
 #include "amy.h"
 
-typedef struct {
-    uint32_t offset;
-    uint32_t length;
-    uint32_t loopstart;
-    uint32_t loopend;
-    uint8_t midinote;
-} pcm_map_t;
 
-#if AMY_PCM_PATCHES_SIZE == 3
-#include "pcm_large.h"
-#include "pcm_samples_large.h"
-#elif AMY_PCM_PATCHES_SIZE == 2
-#include "pcm_small.h"
-#include "pcm_samples_small.h"
-#else
-#include "pcm_tiny.h"
-#include "pcm_samples_tiny.h"
-#endif
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
 
 void pcm_init() {
-/*
-    // For ESP, we can mmap the PCM blob on the luts partition -- do this if you are using OTA 
-#ifdef ESP_PLATFORM
-    spi_flash_mmap_handle_t mmap_handle;
-    const esp_partition_t * pcm_part  = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, "luts");
-    esp_err_t err = esp_partition_mmap(pcm_part, 0, PCM_LENGTH*2, SPI_FLASH_MMAP_DATA, (const void**)&pcm, &mmap_handle);
-    if(err != ESP_OK) {
-        printf("err doing pcm mmap: %d %s\n", err, esp_err_to_name(err));
-    }
-#else
-    pcm = pcm_desktop;
-#endif
-*/
+
 }
 
 // How many bits used for fractional part of PCM table index.
@@ -45,7 +16,9 @@ void pcm_init() {
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
 
 void pcm_note_on(uint16_t osc) {
-    if(synth[osc].patch < 0) synth[osc].patch = 0;
+    //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
+    //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
+    if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
     if(synth[osc].logfreq_coefs[0] <= 0) {
         // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.

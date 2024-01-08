@@ -22,8 +22,13 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy_start();
+    amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
 }
+
+void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus) {
+    amy_start(cores, reverb, chorus);
+}
+
 
 
 void AMY::reset() {
@@ -31,8 +36,10 @@ void AMY::reset() {
 }
 
 
-// Multicore rendering support
-#if AMY_CORES == 2
+void AMY::restart() {
+    amy_restart();
+}
+
 
 // (From either core) prepare to render multicore
 void AMY::prepare() {
@@ -40,30 +47,23 @@ void AMY::prepare() {
 }
 
 void AMY::volume(float vol) {
-    global.volume = vol;
+    amy_global.volume = vol;
 }
 
 
 // From each core, render
 void AMY::render(uint16_t start, uint16_t end, uint8_t core) {
-    render_task(start, end, core);
+    amy_render(start, end, core);
 }
 
-// From either core, combine rendering and output finished audio buffer
-int16_t * AMY::get_buffer() {
+int16_t * AMY::fill_buffer() {
     return amy_fill_buffer();
 }
 
-#else
-
-// Render and return a completed buffer in single core mode.
-int16_t * AMY::get_buffer() {
-    amy_prepare_buffer();
-    render_task(0, AMY_OSCS, 0);
-    return amy_fill_buffer();
+int16_t * AMY::render_to_buffer() {
+    return amy_simple_fill_buffer();
 }
 
-#endif
 
 void AMY::fm(int32_t start) {
     example_multimbral_fm(start, 0);

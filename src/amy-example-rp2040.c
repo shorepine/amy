@@ -46,7 +46,12 @@ void delay_ms(uint32_t ms) {
 
 
 void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
-    int16_t *block = fill_audio_buffer_task();
+    
+    amy_prepare_buffer();
+    send_message_to_other_core(32);
+    amy_render(0, AMY_OSCS/2, 0);
+    await_message_from_other_core(64);
+    int16_t *block = amy_fill_buffer();
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
     int16_t *samples = (int16_t *) buffer->buffer->bytes;
@@ -97,11 +102,11 @@ struct audio_buffer_pool *init_audio() {
 void core1_main() {
     while(1) {
         int32_t ret = 0;
-        while(ret!=64) ret = await_message_from_other_core();
+        while(ret!=32) ret = await_message_from_other_core();
         gpio_put(CPU1_METER, 1);
-        render_task(AMY_OSCS/2, AMY_OSCS, 1);
+        amy_render(AMY_OSCS/2, AMY_OSCS, 1);
         gpio_put(CPU1_METER, 0);
-        send_message_to_other_core(32);
+        send_message_to_other_core(64);
     }
 
 }
@@ -115,17 +120,15 @@ int main() {
 
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
-    //getchar();
-    #if AMY_CORES == 2
+    if(AMY_CORES>1)
         multicore_launch_core1(core1_main);
-    #endif
 
     gpio_put(LED_PIN, 0);
 
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
-    amy_start();
+    amy.begin(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 0);
 
     gpio_init(CPU0_METER);
     gpio_set_dir(CPU0_METER, GPIO_OUT);

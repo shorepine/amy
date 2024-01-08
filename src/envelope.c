@@ -6,6 +6,7 @@
 extern struct synthinfo* synth;
 extern struct mod_synthinfo* msynth;
 extern struct mod_state mglobal;
+extern const int16_t pcm[];
 
 
 SAMPLE compute_mod_value(uint16_t mod_osc) {
@@ -25,7 +26,8 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     if(synth[mod_osc].wave == PULSE) value = compute_mod_pulse(mod_osc);
     if(synth[mod_osc].wave == TRIANGLE) value = compute_mod_triangle(mod_osc);
     if(synth[mod_osc].wave == SINE) value = compute_mod_sine(mod_osc);
-    if(synth[mod_osc].wave == PCM) value = compute_mod_pcm(mod_osc);
+    if(pcm_samples)
+        if(synth[mod_osc].wave == PCM) value = compute_mod_pcm(mod_osc);
     synth[mod_osc].mod_value = value;
     return value;
 }
@@ -57,6 +59,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     // We have to aim to overshoot to the desired gap so that we hit the target by exponential_rate time.
     const SAMPLE exponential_rate_overshoot_factor = F2S(1.0f / (1.0f - exp2f(EXP_RATE_VAL)));
     uint32_t elapsed = 0;    
+
 
     // Find out which one is release (the last one)
     

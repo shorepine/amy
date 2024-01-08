@@ -10,6 +10,16 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+
+typedef struct {
+    uint32_t offset;
+    uint32_t length;
+    uint32_t loopstart;
+    uint32_t loopend;
+    uint8_t midinote;
+} pcm_map_t;
+
+
 #include "amy_config.h"
 
 // Rest of amy setup
@@ -109,7 +119,7 @@ typedef int amy_err_t;
 
 #include "amy_fixedpoint.h"
 
-#if defined ARDUINO && !defined TLONG
+#if defined ARDUINO && !defined TLONG && !defined ESP_PLATFORM
 #include "avr/pgmspace.h" // for PROGMEM, DMAMEM, FASTRUN
 #else
 #define PROGMEM 
@@ -284,13 +294,14 @@ struct mod_synthinfo {
     float feedback;
 };
 
+
 // Callbacks, override if you'd like after calling amy_start()
 //void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
-
-void render_task(uint16_t start, uint16_t end, uint8_t core);
+int16_t * amy_simple_fill_buffer() ;
+void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();
@@ -311,6 +322,9 @@ SAMPLE exp2_lut(SAMPLE x);
 
 // global synth state
 struct state {
+    uint8_t cores;
+    uint8_t has_reverb;
+    uint8_t has_chorus;
     float volume;
     // State of fixed dc-blocking HPF
     SAMPLE hpf_state;
@@ -325,17 +339,14 @@ struct state {
 extern uint32_t total_samples;
 extern struct synthinfo *synth;
 extern struct mod_synthinfo *msynth; // the synth that is being modified by modulations & envelopes
-extern struct state global; 
+extern struct state amy_global; 
 
-int8_t oscs_init();
 
 float atoff(const char *s);
-int parse_float_list_message(char *message, float *vals, int max_num_vals);
-int parse_int_list_message(char *message, int16_t *vals, int max_num_vals);
-void parse_algorithm_source(struct synthinfo * e, char* message) ;
+int8_t oscs_init();
 void parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
+void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
-int16_t * fill_audio_buffer_task();
 void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
 
@@ -347,7 +358,8 @@ void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 // external functions
 void amy_play_message(char *message);
 struct event amy_parse_message(char * message);
-void amy_start();
+void amy_restart();
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();
@@ -359,6 +371,7 @@ extern float render_am_lut(float * buf, float step, float skip, float incoming_a
 extern void ks_init();
 extern void ks_deinit();
 extern void algo_init();
+extern void algo_deinit();
 extern void pcm_init();
 extern void render_ks(SAMPLE * buf, uint16_t osc); 
 extern void render_sine(SAMPLE * buf, uint16_t osc); 

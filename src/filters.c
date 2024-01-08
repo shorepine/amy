@@ -6,12 +6,13 @@
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
 #define LOWEST_RATIO 0.0001
 
-SAMPLE coeffs[AMY_OSCS][5];
-//SAMPLE filter_delay[AMY_OSCS][FILT_NUM_DELAYS];
-//SAMPLE filter_delay2[AMY_OSCS][FILT_NUM_DELAYS];
+#define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
-SAMPLE eq_coeffs[3][5];
-SAMPLE eq_delay[AMY_NCHANS][3][FILT_NUM_DELAYS];
+SAMPLE ** coeffs;
+SAMPLE ** filter_delay;
+SAMPLE ** eq_coeffs;
+SAMPLE *** eq_delay;
+
 
 
 float dsps_sqrtf_f32_ansi(float f)
@@ -209,6 +210,30 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
+void update_filter(uint16_t osc) {
+    // reset the delay for a filter
+    // normal mod / adsr will just change the coeffs
+    filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
+}
+
+
+void filters_deinit() {
+    for(uint16_t i=0;i<AMY_NCHANS;i++) {
+        for(uint16_t j=0;j<3;j++) free(eq_delay[i][j]);
+        free(eq_delay[i]);
+    }
+    for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        free(coeffs[i]);
+        free(filter_delay[i]);
+    }
+    free(coeffs);
+    free(eq_coeffs);
+    free(filter_delay);
+    free(eq_delay);
+}
+
+
 void filters_init() {
     // update the parametric filters 
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
@@ -231,10 +256,10 @@ void parametric_eq_process(SAMPLE *block) {
         dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            output[0][i] = FILT_MUL_SS(output[0][i], global.eq[0]) - FILT_MUL_SS(output[1][i], global.eq[1]);
+            output[0][i] = FILT_MUL_SS(output[0][i], amy_global.eq[0]) - FILT_MUL_SS(output[1][i], amy_global.eq[1]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], global.eq[2]);
+            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
     }
 }
 
@@ -331,8 +356,6 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     block_denorm(block, AMY_BLOCK_SIZE, normbits);
 }
 
-void filters_deinit() {
-}
 
 void reset_filter(uint16_t osc) {
     // Reset all the filter state to zero.

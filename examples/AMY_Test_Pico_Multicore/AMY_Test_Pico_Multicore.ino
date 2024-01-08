@@ -1,6 +1,9 @@
 #include <AMY-Arduino.h>
 #include <I2S.h>
 
+// If you want smaller PCM samples to fit on flash, include it here
+#include "pcm_small.h"
+
 
 // This example renders complex FM tones on both processors of a Pi Pico. 
 // Set this to CPU 250MHz (overclocked) and -O3
@@ -26,7 +29,7 @@ void setup() {
   i2s.begin(AMY_SAMPLE_RATE);
 
   // Start up AMY
-  amy.begin();
+  amy.begin(2, 0, 0);
 
   amy.volume(1);
 

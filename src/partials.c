@@ -3,7 +3,6 @@
 
 #include "amy.h"
 
-#if AMY_HAS_PARTIALS == 1
 
 typedef struct {
     uint32_t bp_offset;
@@ -68,9 +67,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
                 // It's time for the next breakpoint!
                 uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
-                #ifdef ESP_PLATFORM
-                if(o % 2) o = o + 32; // scale
-                #endif
                 // Find our ratio using the midi note of the analyzed partial
                 float freq_logratio = msynth[osc].logfreq - logfreq_for_midi_note(patch.midi_note);
 
@@ -140,9 +136,6 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
     uint16_t oscs = patch.oscs_alloc;
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
-        #ifdef ESP_PLATFORM
-            if(o % 2) o = o + 32; // scale
-        #endif
         if(synth[o].status ==IS_ALGO_SOURCE) {
             hold_and_modify(o);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
@@ -157,4 +150,3 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
     }
 }
 
-#endif

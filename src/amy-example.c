@@ -2,15 +2,17 @@
 // a simple C example that plays audio using AMY out your speaker 
 
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
-
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
+
+
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
-    
+    //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
+
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 
@@ -43,8 +45,9 @@ int main(int argc, char ** argv) {
         } 
     }
     uint32_t start = amy_sysclock();
-
-    amy_start();
+    
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
+    
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
     ma_encoder encoder;
     ma_result result;
@@ -63,7 +66,6 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-
     bleep(start);
 
     example_drums(start+500, 4);
@@ -72,7 +74,7 @@ int main(int argc, char ** argv) {
     // Now just spin for 10s
     while(amy_sysclock() - start < 5000) {
         if (output_filename) {
-            int16_t *frames = fill_audio_buffer_task();
+            int16_t * frames = amy_simple_fill_buffer();
             int num_frames = AMY_BLOCK_SIZE;
             result = ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
         }

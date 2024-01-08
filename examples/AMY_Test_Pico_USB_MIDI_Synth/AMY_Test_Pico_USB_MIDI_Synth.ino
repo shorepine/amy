@@ -48,7 +48,7 @@ void setup() {
   while( !TinyUSBDevice.mounted() ) delay(1);
 
   // Start up AMY
-  amy.begin();
+  amy.begin(1, 0, 0);
 }
 
 

@@ -1,60 +1,30 @@
 /* 
     Configuration for AMY. We make guesses here based on your arch, but feel free to make changes for your own code.
 */
+#include "amy.h"
 
-// # of simultaneous oscs to keep track of 
+// You can edit these here if you want to 
+#define AMY_BLOCK_SIZE 256
+#define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
 #define AMY_OSCS 120
-
-// If using a multi-core capable device, how many cores to render from
-#ifdef ARDUINO
-#define AMY_CORES 2
-#elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
-#define AMY_CORES 2
-#else
-#define AMY_CORES 1              
-#endif
-
-// 1 == tiny PCM, 2 == small, 3 = large PCM samples stored in the program
-#ifdef TULIP
-    #define AMY_PCM_PATCHES_SIZE 2
-#elif defined ARDUINO
-    #if defined ARDUINO_ARCH_RP2040 || defined ESP_PLATFORM
-        #define AMY_PCM_PATCHES_SIZE 2
-    #else
-        #define AMY_PCM_PATCHES_SIZE 1
-    #endif
-#elif defined ALLES
-    #define AMY_PCM_PATCHES_SIZE 3
-#elif defined PICO_ON_DEVICE || defined ESP_PLATFORM
-        #define AMY_PCM_PATCHES_SIZE 2
-#else
-    #define AMY_PCM_PATCHES_SIZE 3
-#endif
+#define AMY_SAMPLE_RATE 44100 
+#define AMY_NCHANS 2
 
 
-#define AMY_EVENT_FIFO_LEN 2000  // number of events the queue can store
+// These are overriden for you if you include pcm_X.h {tiny, small, large}
+extern const int16_t pcm[];
+extern const pcm_map_t pcm_map[];
+extern const uint16_t pcm_samples;
+
+#define AMY_CORES amy_global.cores
+#define AMY_HAS_REVERB amy_global.has_reverb
+#define AMY_HAS_CHORUS amy_global.has_chorus
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
-#define AMY_SAMPLE_RATE 44100    // playback sample rate
-#ifdef ALLES
-#define AMY_NCHANS 1             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
-#else
-#define AMY_NCHANS 2             // 1 = mono output, 'Q' (pan) ignored. 2 = Enable 2-channel output, pan, etc.
-#endif
-
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
-
-#ifdef ALLES
-#define AMY_HAS_CHORUS 1         // Alles can do chorus
-#define AMY_HAS_REVERB 0         // Alles doesn't have the RAM for reverb
-#elif defined PICO_ON_DEVICE || defined ARDUINO_ARCH_RP2040
-#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
-#define AMY_HAS_REVERB 0         // 1 = Make reverb available (uses RAM)
-#else
-#define AMY_HAS_CHORUS 1         // 1 = Make chorus available (uses RAM)
-#define AMY_HAS_REVERB 1         // 1 = Make reverb available (uses RAM)
-#endif
-
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#define PCM_AMY_SAMPLE_RATE 22050
+#define AMY_EVENT_FIFO_LEN 2000
+
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
@@ -104,9 +74,6 @@
 #define REVERB_DEFAULT_XOVER_HZ 3000.0f
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
-
-#define AMY_BLOCK_SIZE 256       // buffer block size in samples
-#define BLOCK_SIZE_BITS 8    // log_2(BLOCK_SIZE)
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.
