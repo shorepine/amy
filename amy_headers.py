@@ -359,9 +359,14 @@ def generate_all():
     LUTentry = collections.namedtuple('LUTentry', ['table', 'highest_harmonic'])
 
     # Impulses.
-    impulse_lutset = create_lutset(LUTentry, np.ones(128))
-    #write_lutset_to_h('src/impulse_lutset.h', 'impulse', impulse_lutset)
-    write_lutset_to_h_as_fxpt('src/impulse_lutset_fxpt.h', 'impulse', impulse_lutset)
+    #impulse_lutset = create_lutset(LUTentry, np.ones(128))
+    ##write_lutset_to_h('src/impulse_lutset.h', 'impulse', impulse_lutset)
+    #write_lutset_to_h_as_fxpt('src/impulse_lutset_fxpt.h', 'impulse', impulse_lutset)
+
+    # Saw_up.
+    saw_lutset = create_lutset(LUTentry, [0] + list(-1 / np.arange(1, 256)), -np.pi/2 * np.ones(256))
+    #write_lutset_to_h('src/saw_lutset.h', 'saw', saw_lutset)
+    write_lutset_to_h_as_fxpt('src/saw_lutset_fxpt.h', 'saw', saw_lutset)
 
     # Triangle wave lutset
     n_harms = 64

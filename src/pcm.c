@@ -4,7 +4,7 @@
 
 
 
-#define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / AMY_MIDI0_HZ)
+#define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
 
 void pcm_init() {
 
@@ -20,9 +20,9 @@ void pcm_note_on(uint16_t osc) {
     //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
     if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
-    if(synth[osc].logfreq <= 0) {
-        synth[osc].logfreq = PCM_AMY_LOG2_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
-        //synth[osc].freq = PCM_AMY_SAMPLE_RATE; // / freq_for_midi_note(patch->midinote);
+    if(synth[osc].logfreq_coefs[0] <= 0) {
+        // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.
+        synth[osc].logfreq_coefs[0] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
     }
     synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
 }
@@ -45,11 +45,11 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
     // Patches can be > 32768 samples long.
     // We need s16.15 fixed-point indexing.
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
-    float playback_freq = PCM_AMY_SAMPLE_RATE;
-    if(msynth[osc].logfreq < PCM_AMY_LOG2_SAMPLE_RATE) { // user adjusted freq 
-        playback_freq = exp2f(msynth[osc].logfreq - logfreq_for_midi_note(patch->midinote)) * PCM_AMY_SAMPLE_RATE;
-        //printf("slf %f logfreq %f notelogfreq %f playback_freq %f\n", synth[osc].logfreq, msynth[osc].logfreq, logfreq_for_midi_note(patch->midinote), playback_freq);
-    }
+    float logfreq = msynth[osc].logfreq;
+    // If osc[midi_note] is unset, apply patch's default here.
+    if (!AMY_IS_SET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch->midinote);
+    float playback_freq = freq_of_logfreq(logfreq);  // PCM_SAMPLE_RATE modified by
+
     SAMPLE amp = F2S(msynth[osc].amp);
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
     const LUTSAMPLE* table = pcm + patch->offset;

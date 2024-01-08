@@ -26,17 +26,27 @@ typedef struct {
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
 #define MAX_BREAKPOINTS 8
-#define MAX_BREAKPOINT_SETS 3
+#define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define BYTES_PER_SAMPLE 2
 
+// Constants for filters.c, needed for synth structure.
+#define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
+
+//#define LINEAR_INTERP        // use linear interp for oscs
+// "The cubic stuff is just showing off.  One would only ever use linear in prod." -- dpwe, May 10 2021 
+//#define CUBIC_INTERP         // use cubic interpolation for oscs
 typedef int16_t output_sample_type;
 // Sample values for modulation sources
 #define UP    32767
 #define DOWN -32768
 
+// Magic value for "0 Hz" in log-scale.
+#define ZERO_HZ_LOG_VAL -99.0
 // Frequency of Midi note 0, used to make logfreq scales.
-#define AMY_MIDI0_HZ 8.175798915643707f
+// Have 0 be midi 60, C4, 261.63 Hz
+#define ZERO_LOGFREQ_IN_HZ 261.63
+#define ZERO_MIDI_NOTE 60
 
 // modulation/breakpoint target mask (int16)
 #define TARGET_AMP 1
@@ -50,12 +60,25 @@ typedef int16_t output_sample_type;
 #define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
 #define TARGET_PAN 0x200
 
+#define NUM_COMBO_COEFS 6  // 6 control-mixing params: const, note, velocity, env1, env2, mod
+enum coefs{
+    COEF_CONST = 0,
+    COEF_NOTE = 1,
+    COEF_VEL = 2,
+    COEF_EG0 = 3,
+    COEF_EG1 = 4,
+    COEF_MOD = 5
+};
+
 #define MAX_MESSAGE_LEN 255
 #define MAX_PARAM_LEN 64
+// synth[].filter_type values
+#define FILTER_NONE 0
 #define FILTER_LPF 1
 #define FILTER_BPF 2
 #define FILTER_HPF 3
-#define FILTER_NONE 0
+#define FILTER_LPF24 4
+// synth[].wave values
 #define SINE 0
 #define PULSE 1
 #define SAW_DOWN 2
@@ -67,14 +90,15 @@ typedef int16_t output_sample_type;
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
-#define OFF 11
-
+// synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
 #define PLAYED 2
 #define AUDIBLE 3
 #define IS_MOD_SOURCE 4
 #define IS_ALGO_SOURCE 5
+// Is this for .wave or .status?
+#define OFF 11
 
 #define true 1
 #define false 0
@@ -88,7 +112,7 @@ typedef int amy_err_t;
 #endif
 
 #ifndef MIN
-#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 
@@ -102,13 +126,23 @@ typedef int amy_err_t;
 #endif
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE, AMP, DUTY, FEEDBACK, FREQ, VELOCITY, PHASE, DETUNE, VOLUME, PAN, FILTER_FREQ /* 12 */,
-    RATIO, RESONANCE, 
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, BP2_TARGET, ALGORITHM, LATENCY /* 25 */,
-    ALGO_SOURCE_START=30, 
-    ALGO_SOURCE_END=30+MAX_ALGO_OPS,
-    BP_START=ALGO_SOURCE_END+1 /* 37 */,   
+    WAVE, PATCH, MIDI_NOTE,
+    AMP,
+    DUTY=AMP + NUM_COMBO_COEFS,
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,
+    FREQ,
+    VELOCITY=FREQ + NUM_COMBO_COEFS,
+    PHASE, DETUNE, VOLUME,
+    PAN,
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS,
+    RESONANCE, CHAINED_OSC,
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,
+    ALGO_SOURCE_START=100,
+    ALGO_SOURCE_END=100+MAX_ALGO_OPS,
+    BP_START=ALGO_SOURCE_END + 1,
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
+    CLONE_OSC,
     NO_PARAM
 };
 
@@ -158,19 +192,20 @@ struct event {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
-    float amp;
-    float duty;
+    float amp_coefs[NUM_COMBO_COEFS];
+    float freq_coefs[NUM_COMBO_COEFS];
+    float filter_freq_coefs[NUM_COMBO_COEFS];
+    float duty_coefs[NUM_COMBO_COEFS];
+    float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    float freq;
     float velocity;
     float phase;
     float detune;
     float volume;
-    float pan;
     uint16_t latency_ms;
-    float filter_freq;
     float ratio;
     float resonance;
+    uint16_t chained_osc;
     uint16_t mod_source;
     uint16_t mod_target;
     uint8_t algorithm;
@@ -181,10 +216,9 @@ struct event {
     char algo_source[MAX_PARAM_LEN];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
-    char bp2[MAX_PARAM_LEN];
     uint16_t bp0_target;
     uint16_t bp1_target;
-    uint16_t bp2_target;
+    uint16_t clone_osc;  // Only used as a flag.
     uint8_t status;
 };
 
@@ -194,22 +228,24 @@ struct synthinfo {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
-    float amp;
-    float duty;
+    float amp_coefs[NUM_COMBO_COEFS];
+    float logfreq_coefs[NUM_COMBO_COEFS];
+    float filter_logfreq_coefs[NUM_COMBO_COEFS];
+    float duty_coefs[NUM_COMBO_COEFS];
+    float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    float logfreq;
     uint8_t status;
     float velocity;
     PHASOR phase;
     float detune;
     float step;
     float substep;
-    SAMPLE sample;
+    SAMPLE sample;  // Used by KS, otherwise?
+    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE.
     float volume;
-    float pan;   // Pan parameters.
-    float filter_logfreq;
     float logratio;
     float resonance;
+    uint16_t chained_osc;
     uint16_t mod_source;
     uint16_t mod_target;
     uint8_t algorithm;
@@ -220,18 +256,16 @@ struct synthinfo {
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
+    uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
   
-    // State variable for the impulse-integrating oscs.
-    SAMPLE lpf_state;
+    // State variable for the dc-removal filter.
     SAMPLE hpf_state[2];
     // Constant offset to add to sawtooth before integrating.
     SAMPLE dc_offset;
-    // Decay alpha of LPF filter (e.g. 0.99 or 0.999).
-    SAMPLE lpf_alpha;
     // amplitude smoother
     SAMPLE last_amp;
     // Selected lookup table and size.
@@ -241,6 +275,10 @@ struct synthinfo {
     float eq_h;
     // For ALGO feedback ops
     SAMPLE last_two[2];
+    // For filters.  Need 2x because LPF24 uses two instances of filter.
+    SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
+    // The block-floating-point shift of the filter delay values.
+    int last_filt_norm_bits;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
@@ -277,7 +315,7 @@ void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay) ;
-void osc_note_on(uint16_t osc);
+void osc_note_on(uint16_t osc, float initial_freq);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
@@ -313,6 +351,8 @@ void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
 
 uint32_t ms_to_samples(uint32_t ms) ;
+
+void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 
 
 // external functions
@@ -356,20 +396,20 @@ extern SAMPLE compute_mod_saw_down(uint16_t osc);
 extern SAMPLE compute_mod_triangle(uint16_t osc);
 extern SAMPLE compute_mod_pcm(uint16_t osc);
 
-extern void ks_note_on(uint16_t osc); 
-extern void ks_note_off(uint16_t osc);
-extern void sine_note_on(uint16_t osc); 
+extern void sine_note_on(uint16_t osc, float initial_freq); 
 extern void fm_sine_note_on(uint16_t osc, uint16_t algo_osc); 
-extern void saw_down_note_on(uint16_t osc); 
-extern void saw_up_note_on(uint16_t osc); 
-extern void triangle_note_on(uint16_t osc); 
-extern void pulse_note_on(uint16_t osc); 
+extern void saw_down_note_on(uint16_t osc, float initial_freq); 
+extern void saw_up_note_on(uint16_t osc, float initial_freq); 
+extern void triangle_note_on(uint16_t osc, float initial_freq); 
+extern void pulse_note_on(uint16_t osc, float initial_freq); 
 extern void pcm_note_on(uint16_t osc);
 extern void pcm_note_off(uint16_t osc);
 extern void partial_note_on(uint16_t osc);
 extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc);
-extern void algo_note_off(uint16_t osc) ;
+extern void algo_note_off(uint16_t osc);
+extern void ks_note_on(uint16_t osc); 
+extern void ks_note_off(uint16_t osc);
 extern void sine_mod_trigger(uint16_t osc);
 extern void saw_down_mod_trigger(uint16_t osc);
 extern void saw_up_mod_trigger(uint16_t osc);
@@ -385,7 +425,7 @@ extern void filters_init();
 extern void filters_deinit();
 extern void filter_process(SAMPLE * block, uint16_t osc);
 extern void parametric_eq_process(SAMPLE *block);
-extern void update_filter(uint16_t osc);
+extern void reset_filter(uint16_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);
 extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
 extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);

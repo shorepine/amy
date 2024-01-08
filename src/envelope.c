@@ -14,20 +14,27 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     // i.e., this oscillator is acting as modulation for something, so
     // just calculate that modulation rate (without knowing what it
     // modulates).
-    if(synth[mod_osc].wave == NOISE) return compute_mod_noise(mod_osc);
-    if(synth[mod_osc].wave == SAW_DOWN) return compute_mod_saw_down(mod_osc);
-    if(synth[mod_osc].wave == SAW_UP) return compute_mod_saw_up(mod_osc);
-    if(synth[mod_osc].wave == PULSE) return compute_mod_pulse(mod_osc);
-    if(synth[mod_osc].wave == TRIANGLE) return compute_mod_triangle(mod_osc);
-    if(synth[mod_osc].wave == SINE) return compute_mod_sine(mod_osc);
+    // Has this mod value already been calculated this frame?  Can't
+    // recalculate, because compute_mod advance phase internally.
+    if (synth[mod_osc].mod_value_clock == total_samples)
+        return synth[mod_osc].mod_value;
+    synth[mod_osc].mod_value_clock = total_samples;
+    SAMPLE value = 0;
+    if(synth[mod_osc].wave == NOISE) value = compute_mod_noise(mod_osc);
+    if(synth[mod_osc].wave == SAW_DOWN) value = compute_mod_saw_down(mod_osc);
+    if(synth[mod_osc].wave == SAW_UP) value = compute_mod_saw_up(mod_osc);
+    if(synth[mod_osc].wave == PULSE) value = compute_mod_pulse(mod_osc);
+    if(synth[mod_osc].wave == TRIANGLE) value = compute_mod_triangle(mod_osc);
+    if(synth[mod_osc].wave == SINE) value = compute_mod_sine(mod_osc);
     if(pcm_samples)
-        if(synth[mod_osc].wave == PCM) return compute_mod_pcm(mod_osc);
-    return 0;
+        if(synth[mod_osc].wave == PCM) value = compute_mod_pcm(mod_osc);
+    synth[mod_osc].mod_value = value;
+    return value;
 }
 
 SAMPLE compute_mod_scale(uint16_t osc) {
     uint16_t source = synth[osc].mod_source;
-    if(AMY_IS_SET(synth[osc].mod_target) && AMY_IS_SET(source)) {
+    if(AMY_IS_SET(source)) {
         if(source != osc) {  // that would be weird
             hold_and_modify(source);
             return compute_mod_value(source);
@@ -45,13 +52,14 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     uint32_t t1,t0;
     SAMPLE v1, v0;
     int8_t bp_r = 0;
-    t0 = 0; v0 = 1.0;
+    t0 = 0; v0 = 0;
     // exp2(4.328085) = exp(3.0)
     #define EXP_RATE_VAL -4.328085
     const SAMPLE exponential_rate = F2S(EXP_RATE_VAL);
     // We have to aim to overshoot to the desired gap so that we hit the target by exponential_rate time.
     const SAMPLE exponential_rate_overshoot_factor = F2S(1.0f / (1.0f - exp2f(EXP_RATE_VAL)));
     uint32_t elapsed = 0;    
+
 
     // Find out which one is release (the last one)
     
@@ -135,7 +143,6 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         t0 = synth[osc].breakpoint_times[bp_set][found-1];
         v0 = F2S(synth[osc].breakpoint_values[bp_set][found-1]);
     }
-    //printf("found %d bp_r %d release %d v0 %f\n", found, bp_r, release, S2F(v0));
     SAMPLE scale = v0;
     int sign = 1;
     if (v0 < 0 || v1 < 0) {
@@ -201,13 +208,13 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
             //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", total_samples, bp_set, found, time_ratio, S2F(scale));
         }
     }
-    // If sign is negative, render the env as 1 - ADSR.
+    // If sign is negative, flip it back again.
     if (sign < 0) {
-        scale = F2S(1.0f) - scale;
+        scale = -scale;
     }
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
-    //printf("env: time %lld bpset %d seg %d t0 %d t1 %d elapsed %lld v0 %f v1 %f scale %f\n", total_samples, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //printf("env: time %f osc %d bpset %d seg %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     return scale;
 }
 

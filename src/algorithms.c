@@ -163,16 +163,23 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
 
     // amp LFO
     //synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
-    synth[target_oscs[6]].logfreq = logfreq_of_freq(p.lfo_freq * time_ratio);
+    synth[target_oscs[6]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(p.lfo_freq * time_ratio);
+    synth[target_oscs[6]].logfreq_coefs[COEF_NOTE] = 0;
     synth[target_oscs[6]].wave = p.lfo_wave;
     synth[target_oscs[6]].status = IS_MOD_SOURCE;
-    synth[target_oscs[6]].amp = p.lfo_amp_amp;
+    synth[target_oscs[6]].amp_coefs[COEF_CONST] = p.lfo_amp_amp;
+    synth[target_oscs[6]].amp_coefs[COEF_VEL] = 0;
+    synth[target_oscs[6]].amp_coefs[COEF_EG0] = 0;
+
     // pitch LFO
     //synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
-    synth[target_oscs[7]].logfreq = logfreq_of_freq(p.lfo_freq * time_ratio);
+    synth[target_oscs[7]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(p.lfo_freq * time_ratio);
+    synth[target_oscs[6]].logfreq_coefs[COEF_NOTE] = 0;
     synth[target_oscs[7]].wave = p.lfo_wave;
     synth[target_oscs[7]].status = IS_MOD_SOURCE;
-    synth[target_oscs[7]].amp = p.lfo_pitch_amp;
+    synth[target_oscs[7]].amp_coefs[COEF_CONST] = p.lfo_pitch_amp;
+    synth[target_oscs[6]].amp_coefs[COEF_VEL] = 0;
+    synth[target_oscs[6]].amp_coefs[COEF_EG0] = 0;
 
 
     float last_release_time= 0;
@@ -183,17 +190,21 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
         operator_parameters_t op = p.ops[i];
         if (op.freq <= 0) {
             //synth[target_oscs[i]].freq = 0;
-            synth[target_oscs[i]].logfreq = 0;
+            synth[target_oscs[i]].logfreq_coefs[COEF_CONST] = 0;
         } else {
             //synth[target_oscs[i]].freq = op.freq;
-            synth[target_oscs[i]].logfreq = logfreq_of_freq(op.freq);
+            synth[target_oscs[i]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(op.freq);
         }
+        synth[target_oscs[i]].logfreq_coefs[COEF_NOTE] = 0;
         synth[target_oscs[i]].status = IS_ALGO_SOURCE;
         synth[target_oscs[i]].logratio = log2f(op.freq_ratio);
-        synth[target_oscs[i]].amp = op.amp;
-        synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
+        synth[target_oscs[i]].amp_coefs[COEF_CONST] = op.amp;
+        synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP + TARGET_DX7_EXPONENTIAL;
+        synth[target_oscs[i]].amp_coefs[COEF_VEL] = 0;
+        synth[target_oscs[i]].amp_coefs[COEF_EG0] = 1.0f;
         synth[target_oscs[i]].phase = F2P(0.25);
         synth[target_oscs[i]].mod_target = op.lfo_target;
+        apply_target_to_coefs(target_oscs[i], op.lfo_target, COEF_MOD);
         for(uint8_t j=0;j<NUM_ALGO_BPS;j++) {
             synth[target_oscs[i]].breakpoint_values[0][j] = op.amp_rate[j];
             synth[target_oscs[i]].breakpoint_times[0][j] =  ms_to_samples((int)((float)op.amp_time[j]/time_ratio));
@@ -210,14 +221,20 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     synth[osc].breakpoint_values[0][0] = 1;
     synth[osc].breakpoint_times[0][1] = ms_to_samples((int)((float)last_release_time/time_ratio));    
     synth[osc].breakpoint_values[0][1] = last_release_value;
-    synth[osc].breakpoint_target[0] = TARGET_AMP+TARGET_DX7_EXPONENTIAL;
+    synth[osc].breakpoint_target[0] = TARGET_AMP + TARGET_DX7_EXPONENTIAL;
+    synth[osc].amp_coefs[COEF_CONST] = 0;
+    synth[osc].amp_coefs[COEF_VEL] = 0;
+    synth[osc].amp_coefs[COEF_EG0] = 1.0f;
 
     // And the pitch BP for the root note
     for(uint8_t i=0;i<NUM_ALGO_BPS;i++) {
         synth[osc].breakpoint_values[1][i] = p.pitch_rate[i];
         synth[osc].breakpoint_times[1][i] = ms_to_samples((int)((float)p.pitch_time[i]/time_ratio));
     }
-    synth[osc].breakpoint_target[1] = TARGET_FREQ+TARGET_TRUE_EXPONENTIAL;
+    synth[osc].breakpoint_target[1] = TARGET_FREQ + TARGET_TRUE_EXPONENTIAL;
+    synth[osc].logfreq_coefs[COEF_EG1] = 1.0f;
+    synth[osc].logfreq_coefs[COEF_CONST] = -1.0f;
+    //synth[osc].logfreq_coefs[COEF_NOTE] = 0;
 
 }
 

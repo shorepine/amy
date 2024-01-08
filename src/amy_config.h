@@ -11,7 +11,6 @@
 #define AMY_NCHANS 2
 
 
-
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
@@ -20,11 +19,12 @@ extern const uint16_t pcm_samples;
 #define AMY_CORES amy_global.cores
 #define AMY_HAS_REVERB amy_global.has_reverb
 #define AMY_HAS_CHORUS amy_global.has_chorus
-#define AMY_EVENT_FIFO_LEN 1000  // number of events the queue can store
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
 #define PCM_AMY_SAMPLE_RATE 22050
+#define AMY_EVENT_FIFO_LEN 2000
+
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM

@@ -76,7 +76,7 @@
 #define P2F(p) (p)
 #define F2P(f) ((f) - floorf(f))
 
-#define AMY_I2S(i, b) ((i) / (float)(1 << (b)))
+#define I2S(i, b) ((i) / (float)(1 << (b)))
 // Integer part of s interpreted as a proportion of a b-bit table.
 #define INT_OF_S(s, b) ((int)floorf((s) * (float)(1 << (b))))
 #define S_FRAC_OF_S(s, b) ((s) * (1 << (b)) - floorf((s) * (1 << (b))))
@@ -85,12 +85,13 @@
 #define MUL4_SS(a, b) ((a) * (b))
 #define MUL8_SS(a, b) ((a) * (b))
 #define MUL8F_SS(a, b) ((a) * (b))
+#define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
 
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
 #define SHIFTL(s, b) ((s) * exp2f(b))
 
-#define INT_OF_P(p, b) ((int)floorf((p) * (float)(1 << (b))))
+#define INT_OF_P(p, b) (((int)floorf((p) * (float)(1 << (b))) + (1 << (b))) % (1 <<(b)))
 #define I2P(i, b) ((i) / (float)(1 << (b)))
 
 #define S_FRAC_OF_P(p, b) ((p) * (1 << (b)) - floorf((p) * (1 << (b))))
@@ -125,7 +126,7 @@ typedef int32_t s16_15; // s16.15 general
 // L is also the format used in the final output.
 #define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
 // Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
-#define AMY_I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
+#define I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
 // Convert S and integer-only part.
 // Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_S(S, B) (int32_t)(S >> (S_FRAC_BITS - B))
@@ -163,6 +164,9 @@ typedef int32_t s16_15; // s16.15 general
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
 #define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+
+// First argument is positive and less that 1/16, i.e. only 19 low-order bits.
+#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+14 = 15, result is >> 8.
 
 // Multiply a SAMPLE (s8.23) by a PHASOR (s.31) yeilding a SAMPLE, so 31 bits to lose.
 #define MUL4_SP_S(s, p) FXMUL_TEMPLATE(s, p, 11, 16, P_FRAC_BITS)  // need to lose 31 bits; 11+16=27, so 4 more on result

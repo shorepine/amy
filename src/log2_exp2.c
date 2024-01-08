@@ -24,7 +24,7 @@ SAMPLE log2_lut(SAMPLE x) {
         ++scale;
     }
     // lut_val is negated because table is stored as negative (to reach 1.0).
-    return AMY_I2S(scale, 0) - lut_val(x - F2S(1.0f), log2_fxpt_lutable, 8 /* =log_2(256) */);
+    return I2S(scale, 0) - lut_val(x - F2S(1.0f), log2_fxpt_lutable, 8 /* =log_2(256) */);
 }
 
 

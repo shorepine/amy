@@ -34,9 +34,31 @@ void example_ks(uint32_t start) {
 void example_sine(uint32_t start) {
     struct event e = amy_default_event();
     e.time = start;
-    e.freq = 440;
+    e.freq_coefs[0] = 440;
     e.wave = SINE;
     e.velocity = 1;
+    amy_add_event(e);
+}
+
+// Schedule a bleep now
+void bleep(uint32_t start) {
+    struct event e = amy_default_event();
+    int64_t sysclock = amy_sysclock();
+    e.osc = 0;
+    e.time = start;
+    e.wave = SINE;
+    e.freq_coefs[COEF_CONST] = 220;
+    amy_add_event(e);
+    e.velocity = 1;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    amy_add_event(e);
+    e.time = sysclock + 150;
+    e.freq_coefs[COEF_CONST] = 440;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(e);
+    e.time = sysclock + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
     amy_add_event(e);
 }
 
@@ -74,7 +96,7 @@ void example_multimbral_fm(int64_t start, int start_osc) {
 
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
-        e.pan = (i%2);
+        e.pan_coefs[0] = (i%2);
         //e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
         e.patch++;
         amy_add_event(e);
@@ -114,7 +136,8 @@ void example_drums(uint32_t start, int loops) {
     e.time = start;
     e.osc = 5;
     e.wave = SAW_DOWN;
-    e.filter_freq = 2500.0;
+    e.filter_freq_coefs[0] = 650.0;  // LOWEST filter center frequency.
+    e.filter_freq_coefs[3] = 2.0;  // When env0 is 1.0, filter is shifted up by 2.0 octaves (x4, so 2600.0).
     e.resonance = 5.0;
     e.filter_type = FILTER_LPF;
     e.bp0_target = TARGET_AMP + TARGET_FILTER_FREQ;
@@ -136,7 +159,7 @@ void example_drums(uint32_t start, int loops) {
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
-            AMY_UNSET(e.freq);
+            AMY_UNSET(e.freq_coefs[0]);
             
             int x = pattern[i];
             if(x & bd) {
