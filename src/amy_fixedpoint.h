@@ -153,6 +153,20 @@ typedef int32_t s16_15; // s16.15 general
 
 #define FXMUL_TEMPLATE(a, b, a_bitloss, b_bitloss, reqd_bitloss) ((((a) >> a_bitloss) * ((b) >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss))
 
+static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int b_bitloss, int reqd_bitloss) {
+    SAMPLE result = ((a >> (a_bitloss - 1)) * (b >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss);
+    // Carry: if result is positive and result & 1 is set, add 1.
+    // if result is negative and result & 1 is clear, sub 1.
+    // (In 2s complement, -1 is 0xFFFF and should round to -2 (0xFFFE) when shifting right 1 bit.
+    if (result & 1) {  // Carry bit set.
+        if (result > 0)   result = (result + 1);
+        else              result = (result - 1);
+    }
+    return result >> 1;  // final bit of shift down.
+}
+
+
+
 // Multiply two SAMPLE values when the result will always be [-1.0, 1.0).
 #define MUL0_SS(a, b) FXMUL_TEMPLATE(a, b, 8, 7, S_FRAC_BITS)  // 8+7 = 15, so additional 8 bits shift right on output to make 23 req'd total.
 
@@ -163,10 +177,12 @@ typedef int32_t s16_15; // s16.15 general
 #define MUL8_SS(a, b)  FXMUL_TEMPLATE(a, b, 12, 11, S_FRAC_BITS)  // 12+11 = 23, so no more shift on result.
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
-#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+//#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 13, 10, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
 
 // First argument is positive and less that 1/16, i.e. only 19 low-order bits.
-#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+14 = 15, result is >> 8.
+//#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
+#define MUL4E_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 9, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
 
 // Multiply a SAMPLE (s8.23) by a PHASOR (s.31) yeilding a SAMPLE, so 31 bits to lose.
 #define MUL4_SP_S(s, p) FXMUL_TEMPLATE(s, p, 11, 16, P_FRAC_BITS)  // need to lose 31 bits; 11+16=27, so 4 more on result

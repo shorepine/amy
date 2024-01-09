@@ -241,19 +241,18 @@ void filters_init() {
     eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, FBL_RAM_CAPS);
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
-        filter_delay[i] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+        filter_delay[i] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, FBL_RAM_CAPS);
     }
     for(uint16_t i=0;i<3;i++) {
-        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, FBL_RAM_CAPS);
     }
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
-        eq_delay[i] = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
+        eq_delay[i] = malloc_caps(sizeof(SAMPLE*) * 3, FBL_RAM_CAPS);
         for(uint16_t j=0;j<3;j++) {
-            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE)*FILT_NUM_DELAYS, FBL_RAM_CAPS);
+            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, FBL_RAM_CAPS);
 
         }
     }
-
 
     // update the parametric filters 
     dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
@@ -273,11 +272,11 @@ void parametric_eq_process(SAMPLE *block) {
     SAMPLE output[2][AMY_BLOCK_SIZE];
     for(int c = 0; c < AMY_NCHANS; ++c) {
         SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
-        dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
-        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
+        dsps_biquad_f32_ansi_split_fb(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
+        dsps_biquad_f32_ansi_split_fb(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
             output[0][i] = FILT_MUL_SS(output[0][i], amy_global.eq[0]) - FILT_MUL_SS(output[1][i], amy_global.eq[1]);
-        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
+        dsps_biquad_f32_ansi_split_fb(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
             cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
     }
@@ -292,7 +291,7 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
     for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
         SAMPLE w = buf[i] - xn1;
         xn1 = buf[i];
-        buf[i] = w + MUL4_SS(pole, yn1);
+        buf[i] = w + FILT_MUL_SS(pole, yn1);
         yn1 = buf[i];
     }
     state[0] = xn1;
