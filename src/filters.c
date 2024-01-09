@@ -358,6 +358,7 @@ void filter_process(SAMPLE * block, uint16_t osc) {
 #define HEADROOM_BITS 6
 #define STATE_HEADROOM_BITS 2
     int normbits = MIN(MAX(0, encl_log2(max) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
+    normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
     //printf("time %f max %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
     block_norm(block, AMY_BLOCK_SIZE, normbits);
     block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
