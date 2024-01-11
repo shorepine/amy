@@ -20,6 +20,12 @@ delay_line_t **delay_lines;
 pthread_mutex_t amy_queue_lock; 
 #endif
 
+#ifdef ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+extern SemaphoreHandle_t xQueueSemaphore;
+#endif
 
 // Global state 
 struct state amy_global;
@@ -1063,35 +1069,7 @@ void amy_prepare_buffer() {
 
 int16_t * amy_simple_fill_buffer() {
     amy_prepare_buffer();
-
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // Tell the rendering threads to start rendering
-    xTaskNotifyGive(amy_render_handle[0]);
-    if(AMY_CORES == 2) xTaskNotifyGive(amy_render_handle[1]);
-
-    // and wait for each of them to come back
-    ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-    if(AMY_CORES == 2) ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
-#elif defined PICO_ON_DEVICE
-    if(AMY_CORES == 2) {
-        // Tell renderer2 it's ok to render
-        multicore_fifo_push_blocking(32);
-        // Do renderer1
-        amy_render(0, AMY_OSCS/2, 0);
-
-        // and wait for other core to finish
-        int32_t ret = 0;
-        while (!multicore_fifo_rvalid());
-        ret = multicore_fifo_pop_blocking();
-    } else {
-        amy_render(0, AMY_OSCS/2, 0);
-    }
-
-#else
-    // todo -- there's no reason we can't multicore render on other platforms
     amy_render(0, AMY_OSCS, 0);
-#endif
-
     return amy_fill_buffer();
 }
 
