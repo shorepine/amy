@@ -149,9 +149,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         sign = -1;
         v0 = -v0; v1 = -v1;
     }
-    if(t1 < 0) { // || v1 < 0) {
-        scale = 0;
-    } else if(t1==t0 || elapsed==t1) {
+    if(t1==t0 || elapsed==t1) {
         // This way we return exact zero for v1 at the end of the segment, rather than BREAKPOINT_EPS
         scale = v1;
     } else {
