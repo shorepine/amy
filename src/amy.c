@@ -253,6 +253,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.algorithm);
     AMY_UNSET(e.bp0_target);
     AMY_UNSET(e.bp1_target);
+    AMY_UNSET(e.reset_osc);
     e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
@@ -340,6 +341,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.chained_osc)) { d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.clone_osc)) { d.param=CLONE_OSC; d.data = *(uint32_t *)&e.clone_osc; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.reset_osc)) { d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.bp0_target)) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.bp0_target; add_delta_to_queue(d); }
@@ -761,6 +763,7 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
+    if(d.param == RESET_OSC) { if(*(int16_t *)&d.data>AMY_OSCS) { amy_reset_oscs(); } else { reset_osc(*(int16_t *)&d.data); } }
     // todo: event-only side effect, remove
     if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(uint16_t *)&d.data; synth[*(uint16_t *)&d.data].status = IS_MOD_SOURCE; }
     if(d.param == MOD_TARGET) {
@@ -1288,7 +1291,6 @@ void parse_coef_message(char *message, float *coefs) {
 // given a string return an event
 struct event amy_parse_message(char * message) {
     uint8_t mode = 0;
-    uint16_t osc = 0;
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
@@ -1351,7 +1353,7 @@ struct event amy_parse_message(char * message) {
                         case 'P': e.phase=F2P(atoff(message + start)); break;
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
                         case 'R': e.resonance=atoff(message + start); break;
-                        case 'S': osc = atoi(message + start); if(osc > AMY_OSCS-1) { amy_reset_oscs(); } else { reset_osc(osc); } break;
+                        case 'S': e.reset_osc = atoi(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
                         case 'W': e.bp1_target = atoi(message + start);  break;
                         case 'v': e.osc=(atoi(message + start) % AMY_OSCS);  break; // allow osc wraparound

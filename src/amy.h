@@ -143,6 +143,7 @@ enum params{
     BP_START=ALGO_SOURCE_END + 1,
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
     CLONE_OSC,
+    RESET_OSC,
     NO_PARAM
 };
 
@@ -219,6 +220,7 @@ struct event {
     uint16_t bp0_target;
     uint16_t bp1_target;
     uint16_t clone_osc;  // Only used as a flag.
+    uint16_t reset_osc;
     uint8_t status;
 };
 
