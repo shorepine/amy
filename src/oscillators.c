@@ -60,6 +60,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
 // Multiple versions of render_lut with different features to avoid branches in sample loop.
 
 #define RENDER_LUT_PREAMBLE \
+    if(lut == NULL)  return phase;\
     int lut_mask = lut->table_size - 1; \
     int lut_bits = lut->log_2_table_size; \
     SAMPLE sample = 0; \
