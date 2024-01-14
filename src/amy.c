@@ -30,6 +30,7 @@ const char* profile_tag_name(enum itags tag) {
         case RENDER_LUT_FM_FB: return "RENDER_LUT_FM_FB";            
         case RENDER_LPF_LUT: return "RENDER_LPF_LUT";            
         case DSPS_BIQUAD_F32_ANSI_SPLIT_FB: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB";            
+        case DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE";
         case DSPS_BIQUAD_F32_ANSI_COMMUTED: return "DSPS_BIQUAD_F32_ANSI_COMMUTED";            
         case PARAMETRIC_EQ_PROCESS: return "PARAMETRIC_EQ_PROCESS";            
         case HPF_BUF: return "HPF_BUF";            
