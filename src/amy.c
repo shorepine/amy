@@ -45,7 +45,6 @@ const char* profile_tag_name(enum itags tag) {
 }
 struct profile profiles[NO_TAG];
 uint64_t profile_start_us = 0;
-uint64_t amy_get_us_time_per_1000000 = 0;
 
 #ifdef ESP_PLATFORM
 int64_t amy_get_us() { return esp_timer_get_time(); }
@@ -57,11 +56,6 @@ int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_s
 #endif
 
 void amy_profiles_init() { 
-    for(uint32_t i=0;i<1000000;i++) {
-        AMY_PROFILE_START(CALIBRATE);
-        AMY_PROFILE_STOP(CALIBRATE);
-    }
-    amy_get_us_time_per_1000000 = profiles[CALIBRATE].us_total;
     for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_INIT(i) } 
 } 
 void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } }
