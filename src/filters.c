@@ -216,7 +216,7 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
 #define FILTER_TWICE_LOOP(MULT) \
     assert(FILTER_SCALEUP_BITS == 0);                        \
     for (int i = 0 ; i < len ; i++) {                        \
-        SAMPLE x0 = FILT_MUL_SS(coef[0], input[i]);          \
+        SAMPLE x0 = FILT_MUL_SS(coef[0], SHIFTL(input[i], normbits));   \
         SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;                 \
         SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;                 \
         v0 = v0 - MULT(e, v1) + MULT(f, v2);                 \
@@ -229,10 +229,10 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
         v1 = v0; \
         y2 = y1; \
         y1 = y0; \
-        output[i] = y0;   \
+        output[i] = SHIFTR(y0, normbits);       \
     }
 
-int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, int normbits) {
     // Apply the filter twice
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -449,21 +449,21 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     normbits = MIN(normbits, synth[osc].last_filt_norm_bits + 1);  // Increase at most one bit per block.
     normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
     //printf("time %f max %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
-    block_norm(block, AMY_BLOCK_SIZE, normbits);
     block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
-    block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
+    //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
+        dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, normbits);
     } else {
+        block_norm(block, AMY_BLOCK_SIZE, normbits);
         dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
+        block_denorm(block, AMY_BLOCK_SIZE, normbits);
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
     synth[osc].last_filt_norm_bits = normbits;
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
-    //hpf_buf(block, &synth[osc].hpf_state[0]);
-    block_denorm(block, AMY_BLOCK_SIZE, normbits);
+    // hpf_buf(block, &synth[osc].hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
 
