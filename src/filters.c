@@ -170,15 +170,25 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
 // Template so we can have the same loop with different MULT functions.
 #define FILTER_LOOP(MULT) \
     for (int i = 0 ; i < len ; i++) { \
+        AMY_PROFILE_START(FILTER_LOOP_STAGE0) \
         SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS); \
+        AMY_PROFILE_STOP(FILTER_LOOP_STAGE0)\
+        AMY_PROFILE_START(FILTER_LOOP_STAGE1)\
         SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2); \
+        AMY_PROFILE_STOP(FILTER_LOOP_STAGE1)\
+        AMY_PROFILE_START(FILTER_LOOP_STAGE2)\
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2; \
+        AMY_PROFILE_STOP(FILTER_LOOP_STAGE2)\
+        AMY_PROFILE_START(FILTER_LOOP_STAGE3)\
         y0 = y0 - MULT(e, y1) + MULT(f, y2); \
+        AMY_PROFILE_STOP(FILTER_LOOP_STAGE3)\
         x2 = x1; \
         x1 = x0; \
         y2 = y1; \
         y1 = y0; \
+        AMY_PROFILE_START(FILTER_LOOP_STAGE4)\
         output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS); \
+        AMY_PROFILE_STOP(FILTER_LOOP_STAGE4)\
     }
 
 
