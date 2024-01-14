@@ -340,6 +340,9 @@ void block_denorm(SAMPLE* block, int len, int bits) {
 
 void filter_process(SAMPLE * block, uint16_t osc) {
     AMY_PROFILE_START(FILTER_PROCESS)
+
+    AMY_PROFILE_START(FILTER_PROCESS_STAGE0)
+
     float ratio = freq_of_logfreq(msynth[osc].filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
     if(synth[osc].filter_type==FILTER_LPF || synth[osc].filter_type==FILTER_LPF24)
@@ -352,6 +355,9 @@ void filter_process(SAMPLE * block, uint16_t osc) {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc].filter_type);
         return;
     }
+    AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
+
+    AMY_PROFILE_START(FILTER_PROCESS_STAGE1)
     SAMPLE max = scan_max(block, AMY_BLOCK_SIZE);
     // Also have to consider the filter state.
     SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
@@ -375,6 +381,7 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
     //hpf_buf(block, &synth[osc].hpf_state[0]);
     block_denorm(block, AMY_BLOCK_SIZE, normbits);
+    AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
 
 }

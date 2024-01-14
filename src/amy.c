@@ -14,6 +14,8 @@ const char* profile_tag_name(enum itags tag) {
         case COMPUTE_BREAKPOINT_SCALE: return "COMPUTE_BREAKPOINT_SCALE";
         case HOLD_AND_MODIFY: return "HOLD_AND_MODIFY";
         case FILTER_PROCESS: return "FILTER_PROCESS";
+        case FILTER_PROCESS_STAGE0: return "FILTER_PROCESS_STAGE0";
+        case FILTER_PROCESS_STAGE1: return "FILTER_PROCESS_STAGE1";
         case ADD_DELTA_TO_QUEUE: return "ADD_DELTA_TO_QUEUE";
         case AMY_ADD_EVENT: return "AMY_ADD_EVENT";
         case PLAY_EVENT: return "PLAY_EVENT";
