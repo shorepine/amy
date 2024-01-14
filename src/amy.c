@@ -39,6 +39,8 @@ const char* profile_tag_name(enum itags tag) {
         case BLOCK_NORM: return "BLOCK_NORM";       
         case FILTER_LOOP_MUL8F_SS: return "FILTER_LOOP_MUL8F_SS";
         case FILTER_LOOP_MUL4E_SS: return "FILTER_LOOP_MUL4E_SS";
+        case SHIFTR: return "SHIFTR";
+        case SHIFTL: return "SHIFTL";
         case NO_TAG: return "NO_TAG";
    }
 }

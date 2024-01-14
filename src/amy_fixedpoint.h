@@ -88,8 +88,15 @@
 #define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
 
-#define SHIFTR(s, b) ((s) * exp2f(-(b)))
-#define SHIFTL(s, b) ((s) * exp2f(b))
+#define SHIFTR(s, b) \
+    AMY_PROFILE_START(SHIFTR)\
+    ((s) * exp2f(-(b)));\
+    AMY_PROFILE_STOP(SHIFTR)
+
+#define SHIFTL(s, b) \
+    AMY_PROFILE_START(SHIFTL)\
+    ((s) * exp2f(b)); \
+    AMY_PROFILE_STOP(SHIFTL)
 
 #define INT_OF_P(p, b) (((int)floorf((p) * (float)(1 << (b))) + (1 << (b))) % (1 <<(b)))
 #define I2P(i, b) ((i) / (float)(1 << (b)))
