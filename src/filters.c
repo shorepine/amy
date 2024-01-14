@@ -193,9 +193,13 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
     if (e < F2S(0.0625)) { // 4 zeros at top of 23 bit frac part
+        AMY_PROFILE_START(FILTER_LOOP_MUL4E_SS);
         FILTER_LOOP(MUL4E_SS);
+        AMY_PROFILE_STOP(FILTER_LOOP_MUL4E_SS);
     } else {
+        AMY_PROFILE_START(FILTER_LOOP_MUL8F_SS);
         FILTER_LOOP(MUL8F_SS);
+        AMY_PROFILE_STOP(FILTER_LOOP_MUL8F_SS);
     }
     w[0] = x1;
     w[1] = x2;

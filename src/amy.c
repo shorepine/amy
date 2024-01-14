@@ -36,7 +36,9 @@ const char* profile_tag_name(enum itags tag) {
         case SCAN_MAX: return "SCAN_MAX";            
         case DSPS_BIQUAD_F32_ANSI: return "DSPS_BIQUAD_F32_ANSI";            
         case ENCL_LOG2: return "ENCL_LOG2";            
-        case BLOCK_NORM: return "BLOCK_NORM";            
+        case BLOCK_NORM: return "BLOCK_NORM";       
+        case FILTER_LOOP_MUL8F_SS: return "FILTER_LOOP_MUL8F_SS";
+        case FILTER_LOOP_MUL4E_SS: return "FILTER_LOOP_MUL4E_SS";
         case NO_TAG: return "NO_TAG";
    }
 }
