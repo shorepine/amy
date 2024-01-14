@@ -148,10 +148,13 @@ enum params{
 };
 
 #ifdef AMY_DEBUG
+      
 
 
 enum itags{
-    RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, NO_TAG
+    RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, ADD_DELTA_TO_QUEUE, 
+    AMY_ADD_EVENT, PLAY_EVENT,  MIX_WITH_PAN, AMY_RENDER, AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, 
+    AMY_PARSE_MESSAGE, NO_TAG
 };
 struct profile {
     uint32_t calls;
@@ -159,10 +162,13 @@ struct profile {
     uint64_t start;
 };
 
+extern uint64_t profile_start_us;
+
 #define AMY_PROFILE_INIT(tag) \
     profiles[tag].start = 0; \
     profiles[tag].calls = 0; \
-    profiles[tag].us_total = 0;
+    profiles[tag].us_total = 0; \
+    profile_start_us = amy_get_us();
 
 #define AMY_PROFILE_START(tag) \
     profiles[tag].start = amy_get_us();
@@ -172,8 +178,10 @@ struct profile {
     profiles[tag].calls++;
 
 #define AMY_PROFILE_PRINT(tag) \
-    fprintf(stderr,"tag %s calls %d total %lldus per call %lldus\n", \
-    profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, profiles[tag].us_total/profiles[tag].calls);
+    fprintf(stderr,"%30s: %10d calls %10lldus total [%2.4f%% of wall] %10lldus per call\n", \
+    profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
+    ((float)profiles[tag].us_total / (float)(amy_get_us() - profile_start_us))*100.0, \
+    profiles[tag].us_total/profiles[tag].calls);
 
 #else
 
