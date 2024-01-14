@@ -126,25 +126,27 @@ typedef int amy_err_t;
 #endif
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE,
-    AMP,
-    DUTY=AMP + NUM_COMBO_COEFS,
-    FEEDBACK=DUTY + NUM_COMBO_COEFS,
-    FREQ,
-    VELOCITY=FREQ + NUM_COMBO_COEFS,
-    PHASE, DETUNE, VOLUME,
-    PAN,
-    FILTER_FREQ=PAN + NUM_COMBO_COEFS,
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS,
-    RESONANCE, CHAINED_OSC,
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, EQ_L, EQ_M, EQ_H, BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,
-    ALGO_SOURCE_START=100,
-    ALGO_SOURCE_END=100+MAX_ALGO_OPS,
-    BP_START=ALGO_SOURCE_END + 1,
-    BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2),
-    CLONE_OSC,
-    RESET_OSC,
-    NO_PARAM
+    WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2
+    AMP,                                 // 3..8
+    DUTY=AMP + NUM_COMBO_COEFS,          // 9..14
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 15
+    FREQ,                                // 16..21
+    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 22
+    PHASE, DETUNE, VOLUME,               // 23, 24, 25
+    PAN,                                 // 26..31
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 32..37
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 38
+    RESONANCE, CHAINED_OSC,              // 39, 40
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, // 41, 42, 43
+    EQ_L, EQ_M, EQ_H,                    // 44, 45, 46
+    BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,  // 47, 48, 49, 50
+    ALGO_SOURCE_START=100,               // 100..105
+    ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
+    BP_START=ALGO_SOURCE_END + 1,        // 107..138
+    BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2), // 139
+    CLONE_OSC,                           // 140
+    RESET_OSC,                           // 141
+    NO_PARAM                             // 142
 };
 
 
