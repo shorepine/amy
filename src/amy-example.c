@@ -80,7 +80,6 @@ int main(int argc, char ** argv) {
         }
         usleep(THREAD_USLEEP);
     }
-    amy_profiles_print();
     show_debug(3);
 
     if (output_filename) {

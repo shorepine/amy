@@ -6,7 +6,6 @@
 #include "amy.h"
 
 #ifdef AMY_DEBUG
-
 const char* profile_tag_name(enum itags tag) {
     switch (tag) {
         case RENDER_OSC_WAVE: return "RENDER_OSC_WAVE";
@@ -16,41 +15,25 @@ const char* profile_tag_name(enum itags tag) {
         case NO_TAG: return "NO_TAG";
    }
 }
-
-
 struct profile profiles[NO_TAG];
-
 
 #ifdef ESP_PLATFORM
 int64_t amy_get_us() { return esp_timer_get_time(); }
+#elif defined PICO_ON_DEVICE
+int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
 #else
 #include <sys/time.h>
-int64_t amy_get_us() { 
-    struct timeval tv;
-    gettimeofday(&tv,NULL);
-    return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
-}
+int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_sec*(uint64_t)1000000+tv.tv_usec; }
 #endif
 
-void amy_profiles_init() {
-    for(uint8_t i=0;i<NO_TAG;i++) {
-        AMY_PROFILE_INIT(i)
-    }
-}
-
-void amy_profiles_print() {
-    for(uint8_t i=0;i<NO_TAG;i++) {
-        AMY_PROFILE_PRINT(i)
-    }    
-}
-
-
+void amy_profiles_init() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_INIT(i) } } 
+void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } }
 #else
-
 void amy_profiles_init() { void; };
 void amy_profiles_print() { void; };
-
 #endif
+
+
 
 // This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
 #include "pcm_small.h"
@@ -632,8 +615,12 @@ int8_t oscs_init() {
 }
 
 
+// types: 0 - show profile if set
+//        1 - show profile, queue
+//        2 - show profile, queue, osc data
 void show_debug(uint8_t type) {
-    if(type>1) {
+    amy_profiles_print();
+    if(type>0) {
         struct delta * ptr = amy_global.event_start;
         uint16_t q = amy_global.event_qsize;
         if(q > 25) q = 25;
@@ -642,7 +629,7 @@ void show_debug(uint8_t type) {
             ptr = ptr->next;
         }
     }
-    if(type>2) {
+    if(type>1) {
         // print out all the osc data
         //printf("global: filter %f resonance %f volume %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.status);
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", amy_global.volume, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
@@ -1471,9 +1458,7 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
     #endif
-    #ifdef AMY_DEBUG
-        amy_profiles_init();
-    #endif
+    amy_profiles_init();
     global_init();
     amy_global.cores = cores;
     amy_global.has_chorus = chorus;
