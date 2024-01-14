@@ -43,11 +43,13 @@ const char* profile_tag_name(enum itags tag) {
         case CALIBRATE: return "CALIBRATE";
         case NO_TAG: return "NO_TAG";
    }
+   return "ERROR";
 }
 struct profile profiles[NO_TAG];
 uint64_t profile_start_us = 0;
 
 #ifdef ESP_PLATFORM
+#include "esp_timer.h"
 int64_t amy_get_us() { return esp_timer_get_time(); }
 #elif defined PICO_ON_DEVICE
 int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }

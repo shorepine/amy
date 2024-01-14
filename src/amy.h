@@ -181,7 +181,7 @@ extern uint64_t profile_start_us;
     profiles[tag].calls++;
 
 #define AMY_PROFILE_PRINT(tag) \
-    fprintf(stderr,"%30s: %10d calls %10lldus total [%6.2f%% of wall, %6.2f%% of render] %10lldus per call\n", \
+    fprintf(stderr,"%40s: %10"PRIu32" calls %10"PRIu64"us total [%6.2f%% wall %6.2f%% render] %9"PRIu64"us per call\n", \
     profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
     ((float)(profiles[tag].us_total) / (float)(amy_get_us() - profile_start_us))*100.0, \
     ((float)(profiles[tag].us_total) / (float)(profiles[AMY_RENDER].us_total))*100.0, \
