@@ -157,7 +157,7 @@ enum itags{
     AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, AMY_PARSE_MESSAGE,RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
     RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
     PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, ENCL_LOG2, BLOCK_NORM, FILTER_LOOP_MUL8F_SS,
-    FILTER_LOOP_MUL4E_SS, NO_TAG
+    FILTER_LOOP_MUL4E_SS, CALIBRATE, NO_TAG
 };
 struct profile {
     uint32_t calls;
@@ -181,11 +181,12 @@ extern uint64_t profile_start_us;
     profiles[tag].calls++;
 
 #define AMY_PROFILE_PRINT(tag) \
-    fprintf(stderr,"%30s: %10d calls %10lldus total [%6.2f%% of wall, %6.2f%% of render] %10lldus per call\n", \
-    profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
-    ((float)profiles[tag].us_total / (float)(amy_get_us() - profile_start_us))*100.0, \
-    ((float)profiles[tag].us_total / (float)(profiles[AMY_RENDER].us_total))*100.0, \
-    profiles[tag].us_total/profiles[tag].calls);
+    uint64_t measure_loss = (profiles[tag].calls/1000000) * amy_get_us_time_per_1000000; \
+    fprintf(stderr,"%30s: %10d calls %10lldus total [%6.2f%% of wall, %6.2f%% of render] %10lldus per call %lldus loss\n", \
+    profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total-measure_loss, \
+    ((float)(profiles[tag].us_total-measure_loss) / (float)(amy_get_us() - profile_start_us))*100.0, \
+    ((float)(profiles[tag].us_total-measure_loss) / (float)(profiles[AMY_RENDER].us_total))*100.0, \
+    (profiles[tag].us_total-measure_loss)/profiles[tag].calls, measure_loss);
 
 #else
 
