@@ -116,6 +116,7 @@ PHASOR render_lut_fm_fb(SAMPLE* buf,
                         SAMPLE incoming_amp, SAMPLE ending_amp,
                         const LUT* lut,
                         SAMPLE* mod, SAMPLE feedback_level, SAMPLE* last_two) { 
+    AMY_PROFILE_START(RENDER_LUT_FM_FB)
     RENDER_LUT_PREAMBLE
     SAMPLE past0 = 0, past1 = 0;
     sample = last_two[0];
@@ -129,6 +130,7 @@ PHASOR render_lut_fm_fb(SAMPLE* buf,
     }
     last_two[0] = sample;
     last_two[1] = past0;
+    AMY_PROFILE_STOP(RENDER_LUT_FM_FB)
     return phase;
 }
 
@@ -138,6 +140,7 @@ PHASOR render_lut_fb(SAMPLE* buf,
                      SAMPLE incoming_amp, SAMPLE ending_amp,
                      const LUT* lut,
                      SAMPLE feedback_level, SAMPLE* last_two) {
+    AMY_PROFILE_START(RENDER_LUT_FB)
     RENDER_LUT_PREAMBLE
     SAMPLE past0 = 0, past1 = 0;
     sample = last_two[0];
@@ -151,6 +154,7 @@ PHASOR render_lut_fb(SAMPLE* buf,
     }
     last_two[0] = sample;
     last_two[1] = past0;
+    AMY_PROFILE_STOP(RENDER_LUT_FB)
     return phase;
 }
 
@@ -160,6 +164,7 @@ PHASOR render_lut_fm(SAMPLE* buf,
                      SAMPLE incoming_amp, SAMPLE ending_amp,
                      const LUT* lut,
                      SAMPLE* mod) {
+    AMY_PROFILE_START(RENDER_LUT_FM)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -168,6 +173,7 @@ PHASOR render_lut_fm(SAMPLE* buf,
 
         RENDER_LUT_LOOP_END
     }
+    AMY_PROFILE_STOP(RENDER_LUT_FM)
     return phase;
 }
 
@@ -176,6 +182,7 @@ PHASOR render_lut(SAMPLE* buf,
                   PHASOR step,
                   SAMPLE incoming_amp, SAMPLE ending_amp,
                   const LUT* lut) {
+    AMY_PROFILE_START(RENDER_LUT)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -184,6 +191,7 @@ PHASOR render_lut(SAMPLE* buf,
 
         RENDER_LUT_LOOP_END
      }
+    AMY_PROFILE_STOP(RENDER_LUT)
     return phase;
 }
 
@@ -192,6 +200,7 @@ PHASOR render_lut_cub(SAMPLE* buf,
                       PHASOR step,
                       SAMPLE incoming_amp, SAMPLE ending_amp,
                       const LUT* lut) {
+    AMY_PROFILE_START(RENDER_LUT_CUB)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -200,6 +209,7 @@ PHASOR render_lut_cub(SAMPLE* buf,
 
         RENDER_LUT_LOOP_END
      }
+    AMY_PROFILE_STOP(RENDER_LUT_CUB)
     return phase;
 }
 
@@ -211,6 +221,7 @@ void pulse_note_on(uint16_t osc, float freq) {
 }
 
 void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
+    AMY_PROFILE_START(RENDER_LPF_LUT)
     // Common function for pulse and saw.
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
@@ -229,6 +240,8 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
     }
     // Remember last_amp.
     synth[osc].last_amp = amp;
+    AMY_PROFILE_STOP(RENDER_LPF_LUT)
+
 }
 
 void render_pulse(SAMPLE* buf, uint16_t osc) {

@@ -7,6 +7,7 @@
 
 #ifdef AMY_DEBUG
 
+
 const char* profile_tag_name(enum itags tag) {
     switch (tag) {
         case RENDER_OSC_WAVE: return "RENDER_OSC_WAVE";
@@ -21,6 +22,12 @@ const char* profile_tag_name(enum itags tag) {
         case AMY_PREPARE_BUFFER: return "AMY_PREPARE_BUFFER";            
         case AMY_FILL_BUFFER: return "AMY_FILL_BUFFER";            
         case AMY_PARSE_MESSAGE: return "AMY_PARSE_MESSAGE";            
+        case RENDER_LUT_FM: return "RENDER_LUT_FM";            
+        case RENDER_LUT_FB: return "RENDER_LUT_FB";            
+        case RENDER_LUT: return "RENDER_LUT";            
+        case RENDER_LUT_CUB: return "RENDER_LUT_CUB";            
+        case RENDER_LUT_FM_FB: return "RENDER_LUT_FM_FB";            
+        case RENDER_LPF_LUT: return "RENDER_LPF_LUT";            
         case NO_TAG: return "NO_TAG";
    }
 }

@@ -154,7 +154,7 @@ enum params{
 enum itags{
     RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, ADD_DELTA_TO_QUEUE, 
     AMY_ADD_EVENT, PLAY_EVENT,  MIX_WITH_PAN, AMY_RENDER, AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, 
-    AMY_PARSE_MESSAGE, NO_TAG
+    AMY_PARSE_MESSAGE,RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, NO_TAG
 };
 struct profile {
     uint32_t calls;
@@ -178,7 +178,7 @@ extern uint64_t profile_start_us;
     profiles[tag].calls++;
 
 #define AMY_PROFILE_PRINT(tag) \
-    fprintf(stderr,"%30s: %10d calls %10lldus total [%2.4f%% of wall] %10lldus per call\n", \
+    fprintf(stderr,"%30s: %10d calls %10lldus total [%7.4f%% of wall] %10lldus per call\n", \
     profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
     ((float)profiles[tag].us_total / (float)(amy_get_us() - profile_start_us))*100.0, \
     profiles[tag].us_total/profiles[tag].calls);
