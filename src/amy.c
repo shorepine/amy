@@ -5,6 +5,52 @@
 
 #include "amy.h"
 
+#ifdef AMY_DEBUG
+
+const char* profile_tag_name(enum itags tag) {
+    switch (tag) {
+        case RENDER_OSC_WAVE: return "RENDER_OSC_WAVE";
+        case COMPUTE_BREAKPOINT_SCALE: return "COMPUTE_BREAKPOINT_SCALE";
+        case HOLD_AND_MODIFY: return "HOLD_AND_MODIFY";
+        case FILTER_PROCESS: return "FILTER_PROCESS";
+        case NO_TAG: return "NO_TAG";
+   }
+}
+
+
+struct profile profiles[NO_TAG];
+
+
+#ifdef ESP_PLATFORM
+int64_t amy_get_us() { return esp_timer_get_time(); }
+#else
+#include <sys/time.h>
+int64_t amy_get_us() { 
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec*(uint64_t)1000000+tv.tv_usec;
+}
+#endif
+
+void amy_profiles_init() {
+    for(uint8_t i=0;i<NO_TAG;i++) {
+        AMY_PROFILE_INIT(i)
+    }
+}
+
+void amy_profiles_print() {
+    for(uint8_t i=0;i<NO_TAG;i++) {
+        AMY_PROFILE_PRINT(i)
+    }    
+}
+
+
+#else
+
+void amy_profiles_init() { void; };
+void amy_profiles_print() { void; };
+
+#endif
 
 // This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
 #include "pcm_small.h"
@@ -885,6 +931,7 @@ float combine_controls_mult(float *controls, float *coefs) {
 
 // apply an mod & bp, if any, to the osc
 void hold_and_modify(uint16_t osc) {
+    AMY_PROFILE_START(HOLD_AND_MODIFY)
     float ctrl_inputs[NUM_COMBO_COEFS];
     ctrl_inputs[COEF_CONST] = 1.0f;
     ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc].midi_note)) ? logfreq_for_midi_note(synth[osc].midi_note) : 0;
@@ -932,6 +979,8 @@ void hold_and_modify(uint16_t osc) {
     } else if (msynth[osc].amp == 0) {
         synth[osc].zero_amp_clock = total_samples;
     }
+    AMY_PROFILE_STOP(HOLD_AND_MODIFY)
+
 }
 
 static inline float lgain_of_pan(float pan) {
@@ -968,6 +1017,7 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 }
 
 void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
+    AMY_PROFILE_START(RENDER_OSC_WAVE)
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
@@ -989,6 +1039,7 @@ void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
         if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
     }
+    AMY_PROFILE_STOP(RENDER_OSC_WAVE)
 }
 
 void amy_render(uint16_t start, uint16_t end, uint8_t core) {
@@ -1419,6 +1470,9 @@ void amy_stop() {
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
+    #endif
+    #ifdef AMY_DEBUG
+        amy_profiles_init();
     #endif
     global_init();
     amy_global.cores = cores;

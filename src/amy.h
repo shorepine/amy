@@ -147,6 +147,47 @@ enum params{
     NO_PARAM
 };
 
+#ifdef AMY_DEBUG
+
+
+enum itags{
+    RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, NO_TAG
+};
+struct profile {
+    uint32_t calls;
+    uint64_t us_total;
+    uint64_t start;
+};
+
+#define AMY_PROFILE_INIT(tag) \
+    profiles[tag].start = 0; \
+    profiles[tag].calls = 0; \
+    profiles[tag].us_total = 0;
+
+#define AMY_PROFILE_START(tag) \
+    profiles[tag].start = amy_get_us();
+
+#define AMY_PROFILE_STOP(tag) \
+    profiles[tag].us_total += (amy_get_us()-profiles[tag].start); \
+    profiles[tag].calls++;
+
+#define AMY_PROFILE_PRINT(tag) \
+    fprintf(stderr,"tag %s calls %d total %lldus per call %lldus\n", \
+    profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, profiles[tag].us_total/profiles[tag].calls);
+
+#else
+
+#define AMY_PROFILE_START(tag) void;
+#define AMY_PROFILE_STOP(tag) void;
+
+#endif
+
+extern void amy_profiles_init();
+extern void amy_profiles_print();
+
+
+
+
 
 #include <limits.h>
 static inline int isnan_c11(float test)
@@ -295,6 +336,15 @@ struct mod_synthinfo {
     float resonance;
     float feedback;
 };
+
+
+extern struct synthinfo* synth;
+extern struct mod_synthinfo* msynth;
+extern struct mod_state mglobal;
+#ifdef AMY_DEBUG
+extern struct profile profiles[NO_TAG];
+extern int64_t amy_get_us();
+#endif
 
 
 // Callbacks, override if you'd like after calling amy_start()
