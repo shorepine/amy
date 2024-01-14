@@ -139,6 +139,8 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
 
 int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI)
+
     // Zeros then poles - Direct Form I
     // We need 2 memories for input, and 2 for output.
     SAMPLE x1 = w[0];
@@ -159,6 +161,8 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
     w[1] = x2;
     w[2] = y1;
     w[3] = y2;
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI)
+
     return 0;
 }
 
@@ -179,6 +183,7 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
 
 
 int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
     SAMPLE x1 = w[0];
     SAMPLE x2 = w[1];
@@ -196,10 +201,13 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     w[1] = x2;
     w[2] = y1;
     w[3] = y2;
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
+
     return 0;
 }
 
 int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_COMMUTED)
     // poles before zeros, for Direct Form II
     for (int i = 0 ; i < len ; i++) {
         SAMPLE d0 = input[i] - FILT_MUL_SS(coef[3], w[0]) - FILT_MUL_SS(coef[4], w[1]);
@@ -207,6 +215,8 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
         w[1] = w[0];
         w[0] = d0;
     }
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_COMMUTED)
+
     return 0;
 }
 
@@ -269,6 +279,8 @@ void filters_init() {
 
 
 void parametric_eq_process(SAMPLE *block) {
+    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
+
     SAMPLE output[2][AMY_BLOCK_SIZE];
     for(int c = 0; c < AMY_NCHANS; ++c) {
         SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
@@ -280,10 +292,14 @@ void parametric_eq_process(SAMPLE *block) {
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
             cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
     }
+    AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
+
 }
 
 
 void hpf_buf(SAMPLE *buf, SAMPLE *state) {
+    AMY_PROFILE_START(HPF_BUF)
+
     // Implement a dc-blocking HPF with a pole at (decay + 0j) and a zero at (1 + 0j).
     SAMPLE pole = F2S(0.99);
     SAMPLE xn1 = state[0];
@@ -296,9 +312,13 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
     }
     state[0] = xn1;
     state[1] = yn1;
+    AMY_PROFILE_STOP(HPF_BUF)
+
 }
 
 SAMPLE scan_max(SAMPLE* block, int len) {
+    AMY_PROFILE_START(SCAN_MAX)
+
     // Find the max abs sample value in a block.
     SAMPLE max = 0;
     while (len--) {
@@ -306,20 +326,26 @@ SAMPLE scan_max(SAMPLE* block, int len) {
         if (val > max) max = val;
         else if ((-val) > max) max = -val;
     }
+    AMY_PROFILE_STOP(SCAN_MAX)
     return max;
 }
 
 int encl_log2(SAMPLE max) {
+    AMY_PROFILE_START(ENCL_LOG2)
+
     // How many bits can you shift before this max overflows?
     int bits = 0;
     while(max < F2S(128.0) && bits < 24) {
         max = SHIFTL(max, 1);
         ++bits;
     }
+    AMY_PROFILE_STOP(ENCL_LOG2)
     return bits;
 }
 
 void block_norm(SAMPLE* block, int len, int bits) {
+    AMY_PROFILE_START(BLOCK_NORM)
+
     if (bits > 0) {
         while(len--) {
             *block = SHIFTL(*block, bits);
@@ -332,6 +358,7 @@ void block_norm(SAMPLE* block, int len, int bits) {
             ++block;
         }
     }
+    AMY_PROFILE_STOP(BLOCK_NORM)
 }
 
 void block_denorm(SAMPLE* block, int len, int bits) {
