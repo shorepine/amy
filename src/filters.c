@@ -1,4 +1,6 @@
 #include "amy.h"
+#include "assert.h"
+
 #ifndef M_PI
     #define M_PI 3.14159265358979323846
 #endif
@@ -212,21 +214,22 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
 
 // Template so we can have the same loop with different MULT functions.
 #define FILTER_TWICE_LOOP(MULT) \
-    for (int i = 0 ; i < len ; i++) { \
-        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS); \
-        SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2); \
-        SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2; \
-        v0 = v0 - MULT(e, v1) + MULT(f, v2); \
-        w0 = FILT_MUL_SS(coef[0], v0) + FILT_MUL_SS(coef[1], v1) + FILT_MUL_SS(coef[2], v2); \
-        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2; \
-        y0 = y0 - MULT(e, y1) + MULT(f, y2); \
+    assert(FILTER_SCALEUP_BITS == 0);                        \
+    for (int i = 0 ; i < len ; i++) {                        \
+        SAMPLE x0 = FILT_MUL_SS(coef[0], input[i]);          \
+        SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;                 \
+        SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;                 \
+        v0 = v0 - MULT(e, v1) + MULT(f, v2);                 \
+        w0 = FILT_MUL_SS(coef[0], v0 + SHIFTL(v1, 1) + v2);  \
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;                 \
+        y0 = y0 - MULT(e, y1) + MULT(f, y2);                 \
         x2 = x1; \
         x1 = x0; \
         v2 = v1; \
         v1 = v0; \
         y2 = y1; \
         y1 = y0; \
-        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS);    \
+        output[i] = y0;   \
     }
 
 int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
@@ -443,6 +446,7 @@ void filter_process(SAMPLE * block, uint16_t osc) {
 #define HEADROOM_BITS 6
 #define STATE_HEADROOM_BITS 2
     int normbits = MIN(MAX(0, encl_log2(max) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
+    normbits = MIN(normbits, synth[osc].last_filt_norm_bits + 1);  // Increase at most one bit per block.
     normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
     //printf("time %f max %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
     block_norm(block, AMY_BLOCK_SIZE, normbits);
