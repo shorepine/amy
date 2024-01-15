@@ -419,7 +419,7 @@ void block_denorm(SAMPLE* block, int len, int bits) {
     block_norm(block, len, -bits);
 }
 
-void filter_process(SAMPLE * block, uint16_t osc) {
+void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     AMY_PROFILE_START(FILTER_PROCESS)
 
     AMY_PROFILE_START(FILTER_PROCESS_STAGE0)
@@ -439,16 +439,16 @@ void filter_process(SAMPLE * block, uint16_t osc) {
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
 
     AMY_PROFILE_START(FILTER_PROCESS_STAGE1)
-    SAMPLE max = scan_max(block, AMY_BLOCK_SIZE);
+    //SAMPLE max_val = scan_max(block, AMY_BLOCK_SIZE);
     // Also have to consider the filter state.
     SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
     int filtnormbits = synth[osc].last_filt_norm_bits + encl_log2(filtmax);
 #define HEADROOM_BITS 6
 #define STATE_HEADROOM_BITS 2
-    int normbits = MIN(MAX(0, encl_log2(max) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
+    int normbits = MIN(MAX(0, encl_log2(max_val) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
     normbits = MIN(normbits, synth[osc].last_filt_norm_bits + 1);  // Increase at most one bit per block.
     normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
-    //printf("time %f max %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
+    //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
     block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
     //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     if(synth[osc].filter_type==FILTER_LPF24) {
