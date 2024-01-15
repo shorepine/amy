@@ -305,7 +305,7 @@ def main(argv):
     #TestSawDownOsc().test()
     TestGuitar().test()
     TestFilter().test()
-
+  amy.send(debug=0)
   print("tests done.")
 
 

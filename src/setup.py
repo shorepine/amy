@@ -13,7 +13,7 @@ if os.uname()[0] == 'Darwin':
 		link_args += ['-framework', f]
 
 extension_mod = Extension("libamy", sources=sources, \
-	extra_compile_args=["-I/opt/homebrew/include"], \
+	extra_compile_args=["-I/opt/homebrew/include", "-DAMY_DEBUG"], \
 	extra_link_args=link_args)
 
 setup(name = "libamy", 

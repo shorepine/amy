@@ -41,6 +41,7 @@ const char* profile_tag_name(enum itags tag) {
         case FILTER_LOOP_MUL8F_SS: return "FILTER_LOOP_MUL8F_SS";
         case FILTER_LOOP_MUL4E_SS: return "FILTER_LOOP_MUL4E_SS";
         case CALIBRATE: return "CALIBRATE";
+        case AMY_ESP_FILL_BUFFER: return "AMY_ESP_FILL_BUFFER";
         case NO_TAG: return "NO_TAG";
    }
    return "ERROR";
