@@ -149,6 +149,59 @@ enum params{
     NO_PARAM                             // 142
 };
 
+#ifdef AMY_DEBUG
+      
+
+
+enum itags{
+    RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, FILTER_PROCESS_STAGE0,
+    FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_EVENT, PLAY_EVENT,  MIX_WITH_PAN, AMY_RENDER, 
+    AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, AMY_PARSE_MESSAGE,RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
+    RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
+    PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, ENCL_LOG2, BLOCK_NORM, FILTER_LOOP_MUL8F_SS,
+    FILTER_LOOP_MUL4E_SS, CALIBRATE, AMY_ESP_FILL_BUFFER, NO_TAG
+};
+struct profile {
+    uint32_t calls;
+    uint64_t us_total;
+    uint64_t start;
+};
+
+extern uint64_t profile_start_us;
+
+#define AMY_PROFILE_INIT(tag) \
+    profiles[tag].start = 0; \
+    profiles[tag].calls = 0; \
+    profiles[tag].us_total = 0; \
+    profile_start_us = amy_get_us();
+
+#define AMY_PROFILE_START(tag) \
+    profiles[tag].start = amy_get_us();
+
+#define AMY_PROFILE_STOP(tag) \
+    profiles[tag].us_total += (amy_get_us()-profiles[tag].start); \
+    profiles[tag].calls++;
+
+#define AMY_PROFILE_PRINT(tag) \
+    if(profiles[tag].calls) {\
+        fprintf(stderr,"%40s: %10"PRIu32" calls %10"PRIu64"us total [%6.2f%% wall %6.2f%% render] %9"PRIu64"us per call\n", \
+        profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
+        ((float)(profiles[tag].us_total) / (float)(amy_get_us() - profile_start_us))*100.0, \
+        ((float)(profiles[tag].us_total) / (float)(profiles[AMY_RENDER].us_total))*100.0, \
+        (profiles[tag].us_total)/profiles[tag].calls);\
+    }
+#else
+#define AMY_PROFILE_START(tag)
+#define AMY_PROFILE_STOP(tag)
+
+#endif
+
+extern void amy_profiles_init();
+extern void amy_profiles_print();
+
+
+
+
 
 #include <limits.h>
 static inline int isnan_c11(float test)
@@ -299,6 +352,15 @@ struct mod_synthinfo {
 };
 
 
+extern struct synthinfo* synth;
+extern struct mod_synthinfo* msynth;
+extern struct mod_state mglobal;
+#ifdef AMY_DEBUG
+extern struct profile profiles[NO_TAG];
+extern int64_t amy_get_us();
+#endif
+
+
 // Callbacks, override if you'd like after calling amy_start()
 //void (*amy_parse_callback)(char,char*);
 
@@ -377,20 +439,20 @@ extern void ks_deinit();
 extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
-extern void render_ks(SAMPLE * buf, uint16_t osc); 
-extern void render_sine(SAMPLE * buf, uint16_t osc); 
-extern void render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
-extern void render_pulse(SAMPLE * buf, uint16_t osc); 
-extern void render_saw_down(SAMPLE * buf, uint16_t osc);
-extern void render_saw_up(SAMPLE * buf, uint16_t osc);
-extern void render_triangle(SAMPLE * buf, uint16_t osc); 
-extern void render_noise(SAMPLE * buf, uint16_t osc); 
-extern void render_pcm(SAMPLE * buf, uint16_t osc);
-extern void render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
-extern void render_partial(SAMPLE *buf, uint16_t osc) ;
+extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
+extern SAMPLE render_pulse(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_saw_down(SAMPLE * buf, uint16_t osc);
+extern SAMPLE render_saw_up(SAMPLE * buf, uint16_t osc);
+extern SAMPLE render_triangle(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_noise(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_pcm(SAMPLE * buf, uint16_t osc);
+extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
+extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
-extern void render_partials(SAMPLE *buf, uint16_t osc);
+extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 
 extern SAMPLE compute_mod_pulse(uint16_t osc);
 extern SAMPLE compute_mod_noise(uint16_t osc);
@@ -427,7 +489,7 @@ extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 // filters
 extern void filters_init();
 extern void filters_deinit();
-extern void filter_process(SAMPLE * block, uint16_t osc);
+extern void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
 extern void parametric_eq_process(SAMPLE *block);
 extern void reset_filter(uint16_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);

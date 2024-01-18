@@ -3,9 +3,6 @@
 
 #include "amy.h"
 
-extern struct synthinfo* synth;
-extern struct mod_synthinfo* msynth;
-extern struct mod_state mglobal;
 extern const int16_t pcm[];
 
 
@@ -44,7 +41,7 @@ SAMPLE compute_mod_scale(uint16_t osc) {
 }
 
 SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
-
+    AMY_PROFILE_START(COMPUTE_BREAKPOINT_SCALE)
     // given a breakpoint list, compute the scale
     // we first see how many BPs are defined, and where we are in them?
     int8_t found = -1;
@@ -213,6 +210,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
     // Keep track of the most-recently returned non-release scale.
     if (!release) synth[osc].last_scale[bp_set] = scale;
     //printf("env: time %f osc %d bpset %d seg %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)
     return scale;
 }
 

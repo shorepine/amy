@@ -64,7 +64,8 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
     int lut_mask = lut->table_size - 1; \
     int lut_bits = lut->log_2_table_size; \
     SAMPLE sample = 0; \
-    SAMPLE current_amp = incoming_amp; \
+    SAMPLE max_value = 0; \
+    SAMPLE current_amp = incoming_amp;                                      \
     SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
 
 #define MOD_PART_MOD  \
@@ -102,7 +103,10 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
             sample = b + MUL0_SS(cminusb - next_bit, frac);
 
 #define RENDER_LUT_LOOP_END \
-            buf[i] += MUL4_SS(current_amp, sample); \
+            SAMPLE value = buf[i] + MUL4_SS(current_amp, sample);     \
+            buf[i] = value;                            \
+            if (value < 0) value = -value;             \
+            if (value > max_value) max_value = value;  \
             current_amp += incremental_amp; \
             phase = P_WRAPPED_SUM(phase, step);
 
@@ -115,7 +119,8 @@ PHASOR render_lut_fm_fb(SAMPLE* buf,
                         PHASOR step,
                         SAMPLE incoming_amp, SAMPLE ending_amp,
                         const LUT* lut,
-                        SAMPLE* mod, SAMPLE feedback_level, SAMPLE* last_two) { 
+                        SAMPLE* mod, SAMPLE feedback_level, SAMPLE* last_two, SAMPLE *pmax_value) { 
+    AMY_PROFILE_START(RENDER_LUT_FM_FB)
     RENDER_LUT_PREAMBLE
     SAMPLE past0 = 0, past1 = 0;
     sample = last_two[0];
@@ -129,6 +134,8 @@ PHASOR render_lut_fm_fb(SAMPLE* buf,
     }
     last_two[0] = sample;
     last_two[1] = past0;
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT_FM_FB)
     return phase;
 }
 
@@ -137,7 +144,8 @@ PHASOR render_lut_fb(SAMPLE* buf,
                      PHASOR step,
                      SAMPLE incoming_amp, SAMPLE ending_amp,
                      const LUT* lut,
-                     SAMPLE feedback_level, SAMPLE* last_two) {
+                     SAMPLE feedback_level, SAMPLE* last_two, SAMPLE *pmax_value) {
+    AMY_PROFILE_START(RENDER_LUT_FB)
     RENDER_LUT_PREAMBLE
     SAMPLE past0 = 0, past1 = 0;
     sample = last_two[0];
@@ -151,6 +159,8 @@ PHASOR render_lut_fb(SAMPLE* buf,
     }
     last_two[0] = sample;
     last_two[1] = past0;
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT_FB)
     return phase;
 }
 
@@ -159,7 +169,9 @@ PHASOR render_lut_fm(SAMPLE* buf,
                      PHASOR step,
                      SAMPLE incoming_amp, SAMPLE ending_amp,
                      const LUT* lut,
-                     SAMPLE* mod) {
+                     SAMPLE* mod,
+                     SAMPLE* pmax_value) {
+    AMY_PROFILE_START(RENDER_LUT_FM)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -168,6 +180,8 @@ PHASOR render_lut_fm(SAMPLE* buf,
 
         RENDER_LUT_LOOP_END
     }
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT_FM)
     return phase;
 }
 
@@ -175,7 +189,9 @@ PHASOR render_lut(SAMPLE* buf,
                   PHASOR phase,
                   PHASOR step,
                   SAMPLE incoming_amp, SAMPLE ending_amp,
-                  const LUT* lut) {
+                  const LUT* lut,
+                  SAMPLE* pmax_value) {
+    AMY_PROFILE_START(RENDER_LUT)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -184,6 +200,8 @@ PHASOR render_lut(SAMPLE* buf,
 
         RENDER_LUT_LOOP_END
      }
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT)
     return phase;
 }
 
@@ -191,7 +209,9 @@ PHASOR render_lut_cub(SAMPLE* buf,
                       PHASOR phase,
                       PHASOR step,
                       SAMPLE incoming_amp, SAMPLE ending_amp,
-                      const LUT* lut) {
+                      const LUT* lut,
+                      SAMPLE *pmax_value) {
+    AMY_PROFILE_START(RENDER_LUT_CUB)
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
@@ -199,7 +219,9 @@ PHASOR render_lut_cub(SAMPLE* buf,
         RENDER_LUT_GUTS(NOTHING, NOTHING, INTERP_CUBIC)
 
         RENDER_LUT_LOOP_END
-     }
+    }
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT_CUB)
     return phase;
 }
 
@@ -210,13 +232,15 @@ void pulse_note_on(uint16_t osc, float freq) {
     synth[osc].lut = choose_from_lutset(period_samples, saw_fxpt_lutset);
 }
 
-void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
+SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
+    AMY_PROFILE_START(RENDER_LPF_LUT)
     // Common function for pulse and saw.
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = direction * F2S(msynth[osc].amp);
     PHASOR pwm_phase = synth[osc].phase;
-    synth[osc].phase = render_lut_cub(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    SAMPLE max_value;
+    synth[osc].phase = render_lut_cub(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, &max_value);
     if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
         float duty = msynth[osc].duty;
         if (duty < 0.01f) duty = 0.01f;
@@ -224,16 +248,18 @@ void render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t directio
         pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(msynth[osc].last_duty));
         // Second pulse is given some blockwise-constant FM to maintain phase continuity across blocks.
         PHASOR delta_phase_per_sample = F2P((duty - msynth[osc].last_duty) / AMY_BLOCK_SIZE);
-        render_lut_cub(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut);
+        render_lut_cub(buf, pwm_phase, step + delta_phase_per_sample, -synth[osc].last_amp, -amp, synth[osc].lut, &max_value);
         msynth[osc].last_duty = duty;
     }
     // Remember last_amp.
     synth[osc].last_amp = amp;
+    AMY_PROFILE_STOP(RENDER_LPF_LUT)
+    return max_value;
 }
 
-void render_pulse(SAMPLE* buf, uint16_t osc) {
+SAMPLE render_pulse(SAMPLE* buf, uint16_t osc) {
     // Second (negative) impulse is <duty> cycles later.
-    render_lpf_lut(buf, osc, true, 1, 0);
+    return render_lpf_lut(buf, osc, true, 1, 0);
 }
 
 void pulse_mod_trigger(uint16_t osc) {
@@ -275,17 +301,17 @@ void saw_up_note_on(uint16_t osc, float freq) {
     saw_note_on(osc, 1, freq);
 }
 
-void render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
-    render_lpf_lut(buf, osc, false, direction, synth[osc].dc_offset);
+SAMPLE render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
+    return render_lpf_lut(buf, osc, false, direction, synth[osc].dc_offset);
     //printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
     //       total_samples, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
 }
 
-void render_saw_down(SAMPLE* buf, uint16_t osc) {
-    render_saw(buf, osc, -1);
+SAMPLE render_saw_down(SAMPLE* buf, uint16_t osc) {
+    return render_saw(buf, osc, -1);
 }
-void render_saw_up(SAMPLE* buf, uint16_t osc) {
-    render_saw(buf, osc, 1);
+SAMPLE render_saw_up(SAMPLE* buf, uint16_t osc) {
+    return render_saw(buf, osc, 1);
 }
 
 
@@ -329,12 +355,14 @@ void triangle_note_on(uint16_t osc, float freq) {
     synth[osc].lut = choose_from_lutset(period_samples, triangle_fxpt_lutset);
 }
 
-void render_triangle(SAMPLE* buf, uint16_t osc) {
+SAMPLE render_triangle(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    SAMPLE max_value;
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, &max_value);
     synth[osc].last_amp = amp;
+    return max_value;
 }
 
 void triangle_mod_trigger(uint16_t osc) {
@@ -370,34 +398,36 @@ void fm_sine_note_on(uint16_t osc, uint16_t algo_osc) {
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
 }
 
-void render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp) {
+SAMPLE render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp) {
     if(AMY_IS_SET(synth[osc].logratio)) {
         msynth[osc].logfreq = msynth[algo_osc].logfreq + synth[osc].logratio;
     }
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = MUL4_SS(F2S(msynth[osc].amp), mod_amp);
+    SAMPLE max_value;
     if (feedback_level > 0 && mod)
         synth[osc].phase = render_lut_fm_fb(buf, synth[osc].phase, step,
                                             synth[osc].last_amp, amp,
                                             synth[osc].lut,
-                                            mod, feedback_level, synth[osc].last_two);
+                                            mod, feedback_level, synth[osc].last_two, &max_value);
     else if (feedback_level > 0)
         synth[osc].phase = render_lut_fb(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp,
                                          synth[osc].lut,
-                                         feedback_level, synth[osc].last_two);
+                                         feedback_level, synth[osc].last_two, &max_value);
     else if (mod)
         synth[osc].phase = render_lut_fm(buf, synth[osc].phase, step,
                                          synth[osc].last_amp, amp,
                                          synth[osc].lut,
-                                         mod);
+                                         mod, &max_value);
     else
         synth[osc].phase = render_lut(buf, synth[osc].phase, step,
                                       synth[osc].last_amp, amp,
-                                      synth[osc].lut);
+                                      synth[osc].lut, &max_value);
 
     synth[osc].last_amp = amp;
+    return max_value;
 }
 
 /* sine */
@@ -408,13 +438,15 @@ void sine_note_on(uint16_t osc, float freq) {
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
 }
 
-void render_sine(SAMPLE* buf, uint16_t osc) { 
+SAMPLE render_sine(SAMPLE* buf, uint16_t osc) { 
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //fprintf(stderr, "render_sine: time %f osc %d freq %f amp %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(amp));
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    SAMPLE max_value;
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, &max_value);
     synth[osc].last_amp = amp;
+    return max_value;
 }
 
 
@@ -451,11 +483,16 @@ SAMPLE amy_get_random() {
 
 /* noise */
 
-void render_noise(SAMPLE *buf, uint16_t osc) {
+SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc].amp);
+    SAMPLE max_value = 0;
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        buf[i] = MUL4_SS(amy_get_random(), amp);
+        SAMPLE value = MUL4_SS(amy_get_random(), amp);
+        buf[i] = value;
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;
     }
+    return max_value;
 }
 
 SAMPLE compute_mod_noise(uint16_t osc) {
@@ -477,13 +514,15 @@ SAMPLE compute_mod_noise(uint16_t osc) {
 
 /* partial */
 
-void render_partial(SAMPLE * buf, uint16_t osc) {
+SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     //printf("render_partial: time %lld logfreq %f freq %f amp %f step %f\n", total_samples, msynth[osc].logfreq, freq, S2F(amp), P2F(step) * synth[osc].lut->table_size); 
-    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut);
+    SAMPLE max_value;
+    synth[osc].phase = render_lut(buf, synth[osc].phase, step, synth[osc].last_amp, amp, synth[osc].lut, &max_value);
     synth[osc].last_amp = amp;
+    return max_value;
 }
 
 void partial_note_on(uint16_t osc) {
@@ -508,10 +547,11 @@ uint8_t ks_polyphony_index;
 
 /* karplus-strong */
 
-void render_ks(SAMPLE * buf, uint16_t osc) {
+SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     SAMPLE half = MUL0_SS(F2S(0.5f), F2S(synth[osc].feedback));
     SAMPLE amp = F2S(msynth[osc].amp);
     float freq = freq_of_logfreq(msynth[osc].logfreq);
+    SAMPLE max_value = 0;
     if(freq >= 55) { // lowest note we can play
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
@@ -522,9 +562,13 @@ void render_ks(SAMPLE * buf, uint16_t osc) {
                     (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
                     half);
             synth[osc].step = (index + 1) % buflen;
-            buf[i] = MUL4_SS(synth[osc].sample, amp);
+            SAMPLE value = MUL4_SS(synth[osc].sample, amp);
+            buf[i] = value;
+            if (value < 0) value = -value;
+            if (value > max_value) max_value = value;
         }
     }
+    return max_value;
 }
 
 void ks_note_on(uint16_t osc) {

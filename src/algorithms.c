@@ -115,7 +115,7 @@ static inline void copy(SAMPLE* a, SAMPLE* b) {
     //}
 }
 
-void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
+SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
     //printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc].amp);
@@ -123,7 +123,9 @@ void render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, ui
     // out = buf
     // in = mod
     // so render_mod is mod, buf (out)
-    if(synth[osc].wave == SINE) render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
+    SAMPLE max_value = 0;
+    if(synth[osc].wave == SINE) max_value = render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
+    return max_value;
 }
 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
@@ -278,8 +280,9 @@ void algo_init() {
 
 }
 
-void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
+SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
     struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
+    SAMPLE max_value = 0;
 
     // starts at op 6
     SAMPLE* in_buf;
@@ -328,7 +331,8 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
                 zero(out_buf);
             }
 
-            render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc, mod_amp);
+            SAMPLE value = render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc, mod_amp);
+            if (out_buf == buf && value > max_value)  max_value = value;
 
             if (out_buf == SCRATCH) {
                 // We had to invoke the spare buffer, meaning we're overwriting BUS_ONE
@@ -337,4 +341,5 @@ void render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
         }
     }
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
+    return max_value;
 }

@@ -41,7 +41,7 @@ void pcm_note_off(uint16_t osc) {
     }
 }
 
-void render_pcm(SAMPLE* buf, uint16_t osc) {
+SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     // Patches can be > 32768 samples long.
     // We need s16.15 fixed-point indexing.
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
@@ -50,6 +50,7 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
     if (!AMY_IS_SET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch->midinote);
     float playback_freq = freq_of_logfreq(logfreq);  // PCM_SAMPLE_RATE modified by
 
+    SAMPLE max_value = 0;
     SAMPLE amp = F2S(msynth[osc].amp);
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
     const LUTSAMPLE* table = pcm + patch->offset;
@@ -75,10 +76,14 @@ void render_pcm(SAMPLE* buf, uint16_t osc) {
                 }
             }
         }
-        buf[i] += MUL4_SS(amp, sample);
+        SAMPLE value = buf[i] + MUL4_SS(amp, sample);
+        buf[i] = value;
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;        
     }
     //printf("render_pcm: osc %d patch %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
     //       osc, synth[osc].patch, patch->length, base_index, P2F(synth[osc].phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc].amp));
+    return max_value;
  }
 
 SAMPLE compute_mod_pcm(uint16_t osc) {

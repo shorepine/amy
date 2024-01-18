@@ -5,6 +5,70 @@
 
 #include "amy.h"
 
+#ifdef AMY_DEBUG
+
+const char* profile_tag_name(enum itags tag) {
+    switch (tag) {
+        case RENDER_OSC_WAVE: return "RENDER_OSC_WAVE";
+        case COMPUTE_BREAKPOINT_SCALE: return "COMPUTE_BREAKPOINT_SCALE";
+        case HOLD_AND_MODIFY: return "HOLD_AND_MODIFY";
+        case FILTER_PROCESS: return "FILTER_PROCESS";
+        case FILTER_PROCESS_STAGE0: return "FILTER_PROCESS_STAGE0";
+        case FILTER_PROCESS_STAGE1: return "FILTER_PROCESS_STAGE1";
+        case ADD_DELTA_TO_QUEUE: return "ADD_DELTA_TO_QUEUE";
+        case AMY_ADD_EVENT: return "AMY_ADD_EVENT";
+        case PLAY_EVENT: return "PLAY_EVENT";
+        case MIX_WITH_PAN: return "MIX_WITH_PAN";
+        case AMY_RENDER: return "AMY_RENDER";            
+        case AMY_PREPARE_BUFFER: return "AMY_PREPARE_BUFFER";            
+        case AMY_FILL_BUFFER: return "AMY_FILL_BUFFER";            
+        case AMY_PARSE_MESSAGE: return "AMY_PARSE_MESSAGE";            
+        case RENDER_LUT_FM: return "RENDER_LUT_FM";            
+        case RENDER_LUT_FB: return "RENDER_LUT_FB";            
+        case RENDER_LUT: return "RENDER_LUT";            
+        case RENDER_LUT_CUB: return "RENDER_LUT_CUB";            
+        case RENDER_LUT_FM_FB: return "RENDER_LUT_FM_FB";            
+        case RENDER_LPF_LUT: return "RENDER_LPF_LUT";            
+        case DSPS_BIQUAD_F32_ANSI_SPLIT_FB: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB";            
+        case DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE";
+        case DSPS_BIQUAD_F32_ANSI_COMMUTED: return "DSPS_BIQUAD_F32_ANSI_COMMUTED";            
+        case PARAMETRIC_EQ_PROCESS: return "PARAMETRIC_EQ_PROCESS";            
+        case HPF_BUF: return "HPF_BUF";            
+        case SCAN_MAX: return "SCAN_MAX";            
+        case DSPS_BIQUAD_F32_ANSI: return "DSPS_BIQUAD_F32_ANSI";            
+        case ENCL_LOG2: return "ENCL_LOG2";            
+        case BLOCK_NORM: return "BLOCK_NORM";       
+        case FILTER_LOOP_MUL8F_SS: return "FILTER_LOOP_MUL8F_SS";
+        case FILTER_LOOP_MUL4E_SS: return "FILTER_LOOP_MUL4E_SS";
+        case CALIBRATE: return "CALIBRATE";
+        case AMY_ESP_FILL_BUFFER: return "AMY_ESP_FILL_BUFFER";
+        case NO_TAG: return "NO_TAG";
+   }
+   return "ERROR";
+}
+struct profile profiles[NO_TAG];
+uint64_t profile_start_us = 0;
+
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+int64_t amy_get_us() { return esp_timer_get_time(); }
+#elif defined PICO_ON_DEVICE
+int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
+#else
+#include <sys/time.h>
+int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_sec*(uint64_t)1000000+tv.tv_usec; }
+#endif
+
+void amy_profiles_init() { 
+    for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_INIT(i) } 
+} 
+void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } }
+#else
+#define amy_profiles_init() 
+#define amy_profiles_print()
+#endif
+
+
 
 // This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
 #include "pcm_small.h"
@@ -51,6 +115,21 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 }
 #endif
+
+
+
+// block -- what gets sent to the dac -- -32768...32767 (int16 le)
+output_sample_type * block;
+uint32_t total_samples;
+uint32_t event_counter ;
+uint32_t message_counter ;
+
+char *message_start_pointer;
+int16_t message_length;
+
+int32_t computed_delta; // can be negative no prob, but usually host is larger # than client
+uint8_t computed_delta_set; // have we set a delta yet?
+
 
 
 // CHORUS_ARATE means that chorus delay is updated at full audio rate and
@@ -147,17 +226,6 @@ void config_reverb(float level, float liveness, float damping, float xover_hz) {
     reverb.xover_hz = xover_hz;
 }
 
-// block -- what gets sent to the dac -- -32768...32767 (int16 le)
-output_sample_type * block;
-uint32_t total_samples;
-uint32_t event_counter ;
-uint32_t message_counter ;
-
-char *message_start_pointer;
-int16_t message_length;
-
-int32_t computed_delta; // can be negative no prob, but usually host is larger # than client
-uint8_t computed_delta_set; // have we set a delta yet?
 
 int8_t check_init(amy_err_t (*fn)(), char *name) {
     //fprintf(stderr,"starting %s: ", name);
@@ -261,6 +329,7 @@ struct event amy_default_event() {
 }
 
 void add_delta_to_queue(struct delta d) {
+    AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
 #if defined ESP_PLATFORM && !defined ARDUINO
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
@@ -305,10 +374,13 @@ void add_delta_to_queue(struct delta d) {
 #elif defined _POSIX_THREADS
     pthread_mutex_unlock(&amy_queue_lock);
 #endif
+    AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
+
 }
 
 // Add a API facing event, convert into delta directly
 void amy_add_event(struct event e) {
+    AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
 
     // Synth defaults if not set, these are required for the delta struct
@@ -374,6 +446,7 @@ void amy_add_event(struct event e) {
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
     if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
+    AMY_PROFILE_STOP(AMY_ADD_EVENT)
 }
 
 
@@ -586,8 +659,12 @@ int8_t oscs_init() {
 }
 
 
+// types: 0 - show profile if set
+//        1 - show profile, queue
+//        2 - show profile, queue, osc data
 void show_debug(uint8_t type) {
-    if(type>1) {
+    amy_profiles_print();
+    if(type>0) {
         struct delta * ptr = amy_global.event_start;
         uint16_t q = amy_global.event_qsize;
         if(q > 25) q = 25;
@@ -596,7 +673,7 @@ void show_debug(uint8_t type) {
             ptr = ptr->next;
         }
     }
-    if(type>2) {
+    if(type>1) {
         // print out all the osc data
         //printf("global: filter %f resonance %f volume %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.status);
         fprintf(stderr,"global: volume %f eq: %f %f %f \n", amy_global.volume, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
@@ -691,6 +768,7 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
 
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
+    AMY_PROFILE_START(PLAY_EVENT)
     //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
     uint8_t trig=0;
     // todo: event-only side effect, remove
@@ -865,7 +943,7 @@ void play_event(struct delta d) {
             play_event(d);
         }
     }
-
+    AMY_PROFILE_STOP(PLAY_EVENT)
 }
 
 float combine_controls(float *controls, float *coefs) {
@@ -885,6 +963,7 @@ float combine_controls_mult(float *controls, float *coefs) {
 
 // apply an mod & bp, if any, to the osc
 void hold_and_modify(uint16_t osc) {
+    AMY_PROFILE_START(HOLD_AND_MODIFY)
     float ctrl_inputs[NUM_COMBO_COEFS];
     ctrl_inputs[COEF_CONST] = 1.0f;
     ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc].midi_note)) ? logfreq_for_midi_note(synth[osc].midi_note) : 0;
@@ -932,6 +1011,8 @@ void hold_and_modify(uint16_t osc) {
     } else if (msynth[osc].amp == 0) {
         synth[osc].zero_amp_clock = total_samples;
     }
+    AMY_PROFILE_STOP(HOLD_AND_MODIFY)
+
 }
 
 static inline float lgain_of_pan(float pan) {
@@ -948,6 +1029,7 @@ static inline float rgain_of_pan(float pan) {
 
 
 void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end) {
+    AMY_PROFILE_START(MIX_WITH_PAN)
     /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan */
     if(AMY_NCHANS==1) {
         // actually dest is mono, pan is ignored.
@@ -965,41 +1047,48 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
             gain_r += d_gain_r;
         }
     }
+    AMY_PROFILE_STOP(MIX_WITH_PAN)
 }
 
-void render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
+SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
+    // Returns abs max of what it wrote.
+    SAMPLE max_val = 0;
+    AMY_PROFILE_START(RENDER_OSC_WAVE)
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
-    if(synth[osc].wave == NOISE) render_noise(buf, osc);
-    if(synth[osc].wave == SAW_DOWN) render_saw_down(buf, osc);
-    if(synth[osc].wave == SAW_UP) render_saw_up(buf, osc);
-    if(synth[osc].wave == PULSE) render_pulse(buf, osc);
-    if(synth[osc].wave == TRIANGLE) render_triangle(buf, osc);
-    if(synth[osc].wave == SINE) render_sine(buf, osc);
+    if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
+    if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
+    if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
+    if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
+    if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
+    if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
     if(synth[osc].wave == KS) {
         #if AMY_KS_OSCS > 0
-        render_ks(buf, osc);
+        max_val = render_ks(buf, osc);
         #endif
     }
     if(pcm_samples)
-        if(synth[osc].wave == PCM) render_pcm(buf, osc);
-    if(synth[osc].wave == ALGO) render_algo(buf, osc, core);
+        if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
+    if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
     if(AMY_HAS_PARTIALS == 1) {
-        if(synth[osc].wave == PARTIAL) render_partial(buf, osc);
-        if(synth[osc].wave == PARTIALS) render_partials(buf, osc);
+        if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
+        if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
     }
+    AMY_PROFILE_STOP(RENDER_OSC_WAVE)
+    return max_val;
 }
 
 void amy_render(uint16_t start, uint16_t end, uint8_t core) {
+    AMY_PROFILE_START(AMY_RENDER)
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
-            render_osc_wave(osc, core, per_osc_fb[core]);
+            SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != OFF) {
                 // apply filter to osc if set
-                if(synth[osc].filter_type != FILTER_NONE) filter_process(per_osc_fb[core], osc);
+                if(synth[osc].filter_type != FILTER_NONE) filter_process(per_osc_fb[core], osc, max_val);
                 mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
                 //printf("render5 %d %d %d %d\n", osc, start, end, core);
 
@@ -1010,6 +1099,8 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
         parametric_eq_process(fbl[core]);
     }
+    AMY_PROFILE_STOP(AMY_RENDER)
+
 }
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
@@ -1030,6 +1121,7 @@ void amy_decrease_volume() {
 
 // this takes scheduled events and plays them at the right time
 void amy_prepare_buffer() {
+    AMY_PROFILE_START(AMY_PREPARE_BUFFER)
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
 
@@ -1068,6 +1160,8 @@ void amy_prepare_buffer() {
         delay_mod_val = compute_mod_value(CHORUS_MOD_SOURCE);
     #endif // CHORUS_ARATE
     }
+    AMY_PROFILE_STOP(AMY_PREPARE_BUFFER)
+
 }
 
 int16_t * amy_simple_fill_buffer() {
@@ -1077,6 +1171,7 @@ int16_t * amy_simple_fill_buffer() {
 }
 
 int16_t * amy_fill_buffer() {
+    AMY_PROFILE_START(AMY_FILL_BUFFER)
     // mix results from both cores.
     if(AMY_CORES==2) {
         for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
@@ -1169,6 +1264,7 @@ int16_t * amy_fill_buffer() {
         }
     }
     total_samples += AMY_BLOCK_SIZE;
+    AMY_PROFILE_STOP(AMY_FILL_BUFFER)
     return block;
 }
 
@@ -1290,6 +1386,7 @@ void parse_coef_message(char *message, float *coefs) {
 
 // given a string return an event
 struct event amy_parse_message(char * message) {
+    AMY_PROFILE_START(AMY_PARSE_MESSAGE)
     uint8_t mode = 0;
     uint16_t start = 0;
     uint16_t c = 0;
@@ -1375,6 +1472,7 @@ struct event amy_parse_message(char * message) {
         }
         c++;
     }
+    AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
 
     // Only do this if we got some data
     if(length >0) {
@@ -1420,6 +1518,7 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
     #endif
+    amy_profiles_init();
     global_init();
     amy_global.cores = cores;
     amy_global.has_chorus = chorus;

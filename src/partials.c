@@ -51,8 +51,9 @@ void partials_note_off(uint16_t osc) {
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all patches have sustain point?
-void render_partials(SAMPLE *buf, uint16_t osc) {
+SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];
+    SAMPLE max_value = 0;
     // If ratio is set (not 0 or -1), use it for a time stretch
     float time_ratio = 1;
     if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
@@ -143,10 +144,12 @@ void render_partials(SAMPLE *buf, uint16_t osc) {
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
             //render_partial(pbuf, o);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j], F2S(msynth[osc].amp)));
-            render_partial(buf, o);
+            SAMPLE value = render_partial(buf, o);
+            if (value > max_value) max_value = value;
             // Deferred termination of this partial, after final ramp-out.
             if (synth[o].amp_coefs[0] == 0)  partial_note_off(o);
         }
     }
+    return max_value;
 }
 
