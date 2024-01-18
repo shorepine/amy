@@ -64,8 +64,8 @@ void amy_profiles_init() {
 } 
 void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } }
 #else
-#define amy_profiles_init() void
-#define amy_profiles_print() void
+#define amy_profiles_init() 
+#define amy_profiles_print()
 #endif
 
 
