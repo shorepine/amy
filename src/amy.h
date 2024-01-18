@@ -189,8 +189,8 @@ extern uint64_t profile_start_us;
         (profiles[tag].us_total)/profiles[tag].calls);\
     }
 #else
-#define AMY_PROFILE_START(tag) void;
-#define AMY_PROFILE_STOP(tag) void;
+#define AMY_PROFILE_START(tag)
+#define AMY_PROFILE_STOP(tag)
 
 #endif
 
