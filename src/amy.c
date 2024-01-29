@@ -319,6 +319,8 @@ struct event amy_default_event() {
     AMY_UNSET(e.eq_m);
     AMY_UNSET(e.eq_h);
     AMY_UNSET(e.algorithm);
+    AMY_UNSET(e.bp_is_set[0]);
+    AMY_UNSET(e.bp_is_set[1]);
     AMY_UNSET(e.bp0_target);
     AMY_UNSET(e.bp1_target);
     AMY_UNSET(e.reset_osc);
@@ -433,12 +435,15 @@ void amy_add_event(struct event e) {
 
     char * bps[MAX_BREAKPOINT_SETS] = {e.bp0, e.bp1};
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
-        if(bps[i][0] != 0) {
+        //if(bps[i][0] != 0) {
+        if(AMY_IS_SET(e.bp_is_set[i])) {
             struct synthinfo t;
             parse_breakpoint(&t, bps[i], i);
             for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) {
-                if(AMY_IS_SET(t.breakpoint_times[i][j])) { d.param=BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d); }
-                if(AMY_IS_SET(t.breakpoint_values[i][j])) { d.param=BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d); }
+                d.param=BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d);
+                // Stop adding deltas after first UNSET time sent, just to mark the end of the set when overwriting.
+                if(!AMY_IS_SET(t.breakpoint_times[i][j])) break;
+                d.param=BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d);
             }
         }
     }
@@ -1422,8 +1427,8 @@ struct event amy_parse_message(char * message) {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
                         case 'a': parse_coef_message(message + start, e.amp_coefs);break;
-                        case 'A': copy_param_list_substring(e.bp0, message+start); break;
-                        case 'B': copy_param_list_substring(e.bp1, message+start); break;
+                        case 'A': copy_param_list_substring(e.bp0, message+start); e.bp_is_set[0] = 1; break;
+                        case 'B': copy_param_list_substring(e.bp1, message+start); e.bp_is_set[1] = 1; break;
                         case 'b': e.feedback=atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
                         case 'C': e.clone_osc = atoi(message + start); break;
