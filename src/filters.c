@@ -136,7 +136,8 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     return 0;
 }
 
-#define FILT_MUL_SS MUL8F_SS
+//#define FILT_MUL_SS MUL8F_SS
+#define FILT_MUL_SS SMULR7
 //#define FILT_MUL_SS MUL8_SS  // Goes unstable for TestFilter
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
 
@@ -245,9 +246,11 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     if (e < F2S(0.0625)) { // 4 zeros at top of 23 bit frac part
-        FILTER_TWICE_LOOP(MUL4E_SS);
+        //FILTER_TWICE_LOOP(MUL4E_SS);
+        FILTER_TWICE_LOOP(SMULR7);
     } else {
-        FILTER_TWICE_LOOP(MUL8F_SS);
+        //FILTER_TWICE_LOOP(MUL8F_SS);
+        FILTER_TWICE_LOOP(SMULR7);
     }
     w[0] = x1;
     w[1] = x2;

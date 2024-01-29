@@ -87,6 +87,7 @@
 #define MUL8F_SS(a, b) ((a) * (b))
 #define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
+#define SMULR7(a, b) ((a) * (b))
 
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
 #define SHIFTL(s, b) ((s) * exp2f(b))
@@ -165,7 +166,12 @@ static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int
     return result >> 1;  // final bit of shift down.
 }
 
-
+// from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
+    // Rounding on input and output; 3 zeros on output (so output is limited to -32.0 .. 32.0).
+    SAMPLE r = 4 + ((a + (1 << 9)) >> 10) * ((b + (1 << 9)) >> 10);
+    return r >> 3;
+}
 
 // Multiply two SAMPLE values when the result will always be [-1.0, 1.0).
 #define MUL0_SS(a, b) FXMUL_TEMPLATE(a, b, 8, 7, S_FRAC_BITS)  // 8+7 = 15, so additional 8 bits shift right on output to make 23 req'd total.
