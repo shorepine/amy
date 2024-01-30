@@ -1,6 +1,8 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. It uses fixed point operations, so you don't even need an FPU. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. 
+AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on Mac, Linux, ESP32 and ESP32S3, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
+
+It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a drum machine (PCM samples included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -29,12 +31,15 @@ It supports
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band parametric EQ
  * Built in patches for PCM, FM and partials
+ * A front end for Juno-6 patches and conversion setup commands 
  * Built-in clock for short term sequencing of events
  * Can use multi-core (including microcontrollers) for rendering if available
 
-The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get. We provide a Python library, `fm.py` that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in `dx7_simulator.py`.
+The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get. We provide a Python library, [`fm.py`](https://github.com/bwhitman/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/bwhitman/amy/blob/main/dx7_simulator.py).
 
-The partial tone synthesizer also provides `partials.py`, where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+The partial tone synthesizer also provides [`partials.py`](https://github.com/bwhitman/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+
+The Juno-6 emulation is in [`juno.py`](https://github.com/bwhitman/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands. 
 
 ## Using AMY in Arduino
 
@@ -117,16 +122,16 @@ void bleep() {
     int32_t sysclock = amy_sysclock();
     e.time = sysclock;
     e.wave = SINE;
-    e.freq = 220;
+    e.freq_coefs[COEF_CONST] = 220;
     e.velocity = 1;
     amy_add_event(e);
     e.time = sysclock + 150;
-    e.freq = 440;
+    e.freq_coefs[COEF_CONST] = 440;
     amy_add_event(e);
     e.time = sysclock + 300;
     e.velocity = 0;
     e.amp = 0;
-    e.freq = 0;
+    e.freq_coefs[COEF_CONST]=0;
     amy_add_event(e);
 }
 
@@ -175,6 +180,18 @@ On storage connstrained devices, you may want to limit the amount of PCM samples
 #include "amy.h"
 #include "pcm_tiny.h" 
 // or, #include "pcm_small.h"
+```
+
+## Juno-6 support
+
+You can load in Juno-6 patches and play them back with AMY. Try:
+
+```python
+import amy, juno
+amy.live()
+j = juno.JunoPatch.from_patch_number(17)
+v = j.get_new_voices(6)
+v[0].note_on(64,0.5)
 ```
 
 # Wire protocol

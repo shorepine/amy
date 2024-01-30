@@ -31,7 +31,7 @@ void setup() {
   struct event e = amy.default_event();
   e.osc = 0;
   e.wave = SINE;
-  e.freq = 440;
+  e.freq_coefs[COEFF_CONST] = 440;
   e.velocity = 1;
   e.time = clock+2500;
   amy.add_event(e);
