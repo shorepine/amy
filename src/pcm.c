@@ -64,7 +64,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         synth[osc].phase = P_WRAPPED_SUM(synth[osc].phase, step);
         base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
         if(base_index >= patch->length) { // end
-            synth[osc].status = OFF;// is this right? 
+            synth[osc].status = STATUS_OFF;// is this right? 
             sample = 0;
         } else {
             if(msynth[osc].feedback > 0) { // loop       
@@ -94,7 +94,7 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
     uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
     SAMPLE sample;
     if(base_index >= patch->length) { // end
-        synth[osc].status = OFF;// is this right? 
+        synth[osc].status = STATUS_OFF;// is this right? 
         sample = 0;
     } else {
         sample = L2S(table[base_index]);

@@ -46,6 +46,8 @@ int main(int argc, char ** argv) {
     }
     uint32_t start = amy_sysclock();
     
+    example_init_custom();
+
     amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
     
     ma_encoder_config config = ma_encoder_config_init(ma_encoding_format_wav, ma_format_s16, AMY_NCHANS, AMY_SAMPLE_RATE);
@@ -68,6 +70,8 @@ int main(int argc, char ** argv) {
     //example_sine(start);
     bleep(start);
 
+    example_custom_beep();
+
     example_drums(start+500, 4);
     example_multimbral_fm(start + 2500, /* start_osc= */ 6);
 
@@ -76,7 +80,7 @@ int main(int argc, char ** argv) {
         if (output_filename) {
             int16_t * frames = amy_simple_fill_buffer();
             int num_frames = AMY_BLOCK_SIZE;
-            result = ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
+            ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
         }
         usleep(THREAD_USLEEP);
     }

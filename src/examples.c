@@ -200,3 +200,59 @@ void example_drums(uint32_t start, int loops) {
         }
     }
 }
+
+
+void beeper_init(void) {
+    printf("Beeper init\n");
+}
+
+void beeper_note_on(struct synthinfo* osc, float freq) {
+    printf("Beeper note on\n");
+    saw_down_note_on(osc->osc, freq);
+}
+
+void beeper_note_off(struct synthinfo* osc) {
+    printf("Beeper note off\n");
+    osc->note_off_clock = total_samples;
+}
+
+void beeper_mod_trigger(struct synthinfo* osc) {
+    saw_down_mod_trigger(osc->osc);
+}
+
+SAMPLE beeper_render(SAMPLE* buf, struct synthinfo* osc) {
+    return render_saw_down(buf, osc->osc);
+}
+
+SAMPLE beeper_compute_mod(struct synthinfo* osc) {
+    return compute_mod_saw_down(osc->osc);
+}
+
+struct custom_oscillator beeper = {
+    beeper_init,
+    beeper_note_on,
+    beeper_note_off,
+    beeper_mod_trigger,
+    beeper_render,
+    beeper_compute_mod
+};
+
+void example_init_custom() {
+    if(AMY_HAS_CUSTOM == 1) {
+        amy_set_custom(&beeper);
+    }
+}
+
+void example_custom_beep() {
+    struct event e = amy_default_event();
+    e.osc = 50;
+    e.time = amy_sysclock();
+    e.freq_coefs[0] = 880;
+    e.wave = CUSTOM;
+    e.velocity = 1;
+    amy_add_event(e);
+
+    e.velocity = 0;
+    e.time += 500;
+    amy_add_event(e);
+}
