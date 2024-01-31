@@ -90,6 +90,7 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
+#define JUNO 11
 // synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1

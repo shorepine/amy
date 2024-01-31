@@ -352,10 +352,13 @@ def make_juno106_patches(filename):
     import juno, amy
     amy.log = True
     amy.override_send = nothing
+
+    # We could save space in ROM by doing this as one long string, with a separate pointer table
+    # but we don't believe this solution will last long anyway so could be premature optimization
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// Juno 106 patch table\n")
         f.write("#ifndef __JUNOH\n#define __JUNOH\n")
-        f.write("const char[128][] juno_patch_commands PROGMEM = {\n")
+        f.write("const char juno_patch_commands[128][333] PROGMEM = {\n")
         for i in range(128):
             amy.mess = []
             p = juno.JunoPatch()

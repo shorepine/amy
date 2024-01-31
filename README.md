@@ -242,7 +242,7 @@ Here's the full list:
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
-| w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
+| w    | wave | uint 0-12 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, JUNO, OFF]. default: 0/SINE |
 | W    | bp1_target | uint mask | see bp0_target |
 | x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
 | y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
