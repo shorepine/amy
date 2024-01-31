@@ -360,10 +360,9 @@ def make_juno106_patches(filename):
             amy.mess = []
             p = juno.JunoPatch()
             j = p.from_patch_number(i)
+            j.base_oscs = list()
             v = j.get_new_voices(1)
             f.write("\t\"%s\",\n" % ("".join(amy.mess)))
-            del j
-            del p
         f.write("};\n#endif\n")
     amy.log = False
 
