@@ -9,6 +9,7 @@
 #define AMY_OSCS 120
 #define AMY_SAMPLE_RATE 44100 
 #define AMY_NCHANS 2
+#define AMY_USE_FIXEDPOINT
 
 
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
