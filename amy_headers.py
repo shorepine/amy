@@ -345,6 +345,29 @@ def make_clipping_lut(filename):
         f.write("#endif\n")
     print("wrote", filename)
 
+def make_juno106_patches(filename):
+    def nothing(**kwargs):
+        return
+
+    import juno, amy
+    amy.log = True
+    amy.override_send = nothing
+    with open(filename, "w") as f:
+        f.write("// Automatically generated.\n// Juno 106 patch table\n")
+        f.write("#ifndef __JUNOH\n#define __JUNOH\n")
+        f.write("const char[128][] juno_patch_commands PROGMEM = {\n")
+        for i in range(128):
+            amy.mess = []
+            p = juno.JunoPatch()
+            j = p.from_patch_number(i)
+            v = j.get_new_voices(1)
+            f.write("\t\"%s\",\n" % ("".join(amy.mess)))
+            del j
+            del p
+        f.write("};\n#endif\n")
+    amy.log = False
+
+
 
 """ 
     Generate all the headers except for the partials headers
@@ -389,6 +412,9 @@ def generate_all():
 
     # PCM patches
     generate_both_pcm_headers()
+
+    # Juno patches
+    make_juno106_patches("src/juno.h")
 
     # FM patches
     fm.generate_fm_header()

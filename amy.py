@@ -13,6 +13,8 @@ AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
 
 override_send = None
+mess = []
+log = False
 
 """
     A bunch of useful presets
@@ -126,10 +128,13 @@ def send_raw(m):
 # Send an AMY message to amy
 def send(**kwargs):
     global override_send
+    global mess, log
+    m = message(**kwargs)
+    if(log): mess.append(m)
+    
     if(override_send is not None):
         override_send(**kwargs)
     else:
-        m = message(**kwargs)
         send_raw(m)
 
 
