@@ -20,7 +20,11 @@ typedef struct {
 } pcm_map_t;
 
 
+#ifdef AMY_CONFIG_H
+#include AMY_CONFIG_H
+#else
 #include "amy_config.h"
+#endif
 
 // Rest of amy setup
 #define SAMPLE_MAX 32767
