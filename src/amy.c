@@ -384,7 +384,6 @@ void add_delta_to_queue(struct delta d) {
 void amy_add_event(struct event e) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
-
     // Synth defaults if not set, these are required for the delta struct
     if(AMY_IS_UNSET(e.osc)) { d.osc = 0; } else { d.osc = e.osc; }
     if(AMY_IS_UNSET(e.time)) { d.time = 0; } else { d.time = e.time; }
@@ -395,10 +394,13 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
         if(AMY_IS_SET(e.amp_coefs[i])) {  d.param=AMP + i; d.data = *(uint32_t *)&e.amp_coefs[i]; add_delta_to_queue(d); }
+
     // First freq coef is in Hz, rest are linear.
     if(AMY_IS_SET(e.freq_coefs[0])) { float logfreq = logfreq_of_freq(e.freq_coefs[0]); d.param=FREQ; d.data = *(uint32_t *)&logfreq; add_delta_to_queue(d); }
+
     for (int i = 1; i < NUM_COMBO_COEFS; ++i)
         if(AMY_IS_SET(e.freq_coefs[i])) { d.param=FREQ + i; d.data = *(uint32_t *)&e.freq_coefs[i]; add_delta_to_queue(d); }
+
     // First freq coef is in Hz, rest are linear.
     if(AMY_IS_SET(e.filter_freq_coefs[0])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[0]); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
     for (int i = 1; i < NUM_COMBO_COEFS; ++i)
@@ -407,6 +409,8 @@ void amy_add_event(struct event e) {
         if(AMY_IS_SET(e.duty_coefs[i])) {  d.param=DUTY + i; d.data = *(uint32_t *)&e.duty_coefs[i]; add_delta_to_queue(d); }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
         if(AMY_IS_SET(e.pan_coefs[i])) { d.param=PAN + i; d.data = *(uint32_t *)&e.pan_coefs[i]; add_delta_to_queue(d); }
+
+
     if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
@@ -418,6 +422,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.reset_osc)) { d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_target)) { d.param=MOD_TARGET; d.data = *(uint32_t *)&e.mod_target; add_delta_to_queue(d); }
+
     if(AMY_IS_SET(e.bp0_target)) { d.param=BP0_TARGET; d.data = *(uint32_t *)&e.bp0_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.bp1_target)) { d.param=BP1_TARGET; d.data = *(uint32_t *)&e.bp1_target; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
@@ -452,6 +457,7 @@ void amy_add_event(struct event e) {
     if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
     message_counter++;
     AMY_PROFILE_STOP(AMY_ADD_EVENT)
+
 }
 
 
@@ -546,6 +552,7 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
+    synth[i].patch_loaded = 0;
     AMY_UNSET(synth[i].logratio);
     synth[i].resonance = 0.7f;
     msynth[i].resonance = 0.7f;
@@ -741,6 +748,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==PULSE) pulse_note_on(osc, initial_freq);
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
+    if(synth[osc].wave==PATCHES) patches_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS) partials_note_on(osc);
@@ -1390,7 +1398,7 @@ void parse_coef_message(char *message, float *coefs) {
 }
 
 // given a string return an event
-struct event amy_parse_message(char * message) {
+struct event amy_parse_message(char * message, uint16_t base_osc) {
     AMY_PROFILE_START(AMY_PARSE_MESSAGE)
     uint8_t mode = 0;
     uint16_t start = 0;
@@ -1458,7 +1466,7 @@ struct event amy_parse_message(char * message) {
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
                         case 'W': e.bp1_target = atoi(message + start);  break;
-                        case 'v': e.osc=(atoi(message + start) % AMY_OSCS);  break; // allow osc wraparound
+                        case 'v': e.osc=((base_osc + atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
@@ -1506,20 +1514,12 @@ struct event amy_parse_message(char * message) {
 // given a string play / schedule the event directly
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
-    struct event e = amy_parse_message(message);
+    struct event e = amy_parse_message(message, 0);
     if(e.status == SCHEDULED) {
         amy_add_event(e);
     }
 }
 
-void amy_play_message_with_base(char* message, uint16_t osc) {
-    // This, but also check for Zs and iterate, and bump up the oscs in the message to + osc
-    struct event e = amy_parse_message(message);
-    if(e.status == SCHEDULED) {
-        amy_add_event(e);
-    }
-
-}
 
 // amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
 

@@ -90,7 +90,7 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
-#define PATCHER 11
+#define PATCHES 11
 // synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
@@ -287,6 +287,7 @@ struct synthinfo {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
+    uint8_t patch_loaded;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
     float filter_logfreq_coefs[NUM_COMBO_COEFS];
@@ -426,7 +427,7 @@ void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 // external functions
 void amy_play_message(char *message);
 void amy_play_message_with_base(char* message, uint16_t osc);
-struct event amy_parse_message(char * message);
+struct event amy_parse_message(char * message, uint16_t base_osc);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
 void amy_stop();
@@ -455,6 +456,8 @@ extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
 extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
+extern void patches_note_on(uint16_t osc);
+
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 
 extern SAMPLE compute_mod_pulse(uint16_t osc);

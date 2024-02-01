@@ -1,32 +1,6 @@
 // algorithms.c
-// FM and partial synths that involve combinations of oscillators
 #include "amy.h"
 
-#define NUM_ALGO_BPS 5
-typedef struct {
-    float freq;
-    float freq_ratio;
-    float amp;
-    float amp_rate[NUM_ALGO_BPS];
-    float amp_time[NUM_ALGO_BPS];
-    int8_t lfo_target;
-} operator_parameters_t;
-
-typedef struct  {
-    uint8_t algo;
-    float feedback;
-    float pitch_rate[NUM_ALGO_BPS];
-    uint16_t pitch_time[NUM_ALGO_BPS];
-    float lfo_freq;
-    int8_t lfo_wave;
-    float lfo_amp_amp;
-    float lfo_pitch_amp;
-    operator_parameters_t ops[MAX_ALGO_OPS];
-} algorithms_parameters_t;
-
-// 1 + 4 + 20 + 10 + 4 + 1 + 4 + (6 * (4 + 4 + 4 + 20 + 20 + 1)) = 
-
-//#include "fm.h"
 // Thank you MFSA for the DX7 op structure , borrowed here \/ \/ \/ 
 enum FmOperatorFlags {
     OUT_BUS_ONE = 1 << 0,
@@ -101,18 +75,12 @@ const struct FmAlgorithm algorithms[33] = {
 // a = 0
 static inline void zero(SAMPLE* a) {
     bzero((void *)a, AMY_BLOCK_SIZE * sizeof(SAMPLE));
-    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-    //    a[i] = 0;
-    //}
 }
 
 
 // b = a 
 static inline void copy(SAMPLE* a, SAMPLE* b) {
     bcopy((void *)a, (void *)b, AMY_BLOCK_SIZE * sizeof(SAMPLE));
-    //for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-    //    b[i] = a[i];
-    //}
 }
 
 SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
@@ -147,116 +115,8 @@ void algo_note_off(uint16_t osc) {
     synth[osc].note_off_clock = total_samples;          
 }
 
-/*
-void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
-    // Set up the voices from a DX7 patch.
-    // 9 voices total - operators 1,2,3,4,5,6, the root voice (silent), and two LFOs (amp then pitch)
-    // osc == root osc (the control one with the parameters in it)
-    // target_oscs = list of 8 osc numbers
-    // target_oscs[0] = op6, [1] = op5, [2] = op4, [3] = op3, [4] = op2, [5] = op1, 
-    // [6] = amp lfo, [7] = pitch lfo
-    algorithms_parameters_t p = fm_patches[synth[osc].patch % ALGO_PATCHES];
-    synth[osc].algorithm = p.algo;
-    synth[osc].feedback = p.feedback;
-
-    synth[osc].mod_source = target_oscs[7];
-    synth[osc].mod_target = TARGET_FREQ;
-    float time_ratio = 1;
-    if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
-
-    // amp LFO
-    //synth[target_oscs[6]].freq = p.lfo_freq * time_ratio;
-    synth[target_oscs[6]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(p.lfo_freq * time_ratio);
-    synth[target_oscs[6]].logfreq_coefs[COEF_NOTE] = 0;
-    synth[target_oscs[6]].wave = p.lfo_wave;
-    synth[target_oscs[6]].status = IS_MOD_SOURCE;
-    synth[target_oscs[6]].amp_coefs[COEF_CONST] = p.lfo_amp_amp;
-    synth[target_oscs[6]].amp_coefs[COEF_VEL] = 0;
-    synth[target_oscs[6]].amp_coefs[COEF_EG0] = 0;
-
-    // pitch LFO
-    //synth[target_oscs[7]].freq = p.lfo_freq * time_ratio;
-    synth[target_oscs[7]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(p.lfo_freq * time_ratio);
-    synth[target_oscs[6]].logfreq_coefs[COEF_NOTE] = 0;
-    synth[target_oscs[7]].wave = p.lfo_wave;
-    synth[target_oscs[7]].status = IS_MOD_SOURCE;
-    synth[target_oscs[7]].amp_coefs[COEF_CONST] = p.lfo_pitch_amp;
-    synth[target_oscs[6]].amp_coefs[COEF_VEL] = 0;
-    synth[target_oscs[6]].amp_coefs[COEF_EG0] = 0;
-
-
-    float last_release_time= 0;
-    float last_release_value = 0;
-    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        // TODO: ADD PER-OP AMP MOD via MOD SENS (SEE FM.PY)
-        synth[osc].algo_source[i] = target_oscs[i];
-        operator_parameters_t op = p.ops[i];
-        if (op.freq <= 0) {
-            //synth[target_oscs[i]].freq = 0;
-            synth[target_oscs[i]].logfreq_coefs[COEF_CONST] = 0;
-        } else {
-            //synth[target_oscs[i]].freq = op.freq;
-            synth[target_oscs[i]].logfreq_coefs[COEF_CONST] = logfreq_of_freq(op.freq);
-        }
-        synth[target_oscs[i]].logfreq_coefs[COEF_NOTE] = 0;
-        synth[target_oscs[i]].status = IS_ALGO_SOURCE;
-        synth[target_oscs[i]].logratio = log2f(op.freq_ratio);
-        synth[target_oscs[i]].amp_coefs[COEF_CONST] = op.amp;
-        synth[target_oscs[i]].breakpoint_target[0] = TARGET_AMP + TARGET_DX7_EXPONENTIAL;
-        synth[target_oscs[i]].amp_coefs[COEF_VEL] = 0;
-        synth[target_oscs[i]].amp_coefs[COEF_EG0] = 1.0f;
-        synth[target_oscs[i]].phase = F2P(0.25);
-        synth[target_oscs[i]].mod_target = op.lfo_target;
-        apply_target_to_coefs(target_oscs[i], op.lfo_target, COEF_MOD);
-        for(uint8_t j=0;j<NUM_ALGO_BPS;j++) {
-            synth[target_oscs[i]].breakpoint_values[0][j] = op.amp_rate[j];
-            synth[target_oscs[i]].breakpoint_times[0][j] =  ms_to_samples((int)((float)op.amp_time[j]/time_ratio));
-        }
-        // Calculate the last release time for the root note's amp BP
-        if(op.amp_time[4] > last_release_time) {
-            last_release_time = op.amp_time[4];
-            last_release_value = op.amp_rate[4];
-        }
-    }
-
-    // Set an overarching amp target for the root note that is the latest operator amp, so the note dies eventually
-    synth[osc].breakpoint_times[0][0] = ms_to_samples((int)((float)0/time_ratio));
-    synth[osc].breakpoint_values[0][0] = 1;
-    synth[osc].breakpoint_times[0][1] = ms_to_samples((int)((float)last_release_time/time_ratio));    
-    synth[osc].breakpoint_values[0][1] = last_release_value;
-    synth[osc].breakpoint_target[0] = TARGET_AMP + TARGET_DX7_EXPONENTIAL;
-    synth[osc].amp_coefs[COEF_CONST] = 0;
-    synth[osc].amp_coefs[COEF_VEL] = 0;
-    synth[osc].amp_coefs[COEF_EG0] = 1.0f;
-
-    // And the pitch BP for the root note
-    for(uint8_t i=0;i<NUM_ALGO_BPS;i++) {
-        synth[osc].breakpoint_values[1][i] = p.pitch_rate[i];
-        synth[osc].breakpoint_times[1][i] = ms_to_samples((int)((float)p.pitch_time[i]/time_ratio));
-    }
-    synth[osc].breakpoint_target[1] = TARGET_FREQ + TARGET_TRUE_EXPONENTIAL;
-    synth[osc].logfreq_coefs[COEF_EG1] = 1.0f;
-    synth[osc].logfreq_coefs[COEF_CONST] = -1.0f;
-    //synth[osc].logfreq_coefs[COEF_NOTE] = 0;
-
-}
-*/
-
-// The default way is to use consecutive osc #s
-
-/*
-void algo_setup_patch(uint16_t osc) {
-    uint16_t target_oscs[8];
-    for(uint8_t i=0;i<8;i++) target_oscs[i] = osc+i+1;
-    algo_custom_setup_patch(osc, target_oscs);
-}
-*/
 
 void algo_note_on(uint16_t osc) {    
-    // trigger all the source operator voices
-    if(AMY_IS_SET(synth[osc].patch)) { 
-        //algo_setup_patch(osc);
-    }
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(AMY_IS_SET(synth[osc].algo_source[i])) {
             note_on_mod(synth[osc].algo_source[i], osc);
