@@ -350,7 +350,8 @@ def make_patches(filename):
         return
 
     import juno, amy, fm
-    amy.log = True
+
+    # Don't make any noise
     amy.override_send = nothing
 
     # We could save space in ROM by doing this as one long string, with a separate pointer table
@@ -360,22 +361,19 @@ def make_patches(filename):
         f.write("const char * patch_commands[256] PROGMEM = {\n")
         # Do juno
         for i in range(128):
-            amy.mess = []
+            amy.log_patch()
             p = juno.JunoPatch()
             j = p.from_patch_number(i)
             j.base_oscs = list()
             v = j.get_new_voices(1)
-            cmd = "".join(amy.mess)
-            f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, cmd))  
+            f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, amy.retrieve_patch()))  
         # Do dx7
         for i in range(128):
-            amy.mess = []
+            amy.log_patch()
             p = fm.AMYPatch.from_dx7(fm.DX7Patch.from_patch_number(i))
             p.send_to_AMY(reset=False)
-            cmd = "".join(amy.mess)
-            f.write("\t/* %d: DX7 %s */ \"%s\",\n" % (i+128, p.name, cmd))  
+            f.write("\t/* %d: DX7 %s */ \"%s\",\n" % (i+128, p.name, amy.retrieve_patch()))  
         f.write("};\n#endif\n")
-    amy.log = False
     amy.override_send = None
 
 

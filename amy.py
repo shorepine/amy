@@ -135,6 +135,19 @@ def send_raw(m):
     import libamy
     libamy.send(m)
 
+def log_patch():
+    global mess, log
+    # start recording a patch
+    log = True
+    mess = []
+
+def retrieve_patch():
+    global mess, log
+    log = False
+    s = "".join(mess)
+    mess =[]
+    return s
+
 # Send an AMY message to amy
 def send(**kwargs):
     global override_send
