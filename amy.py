@@ -6,7 +6,7 @@ AMY_NCHANS = 2
 AMY_OSCS = 120
 CHORUS_OSC = 119
 MAX_QUEUE = 400
-[SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, PATCHES, OFF] = range(13)
+[SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 AMY_LATENCY_MS = 0
@@ -18,7 +18,9 @@ log = False
 
 """
     A bunch of useful presets
+    TODO : move this to patches.c
 """
+
 def preset(which,osc=0, **kwargs):
     # Reset the osc first
     reset(osc=osc)
@@ -81,7 +83,7 @@ def trunc3(number):
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, mod_target=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
-            chorus_level=None, chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None):
+            chorus_level=None, chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None):
 
     m = ""
     if(time is not None): m = m + "t" + str(time)
@@ -124,6 +126,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(reverb_liveness is not None): m = m + "H" + str(reverb_liveness)
     if(reverb_damping is not None): m = m + "j" + str(reverb_damping)
     if(reverb_xover is not None): m = m + "J" + str(reverb_xover)
+    if(load_patch is not None): m = m + 'K' + str(load_patch)
     #print("message " + m)
     return m+'Z'
 
@@ -234,18 +237,22 @@ def test():
 
 
 """
-    Play all of the FM patches in order
+    Play all of the patches 
 """
-def play_patches(wait=0.500, patch_total = 100, **kwargs):
-    once = True
+def play_patches(wait=1, patch_total = 256, **kwargs):
+    import random
     patch_count = 0
     while True:
-        for i in range(24):
-            patch = patch_count % patch_total
-            patch_count = patch_count + 1
-            send(osc=i % AMY_OSCS, note=i+50, wave=ALGO, patch=patch, vel=1, **kwargs)
-            time.sleep(wait)
-            send(osc=i % AMY_OSCS, vel=0)
+        patch = random.randint(0,256) #patch_count % patch_total
+        print("Sending patch %d" %(patch))
+        send(osc=0, load_patch=patch)
+        time.sleep(wait/4.0)            
+        patch_count = patch_count + 1
+        send(osc=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(osc=0, vel=0)
+        reset()
+        time.sleep(wait/4.0)
 
 """
     Play up to AMY_OSCS patches at once

@@ -3,7 +3,29 @@
 
 #include "amy.h"
 
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
+}
 
+void example_patches() {
+    struct event e = amy_default_event();
+    for(uint16_t i=128;i<256;i++) {
+        e.load_patch = i;
+        e.osc = 0;
+        amy_add_event(e);
+        delay_ms(250);
+
+        e = amy_default_event();
+        e.osc = 0;
+        e.midi_note = 50;
+        e.velocity = 1;
+        amy_add_event(e);
+        delay_ms(1000);
+
+        amy_reset_oscs();
+    }
+}
 void example_reverb() {
     if(AMY_HAS_REVERB == 1) {
         config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 

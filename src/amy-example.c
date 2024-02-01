@@ -66,10 +66,10 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    bleep(start);
-
-    example_drums(start+500, 4);
-    example_multimbral_fm(start + 2500, /* start_osc= */ 6);
+    //bleep(start);
+    example_patches();
+    //example_drums(start+500, 4);
+    //example_multimbral_fm(start + 2500, /* start_osc= */ 6);
 
     // Now just spin for 10s
     while(amy_sysclock() - start < 5000) {

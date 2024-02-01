@@ -295,6 +295,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.osc);
     AMY_UNSET(e.patch);
     AMY_UNSET(e.wave);
+    AMY_UNSET(e.load_patch);
     AMY_UNSET(e.phase);
     AMY_UNSET(e.feedback);
     AMY_UNSET(e.velocity);
@@ -388,6 +389,12 @@ void amy_add_event(struct event e) {
     if(AMY_IS_UNSET(e.osc)) { d.osc = 0; } else { d.osc = e.osc; }
     if(AMY_IS_UNSET(e.time)) { d.time = 0; } else { d.time = e.time; }
 
+    // Load patches is special
+    if(AMY_IS_SET(e.load_patch)) {
+        patches_load_patch(e.load_patch, e.osc);
+        goto end;
+    }
+
     // Everything else only added to queue if set
     if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
@@ -455,6 +462,7 @@ void amy_add_event(struct event e) {
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
     if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+end:
     message_counter++;
     AMY_PROFILE_STOP(AMY_ADD_EVENT)
 
@@ -552,7 +560,6 @@ void reset_osc(uint16_t i ) {
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
-    synth[i].patch_loaded = 0;
     AMY_UNSET(synth[i].logratio);
     synth[i].resonance = 0.7f;
     msynth[i].resonance = 0.7f;
@@ -748,7 +755,6 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==PULSE) pulse_note_on(osc, initial_freq);
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
-    if(synth[osc].wave==PATCHES) patches_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS) partials_note_on(osc);
@@ -1452,6 +1458,7 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
                         case 'j': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
                         case 'J': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
                         case 'k': if(AMY_HAS_CHORUS)config_chorus(atoff(message + start), chorus.max_delay); break;
+                        case 'K': e.load_patch = atoi(message+start); break; 
                         case 'l': e.velocity=atoff(message + start); break;
                         case 'L': e.mod_source=atoi(message + start); break;
                         case 'm': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), atoi(message + start)); break;
@@ -1507,6 +1514,7 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
         }
         e.status = SCHEDULED;
         return e;
+        
     }
     return amy_default_event();
 }
