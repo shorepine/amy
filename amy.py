@@ -6,7 +6,7 @@ AMY_NCHANS = 2
 AMY_OSCS = 120
 CHORUS_OSC = 119
 MAX_QUEUE = 400
-[SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, JUNO, OFF] = range(13)
+[SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, PATCHER, OFF] = range(13)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 AMY_LATENCY_MS = 0
@@ -68,7 +68,14 @@ def preset(which,osc=0, **kwargs):
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
-    return ('%.6f' % number).rstrip('0').rstrip('.')
+    if(type(number)==float):
+        return ('%.6f' % number).rstrip('0').rstrip('.')
+    return str(number)
+def trunc3(number):
+    if(type(number)==float):
+        return ('%.3f' % number).rstrip('0').rstrip('.')
+    return str(number)
+
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,

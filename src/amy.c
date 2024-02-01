@@ -1511,6 +1511,16 @@ void amy_play_message(char *message) {
         amy_add_event(e);
     }
 }
+
+void amy_play_message_with_base(char* message, uint16_t osc) {
+    // This, but also check for Zs and iterate, and bump up the oscs in the message to + osc
+    struct event e = amy_parse_message(message);
+    if(e.status == SCHEDULED) {
+        amy_add_event(e);
+    }
+
+}
+
 // amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
 
 // fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]

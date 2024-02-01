@@ -90,7 +90,7 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
-#define JUNO 11
+#define PATCHER 11
 // synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
@@ -425,6 +425,7 @@ void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 
 // external functions
 void amy_play_message(char *message);
+void amy_play_message_with_base(char* message, uint16_t osc);
 struct event amy_parse_message(char * message);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);

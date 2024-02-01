@@ -2,7 +2,7 @@
 // baked in AMY string patches (Juno-6 for now)
 
 #include "amy.h"
-#include "juno.h"
+#include "patches.h"
 #define JUNO_PATCHES 128
 #define TOTAL_PATCHES 128
 
@@ -11,8 +11,8 @@ void patches_init() {
 }
 
 void patches_setup_patch(uint16_t osc) {
-    char * message = juno_patch_commands[synth[osc].patch];
-    amy_play_message(message);
+    char * message = patch_commands[synth[osc].patch];
+    amy_play_message_with_base(message, osc);
 }
 
 void patches_note_on(uint16_t osc) {

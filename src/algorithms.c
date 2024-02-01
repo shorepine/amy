@@ -24,7 +24,7 @@ typedef struct  {
     operator_parameters_t ops[MAX_ALGO_OPS];
 } algorithms_parameters_t;
 
-
+// 1 + 4 + 20 + 10 + 4 + 1 + 4 + (6 * (4 + 4 + 4 + 20 + 20 + 1)) = 
 
 #include "fm.h"
 // Thank you MFSA for the DX7 op structure , borrowed here \/ \/ \/ 
