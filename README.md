@@ -226,6 +226,7 @@ Here's the full list:
 | j    | reverb_damping  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
 | J    | reverb_xover_hz | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
 | k    | chorus_level | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
+| K    | load_patch | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
 | m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
