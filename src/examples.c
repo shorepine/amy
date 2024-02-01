@@ -10,18 +10,24 @@ void delay_ms(uint32_t ms) {
 
 void example_patches() {
     struct event e = amy_default_event();
-    for(uint16_t i=128;i<256;i++) {
+    for(uint16_t i=0;i<256;i++) {
         e.load_patch = i;
         e.osc = 0;
+        fprintf(stderr, "sending patch %d\n", i);
         amy_add_event(e);
         delay_ms(250);
 
         e = amy_default_event();
         e.osc = 0;
         e.midi_note = 50;
-        e.velocity = 1;
+        e.velocity = 0.5;
         amy_add_event(e);
         delay_ms(1000);
+        e.osc = 0;
+        e.velocity = 0;
+        amy_add_event(e);
+
+        delay_ms(250);
 
         amy_reset_oscs();
     }
