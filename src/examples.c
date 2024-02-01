@@ -8,6 +8,47 @@ void delay_ms(uint32_t ms) {
     while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
 }
 
+void example_juno_chord() {
+    struct event e = amy_default_event();
+    e.load_patch = 1;
+    e.osc = 0;
+    amy_add_event(e);
+    e.osc = 5;
+    amy_add_event(e);
+    e.osc = 10;
+    amy_add_event(e);
+
+    delay_ms(250);
+    e = amy_default_event();
+    e.osc = 0;
+    e.velocity=0.2;
+    e.midi_note = 50;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    e.osc = 5;
+    e.midi_note = 54;
+    amy_add_event(e);
+
+    delay_ms(1000);
+    e.osc = 10;
+    e.midi_note = 56;
+    amy_add_event(e);
+
+    delay_ms(2000);
+    e.osc = 0;
+    e.velocity = 0;
+    amy_add_event(e);
+    e.osc = 5;
+    e.velocity = 0;
+    amy_add_event(e);
+    e.osc = 10;
+    e.velocity = 0;
+    amy_add_event(e);
+    delay_ms(100);
+}   
+
+
 void example_patches() {
     struct event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {

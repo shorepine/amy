@@ -1444,8 +1444,8 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
                         case 'A': copy_param_list_substring(e.bp0, message+start); e.bp_is_set[0] = 1; break;
                         case 'B': copy_param_list_substring(e.bp1, message+start); e.bp_is_set[1] = 1; break;
                         case 'b': e.feedback=atoff(message+start); break;
-                        case 'c': e.chained_osc = atoi(message + start); break;
-                        case 'C': e.clone_osc = atoi(message + start); break;
+                        case 'c': e.chained_osc = base_osc + atoi(message + start); break;
+                        case 'C': e.clone_osc = base_osc + atoi(message + start); break;
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
                         case 'D': show_debug(atoi(message + start)); break;
                         case 'f': parse_coef_message(message + start, e.freq_coefs);break;
@@ -1470,7 +1470,7 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
                         case 'P': e.phase=F2P(atoff(message + start)); break;
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
                         case 'R': e.resonance=atoff(message + start); break;
-                        case 'S': e.reset_osc = atoi(message + start); break;
+                        case 'S': e.reset_osc = base_osc + atoi(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
                         case 'W': e.bp1_target = atoi(message + start);  break;
                         case 'v': e.osc=((base_osc + atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
