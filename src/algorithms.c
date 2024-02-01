@@ -26,7 +26,7 @@ typedef struct  {
 
 // 1 + 4 + 20 + 10 + 4 + 1 + 4 + (6 * (4 + 4 + 4 + 20 + 20 + 1)) = 
 
-#include "fm.h"
+//#include "fm.h"
 // Thank you MFSA for the DX7 op structure , borrowed here \/ \/ \/ 
 enum FmOperatorFlags {
     OUT_BUS_ONE = 1 << 0,
@@ -147,6 +147,7 @@ void algo_note_off(uint16_t osc) {
     synth[osc].note_off_clock = total_samples;          
 }
 
+/*
 void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     // Set up the voices from a DX7 patch.
     // 9 voices total - operators 1,2,3,4,5,6, the root voice (silent), and two LFOs (amp then pitch)
@@ -239,18 +240,22 @@ void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs) {
     //synth[osc].logfreq_coefs[COEF_NOTE] = 0;
 
 }
+*/
 
 // The default way is to use consecutive osc #s
+
+/*
 void algo_setup_patch(uint16_t osc) {
     uint16_t target_oscs[8];
     for(uint8_t i=0;i<8;i++) target_oscs[i] = osc+i+1;
     algo_custom_setup_patch(osc, target_oscs);
 }
+*/
 
 void algo_note_on(uint16_t osc) {    
     // trigger all the source operator voices
     if(AMY_IS_SET(synth[osc].patch)) { 
-        algo_setup_patch(osc);
+        //algo_setup_patch(osc);
     }
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(AMY_IS_SET(synth[osc].algo_source[i])) {

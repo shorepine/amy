@@ -486,7 +486,7 @@ extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
-extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
+//extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 
 
 // filters
