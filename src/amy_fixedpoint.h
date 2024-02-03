@@ -53,7 +53,7 @@
 
 #ifndef AMY_USE_FIXEDPOINT
 
-#warning "floating point calc"
+//#warning "floating point calc"
 #define ARITH "float"
 
 
