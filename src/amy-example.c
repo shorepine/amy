@@ -46,7 +46,9 @@ int main(int argc, char ** argv) {
     }
     uint32_t start = amy_sysclock();
     
+    #if AMY_HAS_CUSTOM == 1
     example_init_custom();
+    #endif
 
     amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
     
@@ -68,9 +70,9 @@ int main(int argc, char ** argv) {
     //example_reverb();
     //example_chorus();
     //example_sine(start);
-    bleep(start);
+    //example_custom_beep();
 
-    example_custom_beep();
+    bleep(start);
 
     example_drums(start+500, 4);
     example_multimbral_fm(start + 2500, /* start_osc= */ 6);

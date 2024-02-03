@@ -201,18 +201,19 @@ void example_drums(uint32_t start, int loops) {
     }
 }
 
+// Minimal custom oscillator
+
+#if AMY_HAS_CUSTOM == 1
 
 void beeper_init(void) {
     printf("Beeper init\n");
 }
 
 void beeper_note_on(struct synthinfo* osc, float freq) {
-    printf("Beeper note on\n");
     saw_down_note_on(osc->osc, freq);
 }
 
 void beeper_note_off(struct synthinfo* osc) {
-    printf("Beeper note off\n");
     osc->note_off_clock = total_samples;
 }
 
@@ -238,9 +239,7 @@ struct custom_oscillator beeper = {
 };
 
 void example_init_custom() {
-    if(AMY_HAS_CUSTOM == 1) {
-        amy_set_custom(&beeper);
-    }
+    amy_set_custom(&beeper);
 }
 
 void example_custom_beep() {
@@ -256,3 +255,5 @@ void example_custom_beep() {
     e.time += 500;
     amy_add_event(e);
 }
+
+#endif
