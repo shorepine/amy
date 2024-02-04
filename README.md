@@ -229,6 +229,7 @@ Here's the full list:
 | K    | load_patch | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
+| M    | chorus_freq | float | LFO freq of chorus | 
 | m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
 | N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
@@ -237,6 +238,7 @@ Here's the full list:
 | p    | patch | uint | choose a preloaded PCM sample, partial patch or FM patch number for ALGO waveforms. |
 | P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
 | Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| q    | chorus_depth | float | chorus depth | 
 | R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
 | T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefs. | 

@@ -4,7 +4,6 @@ BLOCK_SIZE = 256
 AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
-CHORUS_OSC = 119
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
@@ -83,7 +82,7 @@ def trunc3(number):
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, mod_target=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
-            chorus_level=None, chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None):
+            chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None):
 
     m = ""
     if(time is not None): m = m + "t" + str(time)
@@ -122,6 +121,8 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(filter_type is not None): m = m + "G" + str(filter_type)
     if(chorus_level is not None): m = m + "k" + str(chorus_level)
     if(chorus_delay is not None): m = m + "m" + str(chorus_delay)
+    if(chorus_depth is not None): m = m + 'q' + trunc(chorus_depth)
+    if(chorus_freq is not None): m =m + 'M' + trunc(chorus_freq)
     if(reverb_level is not None): m = m + "h" + str(reverb_level)
     if(reverb_liveness is not None): m = m + "H" + str(reverb_liveness)
     if(reverb_damping is not None): m = m + "j" + str(reverb_damping)
@@ -353,18 +354,12 @@ def c_major(octave=2,wave=SINE, **kwargs):
 """
     Chorus control
 """
-def chorus(level=-1, max_delay=-1, freq=-1, amp=-1, wave=-1):
+def chorus(level=-1, max_delay=-1, freq=-1, amp=-1):
     args = {}
     if (freq >= 0):
-        args['freq'] = freq
+        args['chorus_freq'] = freq
     if (amp >= 0):
-        args['amp'] = amp
-    if (wave >= 0):
-        args['wave'] = wave
-    if len(args) > 0:
-        # We are sending oscillator commands.
-        args['osc'] = CHORUS_OSC
-    # These ones don't relate to CHORUS_OSC osc.
+        args['chorus_depth'] = amp
     if (level >= 0):
         args['chorus_level'] = level
     if (max_delay >= 0):

@@ -81,7 +81,7 @@ void example_reverb() {
 
 void example_chorus() {
     if(AMY_HAS_CHORUS == 1) {
-        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
+        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     }
 }
 

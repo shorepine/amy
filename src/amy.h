@@ -362,6 +362,8 @@ extern struct profile profiles[NO_TAG];
 extern int64_t amy_get_us();
 #endif
 
+#define CHORUS_MOD_SOURCE AMY_OSCS
+
 
 // Callbacks, override if you'd like after calling amy_start()
 //void (*amy_parse_callback)(char,char*);
@@ -382,8 +384,9 @@ void amy_increase_volume();
 void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
-void config_chorus(float level, int max_delay) ;
+void config_chorus(float level, int max_delay, float lfo_freq, float depth);
 void osc_note_on(uint16_t osc, float initial_freq);
+void chorus_note_on(float initial_freq);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);

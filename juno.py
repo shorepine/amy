@@ -428,15 +428,14 @@ class JunoPatch:
       'chorus_level': float(self.chorus)
     }
     if self.chorus:
-      chorus_args['osc'] = amy.CHORUS_OSC
-      chorus_args['amp'] = 0.5
+      chorus_args['chorus_depth'] = 0.5
       if self.chorus == 1:
-        chorus_args['freq'] = 0.5
+        chorus_args['chorus_freq'] = 0.5
       elif self.chorus == 2:
-        chorus_args['freq'] = 0.83
+        chorus_args['chorus_freq'] = 0.83
       elif self.chorus == 3:
-        chorus_args['freq'] = 0.83
-        chorus_args['amp'] = 0.05
+        chorus_args['chorus_freq'] = 0.83
+        chorus_args['chorus_depth'] = 0.05
     #self.amy_send(osc=amy.CHORUS_OSC, **chorus_args)
     # *Don't* repeat for all the notes, these ones are global.
     amy.send(**chorus_args)

@@ -100,6 +100,8 @@ struct synthinfo * synth;
 // envelope-modified per-osc state
 struct mod_synthinfo * msynth;
 
+
+
 // Two mixing blocks, one per core of rendering
 SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
@@ -145,10 +147,12 @@ SAMPLE delay_mod_val = 0;
 typedef struct chorus_config {
     SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
     int max_delay;   // Max delay when modulating.  Must be <= DELAY_LINE_LEN
+    float lfo_freq;
+    float depth;
 } chorus_config_t;
 
 
-chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY};
+chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH};
 
 void alloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
@@ -171,8 +175,7 @@ void dealloc_chorus_delay_lines(void) {
 }
 
 
-void config_chorus(float level, int max_delay) {
-    // we just config mix level and max_delay here.  modulation freq/amp/shape comes from osc 63.
+void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
     if (level > 0) {
         // only allocate delay lines if chorus is more than inaudible.
         if (delay_lines[0] == NULL) {
@@ -182,9 +185,9 @@ void config_chorus(float level, int max_delay) {
         if (synth[CHORUS_MOD_SOURCE].status == OFF) {  //chorus.level == 0) {
 #ifdef CHORUS_ARATE
             // Setup chorus oscillator.
-            synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(CHORUS_DEFAULT_LFO_FREQ);
+            synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
-            synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = CHORUS_DEFAULT_MOD_DEPTH;
+            synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = depth;
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_VEL] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
@@ -599,14 +602,15 @@ void reset_osc(uint16_t i ) {
 }
 
 void amy_reset_oscs() {
-    for(uint16_t i=0;i<AMY_OSCS;i++) reset_osc(i);
+    // include chorus osc
+    for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
     amy_global.eq[0] = F2S(1.0f);
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
     // Reset chorus oscillator
-    if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY);
+    if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if( AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
 }
 
@@ -623,8 +627,8 @@ int8_t oscs_init() {
         pcm_init();
     }
     events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
-    synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
-    msynth = (struct mod_synthinfo*) malloc_caps(sizeof(struct mod_synthinfo) * AMY_OSCS, SYNTH_RAM_CAPS);
+    synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * (AMY_OSCS+1), SYNTH_RAM_CAPS);
+    msynth = (struct mod_synthinfo*) malloc_caps(sizeof(struct mod_synthinfo) * (AMY_OSCS+1), SYNTH_RAM_CAPS);
     block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, BLOCK_RAM_CAPS);
     // set all oscillators to their default values
     amy_reset_oscs();
@@ -1457,11 +1461,15 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
                         case 'I': e.ratio = atoff(message + start); break;
                         case 'j': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
                         case 'J': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
-                        case 'k': if(AMY_HAS_CHORUS)config_chorus(atoff(message + start), chorus.max_delay); break;
+                        // chorus.level 
+                        case 'k': if(AMY_HAS_CHORUS)config_chorus(atoff(message + start), chorus.max_delay, chorus.lfo_freq, chorus.depth); break;
                         case 'K': e.load_patch = atoi(message+start); break; 
                         case 'l': e.velocity=atoff(message + start); break;
                         case 'L': e.mod_source=atoi(message + start); break;
-                        case 'm': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), atoi(message + start)); break;
+                        // chorus.lfo_freq
+                        case 'M': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), chorus.max_delay, atoff(message + start), chorus.depth); break;
+                        // chorus.max_delay
+                        case 'm': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), atoi(message + start), chorus.lfo_freq, chorus.depth); break;
                         case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atoi(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
@@ -1469,6 +1477,8 @@ struct event amy_parse_message(char * message, uint16_t base_osc) {
                         case 'p': e.patch=atoi(message + start); break;
                         case 'P': e.phase=F2P(atoff(message + start)); break;
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
+                        // chorus.depth
+                        case 'q': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), chorus.max_delay, chorus.lfo_freq, atoff(message+start)); break;
                         case 'R': e.resonance=atoff(message + start); break;
                         case 'S': e.reset_osc = base_osc + atoi(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;

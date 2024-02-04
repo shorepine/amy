@@ -59,8 +59,6 @@ extern const uint16_t pcm_samples;
 #define CHORUS_DEFAULT_LEVEL 0
 #define CHORUS_DEFAULT_MAX_DELAY 320
 #define CHORUS_ARATE
-// Chorus control modulator is hardcoded to OSC 63 (NOSCS - 1)
-#define CHORUS_MOD_SOURCE (AMY_OSCS - 1)
 
 // center frequencies for the EQ
 #define EQ_CENTER_LOW 800.0
