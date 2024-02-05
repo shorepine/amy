@@ -68,6 +68,10 @@ int main(int argc, char ** argv) {
     //example_sine(start);
     //bleep(start);
     example_juno_chord();
+    amy_reset_oscs();
+    example_dx7_chord();
+
+    amy_reset_oscs();
     example_patches();
     //example_drums(start+500, 4);
     //example_multimbral_fm(start + 2500, /* start_osc= */ 6);

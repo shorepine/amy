@@ -48,6 +48,58 @@ void example_juno_chord() {
     delay_ms(100);
 }   
 
+void example_dx7_chord() {
+    struct event e = amy_default_event();
+    e.load_patch = 135;
+    e.osc = 0;
+    amy_add_event(e);
+    e.osc = 10;
+    amy_add_event(e);
+    e.osc = 20;
+    amy_add_event(e);
+
+    delay_ms(250);
+    e = amy_default_event();
+    e.velocity=0.2;
+
+    e.osc=0;
+    e.midi_note = 50;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    e.osc = 10;
+    e.midi_note = 54;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    e.osc = 20;
+    e.midi_note = 56;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    e.osc=0;
+    e.midi_note=62;
+    amy_add_event(e);
+    e.osc=10;
+    e.midi_note=65;
+    amy_add_event(e);
+    e.osc=20;
+    e.midi_note=68;
+    amy_add_event(e);
+    delay_ms(2000);
+
+    e.osc = 0;
+    e.velocity = 0;
+    amy_add_event(e);
+    e.osc = 10;
+    e.velocity = 0;
+    amy_add_event(e);
+    e.osc = 20;
+    e.velocity = 0;
+    amy_add_event(e);
+    delay_ms(100);
+
+}
 
 void example_patches() {
     struct event e = amy_default_event();

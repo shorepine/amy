@@ -58,7 +58,6 @@ extern const uint16_t pcm_samples;
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5
 #define CHORUS_DEFAULT_LEVEL 0
 #define CHORUS_DEFAULT_MAX_DELAY 320
-#define CHORUS_ARATE
 
 // center frequencies for the EQ
 #define EQ_CENTER_LOW 800.0

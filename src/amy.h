@@ -370,6 +370,7 @@ extern int64_t amy_get_us();
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
+void amy_add_event_internal(struct event e, uint16_t base_osc);
 int16_t * amy_simple_fill_buffer() ;
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
@@ -428,8 +429,7 @@ void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 
 // external functions
 void amy_play_message(char *message);
-void amy_play_message_with_base(char* message, uint16_t osc);
-struct event amy_parse_message(char * message, uint16_t base_osc);
+struct event amy_parse_message(char * message);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
 void amy_stop();

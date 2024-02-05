@@ -13,10 +13,10 @@ uint16_t patches_message(char* message, uint16_t base_osc) {
         if(message[i] == 'Z') {
             strncpy(sub_message, message + start, i - start + 1);
             sub_message[i-start+1]= 0;
-            struct event e = amy_parse_message(sub_message, base_osc);
+            struct event e = amy_parse_message(sub_message);
             if(e.status == SCHEDULED) {
-                if(e.osc-base_osc > max_osc) max_osc = e.osc-base_osc;
-                amy_add_event(e);
+                if(e.osc > max_osc) max_osc = e.osc;
+                amy_add_event_internal(e, base_osc);
             }
             start = i+1;
         }

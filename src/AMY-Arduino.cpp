@@ -74,7 +74,7 @@ void AMY::drums(int32_t start, uint16_t loops) {
 }
 
 void AMY::send_message(char * message) {
-    amy_add_event(amy_parse_message(message,0));
+    amy_add_event(amy_parse_message(message));
 }
 
 

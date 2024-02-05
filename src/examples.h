@@ -15,3 +15,4 @@ void example_drums(uint32_t start, int loops);
 void example_sine(uint32_t start);
 void example_patches();
 void example_juno_chord();
+void example_dx7_chord();

@@ -418,13 +418,11 @@ def generate_all():
     # Clipping LUT
     make_clipping_lut('src/clipping_lookup_table.h')
 
-    # PCM patches
+    # PCM LUT
     generate_both_pcm_headers()
 
-    # Juno patches
+    # Juno & FM patches
     make_patches("src/patches.h")
-    # FM patches
-    #fm.generate_fm_header()
 
 
 def main():
