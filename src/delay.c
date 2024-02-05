@@ -48,7 +48,7 @@ static SAMPLE FRACTIONAL_SAMPLE(PHASOR phase, const SAMPLE *delay, int index_mas
     SAMPLE b = delay[base_index];
     SAMPLE c = delay[(base_index + 1) & index_mask];
     // linear interpolation.
-    SAMPLE sample = b + MUL4_SS((c - b), frac);
+    SAMPLE sample = b + MUL8_SS((c - b), frac);
     return sample;
 }
 
@@ -69,16 +69,16 @@ void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, S
     SAMPLE *delay = delay_line->samples;
     SAMPLE half_mod_scale = SHIFTR(mod_scale, 1);
     while(n_samples-- > 0) {
-        SAMPLE next_in = *in++ + MUL4_SS(feedback_level,
+        SAMPLE next_in = *in++ + MUL8_SS(feedback_level,
                                          delay[index_feedback++]);
         index_feedback &= index_mask;
 
         PHASOR phase_out = I2P(index_in, index_bits)
-            - S2P(F2S(0.5) + MUL4_SS(half_mod_scale, *mod_in++));
+            - S2P(F2S(0.5) + MUL8_SS(half_mod_scale, *mod_in++));
         //if(index_out >= delay_len) index_out -= delay_len;
         //if(index_out < 0) index_out += delay_len;
         SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
-        *out++ += MUL4_SS(mix_level, sample);  // mix delayed + original.
+        *out++ += MUL8_SS(mix_level, sample);  // mix delayed + original.
         delay[index_in++] = next_in;
         index_in &= index_mask;
     }
@@ -102,7 +102,7 @@ void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, SAMPL
 
         PHASOR phase_out = I2P(index_in, index_bits) - delay_phase;
         SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
-        *out++ += MUL4_SS(mix_level, sample);  // mix delayed + original.
+        *out++ += MUL8_SS(mix_level, sample);  // mix delayed + original.
         delay[index_in++] = next_in;
         index_in &= index_mask;
     }
@@ -133,9 +133,9 @@ static inline void DEL_IN(delay_line_t *delay_line, SAMPLE val) {
 static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain, SAMPLE gain) {
     // 1-pole lowpass filter (exponential smoothing).
     // Smoothing. lpcoef=1 => no smoothing; lpcoef=0.001 => much smoothing.
-    state += MUL0_SS(lpcoef, samp - state);
+    state += SMULR6(lpcoef, samp - state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
-    return MUL0_SS(SHIFTR(gain, 1), state + MUL0_SS(lpgain, samp - state));
+    return SMULR6(SHIFTR(gain, 1), state + SMULR6(lpgain, samp - state));
 }
 
 SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
@@ -254,12 +254,12 @@ void stereo_reverb(SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int
         SAMPLE d1 = DEL_OUT(delay_1);
         d1 = LPF(d1, f1state, lpfcoef, lpfgain, liveness);
         d1 += r_acc;
-        *r_out++ = in_r + MUL4_SS(level, d1);
+        *r_out++ = in_r + MUL8_SS(level, d1);
 
         SAMPLE d2 = DEL_OUT(delay_2);
         d2 = LPF(d2, f2state, lpfcoef, lpfgain, liveness);
         d2 += l_acc;
-        if (l_out != NULL)  *l_out++ = in_l + MUL4_SS(level, d2);
+        if (l_out != NULL)  *l_out++ = in_l + MUL8_SS(level, d2);
 
         SAMPLE d3 = DEL_OUT(delay_3);
         d3 = LPF(d3, f3state, lpfcoef, lpfgain, liveness);

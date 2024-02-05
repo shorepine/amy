@@ -167,6 +167,12 @@ static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int
 }
 
 // from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+static inline SAMPLE SMULR6(SAMPLE a, SAMPLE b) {
+    // s8.23 fixed-point multiplication with rounding, 1 zero on output (-128..128)
+    SAMPLE r = 1 + ((a + (1 << 10)) >> 11) * ((b + (1 << 10)) >> 11);
+    return r >> 1;
+}
+
 static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
     // Rounding on input and output; 3 zeros on output (so output is limited to -32.0 .. 32.0).
     SAMPLE r = 4 + ((a + (1 << 9)) >> 10) * ((b + (1 << 9)) >> 10);
