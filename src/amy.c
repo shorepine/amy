@@ -5,6 +5,9 @@
 
 #include "amy.h"
 
+// Flag set momentarily by debug message to report state on-demand.
+int debug_flag = 0;
+
 #ifdef AMY_DEBUG
 
 const char* profile_tag_name(enum itags tag) {
@@ -176,6 +179,8 @@ void dealloc_chorus_delay_lines(void) {
 
 
 void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
+    //fprintf(stderr, "config_chorus: level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
+    //        level, max_delay, lfo_freq, depth);
     if (level > 0) {
         // only allocate delay lines if chorus is more than inaudible.
         if (delay_lines[0] == NULL) {
@@ -204,6 +209,8 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
     }
     chorus.max_delay = max_delay;
     chorus.level = F2S(level);
+    chorus.lfo_freq = lfo_freq;
+    chorus.depth = depth;
 }
 
 
@@ -686,6 +693,7 @@ int8_t oscs_init() {
 //        1 - show profile, queue
 //        2 - show profile, queue, osc data
 void show_debug(uint8_t type) {
+    debug_flag = type;
     amy_profiles_print();
     if(type>0) {
         struct delta * ptr = amy_global.event_start;
@@ -1105,9 +1113,11 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
 void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     AMY_PROFILE_START(AMY_RENDER)
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
+    SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
+            if (max_val > max_max) max_max = max_val;
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != OFF) {
                 // apply filter to osc if set
@@ -1121,6 +1131,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     // apply the eq filters if set
     if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
         parametric_eq_process(fbl[core]);
+    }
+    if (debug_flag) {
+        debug_flag = 0;  // Only do this once each time debug_flag is set.
+        SAMPLE smax = scan_max(fbl[core], AMY_BLOCK_SIZE);
+        fprintf(stderr, "time %d core %d max_max=%.3f post-eq max=%.3f\n", total_samples, core, S2F(max_max), S2F(smax));
     }
     AMY_PROFILE_STOP(AMY_RENDER)
 

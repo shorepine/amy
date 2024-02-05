@@ -503,6 +503,7 @@ extern void reset_filter(uint16_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);
 extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
 extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);
+extern SAMPLE scan_max(SAMPLE* block, int len);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
 #include "esp_err.h"

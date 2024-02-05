@@ -25,7 +25,7 @@ uint16_t patches_message(char* message, uint16_t base_osc) {
 }
 
 void patches_load_patch(uint16_t patch, uint16_t base_osc) {
-    uint16_t oscs = patches_message((char*)patch_commands[patch], base_osc);
+    /* uint16_t oscs = */ patches_message((char*)patch_commands[patch], base_osc);
     // todo, use oscs to set up voices
     
 }

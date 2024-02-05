@@ -27,6 +27,8 @@ float dsps_sqrtf_f32_ansi(float f)
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
+    qFactor = sqrtf(qFactor);
+    
     if (qFactor < 0.51) {
         qFactor = 0.51;
     }
@@ -139,7 +141,10 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 //#define FILT_MUL_SS MUL8F_SS
 #define FILT_MUL_SS SMULR7
 //#define FILT_MUL_SS MUL8_SS  // Goes unstable for TestFilter
-#define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.  Reduces peak sample value to 64, not 256.
+#define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
+#define FILTER_BIQUAD_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
+
+#define FILTER_BIQUAD_SCALEDOWN_BITS 0  // Extra headroom for EQ filters to avoid clipping on loud signals.
 
 int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI)
@@ -151,14 +156,16 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
     SAMPLE y1 = w[2];
     SAMPLE y2 = w[3];
     for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS);
+        SAMPLE x0 = SHIFTL(input[i], FILTER_BIQUAD_SCALEUP_BITS);
+        // SAMPLE x0 = SHIFTR(input[i], FILTER_BIQUAD_SCALEDOWN_BITS);
         SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
         SAMPLE y0 = w0 - FILT_MUL_SS(coef[3], y1) - FILT_MUL_SS(coef[4], y2);
         x2 = x1;
         x1 = x0;
         y2 = y1;
         y1 = y0;
-        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS);
+        output[i] = SHIFTR(y0, FILTER_BIQUAD_SCALEUP_BITS);
+        //output[i] = SHIFTL(y0, FILTER_BIQUAD_SCALEDOWN_BITS);
     }
     w[0] = x1;
     w[1] = x2;
@@ -341,13 +348,13 @@ void parametric_eq_process(SAMPLE *block) {
     SAMPLE output[2][AMY_BLOCK_SIZE];
     for(int c = 0; c < AMY_NCHANS; ++c) {
         SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
-        dsps_biquad_f32_ansi_split_fb(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
-        dsps_biquad_f32_ansi_split_fb(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
+        dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
+        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            output[0][i] = FILT_MUL_SS(output[0][i], amy_global.eq[0]) - FILT_MUL_SS(output[1][i], amy_global.eq[1]);
-        dsps_biquad_f32_ansi_split_fb(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
+            output[0][i] = MUL8F_SS(output[0][i], amy_global.eq[0]) - MUL8F_SS(output[1][i], amy_global.eq[1]);
+        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
+            cblock[i] = output[0][i] + MUL8F_SS(output[1][i], amy_global.eq[2]);
     }
     AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
 

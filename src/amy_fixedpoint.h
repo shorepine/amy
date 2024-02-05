@@ -184,7 +184,7 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
 //#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
-#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 13, 10, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 11, 12, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
 
 // First argument is positive and less that 1/16, i.e. only 19 low-order bits.
 //#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
