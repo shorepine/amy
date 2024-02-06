@@ -394,6 +394,30 @@ SAMPLE scan_max(SAMPLE* block, int len) {
     return max;
 }
 
+void check_overflow(SAMPLE* block, int osc, char *msg) {
+    // Search for overflow in a sample buffer as an unusually large sample-to-sample delta.
+#ifdef AMY_DEBUG
+    SAMPLE last = block[0];
+    SAMPLE max = 0;
+    SAMPLE maxdiff = 0;
+    int len = AMY_BLOCK_SIZE;
+    while (len--) {
+        SAMPLE val = *block++;
+        SAMPLE diff = val - last;
+        if (diff < 0)  diff = -diff;
+        if (diff > maxdiff) maxdiff = diff;
+        last = val;
+        if (val < 0)  val = -val;
+        if (val > max)  max = val;
+    }
+    if (maxdiff > F2S(0.2f))
+        fprintf(stderr, "Overflow at timeframe %.3f max=%.3f maxdiff=%.3f osc=%d msg=%s\n",
+                (float)(total_samples) / AMY_SAMPLE_RATE,
+                S2F(max), S2F(maxdiff), osc, msg);
+
+#endif // AMY_DEBUG
+}
+
 int encl_log2(SAMPLE max) {
     AMY_PROFILE_START(ENCL_LOG2)
 
