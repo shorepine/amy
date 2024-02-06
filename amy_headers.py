@@ -354,7 +354,6 @@ def make_patches(filename):
     # Don't make any noise
     amy.override_send = nothing
 
-    # We could save space in ROM by doing this as one long string, with a separate pointer table
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")

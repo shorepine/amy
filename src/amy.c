@@ -324,6 +324,7 @@ struct event amy_default_event() {
     e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
+    e.voices[0] = 0;
     return e;
 }
 
@@ -388,19 +389,25 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     
 
     // Synth defaults if not set, these are required for the delta struct
-    if(AMY_IS_UNSET(e.osc)) { d.osc = 0; } else { d.osc = e.osc; }
-    if(AMY_IS_UNSET(e.time)) { d.time = 0; } else { d.time = e.time; }
+    if(AMY_IS_UNSET(e.osc)) { e.osc = 0; } 
+    if(AMY_IS_UNSET(e.time)) { e.time = 0; } 
 
     // First, adapt the osc in this event with base_osc offsets for voices
-    d.osc += base_osc;
+    e.osc += base_osc;
 
+    // Voices gets set up here 
+    if(e.voices[0] != 0) {
+        patches_set_voices(e);
+    }
 
-    // Load patches is special
+    // Load patches is special, skips everything else 
     if(AMY_IS_SET(e.load_patch)) {
-        patches_load_patch(e.load_patch, e.osc);
+        patches_load_patch(e);
         goto end;
     }
 
+    d.time = e.time;
+    d.osc = e.osc;
     // Everything else only added to queue if set
     if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
@@ -1489,6 +1496,7 @@ struct event amy_parse_message(char * message) {
                         // chorus.depth
                         case 'q': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), chorus.max_delay, chorus.lfo_freq, atoff(message+start)); break;
                         case 'R': e.resonance=atoff(message + start); break;
+                        case 'r': copy_param_list_substring(e.voices, message+start); break; 
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
                         case 'W': e.bp1_target = atoi(message + start);  break;

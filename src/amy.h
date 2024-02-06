@@ -274,6 +274,7 @@ struct event {
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
+    char voices[MAX_PARAM_LEN];
     uint16_t bp0_target;
     uint16_t bp1_target;
     uint16_t clone_osc;  // Only used as a flag.
@@ -458,7 +459,8 @@ extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
 extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
-extern void patches_load_patch(uint16_t patch, uint16_t base_osc);
+extern void patches_load_patch(struct event e); 
+extern void patches_set_voices(struct event e);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 
