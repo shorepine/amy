@@ -378,11 +378,12 @@ void add_delta_to_queue(struct delta d) {
 
 }
 
-// Add a API facing event, convert into delta directly
+// For people to call when they don't know base_osc or don't care
 void amy_add_event(struct event e) {
     amy_add_event_internal(e, 0);
 }
 
+// Add a API facing event, convert into delta directly
 void amy_add_event_internal(struct event e, uint16_t base_osc) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
@@ -395,16 +396,17 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     // First, adapt the osc in this event with base_osc offsets for voices
     e.osc += base_osc;
 
-    // Voices gets set up here 
-    if(e.voices[0] != 0) {
-        patches_set_voices(e);
-    }
-
-    // Load patches is special, skips everything else 
-    if(AMY_IS_SET(e.load_patch)) {
+    // Voices / patches gets set up here 
+    // you must set both voices & load_patch together to load a patch 
+    if(e.voices[0] != 0 && AMY_IS_SET(e.load_patch)) {
         patches_load_patch(e);
         goto end;
+    } else {
+        if(e.voices[0] != 0) {
+            patches_event_has_voices(e);
+        }
     }
+
 
     d.time = e.time;
     d.osc = e.osc;
@@ -629,6 +631,8 @@ void amy_reset_oscs() {
     // Reset chorus oscillator
     if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if( AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    // Reset patches
+    patches_reset();
 }
 
 

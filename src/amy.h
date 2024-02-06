@@ -460,7 +460,8 @@ extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
 extern void patches_load_patch(struct event e); 
-extern void patches_set_voices(struct event e);
+extern void patches_event_has_voices(struct event e);
+extern void patches_reset();
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 

@@ -11,38 +11,29 @@ void delay_ms(uint32_t ms) {
 void example_juno_chord() {
     struct event e = amy_default_event();
     e.load_patch = 1;
-    e.osc = 0;
+    strcpy(e.voices, "0,1,2");
     amy_add_event(e);
-    e.osc = 5;
-    amy_add_event(e);
-    e.osc = 10;
-    amy_add_event(e);
-
     delay_ms(250);
+
     e = amy_default_event();
-    e.osc = 0;
     e.velocity=0.2;
+
+    strcpy(e.voices, "0");
     e.midi_note = 50;
     amy_add_event(e);
     delay_ms(1000);
 
-    e.osc = 5;
+    strcpy(e.voices, "1");
     e.midi_note = 54;
     amy_add_event(e);
-
     delay_ms(1000);
-    e.osc = 10;
+
+    strcpy(e.voices, "2");
     e.midi_note = 56;
     amy_add_event(e);
-
     delay_ms(2000);
-    e.osc = 0;
-    e.velocity = 0;
-    amy_add_event(e);
-    e.osc = 5;
-    e.velocity = 0;
-    amy_add_event(e);
-    e.osc = 10;
+    
+    strcpy(e.voices, "0,1,2");
     e.velocity = 0;
     amy_add_event(e);
     delay_ms(100);
@@ -50,73 +41,52 @@ void example_juno_chord() {
 
 void example_dx7_chord() {
     struct event e = amy_default_event();
-    e.load_patch = 135;
-    e.osc = 0;
-    amy_add_event(e);
-    e.osc = 10;
-    amy_add_event(e);
-    e.osc = 20;
+    e.load_patch = 136;
+    strcpy(e.voices, "0,1,2");
     amy_add_event(e);
 
     delay_ms(250);
+
     e = amy_default_event();
-    e.velocity=0.2;
+    e.velocity = 0.4;
+    
+    strcpy(e.voices, "0");
+    e.midi_note=54;
+    amy_add_event(e);
 
-    e.osc=0;
-    e.midi_note = 50;
+    strcpy(e.voices, "1");
+    e.midi_note=56;
     amy_add_event(e);
-    delay_ms(1000);
 
-    e.osc = 10;
-    e.midi_note = 54;
+    strcpy(e.voices, "2");
+    e.midi_note=50;
     amy_add_event(e);
-    delay_ms(1000);
 
-    e.osc = 20;
-    e.midi_note = 56;
-    amy_add_event(e);
-    delay_ms(1000);
-
-    e.osc=0;
-    e.midi_note=62;
-    amy_add_event(e);
-    e.osc=10;
-    e.midi_note=65;
-    amy_add_event(e);
-    e.osc=20;
-    e.midi_note=68;
-    amy_add_event(e);
     delay_ms(2000);
-
-    e.osc = 0;
-    e.velocity = 0;
-    amy_add_event(e);
-    e.osc = 10;
-    e.velocity = 0;
-    amy_add_event(e);
-    e.osc = 20;
+    strcpy(e.voices, "0,1,2");
     e.velocity = 0;
     amy_add_event(e);
     delay_ms(100);
-
 }
 
 void example_patches() {
     struct event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
         e.load_patch = i;
-        e.osc = 0;
+        strcpy(e.voices, "0");
         fprintf(stderr, "sending patch %d\n", i);
         amy_add_event(e);
         delay_ms(250);
 
         e = amy_default_event();
+        strcpy(e.voices, "0");
         e.osc = 0;
         e.midi_note = 50;
         e.velocity = 0.5;
         amy_add_event(e);
+
         delay_ms(1000);
-        e.osc = 0;
+        strcpy(e.voices, "0");
         e.velocity = 0;
         amy_add_event(e);
 
