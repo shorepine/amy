@@ -144,17 +144,17 @@ class TestSineEnv(AmyTest):
 class TestAlgo(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.ALGO, patch=21)
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=500, vel=0)
+    amy.send(time=0, voices="0",  load_patch=21+128)
+    amy.send(time=100, voices="0", note=70, vel=1)
+    amy.send(time=500, voices="0", vel=0)
 
 
 class TestAlgo2(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.ALGO, patch=24)
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=500, vel=0)
+    amy.send(time=0, voices="0", load_patch=128+24)
+    amy.send(time=100, voices="0", note=70, vel=1)
+    amy.send(time=500, voices="0", vel=0)
 
 
 class TestFilter(AmyTest):
