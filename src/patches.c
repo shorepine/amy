@@ -71,47 +71,55 @@ void patches_load_patch(struct event e) {
     for(uint8_t v=0;v<num_voices;v++) {
         // Find the first osc with patch_oscs[e.load_patch] free oscs
         // First, is this an old voice we're re-doing? 
-        if(AMY_IS_SET(voice_to_base_osc[v])) {
-            fprintf(stderr, "Already set voice %d\n", v);
+        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
+            //fprintf(stderr, "Already set voice %d, removing it\n", voices[v]);
             // Remove the oscs for this old voice
             for(uint16_t i=0;i<AMY_OSCS;i++) {
-                if(osc_to_voice[i]==v) { 
-                    fprintf(stderr, "Already set voice %d osc %d\n", v, i);
+                if(osc_to_voice[i]==voices[v]) { 
+                    //fprintf(stderr, "Already set voice %d osc %d, removing it\n", voices[v], i);
                     AMY_UNSET(osc_to_voice[i]);
                 }
             }
-            AMY_UNSET(voice_to_base_osc[v]);
-        }
-        // Now find some oscs
-        // they have to be consecutive ...
-        uint16_t found_oscs = 0;
-        for(uint16_t i=0;i<AMY_OSCS;i++) {
-            if(AMY_IS_UNSET(osc_to_voice[i])) {
-                fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", found_oscs, v, i);
-                found_oscs++;
-                osc_to_voice[i] = v;
-                if(found_oscs == 1) { 
-                    fprintf(stderr, "setting base osc for voice %d to %d\n", v, i);
-                    voice_to_base_osc[v] = i;
-                }
-                if(found_oscs == patch_oscs[e.load_patch]) i = AMY_OSCS+1; // we're done
-            }
-        }
-        if(found_oscs != patch_oscs[e.load_patch]) {
-            fprintf(stderr, "we are out of oscs for this voice. what do i do?\n");
+            AMY_UNSET(voice_to_base_osc[voices[v]]);
         }
 
-        uint16_t start = 0;
-        for(uint16_t i=0;i<strlen(message);i++) {
-            if(message[i] == 'Z') {
-                strncpy(sub_message, message + start, i - start + 1);
-                sub_message[i-start+1]= 0;
-                struct event patch_event = amy_parse_message(sub_message);
-                patch_event.time = e.time;
-                if(patch_event.status == SCHEDULED) {
-                    amy_add_event_internal(patch_event, voice_to_base_osc[v]);
+        // Now find some oscs
+        uint8_t good = 0;
+        for(uint16_t i=0;i<AMY_OSCS;i++) {
+            if(AMY_IS_UNSET(osc_to_voice[i])) {
+                // Are there num_voices patch_oscs free oscs after this one?
+                good = 1;
+                for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
+                    good = good & AMY_IS_UNSET(osc_to_voice[i+j]);
                 }
-                start = i+1;
+                if(good) {
+                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], i, voices[v]);
+                    //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], i);
+                    voice_to_base_osc[voices[v]] = i; 
+                    for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
+                        //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], i+j);
+                        osc_to_voice[i+j] = voices[v];
+                    }
+                    // exit the loop
+                    i = AMY_OSCS + 1;
+                }
+            }
+        }
+        if(!good) {
+            fprintf(stderr, "we are out of oscs for voice %d. not setting this voice\n", voices[v]);
+        } else {
+            uint16_t start = 0;
+            for(uint16_t i=0;i<strlen(message);i++) {
+                if(message[i] == 'Z') {
+                    strncpy(sub_message, message + start, i - start + 1);
+                    sub_message[i-start+1]= 0;
+                    struct event patch_event = amy_parse_message(sub_message);
+                    patch_event.time = e.time;
+                    if(patch_event.status == SCHEDULED) {
+                        amy_add_event_internal(patch_event, voice_to_base_osc[voices[v]]);
+                    }
+                    start = i+1;
+                }
             }
         }
     }

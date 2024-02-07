@@ -61,8 +61,8 @@ int main(int argc, char ** argv) {
         amy_live_start();
     }
 
-    amy_reset_oscs();
-    example_voice_alloc();
+    //amy_reset_oscs();
+    //example_voice_alloc();
 
     amy_reset_oscs();
     //example_reverb();

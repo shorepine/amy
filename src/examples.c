@@ -38,6 +38,17 @@ void example_voice_alloc() {
     delay_ms(2000);
 
 
+    // now try to alloc voice 0 with a juno, should use oscs 0-4 again
+    e = amy_default_event();
+    e.load_patch = 2;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+
+
+
+
+
 }
 
 
