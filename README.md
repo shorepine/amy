@@ -163,9 +163,11 @@ On storage connstrained devices, you may want to limit the amount of PCM samples
 // or, #include "pcm_small.h"
 ```
 
-## Voices and patch (DX7 and Juno-6) support
+## Voices and patches (DX7 and Juno-6) support
 
-You can load in patches and play them back with AMY using `load_patch` and voices. A voice is a collection of oscillators. You can assign patches to any voice number, and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
+With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators. 
+
+A voice in AMY is a collection of oscillators. You can assign patches to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
 
 ```python
 amy.send(voices="0,1,2,3", load_patch=1) # juno patch #1 on voice 0-3
@@ -174,7 +176,7 @@ amy.send(voices="0", note=60, vel=1) # Play note 60 on voice 0
 amy.send(voices="0", osc=1, filter_freq="440,0,0,0,5") # adjust the filter on the juno voice (its second oscillator)
 ```
 
-Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches.
+Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches by "recording" AMY setup commands and adding them to `patches.h`.
 
 # Wire protocol
 
@@ -222,7 +224,7 @@ Here's the full list:
 | Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | q    | chorus_depth | float | chorus depth | 
 | R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
-| r    | voices | int[,int] | List of voices to send message to, or load patch into | 
+| r    | voices | int[,int] | String comma separated list of voices to send message to, or load patch into | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
 | T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefs. | 
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
