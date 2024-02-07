@@ -41,8 +41,9 @@ void patches_reset() {
 void patches_event_has_voices(struct event e) {
     int16_t voices[MAX_VOICES];
     uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES);
-    // clear out the voices now from the event. If we didn't, we'd keep calling this over and over
+    // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
     e.voices[0] = 0;
+    AMY_UNSET(e.load_patch);
     // for each voice, send the event to the base osc (+ e.osc if given!)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[i])) {
@@ -54,6 +55,8 @@ void patches_event_has_voices(struct event e) {
 
 // Given an event with a load_patch object AND a voices object in it
 // This means to set/reset the voices and load the messages from ROM and set them
+// TODO: for some reason you can't ALSO send other messages on this same event, liek note / vel
+
 void patches_load_patch(struct event e) {
     char sub_message[255];
     

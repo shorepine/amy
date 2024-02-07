@@ -400,10 +400,12 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     // you must set both voices & load_patch together to load a patch 
     if(e.voices[0] != 0 && AMY_IS_SET(e.load_patch)) {
         patches_load_patch(e);
+        patches_event_has_voices(e);
         goto end;
     } else {
         if(e.voices[0] != 0) {
             patches_event_has_voices(e);
+            goto end;
         }
     }
 
