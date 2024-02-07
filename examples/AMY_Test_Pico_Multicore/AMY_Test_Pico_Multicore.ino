@@ -48,11 +48,13 @@ void loop() {
     if(amy.sysclock() > note_on_ms) {
       note_on_ms = amy.sysclock() + TIME_BETWEEN_NOTES_MS;
       struct event e = amy.default_event();
+      e.load_patch = note_counter + 128; // dx7 patches start at 128
+      strcpy(e.voices, "0");
+      e.time = amy.sysclock(); 
+      amy_add_event(e);
+
+      e = amy.default_event();
       e.midi_note = 50 + (note_counter*2);
-      e.patch = note_counter;
-      e.wave = ALGO;
-      // Each FM voice takes up 9 AMY oscillators.
-      e.osc = note_counter * 10;
       e.velocity = 1;
       e.time = amy.sysclock(); // play it now
       amy.add_event(e);
