@@ -3,7 +3,142 @@
 
 #include "amy.h"
 
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
+}
 
+void example_voice_alloc() {
+    // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
+    struct event e = amy_default_event();
+    e.load_patch = 1;
+    strcpy(e.voices, "0,1");
+    amy_add_event(e);
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.load_patch = 131;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+
+    // play the same note on both
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"0");
+    amy_add_event(e);
+    delay_ms(2000);
+
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"1");
+    amy_add_event(e);
+    delay_ms(2000);
+
+
+    // now try to alloc voice 0 with a juno, should use oscs 0-4 again
+    e = amy_default_event();
+    e.load_patch = 2;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+
+
+
+
+
+}
+
+
+void example_juno_chord() {
+    struct event e = amy_default_event();
+    e.load_patch = 1;
+    strcpy(e.voices, "0,1,2");
+    amy_add_event(e);
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.velocity=0.2;
+
+    strcpy(e.voices, "0");
+    e.midi_note = 50;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    strcpy(e.voices, "1");
+    e.midi_note = 54;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    strcpy(e.voices, "2");
+    e.midi_note = 56;
+    amy_add_event(e);
+    delay_ms(2000);
+    
+    strcpy(e.voices, "0,1,2");
+    e.velocity = 0;
+    amy_add_event(e);
+    delay_ms(100);
+}   
+
+void example_dx7_chord() {
+    struct event e = amy_default_event();
+    e.load_patch = 136;
+    strcpy(e.voices, "0,1,2");
+    amy_add_event(e);
+
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.velocity = 0.4;
+    
+    strcpy(e.voices, "0");
+    e.midi_note=54;
+    amy_add_event(e);
+
+    strcpy(e.voices, "1");
+    e.midi_note=56;
+    amy_add_event(e);
+
+    strcpy(e.voices, "2");
+    e.midi_note=50;
+    amy_add_event(e);
+
+    delay_ms(2000);
+    strcpy(e.voices, "0,1,2");
+    e.velocity = 0;
+    amy_add_event(e);
+    delay_ms(100);
+}
+
+void example_patches() {
+    struct event e = amy_default_event();
+    for(uint16_t i=0;i<256;i++) {
+        e.load_patch = i;
+        strcpy(e.voices, "0");
+        fprintf(stderr, "sending patch %d\n", i);
+        amy_add_event(e);
+        delay_ms(250);
+
+        e = amy_default_event();
+        strcpy(e.voices, "0");
+        e.osc = 0;
+        e.midi_note = 50;
+        e.velocity = 0.5;
+        amy_add_event(e);
+
+        delay_ms(1000);
+        strcpy(e.voices, "0");
+        e.velocity = 0;
+        amy_add_event(e);
+
+        delay_ms(250);
+
+        amy_reset_oscs();
+    }
+}
 void example_reverb() {
     if(AMY_HAS_REVERB == 1) {
         config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
@@ -12,7 +147,7 @@ void example_reverb() {
 
 void example_chorus() {
     if(AMY_HAS_CHORUS == 1) {
-        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
+        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     }
 }
 

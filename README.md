@@ -30,16 +30,17 @@ It supports
  * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band parametric EQ
- * Built in patches for PCM, FM and partials
+ * Built in patches for PCM, DX7, Juno and partials
  * A front end for Juno-6 patches and conversion setup commands 
  * Built-in clock for short term sequencing of events
  * Can use multi-core (including microcontrollers) for rendering if available
 
-The FM synthesizer in AMY is especially well-loved and as close to a real DX7 as you can get. We provide a Python library, [`fm.py`](https://github.com/bwhitman/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/bwhitman/amy/blob/main/dx7_simulator.py).
+The FM synth provides a Python library, [`fm.py`](https://github.com/bwhitman/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/bwhitman/amy/blob/main/dx7_simulator.py).
 
-The partial tone synthesizer also provides [`partials.py`](https://github.com/bwhitman/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+The partial tone synthesizer provides [`partials.py`](https://github.com/bwhitman/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
 
-The Juno-6 emulation is in [`juno.py`](https://github.com/bwhitman/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands. 
+The Juno-6 emulation is in [`juno.py`](https://github.com/bwhitman/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands and generate patches.
+
 
 ## Using AMY in Arduino
 
@@ -51,26 +52,7 @@ The examples rely on the following board packages and libraries:
  * ESP32/ESP32-S3/etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html) - use a 3.X version when installing
  * The USB MIDI example requires the [MIDI Library](https://www.arduino.cc/reference/en/libraries/midi-library/)
 
- We provide examples for the Pi Pico and ESP32 that also render in multicore, taking full advantage of the chips for more simultaneous oscillators. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. 
-
-
-## Using AMY on bare-metal RP2040 or ESP-IDF (without Arduino)
-
-To build an example without Arduino, supporting multicore, for the Pi Pico / RP2040:
-
-```
-gh repo clone raspberrypi/pico-extras
-gh repo clone raspberrypi/pico-sdk
-# Do whatever installs you need for the pico-sdk
-gh repo clone bwhitman/amy
-cd amy/src; mkdir build; cd build
-export PICO_SDK_PATH=../../../pico-sdk
-export PICO_EXTRAS_PATH=../../../pico-extras
-cmake ..
-make && picotool load amy_example.elf && picotool reboot
-```
-
-To build an example of AMY using ESP-IDF for ESP32 variants (without Arduino, supports multi-core), follow the steps in [Alles Flashing](https://github.com/bwhitman/alles/blob/main/alles-flashing.md#set-up-esp-idf) to set up your system with ESP-IDF 5.1-rc2 and building [Alles](https://github.com/bwhitman/alles) for your board.
+ We provide Arduino examples for the Pi Pico and ESP32 that also render in multicore, taking full advantage of the chips for more simultaneous oscillators. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. We provide `amy-example-rp2040.c` for a Pi Pico example and you can use [Alles](https://github.com/bwhitman/alles) for a `ESP-IDF` example.
 
 ## Using AMY in Python on any platform
 
@@ -84,9 +66,8 @@ To run a simple C example on many platforms:
 
 ```
 make
-./amy-example # you should hear FM tones out your default speaker, use ./amy-example -h for options
+./amy-example # you should hear tones out your default speaker, use ./amy-example -h for options
 ```
-
 
 # Using AMY
 
@@ -96,7 +77,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 
 ```python
 >>> import amy
->>> m = amy.message(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
+>>> m = amy.message(voices="0",load_patch=130,note=50,vel=1)
 >>> print(m) # Show the wire protocol message
 't76555951v0w8n50p30l1Z'
 >>> amy.send_raw(m)
@@ -108,7 +89,7 @@ You can also start a thread playing live audio:
 ```python
 >>> import amy
 >>> amy.live() # can optinally pass in audio device ID, amy.live(2) 
->>> amy.send(osc=0,wave=amy.ALGO,patch=30,note=50,vel=1)
+>>> m = amy.send(voices="0",load_patch=130,note=50,vel=1)
 >>> amy.stop()
 ```
 
@@ -182,17 +163,18 @@ On storage connstrained devices, you may want to limit the amount of PCM samples
 // or, #include "pcm_small.h"
 ```
 
-## Juno-6 support
+## Voices and patch (DX7 and Juno-6) support
 
-You can load in Juno-6 patches and play them back with AMY. Try:
+You can load in patches and play them back with AMY using `load_patch` and voices. A voice is a collection of oscillators. You can assign patches to any voice number, and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
 
 ```python
-import amy, juno
-amy.live()
-j = juno.JunoPatch.from_patch_number(17)
-v = j.get_new_voices(6)
-v[0].note_on(64,0.5)
+amy.send(voices="0,1,2,3", load_patch=1) # juno patch #1 on voice 0-3
+amy.send(voices="4,5,6,7", load_patch=129) # DX7 patch #2 on voices 4-7
+amy.send(voices="0", note=60, vel=1) # Play note 60 on voice 0
+amy.send(voices="0", osc=1, filter_freq="440,0,0,0,5") # adjust the filter on the juno voice (its second oscillator)
 ```
+
+Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches.
 
 # Wire protocol
 
@@ -226,17 +208,21 @@ Here's the full list:
 | j    | reverb_damping  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
 | J    | reverb_xover_hz | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
 | k    | chorus_level | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
+| K    | load_patch | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
+| M    | chorus_freq | float | LFO freq of chorus | 
 | m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
 | N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
 | o    | algorithm | uint 1-32 | DX7 algorith to use for ALGO type | 
 | O    | algo_source | string | which oscillators to use for the algorithm. list of six, use -1 for not used, e.g 0,1,2,-1,-1-1 |
-| p    | patch | uint | choose a preloaded PCM sample, partial patch or FM patch number for ALGO waveforms. |
+| p    | P-patch | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
 | P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
 | Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| q    | chorus_depth | float | chorus depth | 
 | R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
+| r    | voices | int[,int] | List of voices to send message to, or load patch into | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
 | T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefs. | 
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
@@ -407,22 +393,20 @@ You can set a completely separate breakpoints using the second and third breakpo
 
 ## FM & ALGO type
 
-Try default DX7 patches:
+Try default DX7 patches, from 128 to 256:
 
 ```python
-amy.send(wave=amy.ALGO,osc=0,patch=0,note=50,vel=1)
-amy.send(wave=amy.ALGO,osc=0,patch=1,note=50,vel=1)
+amy.send(voices="0", load_patch=128)
+amy.send(voices="0", note=50,vel=1)
 ```
 
-The `patch` lets you set which preset. It can be from 0 to 1024. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
+The `load_patch` lets you set which preset. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
 
 ```python
-amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.5,patch=8) # half speed
-amy.send(wave=amy.ALGO,osc=0,note=40,vel=1,ratio=0.05,patch=8)  # reaaall sloooow
-amy.send(wave=amy.ALGO,osc=0,note=30,vel=1,ratio=0.1,patch=590) 
+amy.send(voices="0", note=50,vel=1, ratio=0.5) # real slow
 ```
 
-Let's make the classic FM bell tone ourselves, without a preset. We'll just be using two operators (two sine waves), one modulating the other. 
+Let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other. 
 
 ![DX7 Algorithms](https://raw.githubusercontent.com/bwhitman/alles/main/pics/dx7_algorithms.jpg)
 

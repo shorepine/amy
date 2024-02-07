@@ -4,7 +4,6 @@ BLOCK_SIZE = 256
 AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
-CHORUS_OSC = 119
 MAX_QUEUE = 400
 [SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF] = range(12)
 TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
@@ -13,10 +12,14 @@ AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
 
 override_send = None
+mess = []
+log = False
 
 """
     A bunch of useful presets
+    TODO : move this to patches.c
 """
+
 def preset(which,osc=0, **kwargs):
     # Reset the osc first
     reset(osc=osc)
@@ -66,13 +69,20 @@ def preset(which,osc=0, **kwargs):
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
-    return ('%.6f' % number).rstrip('0').rstrip('.')
+    if(type(number)==float):
+        return ('%.6f' % number).rstrip('0').rstrip('.')
+    return str(number)
+def trunc3(number):
+    if(type(number)==float):
+        return ('%.3f' % number).rstrip('0').rstrip('.')
+    return str(number)
+
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, mod_target=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
-            chorus_level=None, chorus_delay=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None):
+            chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, voices=None):
 
     m = ""
     if(time is not None): m = m + "t" + str(time)
@@ -111,10 +121,14 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(filter_type is not None): m = m + "G" + str(filter_type)
     if(chorus_level is not None): m = m + "k" + str(chorus_level)
     if(chorus_delay is not None): m = m + "m" + str(chorus_delay)
+    if(chorus_depth is not None): m = m + 'q' + trunc(chorus_depth)
+    if(chorus_freq is not None): m =m + 'M' + trunc(chorus_freq)
     if(reverb_level is not None): m = m + "h" + str(reverb_level)
     if(reverb_liveness is not None): m = m + "H" + str(reverb_liveness)
     if(reverb_damping is not None): m = m + "j" + str(reverb_damping)
     if(reverb_xover is not None): m = m + "J" + str(reverb_xover)
+    if(load_patch is not None): m = m + 'K' + str(load_patch)
+    if(voices is not None): m = m + 'r' + str(voices)
     #print("message " + m)
     return m+'Z'
 
@@ -123,13 +137,29 @@ def send_raw(m):
     import libamy
     libamy.send(m)
 
+def log_patch():
+    global mess, log
+    # start recording a patch
+    log = True
+    mess = []
+
+def retrieve_patch():
+    global mess, log
+    log = False
+    s = "".join(mess)
+    mess =[]
+    return s
+
 # Send an AMY message to amy
 def send(**kwargs):
     global override_send
+    global mess, log
+    m = message(**kwargs)
+    if(log): mess.append(m)
+
     if(override_send is not None):
         override_send(**kwargs)
     else:
-        m = message(**kwargs)
         send_raw(m)
 
 
@@ -222,18 +252,22 @@ def test():
 
 
 """
-    Play all of the FM patches in order
+    Play all of the patches 
 """
-def play_patches(wait=0.500, patch_total = 100, **kwargs):
-    once = True
+def play_patches(wait=1, patch_total = 256, **kwargs):
+    import random
     patch_count = 0
     while True:
-        for i in range(24):
-            patch = patch_count % patch_total
-            patch_count = patch_count + 1
-            send(osc=i % AMY_OSCS, note=i+50, wave=ALGO, patch=patch, vel=1, **kwargs)
-            time.sleep(wait)
-            send(osc=i % AMY_OSCS, vel=0)
+        patch = random.randint(0,256) #patch_count % patch_total
+        print("Sending patch %d" %(patch))
+        send(osc=0, load_patch=patch)
+        time.sleep(wait/4.0)            
+        patch_count = patch_count + 1
+        send(osc=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(osc=0, vel=0)
+        reset()
+        time.sleep(wait/4.0)
 
 """
     Play up to AMY_OSCS patches at once
@@ -321,18 +355,12 @@ def c_major(octave=2,wave=SINE, **kwargs):
 """
     Chorus control
 """
-def chorus(level=-1, max_delay=-1, freq=-1, amp=-1, wave=-1):
+def chorus(level=-1, max_delay=-1, freq=-1, amp=-1):
     args = {}
     if (freq >= 0):
-        args['freq'] = freq
+        args['chorus_freq'] = freq
     if (amp >= 0):
-        args['amp'] = amp
-    if (wave >= 0):
-        args['wave'] = wave
-    if len(args) > 0:
-        # We are sending oscillator commands.
-        args['osc'] = CHORUS_OSC
-    # These ones don't relate to CHORUS_OSC osc.
+        args['chorus_depth'] = amp
     if (level >= 0):
         args['chorus_level'] = level
     if (max_delay >= 0):

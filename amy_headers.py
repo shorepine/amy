@@ -345,6 +345,42 @@ def make_clipping_lut(filename):
         f.write("#endif\n")
     print("wrote", filename)
 
+def make_patches(filename):
+    def nothing(**kwargs):
+        return
+
+    import juno, amy, fm
+    num_oscs =[]
+    # Don't make any noise
+    amy.override_send = nothing
+
+    with open(filename, "w") as f:
+        f.write("// Automatically generated.\n// DX7 and juno 106 patch table\n")
+        f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
+        f.write("const char * patch_commands[256] PROGMEM = {\n")
+        # Do juno
+        for i in range(128):
+            amy.log_patch()
+            p = juno.JunoPatch()
+            j = p.from_patch_number(i)
+            j.base_oscs = list()
+            v = j.get_new_voices(1)
+            f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, amy.retrieve_patch()))  
+            num_oscs.append(5)
+        # Do dx7
+        for i in range(128):
+            amy.log_patch()
+            p = fm.AMYPatch.from_dx7(fm.DX7Patch.from_patch_number(i))
+            p.send_to_AMY(reset=False)
+            f.write("\t/* %d: DX7 %s */ \"%s\",\n" % (i+128, p.name, amy.retrieve_patch()))  
+            num_oscs.append(9)
+        f.write("};\n")
+        f.write("const uint16_t patch_oscs[256] PROGMEM = {\n")
+        for i in num_oscs:
+            f.write("%d," % (i))
+        f.write("\n};\n#endif\n")
+    amy.override_send = None
+
 
 """ 
     Generate all the headers except for the partials headers
@@ -387,11 +423,11 @@ def generate_all():
     # Clipping LUT
     make_clipping_lut('src/clipping_lookup_table.h')
 
-    # PCM patches
+    # PCM LUT
     generate_both_pcm_headers()
 
-    # FM patches
-    fm.generate_fm_header()
+    # Juno & FM patches
+    make_patches("src/patches.h")
 
 
 def main():

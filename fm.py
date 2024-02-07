@@ -164,7 +164,12 @@ class AMYOscillator:
             result.freq_is_ratio = False
         result.ampmodsens = float(op.ampmodsens)  # Don't know scaling, just 0/nonzero.
         return result
-    
+
+def fm_trunc(number):
+    if(type(number)==float or type(number)==np.float64):
+        return ('%.6f' % number).rstrip('0').rstrip('.')
+    return str(number)
+
 @dataclass
 class AMYPatch:
     oscs: List[AMYOscillator] = None
@@ -203,44 +208,44 @@ class AMYPatch:
         result.name = dx7_patch.name
         return result
     
-    def send_to_AMY(self):
+    def send_to_AMY(self, reset=True):
         # Take a FM patch and output AMY commands to set up the patch.
-        # Send amy.send(vel=0,osc=6,note=50) after
-    
-        amy.reset()
+        # Send amy.send(vel=1,osc=0,note=50) after
+        t = fm_trunc
+        if(reset): amy.reset()
         pitch_levels, pitch_times = self.pitch_levels, self.pitch_times
-        pitchbp = "%d,%f,%d,%f,%d,%f,%d,%f,%d,%f" % (
-            pitch_times[0], pitch_levels[0], pitch_times[1], pitch_levels[1],
-            pitch_times[2], pitch_levels[2], pitch_times[3], pitch_levels[3],
-            pitch_times[4], pitch_levels[4])
+        pitchbp = "%d,%s,%d,%s,%d,%s,%d,%s,%d,%s" % (
+            pitch_times[0], t(pitch_levels[0]), pitch_times[1], t(pitch_levels[1]),
+            pitch_times[2], t(pitch_levels[2]), pitch_times[3], t(pitch_levels[3]),
+            pitch_times[4], t(pitch_levels[4]))
         # Set up each operator.
         last_release_time = 0
         last_release_value = 0
         for i, osc in enumerate(self.oscs):
             amp_levels, amp_times = osc.amp_levels, osc.amp_times
-            oscbp = "%d,%f,%d,%f,%d,%f,%d,%f,%d,%f" % (
-                amp_times[0], amp_levels[0], amp_times[1], amp_levels[1],
-                amp_times[2], amp_levels[2], amp_times[3], amp_levels[3],
-                amp_times[4], amp_levels[4])
-            oscbpfmt = "%d,%.3f/%d,%.3f/%d,%.3f/%d,%.3f/%d,%.3f" % (
-                amp_times[0], amp_levels[0], amp_times[1], amp_levels[1],
-                amp_times[2], amp_levels[2], amp_times[3], amp_levels[3],
-                amp_times[4], amp_levels[4])
+            oscbp = "%d,%s,%d,%s,%d,%s,%d,%s,%d,%s" % (
+                amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
+                amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
+                amp_times[4], t(amp_levels[4]))
+            oscbpfmt = "%d,%s/%d,%s/%d,%s/%d,%s/%d,%s" % (
+                amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
+                amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
+                amp_times[4], t(amp_levels[4]))
             if(amp_times[4] > last_release_time):
                 last_release_time = amp_times[4]
                 last_release_value = amp_levels[4]
-            print("osc %d (op %d) freq %.2f ratio %d env %s amp %.3f amp_mod %d" % \
-                  (i, osc.op_num, osc.frequency, osc.freq_is_ratio, oscbpfmt,
+            print("osc %d (op %d) freq %.6f ratio %d env %s amp %.6f amp_mod %d" % \
+                  (i+1, osc.op_num, osc.frequency, osc.freq_is_ratio, oscbpfmt,
                    osc.op_amp, osc.ampmodsens))
 
             # Make them all in cosine phase, to be like DX7.  Important for slow oscs
-            args = {"osc":i,
+            args = {"osc":i+1,
                     "bp0_target":amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
-                    "bp0":oscbp, "amp":osc.op_amp, "phase":0.25}
+                    "bp0":oscbp, "amp":t(osc.op_amp), "phase":0.25}
             if osc.freq_is_ratio:
-                args["ratio"] = osc.frequency
+                args["ratio"] = t(osc.frequency)
             else:
-                args["freq"] = osc.frequency
+                args["freq"] = t(osc.frequency)
             if(osc.ampmodsens > 0):
                 # TODO: we ignore intensity of amp mod sens, just on/off
                 args.update({"mod_source": 7, "mod_target":amy.TARGET_AMP})
@@ -254,22 +259,22 @@ class AMYPatch:
         # Set up the amp LFO 
         print("osc 7 amp lfo wave %d freq %f amp %f" % (
             self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
-        amy.send(osc=7, wave=self.lfo_waveform, freq=self.lfo_freq,
-                   amp=self.amp_lfo_amp)
+        amy.send(osc=7, wave=self.lfo_waveform, freq=t(self.lfo_freq),
+                   amp=t(self.amp_lfo_amp))
 
         # and the pitch one
         print("osc 8 pitch lfo wave %d freq %f amp %f" % (
             self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
-        amy.send(osc=8, wave=self.lfo_waveform, freq=self.lfo_freq,
-                   amp=self.pitch_lfo_amp)
+        amy.send(osc=8, wave=self.lfo_waveform, freq=t(self.lfo_freq),
+                   amp=t(self.pitch_lfo_amp))
 
         print("not used: lfo delay %d " % self.lfo_delay)
 
         ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
-        print("osc 6 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
+        print("osc 0 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
             self.algo, self.feedback, pitchbp, ampbp))
-        amy.send(osc=6, wave=amy.ALGO, algorithm=self.algo, feedback=self.feedback,
-                   algo_source="0,1,2,3,4,5",
+        amy.send(osc=0, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
+                   algo_source="1,2,3,4,5,6",
                    bp0=ampbp, bp0_target=amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
                    bp1=pitchbp, bp1_target=amy.TARGET_FREQ+amy.TARGET_TRUE_EXPONENTIAL,
                    mod_target=amy.TARGET_FREQ, mod_source=8)
@@ -419,62 +424,6 @@ def play_np_array(np_array, samplerate=amy.AMY_SAMPLE_RATE):
     obj.close()
     os.system("afplay " + tf.name)
     tf.close()
-
-
-#### Header file stuff below
-
-def generate_fm_header():
-    # given a list of patch numbers, output a fm.h
-    all_patches = []
-    ids = []
-    for patch_num in range(1024):
-        ids.append(patch_num)
-        p = AMYPatch.from_dx7(DX7Patch.from_patch_number(patch_num))
-        all_patches.append(p)
-    pitch_fix = 0
-    amp_fix = 0
-    out = open("src/fm.h", "w")
-    out.write("// Automatically generated by fm.generate_fm_header()\n#ifndef __FM_H\n#define __FM_H\n#define ALGO_PATCHES %d\n" % (len(all_patches)))
-    out.write("const algorithms_parameters_t fm_patches[ALGO_PATCHES] PROGMEM = {\n")
-    for idx, p in enumerate(all_patches):
-        for x in range(5):
-            # We can't store envelope times in ms greater than an uint16 (65 seconds). Rare
-            if(p.pitch_times[x] > 65535):
-                #print("patch %d pitch times %d is %d" % ( idx, x, p.pitch_times[x]))
-                p.pitch_times[x] = 65535
-                pitch_fix += 1
-        out.write("\t{ %d, %f, {%f, %f, %f, %f, %f}, {%d, %d, %d, %d, %d}, %f, %d, %f, %f, {\n" % (
-            p.algo, p.feedback,
-            p.pitch_levels[0], p.pitch_levels[1], p.pitch_levels[2], p.pitch_levels[3], p.pitch_levels[4], 
-            p.pitch_times[0], p.pitch_times[1], p.pitch_times[2], p.pitch_times[3], p.pitch_times[4],
-            p.lfo_freq, p.lfo_waveform, p.amp_lfo_amp, p.pitch_lfo_amp))
-        for i, osc in enumerate(p.oscs):
-            if osc.ampmodsens > 0:
-                lfo_target = amy.TARGET_AMP
-            else:
-                lfo_target = 0
-            if osc.freq_is_ratio:
-                ratio = osc.frequency
-                frequency = -1
-            else:
-                ratio = -1
-                frequency = osc.frequency
-            for x in range(5):
-                # We can't store envelope times in ms greater than an uint16 (65 seconds). Rare
-                if(osc.amp_times[x] > 65535):
-                    #print("patch %d osc %d amp times %d is %d" %(idx, i , x, osc.amp_times[x]))
-                    osc.amp_times[x] = 65535
-                    amp_fix += 1
-
-            out.write("\t\t\t{%f, %f, %f, {%f, %f, %f, %f, %f}, {%d, %d, %d, %d, %d}, %d}, /* op %d */\n" % (
-                frequency, ratio, osc.op_amp,
-                osc.amp_levels[0], osc.amp_levels[1], osc.amp_levels[2], osc.amp_levels[3], osc.amp_levels[4], 
-                osc.amp_times[0], osc.amp_times[1], osc.amp_times[2], osc.amp_times[3], osc.amp_times[4],
-                lfo_target, 6 - i))
-        out.write("\t\t},\n\t}, /* %s (%d) */ \n" % (p.name, ids[idx]))
-    out.write("};\n#endif // __FM_H\n")
-    out.close()
-    print("pitch fixed: %d. amp fixed: %d" % (pitch_fix, amp_fix))
 
 
 

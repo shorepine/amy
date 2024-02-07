@@ -167,6 +167,12 @@ static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int
 }
 
 // from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+static inline SAMPLE SMULR6(SAMPLE a, SAMPLE b) {
+    // s8.23 fixed-point multiplication with rounding, 1 zero on output (-128..128)
+    SAMPLE r = 1 + ((a + (1 << 10)) >> 11) * ((b + (1 << 10)) >> 11);
+    return r >> 1;
+}
+
 static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
     // Rounding on input and output; 3 zeros on output (so output is limited to -32.0 .. 32.0).
     SAMPLE r = 4 + ((a + (1 << 9)) >> 10) * ((b + (1 << 9)) >> 10);
@@ -184,7 +190,7 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
 //#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
-#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 13, 10, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 11, 12, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
 
 // First argument is positive and less that 1/16, i.e. only 19 low-order bits.
 //#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.

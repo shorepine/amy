@@ -49,6 +49,13 @@ void setup() {
 
   // Start up AMY
   amy.begin(1, 0, 0);
+
+  // Setup the voice
+  struct event e = amy.default_event();
+  e.load_patch = 129;
+  strcpy(e.voices, "0");
+  e.time = amy.sysclock();
+  amy.add_event(e);
 }
 
 
@@ -57,11 +64,7 @@ void handleNoteOn(byte channel, byte pitch, byte velocity)
 {
   struct event e = amy.default_event();
   e.midi_note = pitch;
-  e.wave=ALGO;
-  e.patch = 1;
-  e.amp=2;
   e.velocity = (float)velocity/127.0;
-  e.osc = channel;
   e.time = amy.sysclock();
   amy.add_event(e);
 
