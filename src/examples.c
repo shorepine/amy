@@ -8,6 +8,39 @@ void delay_ms(uint32_t ms) {
     while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
 }
 
+void example_voice_alloc() {
+    // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
+    struct event e = amy_default_event();
+    e.load_patch = 1;
+    strcpy(e.voices, "0,1");
+    amy_add_event(e);
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.load_patch = 131;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+
+    // play the same note on both
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"0");
+    amy_add_event(e);
+    delay_ms(2000);
+
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"1");
+    amy_add_event(e);
+    delay_ms(2000);
+
+
+}
+
+
 void example_juno_chord() {
     struct event e = amy_default_event();
     e.load_patch = 1;

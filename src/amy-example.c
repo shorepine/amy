@@ -62,7 +62,9 @@ int main(int argc, char ** argv) {
     }
 
     amy_reset_oscs();
+    example_voice_alloc();
 
+    amy_reset_oscs();
     //example_reverb();
     //example_chorus();
     //example_sine(start);
