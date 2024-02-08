@@ -72,6 +72,7 @@ def trunc(number):
     if(type(number)==float):
         return ('%.6f' % number).rstrip('0').rstrip('.')
     return str(number)
+
 def trunc3(number):
     if(type(number)==float):
         return ('%.3f' % number).rstrip('0').rstrip('.')

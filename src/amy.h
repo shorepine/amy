@@ -439,6 +439,7 @@ void amy_live_stop();
 void amy_reset_oscs();
 void amy_print_devices(); 
 
+extern void reset_osc(uint16_t i );
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();

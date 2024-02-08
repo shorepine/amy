@@ -102,6 +102,7 @@ void patches_load_patch(struct event e) {
                     for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
                         //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], i+j);
                         osc_to_voice[i+j] = voices[v];
+                        reset_osc(i+j);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
