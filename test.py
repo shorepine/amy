@@ -145,7 +145,7 @@ class TestAlgo(AmyTest):
 
   def run(self):
     amy.send(time=0, voices="0",  load_patch=21+128)
-    amy.send(time=100, voices="0", note=70, vel=1)
+    amy.send(time=100, voices="0", note=58, vel=1)
     amy.send(time=500, voices="0", vel=0)
 
 
@@ -153,7 +153,7 @@ class TestAlgo2(AmyTest):
 
   def run(self):
     amy.send(time=0, voices="0", load_patch=128+24)
-    amy.send(time=100, voices="0", note=70, vel=1)
+    amy.send(time=100, voices="0", note=58, vel=1)
     amy.send(time=500, voices="0", vel=0)
 
 
@@ -313,8 +313,9 @@ def main(argv):
     #TestBrass2().test()
     #TestSineEnv().test()
     #TestSawDownOsc().test()
-    TestGuitar().test()
-    TestFilter().test()
+    #TestGuitar().test()
+    #TestFilter().test()
+    TestAlgo().test()
   amy.send(debug=0)
   print("tests done.")
 

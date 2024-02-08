@@ -27,7 +27,7 @@ float dsps_sqrtf_f32_ansi(float f)
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
-    qFactor = sqrtf(qFactor);
+    //qFactor = sqrtf(qFactor);
     
     if (qFactor < 0.51) {
         qFactor = 0.51;
