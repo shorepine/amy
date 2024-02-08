@@ -35,6 +35,8 @@ bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_C
 #define CPU0_METER 2
 #define CPU1_METER 3
 
+struct audio_buffer_pool *ap;
+
 
 int32_t await_message_from_other_core() {
      while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
@@ -62,7 +64,7 @@ static inline uint32_t _millis(void)
 
 
 
-void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
+void rp2040_fill_audio_buffer() {
     
     amy_prepare_buffer();
     send_message_to_other_core(32);
@@ -128,19 +130,20 @@ void core1_main() {
 
 }
 
-const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+// delay and feed audio buffer while you wait
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) {
+        rp2040_fill_audio_buffer();
+    }
+}
+
 
 int main() {
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-    gpio_put(LED_PIN, 1);
-
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
     if(AMY_CORES>1)
         multicore_launch_core1(core1_main);
-
-    gpio_put(LED_PIN, 0);
 
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
@@ -155,41 +158,34 @@ int main() {
     gpio_set_dir(CPU1_METER, GPIO_OUT);
     gpio_put(CPU1_METER, 0);
 
-    {
-        gpio_put(LED_PIN, 1);
-        printf("Clock is set to %d\n", clock_get_hz(clk_sys));
-        printf("LED ON !\n");
-        sleep_ms(250);
-
-        gpio_put(LED_PIN, 0);
-        printf("LED OFF !\n");
-        sleep_ms(250);
-    }
+    printf("Clock is set to %d\n", clock_get_hz(clk_sys));
+    sleep_ms(250);
 
     example_reverb();
     example_chorus();
 
-    struct audio_buffer_pool *ap = init_audio();
-    int32_t start = amy_sysclock();
+    ap = init_audio();
 
-    example_voice_chord(0, start);
-    example_voice_chord(130, start+3500);
-    example_multimbral_fm(start+7500);
+    uint8_t dx7 = 0;
+    uint8_t multimbral = 0;
+    uint8_t stop = 0;
 
-    for (int i = 0; i < 5000; ++i) {
-        rp2040_fill_audio_buffer(ap);
-        if (i == 1000) {
-            config_reverb(0.7, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    
+    example_voice_chord(0); // juno patch 0
+    while(1) {
+        delay_ms(100);
+        if(amy_sysclock() > 4000 && !dx7) {
+            example_voice_chord(130); // dx7 patch 2
+            dx7 = 1;
         }
-
-    }
-
-    while(true) {
-        gpio_put(LED_PIN, 1);
-        sleep_ms(250);
-
-        gpio_put(LED_PIN, 0);
-        sleep_ms(250);
+        if(amy_sysclock() > 8000 && !multimbral) {
+            example_multimbral_fm();
+            multimbral = 1;
+        }
+        if(amy_sysclock() > 15000 && !stop) {
+            amy_reset_oscs();
+            stop = 1;
+        }
     }
     return 0;
 }
