@@ -93,7 +93,7 @@ void patches_load_patch(struct event e) {
                 // Are there num_voices patch_oscs free oscs after this one?
                 good = 1;
                 for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
-                    good = good & AMY_IS_UNSET(osc_to_voice[i+j]);
+                    good = good & (AMY_IS_UNSET(osc_to_voice[i+j]));
                 }
                 if(good) {
                     //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], i, voices[v]);

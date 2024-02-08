@@ -1,11 +1,18 @@
 #if PICO_ON_DEVICE
 #ifndef ARDUINO
 
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
+/*
+gh repo clone raspberrypi/pico-extras
+gh repo clone raspberrypi/pico-sdk
+# Do whatever installs you need for the pico-sdk
+gh repo clone bwhitman/amy
+cd amy/src; mkdir build; cd build
+export PICO_SDK_PATH=../../../pico-sdk
+export PICO_EXTRAS_PATH=../../../pico-extras
+cmake ..
+make && ~/outside/picotool/build/picotool load -F amy_example.elf &&  ~/outside/picotool/build/picotool reboot
+*/
+
 
 #include <stdio.h>
 #include <math.h>
@@ -28,18 +35,28 @@ bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_C
 #define CPU0_METER 2
 #define CPU1_METER 3
 
-extern int32_t await_message_from_other_core();
-extern void send_message_to_other_core(int32_t t);
+
+int32_t await_message_from_other_core() {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
+         __wfe();
+     }
+     int32_t msg = sio_hw->fifo_rd;
+     __sev();
+     return msg;
+ }
+
+ // Send 32-bit message to other core
+ void send_message_to_other_core(int32_t t) {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
+         __wfe();
+     }
+     sio_hw->fifo_wr = t;
+     __sev();
+ }
 
 static inline uint32_t _millis(void)
 {
     return to_ms_since_boot(get_absolute_time());
-}
-
-
-void delay_ms(uint32_t ms) {
-    uint32_t now = _millis();
-    while(_millis() < now+ms) {}
 }
 
 
@@ -128,7 +145,7 @@ int main() {
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
-    amy.begin(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 0);
+    amy_start(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 1);
 
     gpio_init(CPU0_METER);
     gpio_set_dir(CPU0_METER, GPIO_OUT);
@@ -154,7 +171,10 @@ int main() {
 
     struct audio_buffer_pool *ap = init_audio();
     int32_t start = amy_sysclock();
-    example_multiimbral_fm(start);
+
+    example_voice_chord(0, start);
+    example_voice_chord(130, start+3500);
+    example_multimbral_fm(start+7500);
 
     for (int i = 0; i < 5000; ++i) {
         rp2040_fill_audio_buffer(ap);
@@ -176,4 +196,3 @@ int main() {
 
 #endif
 #endif
-

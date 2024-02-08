@@ -1151,7 +1151,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if (debug_flag) {
         debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core], AMY_BLOCK_SIZE);
-        fprintf(stderr, "time %d core %d max_max=%.3f post-eq max=%.3f\n", total_samples, core, S2F(max_max), S2F(smax));
+        fprintf(stderr, "time %" PRIu32 " core %d max_max=%.3f post-eq max=%.3f\n", total_samples, core, S2F(max_max), S2F(smax));
     }
     AMY_PROFILE_STOP(AMY_RENDER)
 
