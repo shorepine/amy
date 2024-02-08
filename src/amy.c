@@ -1126,6 +1126,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     return max_val;
 }
 
+#include "my_logging.h"
 void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     AMY_PROFILE_START(AMY_RENDER)
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
@@ -1143,16 +1144,20 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
             }
         }
+
     }
+
     // apply the eq filters if set
     if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
         parametric_eq_process(fbl[core]);
     }
+
     if (debug_flag) {
         debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core], AMY_BLOCK_SIZE);
         fprintf(stderr, "time %" PRIu32 " core %d max_max=%.3f post-eq max=%.3f\n", total_samples, core, S2F(max_max), S2F(smax));
     }
+
     AMY_PROFILE_STOP(AMY_RENDER)
 
 }
@@ -1581,5 +1586,4 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     amy_global.has_reverb = reverb;
     oscs_init();
     amy_reset_oscs();
-
 }

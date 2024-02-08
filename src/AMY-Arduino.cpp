@@ -9,6 +9,16 @@ AMY::AMY()
 
 }
 
+
+extern "C" {
+  #include "my_logging.h"
+}
+
+
+void my_log(int msg) {
+    Serial.println(msg);
+}
+
 struct event AMY::default_event() {
     return amy_default_event();
 }

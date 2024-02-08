@@ -122,9 +122,7 @@ void core1_main() {
     while(1) {
         int32_t ret = 0;
         while(ret!=32) ret = await_message_from_other_core();
-        gpio_put(CPU1_METER, 1);
         amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-        gpio_put(CPU1_METER, 0);
         send_message_to_other_core(64);
     }
 
@@ -142,8 +140,8 @@ void delay_ms(uint32_t ms) {
 int main() {
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
-    if(AMY_CORES>1)
-        multicore_launch_core1(core1_main);
+    multicore_launch_core1(core1_main);
+    
 
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
@@ -170,7 +168,7 @@ int main() {
     uint8_t multimbral = 0;
     uint8_t stop = 0;
 
-    
+
     example_voice_chord(0); // juno patch 0
     while(1) {
         delay_ms(100);

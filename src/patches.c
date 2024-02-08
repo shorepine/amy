@@ -55,20 +55,12 @@ void patches_event_has_voices(struct event e) {
 
 // Given an event with a load_patch object AND a voices object in it
 // This means to set/reset the voices and load the messages from ROM and set them
-// TODO: for some reason you can't ALSO send other messages on this same event, liek note / vel
 
 void patches_load_patch(struct event e) {
     char sub_message[255];
     
     int16_t voices[MAX_VOICES];
     uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES);
-
-    // We have to be smart about voice # and allocating oscs 
-    // if i call this with voices=0,1,2,3 , we're fine
-    // but then if i call this with voices=5,6 (skipping 4), how do I know what to do
-    // also, if i overwrite a patch with a bigger or smaller osc set , non consecutive 
-    // e.g. voices=0,1 , load_patch=0 (juno - 5 oscs)
-    // then voices=0, load_patch=130 (dx7 - 9 oscs, will eat into patch 1)
 
     char*message = (char*)patch_commands[e.load_patch];
     for(uint8_t v=0;v<num_voices;v++) {
@@ -88,21 +80,27 @@ void patches_load_patch(struct event e) {
 
         // Now find some oscs
         uint8_t good = 0;
+
+        // If voice % 2 = 1, start at AMY_OSCS/2, to distribute across both "halves" for mulitcore on platforms that use it
+        uint16_t osc_start = 0;
+        if(voices[v]%2) osc_start = (AMY_OSCS/2);
+
         for(uint16_t i=0;i<AMY_OSCS;i++) {
-            if(AMY_IS_UNSET(osc_to_voice[i])) {
+            uint16_t osc = (osc_start + i) % AMY_OSCS;
+            if(AMY_IS_UNSET(osc_to_voice[osc])) {
                 // Are there num_voices patch_oscs free oscs after this one?
                 good = 1;
                 for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
-                    good = good & (AMY_IS_UNSET(osc_to_voice[i+j]));
+                    good = good & (AMY_IS_UNSET(osc_to_voice[osc+j]));
                 }
                 if(good) {
-                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], i, voices[v]);
-                    //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], i);
-                    voice_to_base_osc[voices[v]] = i; 
+                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], osc, voices[v]);
+                    //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
+                    voice_to_base_osc[voices[v]] = osc; 
                     for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
-                        //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], i+j);
-                        osc_to_voice[i+j] = voices[v];
-                        reset_osc(i+j);
+                        //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
+                        osc_to_voice[osc+j] = voices[v];
+                        reset_osc(osc+j);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;

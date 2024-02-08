@@ -50,11 +50,10 @@ void setup() {
   // Start up AMY
   amy.begin(1, 0, 0);
 
-  // Setup the voice
+  // Setup the voice with a Juno patch
   struct event e = amy.default_event();
-  e.load_patch = 129;
+  e.load_patch = 0; // Juno Patch 0
   strcpy(e.voices, "0");
-  e.time = amy.sysclock();
   amy.add_event(e);
 }
 
@@ -63,9 +62,9 @@ void setup() {
 void handleNoteOn(byte channel, byte pitch, byte velocity)
 {
   struct event e = amy.default_event();
+  strcpy(e.voices, "0");
   e.midi_note = pitch;
   e.velocity = (float)velocity/127.0;
-  e.time = amy.sysclock();
   amy.add_event(e);
 
 }
