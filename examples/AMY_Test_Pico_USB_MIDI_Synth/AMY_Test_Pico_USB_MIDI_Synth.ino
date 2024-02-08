@@ -77,7 +77,7 @@ void handleNoteOff(byte channel, byte pitch, byte velocity)
 
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
-  uint8_t * samples = (uint8_t*)amy.get_buffer();
+  uint8_t * samples = (uint8_t*)amy.render_to_buffer();
   // Block until ready
   while(i2s.availableForWrite()<AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
   size_t written = i2s.write((const uint8_t*)samples, (size_t)AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);

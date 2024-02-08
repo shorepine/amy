@@ -1,9 +1,6 @@
 #include <AMY-Arduino.h>
 #include <I2S.h>
 
-// If you want smaller PCM samples to fit on flash, include it here
-#include "pcm_tiny.h"
-
 #define MAX_NOTES 12
 #define TIME_BETWEEN_NOTES_MS 2000
 int note_on_ms = 0;
@@ -54,7 +51,7 @@ void render_0( void * pvParameters ){
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 
     // Get the buffer and play it.
-    short * samples = amy.get_buffer();
+    short * samples = amy.fill_buffer();
     I2S.write_blocking(samples, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
   } 
 }
@@ -82,13 +79,11 @@ void loop() {
       struct event e = amy.default_event();
       e.load_patch = note_counter + 128; // dx7 patches start at 128
       strcpy(e.voices, "0");
-      e.time = amy.sysclock(); 
       amy_add_event(e);
 
       e = amy.default_event();
       e.midi_note = 50 + (note_counter*2);
       e.velocity = 1;
-      e.time = amy.sysclock(); // play it now
       amy.add_event(e);
       note_counter++;
     }

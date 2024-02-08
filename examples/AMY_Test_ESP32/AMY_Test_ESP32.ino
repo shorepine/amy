@@ -33,7 +33,7 @@ void setup() {
   struct event e = amy.default_event();
   e.osc = 0;
   e.wave = SINE;
-  e.freq_coefs[COEFF_CONST] = 440;
+  e.freq_coefs[COEF_CONST] = 440;
   e.velocity = 1;
   e.time = clock+2500;
   amy.add_event(e);
@@ -45,7 +45,7 @@ void setup() {
 
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
-  short * samples = amy.get_buffer();
+  short * samples = amy.render_to_buffer();
   I2S.write_blocking(samples, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
 }
 

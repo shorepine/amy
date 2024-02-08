@@ -1,10 +1,6 @@
 #include <AMY-Arduino.h>
 #include <I2S.h>
 
-// If you want smaller PCM samples to fit on flash, include it here
-#include "pcm_small.h"
-
-
 // This example renders complex FM tones on both processors of a Pi Pico. 
 // Set this to CPU 250MHz (overclocked) and -O3
 // You can get 11 or 12 multitimbral DX7-style voices at once.
@@ -84,7 +80,7 @@ void loop() {
   while(signal != CORE1_RENDER_SIGNAL) signal = rp2040.fifo.pop();
 
   // Now get the completed buffer from both cores
-  uint8_t * samples = (uint8_t*)amy.get_buffer();
+  uint8_t * samples = (uint8_t*)amy.fill_buffer();
 
   // Write, block until i2s is ready
   while(i2s.availableForWrite()<AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);

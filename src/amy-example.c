@@ -64,22 +64,10 @@ int main(int argc, char ** argv) {
         amy_live_start();
     }
 
-    //amy_reset_oscs();
-    //example_voice_alloc();
 
     amy_reset_oscs();
-    //example_reverb();
-    //example_chorus();
-    //example_sine(start);
-    //bleep(start);
-    example_juno_chord();
-    amy_reset_oscs();
-    example_dx7_chord();
 
-    amy_reset_oscs();
-    example_patches();
-    //example_drums(start+500, 4);
-    //example_multimbral_fm(start + 2500, /* start_osc= */ 6);
+    example_voice_chord(0);
 
     // Now just spin for 10s
     while(amy_sysclock() - start < 5000) {

@@ -5,6 +5,10 @@
 #include "amy.h"
 #include "libminiaudio-audio.h"
 
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
+}
 int main(int argc, char ** argv) {
 
     int opt;

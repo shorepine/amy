@@ -22,7 +22,7 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
 }
 
 void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus) {
@@ -62,11 +62,6 @@ int16_t * AMY::fill_buffer() {
 
 int16_t * AMY::render_to_buffer() {
     return amy_simple_fill_buffer();
-}
-
-
-void AMY::fm(int32_t start) {
-    example_multimbral_fm(start, 0);
 }
 
 void AMY::drums(int32_t start, uint16_t loops) {
