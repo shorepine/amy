@@ -139,7 +139,7 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 }
 
 //#define FILT_MUL_SS MUL8F_SS
-#define FILT_MUL_SS SMULR7
+#define FILT_MUL_SS SMULR6
 //#define FILT_MUL_SS MUL8_SS  // Goes unstable for TestFilter
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
 #define FILTER_BIQUAD_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
@@ -220,25 +220,6 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-// Template so we can have the same loop with different MULT functions.
-#define FILTER_TWICE_LOOP(MULT) \
-    assert(FILTER_SCALEUP_BITS == 0);                        \
-    for (int i = 0 ; i < len ; i++) {                        \
-        SAMPLE x0 = FILT_MUL_SS(coef[0], SHIFTL(input[i], normbits));   \
-        SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;                 \
-        SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;                 \
-        v0 = v0 - MULT(e, v1) + MULT(f, v2);                 \
-        w0 = FILT_MUL_SS(coef[0], v0 + SHIFTL(v1, 1) + v2);  \
-        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;                 \
-        y0 = y0 - MULT(e, y1) + MULT(f, y2);                 \
-        x2 = x1; \
-        x1 = x0; \
-        v2 = v1; \
-        v1 = v0; \
-        y2 = y1; \
-        y1 = y0; \
-        output[i] = SHIFTR(y0, normbits);       \
-    }
 
 int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, int normbits) {
     // Apply the filter twice
@@ -252,12 +233,22 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE v2 = w[5];
     SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
-    if (e < F2S(0.0625)) { // 4 zeros at top of 23 bit frac part
-        //FILTER_TWICE_LOOP(MUL4E_SS);
-        FILTER_TWICE_LOOP(SMULR7);
-    } else {
-        //FILTER_TWICE_LOOP(MUL8F_SS);
-        FILTER_TWICE_LOOP(SMULR7);
+    assert(FILTER_SCALEUP_BITS == 0);                        \
+    for (int i = 0 ; i < len ; i++) {                        \
+        SAMPLE x0 = FILT_MUL_SS(coef[0], SHIFTL(input[i], normbits));   \
+        SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;                 \
+        SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;                 \
+        v0 = v0 - FILT_MUL_SS(e, v1) + FILT_MUL_SS(f, v2);                 \
+        w0 = FILT_MUL_SS(coef[0], v0 + SHIFTL(v1, 1) + v2);  \
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;                 \
+        y0 = y0 - FILT_MUL_SS(e, y1) + FILT_MUL_SS(f, y2);                 \
+        x2 = x1; \
+        x1 = x0; \
+        v2 = v1; \
+        v1 = v0; \
+        y2 = y1; \
+        y1 = y0; \
+        output[i] = SHIFTR(y0, normbits);       \
     }
     w[0] = x1;
     w[1] = x2;
