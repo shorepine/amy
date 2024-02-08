@@ -420,7 +420,9 @@ class JunoPatch:
     # Chorus & HPF
     eq_l = eq_m = eq_h = 0
     if self.hpf == 0:
-      eq_l = 10
+      eq_l = 7
+      eq_m = -3
+      eq_h = -3
     elif self.hpf == 1:
       pass
     elif self.hpf == 2:
