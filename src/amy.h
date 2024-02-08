@@ -19,12 +19,14 @@ typedef struct {
     uint8_t midinote;
 } pcm_map_t;
 
-
-#ifdef AMY_CONFIG_H
-#include AMY_CONFIG_H
-#else
-#include "amy_config.h"
+#ifndef AMY_CONFIG_H
+#define AMY_CONFIG_H amy_config.h
 #endif
+
+#define QUOTED(x) #x
+#define INCLUDE(x) QUOTED(x)
+
+#include INCLUDE(AMY_CONFIG_H)
 
 // Rest of amy setup
 #define SAMPLE_MAX 32767
