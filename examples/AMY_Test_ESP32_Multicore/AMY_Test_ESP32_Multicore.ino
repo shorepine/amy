@@ -19,15 +19,10 @@ void setup() {
   digitalWrite(21, 1);
 
   // Set your I2S pins. Data/SD/DIN/DOUT, SCK/BLCK, FS/WS/LRCLK. 
-  I2S.setDataPin(8); // 27
-  I2S.setSckPin(10); // 26
-  I2S.setFsPin(11); // 25
+  I2S.setDataPin(27); // 27
+  I2S.setSckPin(26); // 26
+  I2S.setFsPin(25); // 25
   I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, BYTES_PER_SAMPLE*8);
-
-
-  Serial.begin(115200);
-  while (!Serial && millis() < 10000UL);
-  Serial.println("Welcome to AMY example");
 
   // Set up the rendering tasks on the ESP.
   xTaskCreatePinnedToCore(render_0, "render_0",4096,NULL, configMAX_PRIORITIES-2,&render0,0);                          
@@ -45,7 +40,7 @@ void render_0( void * pvParameters ){
     xTaskNotifyGive(render1);
 
     // Render half or so of the oscillators
-    amy.render(0,30,0);
+    amy.render(0,AMY_OSCS/2,0);
 
     // Wait for render_1 to come back
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
@@ -63,7 +58,7 @@ void render_1( void * pvParameters ){
     ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 
     // Render the other half of the processors
-    amy.render(30, AMY_OSCS, 1);
+    amy.render(AMY_OSCS/2, AMY_OSCS, 1);
 
     // Tell render_0 we're done
     xTaskNotifyGive(render0);
@@ -78,10 +73,7 @@ void loop() {
       note_on_ms = amy.sysclock() + TIME_BETWEEN_NOTES_MS;
       struct event e = amy.default_event();
       e.load_patch = note_counter + 128; // dx7 patches start at 128
-      strcpy(e.voices, "0");
-      amy_add_event(e);
-
-      e = amy.default_event();
+      sprintf(e.voices, "%d", note_counter);
       e.midi_note = 50 + (note_counter*2);
       e.velocity = 1;
       amy.add_event(e);
