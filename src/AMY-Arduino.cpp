@@ -9,7 +9,7 @@ AMY::AMY()
 
 }
 
-
+#ifdef ARDUINO
 extern "C" {
   #include "my_logging.h"
 }
@@ -18,6 +18,7 @@ extern "C" {
 void my_log(int msg) {
     Serial.println(msg);
 }
+#endif
 
 struct event AMY::default_event() {
     return amy_default_event();
