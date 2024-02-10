@@ -319,7 +319,7 @@ def make_log2_exp2_luts(filename):
 def make_clipping_lut(filename):
     # Soft clipping lookup table scratchpad.
     SAMPLE_MAX = 32767
-    linear_proportion = 0.9
+    linear_proportion = 0.9  # I tried 0.6 and you could hear the difference but not enough to matter.
     LIN_MAX = int(round(linear_proportion * 32768))  # 29491
     NONLIN_RANGE = round(1.5 * (32767 - LIN_MAX))  # size of nonlinearity lookup table = 4915
 
