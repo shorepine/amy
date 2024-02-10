@@ -302,18 +302,24 @@ class TestJunoPatch(AmyTest):
     amy.send(time=50, voices="1", note=60, vel=1)
     amy.send(time=50, voices="2", note=63, vel=1)
     amy.send(time=50, voices="3", note=67, vel=1)
-    amy.send(time=700, voices="0", vel=0)
-    amy.send(time=700, voices="1", vel=0)
-    amy.send(time=700, voices="2", vel=0)
-    amy.send(time=700, voices="3", vel=0)
+    amy.send(time=600, voices="0", vel=0)
+    amy.send(time=600, voices="1", vel=0)
+    amy.send(time=600, voices="2", vel=0)
+    amy.send(time=600, voices="3", vel=0)
 
 class TestJunoClip(AmyTest):
   """Juno patch that clips."""
 
   def run(self):
-    amy.send(time=0, voices="0", load_patch=9)
+    amy.send(time=0, voices="0,1,2,3", load_patch=9)
     amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=900, voices="0", vel=0)
+    amy.send(time=50, voices="1", note=57, vel=1)
+    amy.send(time=50, voices="2", note=55, vel=1)
+    amy.send(time=50, voices="3", note=52, vel=1)
+    amy.send(time=800, voices="0", vel=0)
+    amy.send(time=800, voices="1", vel=0)
+    amy.send(time=800, voices="2", vel=0)
+    amy.send(time=800, voices="3", vel=0)
 
 
 def main(argv):

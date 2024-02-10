@@ -319,8 +319,9 @@ def make_log2_exp2_luts(filename):
 def make_clipping_lut(filename):
     # Soft clipping lookup table scratchpad.
     SAMPLE_MAX = 32767
-    LIN_MAX = 29491  #// int(round(0.9 * 32768))
-    NONLIN_RANGE = 4915  # // size of nonlinearity lookup table = round(1.5 * (INT16_MAX - LIN_MAX))
+    linear_proportion = 0.9
+    LIN_MAX = int(round(linear_proportion * 32768))  # 29491
+    NONLIN_RANGE = round(1.5 * (32767 - LIN_MAX))  # size of nonlinearity lookup table = 4915
 
     clipping_lookup_table = np.arange(LIN_MAX + NONLIN_RANGE)
 
