@@ -293,6 +293,28 @@ class TestOverload(AmyTest):
     amy.send(time=100, note=48, vel=8.0)
     amy.send(time=900, vel=0)
 
+class TestJunoPatch(AmyTest):
+  """Known Juno patch."""
+
+  def run(self):
+    amy.send(time=0, voices="0,1,2,3", load_patch=20)
+    amy.send(time=50, voices="0", note=48, vel=1)
+    amy.send(time=50, voices="1", note=60, vel=1)
+    amy.send(time=50, voices="2", note=63, vel=1)
+    amy.send(time=50, voices="3", note=67, vel=1)
+    amy.send(time=700, voices="0", vel=0)
+    amy.send(time=700, voices="1", vel=0)
+    amy.send(time=700, voices="2", vel=0)
+    amy.send(time=700, voices="3", vel=0)
+
+class TestJunoClip(AmyTest):
+  """Juno patch that clips."""
+
+  def run(self):
+    amy.send(time=0, voices="0", load_patch=9)
+    amy.send(time=50, voices="0", note=60, vel=1)
+    amy.send(time=900, voices="0", vel=0)
+
 
 def main(argv):
   if len(argv) > 1:

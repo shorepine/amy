@@ -56,7 +56,7 @@
 
 #ifndef AMY_USE_FIXEDPOINT
 
-#warning "floating point calc"
+//#warning "floating point calc"
 #define ARITH "float"
 
 
@@ -87,6 +87,7 @@
 #define MUL8F_SS(a, b) ((a) * (b))
 #define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
+#define SMULR6(a, b) ((a) * (b))
 #define SMULR7(a, b) ((a) * (b))
 
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
