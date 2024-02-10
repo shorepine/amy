@@ -409,9 +409,15 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
 #endif // AMY_DEBUG
 }
 
+// CLZ saves about 10% of total filtering time.
+#define USE_CLZ
+
 int encl_log2(SAMPLE max) {
     AMY_PROFILE_START(ENCL_LOG2)
 
+#ifdef USE_CLZ
+        return __builtin_clz(max) - 1;
+#else  // !USE_CLZ
     // How many bits can you shift before this max overflows?
     int bits = 0;
     while(max < F2S(128.0) && bits < 24) {
@@ -420,6 +426,7 @@ int encl_log2(SAMPLE max) {
     }
     AMY_PROFILE_STOP(ENCL_LOG2)
     return bits;
+#endif  // USE_CLZ
 }
 
 void block_norm(SAMPLE* block, int len, int bits) {
