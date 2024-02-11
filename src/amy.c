@@ -1028,6 +1028,7 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
     msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
 
     msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].resonance = synth[osc].resonance;
@@ -1104,23 +1105,25 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
-    if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
-    if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
-    if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
-    if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
-    if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
-    if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
-    if(synth[osc].wave == KS) {
-        #if AMY_KS_OSCS > 0
-        max_val = render_ks(buf, osc);
-        #endif
-    }
-    if(pcm_samples)
-        if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
-    if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
-    if(AMY_HAS_PARTIALS == 1) {
-        if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
-        if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+    if(!(msynth[osc].amp == 0 && synth[osc].last_amp == 0)) {
+        if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
+        if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
+        if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
+        if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
+        if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
+        if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
+        if(synth[osc].wave == KS) {
+            #if AMY_KS_OSCS > 0
+            max_val = render_ks(buf, osc);
+            #endif
+        }
+        if(pcm_samples)
+            if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
+        if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
+        if(AMY_HAS_PARTIALS == 1) {
+            if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
+            if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+        }
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
     return max_val;
