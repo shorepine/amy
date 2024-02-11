@@ -437,6 +437,10 @@ void block_denorm(SAMPLE* block, int len, int bits) {
 }
 
 void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
+
+    SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
+    if (max_val == 0 && filtmax == 0) return;
+
     AMY_PROFILE_START(FILTER_PROCESS)
 
     AMY_PROFILE_START(FILTER_PROCESS_STAGE0)
@@ -460,7 +464,6 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     // Also have to consider the filter state.
 #define USE_BLOCK_FLOATING_POINT
 #ifdef USE_BLOCK_FLOATING_POINT
-    SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
     int filtnormbits = synth[osc].last_filt_norm_bits + encl_log2(filtmax);
 #define HEADROOM_BITS 6
 #define STATE_HEADROOM_BITS 2
