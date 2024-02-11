@@ -395,7 +395,9 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
 }
 
 // CLZ saves about 10% of total filtering time.
+#ifdef USE_FIXEDPOINT
 #define USE_CLZ
+#endif
 
 int encl_log2(SAMPLE max) {
     AMY_PROFILE_START(ENCL_LOG2)
