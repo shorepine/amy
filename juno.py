@@ -203,7 +203,7 @@ class JunoPatch:
                  'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub', 'stop_16', 'stop_8', 'stop_4',
                          'pulse', 'saw', 'pwm_manual', 'vca_level'],
                  'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
-                 'env': ['env_a', 'env_d', 'env_s', 'env_r'],
+                 'env': ['env_a', 'env_d', 'env_s', 'env_r', 'vca_gate'],
                  'cho': ['chorus', 'hpf']}
   
   # These lists name the fields in the order they appear in the sysex.
@@ -344,8 +344,7 @@ class JunoPatch:
                    chained_osc=other_base_osc + self.voice_oscs[i + 1])
     
   def _amp_coef_string(self, level):
-    return '0,0,%s,1,0,0' % ffmt(
-      max(.001, to_level(level) * to_level(self.vca_level)))
+    return '0,0,%s,1,0,0' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
 
   def _freq_coef_string(self, base_freq):
     return '%s,1,0,0,0,%s' % (
@@ -413,7 +412,7 @@ class JunoPatch:
   def update_env(self):
     bp1_coefs = self._breakpoint_string()
     if self.vca_gate:
-      bp0_coefs=''
+      bp0_coefs='0,1,0,0'
     else:
       bp0_coefs = self._breakpoint_string()
     self.amy_send(osc=self.pwm_osc, bp0=bp0_coefs, bp1=bp1_coefs)
