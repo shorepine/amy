@@ -321,6 +321,19 @@ class TestJunoClip(AmyTest):
     amy.send(time=800, voices="2", vel=0)
     amy.send(time=800, voices="3", vel=0)
 
+class TestLowVcf(AmyTest):
+  """Weird fxpt warble when hitting fundamental."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
+             filter_type=amy.FILTER_LPF24, resonance=1.0,
+             amp='0,0,0.85,1',
+             filter_freq='161.28,0,0,0,5',
+             bp0='0,1,0,0',
+             bp1='0,1,600,0,1,0')
+    amy.send(time=100, osc=0, note=48, vel=3)
+    amy.send(time=800, osc=0, vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
