@@ -56,7 +56,7 @@ amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 amy-module: amy-example
-	touch src/amy.c; cd src; ${PYTHON} -m pip install . --force-reinstall; cd ..
+	${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; cd src; ${PYTHON} -m pip install . --force-reinstall; cd ..
 
 test: amy-module
 	${PYTHON} test.py
