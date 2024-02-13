@@ -138,7 +138,50 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     return 0;
 }
 
-#define FILT_MUL_SS SMULR6
+// 16 bit pseudo floating-point multiply.
+// See https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=njPHwSB9VIJi
+
+int dropfor16(int32_t a) {
+    // How many bits you drop to leave just 16 in a.
+    if (a < 0) a = -a;
+    int leading_zero_bits = __builtin_clz(a);
+    const int bits_to_keep = 15;
+    const int word_bits = 32;
+    int bits_to_drop = MAX(0, word_bits - bits_to_keep - leading_zero_bits);
+    return bits_to_drop;
+}
+
+int32_t top16(SAMPLE a, int bits_to_drop) {
+    // Convert a to 16 bits, return also how many we dropped.
+    if (bits_to_drop > 0) {
+        a += (1 << (bits_to_drop - 1));
+    }
+    return a >> bits_to_drop;
+}
+
+SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
+    // Multiply the top 16 bits of a and b.
+    int adropped = dropfor16(a);
+    int bdropped = dropfor16(b);
+    int32_t a16 = top16(a, adropped);
+    int32_t b16 = top16(b, bdropped);
+    int totaldrop = adropped + bdropped;
+    if (totaldrop > 23) {
+        // Arbitrarily reduce drop on b, assume it's the samples.
+        bdropped -= (totaldrop - 23);
+        totaldrop = 23;  // i.e. adropped + bdropped
+    }
+    SAMPLE offset = 0;
+    if (totaldrop < 23) {
+        offset = 1 << (22 - totaldrop);
+    }
+    return (a16 * b16 + offset) >> (23 - totaldrop);
+}
+
+//#define FILT_MUL_SS(a, b) SMULR6(a, b)
+// top16SMUL pushes FILTER_PROCESS from ~2500 (time units) to ~7000 (per "make timing") but it gives super luscious floating-point-like results.
+// TODO: Block-floating-point approach to avoid recalculating bits to drop, offset for every multiply.
+#define FILT_MUL_SS(a, b) top16SMUL(a, b)
 
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
 #define FILTER_BIQUAD_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
@@ -204,7 +247,6 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
 
     return 0;
 }
-
 
 int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, int normbits) {
     // Apply the filter twice
