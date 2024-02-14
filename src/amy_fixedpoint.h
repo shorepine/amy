@@ -53,7 +53,6 @@
 
 #define AMY_USE_FIXEDPOINT
 
-
 #ifndef AMY_USE_FIXEDPOINT
 
 //#warning "floating point calc"

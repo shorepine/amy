@@ -213,43 +213,36 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
 
 static inline int headroom(SAMPLE a) {
     // How many bits bigger can this value get before overflow?
+#ifdef AMY_USE_FIXEDPOINT
     return __builtin_clz(ABS(a)) - 1;  // -1 for sign bit.
+#else  // !AMY_USE_FIXEDPOINT
+    // How many bits can you shift before this max overflows?
+    int bits = 0;
+    while(a < F2S(128.0) && bits < 32) {
+        a = SHIFTL(a, 1);
+        ++bits;
+    }
+    return bits;
+#endif  // AMY_USE_FIXEDPOINT
 }
+
+#ifdef AMY_USE_FIXEDPOINT
 
 SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
     // Multiply the top 15 bits of a and b.
     int adropped = MAX(0, 16 - headroom(a));
     if (adropped) {
-        a = (a + (1 << (adropped - 1))) >> adropped;
+        a = SHIFTR(a + (1 << (adropped - 1)), adropped);
     }
     int resultdrop = 23 - adropped;
     int bdropped = MIN(resultdrop, MAX(0, 16 - headroom(b)));
     if (bdropped) {
-        b = (b + (1 << (bdropped - 1))) >> bdropped;
+        b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
     }
     resultdrop -= bdropped;
     SAMPLE result = a * b;
     if (resultdrop) {
-        return (result + (1 << (resultdrop - 1))) >> resultdrop;
-    }
-    return result;
-}
-
-SAMPLE top16SMUL_preheadroom(SAMPLE a, SAMPLE b, int aheadroom, int bheadroom) {
-    // Multiply the top 15 bits of a and b.
-    int adropped = MAX(0, 16 - aheadroom);
-    if (adropped) {
-        a = (a + (1 << (adropped - 1))) >> adropped;
-    }
-    int resultdrop = 23 - adropped;
-    int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
-    if (bdropped) {
-        b = (b + (1 << (bdropped - 1))) >> bdropped;
-    }
-    resultdrop -= bdropped;
-    SAMPLE result = a * b;
-    if (resultdrop) {
-        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+        return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
     }
     return result;
 }
@@ -258,7 +251,7 @@ SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
     // Just the processing of a, so we can split it out
     int adropped = MAX(0, 16 - headroom(a));
     if (adropped) {
-        a = (a + (1 << (adropped - 1))) >> adropped;
+        a = SHIFTR(a + (1 << (adropped - 1)), adropped);
     }
     *p_adropped = adropped;
     return a;
@@ -269,15 +262,34 @@ SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped, int bheadro
     int resultdrop = 23 - adropped;
     int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
     if (bdropped) {
-        b = (b + (1 << (bdropped - 1))) >> bdropped;
+        b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
     }
     resultdrop -= bdropped;
     SAMPLE result = a_processed * b;
     if (resultdrop) {
-        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+        return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
     }
     return result;
 }
+
+#else // !AMY_USE_FIXEDPOINT
+
+// Sidestep all this logic for SAMPLE == float.
+
+SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
+    return a * b;
+}
+
+SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
+    *p_adropped = 0;  // dropped_bits registration unused in float.
+    return a;
+}
+
+SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped_unused, int bheadroom_unused) {
+    return a_processed * b;
+}
+
+#endif // AMY_USE_FIXEDPOINT
 
 SAMPLE scan_max(SAMPLE* block, int len) {
     AMY_PROFILE_START(SCAN_MAX)
@@ -532,28 +544,6 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
 #endif // AMY_DEBUG
 }
 
-// CLZ saves about 10% of total filtering time.
-#ifdef USE_FIXEDPOINT
-#define USE_CLZ
-#endif
-
-int encl_log2(SAMPLE max) {
-    AMY_PROFILE_START(ENCL_LOG2)
-
-#ifdef USE_CLZ
-        return __builtin_clz(max) - 1;
-#else  // !USE_CLZ
-    // How many bits can you shift before this max overflows?
-    int bits = 0;
-    while(max < F2S(128.0) && bits < 24) {
-        max = SHIFTL(max, 1);
-        ++bits;
-    }
-    AMY_PROFILE_STOP(ENCL_LOG2)
-    return bits;
-#endif  // USE_CLZ
-}
-
 void block_norm(SAMPLE* block, int len, int bits) {
     AMY_PROFILE_START(BLOCK_NORM)
 
@@ -604,10 +594,10 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     // Also have to consider the filter state.
 #define USE_BLOCK_FLOATING_POINT
 #ifdef USE_BLOCK_FLOATING_POINT
-    int filtnormbits = synth[osc].last_filt_norm_bits + encl_log2(filtmax);
+    int filtnormbits = synth[osc].last_filt_norm_bits + headroom(filtmax);
 #define HEADROOM_BITS 6
 #define STATE_HEADROOM_BITS 2
-    int normbits = MIN(MAX(0, encl_log2(max_val) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
+    int normbits = MIN(MAX(0, headroom(max_val) - HEADROOM_BITS), MAX(0, filtnormbits - STATE_HEADROOM_BITS));
     normbits = MIN(normbits, synth[osc].last_filt_norm_bits + 1);  // Increase at most one bit per block.
     normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
 #else  // No block floating point
