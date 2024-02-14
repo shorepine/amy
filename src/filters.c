@@ -178,10 +178,13 @@ SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
     return (a16 * b16 + offset) >> (23 - totaldrop);
 }
 
-//#define FILT_MUL_SS(a, b) SMULR6(a, b)
 // top16SMUL pushes FILTER_PROCESS from ~2500 (time units) to ~7000 (per "make timing") but it gives super luscious floating-point-like results.
 // TODO: Block-floating-point approach to avoid recalculating bits to drop, offset for every multiply.
-#define FILT_MUL_SS(a, b) top16SMUL(a, b)
+// This is the multiply just for dsps_biquad_f32_ansi_split_fb_twice, which is only used for FILTER_LPF24.
+#define FILT_MUL_SS_24(a, b) top16SMUL(a, b)
+
+// Stick to the faster mult for biquad, hpf etc, since the parameters aren't so sensitive, and parametric_eq was chewing major CPU.
+#define FILT_MUL_SS(a, b) SMULR6(a, b)
 
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
 #define FILTER_BIQUAD_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
@@ -262,13 +265,13 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
     for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = FILT_MUL_SS(coef[0], SHIFTL(input[i], normbits));
+        SAMPLE x0 = FILT_MUL_SS_24(coef[0], SHIFTL(input[i], normbits));
         SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;
         SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;
-        v0 = v0 - FILT_MUL_SS(e, v1) + FILT_MUL_SS(f, v2);
-        w0 = FILT_MUL_SS(coef[0], v0 + SHIFTL(v1, 1) + v2);
+        v0 = v0 - FILT_MUL_SS_24(e, v1) + FILT_MUL_SS_24(f, v2);
+        w0 = FILT_MUL_SS_24(coef[0], v0 + SHIFTL(v1, 1) + v2);
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
-        y0 = y0 - FILT_MUL_SS(e, y1) + FILT_MUL_SS(f, y2);
+        y0 = y0 - FILT_MUL_SS_24(e, y1) + FILT_MUL_SS_24(f, y2);
         x2 = x1;
         x1 = x0;
         v2 = v1;
@@ -360,8 +363,8 @@ void filters_init() {
 }
 
 
-void parametric_eq_process(SAMPLE *block) {
-    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
+void parametric_eq_process_old(SAMPLE *block) {
+    //AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
 
     SAMPLE output[2][AMY_BLOCK_SIZE];
     for(int c = 0; c < AMY_NCHANS; ++c) {
@@ -369,10 +372,58 @@ void parametric_eq_process(SAMPLE *block) {
         dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            output[0][i] = MUL8F_SS(output[0][i], amy_global.eq[0]) - MUL8F_SS(output[1][i], amy_global.eq[1]);
+            output[0][i] = FILT_MUL_SS(output[0][i], amy_global.eq[0]) - FILT_MUL_SS(output[1][i], amy_global.eq[1]);
         dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            cblock[i] = output[0][i] + MUL8F_SS(output[1][i], amy_global.eq[2]);
+            cblock[i] = output[0][i] + FILT_MUL_SS(output[1][i], amy_global.eq[2]);
+    }
+    //AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
+
+}
+
+
+void parametric_eq_process(SAMPLE *block) {
+    // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
+    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
+
+    for(int c = 0; c < AMY_NCHANS; ++c) {
+        SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
+        // Zeros then poles - Direct Form I
+        // We need 2 memories for input, and 2 for output.
+        SAMPLE x1 = eq_delay[c][0][0];
+        SAMPLE x2 = eq_delay[c][0][1];
+        SAMPLE y01 = eq_delay[c][0][2];
+        SAMPLE y02 = eq_delay[c][0][3];
+        SAMPLE y11 = eq_delay[c][1][2];
+        SAMPLE y12 = eq_delay[c][1][3];
+        SAMPLE y21 = eq_delay[c][2][2];
+        SAMPLE y22 = eq_delay[c][2][3];
+        for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
+            SAMPLE x0 = SHIFTL(cblock[i], FILTER_BIQUAD_SCALEUP_BITS);
+            SAMPLE w00 = FILT_MUL_SS(eq_coeffs[0][0], x0) + FILT_MUL_SS(eq_coeffs[0][1], x1) + FILT_MUL_SS(eq_coeffs[0][2], x2);
+            SAMPLE y00 = w00 - FILT_MUL_SS(eq_coeffs[0][3], y01) - FILT_MUL_SS(eq_coeffs[0][4], y02);
+            SAMPLE w10 = FILT_MUL_SS(eq_coeffs[1][0], x0) + FILT_MUL_SS(eq_coeffs[1][1], x1) + FILT_MUL_SS(eq_coeffs[1][2], x2);
+            SAMPLE y10 = w10 - FILT_MUL_SS(eq_coeffs[1][3], y11) - FILT_MUL_SS(eq_coeffs[1][4], y12);
+            SAMPLE w20 = FILT_MUL_SS(eq_coeffs[2][0], x0) + FILT_MUL_SS(eq_coeffs[2][1], x1) + FILT_MUL_SS(eq_coeffs[2][2], x2);
+            SAMPLE y20 = w20 - FILT_MUL_SS(eq_coeffs[2][3], y21) - FILT_MUL_SS(eq_coeffs[2][4], y22);
+            x2 = x1;
+            x1 = x0;
+            y02 = y01;
+            y01 = y00;
+            y12 = y11;
+            y11 = y10;
+            y22 = y21;
+            y21 = y20;
+            cblock[i] = SHIFTR(FILT_MUL_SS(y00, amy_global.eq[0]) - FILT_MUL_SS(y10, amy_global.eq[1]) + FILT_MUL_SS(y20, amy_global.eq[2]), FILTER_BIQUAD_SCALEUP_BITS);
+        }
+        eq_delay[c][0][0] = x1;
+        eq_delay[c][0][1] = x2;
+        eq_delay[c][0][2] = y01;
+        eq_delay[c][0][3] = y02;
+        eq_delay[c][1][2] = y11;
+        eq_delay[c][1][3] = y12;
+        eq_delay[c][2][2] = y21;
+        eq_delay[c][2][3] = y22;
     }
     AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
 

@@ -1151,11 +1151,6 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
     }
 
-    // apply the eq filters if set
-    if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
-        parametric_eq_process(fbl[core]);
-    }
-
     if (debug_flag) {
         debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core], AMY_BLOCK_SIZE);
@@ -1235,6 +1230,11 @@ int16_t * amy_fill_buffer() {
     if(AMY_CORES==2) {
         for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
     }
+    // apply the eq filters if set
+    if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
+        parametric_eq_process(fbl[0]);
+    }
+
     if(AMY_HAS_CHORUS==1) {
         // apply chorus.
         if(chorus.level > 0 && delay_lines[0] != NULL) {

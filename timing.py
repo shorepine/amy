@@ -318,6 +318,14 @@ class TestJunoPatch(AmyTest):
     amy.send(time=600, voices="2", vel=0)
     amy.send(time=600, voices="3", vel=0)
 
+class TestJunoPatch3(AmyTest):
+  """Known Juno patch with parametric EQ."""
+
+  def run(self):
+    amy.send(time=0, voices="0", load_patch=3)
+    amy.send(time=50, voices="0", note=60, vel=1)
+    amy.send(time=900, voices="0", vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
@@ -342,7 +350,7 @@ def main(argv):
     #TestFilter().test()
     for _ in range(5):
       #TestTiming().test()
-      TestJunoPatch().test()
+      TestJunoPatch3().test()
 
     amy.send(time=1001, debug=0)
     amy.render(0.01)
