@@ -141,41 +141,50 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 // 16 bit pseudo floating-point multiply.
 // See https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=njPHwSB9VIJi
 
-int dropfor16(int32_t a) {
-    // How many bits you drop to leave just 16 in a.
-    if (a < 0) a = -a;
-    int leading_zero_bits = __builtin_clz(a);
-    const int bits_to_keep = 15;
-    const int word_bits = 32;
-    int bits_to_drop = MAX(0, word_bits - bits_to_keep - leading_zero_bits);
-    return bits_to_drop;
-}
-
-int32_t top16(SAMPLE a, int bits_to_drop) {
-    // Convert a to 16 bits, return also how many we dropped.
-    if (bits_to_drop > 0) {
-        a += (1 << (bits_to_drop - 1));
-    }
-    return a >> bits_to_drop;
-}
+#define ABS(a) (a > 0) ? (a) : -(a)
 
 SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
-    // Multiply the top 16 bits of a and b.
-    int adropped = dropfor16(a);
-    int bdropped = dropfor16(b);
-    int32_t a16 = top16(a, adropped);
-    int32_t b16 = top16(b, bdropped);
-    int totaldrop = adropped + bdropped;
-    if (totaldrop > 23) {
-        // Arbitrarily reduce drop on b, assume it's the samples.
-        bdropped -= (totaldrop - 23);
-        totaldrop = 23;  // i.e. adropped + bdropped
+    // Multiply the top 15 bits of a and b.
+    int adropped = MAX(0, 17 - __builtin_clz(ABS(a)));
+    if (adropped) {
+        a = (a + (1 << (adropped - 1))) >> adropped;
     }
-    SAMPLE offset = 0;
-    if (totaldrop < 23) {
-        offset = 1 << (22 - totaldrop);
+    int resultdrop = 23 - adropped;
+    int bdropped = MIN(resultdrop, MAX(0, 17 - __builtin_clz(ABS(b))));
+    if (bdropped) {
+        b = (b + (1 << (bdropped - 1))) >> bdropped;
     }
-    return (a16 * b16 + offset) >> (23 - totaldrop);
+    resultdrop -= bdropped;
+    SAMPLE result = a * b;
+    if (resultdrop) {
+        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+    }
+    return result;
+}
+
+SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
+    // Just the processing of a, so we can split it out
+    int adropped = MAX(0, 17 - __builtin_clz(ABS(a)));
+    if (adropped) {
+        a = (a + (1 << (adropped - 1))) >> adropped;
+    }
+    *p_adropped = adropped;
+    return a;
+}
+
+SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped) {
+    // The rest of top16SMUL after a has been preprocessed by top16SML_a_part.
+    int resultdrop = 23 - adropped;
+    int bdropped = MIN(resultdrop, MAX(0, 17 - __builtin_clz(ABS(b))));
+    if (bdropped) {
+        b = (b + (1 << (bdropped - 1))) >> bdropped;
+    }
+    resultdrop -= bdropped;
+    SAMPLE result = a_processed * b;
+    if (resultdrop) {
+        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+    }
+    return result;
 }
 
 // top16SMUL pushes FILTER_PROCESS from ~2500 (time units) to ~7000 (per "make timing") but it gives super luscious floating-point-like results.
@@ -261,17 +270,19 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE y2 = w[3];
     SAMPLE v1 = w[4];
     SAMPLE v2 = w[5];
-    SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
-    SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
+    int abits, ebits, fbits;
+    SAMPLE a = top16SMUL_a_part(coef[0], &abits);
+    SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
+    SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
     for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = FILT_MUL_SS_24(coef[0], SHIFTL(input[i], normbits));
+        SAMPLE x0 = top16SMUL_after_a(a, SHIFTL(input[i], normbits), abits);
         SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;
         SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;
-        v0 = v0 - FILT_MUL_SS_24(e, v1) + FILT_MUL_SS_24(f, v2);
-        w0 = FILT_MUL_SS_24(coef[0], v0 + SHIFTL(v1, 1) + v2);
+        v0 = v0 - top16SMUL_after_a(e, v1, ebits) + top16SMUL_after_a(f, v2, fbits);
+        w0 = top16SMUL_after_a(a, v0 + SHIFTL(v1, 1) + v2, abits);
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
-        y0 = y0 - FILT_MUL_SS_24(e, y1) + FILT_MUL_SS_24(f, y2);
+        y0 = y0 - top16SMUL_after_a(e, y1, ebits) + top16SMUL_after_a(f, y2, fbits);
         x2 = x1;
         x1 = x0;
         v2 = v1;
