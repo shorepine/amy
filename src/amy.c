@@ -65,7 +65,7 @@ int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_s
 void amy_profiles_init() { 
     for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_INIT(i) } 
 } 
-void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } }
+void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } amy_profiles_init(); }
 #else
 #define amy_profiles_init() 
 #define amy_profiles_print()
