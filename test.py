@@ -165,6 +165,14 @@ class TestFilter(AmyTest):
     amy.send(time=900, vel=0)
 
 
+class TestFilter24(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy.send(time=100, note=48, vel=1.0)
+    amy.send(time=900, vel=0)
+
+
 class TestFilterLFO(AmyTest):
 
   def run(self):

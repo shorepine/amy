@@ -138,60 +138,6 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     return 0;
 }
 
-// 16 bit pseudo floating-point multiply.
-// See https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=njPHwSB9VIJi
-
-#define ABS(a) (a > 0) ? (a) : -(a)
-
-SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
-    // Multiply the top 15 bits of a and b.
-    int adropped = MAX(0, 17 - __builtin_clz(ABS(a)));
-    if (adropped) {
-        a = (a + (1 << (adropped - 1))) >> adropped;
-    }
-    int resultdrop = 23 - adropped;
-    int bdropped = MIN(resultdrop, MAX(0, 17 - __builtin_clz(ABS(b))));
-    if (bdropped) {
-        b = (b + (1 << (bdropped - 1))) >> bdropped;
-    }
-    resultdrop -= bdropped;
-    SAMPLE result = a * b;
-    if (resultdrop) {
-        return (result + (1 << (resultdrop - 1))) >> resultdrop;
-    }
-    return result;
-}
-
-SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
-    // Just the processing of a, so we can split it out
-    int adropped = MAX(0, 17 - __builtin_clz(ABS(a)));
-    if (adropped) {
-        a = (a + (1 << (adropped - 1))) >> adropped;
-    }
-    *p_adropped = adropped;
-    return a;
-}
-
-SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped) {
-    // The rest of top16SMUL after a has been preprocessed by top16SML_a_part.
-    int resultdrop = 23 - adropped;
-    int bdropped = MIN(resultdrop, MAX(0, 17 - __builtin_clz(ABS(b))));
-    if (bdropped) {
-        b = (b + (1 << (bdropped - 1))) >> bdropped;
-    }
-    resultdrop -= bdropped;
-    SAMPLE result = a_processed * b;
-    if (resultdrop) {
-        return (result + (1 << (resultdrop - 1))) >> resultdrop;
-    }
-    return result;
-}
-
-// top16SMUL pushes FILTER_PROCESS from ~2500 (time units) to ~7000 (per "make timing") but it gives super luscious floating-point-like results.
-// TODO: Block-floating-point approach to avoid recalculating bits to drop, offset for every multiply.
-// This is the multiply just for dsps_biquad_f32_ansi_split_fb_twice, which is only used for FILTER_LPF24.
-#define FILT_MUL_SS_24(a, b) top16SMUL(a, b)
-
 // Stick to the faster mult for biquad, hpf etc, since the parameters aren't so sensitive, and parametric_eq was chewing major CPU.
 #define FILT_MUL_SS(a, b) SMULR6(a, b)
 
@@ -260,7 +206,97 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, int normbits) {
+// 16 bit pseudo floating-point multiply.
+// See https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=njPHwSB9VIJi
+
+#define ABS(a) (a > 0) ? (a) : -(a)
+
+static inline int headroom(SAMPLE a) {
+    // How many bits bigger can this value get before overflow?
+    return __builtin_clz(ABS(a)) - 1;  // -1 for sign bit.
+}
+
+SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
+    // Multiply the top 15 bits of a and b.
+    int adropped = MAX(0, 16 - headroom(a));
+    if (adropped) {
+        a = (a + (1 << (adropped - 1))) >> adropped;
+    }
+    int resultdrop = 23 - adropped;
+    int bdropped = MIN(resultdrop, MAX(0, 16 - headroom(b)));
+    if (bdropped) {
+        b = (b + (1 << (bdropped - 1))) >> bdropped;
+    }
+    resultdrop -= bdropped;
+    SAMPLE result = a * b;
+    if (resultdrop) {
+        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+    }
+    return result;
+}
+
+SAMPLE top16SMUL_preheadroom(SAMPLE a, SAMPLE b, int aheadroom, int bheadroom) {
+    // Multiply the top 15 bits of a and b.
+    int adropped = MAX(0, 16 - aheadroom);
+    if (adropped) {
+        a = (a + (1 << (adropped - 1))) >> adropped;
+    }
+    int resultdrop = 23 - adropped;
+    int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
+    if (bdropped) {
+        b = (b + (1 << (bdropped - 1))) >> bdropped;
+    }
+    resultdrop -= bdropped;
+    SAMPLE result = a * b;
+    if (resultdrop) {
+        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+    }
+    return result;
+}
+
+SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
+    // Just the processing of a, so we can split it out
+    int adropped = MAX(0, 16 - headroom(a));
+    if (adropped) {
+        a = (a + (1 << (adropped - 1))) >> adropped;
+    }
+    *p_adropped = adropped;
+    return a;
+}
+
+SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped, int bheadroom) {
+    // The rest of top16SMUL after a has been preprocessed by top16SML_a_part.
+    int resultdrop = 23 - adropped;
+    int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
+    if (bdropped) {
+        b = (b + (1 << (bdropped - 1))) >> bdropped;
+    }
+    resultdrop -= bdropped;
+    SAMPLE result = a_processed * b;
+    if (resultdrop) {
+        return (result + (1 << (resultdrop - 1))) >> resultdrop;
+    }
+    return result;
+}
+
+SAMPLE scan_max(SAMPLE* block, int len) {
+    AMY_PROFILE_START(SCAN_MAX)
+
+    // Find the max abs sample value in a block.
+    SAMPLE max = 0;
+    while (len--) {
+        SAMPLE val = *block++;
+        if (val > max) max = val;
+        else if ((-val) > max) max = -val;
+    }
+    AMY_PROFILE_STOP(SCAN_MAX)
+    return max;
+}
+
+// This is the multiply just for dsps_biquad_f32_ansi_split_fb_twice, which is only used for FILTER_LPF24.
+#define FILT_MUL_SS_24(a, b) top16SMUL(a, b)
+
+SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
     // Apply the filter twice
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -270,26 +306,38 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE y2 = w[3];
     SAMPLE v1 = w[4];
     SAMPLE v2 = w[5];
-    int abits, ebits, fbits;
+    SAMPLE state_max = scan_max(w, 6);
+    int abits, bbits, cbits, ebits, fbits;
     SAMPLE a = top16SMUL_a_part(coef[0], &abits);
     SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
     SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
+    bbits = headroom(max_val);
+    cbits = headroom(SHIFTL(MAX(state_max, max_val), 2));
+    SAMPLE max_out = 0;
     for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = top16SMUL_after_a(a, SHIFTL(input[i], normbits), abits);
-        SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;
-        SAMPLE v0 = w0 + SHIFTL(v1, 1) - v2;
-        v0 = v0 - top16SMUL_after_a(e, v1, ebits) + top16SMUL_after_a(f, v2, fbits);
-        w0 = top16SMUL_after_a(a, v0 + SHIFTL(v1, 1) + v2, abits);
+        SAMPLE x0, w0, v0;
+        x0 = top16SMUL_after_a(a, input[i], abits, bbits);  // headroom(input[i]);
+        w0 = x0 + SHIFTL(x1, 1) + x2;
+        v0 = w0 + SHIFTL(v1, 1) - v2;
+        v0 = v0
+            - top16SMUL_after_a(e, v1, ebits, cbits)  //headroom(v1))
+            + top16SMUL_after_a(f, v2, fbits, cbits); //headroom(v2));
+        w0 = v0 + SHIFTL(v1, 1) + v2;
+        w0 = top16SMUL_after_a(a, w0, abits, cbits);  //headroom(w0));
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
-        y0 = y0 - top16SMUL_after_a(e, y1, ebits) + top16SMUL_after_a(f, y2, fbits);
+        y0 = y0
+            - top16SMUL_after_a(e, y1, ebits, cbits)  //headroom(y1))
+            + top16SMUL_after_a(f, y2, fbits, cbits); //headroom(y2));
         x2 = x1;
         x1 = x0;
         v2 = v1;
         v1 = v0;
         y2 = y1;
         y1 = y0;
-        output[i] = SHIFTR(y0, normbits);
+        output[i] = y0;
+        if (y0 < 0) y0 = -y0;
+        if (y0 > max_out) max_out = y0;
     }
     w[0] = x1;
     w[1] = x2;
@@ -299,7 +347,7 @@ int8_t dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     w[5] = v2;
     AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
 
-    return 0;
+    return max_out;
 }
 
 int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
@@ -460,20 +508,6 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
 
 }
 
-SAMPLE scan_max(SAMPLE* block, int len) {
-    AMY_PROFILE_START(SCAN_MAX)
-
-    // Find the max abs sample value in a block.
-    SAMPLE max = 0;
-    while (len--) {
-        SAMPLE val = *block++;
-        if (val > max) max = val;
-        else if ((-val) > max) max = -val;
-    }
-    AMY_PROFILE_STOP(SCAN_MAX)
-    return max;
-}
-
 void check_overflow(SAMPLE* block, int osc, char *msg) {
     // Search for overflow in a sample buffer as an unusually large sample-to-sample delta.
 #ifdef AMY_DEBUG
@@ -580,19 +614,19 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     const int normbits = 0;  // defeat BFP
 #endif
     //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
-    block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
     //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, normbits);
+        dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, max_val);
     } else {
+        block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
         block_norm(block, AMY_BLOCK_SIZE, normbits);
         dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
         block_denorm(block, AMY_BLOCK_SIZE, normbits);
+        synth[osc].last_filt_norm_bits = normbits;
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
     //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
-    synth[osc].last_filt_norm_bits = normbits;
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
     // hpf_buf(block, &synth[osc].hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
