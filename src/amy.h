@@ -23,8 +23,14 @@ typedef struct {
     uint8_t midinote;
 } pcm_map_t;
 
+#ifndef AMY_CONFIG_H
+#define AMY_CONFIG_H amy_config.h
+#endif
 
-#include "amy_config.h"
+#define QUOTED(x) #x
+#define INCLUDE(x) QUOTED(x)
+
+#include INCLUDE(AMY_CONFIG_H)
 
 // Rest of amy setup
 #define SAMPLE_MAX 32767
@@ -94,6 +100,8 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
+#define CUSTOM 11
+#define WAVE_OFF 12
 // synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
@@ -101,8 +109,7 @@ enum coefs{
 #define AUDIBLE 3
 #define IS_MOD_SOURCE 4
 #define IS_ALGO_SOURCE 5
-// Is this for .wave or .status?
-#define OFF 11
+#define STATUS_OFF 6
 
 #define true 1
 #define false 0
@@ -412,6 +419,16 @@ struct state {
     int16_t latency_ms;
 };
 
+// custom oscillator
+struct custom_oscillator {
+    void (*init)(void);
+    void (*note_on)(struct synthinfo* osc, float freq);
+    void (*note_off)(struct synthinfo* osc);
+    void (*mod_trigger)(struct synthinfo* osc);
+    SAMPLE (*render)(SAMPLE* buf, struct synthinfo* osc);
+    SAMPLE (*compute_mod)(struct synthinfo* osc);
+};
+
 // Shared structures
 extern uint32_t total_samples;
 extern struct synthinfo *synth;
@@ -441,8 +458,8 @@ void amy_stop();
 void amy_live_start();
 void amy_live_stop();
 void amy_reset_oscs();
-void amy_print_devices(); 
-
+void amy_print_devices();
+void amy_set_custom(struct custom_oscillator* custom);
 extern void reset_osc(uint16_t i );
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
@@ -451,6 +468,7 @@ extern void ks_deinit();
 extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
+extern void custom_init();
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
@@ -469,6 +487,7 @@ extern void patches_event_has_voices(struct event e);
 extern void patches_reset();
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
+extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;
 
 extern SAMPLE compute_mod_pulse(uint16_t osc);
 extern SAMPLE compute_mod_noise(uint16_t osc);
@@ -477,6 +496,7 @@ extern SAMPLE compute_mod_saw_up(uint16_t osc);
 extern SAMPLE compute_mod_saw_down(uint16_t osc);
 extern SAMPLE compute_mod_triangle(uint16_t osc);
 extern SAMPLE compute_mod_pcm(uint16_t osc);
+extern SAMPLE compute_mod_custom(uint16_t osc);
 
 extern void sine_note_on(uint16_t osc, float initial_freq); 
 extern void fm_sine_note_on(uint16_t osc, uint16_t algo_osc); 
@@ -486,6 +506,8 @@ extern void triangle_note_on(uint16_t osc, float initial_freq);
 extern void pulse_note_on(uint16_t osc, float initial_freq); 
 extern void pcm_note_on(uint16_t osc);
 extern void pcm_note_off(uint16_t osc);
+extern void custom_note_on(uint16_t osc, float freq);
+extern void custom_note_off(uint16_t osc);
 extern void partial_note_on(uint16_t osc);
 extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc);
@@ -498,6 +520,7 @@ extern void saw_up_mod_trigger(uint16_t osc);
 extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
+extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
 //extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 

@@ -175,7 +175,7 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
-        if (synth[CHORUS_MOD_SOURCE].status == OFF) {  //chorus.level == 0) {
+        if (synth[CHORUS_MOD_SOURCE].status == STATUS_OFF) {  //chorus.level == 0) {
             // Setup chorus oscillator.
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
@@ -592,7 +592,7 @@ void reset_osc(uint16_t i ) {
     synth[i].sample = F2S(0);
     synth[i].mod_value = F2S(0);
     synth[i].substep = 0;
-    synth[i].status = OFF;
+    synth[i].status = STATUS_OFF;
     AMY_UNSET(synth[i].chained_osc);
     AMY_UNSET(synth[i].mod_source);
     synth[i].mod_target = 0;
@@ -648,6 +648,9 @@ int8_t oscs_init() {
 
     if(pcm_samples) {
         pcm_init();
+    }
+    if(AMY_HAS_CUSTOM == 1) {
+        custom_init();
     }
     events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, EVENTS_RAM_CAPS);
     synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * (AMY_OSCS+1), SYNTH_RAM_CAPS);
@@ -786,6 +789,9 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS) partials_note_on(osc);
+    }
+    if(AMY_HAS_CUSTOM == 1) {
+        if(synth[osc].wave==CUSTOM) custom_note_on(osc, initial_freq);
     }
 }
 
@@ -954,6 +960,7 @@ void play_event(struct delta d) {
                     if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
                     if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
                     if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
+                    if(synth[synth[d.osc].mod_source].wave==CUSTOM) custom_mod_trigger(synth[d.osc].mod_source);
                 }
 
             }
@@ -977,6 +984,11 @@ void play_event(struct delta d) {
                 #endif
             }
             else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
+            else if(synth[d.osc].wave==CUSTOM) {
+                #if AMY_HAS_CUSTOM == 1
+                custom_note_off(d.osc);
+                #endif
+            }
             else {
                 // osc note off, start release
                 AMY_UNSET(synth[d.osc].note_on_clock);
@@ -1051,7 +1063,7 @@ void hold_and_modify(uint16_t osc) {
         } else {
             if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                 //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
-                synth[osc].status = OFF;
+                synth[osc].status = STATUS_OFF;
                 AMY_UNSET(synth[osc].note_off_clock);
                 AMY_UNSET(synth[osc].zero_amp_clock);
             }
@@ -1125,6 +1137,9 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
         }
     }
+    if(AMY_HAS_CUSTOM == 1) {
+        if(synth[osc].wave == CUSTOM) max_val = render_custom(buf, osc);
+    }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
     return max_val;
 }
@@ -1140,7 +1155,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             if (max_val > max_max) max_max = max_val;
             // check it's not off, just in case. todo, why do i care?
-            if(synth[osc].wave != OFF) {
+            if(synth[osc].wave != WAVE_OFF) {
                 // apply filter to osc if set
                 if(synth[osc].filter_type != FILTER_NONE) filter_process(per_osc_fb[core], osc, max_val);
                 mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);

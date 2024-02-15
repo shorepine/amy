@@ -9,6 +9,7 @@
 #define AMY_OSCS 120
 #define AMY_SAMPLE_RATE 44100 
 #define AMY_NCHANS 2
+#define AMY_USE_FIXEDPOINT
 
 
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
@@ -22,6 +23,7 @@ extern const uint16_t pcm_samples;
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#define AMY_HAS_CUSTOM 0         // 1 = Make custom oscillators available
 #define PCM_AMY_SAMPLE_RATE 22050
 #define AMY_EVENT_FIFO_LEN 2000
 

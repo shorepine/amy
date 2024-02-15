@@ -51,7 +51,6 @@
 // #define MUL_KK mul4_k12k11(a, b)
 // #define MUL_KKS mul4_k16k7(a, b)  // the second arg is "sensitive".
 
-#define AMY_USE_FIXEDPOINT
 
 #ifndef AMY_USE_FIXEDPOINT
 
