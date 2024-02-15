@@ -10,6 +10,10 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifdef ARDUINO
+#include "my_logging.h"
+#endif
+
 
 typedef struct {
     uint32_t offset;
@@ -255,6 +259,7 @@ struct event {
     uint16_t wave;
     uint16_t patch;
     uint16_t midi_note;
+    uint16_t load_patch;
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];
     float filter_freq_coefs[NUM_COMBO_COEFS];
@@ -280,6 +285,7 @@ struct event {
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
+    char voices[MAX_PARAM_LEN];
     uint16_t bp0_target;
     uint16_t bp1_target;
     uint16_t clone_osc;  // Only used as a flag.
@@ -368,12 +374,15 @@ extern struct profile profiles[NO_TAG];
 extern int64_t amy_get_us();
 #endif
 
+#define CHORUS_MOD_SOURCE AMY_OSCS
+
 
 // Callbacks, override if you'd like after calling amy_start()
 //void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
+void amy_add_event_internal(struct event e, uint16_t base_osc);
 int16_t * amy_simple_fill_buffer() ;
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
@@ -388,8 +397,9 @@ void amy_increase_volume();
 void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
-void config_chorus(float level, int max_delay) ;
+void config_chorus(float level, int max_delay, float lfo_freq, float depth);
 void osc_note_on(uint16_t osc, float initial_freq);
+void chorus_note_on(float initial_freq);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
@@ -450,6 +460,7 @@ void amy_live_stop();
 void amy_reset_oscs();
 void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
+extern void reset_osc(uint16_t i );
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
@@ -471,6 +482,10 @@ extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
 extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
+extern void patches_load_patch(struct event e); 
+extern void patches_event_has_voices(struct event e);
+extern void patches_reset();
+
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;
 
@@ -507,7 +522,7 @@ extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
-extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
+//extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 
 
 // filters
@@ -519,6 +534,7 @@ extern void reset_filter(uint16_t osc);
 extern float dsps_sqrtf_f32_ansi(float f);
 extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
 extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);
+extern SAMPLE scan_max(SAMPLE* block, int len);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
 #include "esp_err.h"

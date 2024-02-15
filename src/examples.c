@@ -3,7 +3,106 @@
 
 #include "amy.h"
 
+// set by the arch
+extern void delay_ms(uint32_t ms);
 
+void example_voice_alloc() {
+    // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
+    struct event e = amy_default_event();
+    e.load_patch = 1;
+    strcpy(e.voices, "0,1");
+    amy_add_event(e);
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.load_patch = 131;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+
+    // play the same note on both
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"0");
+    amy_add_event(e);
+    delay_ms(2000);
+
+    e = amy_default_event();
+    e.velocity = 1;
+    e.midi_note = 60;
+    strcpy(e.voices,"1");
+    amy_add_event(e);
+    delay_ms(2000);
+
+
+    // now try to alloc voice 0 with a juno, should use oscs 0-4 again
+    e = amy_default_event();
+    e.load_patch = 2;
+    strcpy(e.voices, "0");
+    amy_add_event(e);
+    delay_ms(250);
+}
+
+
+void example_voice_chord(uint16_t patch) {
+    struct event e = amy_default_event();
+    e.load_patch = patch;
+    strcpy(e.voices, "0,1,2");
+    amy_add_event(e);
+    delay_ms(250);
+
+    e = amy_default_event();
+    e.velocity=0.5;
+
+    strcpy(e.voices, "0");
+    e.midi_note = 50;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    strcpy(e.voices, "1");
+    e.midi_note = 54;
+    amy_add_event(e);
+    delay_ms(1000);
+
+    strcpy(e.voices, "2");
+    e.midi_note = 56;
+    amy_add_event(e);
+    delay_ms(2000);
+    
+    strcpy(e.voices, "0,1,2");
+    e.velocity = 0;
+    amy_add_event(e);
+    delay_ms(100);
+}   
+
+
+void example_patches() {
+    struct event e = amy_default_event();
+    for(uint16_t i=0;i<256;i++) {
+        e.load_patch = i;
+        strcpy(e.voices, "0");
+        fprintf(stderr, "sending patch %d\n", i);
+        amy_add_event(e);
+        delay_ms(250);
+
+        e = amy_default_event();
+        strcpy(e.voices, "0");
+        e.osc = 0;
+        e.midi_note = 50;
+        e.velocity = 0.5;
+        amy_add_event(e);
+
+        delay_ms(1000);
+        strcpy(e.voices, "0");
+        e.velocity = 0;
+        amy_add_event(e);
+
+        delay_ms(250);
+
+        amy_reset_oscs();
+    }
+}
 void example_reverb() {
     if(AMY_HAS_REVERB == 1) {
         config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
@@ -12,7 +111,7 @@ void example_reverb() {
 
 void example_chorus() {
     if(AMY_HAS_CHORUS == 1) {
-        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY);
+        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     }
 }
 
@@ -62,46 +161,20 @@ void bleep(uint32_t start) {
     amy_add_event(e);
 }
 
-void example_fm(uint32_t start) {
-    // Play a few notes in FM
-    struct event e = amy_default_event();
-    e.time = start;
-    e.velocity = 1;
-    e.wave = ALGO;
-    e.patch = 15;
-    e.midi_note = 60;
-    amy_add_event(e);
 
-    e.time = start + 500;
-    e.osc += 9; // remember that an FM patch takes up 9 oscillators
-    e.midi_note = 64;
-    amy_add_event(e);
-    
-    e.time = start + 1000;
-    e.osc += 9;
-    e.midi_note = 68;
-    amy_add_event(e);
-}
-
-void example_multimbral_fm(int64_t start, int start_osc) {
+void example_multimbral_fm() {
     struct event e = amy_default_event();
-    int osc_inc;
-    e.time = start;
-    e.osc = start_osc;
-    e.wave = ALGO;
-    e.patch = 20;
-    osc_inc = 9;
+    char *voices[] = {"0","1","2","3","4","5"};
     int notes[] = {60, 70, 64, 68, 72, 82};
-    e.velocity = 0.2;
-
+    e.velocity = 0.5;
+    e.load_patch = 128;
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
         e.pan_coefs[0] = (i%2);
-        //e.pan = 0.5 + 0.5 * ((2 * (i %2)) - 1);
-        e.patch++;
+        e.load_patch++;
+        strcpy(e.voices, voices[i]);
         amy_add_event(e);
-        e.osc += osc_inc;
-        e.time += 1000;
+        delay_ms(1000);
     }
 }
 

@@ -34,8 +34,8 @@ extern const uint16_t pcm_samples;
 #ifdef TULIP
 #define EVENTS_RAM_CAPS MALLOC_CAP_SPIRAM
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
-#define BLOCK_RAM_CAPS MALLOC_CAP_INTERNAL
-#define FBL_RAM_CAPS MALLOC_CAP_INTERNAL
+#define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
+#define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
 #define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
 #define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
 #else
@@ -60,9 +60,6 @@ extern const uint16_t pcm_samples;
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5
 #define CHORUS_DEFAULT_LEVEL 0
 #define CHORUS_DEFAULT_MAX_DELAY 320
-#define CHORUS_ARATE
-// Chorus control modulator is hardcoded to OSC 63 (NOSCS - 1)
-#define CHORUS_MOD_SOURCE (AMY_OSCS - 1)
 
 // center frequencies for the EQ
 #define EQ_CENTER_LOW 800.0

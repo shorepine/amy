@@ -1,11 +1,18 @@
 #if PICO_ON_DEVICE
 #ifndef ARDUINO
 
-/**
- * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
+/*
+gh repo clone raspberrypi/pico-extras
+gh repo clone raspberrypi/pico-sdk
+# Do whatever installs you need for the pico-sdk
+gh repo clone bwhitman/amy
+cd amy/src; mkdir build; cd build
+export PICO_SDK_PATH=../../../pico-sdk
+export PICO_EXTRAS_PATH=../../../pico-extras
+cmake ..
+make && ~/outside/picotool/build/picotool load -F amy_example.elf &&  ~/outside/picotool/build/picotool reboot
+*/
+
 
 #include <stdio.h>
 #include <math.h>
@@ -28,8 +35,26 @@ bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_C
 #define CPU0_METER 2
 #define CPU1_METER 3
 
-extern int32_t await_message_from_other_core();
-extern void send_message_to_other_core(int32_t t);
+struct audio_buffer_pool *ap;
+
+
+int32_t await_message_from_other_core() {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
+         __wfe();
+     }
+     int32_t msg = sio_hw->fifo_rd;
+     __sev();
+     return msg;
+ }
+
+ // Send 32-bit message to other core
+ void send_message_to_other_core(int32_t t) {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
+         __wfe();
+     }
+     sio_hw->fifo_wr = t;
+     __sev();
+ }
 
 static inline uint32_t _millis(void)
 {
@@ -37,15 +62,9 @@ static inline uint32_t _millis(void)
 }
 
 
-void delay_ms(uint32_t ms) {
-    uint32_t now = _millis();
-    while(_millis() < now+ms) {}
-}
 
 
-
-
-void rp2040_fill_audio_buffer(struct audio_buffer_pool *ap) {
+void rp2040_fill_audio_buffer() {
     
     amy_prepare_buffer();
     send_message_to_other_core(32);
@@ -103,32 +122,31 @@ void core1_main() {
     while(1) {
         int32_t ret = 0;
         while(ret!=32) ret = await_message_from_other_core();
-        gpio_put(CPU1_METER, 1);
         amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-        gpio_put(CPU1_METER, 0);
         send_message_to_other_core(64);
     }
 
 }
 
-const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+// delay and feed audio buffer while you wait
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) {
+        rp2040_fill_audio_buffer();
+    }
+}
+
 
 int main() {
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-    gpio_put(LED_PIN, 1);
-
     set_sys_clock_khz(250000000 / 1000, false); 
     stdio_init_all();
-    if(AMY_CORES>1)
-        multicore_launch_core1(core1_main);
-
-    gpio_put(LED_PIN, 0);
+    multicore_launch_core1(core1_main);
+    
 
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
-    amy.begin(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 0);
+    amy_start(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 1);
 
     gpio_init(CPU0_METER);
     gpio_set_dir(CPU0_METER, GPIO_OUT);
@@ -138,42 +156,37 @@ int main() {
     gpio_set_dir(CPU1_METER, GPIO_OUT);
     gpio_put(CPU1_METER, 0);
 
-    {
-        gpio_put(LED_PIN, 1);
-        printf("Clock is set to %d\n", clock_get_hz(clk_sys));
-        printf("LED ON !\n");
-        sleep_ms(250);
-
-        gpio_put(LED_PIN, 0);
-        printf("LED OFF !\n");
-        sleep_ms(250);
-    }
+    printf("Clock is set to %d\n", clock_get_hz(clk_sys));
+    sleep_ms(250);
 
     example_reverb();
     example_chorus();
 
-    struct audio_buffer_pool *ap = init_audio();
-    int32_t start = amy_sysclock();
-    example_multiimbral_fm(start);
+    ap = init_audio();
 
-    for (int i = 0; i < 5000; ++i) {
-        rp2040_fill_audio_buffer(ap);
-        if (i == 1000) {
-            config_reverb(0.7, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    uint8_t dx7 = 0;
+    uint8_t multimbral = 0;
+    uint8_t stop = 0;
+
+
+    example_voice_chord(0); // juno patch 0
+    while(1) {
+        delay_ms(100);
+        if(amy_sysclock() > 4000 && !dx7) {
+            example_voice_chord(130); // dx7 patch 2
+            dx7 = 1;
         }
-
-    }
-
-    while(true) {
-        gpio_put(LED_PIN, 1);
-        sleep_ms(250);
-
-        gpio_put(LED_PIN, 0);
-        sleep_ms(250);
+        if(amy_sysclock() > 8000 && !multimbral) {
+            example_multimbral_fm();
+            multimbral = 1;
+        }
+        if(amy_sysclock() > 15000 && !stop) {
+            amy_reset_oscs();
+            stop = 1;
+        }
     }
     return 0;
 }
 
 #endif
 #endif
-

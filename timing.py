@@ -144,31 +144,23 @@ class TestSineEnv(AmyTest):
 class TestAlgo(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0",  load_patch=21+128)
-    amy.send(time=100, voices="0", note=58, vel=1)
-    amy.send(time=500, voices="0", vel=0)
+    amy.send(time=0, osc=0, wave=amy.ALGO, patch=21)
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=500, vel=0)
 
 
 class TestAlgo2(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0", load_patch=128+24)
-    amy.send(time=100, voices="0", note=58, vel=1)
-    amy.send(time=500, voices="0", vel=0)
+    amy.send(time=0, osc=0, wave=amy.ALGO, patch=24)
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=500, vel=0)
 
 
 class TestFilter(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=100, note=48, vel=1.0)
-    amy.send(time=900, vel=0)
-
-
-class TestFilter24(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     amy.send(time=100, note=48, vel=1.0)
     amy.send(time=900, vel=0)
 
@@ -291,15 +283,26 @@ class TestBleep(AmyTest):
     amy.send(time=250, osc=0, pan=0.1, freq=440)
     amy.send(time=300, osc=0, pan=0.5, vel=0)
 
-class TestOverload(AmyTest):
-  """Run the output very hot to check for clipping."""
+class TestTiming(AmyTest):
+  """Run LPF24 to see how it times."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=0, eq_l=12)
-    amy.send(time=0, chorus_level=1)
-    amy.send(time=100, note=48, vel=8.0)
-    amy.send(time=900, vel=0)
+    amy.send(time=0, osc=0, wave=amy.SAW_UP, filter_freq='16,0,0,0,10', resonance=0.75, filter_type=amy.FILTER_LPF24,
+             bp1='3,1,200,0.5,200,0')
+    amy.send(time=0, osc=1, clone_osc=0)
+    amy.send(time=0, osc=2, clone_osc=0)
+    amy.send(time=0, osc=3, clone_osc=0)
+    amy.send(time=0, osc=4, clone_osc=0)
+    amy.send(time=50, osc=0, note=48, vel=1)
+    amy.send(time=100, osc=1, note=51, vel=1)
+    amy.send(time=150, osc=2, note=54, vel=1)
+    amy.send(time=200, osc=3, note=57, vel=1)
+    amy.send(time=250, osc=4, note=60, vel=1)
+    amy.send(time=800, osc=0, vel=0)
+    amy.send(time=820, osc=1, vel=0)
+    amy.send(time=840, osc=2, vel=0)
+    amy.send(time=860, osc=3, vel=0)
+    amy.send(time=880, osc=4, vel=0)
 
 class TestJunoPatch(AmyTest):
   """Known Juno patch."""
@@ -315,45 +318,13 @@ class TestJunoPatch(AmyTest):
     amy.send(time=600, voices="2", vel=0)
     amy.send(time=600, voices="3", vel=0)
 
-class TestJunoClip(AmyTest):
-  """Juno patch that clips."""
+class TestJunoPatch3(AmyTest):
+  """Known Juno patch with parametric EQ."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", load_patch=9)
+    amy.send(time=0, voices="0", load_patch=3)
     amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=50, voices="1", note=57, vel=1)
-    amy.send(time=50, voices="2", note=55, vel=1)
-    amy.send(time=50, voices="3", note=52, vel=1)
-    amy.send(time=800, voices="0", vel=0)
-    amy.send(time=800, voices="1", vel=0)
-    amy.send(time=800, voices="2", vel=0)
-    amy.send(time=800, voices="3", vel=0)
-
-class TestLowVcf(AmyTest):
-  """Weird fxpt warble when hitting fundamental."""
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
-             filter_type=amy.FILTER_LPF24, resonance=1.0,
-             amp='0,0,0.85,1',
-             filter_freq='161.28,0,0,0,5',
-             bp0='0,1,0,0',
-             bp1='0,1,600,0,1,0')
-    amy.send(time=100, osc=0, note=48, vel=3)
-    amy.send(time=800, osc=0, vel=0)
-
-class TestLowerVcf(AmyTest):
-  """Top16 LPF24 has issues with cf below fundamental?"""
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
-             filter_type=amy.FILTER_LPF24, resonance=4.0,
-             amp='0,0,0.85,1',
-             filter_freq='50,0,0,0,6',
-             bp0='0,1,0,0',
-             bp1='0,1,300,0,1,0')
-    amy.send(time=100, osc=0, note=48, vel=3)
-    amy.send(time=800, osc=0, vel=0)
+    amy.send(time=900, voices="0", vel=0)
 
 
 def main(argv):
@@ -361,7 +332,7 @@ def main(argv):
     # Override location of reference files.
     AmyTest.ref_dir = argv[1]
 
-  do_all_tests = True
+  do_all_tests = False
 
   if do_all_tests:
     for testClass in AmyTest.__subclasses__():
@@ -377,8 +348,13 @@ def main(argv):
     #TestSawDownOsc().test()
     #TestGuitar().test()
     #TestFilter().test()
-    TestAlgo().test()
-  amy.send(debug=0)
+    for _ in range(5):
+      #TestTiming().test()
+      TestJunoPatch3().test()
+
+    amy.send(time=1001, debug=0)
+    amy.render(0.01)
+    
   print("tests done.")
 
 

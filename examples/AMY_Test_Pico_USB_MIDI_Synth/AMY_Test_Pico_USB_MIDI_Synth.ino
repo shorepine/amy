@@ -49,6 +49,12 @@ void setup() {
 
   // Start up AMY
   amy.begin(1, 0, 0);
+
+  // Setup the voice with a Juno patch
+  struct event e = amy.default_event();
+  e.load_patch = 0; // Juno Patch 0
+  strcpy(e.voices, "0");
+  amy.add_event(e);
 }
 
 
@@ -56,13 +62,9 @@ void setup() {
 void handleNoteOn(byte channel, byte pitch, byte velocity)
 {
   struct event e = amy.default_event();
+  strcpy(e.voices, "0");
   e.midi_note = pitch;
-  e.wave=ALGO;
-  e.patch = 1;
-  e.amp=2;
   e.velocity = (float)velocity/127.0;
-  e.osc = channel;
-  e.time = amy.sysclock();
   amy.add_event(e);
 
 }
@@ -74,7 +76,7 @@ void handleNoteOff(byte channel, byte pitch, byte velocity)
 
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
-  uint8_t * samples = (uint8_t*)amy.get_buffer();
+  uint8_t * samples = (uint8_t*)amy.render_to_buffer();
   // Block until ready
   while(i2s.availableForWrite()<AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
   size_t written = i2s.write((const uint8_t*)samples, (size_t)AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);

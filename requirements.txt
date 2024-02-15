@@ -1,0 +1,5 @@
+numpy
+scipy
+resampy
+sf2utils
+

@@ -46,7 +46,7 @@ void setup() {
   struct event e = amy.default_event();
   e.osc = 0;
   e.wave = SINE;
-  e.freq = 440;
+  e.freq_coefs[COEF_CONST] = 440;
   e.velocity = 1;
   e.time = clock+2500;
   amy.add_event(e);
@@ -57,7 +57,7 @@ void setup() {
 
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
-  int16_t * samples = amy.get_buffer();
+  int16_t * samples = amy.render_to_buffer();
   for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
     samples_l[i] = samples[i*2];
     samples_r[i] = samples[i*2+1];

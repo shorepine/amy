@@ -7,7 +7,10 @@
 #include "miniaudio.h"
 #include "libminiaudio-audio.h"
 
-
+void delay_ms(uint32_t ms) {
+    uint32_t start = amy_sysclock();
+    while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
+}
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
@@ -65,17 +68,9 @@ int main(int argc, char ** argv) {
         amy_live_start();
     }
 
+
     amy_reset_oscs();
-
-    //example_reverb();
-    //example_chorus();
-    //example_sine(start);
-    //example_custom_beep();
-
-    bleep(start);
-
-    example_drums(start+500, 4);
-    example_multimbral_fm(start + 2500, /* start_osc= */ 6);
+    example_voice_chord(0);
 
     // Now just spin for 10s
     while(amy_sysclock() - start < 5000) {

@@ -51,6 +51,7 @@
 // #define MUL_KK mul4_k12k11(a, b)
 // #define MUL_KKS mul4_k16k7(a, b)  // the second arg is "sensitive".
 
+
 #ifndef AMY_USE_FIXEDPOINT
 
 //#warning "floating point calc"
@@ -73,7 +74,7 @@
 #define P2F(p) (p)
 #define F2P(f) ((f) - floorf(f))
 
-#define I2S(i, b) ((i) / (float)(1 << (b)))
+#define AMY_I2S(i, b) ((i) / (float)(1 << (b)))
 // Integer part of s interpreted as a proportion of a b-bit table.
 #define INT_OF_S(s, b) ((int)floorf((s) * (float)(1 << (b))))
 #define S_FRAC_OF_S(s, b) ((s) * (1 << (b)) - floorf((s) * (1 << (b))))
@@ -84,6 +85,7 @@
 #define MUL8F_SS(a, b) ((a) * (b))
 #define MUL4E_SS(a, b) ((a) * (b))
 #define MUL4_SP_S(a, b) ((a) * (b))
+#define SMULR6(a, b) ((a) * (b))
 #define SMULR7(a, b) ((a) * (b))
 
 #define SHIFTR(s, b) ((s) * exp2f(-(b)))
@@ -124,7 +126,7 @@ typedef int32_t s16_15; // s16.15 general
 // L is also the format used in the final output.
 #define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
 // Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
-#define I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
+#define AMY_I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
 // Convert S and integer-only part.
 // Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_S(S, B) (int32_t)(S >> (S_FRAC_BITS - B))
@@ -164,6 +166,12 @@ static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int
 }
 
 // from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+static inline SAMPLE SMULR6(SAMPLE a, SAMPLE b) {
+    // s8.23 fixed-point multiplication with rounding, 1 zero on output (-128..128)
+    SAMPLE r = 1 + ((a + (1 << 10)) >> 11) * ((b + (1 << 10)) >> 11);
+    return r >> 1;
+}
+
 static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
     // Rounding on input and output; 3 zeros on output (so output is limited to -32.0 .. 32.0).
     SAMPLE r = 4 + ((a + (1 << 9)) >> 10) * ((b + (1 << 9)) >> 10);
@@ -181,7 +189,7 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
 //#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
-#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 13, 10, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
+#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 11, 12, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
 
 // First argument is positive and less that 1/16, i.e. only 19 low-order bits.
 //#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
