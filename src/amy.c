@@ -39,10 +39,7 @@ const char* profile_tag_name(enum itags tag) {
         case HPF_BUF: return "HPF_BUF";            
         case SCAN_MAX: return "SCAN_MAX";            
         case DSPS_BIQUAD_F32_ANSI: return "DSPS_BIQUAD_F32_ANSI";            
-        case ENCL_LOG2: return "ENCL_LOG2";            
         case BLOCK_NORM: return "BLOCK_NORM";       
-        case FILTER_LOOP_MUL8F_SS: return "FILTER_LOOP_MUL8F_SS";
-        case FILTER_LOOP_MUL4E_SS: return "FILTER_LOOP_MUL4E_SS";
         case CALIBRATE: return "CALIBRATE";
         case AMY_ESP_FILL_BUFFER: return "AMY_ESP_FILL_BUFFER";
         case NO_TAG: return "NO_TAG";
@@ -1101,8 +1098,8 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
         SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) - lgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
         SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) - rgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-            stereo_dest[i] += MUL8F_SS(gain_l, mono_src[i]);
-            stereo_dest[AMY_BLOCK_SIZE + i] += MUL8F_SS(gain_r, mono_src[i]);
+            stereo_dest[i] += MUL8_SS(gain_l, mono_src[i]);
+            stereo_dest[AMY_BLOCK_SIZE + i] += MUL8_SS(gain_r, mono_src[i]);
             gain_l += d_gain_l;
             gain_r += d_gain_r;
         }
@@ -1273,18 +1270,18 @@ int16_t * amy_fill_buffer() {
         }
     }
     // global volume is supposed to max out at 10, so scale by 0.1.
-    SAMPLE volume_scale = F2S(0.1f * amy_global.volume);
+    SAMPLE volume_scale = MUL4_SS(F2S(0.1f), F2S(amy_global.volume));
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
 
             // Convert the mixed sample into the int16 range, applying overall gain.
-            SAMPLE fsample = MUL8F_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE]);
+            SAMPLE fsample = MUL8_SS(volume_scale, fbl[0][i + c * AMY_BLOCK_SIZE]);
 
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
-            //SAMPLE new_state = fsample + MUL8F_SS(F2S(0.995f), amy_global.hpf_state);  // MUL8 is critical here.
+            //SAMPLE new_state = fsample + SMULR6(F2S(0.995f), amy_global.hpf_state);  // High-output-range, rounded MUL is critical here.
 #ifdef HPF_OUTPUT
-            SAMPLE new_state = fsample + amy_global.hpf_state - SHIFTR(amy_global.hpf_state, 8);  // i.e. 0.9961*hpf_state
+            SAMPLE new_state = fsample + amy_global.hpf_state - SHIFTR(amy_global.hpf_state + (1 << 7), 8);  // i.e. 0.9961*hpf_state
             fsample = new_state - amy_global.hpf_state;
             amy_global.hpf_state = new_state;
 #endif

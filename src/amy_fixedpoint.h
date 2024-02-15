@@ -1,6 +1,6 @@
 // amy_fixedpoint.h - common definitions for fixed-point arithmetic.
 
-// This is the fixed point version.  We use 3 fixed-point formats:
+// We use 3 fixed-point formats:
 //  - Lookup tables are stored as int16_t, using s.15 (one sign bit, then 15 bits expressing the fractional part, for [-1.0, 1.0) range).
 //  - Oscillator phases and increments are stored as int32_t using s.31 (since these implicitly cannot exceed 1.0)
 //  - Samples and other arguments are stored as int32_t using s8.23 (23 fractional bits, range [-256.0, 256.0) to permit headroom.
@@ -9,12 +9,20 @@
 
 // Fixed point multiply is accomplished by standard integer multiply followed by a right-shift to re-center the decimal point.
 // In general, (w.x) * (y.z) will yeild a (w+y).(x+z) result, which will need to be shifted right by, for instance z bits to
-// regain a *.x representation.  Depending on the multiply, there may be overflow in the basic multiply result (i.e., if w+x+y+z
-// is greater than the width of the multiplier output).  The overall right-shift can be applied either before or after the multiply,
-// as long as the total number of bits is achieved (bit shifts to each operand and the result summed).  Applying shifts to an operand
-// before the multiply discards that many bits of resolution (the bits at the bottom that are shifted out before calculation); applying
-// it after multiplication limits the range of the result (since that many of the top bits will be uninformative).  In general, then,
-// we want to apply sufficient shifts to the operands to avoid overflow in the multiply.
+// regain a *.x representation.  For example, multiplying two s8.23 values, using an int32 x int32 -> int64 multiplication,
+// would give a s16.46 result, which would need to be right-shifted by 23 bits to realign the "decimal point" to be left of the
+// 23rd bit.
+//
+// In this example, even after the shift, we'd still have potentially 16 significant bits above the point, which might not
+// fit in the 8 bits for the integral part of s8.23 (depending on the actual values of the original factors).  And if the multiply
+// is actuall int32 x int32 -> int32 (a common case), that overflow can happen during the multiply itself.
+//
+// The overall right-shift needed to realign the point can be applied either before or after the multiplication as long as the total
+// number of bits is achieved, where the total shift is the sum of the shifts to each input factor and the output result.  Applying
+// shifts to a factor before the multiply discards that many bits of resolution (the bits at the bottom that are shifted out before
+// calculation); applying it after multiplication limits the range of the result (since that many of the top bits will be
+// uninformative/sign extension).  In general, then, we want to apply enough shifts to the factors to avoid overflow in the multiply,
+// but otherwise as few as possible.
 
 // By limiting ourselves to the 32x32 -> 32 hardware multiplier in the RP2040, we have to decide which parameters to shift.
 // Without knowing anything about the input values, we should shift down the bits on the operands, so the result will not overflow
@@ -26,37 +34,44 @@
 // mul_kk(a, b) = ((a >> 12) * (b >> 11)
 // If, however, we assume the result of the product is not going to exceed some value, we can reserve some of the right-shift for
 // the result, preserving more bits for the input.  For instance, if we assume an s8.23 result has its magnitude bounded by 16
-// (4 bits left of the fraction point), we could do
+// (4 bits left of the point), we could do
 // mul_kk(a, b) = ((a >> 10) * (b >> 9)) >> 4.
 // If we further assume that a is large but b is always less than 1, we can prefer to shift it down less, e.g.
 // mul_kk(a, b) = ((a >> 12) * (b >> 7)) >> 4
-// If we know that a and b are smaller than 1 (15 bits each), the result must also be less than 1:
+// If we know that a and b are smaller than 1 (15 bits each), the result must also be less than 1, so we can sign-extend the
+// top 8 bits:
 // mul_kk(a, b) = ((a >> 8) * (b >> 7)) >> 8
 
 // In general, then, the multiply operation has three parameters:
 //  - max value of result -> number of right-shift bits applied to result
-//  - resolution sensitivity of first operand -> right-shift applied before mult
-//  - resolution sensitivity of second operand -> right-shift applied to it before mult
+//  - resolution sensitivity of first factor -> right-shift applied before mult
+//  - resolution sensitivity of second factor -> right-shift applied to it before mult
 // These parameters are in fact constrained since the total number of right-shifts must match the needed alignment.
 // We can directly parameterize these as:
 // accum mulN_kAkB(x, y) { return ( (x >> A) * (y >> B) ) >> N; }
-// where N + A + B must equal the number of accum bits (23).
+// where N + A + B must equal the number of fraction bits (23).
 
 // How best to express these?
 //  - we can define a range, e.g. -16 to 16, dictating the number of bits applied after multiplication, and thus the
 //    remaining number of bits that need to be applied to the operands.
 //  - we can define a "sensitive" arg, meaning we discard fewer bits for that arg.  But that makes the other arg less sensitive.
 
-// So for a standard set of [-16, 16) Accum operations:
-// #define MUL_KK mul4_k12k11(a, b)
-// #define MUL_KKS mul4_k16k7(a, b)  // the second arg is "sensitive".
+// ROUNDING: If we use integer multiplication, then shift down the result to realign, we are effectively truncating the bit
+// representation.  For positive numbers, this is rounding down: both (6 >> 1) and (7 >> 1) give 3.  For negative values,
+// this is actually rounding towards negative infinity: In 8 bits, -6 is 0xfa; sign-extended shift right is 0xfd or -3,
+// but -7 is 0xf9 and its sign-extended shift right is 0xfc or -4.
+//
+// This systematic bias can cause problems, particularly in feedback systems (like IIR filter).  We can restore conventional
+// rounding by adding 1 to the value just before the final right-shift: ((6 + 1) >> 1) is 3, but ((7 + 1) >> 1) is 4.
+// (-6 + 1) >> 1 = -3 and (-7 + 1) >> 1 = -4.  When the final right-shift is by k bits, we should add (1 << (k - 1))
+// immediately before the shift to achieve rounding. But this adds several instructions to each multiply, so we only
+// do it for the multplies used in digital filtering, where failure to round can cause issues.
 
 
 #ifndef AMY_USE_FIXEDPOINT
 
 //#warning "floating point calc"
 #define ARITH "float"
-
 
 #define GENFXP float
 #define LUTSAMPLE int16_t
@@ -102,19 +117,19 @@
 //#warning "FIXED point calc"
 #define ARITH "FIXED"
 
-typedef int16_t s_15;    // s.15 LUT sample
-typedef int32_t s_31;    // s.31 phasor
-typedef int32_t s8_23;  // s8.23 sample
+typedef int16_t s_15;    //  s.15 LUT sample
+typedef int32_t s_31;    //  s.31 phasor
+typedef int32_t s8_23;  //  s8.23 sample
 typedef int32_t s16_15; // s16.15 general
 
-#define GENFXP s16_15 // "65536 Hz should be enough for anyone?" -- dpwe
 #define LUTSAMPLE s_15
 #define PHASOR s_31
 #define SAMPLE s8_23
+#define GENFXP s16_15 // "65536 Hz should be enough for anyone?" -- dpwe
 
 #define L_FRAC_BITS 15
-#define S_FRAC_BITS 23
 #define P_FRAC_BITS 31
+#define S_FRAC_BITS 23
 #define G_FRAC_BITS 15
 
 // Convert a SAMPLE to a PHASOR
@@ -127,13 +142,11 @@ typedef int32_t s16_15; // s16.15 general
 #define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
 // Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
 #define AMY_I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
-// Convert S and integer-only part.
 // Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
 #define INT_OF_S(S, B) (int32_t)(S >> (S_FRAC_BITS - B))
-// Fractonal part of SAMPLE within B bits, returns a SAMPLE.
+// Fractonal part of SAMPLE within a B bit table, returns a SAMPLE.
 // Add 1 to B shift-up and cast to uint32_t to strip sign bit, pad a zero sign bit on way down.
 #define S_FRAC_OF_S(S, B) (((S) & ((1 << (S_FRAC_BITS - (B))) - 1)) << (B))
-
 
 // Convert between SAMPLE and float
 #define S2F(s) ((float)(s) / (float)(1 << S_FRAC_BITS))
@@ -152,18 +165,6 @@ typedef int32_t s16_15; // s16.15 general
 // Fixed-point multiply routines
 
 #define FXMUL_TEMPLATE(a, b, a_bitloss, b_bitloss, reqd_bitloss) ((((a) >> a_bitloss) * ((b) >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss))
-
-static inline SAMPLE FXMUL_CARRY_TEMPLATE(SAMPLE a, SAMPLE b, int a_bitloss, int b_bitloss, int reqd_bitloss) {
-    SAMPLE result = ((a >> (a_bitloss - 1)) * (b >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss);
-    // Carry: if result is positive and result & 1 is set, add 1.
-    // if result is negative and result & 1 is clear, sub 1.
-    // (In 2s complement, -1 is 0xFFFF and should round to -2 (0xFFFE) when shifting right 1 bit.
-    if (result & 1) {  // Carry bit set.
-        if (result > 0)   result = (result + 1);
-        else              result = (result - 1);
-    }
-    return result >> 1;  // final bit of shift down.
-}
 
 // from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
 static inline SAMPLE SMULR6(SAMPLE a, SAMPLE b) {
@@ -186,17 +187,6 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range
 #define MUL8_SS(a, b)  FXMUL_TEMPLATE(a, b, 12, 11, S_FRAC_BITS)  // 12+11 = 23, so no more shift on result.
-
-// Multiply two SAMPLE values and allow result to occupy full [-256, 256) range. Assume first arg is filter coef with |a| < 2.0.
-//#define MUL8F_SS(a, b)  FXMUL_TEMPLATE(a, b, 9, 14, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
-#define MUL8F_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 11, 12, S_FRAC_BITS)  // 9+14 = 23, so no more shift on result.
-
-// First argument is positive and less that 1/16, i.e. only 19 low-order bits.
-//#define MUL4E_SS(a, b)  FXMUL_TEMPLATE(a, b, 5, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
-#define MUL4E_SS(a, b)  FXMUL_CARRY_TEMPLATE(a, b, 9, 10, S_FRAC_BITS)  // 5+10 = 15, result is >> 8.
-
-// Multiply a SAMPLE (s8.23) by a PHASOR (s.31) yeilding a SAMPLE, so 31 bits to lose.
-#define MUL4_SP_S(s, p) FXMUL_TEMPLATE(s, p, 11, 16, P_FRAC_BITS)  // need to lose 31 bits; 11+16=27, so 4 more on result
 
 // Shifts
 #define SHIFTR(s, b) ((s) >> (b))
