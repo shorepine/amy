@@ -10,9 +10,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#ifdef ARDUINO
-#include "my_logging.h"
-#endif
 
 
 typedef struct {
