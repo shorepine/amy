@@ -3,7 +3,7 @@
 
 #include "amy.h"
 
-extern const int16_t pcm[];
+//extern const int16_t pcm[];
 
 
 SAMPLE compute_mod_value(uint16_t mod_osc) {

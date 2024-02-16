@@ -18,6 +18,10 @@ typedef struct {
     uint32_t loopstart;
     uint32_t loopend;
     uint8_t midinote;
+#ifdef PCM_MUTABLE
+    uint8_t sample_rate_index;
+    int16_t *sample;
+#endif
 } pcm_map_t;
 
 #ifndef AMY_CONFIG_H

@@ -5,6 +5,17 @@
 
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
+#ifdef PCM_MUTABLE
+#define PCM_AMY_LOG2_SAMPLE_RATE_FULL log2f(AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
+
+static float pt[] = {
+    PCM_AMY_LOG2_SAMPLE_RATE,
+    PCM_AMY_LOG2_SAMPLE_RATE_FULL,
+};
+
+#endif
+
+
 
 void pcm_init() {
 
@@ -18,11 +29,16 @@ void pcm_init() {
 void pcm_note_on(uint16_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
     //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
-    if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
+    if(synth[osc].patch >= pcm_samples + PCM_USER) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
     if(synth[osc].logfreq_coefs[0] <= 0) {
         // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.
+#ifdef PCM_MUTABLE
+        int patch = synth[osc].patch;
+        synth[osc].logfreq_coefs[0] = pt[pcm_map[patch].sample_rate_index] - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
+#else
         synth[osc].logfreq_coefs[0] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
+#endif
     }
     synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
 }
@@ -44,7 +60,7 @@ void pcm_note_off(uint16_t osc) {
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     // Patches can be > 32768 samples long.
     // We need s16.15 fixed-point indexing.
-    const pcm_map_t* patch = &pcm_map[synth[osc].patch];
+    PMUTATE pcm_map_t* patch = &pcm_map[synth[osc].patch];
     float logfreq = msynth[osc].logfreq;
     // If osc[midi_note] is unset, apply patch's default here.
     if (!AMY_IS_SET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch->midinote);
@@ -53,7 +69,16 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     SAMPLE max_value = 0;
     SAMPLE amp = F2S(msynth[osc].amp);
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
-    const LUTSAMPLE* table = pcm + patch->offset;
+    const LUTSAMPLE* table;
+#ifdef PCM_MUTABLE
+    if (patch->sample == NULL) {
+        table = pcm + patch->offset;
+    } else {
+        table = patch->sample;
+    }
+#else
+    table = pcm + patch->offset;
+#endif
     uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
     for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
         SAMPLE frac = S_FRAC_OF_P(synth[osc].phase, PCM_INDEX_BITS);
@@ -89,8 +114,17 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
 SAMPLE compute_mod_pcm(uint16_t osc) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     PHASOR step = F2P((PCM_AMY_SAMPLE_RATE / mod_sr) / (1 << PCM_INDEX_BITS));
-    const pcm_map_t* patch = &pcm_map[synth[osc].patch];
-    const LUTSAMPLE* table = pcm + patch->offset;
+    PMUTATE pcm_map_t* patch = &pcm_map[synth[osc].patch];
+    const LUTSAMPLE* table;
+#ifdef PCM_MUTABLE
+    if (patch->sample == NULL) {
+        table = pcm + patch->offset;
+    } else {
+        table = patch->sample;
+    }
+#else
+    table = pcm + patch->offset;
+#endif
     uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
     SAMPLE sample;
     if(base_index >= patch->length) { // end

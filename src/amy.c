@@ -74,7 +74,7 @@ void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i)
 
 
 // This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
-#include "pcm_small.h"
+#include "pcm_large.h"
 
 
 #include "clipping_lookup_table.h"

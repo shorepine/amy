@@ -13,8 +13,19 @@
 
 
 // These are overriden for you if you include pcm_X.h {tiny, small, large}
+
+#ifdef PCM_MUTABLE
+#define PMUTATE
+#define PCM_USER 16
+#define PCM_INIT ,0,NULL
+#else
+#define PMUTATE const
+#define PCM_INIT
+#define PCM_USER 0
+#endif
+
 extern const int16_t pcm[];
-extern const pcm_map_t pcm_map[];
+extern PMUTATE pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
 #define AMY_CORES amy_global.cores
