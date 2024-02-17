@@ -23,6 +23,7 @@ if (TARGET tinyusb_device)
             amy.c
             delay.c
             envelope.c
+            custom.c
             filters.c
             patches.c
             log2_exp2.c
