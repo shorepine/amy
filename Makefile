@@ -66,6 +66,7 @@ timing: amy-module
 	for a in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do ${PYTHON} timing.py 2>&1 ; done > /tmp/timings.txt
 	cat /tmp/timings.txt | grep AMY_RENDER: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
+	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
 
 web: $(TARGET)

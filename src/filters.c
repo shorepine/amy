@@ -11,7 +11,6 @@
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
 SAMPLE ** coeffs;
-SAMPLE ** filter_delay;
 SAMPLE ** eq_coeffs;
 SAMPLE *** eq_delay;
 
@@ -379,7 +378,7 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
 void update_filter(uint16_t osc) {
     // reset the delay for a filter
     // normal mod / adsr will just change the coeffs
-    filter_delay[osc][0] = 0; filter_delay[osc][1] = 0;
+    bzero(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS * sizeof(SAMPLE));
 }
 
 
@@ -391,11 +390,9 @@ void filters_deinit() {
     for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         free(coeffs[i]);
-        free(filter_delay[i]);
     }
     free(coeffs);
     free(eq_coeffs);
-    free(filter_delay);
     free(eq_delay);
 }
 
@@ -403,11 +400,9 @@ void filters_deinit() {
 void filters_init() {
     coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
     eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
-    filter_delay = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
     eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, FBL_RAM_CAPS);
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
-        filter_delay[i] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, FBL_RAM_CAPS);
     }
     for(uint16_t i=0;i<3;i++) {
         eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, FBL_RAM_CAPS);
@@ -615,7 +610,7 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
         block_denorm(block, AMY_BLOCK_SIZE, normbits);
         synth[osc].last_filt_norm_bits = normbits;
     }
-    //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], filter_delay[osc]);
+    //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
     //block_denorm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
     // hpf_buf(block, &synth[osc].hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
@@ -632,4 +627,11 @@ void reset_filter(uint16_t osc) {
     for(int i = 0; i < 2 * FILT_NUM_DELAYS; ++i) synth[osc].filter_delay[i] = 0;
     synth[osc].last_filt_norm_bits = 0;
     synth[osc].hpf_state[0] = 0; synth[osc].hpf_state[1] = 0;
+    for (int c = 0; c < AMY_NCHANS; ++c) {
+        for (int b = 0; b < 3; ++b) {
+            for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
+                eq_delay[c][b][d] = 0;
+            }
+        }
+    }
 }
