@@ -176,6 +176,7 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             // Setup chorus oscillator.
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_CONST] = depth;
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_VEL] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
@@ -243,6 +244,7 @@ int8_t global_init() {
     amy_global.event_start = NULL;
     amy_global.event_qsize = 0;
     amy_global.volume = 1.0f;
+    amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
     amy_global.eq[0] = F2S(1.0f);
     amy_global.eq[1] = F2S(1.0f);
@@ -294,6 +296,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.velocity);
     AMY_UNSET(e.midi_note);
     AMY_UNSET(e.volume);
+    AMY_UNSET(e.pitch_bend);
     AMY_UNSET(e.latency_ms);
     AMY_UNSET(e.ratio);
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
@@ -435,6 +438,7 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.pitch_bend)) { d.param=PITCH_BEND; d.data = *(uint32_t *)&e.pitch_bend; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
@@ -562,6 +566,7 @@ void reset_osc(uint16_t i ) {
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].logfreq_coefs[j] = 0;
     synth[i].logfreq_coefs[COEF_NOTE] = 1.0;
+    synth[i].logfreq_coefs[COEF_BEND] = 1.0;
     msynth[i].logfreq = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].filter_logfreq_coefs[j] = 0;
@@ -624,6 +629,7 @@ void amy_reset_oscs() {
     for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
+    amy_global.pitch_bend = 0;
     amy_global.eq[0] = F2S(1.0f);
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
@@ -723,8 +729,8 @@ void show_debug(uint8_t type) {
     }
     if(type>1) {
         // print out all the osc data
-        //printf("global: filter %f resonance %f volume %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.status);
-        fprintf(stderr,"global: volume %f eq: %f %f %f \n", amy_global.volume, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
+        //printf("global: filter %f resonance %f volume %f bend %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.pitch_bend, amy_global.status);
+        fprintf(stderr,"global: volume %f bend %f eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
             fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %flogratio %f feedback %f resonance %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
@@ -732,11 +738,11 @@ void show_debug(uint8_t type) {
                     synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].chained_osc, 
                     synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
-            fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5]);
-            fprintf(stderr, "  lfr_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].logfreq_coefs[0], synth[i].logfreq_coefs[1], synth[i].logfreq_coefs[2], synth[i].logfreq_coefs[3], synth[i].logfreq_coefs[4], synth[i].logfreq_coefs[5]);
-            fprintf(stderr, "  flf_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].filter_logfreq_coefs[0], synth[i].filter_logfreq_coefs[1], synth[i].filter_logfreq_coefs[2], synth[i].filter_logfreq_coefs[3], synth[i].filter_logfreq_coefs[4], synth[i].filter_logfreq_coefs[5]);
-            fprintf(stderr, "  dut_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].duty_coefs[0], synth[i].duty_coefs[1], synth[i].duty_coefs[2], synth[i].duty_coefs[3], synth[i].duty_coefs[4], synth[i].duty_coefs[5]);
-            fprintf(stderr, "  pan_coefs: %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].pan_coefs[0], synth[i].pan_coefs[1], synth[i].pan_coefs[2], synth[i].pan_coefs[3], synth[i].pan_coefs[4], synth[i].pan_coefs[5]);
+            fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5], synth[i].amp_coefs[6]);
+            fprintf(stderr, "  lfr_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].logfreq_coefs[0], synth[i].logfreq_coefs[1], synth[i].logfreq_coefs[2], synth[i].logfreq_coefs[3], synth[i].logfreq_coefs[4], synth[i].logfreq_coefs[5], synth[i].logfreq_coefs[6]);
+            fprintf(stderr, "  flf_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].filter_logfreq_coefs[0], synth[i].filter_logfreq_coefs[1], synth[i].filter_logfreq_coefs[2], synth[i].filter_logfreq_coefs[3], synth[i].filter_logfreq_coefs[4], synth[i].filter_logfreq_coefs[5], synth[i].filter_logfreq_coefs[6]);
+            fprintf(stderr, "  dut_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].duty_coefs[0], synth[i].duty_coefs[1], synth[i].duty_coefs[2], synth[i].duty_coefs[3], synth[i].duty_coefs[4], synth[i].duty_coefs[5], synth[i].duty_coefs[6]);
+            fprintf(stderr, "  pan_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].pan_coefs[0], synth[i].pan_coefs[1], synth[i].pan_coefs[2], synth[i].pan_coefs[3], synth[i].pan_coefs[4], synth[i].pan_coefs[5], synth[i].pan_coefs[6]);
             if(type>3) {
                 for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
                     fprintf(stderr,"  bp%d (target %d): ", j, synth[i].breakpoint_target[j]);
@@ -915,6 +921,7 @@ void play_event(struct delta d) {
 
     // for global changes, just make the change, no need to update the per-osc synth
     if(d.param == VOLUME) amy_global.volume = *(float *)&d.data;
+    if(d.param == PITCH_BEND) amy_global.pitch_bend = *(float *)&d.data;
     if(d.param == LATENCY) { amy_global.latency_ms = *(uint16_t *)&d.data; computed_delta_set = 0; computed_delta = 0; }
     if(d.param == EQ_L) amy_global.eq[0] = F2S(powf(10, *(float *)&d.data / 20.0));
     if(d.param == EQ_M) amy_global.eq[1] = F2S(powf(10, *(float *)&d.data / 20.0));
@@ -1028,6 +1035,7 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0));
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
+    ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
 
     msynth[osc].last_pan = msynth[osc].pan;
 
@@ -1186,6 +1194,10 @@ void amy_increase_volume() {
 void amy_decrease_volume() {
     amy_global.volume -= 0.5f;
     if(amy_global.volume < 0) amy_global.volume = 0;    
+}
+
+void amy_set_pitch_bend(float value) {
+    amy_global.pitch_bend = value;
 }
 
 // this takes scheduled events and plays them at the right time
@@ -1524,6 +1536,7 @@ struct event amy_parse_message(char * message) {
                         case 'R': e.resonance=atoff(message + start); break;
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
                         case 'S': e.reset_osc = atoi(message + start); break;
+                        case 's': e.pitch_bend = atoff(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
                         case 'W': e.bp1_target = atoi(message + start);  break;
                         case 'v': e.osc=((atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound

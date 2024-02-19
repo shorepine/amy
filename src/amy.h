@@ -67,14 +67,15 @@ typedef int16_t output_sample_type;
 #define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
 #define TARGET_PAN 0x200
 
-#define NUM_COMBO_COEFS 6  // 6 control-mixing params: const, note, velocity, env1, env2, mod
+#define NUM_COMBO_COEFS 7  // 7 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend
 enum coefs{
     COEF_CONST = 0,
     COEF_NOTE = 1,
     COEF_VEL = 2,
     COEF_EG0 = 3,
     COEF_EG1 = 4,
-    COEF_MOD = 5
+    COEF_MOD = 5,
+    COEF_BEND = 6,
 };
 
 #define MAX_MESSAGE_LEN 255
@@ -135,19 +136,19 @@ typedef int amy_err_t;
 
 enum params{
     WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2
-    AMP,                                 // 3..8
-    DUTY=AMP + NUM_COMBO_COEFS,          // 9..14
-    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 15
-    FREQ,                                // 16..21
-    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 22
-    PHASE, DETUNE, VOLUME,               // 23, 24, 25
-    PAN,                                 // 26..31
-    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 32..37
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 38
-    RESONANCE, CHAINED_OSC,              // 39, 40
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, // 41, 42, 43
-    EQ_L, EQ_M, EQ_H,                    // 44, 45, 46
-    BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,  // 47, 48, 49, 50
+    AMP,                                 // 3..9
+    DUTY=AMP + NUM_COMBO_COEFS,          // 10..16
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 17
+    FREQ,                                // 18..24
+    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 25
+    PHASE, DETUNE, VOLUME, PITCH_BEND,   // 26, 26, 28, 29
+    PAN,                                 // 30..36
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 37..43
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 44
+    RESONANCE, CHAINED_OSC,              // 45, 46
+    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, // 47, 48, 49
+    EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
+    BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,  // 53, 54, 55, 56
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -266,6 +267,7 @@ struct event {
     float phase;
     float detune;
     float volume;
+    float pitch_bend;
     uint16_t latency_ms;
     float ratio;
     float resonance;
@@ -406,6 +408,7 @@ struct state {
     uint8_t has_reverb;
     uint8_t has_chorus;
     float volume;
+    float pitch_bend;
     // State of fixed dc-blocking HPF
     SAMPLE hpf_state;
     SAMPLE eq[3];
