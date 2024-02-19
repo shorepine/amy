@@ -347,7 +347,7 @@ class JunoPatch:
     return '0,0,%s,1,0,0' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
 
   def _freq_coef_string(self, base_freq):
-    return '%s,1,0,0,0,%s' % (
+    return '%s,1,0,0,0,%s,1' % (
       ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo)))
 
   def clone_voice_oscs(self):
@@ -516,3 +516,6 @@ class JunoPatch:
     self._init_from_patch_number(patch)
     print("New patch", patch, ":", self.name)
     self.init_AMY()
+
+  def set_pitch_bend(self, value):
+    amy.send(pitch_bend=value)
