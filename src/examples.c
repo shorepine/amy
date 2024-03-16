@@ -229,10 +229,13 @@ void example_drums(uint32_t start, int loops) {
 
     e = amy_default_event();
     e.time = start;
+    int last_bass_was_on = 0;
+    int actually_send_the_bass;
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
             AMY_UNSET(e.freq_coefs[0]);
+            AMY_UNSET(e.midi_note);
             
             int x = pattern[i];
             if(x & bd) {
@@ -265,11 +268,22 @@ void example_drums(uint32_t start, int loops) {
             if(bassline[i]>0) {
                 e.velocity = 0.5 * volume;
                 e.midi_note = bassline[i] - 12;
+                last_bass_was_on = 1;
+                actually_send_the_bass = 1;
             } else {
+                actually_send_the_bass = last_bass_was_on;
                 e.velocity = 0;
+                last_bass_was_on = 0;
             }
-            amy_add_event(e);
-            AMY_UNSET(e.midi_note);
+            if (actually_send_the_bass) {
+                Serial_prints("bassline: ");
+                Serial_printi(e.time);
+                Serial_prints(" ");
+                Serial_printi(e.midi_note);
+                Serial_prints(" ");
+                Serial_printfln((float)e.velocity);
+                amy_add_event(e);
+            }
         }
     }
 }
