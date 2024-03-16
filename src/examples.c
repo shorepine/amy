@@ -276,12 +276,6 @@ void example_drums(uint32_t start, int loops) {
                 last_bass_was_on = 0;
             }
             if (actually_send_the_bass) {
-                Serial_prints("bassline: ");
-                Serial_printi(e.time);
-                Serial_prints(" ");
-                Serial_printi(e.midi_note);
-                Serial_prints(" ");
-                Serial_printfln((float)e.velocity);
                 amy_add_event(e);
             }
         }
