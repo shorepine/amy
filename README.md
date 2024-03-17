@@ -405,13 +405,7 @@ amy.send(voices="0", load_patch=128)
 amy.send(voices="0", note=50,vel=1)
 ```
 
-The `load_patch` lets you set which preset. Another fun parameter is `ratio`, which for ALGO patch types indicates how slow / fast to play the patch's envelopes. Really cool to slow them down!
-
-```python
-amy.send(voices="0", note=50,vel=1, ratio=0.5) # real slow
-```
-
-Let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other. 
+The `load_patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
 
 ![DX7 Algorithms](https://raw.githubusercontent.com/bwhitman/alles/main/pics/dx7_algorithms.jpg)
 
@@ -420,14 +414,14 @@ When building your own algorithm sets, assign a separate oscillator as wave=`ALG
 
 ```python
 amy.reset()
-amy.send(wave=amy.SINE,ratio=0.2,amp="0,0,0.1,1",osc=0,bp0="1000,0,0,0")
-amy.send(wave=amy.SINE,ratio=1,amp=1,osc=1)
-amy.send(wave=amy.ALGO,algorithm=1,algo_source="-1,-1,-1,-1,1,0",osc=2)
+amy.send(osc=0, wave=amy.SINE, ratio=0.2, amp="0.1,0,0,1", bp0="0,1,1000,0,0,0")
+amy.send(osc=1, wave=amy.SINE, ratio=1, amp="1")
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
 ```
 
-Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operators 2 and 1, and have oscillator 1 modulate oscillator 0. 
+Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
 
-What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator and the base note. So oscillator 0 will be played a 20% of the base note, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using a breakpoint. That's key to the "bell ringing out" effect. 
+What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator to the base note. So oscillator 0 will be played at 20% of the base note frequency, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using a breakpoint. That's key to the "bell ringing out" effect.
 
 Ok, we've set up the oscillators. Now, let's hear it!
 
@@ -439,15 +433,21 @@ You should hear a bell-like tone. Nice. Another classic two operator tone is to 
 
 ```python
 amy.reset()
-amy.send(osc=0,ratio=0.2,amp=0.5,bp0_target=amy.TARGET_AMP,bp0="0,0,5000,1,0,0")
-amy.send(osc=1,ratio=1)
-amy.send(osc=2,algorithm=1,wave=amy.ALGO,algo_source="-1,-1,-1,-1,0,1")
+amy.send(osc=0, wave=amy.SINE, ratio=1, amp="1")  # Op 1, carrier
+amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp="2", bp0="0,0,5000,1,0,0")  # Op 2, modulator
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
 ```
 
-Just a refresher on breakpoints; here we are saying to set the beta parameter (amplitude of the modulating tone) to 0.5 but have it start at 0 at time 0, then be at 1.0x of 0.5 (so, 0.5) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
+Just a refresher on breakpoints; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
 
 ```python
-amy.send(osc=2,vel=2,note=50)
+amy.send(osc=2, vel=2, note=50)
+```
+
+and stop it with
+
+```python
+amy.send(osc=2, vel=0)
 ```
 
 
