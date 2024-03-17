@@ -27,7 +27,7 @@ It supports
  * Stereo pan or mono operation 
  * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves
  * Oscillators can be specified by frequency in floating point or midi note 
- * Each oscillator has 3 breakpoint generators, which can modify any combination of amplitude, frequency, duty, filter cutoff, feedback or resonance over time
+ * Each oscillator has 2 breakpoint sets, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band parametric EQ
  * Built in patches for PCM, DX7, Juno and partials
@@ -196,40 +196,41 @@ Here's the full list:
 | Code | Python |  Type-range      | Notes                                 |
 | ---- | ------ |  ---------- | ------------------------------------- |
 | a    | amp    |  float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
-| A    | bp0    | string     | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with alternating time(ms) and ratio. last pair triggers on note off |
-| B    | bp1    |  string     | set the second breakpoint generator. see breakpoint 0 |
-| b    | feedback | float 0-1  | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| A    | bp0    | string      | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
+| B    | bp1    | string      | the second breakpoint generator. See bp0 |
+| b    | feedback | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to the chained oscillator also. |
 | C    | clone_osc | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |  
 | d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| f    | freq   |  float[,float...]      | frequency of oscillator, set of Control Coefficients |
+| f    | freq   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients |
 | F    | filter_freq | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
 | g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. **Deprecated**, subsumed by ControlCoefficients. |
-| G    | filter_type | 0-3 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass. |
+| G    | filter_type | 0-4 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass, 4 = double-order low pass. |
 | H    | reverb_liveness | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
 | h    | reverb_level | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
-| I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the ALGO base note and PARTIALS base note, where the ratio controls the speed of the playback |
+| I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
 | j    | reverb_damping  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
 | J    | reverb_xover_hz | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
 | k    | chorus_level | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
 | K    | load_patch | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
-| l    | vel | float 0-1+ | velocity - >0 to trigger note on, 0 to trigger note off. sets amplitude |
+| l    | vel | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
 | M    | chorus_freq | float | LFO freq of chorus | 
-| m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320. |
+| m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320 |
 | N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
-| o    | algorithm | uint 1-32 | DX7 algorith to use for ALGO type | 
-| O    | algo_source | string | which oscillators to use for the algorithm. list of six, use -1 for not used, e.g 0,1,2,-1,-1-1 |
+| o    | algorithm | uint 1-32 | DX7 algorithm to use for ALGO type |
+| O    | algo_source | string | which oscillators to use for the algorithm. list of six (starting with op 6), use -1 for not used, e.g 0,1,2,-1,-1-1 |
 | p    | P-patch | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
 | P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
-| Q    | pan   | float 0-1 | panning index (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| Q    | pan   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | q    | chorus_depth | float | chorus depth | 
-| R    | resonance | float | q factor of biquad filter. in practice, 0-10.0. default 0.7 | 
+| R    | resonance | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 | 
 | r    | voices | int[,int] | String comma separated list of voices to send message to, or load patch into | 
-| S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |  
-| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefs. | 
+| S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
+| s    | pitch_bend | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
+| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefficients. |
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
@@ -258,17 +259,17 @@ AMY is meant to receive messages in real time. It, on its own, is not a sequence
 For example, to play two notes, one a second after the first, you could do:
 
 ```python
-amy.send(osc=0,note=50,vel=1)
+amy.send(osc=0, note=50, vel=1)
 time.sleep(1)
-amy.send(osc=0,note=52,vel=1)
+amy.send(osc=0, note=52, vel=1)
 ```
 
 But you'd be at the mercy of Python's internal timing, or your OS. A more precise way is to send the messages at the same time, but to indicate the intended time of the playback:
 
 ```python
-start = amy.millis() # arbitrary start timestamp
-amy.send(osc=0,note=50,vel=1,timestamp=start)
-amy.send(osc=0,note=52,vel=1,timestamp=start+1000)
+start = amy.millis()  # arbitrary start timestamp
+amy.send(osc=0, note=50, vel=1, timestamp=start)
+amy.send(osc=0, note=52, vel=1, timestamp=start + 1000)
 ```
 
 Both `amy.send()`s will return immediately, but you'll hear the second note play precisely a second after the first. AMY uses this internal clock to schedule step changes in breakpoints as well. 
@@ -288,17 +289,30 @@ Let's set a simple sine wave first
 amy.send(osc=0, wave=amy.SINE, freq=220, amp=1)
 ```
 
-What we're doing here should be pretty straightforward. I'm telling oscillator 0 to be a sine wave at 220Hz and amplitude 1. You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc. 
+What we're doing here should be pretty straightforward. I'm telling oscillator 0 to be a sine wave at 220Hz and amplitude 1.  You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc.
 
-**Why can't you hear anything yet?** It's because you haven't triggered the note on for this oscillator. We accept a parameter called `vel` (velocity) that can turn a note on or off (`vel=0`.) So now that we've set up the oscillator, we just turn it on by `amy.send(osc=0, vel=1)`. Note the oscillator remembers all its state and setup. To turn off the note, just do `amy.send(osc=0, vel=0)`. 
-
-You can also make oscillators louder with `amp` or `vel` over 1. 
-
-You can also always use `note`, (MIDI note value) instead of `freq`.
+**Why can't you hear anything yet?** It's because you haven't triggered the note on for this oscillator. We accept a parameter called `vel` (velocity) that can turn a note on or off (`vel=0`.) So now that we've set up the oscillator, we just turn it on (note the oscillator remembers all its state and setup):
 
 ```python
+amy.send(osc=0, vel=1)  # Note on.
+```
+
+To turn off the note, send a note off (velocity zero):
+
+```python
+amy.send(osc=0, vel=0)  # Note off.
+```
+
+You can also make oscillators louder with `amp` or `vel` over 1.  The total amplitude comes from multiplying together the oscillator amplitude (i.e., the natural level of the oscillator) and the velocity (the particular level of this note event).
+
+You can also use `note` (MIDI note value) instead of `freq` to control the oscillator frequency for each note event:
+
+```python
+amy.reset()
 amy.send(osc=0, wave=amy.SINE, note=57, vel=1)
 ```
+
+This won't work without the `amy.reset()`, because once you've set the oscillator to a constant frequency with `freq=220`, it will ignore the frequency specified by `note`.  (But see **ControlCoefficients** below to see how you can use both at the same time).
 
 Now let's make a lot of sine waves! 
 
@@ -322,7 +336,7 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint! A breakpoint is a simple list of (time, value) - you can have up to 8 of those pairs, and 2 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, frequency, duty cycle, feedback, filter frequence, or resonance with a breakpoint. It gets triggered when the note does. So let's make a breakpoint that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, taper the frequency to 50 Hz over 200 millseconds. 
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint set! A breakpoint set is a simple list of (time, value) pairs - you can have up to 8 of these per set, and 2 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with a breakpoint set. It gets triggered when the note begins. So let's make a breakpoint set that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
@@ -330,11 +344,24 @@ amy.send(osc=0, filter_freq="50,0,0,0,1,0", bp1="0,6.0,1000,3.0,200,0")
 amy.send(osc=0, vel=1, note=40)
 ```
 
-There are two things to note here: (1) The filter frequency modulation is accomplished by a set of **ControlCoefficients**, a set of 6 floats that are applied, respectively, to a constant value of 1, the note pitch, the velocity, the output of breakpoint set 0, the output of breakpoint set 1, and the modulating oscillator.  The set "50,0,0,0,1,0" means that we have a base frequency of 50 Hz, but we also add the output of breakpoint set 1. If you specify fewer than 6 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0"`.  (2) The frequency calculations are done in log2-frequency relative to Midi note 0 (8.18 Hz).  The first, constant term is automatically converted from Hz.  But the envelope values (initially 6.0, falling to 3.0 over 1000ms, then falling to 0 over 200ms on release) are in octave units, so 6.0 corresponds to a *factor* of `2**6 = 64`, giving a net frequency of 3200 Hz when applied to the 50 Hz base.  Then the decay is to `(2**3) * 50 = 400 Hz`, and the final release is down to 50 Hz.
+There are two things to note here:  Firstly, the filter frequency is controlled by the breakpoint set using a "unit per octave" rule.  So when the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency, or 3200 Hz.  It then decays to 3.0 over the first second, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it returns back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
 
-Great. There are 5 oscillator parameters that take **ControlCoefficients**: Amplitude, Frequency, FilterFrequency, PWM Duty, and Pan.  You can use the same breakpoint set to control several at once, for instance by also specifying `freq="0,1,0,0,0.125,0"`, which says to set the note frequency from the same breakpoint set as the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
+ * A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero or not specified.
+ * The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-Hz relative to middle C).
+ * The velocity from the note-on event.
+ * The output of breakpoint set 0.
+ * The output of breakpoint set 1.
+ * The output of the modulating oscillator, specified by the `mod_source` parameter.
+ * The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
 
-We also have LFOs, which are implemented as one oscillator modulating another. You set the lower-frequency oscillator up, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite: 
+The set "50,0,0,0,1" means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and breakpoint set 0, but we also add the output of breakpoint set 1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0,0"`.
+
+You can use the same breakpoint set to control several things at once.  For example, we could include `freq="50,0,0,0,0.125,0"`, which says to modify a base note frequency of 50 Hz from the same breakpoint set as the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+
+The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you need something like `freq="261.63,1"` (which is its default setting before any `freq` parameter is passed).  Setting it to `freq="523.26,1"` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq="261.3,0.5"` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
+
+We also have LFOs, which are implemented as one oscillator modulating another. You set up the lower-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
 ```python
 amy.reset()  # Clear the state.
