@@ -268,16 +268,16 @@ void example_drums(uint32_t start, int loops) {
             if(bassline[i]>0) {
                 e.velocity = 0.5 * volume;
                 e.midi_note = bassline[i] - 12;
-                last_bass_was_on = 1;
-                actually_send_the_bass = 1;
+                //last_bass_was_on = 1;
+                //actually_send_the_bass = 1;
             } else {
-                actually_send_the_bass = last_bass_was_on;
+                //actually_send_the_bass = last_bass_was_on;
                 e.velocity = 0;
-                last_bass_was_on = 0;
+                //last_bass_was_on = 0;
             }
-            if (actually_send_the_bass) {
+            //if (actually_send_the_bass) {
                 amy_add_event(e);
-            }
+            //}
         }
     }
 }

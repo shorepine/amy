@@ -943,6 +943,7 @@ void play_event(struct delta d) {
             }  else {
                 // an osc came in with a note on.
                 // start the bp clock
+                AMY_UNSET(synth[d.osc].note_off_clock);
                 synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
 
                 // if there was a filter active for this voice, reset it
