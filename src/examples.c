@@ -45,35 +45,39 @@ void example_voice_alloc() {
 }
 
 
-void example_voice_chord(uint16_t patch) {
+void example_voice_chord(uint32_t start, uint16_t patch) {
     struct event e = amy_default_event();
+    e.time = start;
     e.load_patch = patch;
     strcpy(e.voices, "0,1,2");
     amy_add_event(e);
-    delay_ms(250);
+    start += 250;
 
     e = amy_default_event();
+    e.time = start;
     e.velocity=0.5;
 
     strcpy(e.voices, "0");
     e.midi_note = 50;
     amy_add_event(e);
-    delay_ms(1000);
+    start += 1000;
 
     strcpy(e.voices, "1");
     e.midi_note = 54;
+    e.time = start;
     amy_add_event(e);
-    delay_ms(1000);
+    start += 1000;
 
     strcpy(e.voices, "2");
     e.midi_note = 56;
+    e.time = start;
     amy_add_event(e);
-    delay_ms(2000);
+    start += 2000;
     
     strcpy(e.voices, "0,1,2");
     e.velocity = 0;
+    e.time = start;
     amy_add_event(e);
-    delay_ms(100);
 }   
 
 

@@ -31,6 +31,7 @@ class AMY
     int32_t sysclock();
     void fm(int32_t start);
     void drums(int32_t start, uint16_t loops);
+    void voice_chord(uint32_t start, uint16_t patch);
     void reset();
     struct event default_event();
     void add_event(struct event e);

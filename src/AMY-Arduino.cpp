@@ -65,12 +65,16 @@ int16_t * AMY::render_to_buffer() {
     return amy_simple_fill_buffer();
 }
 
+void AMY::send_message(char * message) {
+    amy_add_event(amy_parse_message(message));
+}
+
 void AMY::drums(int32_t start, uint16_t loops) {
     example_drums(start, loops);
 }
 
-void AMY::send_message(char * message) {
-    amy_add_event(amy_parse_message(message));
+void AMY::voice_chord(uint32_t start, uint16_t patch) {
+    example_voice_chord(start, patch);
 }
 
 

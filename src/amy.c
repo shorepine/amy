@@ -387,7 +387,6 @@ void amy_add_event(struct event e) {
 void amy_add_event_internal(struct event e, uint16_t base_osc) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
-    
 
     // Synth defaults if not set, these are required for the delta struct
     if(AMY_IS_UNSET(e.osc)) { e.osc = 0; } 
@@ -460,10 +459,8 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         struct synthinfo t;
         parse_algorithm_source(&t, e.algo_source);
         for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { 
-            if(AMY_IS_SET(t.algo_source[i])) { 
-                uint32_t algo_source = t.algo_source[i] + base_osc;
-                d.data = algo_source;
-                d.param=ALGO_SOURCE_START+i; 
+                d.param = ALGO_SOURCE_START + i;
+                d.data = t.algo_source[i] + base_osc;
                 add_delta_to_queue(d); 
             }
         }
@@ -1060,9 +1057,9 @@ void hold_and_modify(uint16_t osc) {
                synth[osc].logfreq_coefs[0], synth[osc].logfreq_coefs[1], synth[osc].logfreq_coefs[2], synth[osc].logfreq_coefs[3], synth[osc].logfreq_coefs[4], synth[osc].logfreq_coefs[5],
                msynth[osc].amp, msynth[osc].logfreq);
 
+    }
     // Stop oscillators if amp is zero for several frames in a row.
     // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-    }
 #define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
     if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
         if (msynth[osc].amp > 0) {
@@ -1430,8 +1427,13 @@ void copy_param_list_substring(char *dest, const char *src) {
 }
 
 // helper to parse the list of source voices for an algorithm
-void parse_algorithm_source(struct synthinfo * e, char *message) {
-    parse_int_list_message(message, e->algo_source, MAX_ALGO_OPS);
+void parse_algorithm_source(struct synthinfo * t, char *message) {
+    parse_int_list_message(message, t->algo_source, MAX_ALGO_OPS);
+    for (int i = 0; i < MAX_ALGO_OPS; ++i) {
+        if (t->algo_source[i] == -1) {
+            AMY_UNSET(t->algo_source[i]);
+        }
+    }
 }
 
 // helper to parse the special bp string

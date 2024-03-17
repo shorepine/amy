@@ -279,8 +279,8 @@ struct event {
     float eq_l;
     float eq_m;
     float eq_h;
-    char algo_source[MAX_PARAM_LEN];
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
+    char algo_source[MAX_PARAM_LEN];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
     char voices[MAX_PARAM_LEN];
