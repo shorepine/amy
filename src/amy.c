@@ -468,8 +468,9 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
 
     char * bps[MAX_BREAKPOINT_SETS] = {e.bp0, e.bp1};
     for(uint8_t i=0;i<MAX_BREAKPOINT_SETS;i++) {
-        //if(bps[i][0] != 0) {
-        if(AMY_IS_SET(e.bp_is_set[i])) {
+        // amy_parse_message sets bp_is_set for anything including an empty string,
+        // but direct calls to amy_add_event can just put a nonempty string into bp0/1.
+        if(AMY_IS_SET(e.bp_is_set[i]) || bps[i][0] != 0) {
             struct synthinfo t;
             parse_breakpoint(&t, bps[i], i);
             for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) {

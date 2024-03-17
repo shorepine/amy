@@ -233,8 +233,6 @@ void example_drums(uint32_t start, int loops) {
 
     e = amy_default_event();
     e.time = start;
-    int last_bass_was_on = 0;
-    int actually_send_the_bass;
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
@@ -272,19 +270,59 @@ void example_drums(uint32_t start, int loops) {
             if(bassline[i]>0) {
                 e.velocity = 0.5 * volume;
                 e.midi_note = bassline[i] - 12;
-                //last_bass_was_on = 1;
-                //actually_send_the_bass = 1;
             } else {
-                //actually_send_the_bass = last_bass_was_on;
                 e.velocity = 0;
-                //last_bass_was_on = 0;
             }
-            //if (actually_send_the_bass) {
-                amy_add_event(e);
-            //}
+            amy_add_event(e);
         }
     }
 }
+
+void example_fm(uint32_t start) {
+    // Direct construction of an FM tone, as in the documentation.
+    struct event e;
+
+    // Output oscillator (op 1)
+    e = amy_default_event();
+    e.time = start;
+    e.osc = 0;
+    e.wave = SINE;
+    e.ratio = 0.2f;
+    e.amp_coefs[COEF_CONST] = 0.1f;
+    e.amp_coefs[COEF_VEL] = 0;
+    e.amp_coefs[COEF_EG0] = 1.0f;
+    strcpy(e.bp0, "0,1,1000,0,0,0");
+    amy_add_event(e);
+
+    // Modulating oscillator (op 2)
+    e = amy_default_event();
+    e.time = start;
+    e.osc = 1;
+    e.wave = SINE;
+    e.ratio = 1.0f;
+    e.amp_coefs[COEF_CONST] = 1.0f;
+    e.amp_coefs[COEF_VEL] = 0;
+    e.amp_coefs[COEF_EG0] = 0;
+    amy_add_event(e);
+  
+    // ALGO control oscillator
+    e = amy_default_event();
+    e.time = start;
+    e.osc = 2;
+    e.wave = ALGO;
+    e.algorithm = 1;  // algo 1 has op 2 driving op 1 driving output (plus a second chain for ops 6,5,4,3).
+    strcpy(e.algo_source, "-1,-1,-1,-1,1,0");
+    amy_add_event(e);
+
+    // Add a note on event.
+    e = amy_default_event();
+    e.time = start + 100;
+    e.osc = 2;
+    e.midi_note = 60;
+    e.velocity = 1.0f;
+    amy_add_event(e);
+}
+
 
 // Minimal custom oscillator
 
