@@ -912,8 +912,9 @@ void play_event(struct delta d) {
 
     if(d.param >= ALGO_SOURCE_START && d.param < ALGO_SOURCE_END) {
         uint16_t which_source = d.param - ALGO_SOURCE_START;
-        synth[d.osc].algo_source[which_source] = *(int16_t *)&d.data;
-        if(synth[d.osc].algo_source[which_source] >= 0) synth[*(int16_t*)&d.data].status=IS_ALGO_SOURCE;
+        synth[d.osc].algo_source[which_source] = d.data;
+        if(AMY_IS_SET(synth[d.osc].algo_source[which_source]))
+            synth[synth[d.osc].algo_source[which_source]].status = IS_ALGO_SOURCE;
     }
 
     // for global changes, just make the change, no need to update the per-osc synth

@@ -29,9 +29,9 @@ class AMY
     void begin(uint8_t cores, uint8_t reverb, uint8_t chorus);
 
     int32_t sysclock();
-    void fm(int32_t start);
-    void drums(int32_t start, uint16_t loops);
+    void drums(uint32_t start, uint16_t loops);
     void voice_chord(uint32_t start, uint16_t patch);
+    void fm(uint32_t start);
     void reset();
     struct event default_event();
     void add_event(struct event e);

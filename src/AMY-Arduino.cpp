@@ -69,12 +69,16 @@ void AMY::send_message(char * message) {
     amy_add_event(amy_parse_message(message));
 }
 
-void AMY::drums(int32_t start, uint16_t loops) {
+void AMY::drums(uint32_t start, uint16_t loops) {
     example_drums(start, loops);
 }
 
 void AMY::voice_chord(uint32_t start, uint16_t patch) {
     example_voice_chord(start, patch);
+}
+
+void AMY::fm(uint32_t start) {
+    example_fm(start);
 }
 
 
