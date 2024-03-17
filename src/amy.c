@@ -459,10 +459,9 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         struct synthinfo t;
         parse_algorithm_source(&t, e.algo_source);
         for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { 
-                d.param = ALGO_SOURCE_START + i;
-                d.data = t.algo_source[i] + base_osc;
-                add_delta_to_queue(d); 
-            }
+            d.param = ALGO_SOURCE_START + i;
+            d.data = t.algo_source[i] + base_osc;
+            add_delta_to_queue(d); 
         }
     }
 
