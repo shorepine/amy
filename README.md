@@ -361,6 +361,8 @@ You can use the same breakpoint set to control several things at once.  For exam
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you need something like `freq="261.63,1"` (which is its default setting before any `freq` parameter is passed).  Setting it to `freq="523.26,1"` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq="261.3,0.5"` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
+Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  `amp` also has a set of defaults "0,0,1,1,0,0,0", i.e. tracking note-on velocity plus modulation by breakpoint set 0 (if it is doing anything).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  These defaults are set up in [src/amy.c:reset_osc()](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
+
 We also have LFOs, which are implemented as one oscillator modulating another. You set up the lower-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
 ```python
@@ -456,7 +458,9 @@ Ok, we've set up the oscillators. Now, let's hear it!
 amy.send(osc=2, note=60, vel=3)
 ```
 
-You should hear a bell-like tone. Nice. Another classic two operator tone is to instead modulate the higher tone with the lower one, to make a filter sweep. Let's do it over 5 seconds.
+You should hear a bell-like tone. Nice. (This example is also implemented using the C API in [src/examples.c:example_fm()](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/examples.c#L281).)
+
+Another classic two operator tone is to instead modulate the higher tone with the lower one, to make a filter sweep. Let's do it over 5 seconds.
 
 ```python
 amy.reset()
