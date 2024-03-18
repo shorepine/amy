@@ -23,46 +23,44 @@ log = False
 def preset(which,osc=0, **kwargs):
     # Reset the osc first
     reset(osc=osc)
-    if(which==0): # simple note
-        send(osc=osc, wave=SINE, bp0="10,1,250,0.7,500,0", bp0_target=TARGET_AMP, **kwargs)
-    if(which==1): # filter bass
-        send(osc=osc, filter_freq=2500, resonance=5, wave=SAW_DOWN, filter_type=FILTER_LPF, bp0="0,1,500,0.2,25,0", bp0_target=TARGET_AMP+TARGET_FILTER_FREQ, **kwargs)
-
+    if(which==0): # simple note. bp0 applied to amp by default (i.e., amp="0,0,1,1" for vel + bp0)
+        send(osc=osc, wave=SINE, bp0="10,1,250,0.7,500,0", **kwargs)
+    if(which==1): # filter bass.  bp0 is amplitude (default) and filter.
+        send(osc=osc, filter_freq="100,0,0,5", resonance=5, wave=SAW_DOWN, filter_type=FILTER_LPF, bp0="0,1,1000,0,100,0", **kwargs)
     # TODO -- this is a good one to test the whistle on the bps... 
     if(which==2): # long sine pad to test ADSR
-        send(osc=osc, wave=SINE, bp0="0,0,500,1,1000,0.25,750,0", bp0_target=TARGET_AMP, **kwargs)
-
+        send(osc=osc, wave=SINE, bp0="0,0,500,1,1000,0.25,750,0", **kwargs)
     if(which==3): # amp LFO example
         reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, vel=0.50, freq=1.5, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,250,0.25,250,0", bp0_target=TARGET_AMP, mod_target=TARGET_AMP, mod_source=osc+1, **kwargs)
+        send(osc=osc+1, wave=SINE, amp=0.50, freq=1.5, **kwargs)
+        send(osc=osc, wave=PULSE, bp0="150,1,2000,0.25,250,0", amp="0,0,1,1,0,1", mod_source=osc+1, **kwargs)
     if(which==4): # pitch LFO going up 
         reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, vel=0.50, freq=0.25, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,400,0,0,0", bp0_target=TARGET_AMP, mod_target=TARGET_FREQ, mod_source=osc+1, **kwargs)
+        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, **kwargs)
+        send(osc=osc, wave=PULSE, bp0="150,1,400,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
     if(which==5): # bass drum
         # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
         reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, vel=0.50, freq=0.25, phase=0.5, **kwargs)
-        send(osc=osc, wave=SINE, vel=0, bp0="500,0,0,0", bp0_target=TARGET_AMP, mod_target=TARGET_FREQ, mod_source=osc+1, **kwargs)
+        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, phase=0.5, **kwargs)
+        send(osc=osc, wave=SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
     if(which==6): # noise snare
-        send(osc=osc, wave=NOISE, vel=0, bp0="250,0,0,0", bp0_target=TARGET_AMP, **kwargs)
+        send(osc=osc, wave=NOISE, bp0="0,1,250,0,0,0",  **kwargs)
     if(which==7): # closed hat
-        send(osc=osc, wave=NOISE, vel=0, bp0="25,1,75,0,0,0", bp0_target=TARGET_AMP, **kwargs)
+        send(osc=osc, wave=NOISE, bp0="25,1,75,0,0,0", **kwargs)
     if(which==8): # closed hat from PCM 
-        send(osc=osc, wave=PCM, vel=0, patch=0, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, patch=0, **kwargs)
     if(which==9): # cowbell from PCM
-        send(osc=osc, wave=PCM, vel=0, patch=10, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, patch=10, **kwargs)
     if(which==10): # high cowbell from PCM
-        send(osc=osc, wave=PCM, vel=0, patch=10, note=70, **kwargs)
+        send(osc=osc, wave=PCM, patch=10, note=70, **kwargs)
     if(which==11): # snare from PCM
-        send(osc=osc, wave=PCM, vel=0, patch=5, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, patch=5, freq=0, **kwargs)
     if(which==12): # FM bass 
-        send(osc=osc, wave=ALGO, vel=0, patch=21, **kwargs)
+        send(osc=osc, wave=ALGO, patch=21, **kwargs)
     if(which==13): # Pcm bass drum
-        send(osc=osc, wave=PCM, vel=0, patch=1, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, patch=1, freq=0, **kwargs)
     if(which==14): # filtered algo 
-        send(wave=ALGO, vel=0, patch=62,filter_freq=2000,resonance=2.5,filter_type=FILTER_LPF, bp0_target=TARGET_FILTER_FREQ,bp0="1,1,500,0,0,0")
+        send(wave=ALGO, patch=62, filter_freq="125,0,0,4", resonance=2.5, filter_type=FILTER_LPF, bp0="1,1,500,0,0,0")
 
 
 # Removes trailing 0s and x.0000s from floating point numbers to trim wire message size
