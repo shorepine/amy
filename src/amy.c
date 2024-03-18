@@ -1012,7 +1012,7 @@ void play_event(struct delta d) {
 float combine_controls(float *controls, float *coefs) {
     float result = 0;
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        result += controls[i] * coefs[i];
+        result += coefs[i] * controls[i];
     return result;
 }
 
@@ -1020,7 +1020,8 @@ float combine_controls_mult(float *controls, float *coefs) {
     float result = 1.0;
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
         if (coefs[i] != 0)
-            result *= controls[i] * coefs[i];
+            // COEF_MOD and COEF_BEND are applied as amp *= (1 + COEF * CONTROL).
+            result *= ((i > COEF_EG1)? 1.0f : 0) + coefs[i] * controls[i];
     return result;
 }
 
