@@ -358,7 +358,8 @@ def make_patches(filename):
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
-        f.write("const char * patch_commands[256] PROGMEM = {\n")
+        f.write("static const char * const patch_commands[256] PROGMEM = {\n")
+        #f.write("const char * patch_commands[256] PROGMEM = {\n")
         # Do juno
         for i in range(128):
             amy.log_patch()
