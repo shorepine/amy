@@ -1387,15 +1387,17 @@ float atoff(const char *s) {
 int parse_float_list_message(char *message, float *vals, int max_num_vals) {
     // Return the number of values extracted from message.
     uint16_t c = 0;
-    uint16_t stop = strspn(message, " 0123456789-,.");  // Note space & period.
+    uint16_t stop = strspn(message, " 0123456789-,.");  // Note: space AND period.
     int num_vals_received = 0;
     while(c < stop && num_vals_received < max_num_vals) {
-        if(message[c] != ',') {
-            *vals++ = atoff(message + c);
-            ++num_vals_received;
-        }
+        *vals++ = atoff(message + c);
+        ++num_vals_received;
         while(message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
         c++;
+    }
+    if (c < stop) {
+        fprintf(stderr, "WARNING: parse_float_list: More than %d values in \"%s\"\n",
+                max_num_vals, message);
     }
     return num_vals_received;
 }
@@ -1406,12 +1408,14 @@ int parse_int_list_message(char *message, int16_t *vals, int max_num_vals) {
     uint16_t stop = strspn(message, " 0123456789-,");  // Space, no period.
     int num_vals_received = 0;
     while(c < stop && num_vals_received < max_num_vals) {
-        if(message[c] != ',') {
-            *vals++ = atoi(message + c);
-            ++num_vals_received;
-        }
+        *vals++ = atoi(message + c);
+        ++num_vals_received;
         while(message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
         c++;
+    }
+    if (c < stop) {
+        fprintf(stderr, "WARNING: parse_int_list: More than %d values in \"%s\"\n",
+                max_num_vals, message);
     }
     return num_vals_received;
 }
@@ -1430,8 +1434,16 @@ void copy_param_list_substring(char *dest, const char *src) {
 // helper to parse the list of source voices for an algorithm
 void parse_algorithm_source(struct synthinfo * t, char *message) {
     parse_int_list_message(message, t->algo_source, MAX_ALGO_OPS);
+    char *s = message;
+    int num_len;
     for (int i = 0; i < MAX_ALGO_OPS; ++i) {
-        if (t->algo_source[i] == -1) {
+        // How long was the non-WS part of this inter-comma segment?
+        s += strspn(s, " ");
+        num_len = strspn(s, "01234567890-");
+        s += num_len;
+        s += strspn(s, " ");
+        if (*s == ',') ++s;
+        if (t->algo_source[i] == -1 || num_len == 0) {
             AMY_UNSET(t->algo_source[i]);
         }
     }
