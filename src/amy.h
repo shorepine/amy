@@ -305,6 +305,7 @@ struct synthinfo {
     float feedback;
     uint8_t status;
     float velocity;
+    PHASOR trigger_phase;
     PHASOR phase;
     float detune;
     float step;

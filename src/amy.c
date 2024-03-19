@@ -579,6 +579,7 @@ void reset_osc(uint16_t i ) {
     synth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     msynth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     synth[i].phase = F2P(0);
+    synth[i].trigger_phase = F2P(0);
     synth[i].volume = 0;
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
@@ -847,7 +848,7 @@ void play_event(struct delta d) {
             sine_note_on(d.osc, freq_of_logfreq(synth[d.osc].logfreq_coefs[0]));
         }
     }
-    if(d.param == PHASE) synth[d.osc].phase = *(PHASOR *)&d.data;  // PHASOR
+    if(d.param == PHASE) { synth[d.osc].phase = *(PHASOR *)&d.data;  synth[d.osc].trigger_phase = *(PHASOR*)&d.data; } // PHASOR
     if(d.param == PATCH) synth[d.osc].patch = *(uint16_t *)&d.data;
     if(d.param == FEEDBACK) synth[d.osc].feedback = *(float *)&d.data;
 
@@ -957,6 +958,9 @@ void play_event(struct delta d) {
                 osc_note_on(d.osc, initial_freq);
                 // trigger the mod source, if we have one
                 if(AMY_IS_SET(synth[d.osc].mod_source)) {
+                    synth[synth[d.osc].mod_source].phase = synth[synth[d.osc].mod_source].trigger_phase;
+
+
                     synth[synth[d.osc].mod_source].note_on_clock = total_samples;  // Need a note_on_clock to have envelope work correctly.
                     if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
                     if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
