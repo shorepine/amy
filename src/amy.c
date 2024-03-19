@@ -1049,7 +1049,11 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
     // Also, we advance one frame by writing both last_amp and amp (=next amp)
-    msynth[osc].last_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    float new_last_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
+    if (new_last_amp > 0) {
+        msynth[osc].last_amp = new_last_amp;
+    }
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
     msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);

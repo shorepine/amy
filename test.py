@@ -406,7 +406,8 @@ def main(argv):
     #TestSawDownOsc().test()
     #TestGuitar().test()
     #TestFilter().test()
-    TestAlgo().test()
+    #TestAlgo().test()
+    TestBleep().test()
   amy.send(debug=0)
   print("tests done.")
 

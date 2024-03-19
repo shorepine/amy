@@ -445,7 +445,7 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     SAMPLE last_amp = F2S(msynth[osc].last_amp);
-    //fprintf(stderr, "render_sine: time %f osc %d freq %f amp %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(amp));
+    //fprintf(stderr, "render_sine: time %f osc %d freq %f last_amp %f amp %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
     SAMPLE max_value;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, last_amp, amp, synth[osc].lut, &max_value);
     msynth[osc].last_amp = msynth[osc].amp;
