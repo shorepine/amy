@@ -287,8 +287,8 @@ class TestBleep(AmyTest):
 
   def run(self):
     amy.send(time=0, wave=amy.SINE, freq=220)
-    amy.send(time=100, osc=0, pan=0.9, vel=1)
-    amy.send(time=250, osc=0, pan=0.1, freq=440)
+    amy.send(time=0, osc=0, pan=0.9, vel=1)
+    amy.send(time=150, osc=0, pan=0.1, freq=440)
     amy.send(time=300, osc=0, pan=0.5, vel=0)
 
 class TestOverload(AmyTest):
