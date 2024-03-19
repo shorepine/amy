@@ -263,7 +263,9 @@ int8_t global_init() {
 
 float logfreq_of_freq(float freq) {
     // logfreq is defined as log_2(freq / 8.18 Hz)
-    if (freq==0) return ZERO_HZ_LOG_VAL;
+    //if (freq==0) return ZERO_HZ_LOG_VAL;
+    // Actually, special-case zero to mean middle C, for convenience.
+    if (freq==0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ == 261.63.
     return log2f(freq / ZERO_LOGFREQ_IN_HZ);
 }
 
