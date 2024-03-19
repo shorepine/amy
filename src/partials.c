@@ -79,7 +79,6 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].amp_coefs[0] = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
-                //synth[o].last_amp = 0;
 
                 synth[o].breakpoint_times[0][0] = 0;
                 synth[o].breakpoint_values[0][0] = 1.0;
@@ -121,7 +120,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     //partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
-                    synth[o].last_amp = 0;
+                    msynth[o].last_amp = 0;
                     partial_note_on(o);
                 }
                 synth[osc].step++;
@@ -138,7 +137,12 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==IS_ALGO_SOURCE) {
+            // msynth amp used to lag one frame behind, but we advanced it one frame.
+            // For partials, retard it again to preserve the old behavior.
+            float last_amp_on_entry = msynth[o].last_amp;
             hold_and_modify(o);
+            msynth[o].amp = msynth[o].last_amp;
+            msynth[o].last_amp = last_amp_on_entry;
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;

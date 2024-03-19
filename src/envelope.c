@@ -43,7 +43,8 @@ SAMPLE compute_mod_scale(uint16_t osc) {
     return 0; // 0 is no change, unlike bp scale
 }
 
-SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
+// sample_offset allows you to probe the EG output at some point this many samples into the future.
+SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset) {
     AMY_PROFILE_START(COMPUTE_BREAKPOINT_SCALE)
     // given a breakpoint list, compute the scale
     // we first see how many BPs are defined, and where we are in them?
@@ -75,7 +76,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
 
     // Find out which BP we're in
     if(AMY_IS_SET(synth[osc].note_on_clock)) {
-        elapsed = (total_samples - synth[osc].note_on_clock) + 1; 
+        elapsed = (total_samples - synth[osc].note_on_clock + sample_offset) + 1;
         for(uint8_t i = 0; i < bp_r; i++) {
             if(elapsed < synth[osc].breakpoint_times[bp_set][i]) {
                 // We found a segment.
@@ -95,7 +96,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set) {
         }
     } else if(AMY_IS_SET(synth[osc].note_off_clock)) {
         release = 1;
-        elapsed = (total_samples - synth[osc].note_off_clock) + 1; 
+        elapsed = (total_samples - synth[osc].note_off_clock + sample_offset) + 1;
         // Get the last t/v pair , for release
         found = bp_r;
         t0 = 0; // start the elapsed clock again

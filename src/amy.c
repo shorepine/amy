@@ -531,7 +531,6 @@ void clone_osc(uint16_t i, uint16_t f) {
     synth[i].filter_type = synth[f].filter_type;
     //synth[i].hpf_state[0] = synth[f].hpf_state[0];
     //synth[i].hpf_state[1] = synth[f].hpf_state[1];
-    //synth[i].last_amp = synth[f].last_amp;
     //synth[i].dc_offset = synth[f].dc_offset;
     synth[i].algorithm = synth[f].algorithm;
     //for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = synth[f].algo_source[j];  // RISKY - end up allocating secondary oscs to multiple mains.
@@ -560,6 +559,7 @@ void reset_osc(uint16_t i ) {
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
     synth[i].amp_coefs[COEF_EG0] = 1.0f;
     msynth[i].amp = 1.0f;
+    msynth[i].last_amp = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].logfreq_coefs[j] = 0;
     synth[i].logfreq_coefs[COEF_NOTE] = 1.0;
@@ -605,7 +605,6 @@ void reset_osc(uint16_t i ) {
     synth[i].hpf_state[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i].filter_delay[j] = 0;
     synth[i].last_filt_norm_bits = 0;
-    synth[i].last_amp = 0;
     synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i].algo_source[j]);
@@ -1036,8 +1035,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_CONST] = 1.0f;
     ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc].midi_note)) ? logfreq_for_midi_note(synth[osc].midi_note) : 0;
     ctrl_inputs[COEF_VEL] = synth[osc].velocity;
-    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0));
-    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1));
+    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, 0));
+    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
 
@@ -1049,6 +1048,10 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].duty = combine_controls(ctrl_inputs, synth[osc].duty_coefs);
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
+    // Also, we advance one frame by writing both last_amp and amp (=next amp)
+    msynth[osc].last_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
+    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
     msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
     if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
 
@@ -1127,7 +1130,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     // fill buf with next block_size of samples for specified osc.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
     hold_and_modify(osc); // apply bp / mod
-    if(!(msynth[osc].amp == 0 && synth[osc].last_amp == 0)) {
+    if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
         if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
         if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
         if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);

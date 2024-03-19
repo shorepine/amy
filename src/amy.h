@@ -336,8 +336,6 @@ struct synthinfo {
     SAMPLE hpf_state[2];
     // Constant offset to add to sawtooth before integrating.
     SAMPLE dc_offset;
-    // amplitude smoother
-    SAMPLE last_amp;
     // Selected lookup table and size.
     const LUT *lut;
     float eq_l;
@@ -354,6 +352,7 @@ struct synthinfo {
 // synthinfo, but only the things that mods/env can change. one per osc
 struct mod_synthinfo {
     float amp;
+    float last_amp;    // amplitude smoother
     float pan;
     float last_pan;   // Pan history for interpolation.
     float duty;
@@ -548,7 +547,7 @@ esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float
 
 
 // envelopes
-extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set);
+extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset);
 extern SAMPLE compute_mod_scale(uint16_t osc);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
