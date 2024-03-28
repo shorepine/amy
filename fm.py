@@ -234,9 +234,9 @@ class AMYPatch:
             if(amp_times[4] > last_release_time):
                 last_release_time = amp_times[4]
                 last_release_value = amp_levels[4]
-            print("osc %d (op %d) freq %.6f ratio %d env %s amp %.6f amp_mod %d" % \
-                  (i+1, osc.op_num, osc.frequency, osc.freq_is_ratio, oscbpfmt,
-                   osc.op_amp, osc.ampmodsens))
+            #print("osc %d (op %d) freq %.6f ratio %d env %s amp %.6f amp_mod %d" % \
+            #      (i+1, osc.op_num, osc.frequency, osc.freq_is_ratio, oscbpfmt,
+            #       osc.op_amp, osc.ampmodsens))
 
             # Make them all in cosine phase, to be like DX7.  Important for slow oscs
             args = {"osc":i+1,
@@ -257,22 +257,22 @@ class AMYPatch:
             amy.send(**args)
 
         # Set up the amp LFO 
-        print("osc 7 amp lfo wave %d freq %f amp %f" % (
-            self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
+        #print("osc 7 amp lfo wave %d freq %f amp %f" % (
+        #    self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
         amy.send(osc=7, wave=self.lfo_waveform, freq=t(self.lfo_freq),
                    amp=t(self.amp_lfo_amp))
 
         # and the pitch one
-        print("osc 8 pitch lfo wave %d freq %f amp %f" % (
-            self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
+        #print("osc 8 pitch lfo wave %d freq %f amp %f" % (
+        #    self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
         amy.send(osc=8, wave=self.lfo_waveform, freq=t(self.lfo_freq),
                    amp=t(self.pitch_lfo_amp))
 
-        print("not used: lfo delay %d " % self.lfo_delay)
+        #print("not used: lfo delay %d " % self.lfo_delay)
 
         ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
-        print("osc 0 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
-            self.algo, self.feedback, pitchbp, ampbp))
+        #print("osc 0 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
+        #    self.algo, self.feedback, pitchbp, ampbp))
         amy.send(osc=0, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
                    algo_source="1,2,3,4,5,6",
                    bp0=ampbp, bp0_target=amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,

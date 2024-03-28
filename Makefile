@@ -40,8 +40,14 @@ OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c \
 	src/libminiaudio-audio.c)
 
 HEADERS = $(wildcard src/*.h) src/amy_config.h
+HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 
-%.o: %.c $(HEADERS)
+PYTHONS = $(wildcard *.py)
+
+src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
+	${PYTHON} amy_headers.py
+
+%.o: %.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.mm $(HEADERS)
@@ -74,4 +80,5 @@ web: $(TARGET)
 
 clean:
 	-rm -f src/*.o
+	-rm -r src/patches.h
 	-rm -f $(TARGET)
