@@ -163,7 +163,7 @@ On storage connstrained devices, you may want to limit the amount of PCM samples
 // or, #include "pcm_small.h"
 ```
 
-## Voices and patches (DX7 and Juno-6) support
+## Voices and patches (DX7, Juno-6, custom) support
 
 With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators. 
 
@@ -177,6 +177,27 @@ amy.send(voices="0", osc=1, filter_freq="440,0,0,0,5") # adjust the filter on th
 ```
 
 Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches by "recording" AMY setup commands and adding them to `patches.h`.
+
+You can also create your own patches at runtime and use them for voices using `store_patch`=`1024,AMY_PATCH_STRING` where 1024 is a patch number from 1024-1055. This message must be the only thing in the string sent over. AMY will treat the rest of the message as a patch, not further messages.
+
+So you can do:
+```
+>>> import amy; amy.live()
+>>> amy.send(store_patch="1024,v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z")
+>>> amy.send(voices="0",load_patch=1024)
+>>> amy.send(voices='0',vel=2,note=50)
+```
+We divine the number of oscs used for the patch at store_patch time. If you store a new patch over an old one, that old memory is freed and re-allocated. We rely on malloc for all of this.
+
+Also recall you can "record" patches in amy.py, so the whole loop is:
+```
+>>> amy.log_patch()
+>>> amy.preset(5)
+>>> bass_drum = amy.retrieve_patch()
+>>> bass_drum
+'v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z'
+>>> amy.send(store_patch="1024,"+bass_drum)
+```
 
 **Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and managing your own oscillator mapping in your code.
 
