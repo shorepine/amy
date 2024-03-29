@@ -287,8 +287,8 @@ class TestBleep(AmyTest):
 
   def run(self):
     amy.send(time=0, wave=amy.SINE, freq=220)
-    amy.send(time=100, osc=0, pan=0.9, vel=1)
-    amy.send(time=250, osc=0, pan=0.1, freq=440)
+    amy.send(time=0, osc=0, pan=0.9, vel=1)
+    amy.send(time=150, osc=0, pan=0.1, freq=440)
     amy.send(time=300, osc=0, pan=0.5, vel=0)
 
 class TestOverload(AmyTest):
@@ -373,6 +373,18 @@ class TestFlutesEq(AmyTest):
     amy.send(time=900, osc=1, vel=0)
     amy.send(time=900, osc=2, vel=0)
 
+class TestOscBD(AmyTest):
+  """Bass Drum as modulated sine-tone. amy.py:preset(5). """
+
+  def run(self):
+    # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
+    amy.send(time=0, osc=1, wave=amy.SINE, amp=1, freq=0.25, phase=0.5)
+    amy.send(time=0, osc=0, wave=amy.SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,2", mod_source=1)
+    amy.send(time=100, osc=0, note=84, vel=1)
+    amy.send(time=350, osc=0, note=84, vel=1)
+    amy.send(time=600, osc=0, note=84, vel=1)
+
+
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.
@@ -394,7 +406,8 @@ def main(argv):
     #TestSawDownOsc().test()
     #TestGuitar().test()
     #TestFilter().test()
-    TestAlgo().test()
+    #TestAlgo().test()
+    TestBleep().test()
   amy.send(debug=0)
   print("tests done.")
 
