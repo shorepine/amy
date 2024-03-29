@@ -79,11 +79,13 @@ def trunc3(number):
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
-            client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, mod_target=None,
-            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, algorithm=None, ratio = None, latency_ms = None, algo_source=None,
-            chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, voices=None):
+            client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, 
+            mod_target=None, debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, 
+            algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, 
+            reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, store_patch=None, voices=None):
 
     m = ""
+    if(store_patch is not None): return "u" + str(store_patch)
     if(time is not None): m = m + "t" + str(time)
     if(osc is not None): m = m + "v" + str(osc)
     if(wave is not None): m = m + "w" + str(wave)

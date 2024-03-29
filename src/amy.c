@@ -1568,9 +1568,10 @@ struct event amy_parse_message(char * message) {
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 's': e.pitch_bend = atoff(message + start); break;
                         case 'T': e.bp0_target = atoi(message + start);  break;
-                        case 'W': e.bp1_target = atoi(message + start);  break;
+                        case 'u': patches_store_patch(message+start); return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
+                        case 'W': e.bp1_target = atoi(message + start);  break;
                         case 'w': e.wave=atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
                         case 'y': e.eq_m = atoff(message+start); break;

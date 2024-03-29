@@ -232,6 +232,7 @@ Here's the full list:
 | s    | pitch_bend | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
 | T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefficients. |
 | t    | timestamp | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
+| u    | store_patch | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |  
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
 | w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
