@@ -70,9 +70,9 @@ int main(int argc, char ** argv) {
 
 
     amy_reset_oscs();
-    //example_voice_chord(0, 128);
+    example_voice_chord(0, 128);
     //example_drums(0, 4);
-    example_fm(0);
+    //example_fm(0);
 
     // Now just spin for 10s
     while(amy_sysclock() - start < 5000) {
