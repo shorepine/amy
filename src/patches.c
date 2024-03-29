@@ -20,6 +20,9 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 */
 
 #define MAX_VOICES 16
+#define MEMORY_PATCHES 32
+char * memory_patch[MEMORY_PATCHES];
+uint16_t memory_patch_oscs[MEMORY_PATCHES];
 uint8_t osc_to_voice[AMY_OSCS];
 uint16_t voice_to_base_osc[MAX_VOICES];
 
@@ -33,8 +36,36 @@ void patches_reset() {
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         AMY_UNSET(osc_to_voice[i]);
     }
+    for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
+        if(memory_patch[i] != NULL) free(memory_patch[i]);
+        memory_patch_oscs[i] = 0; 
+    }
 }
 
+void patches_store_patch(char * message) {
+    // patch#,amy patch string
+    // put it in ram
+    uint16_t patch_number = atoi(message);
+    char * patch = message + 5; // always 4 digit patch + ,
+    // Now find out how many oscs this message uses
+
+    uint16_t max_osc = 0;
+    char sub_message[255];
+    uint16_t start = 0;
+    for(uint16_t i=0;i<strlen(patch);i++) {
+        if(message[i] == 'Z') {
+            strncpy(sub_message, message + start, i - start + 1);
+            sub_message[i-start+1]= 0;
+            struct event patch_event = amy_parse_message(sub_message);
+            if(patch_event.osc > max_osc) max_osc = patch_event.osc;
+            start = i+1;
+        }
+    }
+    if(memory_patch[patch_number-1024] != NULL) free(memory_patch[patch_number-1024]);
+    memory_patch[patch_number-1024] = malloc(strlen(patch));
+    memory_patch_oscs[patch_number-1024] = max_osc + 1;
+    strcpy(memory_patch[patch_number-1024], patch);
+}
 
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 
 // So i know that the patch / voice alloc already exists and the patch has already been set!
@@ -61,8 +92,15 @@ void patches_load_patch(struct event e) {
     
     int16_t voices[MAX_VOICES];
     uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES);
-
-    char*message = (char*)patch_commands[e.load_patch];
+    char *message;
+    uint16_t patch_osc = 0;
+    if(e.load_patch > 1023) {
+        message = memory_patch[e.load_patch-1024];
+        patch_osc = memory_patch_oscs[e.load_patch-1024];
+    } else {
+        message = (char*)patch_commands[e.load_patch];    
+        patch_osc = patch_oscs[e.load_patch];
+    }
     for(uint8_t v=0;v<num_voices;v++) {
         // Find the first osc with patch_oscs[e.load_patch] free oscs
         // First, is this an old voice we're re-doing? 
@@ -90,14 +128,14 @@ void patches_load_patch(struct event e) {
             if(AMY_IS_UNSET(osc_to_voice[osc])) {
                 // Are there num_voices patch_oscs free oscs after this one?
                 good = 1;
-                for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
+                for(uint16_t j=0;j<patch_osc;j++) {
                     good = good & (AMY_IS_UNSET(osc_to_voice[osc+j]));
                 }
                 if(good) {
                     //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], osc, voices[v]);
                     //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
                     voice_to_base_osc[voices[v]] = osc; 
-                    for(uint16_t j=0;j<patch_oscs[e.load_patch];j++) {
+                    for(uint16_t j=0;j<patch_osc;j++) {
                         //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
                         osc_to_voice[osc+j] = voices[v];
                         reset_osc(osc+j);
