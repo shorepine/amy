@@ -629,13 +629,15 @@ SAMPLE block_norm(SAMPLE* block, int len, int bits) {
     AMY_PROFILE_START(BLOCK_NORM)
 
     SAMPLE max_val = 0;
-    if (bits > 0) {
+    if (bits >= 0) {
+        // do this even if bits == 0 to ensure max_val is set.
         while(len--) {
             *block = SHIFTL(*block, bits);
             if (*block > max_val) max_val = *block;
             ++block;
         }
-    } else if (bits < 0) {
+    } else {
+        // bits is negative - right-shift.
         bits = -bits;
         while(len--) {
             *block = SHIFTR(*block, bits);
