@@ -159,8 +159,9 @@ def send(**kwargs):
     m = message(**kwargs)
     if(log): mess.append(m)
 
+    # override_send is used by e.g. Tulip, to send messages in a different way than libamy or UDP 
     if(override_send is not None):
-        override_send(**kwargs)
+        override_send(m)
     else:
         send_raw(m)
 
