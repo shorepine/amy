@@ -105,6 +105,7 @@ struct mod_synthinfo * msynth;
 // Two mixing blocks, one per core of rendering
 SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
+SAMPLE core_max[AMY_MAX_CORES];
 
 #ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
@@ -1170,18 +1171,18 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
-            if (max_val > max_max) max_max = max_val;
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != WAVE_OFF) {
                 // apply filter to osc if set
-                if(synth[osc].filter_type != FILTER_NONE) filter_process(per_osc_fb[core], osc, max_val);
+                if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
                 mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
                 //printf("render5 %d %d %d %d\n", osc, start, end, core);
 
             }
+            if (max_val > max_max) max_max = max_val;
         }
-
     }
+    core_max[core] = max_max;
 
     if (debug_flag) {
         debug_flag = 0;  // Only do this once each time debug_flag is set.
@@ -1263,25 +1264,30 @@ int16_t * amy_simple_fill_buffer() {
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
     // mix results from both cores.
+    SAMPLE max_val = core_max[0];
     if(AMY_CORES==2) {
         for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
+        if (core_max[1] > max_val)  max_val = core_max[1];
     }
-    // apply the eq filters if set
-    if(amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
-        parametric_eq_process(fbl[0]);
-    }
+    // Apply global processing only if there is some signal.
+    if (max_val > 0) {
+        // apply the eq filters if there is some signal and EQ is non-default.
+        if (amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
+            parametric_eq_process(fbl[0]);
+        }
 
-    if(AMY_HAS_CHORUS==1) {
-        // apply chorus.
-        if(chorus.level > 0 && delay_lines[0] != NULL) {
-            // apply time-varying delays to both chans.
-            // delay_mod_val, the modulated delay amount, is set up before calling render_*.
-            SAMPLE scale = F2S(1.0f);
-            for (int16_t c=0; c < AMY_NCHANS; ++c) {
-                apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
-                                     delay_mod, scale, chorus.level, 0);
-                // flip delay direction for alternating channels.
-                scale = -scale;
+        if(AMY_HAS_CHORUS==1) {
+            // apply chorus.
+            if(chorus.level > 0 && delay_lines[0] != NULL) {
+                // apply time-varying delays to both chans.
+                // delay_mod_val, the modulated delay amount, is set up before calling render_*.
+                SAMPLE scale = F2S(1.0f);
+                for (int16_t c=0; c < AMY_NCHANS; ++c) {
+                    apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
+                                         delay_mod, scale, chorus.level, 0);
+                    // flip delay direction for alternating channels.
+                    scale = -scale;
+                }
             }
         }
     }

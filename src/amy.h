@@ -528,7 +528,7 @@ extern SAMPLE amy_get_random();
 // filters
 extern void filters_init();
 extern void filters_deinit();
-extern void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
+extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
 extern void parametric_eq_process(SAMPLE *block);
 extern void reset_filter(uint16_t osc);
 extern void reset_parametric(void);

@@ -17,6 +17,7 @@ extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
+#define AMY_MAX_CORES 2          // upper bound for static arrays.
 #define AMY_CORES amy_global.cores
 #define AMY_HAS_REVERB amy_global.has_reverb
 #define AMY_HAS_CHORUS amy_global.has_chorus

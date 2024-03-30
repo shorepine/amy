@@ -625,32 +625,36 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
 #endif // AMY_DEBUG
 }
 
-void block_norm(SAMPLE* block, int len, int bits) {
+SAMPLE block_norm(SAMPLE* block, int len, int bits) {
     AMY_PROFILE_START(BLOCK_NORM)
 
+    SAMPLE max_val = 0;
     if (bits > 0) {
         while(len--) {
             *block = SHIFTL(*block, bits);
+            if (*block > max_val) max_val = *block;
             ++block;
         }
     } else if (bits < 0) {
         bits = -bits;
         while(len--) {
             *block = SHIFTR(*block, bits);
+            if (*block > max_val) max_val = *block;
             ++block;
         }
     }
     AMY_PROFILE_STOP(BLOCK_NORM)
+    return max_val;
 }
 
-void block_denorm(SAMPLE* block, int len, int bits) {
-    block_norm(block, len, -bits);
+SAMPLE block_denorm(SAMPLE* block, int len, int bits) {
+    return block_norm(block, len, -bits);
 }
 
-void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
+SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
 
     SAMPLE filtmax = scan_max(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS);
-    if (max_val == 0 && filtmax == 0) return;
+    if (max_val == 0 && filtmax == 0) return 0;
 
     AMY_PROFILE_START(FILTER_PROCESS)
 
@@ -666,7 +670,7 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
         dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc].resonance);
     else {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc].filter_type);
-        return;
+        return 0;
     }
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
 
@@ -688,12 +692,12 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, max_val);
+        max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, max_val);
     } else {
         block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
         block_norm(block, AMY_BLOCK_SIZE, normbits);
         dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
-        block_denorm(block, AMY_BLOCK_SIZE, normbits);
+        max_val = block_denorm(block, AMY_BLOCK_SIZE, normbits);
         synth[osc].last_filt_norm_bits = normbits;
     }
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay);
@@ -702,7 +706,7 @@ void filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     // hpf_buf(block, &synth[osc].hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
-
+    return max_val;
 }
 
 
