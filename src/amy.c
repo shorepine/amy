@@ -1603,7 +1603,7 @@ struct event amy_parse_message(char * message) {
 
         // Now adjust time in some useful way:
         // if we have a delta OR latency is 0 , AND got a time in this message, use it schedule it properly
-        if(( (computed_delta_set || amy_global.latency_ms==0) && e.time > 0)) {
+        if(( (computed_delta_set || amy_global.latency_ms==0) && AMY_IS_SET(e.time))) {
             // OK, so check for potentially negative numbers here (or really big numbers-sysclock)
             int32_t potential_time = (int32_t)((int32_t)e.time - (int32_t)computed_delta) + amy_global.latency_ms;
             if(potential_time < 0 || (potential_time > (int32_t)(sysclock + amy_global.latency_ms + AMY_MAX_DRIFT_MS))) {
