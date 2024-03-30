@@ -348,7 +348,13 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
         y1 = y0;
         output[i] = y0;
         if (y0 < 0) y0 = -y0;
-        if (y0 > max_out) max_out = y0;
+        if (y0 > 0) {
+            if (y0 > max_out)
+                max_out = y0;
+        } else {
+            if (-y0 > max_out)
+                max_out = -y0;
+        }
     }
     w[0] = x1;
     w[1] = x2;
@@ -633,7 +639,13 @@ SAMPLE block_norm(SAMPLE* block, int len, int bits) {
         // do this even if bits == 0 to ensure max_val is set.
         while(len--) {
             *block = SHIFTL(*block, bits);
-            if (*block > max_val) max_val = *block;
+            if (*block > 0) {
+                if (*block > max_val)
+                    max_val = *block;
+            } else {
+                if (-*block > max_val)
+                    max_val = -*block;
+            }
             ++block;
         }
     } else {
@@ -641,7 +653,13 @@ SAMPLE block_norm(SAMPLE* block, int len, int bits) {
         bits = -bits;
         while(len--) {
             *block = SHIFTR(*block, bits);
-            if (*block > max_val) max_val = *block;
+            if (*block > 0) {
+                if (*block > max_val)
+                    max_val = *block;
+            } else {
+                if (-*block > max_val)
+                    max_val = -*block;
+            }
             ++block;
         }
     }
