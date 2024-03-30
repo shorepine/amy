@@ -347,7 +347,7 @@ def make_clipping_lut(filename):
     print("wrote", filename)
 
 def make_patches(filename):
-    def nothing(**kwargs):
+    def nothing(message):
         return
 
     import juno, amy, fm
