@@ -538,6 +538,13 @@ void parametric_eq_process_full(SAMPLE *block) {
 
 }
 
+static SAMPLE inline MAXABS2(SAMPLE a, SAMPLE b) {
+    if (a < 0) a = -a;
+    if (b < 0) b = -b;
+    if (a > b) return a;
+    return b;
+}
+
 void parametric_eq_process_top16block(SAMPLE *block) {
     // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
     AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
@@ -571,16 +578,16 @@ void parametric_eq_process_top16block(SAMPLE *block) {
         for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
             SAMPLE x0 = cblock[i];
             SAMPLE x1times2 = SHIFTL(x1, 1);
-            int xbits = nheadroom16(MAX(ABS(x0), MAX(ABS(x1times2), ABS(x2))));
+            int xbits = nheadroom16(MAXABS2(x0, MAXABS2(x1times2, x2)));
             // Optimize the FIR multiplies for the known structure of the zeros in LPF/BPF/HPF.
             SAMPLE w00 = top16SMUL_after_a(c00, x0 + x1times2 + x2, c00bits, xbits);
-            int y0bits = nheadroom16(MAX(ABS(y01), ABS(y02)));
+            int y0bits = nheadroom16(MAXABS2(y01, y02));
             SAMPLE y00 = w00 - top16SMUL_after_a(c03, y01, c03bits, y0bits) - top16SMUL_after_a(c04, y02, c04bits, y0bits);
             SAMPLE w10 = top16SMUL_after_a(c10, x0 - x2, c10bits, xbits);
-            int y1bits = nheadroom16(MAX(ABS(y11), ABS(y12)));
+            int y1bits = nheadroom16(MAXABS2(y11, y12));
             SAMPLE y10 = w10 - top16SMUL_after_a(c13, y11, c13bits, y1bits) - top16SMUL_after_a(c14, y12, c14bits, y1bits);
             SAMPLE w20 = top16SMUL_after_a(c20, x0 - x1times2 + x2, c20bits, xbits);
-            int y2bits = nheadroom16(MAX(ABS(y21), ABS(y22)));
+            int y2bits = nheadroom16(MAXABS2(y21, y22));
             SAMPLE y20 = w20 - top16SMUL_after_a(c23, y21, c23bits, y2bits) - top16SMUL_after_a(c24, y22, c24bits, y2bits);
             x2 = x1;
             x1 = x0;
