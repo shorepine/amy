@@ -208,7 +208,12 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
 // 16 bit pseudo floating-point multiply.
 // See https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=njPHwSB9VIJi
 
-#define ABS(a) (a > 0) ? (a) : -(a)
+static inline SAMPLE ABS(SAMPLE a) {
+    if (a > 0)
+        return a;
+    else
+        return -a;
+}
 
 static inline int headroom(SAMPLE a) {
     // How many bits bigger can this value get before overflow?
@@ -247,7 +252,7 @@ SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
     //int adropped = MAX(0, 16 - headroom(a));
     int adropped = nheadroom16(a);  //MAX(0, 16 - headroom(a));
     if (adropped) {
-        a = SHIFTR(a + (1 << (adropped - 1)), adropped);
+        a = SHIFTR(SHIFTR(a, adropped - 1) + 1, 1);
     }
     int resultdrop = 23 - adropped;
     int bdropped = MIN(resultdrop, nheadroom16(b)); // MAX(0, 16 - headroom(b)));
@@ -268,7 +273,8 @@ SAMPLE top16SMUL_a_part(SAMPLE a, int *p_resultdrop) {
     // Just the processing of a, so we can split it out
     int adropped = nheadroom16(a);
     if (adropped) {
-        a = SHIFTR(a + (1 << (adropped - 1)), adropped);
+        //a = SHIFTR(a + (1 << (adropped - 1)), adropped);
+        a = SHIFTR(SHIFTR(a, adropped - 1) + 1, 1);
     }
     *p_resultdrop = 23 - adropped;
     return a;
@@ -468,7 +474,7 @@ void parametric_eq_process(SAMPLE *block) {
 }
 
 void parametric_eq_process_old(SAMPLE *block) {
-    //AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
+    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
 
     SAMPLE output[2][AMY_BLOCK_SIZE];
     for(int c = 0; c < AMY_NCHANS; ++c) {
@@ -481,7 +487,7 @@ void parametric_eq_process_old(SAMPLE *block) {
         for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
             cblock[i] = output[0][i] + FILT_MUL_SS_EQ(output[1][i], amy_global.eq[2]);
     }
-    //AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
+    AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
 
 }
 
@@ -552,26 +558,16 @@ void parametric_eq_process_top16block(SAMPLE *block) {
         int c10bits, c13bits, c14bits;
         int c20bits, c23bits, c24bits;
         // int c21bits, c22bits, c11bits, c12bits, c01bits, c02bits;
-        SAMPLE c00 = top16SMUL_a_part(eq_coeffs[0][0], &c00bits);
-        //SAMPLE c01 = top16SMUL_a_part(eq_coeffs[0][1], &c01bits);
-        //SAMPLE c02 = top16SMUL_a_part(eq_coeffs[0][2], &c02bits);
+        // Fold the global EQ parameters into the forward-gains of each stage.
+        SAMPLE c00 = top16SMUL_a_part(top16SMUL(amy_global.eq[0], eq_coeffs[0][0]), &c00bits);
         SAMPLE c03 = top16SMUL_a_part(eq_coeffs[0][3], &c03bits);
         SAMPLE c04 = top16SMUL_a_part(eq_coeffs[0][4], &c04bits);
-        SAMPLE c10 = top16SMUL_a_part(eq_coeffs[1][0], &c10bits);
-        //SAMPLE c11 = top16SMUL_a_part(eq_coeffs[1][1], &c11bits);
-        //SAMPLE c12 = top16SMUL_a_part(eq_coeffs[1][2], &c12bits);
+        SAMPLE c10 = top16SMUL_a_part(top16SMUL(amy_global.eq[1], eq_coeffs[1][0]), &c10bits);
         SAMPLE c13 = top16SMUL_a_part(eq_coeffs[1][3], &c13bits);
         SAMPLE c14 = top16SMUL_a_part(eq_coeffs[1][4], &c14bits);
-        SAMPLE c20 = top16SMUL_a_part(eq_coeffs[2][0], &c20bits);
-        //SAMPLE c21 = top16SMUL_a_part(eq_coeffs[2][1], &c21bits);
-        //SAMPLE c22 = top16SMUL_a_part(eq_coeffs[2][2], &c22bits);
+        SAMPLE c20 = top16SMUL_a_part(top16SMUL(amy_global.eq[2], eq_coeffs[2][0]), &c20bits);
         SAMPLE c23 = top16SMUL_a_part(eq_coeffs[2][3], &c23bits);
         SAMPLE c24 = top16SMUL_a_part(eq_coeffs[2][4], &c24bits);
-        int e0bits, e1bits, e2bits;
-        SAMPLE e0 = top16SMUL_a_part(amy_global.eq[0], &e0bits);
-        SAMPLE e1 = top16SMUL_a_part(amy_global.eq[1], &e1bits);
-        SAMPLE e2 = top16SMUL_a_part(amy_global.eq[2], &e2bits);
-        //int xbits = headroom(SHIFTL(scan_max(cblock, AMY_BLOCK_SIZE), 0));
         for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
             SAMPLE x0 = cblock[i];
             SAMPLE x1times2 = SHIFTL(x1, 1);
@@ -594,7 +590,7 @@ void parametric_eq_process_top16block(SAMPLE *block) {
             y11 = y10;
             y22 = y21;
             y21 = y20;
-            cblock[i] = top16SMUL_after_a(e0, y00, e0bits, y0bits) - top16SMUL_after_a(e1, y10, e1bits, y1bits) + top16SMUL_after_a(e2, y20, e2bits, y2bits);
+            cblock[i] = y00 - y10 + y20;
         }
         eq_delay[c][0][0] = x1;
         eq_delay[c][0][1] = x2;
