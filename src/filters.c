@@ -264,30 +264,29 @@ SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
     return result;
 }
 
-SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
+SAMPLE top16SMUL_a_part(SAMPLE a, int *p_resultdrop) {
     // Just the processing of a, so we can split it out
     int adropped = nheadroom16(a);
     if (adropped) {
         a = SHIFTR(a + (1 << (adropped - 1)), adropped);
     }
-    *p_adropped = adropped;
+    *p_resultdrop = 23 - adropped;
     return a;
 }
 
-SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped, int bnheadroom16) {
+SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int resultdrop, int bnheadroom16) {
     // The rest of top16SMUL after a has been preprocessed by top16SML_a_part.
-    int resultdrop = 23 - adropped;
     //int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
-    int bdropped = MIN(resultdrop, bnheadroom16);
-    if (bdropped) {
-        //b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
-        b = SHIFTR(SHIFTR(b, bdropped - 1) + 1, 1);
+    int bdrop = MIN(resultdrop, bnheadroom16);
+    if (bdrop) {
+        //b = SHIFTR(b + (1 << (bdrop - 1)), bdrop);
+        b = SHIFTR(SHIFTR(b, bdrop - 1) + 1, 1);
+        resultdrop -= bdrop;
     }
-    resultdrop -= bdropped;
     SAMPLE result = a_processed * b;
     if (resultdrop) {
         //return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
-        result = SHIFTR(SHIFTR(result, resultdrop - 1) + 1, 1);
+        return SHIFTR(SHIFTR(result, resultdrop - 1) + 1, 1);
     }
     return result;
 }
