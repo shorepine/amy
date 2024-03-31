@@ -225,30 +225,48 @@ static inline int headroom(SAMPLE a) {
 #endif  // AMY_USE_FIXEDPOINT
 }
 
+static inline int nheadroom16(SAMPLE a) {
+    // Headroom with MAX(0, 16 - headroom(a)) precomputed.
+#ifdef AMY_USE_FIXEDPOINT
+    return MAX(0, 16 - (__builtin_clz(ABS(a)) - 1));  // -1 for sign bit.
+#else  // !AMY_USE_FIXEDPOINT
+    // How many bits can you shift before this max overflows?
+    int bits = 0;
+    while(a < F2S(128.0) && bits < 32) {
+        a = SHIFTL(a, 1);
+        ++bits;
+    }
+    return bits;
+#endif  // AMY_USE_FIXEDPOINT
+}
+
 #ifdef AMY_USE_FIXEDPOINT
 
 SAMPLE top16SMUL(SAMPLE a, SAMPLE b) {
     // Multiply the top 15 bits of a and b.
-    int adropped = MAX(0, 16 - headroom(a));
+    //int adropped = MAX(0, 16 - headroom(a));
+    int adropped = nheadroom16(a);  //MAX(0, 16 - headroom(a));
     if (adropped) {
         a = SHIFTR(a + (1 << (adropped - 1)), adropped);
     }
     int resultdrop = 23 - adropped;
-    int bdropped = MIN(resultdrop, MAX(0, 16 - headroom(b)));
+    int bdropped = MIN(resultdrop, nheadroom16(b)); // MAX(0, 16 - headroom(b)));
     if (bdropped) {
-        b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
+        //b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
+        b = SHIFTR(SHIFTR(b, bdropped - 1) + 1, 1);
     }
     resultdrop -= bdropped;
     SAMPLE result = a * b;
     if (resultdrop) {
-        return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
+        //return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
+        return SHIFTR(SHIFTR(result, resultdrop - 1) + 1, 1);
     }
     return result;
 }
 
 SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
     // Just the processing of a, so we can split it out
-    int adropped = MAX(0, 16 - headroom(a));
+    int adropped = nheadroom16(a);
     if (adropped) {
         a = SHIFTR(a + (1 << (adropped - 1)), adropped);
     }
@@ -256,17 +274,20 @@ SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
     return a;
 }
 
-SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped, int bheadroom) {
+SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped, int bnheadroom16) {
     // The rest of top16SMUL after a has been preprocessed by top16SML_a_part.
     int resultdrop = 23 - adropped;
-    int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
+    //int bdropped = MIN(resultdrop, MAX(0, 16 - bheadroom));
+    int bdropped = MIN(resultdrop, bnheadroom16);
     if (bdropped) {
-        b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
+        //b = SHIFTR(b + (1 << (bdropped - 1)), bdropped);
+        b = SHIFTR(SHIFTR(b, bdropped - 1) + 1, 1);
     }
     resultdrop -= bdropped;
     SAMPLE result = a_processed * b;
     if (resultdrop) {
-        return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
+        //return SHIFTR(result + (1 << (resultdrop - 1)), resultdrop);
+        result = SHIFTR(SHIFTR(result, resultdrop - 1) + 1, 1);
     }
     return result;
 }
@@ -323,8 +344,8 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
     SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
-    bbits = headroom(max_val);
-    cbits = headroom(SHIFTL(MAX(state_max, max_val), 2));
+    bbits = nheadroom16(max_val);
+    cbits = nheadroom16(SHIFTL(MAX(state_max, max_val), 2));
     SAMPLE max_out = 0;
     for (int i = 0 ; i < len ; i++) {
         SAMPLE x0, w0, v0;
@@ -555,16 +576,16 @@ void parametric_eq_process_top16block(SAMPLE *block) {
         for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
             SAMPLE x0 = cblock[i];
             SAMPLE x1times2 = SHIFTL(x1, 1);
-            int xbits = headroom(MAX(ABS(x0), MAX(ABS(x1times2), ABS(x2))));
+            int xbits = nheadroom16(MAX(ABS(x0), MAX(ABS(x1times2), ABS(x2))));
             // Optimize the FIR multiplies for the known structure of the zeros in LPF/BPF/HPF.
             SAMPLE w00 = top16SMUL_after_a(c00, x0 + x1times2 + x2, c00bits, xbits);
-            int y0bits = headroom(MAX(ABS(y01), ABS(y02)));
+            int y0bits = nheadroom16(MAX(ABS(y01), ABS(y02)));
             SAMPLE y00 = w00 - top16SMUL_after_a(c03, y01, c03bits, y0bits) - top16SMUL_after_a(c04, y02, c04bits, y0bits);
             SAMPLE w10 = top16SMUL_after_a(c10, x0 - x2, c10bits, xbits);
-            int y1bits = headroom(MAX(ABS(y11), ABS(y12)));
+            int y1bits = nheadroom16(MAX(ABS(y11), ABS(y12)));
             SAMPLE y10 = w10 - top16SMUL_after_a(c13, y11, c13bits, y1bits) - top16SMUL_after_a(c14, y12, c14bits, y1bits);
             SAMPLE w20 = top16SMUL_after_a(c20, x0 - x1times2 + x2, c20bits, xbits);
-            int y2bits = headroom(MAX(ABS(y21), ABS(y22)));
+            int y2bits = nheadroom16(MAX(ABS(y21), ABS(y22)));
             SAMPLE y20 = w20 - top16SMUL_after_a(c23, y21, c23bits, y2bits) - top16SMUL_after_a(c24, y22, c24bits, y2bits);
             x2 = x1;
             x1 = x0;
