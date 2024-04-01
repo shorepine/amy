@@ -220,7 +220,7 @@ Here's the full list:
 | A    | bp0    | string      | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
 | B    | bp1    | string      | the second breakpoint generator. See bp0 |
 | b    | feedback | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
-| c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to the chained oscillator also. |
+| c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | C    | clone_osc | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |  
 | d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
