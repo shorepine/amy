@@ -1075,23 +1075,6 @@ void hold_and_modify(uint16_t osc) {
                msynth[osc].amp, msynth[osc].logfreq);
 
     }
-    // Stop oscillators if amp is zero for several frames in a row.
-    // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-    if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
-        if (msynth[osc].amp > 0) {
-            AMY_UNSET(synth[osc].zero_amp_clock);
-        } else {
-            if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
-                //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
-                synth[osc].status = STATUS_OFF;
-                AMY_UNSET(synth[osc].note_off_clock);
-                AMY_UNSET(synth[osc].zero_amp_clock);
-            }
-        }
-    } else if (msynth[osc].amp == 0) {
-        synth[osc].zero_amp_clock = total_samples;
-    }
     AMY_PROFILE_STOP(HOLD_AND_MODIFY)
 
 }
@@ -1170,6 +1153,25 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             // Stack oscillators - render next osc into same buffer.
             SAMPLE new_max_val = render_osc_wave(synth[osc].chained_osc, core, buf);
             if (new_max_val > max_val)  max_val = new_max_val;
+        }
+        // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
+        // from zero-amplitude (but maybe inheriting values from chained_oscs).
+        // Stop oscillators if amp is zero for several frames in a row.
+        // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
+#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
+        if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
+            if (max_val > 0) {
+                AMY_UNSET(synth[osc].zero_amp_clock);
+            } else {
+                if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                    //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
+                    synth[osc].status = STATUS_OFF;
+                    AMY_UNSET(synth[osc].note_off_clock);
+                    AMY_UNSET(synth[osc].zero_amp_clock);
+                }
+            }
+        } else if (max_val == 0) {
+            synth[osc].zero_amp_clock = total_samples;
         }
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)

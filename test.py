@@ -436,7 +436,8 @@ def main(argv):
     #TestAlgo().test()
     #TestBleep().test()
     #TestChainedOsc().test()
-    TestJunoPatch().test()
+    #TestJunoPatch().test()
+    TestJunoTrumpetPatch().test()
 
   amy.send(debug=0)
   print("tests done.")
