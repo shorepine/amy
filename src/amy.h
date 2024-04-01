@@ -323,6 +323,7 @@ struct synthinfo {
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
 
+    uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.

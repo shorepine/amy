@@ -491,7 +491,7 @@ SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
     SAMPLE max_value = 0;
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
         SAMPLE value = MUL4_SS(amy_get_random(), amp);
-        buf[i] = value;
+        buf[i] += value;
         if (value < 0) value = -value;
         if (value > max_value) max_value = value;
     }

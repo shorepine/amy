@@ -384,6 +384,22 @@ class TestOscBD(AmyTest):
     amy.send(time=350, osc=0, note=84, vel=1)
     amy.send(time=600, osc=0, note=84, vel=1)
 
+class TestChainedOsc(AmyTest):
+  """Two oscillators chained together."""
+
+  def run(self):
+    # TestFilter but on Saw + subosc with same envelope.
+    #amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    #amy.send(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0,0,0.2,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    #amy.send(time=100, osc=0, note=48, vel=1.0)
+    #amy.send(time=100, osc=1, note=48, vel=1.0)
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
+    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0,0,0.2,1", freq='130.81,1')
+    amy.send(time=100, osc=0, note=48, vel=1.0)
+    #amy.send(time=100, osc=1, note=48, vel=1.0)
+    amy.send(time=900, osc=0, vel=0)
+    #amy.send(time=900, osc=1, vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
@@ -407,7 +423,9 @@ def main(argv):
     #TestGuitar().test()
     #TestFilter().test()
     #TestAlgo().test()
-    TestBleep().test()
+    #TestBleep().test()
+    #TestChainedOsc().test()
+    TestJunoPatch().test()
   amy.send(debug=0)
   print("tests done.")
 
