@@ -183,6 +183,7 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             synth[CHORUS_MOD_SOURCE].amp_coefs[COEF_EG0] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE].wave = TRIANGLE;
             osc_note_on(CHORUS_MOD_SOURCE, freq_of_logfreq(synth[CHORUS_MOD_SOURCE].logfreq_coefs[0]));
+            synth[CHORUS_MOD_SOURCE].status = AUDIBLE;
         }
         // apply max_delay.
         for (int core=0; core<AMY_CORES; ++core) {
@@ -1141,26 +1142,28 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     // Only render if osc has not already been rendered this time step e.g. by chained_osc.
     if (synth[osc].render_clock != total_samples) {
         synth[osc].render_clock = total_samples;
-        // fill buf with next block_size of samples for specified osc.
-        hold_and_modify(osc); // apply bp / mod
-        if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
-            if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
-            if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
-            if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
-            if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
-            if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
-            if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
-            if(synth[osc].wave == KS) {
-                #if AMY_KS_OSCS > 0
-                max_val = render_ks(buf, osc);
-                #endif
-            }
-            if(pcm_samples)
-                if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
-            if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
-            if(AMY_HAS_PARTIALS == 1) {
-                if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
-                if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+        if (synth[osc].status==AUDIBLE) {
+            // fill buf with next block_size of samples for specified osc.
+            hold_and_modify(osc); // apply bp / mod
+            if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
+                if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
+                if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
+                if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
+                if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
+                if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
+                if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
+                if(synth[osc].wave == KS) {
+                    #if AMY_KS_OSCS > 0
+                    max_val = render_ks(buf, osc);
+                    #endif
+                }
+                if(pcm_samples)
+                    if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
+                if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
+                if(AMY_HAS_PARTIALS == 1) {
+                    if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
+                    if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+                }
             }
         }
         if(AMY_HAS_CUSTOM == 1) {

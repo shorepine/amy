@@ -426,6 +426,7 @@ def main(argv):
     #TestBleep().test()
     #TestChainedOsc().test()
     TestJunoPatch().test()
+
   amy.send(debug=0)
   print("tests done.")
 
