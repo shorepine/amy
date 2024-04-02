@@ -599,6 +599,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].chained_osc);
     AMY_UNSET(synth[i].mod_source);
     synth[i].mod_target = 0;
+    AMY_UNSET(synth[i].render_clock);
     AMY_UNSET(synth[i].note_on_clock);
     AMY_UNSET(synth[i].note_off_clock);
     AMY_UNSET(synth[i].zero_amp_clock);
@@ -733,9 +734,9 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f bend %f eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
-            fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %flogratio %f feedback %f resonance %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
+            fprintf(stderr,"osc %d: status %d wave %d mod_target %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
                     i, synth[i].status, synth[i].wave, synth[i].mod_target, synth[i].mod_source,
-                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].resonance, P2F(synth[i].step), synth[i].chained_osc, 
+                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].filter_type, synth[i].resonance, P2F(synth[i].step), synth[i].chained_osc, 
                     synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5], synth[i].amp_coefs[6]);
@@ -1074,23 +1075,6 @@ void hold_and_modify(uint16_t osc) {
                msynth[osc].amp, msynth[osc].logfreq);
 
     }
-    // Stop oscillators if amp is zero for several frames in a row.
-    // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-    if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
-        if (msynth[osc].amp > 0) {
-            AMY_UNSET(synth[osc].zero_amp_clock);
-        } else {
-            if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
-                //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
-                synth[osc].status = STATUS_OFF;
-                AMY_UNSET(synth[osc].note_off_clock);
-                AMY_UNSET(synth[osc].zero_amp_clock);
-            }
-        }
-    } else if (msynth[osc].amp == 0) {
-        synth[osc].zero_amp_clock = total_samples;
-    }
     AMY_PROFILE_STOP(HOLD_AND_MODIFY)
 
 }
@@ -1131,36 +1115,69 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 }
 
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
-    // Returns abs max of what it wrote.
-    SAMPLE max_val = 0;
     AMY_PROFILE_START(RENDER_OSC_WAVE)
-    // fill buf with next block_size of samples for specified osc.
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { buf[i] = 0; }
-    hold_and_modify(osc); // apply bp / mod
-    if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
-        if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
-        if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
-        if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
-        if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
-        if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
-        if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
-        if(synth[osc].wave == KS) {
-            #if AMY_KS_OSCS > 0
-            max_val = render_ks(buf, osc);
-            #endif
+    // Returns abs max of what it wrote.
+    //fprintf(stderr, "+render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
+    //        total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+    //        osc, synth[osc].render_clock);
+    SAMPLE max_val = 0;
+    // Only render if osc has not already been rendered this time step e.g. by chained_osc.
+    if (synth[osc].render_clock != total_samples) {
+        synth[osc].render_clock = total_samples;
+        // fill buf with next block_size of samples for specified osc.
+        hold_and_modify(osc); // apply bp / mod
+        if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
+            if(synth[osc].wave == NOISE) max_val = render_noise(buf, osc);
+            if(synth[osc].wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
+            if(synth[osc].wave == SAW_UP) max_val = render_saw_up(buf, osc);
+            if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
+            if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
+            if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
+            if(synth[osc].wave == KS) {
+                #if AMY_KS_OSCS > 0
+                max_val = render_ks(buf, osc);
+                #endif
+            }
+            if(pcm_samples)
+                if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
+            if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
+            if(AMY_HAS_PARTIALS == 1) {
+                if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
+                if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+            }
         }
-        if(pcm_samples)
-            if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
-        if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
-        if(AMY_HAS_PARTIALS == 1) {
-            if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
-            if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+        if(AMY_HAS_CUSTOM == 1) {
+            if(synth[osc].wave == CUSTOM) max_val = render_custom(buf, osc);
         }
-    }
-    if(AMY_HAS_CUSTOM == 1) {
-        if(synth[osc].wave == CUSTOM) max_val = render_custom(buf, osc);
+        if(AMY_IS_SET(synth[osc].chained_osc)) {
+            // Stack oscillators - render next osc into same buffer.
+            SAMPLE new_max_val = render_osc_wave(synth[osc].chained_osc, core, buf);
+            if (new_max_val > max_val)  max_val = new_max_val;
+        }
+        // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
+        // from zero-amplitude (but maybe inheriting values from chained_oscs).
+        // Stop oscillators if amp is zero for several frames in a row.
+        // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
+#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
+        if(AMY_IS_SET(synth[osc].zero_amp_clock)) {
+            if (max_val > 0) {
+                AMY_UNSET(synth[osc].zero_amp_clock);
+            } else {
+                if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                    //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
+                    synth[osc].status = STATUS_OFF;
+                    AMY_UNSET(synth[osc].note_off_clock);
+                    AMY_UNSET(synth[osc].zero_amp_clock);
+                }
+            }
+        } else if (max_val == 0) {
+            synth[osc].zero_amp_clock = total_samples;
+        }
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
+    //fprintf(stderr, "-render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
+    //    total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+    //    osc, synth[osc].render_clock);
     return max_val;
 }
 
@@ -1170,6 +1187,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
+            bzero(per_osc_fb[core], AMY_BLOCK_SIZE * sizeof(SAMPLE));
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             if(synth[osc].wave != WAVE_OFF) {
@@ -1249,7 +1267,10 @@ void amy_prepare_buffer() {
     
     if(AMY_HAS_CHORUS==1) {
         hold_and_modify(CHORUS_MOD_SOURCE);
-        if(chorus.level!=0)  render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+        if(chorus.level!=0)  {
+            bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+            render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+        }
     }
     AMY_PROFILE_STOP(AMY_PREPARE_BUFFER)
 
