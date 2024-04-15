@@ -26,8 +26,6 @@ uint16_t memory_patch_oscs[MEMORY_PATCHES];
 uint8_t osc_to_voice[AMY_OSCS];
 uint16_t voice_to_base_osc[MAX_VOICES];
 
-extern int parse_int_list_message(char *message, int16_t *vals, int max_num_vals);
-
 
 void patches_reset() {
     for(uint8_t v=0;v<MAX_VOICES;v++) {
@@ -71,7 +69,7 @@ void patches_store_patch(char * message) {
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(struct event e) {
     int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES);
+    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES, 0);
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
     e.voices[0] = 0;
     AMY_UNSET(e.load_patch);
@@ -91,7 +89,7 @@ void patches_load_patch(struct event e) {
     char sub_message[255];
     
     int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES);
+    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
     if(e.load_patch > 1023) {
