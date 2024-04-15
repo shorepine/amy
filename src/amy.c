@@ -497,7 +497,7 @@ end:
 void clone_osc(uint16_t i, uint16_t f) {
     // Set all the synth state to the values from another osc.
     //fprintf(stderr, "cloning osc %d from %d\n", i, f);
-    reset_osc(i);
+    //reset_osc(i);  // Causes current voices to stop on param change...
     synth[i].wave = synth[f].wave;
     synth[i].patch = synth[f].patch;
     //synth[i].midi_note = synth[f].midi_note;
@@ -525,7 +525,8 @@ void clone_osc(uint16_t i, uint16_t f) {
     //synth[i].mod_value = synth[f].mod_value;
     //synth[i].substep = synth[f].substep;
     //synth[i].status = synth[f].status;
-    //synth[i].chained_osc = synth[f].chained_osc + (f - i);  // RISKY - could make osc loops without knowing.
+    //synth[i].chained_osc = synth[f].chained_osc + (f - i);  // Can't do this because we don't have a way to unset it afterwards.  Have to manually set chained_osc after clone.
+    AMY_UNSET(synth[i].chained_osc);
     synth[i].mod_source = synth[f].mod_source;    // It's OK to have multiple oscs with the same mod source.  But if we set it, then clone other params, we overwrite it.
     synth[i].mod_target = synth[f].mod_target;
     //synth[i].note_on_clock = synth[f].note_on_clock;
