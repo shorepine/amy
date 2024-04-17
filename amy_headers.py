@@ -363,10 +363,8 @@ def make_patches(filename):
         # Do juno
         for i in range(128):
             amy.log_patch()
-            p = juno.JunoPatch()
-            j = p.from_patch_number(i)
-            j.base_oscs = list()
-            v = j.get_new_voices(1)
+            j = juno.JunoPatch()
+            j.set_patch(i)
             f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, amy.retrieve_patch()))  
             num_oscs.append(5)
         # Do dx7
