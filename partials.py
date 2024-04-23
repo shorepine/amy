@@ -175,7 +175,7 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
 
         partial_args = {}
 
-        partial_args.update({"timestamp":my_start_time + (s[0]/time_ratio + sustain_offset),
+        partial_args.update({"time":my_start_time + (s[0]/time_ratio + sustain_offset),
             "osc":s[1]+osc_offset,
             "wave":amy.PARTIAL,
             "amp":s[3]*amp_ratio,
