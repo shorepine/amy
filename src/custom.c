@@ -18,25 +18,25 @@ void custom_init() {
 
 void custom_note_on(uint16_t osc, float freq) {
     assert(custom_osc != NULL);
-    custom_osc->note_on(&synth[osc], freq);
+    custom_osc->note_on(osc, freq);
 }
 
 void custom_note_off(uint16_t osc) {
     assert(custom_osc != NULL);
-    custom_osc->note_off(&synth[osc]);
+    custom_osc->note_off(osc);
 }
 
 void custom_mod_trigger(uint16_t osc) {
     assert(custom_osc != NULL);
-    custom_osc->mod_trigger(&synth[osc]);
+    custom_osc->mod_trigger(osc);
 }
 
 SAMPLE render_custom(SAMPLE* buf, uint16_t osc) {
     assert(custom_osc != NULL);
-    return custom_osc->render(buf, &synth[osc]);
+    return custom_osc->render(buf, osc);
 }
 
 SAMPLE compute_mod_custom(uint16_t osc) {
     assert(custom_osc != NULL);
-    return custom_osc->compute_mod(&synth[osc]);
+    return custom_osc->compute_mod(osc);
 }

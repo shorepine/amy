@@ -423,11 +423,11 @@ struct state {
 // custom oscillator
 struct custom_oscillator {
     void (*init)(void);
-    void (*note_on)(struct synthinfo* osc, float freq);
-    void (*note_off)(struct synthinfo* osc);
-    void (*mod_trigger)(struct synthinfo* osc);
-    SAMPLE (*render)(SAMPLE* buf, struct synthinfo* osc);
-    SAMPLE (*compute_mod)(struct synthinfo* osc);
+    void (*note_on)(uint16_t osc, float freq);
+    void (*note_off)(uint16_t osc);
+    void (*mod_trigger)(uint16_t osc);
+    SAMPLE (*render)(SAMPLE* buf, uint16_t osc);
+    SAMPLE (*compute_mod)(uint16_t osc);
 };
 
 // Shared structures

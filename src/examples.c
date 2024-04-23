@@ -332,24 +332,24 @@ void beeper_init(void) {
     printf("Beeper init\n");
 }
 
-void beeper_note_on(struct synthinfo* osc, float freq) {
-    saw_down_note_on(osc->osc, freq);
+void beeper_note_on(uint16_t osc, float freq) {
+    saw_down_note_on(osc, freq);
 }
 
-void beeper_note_off(struct synthinfo* osc) {
-    osc->note_off_clock = total_samples;
+void beeper_note_off(uint16_t osc) {
+    synth[osc].note_off_clock = total_samples;
 }
 
-void beeper_mod_trigger(struct synthinfo* osc) {
-    saw_down_mod_trigger(osc->osc);
+void beeper_mod_trigger(uint16_t osc) {
+    saw_down_mod_trigger(osc);
 }
 
-SAMPLE beeper_render(SAMPLE* buf, struct synthinfo* osc) {
-    return render_saw_down(buf, osc->osc);
+SAMPLE beeper_render(SAMPLE* buf, uint16_t osc) {
+    return render_saw_down(buf, osc);
 }
 
-SAMPLE beeper_compute_mod(struct synthinfo* osc) {
-    return compute_mod_saw_down(osc->osc);
+SAMPLE beeper_compute_mod(uint16_t osc) {
+    return compute_mod_saw_down(osc);
 }
 
 struct custom_oscillator beeper = {
