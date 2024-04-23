@@ -100,6 +100,7 @@ enum coefs{
 #define PARTIALS 10
 #define CUSTOM 11
 #define WAVE_OFF 12
+
 // synth[].status values
 #define EMPTY 0
 #define SCHEDULED 1
