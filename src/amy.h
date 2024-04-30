@@ -79,7 +79,7 @@ enum coefs{
 };
 
 #define MAX_MESSAGE_LEN 255
-#define MAX_PARAM_LEN 128
+#define MAX_PARAM_LEN 80
 // synth[].filter_type values
 #define FILTER_NONE 0
 #define FILTER_LPF 1
