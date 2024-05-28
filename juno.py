@@ -442,6 +442,11 @@ class JunoPatch:
     #print("New patch", patch, ":", self.name)
     self.init_AMY()
 
+  def set_sysex(self, sysex):
+    self._init_from_sysex(sysex)
+    #print("New patch", patch, ":", self.name)
+    self.init_AMY()
+
   def set_pitch_bend(self, value):
     # Global, not osc-specific.
     amy.send(pitch_bend=value)
