@@ -242,6 +242,27 @@ class JunoPatch:
     # Bits 3 & 4 also have flipped endianness & sense.
     setattr(self, 'hpf', [3, 2, 1, 0][int(sysexbytes[17]) >> 3])
 
+  def to_sysex(self):
+    """Return the 18 byte SYSEX corresponding to current object state."""
+    byte_values = []
+    # 16 continuous values in order specified by self.FIELDS.
+    for field in self.FIELDS:
+      byte_values.append(int(round(127.0 * getattr(self, field))))
+    # 2 bytes of booleans.
+    val = 0
+    for index, field in enumerate(self.BITS1):
+      val |= (1 << index) if getattr(self, field) else 0
+    # Chorus has a weird mapping.  Bit 5 is ~Chorus, bit 6 is ChorusI-notII
+    val |= ([1, 2, 0][getattr(self, 'chorus')]) << 5
+    byte_values.append(val)
+    val = 0
+    for index, field in enumerate(self.BITS2):
+      val |= (1 << index) if getattr(self, field) else 0
+    # Bits 3 & 4 also have flipped endianness & sense.
+    val |= ([3, 2, 1, 0][getattr(self, 'hpf')]) << 3
+    byte_values.append(val)
+    return bytes(byte_values)
+
   def set_voices(self, amy_voices):
     self.amy_voices = amy_voices
 
