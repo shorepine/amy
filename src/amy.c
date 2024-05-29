@@ -957,8 +957,10 @@ void play_event(struct delta d) {
                 // restart the waveforms
                 // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
                 float initial_logfreq = synth[d.osc].logfreq_coefs[0];
-                if (AMY_IS_SET(synth[d.osc].midi_note))
+                if (AMY_IS_SET(synth[d.osc].midi_note)) {
+                    synth[d.osc].logfreq_coefs[0] = 0;
                     initial_logfreq += synth[d.osc].logfreq_coefs[1] * logfreq_for_midi_note(synth[d.osc].midi_note);
+                }
                 float initial_freq = freq_of_logfreq(initial_logfreq);
                 osc_note_on(d.osc, initial_freq);
                 // trigger the mod source, if we have one
