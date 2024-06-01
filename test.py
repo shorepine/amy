@@ -410,6 +410,13 @@ class TestJunoTrumpetPatch(AmyTest):
     amy.send(time=300, voices="1", note=60, vel=1)
     amy.send(time=450, voices="1", vel=0)
 
+class TestJunoThudWah(AmyTest):
+  """28: A57 Thud Wah has a big resonance right on G4, it clips."""
+
+  def run(self):
+    amy.send(time=0, voices="0", load_patch=38)
+    amy.send(time=100, voices="0", note=67, vel=1)
+    amy.send(time=500, voices="0", vel=0)
 
 
 def main(argv):
