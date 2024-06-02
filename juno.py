@@ -243,6 +243,8 @@ class JunoPatch:
       setattr(self, field, (int(sysexbytes[17]) & (1 << index)) > 0)
     # Bits 3 & 4 also have flipped endianness & sense.
     setattr(self, 'hpf', [3, 2, 1, 0][int(sysexbytes[17]) >> 3])
+    # Nonstandard extension: Put "cheap" flag in bit 5 of byte 2.
+    self.cheap_filter = int(sysexbytes[17] & (1 << 5)) > 0
 
   def to_sysex(self):
     """Return the 18 byte SYSEX corresponding to current object state."""
@@ -262,6 +264,9 @@ class JunoPatch:
       val |= (1 << index) if getattr(self, field) else 0
     # Bits 3 & 4 also have flipped endianness & sense.
     val |= ([3, 2, 1, 0][getattr(self, 'hpf')]) << 3
+    # Nonstandard extension: Put "cheap" flag in bit 5 of byte 2.
+    if self.cheap_filter:
+      val |= (1 << 5)
     byte_values.append(val)
     return bytes(byte_values)
 
