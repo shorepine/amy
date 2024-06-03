@@ -411,6 +411,18 @@ class TestJunoTrumpetPatch(AmyTest):
     amy.send(time=450, voices="1", vel=0)
 
 
+class TestJunoCheapTrumpetPatch(AmyTest):
+  """Try out the 'cheap' LPF hack."""
+
+  def run(self):
+    amy.send(time=0, voices="0,1", load_patch=2)
+    amy.send(time=0, voices="0,1", filter_type=amy.FILTER_LPF)
+    amy.send(time=50, voices="0", note=60, vel=1)
+    amy.send(time=200, voices="0", vel=0)
+    amy.send(time=300, voices="1", note=60, vel=1)
+    amy.send(time=450, voices="1", vel=0)
+
+
 
 def main(argv):
   if len(argv) > 1:

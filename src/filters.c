@@ -333,6 +333,53 @@ SAMPLE scan_max(SAMPLE* block, int len) {
 // This is the multiply just for dsps_biquad_f32_ansi_split_fb_twice, which is only used for FILTER_LPF24.
 #define FILT_MUL_SS_24(a, b) top16SMUL(a, b)
 
+SAMPLE dsps_biquad_f32_ansi_split_fb_once(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
+    // Apply the filter once (for 12 dB/oct LPF)
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
+    // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
+    SAMPLE x1 = w[0];
+    SAMPLE x2 = w[1];
+    SAMPLE y1 = w[2];
+    SAMPLE y2 = w[3];
+    SAMPLE state_max = scan_max(w, 4);
+    int abits, bbits, cbits, ebits, fbits;
+    SAMPLE a = top16SMUL_a_part(coef[0], &abits);
+    SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
+    SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
+    assert(FILTER_SCALEUP_BITS == 0);
+    bbits = nheadroom16(max_val);
+    cbits = nheadroom16(SHIFTL(MAX(state_max, max_val), 2));
+    SAMPLE max_out = 0;
+    for (int i = 0 ; i < len ; i++) {
+        SAMPLE x0 = top16SMUL_after_a(a, input[i], abits, bbits);  // headroom(input[i]);
+        SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
+        y0 = y0
+            - top16SMUL_after_a(e, y1, ebits, cbits)  //headroom(y1))
+            + top16SMUL_after_a(f, y2, fbits, cbits); //headroom(y2));
+        x2 = x1;
+        x1 = x0;
+        y2 = y1;
+        y1 = y0;
+        output[i] = y0;
+        if (y0 < 0) y0 = -y0;
+        if (y0 > 0) {
+            if (y0 > max_out)
+                max_out = y0;
+        } else {
+            if (-y0 > max_out)
+                max_out = -y0;
+        }
+    }
+    w[0] = x1;
+    w[1] = x2;
+    w[2] = y1;
+    w[3] = y2;
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
+
+    return max_out;
+}
+
 SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
     // Apply the filter twice
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
@@ -736,6 +783,9 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
         max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, max_val);
+    //} else if(synth[osc].filter_type==FILTER_LPF) {
+        // Optimized block-floating point 12 dB/oct LPF
+        //max_val = dsps_biquad_f32_ansi_split_fb_once(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc].filter_delay, max_val);
     } else {
         block_norm(synth[osc].filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc].last_filt_norm_bits);
         block_norm(block, AMY_BLOCK_SIZE, normbits);

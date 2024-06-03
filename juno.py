@@ -192,6 +192,8 @@ class JunoPatch:
   # After the 16 integer values, there are two bytes of bits.
   BITS1 = ['stop_16', 'stop_8', 'stop_4', 'pulse', 'saw']
   BITS2 = ['pwm_manual', 'vcf_neg', 'vca_gate']
+  # Non-sysex state: Do we use the cheaper 12 dB/oct VCF?
+  cheap_filter = False
 
   # Patch number we're based on, if any.
   patch_number = None
@@ -241,6 +243,8 @@ class JunoPatch:
       setattr(self, field, (int(sysexbytes[17]) & (1 << index)) > 0)
     # Bits 3 & 4 also have flipped endianness & sense.
     setattr(self, 'hpf', [3, 2, 1, 0][int(sysexbytes[17]) >> 3])
+    # Nonstandard extension: Put "cheap" flag in bit 5 of byte 2.
+    self.cheap_filter = int(sysexbytes[17] & (1 << 5)) > 0
 
   def to_sysex(self):
     """Return the 18 byte SYSEX corresponding to current object state."""
@@ -260,6 +264,9 @@ class JunoPatch:
       val |= (1 << index) if getattr(self, field) else 0
     # Bits 3 & 4 also have flipped endianness & sense.
     val |= ([3, 2, 1, 0][getattr(self, 'hpf')]) << 3
+    # Nonstandard extension: Put "cheap" flag in bit 5 of byte 2.
+    if self.cheap_filter:
+      val |= (1 << 5)
     byte_values.append(val)
     return bytes(byte_values)
 
@@ -315,23 +322,25 @@ class JunoPatch:
   def clone_oscs(self):
     """Clone modifications on osc 0 to remaining oscs, then fixup."""
     clone_osc = self.pwm_osc
-    # Make the clones have their filters turned off.
-    self.amy_send(osc=clone_osc, filter_type=amy.FILTER_NONE)
+    # After the filter-once-at-end-of-chain modification, each secondary osc
+    # needs to have its filter turned off.
     self.amy_send(osc=self.saw_osc, clone_osc=clone_osc)
     self.amy_send(osc=self.saw_osc, wave=amy.SAW_UP,
-             amp=self._amp_coef_string(float(self.saw)),
-             chained_osc=self.sub_osc)
+                  filter_type=amy.FILTER_NONE,
+                  amp=self._amp_coef_string(float(self.saw)),
+                  chained_osc=self.sub_osc)
     self.amy_send(osc=self.sub_osc, clone_osc=clone_osc)
     self.amy_send(osc=self.sub_osc, wave=amy.PULSE,
-             amp=self._amp_coef_string(self.dco_sub),
-             freq=self.sub_freq,
-             chained_osc=self.nse_osc)
+                  filter_type=amy.FILTER_NONE,
+                  amp=self._amp_coef_string(self.dco_sub),
+                  freq=self.sub_freq,
+                  chained_osc=self.nse_osc)
     self.amy_send(osc=self.nse_osc, clone_osc=clone_osc)
     self.amy_send(osc=self.nse_osc, wave=amy.NOISE,
-             amp=self._amp_coef_string(self.dco_noise))  # No chained_osc.
-    # Re-enable the filter on PWM osc.  Also, enable its chaining.
-    self.amy_send(osc=clone_osc, filter_type=amy.FILTER_LPF24,
-             chained_osc=self.saw_osc)
+                  filter_type=amy.FILTER_NONE,
+                  amp=self._amp_coef_string(self.dco_noise))  # No chained_osc.
+    # Enable chaining on PWM osc.
+    self.amy_send(osc=clone_osc, chained_osc=self.saw_osc)
 
   def update_lfo(self):
     lfo_args = {'freq': to_lfo_freq(self.lfo_rate),
@@ -373,6 +382,11 @@ class JunoPatch:
                     ffmt(to_level(self.vcf_kbd)),
                     ffmt(11 * vcf_env_polarity * to_level(self.vcf_env)),
                     ffmt(1.25 * to_level(self.vcf_lfo))))
+    # Optionally back off to the "cheap" LPF.
+    if self.cheap_filter:
+      self.amy_send(osc=self.pwm_osc, filter_type=amy.FILTER_LPF)
+    else:
+      self.amy_send(osc=self.pwm_osc, filter_type=amy.FILTER_LPF24)
     self.recloning_needed = True
 
   def update_env(self):

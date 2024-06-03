@@ -1156,8 +1156,11 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         }
         if(AMY_IS_SET(synth[osc].chained_osc)) {
             // Stack oscillators - render next osc into same buffer.
-            SAMPLE new_max_val = render_osc_wave(synth[osc].chained_osc, core, buf);
-            if (new_max_val > max_val)  max_val = new_max_val;
+            uint16_t chained_osc = synth[osc].chained_osc;
+            if (synth[chained_osc].status == AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
+                SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
+                if (new_max_val > max_val)  max_val = new_max_val;
+            }
         }
         // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
         // from zero-amplitude (but maybe inheriting values from chained_oscs).
