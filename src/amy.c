@@ -107,6 +107,9 @@ SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
+// Optional render hook that's called per oscillator during rendering
+uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
+
 #ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
 #ifdef ESP_PLATFORM
@@ -234,13 +237,9 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 }
 
 
-void default_amy_parse_callback(char mode, char * message) {
-    // do nothing
-}
 
 int8_t global_init() {
     // function pointers
-    //amy_parse_callback = &default_amy_parse_callback;
     amy_global.next_event_write = 0;
     amy_global.event_start = NULL;
     amy_global.event_qsize = 0;
@@ -1178,7 +1177,12 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             if(synth[osc].wave != WAVE_OFF) {
                 // apply filter to osc if set
                 if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
-                mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
+                uint8_t handled = 0;
+                if(amy_external_render_hook!=NULL) {
+                    handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
+                }
+                // only mix the audio in if the external hook did not handle it 
+                if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
                 //printf("render5 %d %d %d %d\n", osc, start, end, core);
 
             }
@@ -1593,13 +1597,10 @@ struct event amy_parse_message(char * message) {
                         case 'x': e.eq_l = atoff(message+start); break;
                         /* Y available */
                         case 'y': e.eq_m = atoff(message+start); break;
-                        /* Z available */
+                        /* Z used for end of message */
                         case 'z': e.eq_h = atoff(message+start); break;
                         default:
                             break;
-                            // If a parse callback function is declared, call it to see if there's something else to parse
-                            //(*amy_parse_callback)(mode, message+start);
-                            //break;
                     }
                 }
             }
