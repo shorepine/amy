@@ -130,7 +130,7 @@ typedef int amy_err_t;
 #define PROGMEM 
 #endif
 
-extern void (*amy_external_render_hook)(uint16_t, SAMPLE*, uint8_t*);
+extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
 
 
 enum params{
@@ -373,8 +373,6 @@ extern int64_t amy_get_us();
 #define CHORUS_MOD_SOURCE AMY_OSCS
 
 
-// Callbacks, override if you'd like after calling amy_start()
-//void (*amy_parse_callback)(char,char*);
 
 struct event amy_default_event();
 void amy_add_event(struct event e);

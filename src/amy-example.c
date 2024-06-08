@@ -13,9 +13,9 @@ void delay_ms(uint32_t ms) {
 }
 
 // Example how to use external render hook
-void render(uint16_t osc, SAMPLE * buf, uint8_t * handled) {
+uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     //fprintf(stderr, "render hook %d\n", osc);
-    *handled = 0; // handled = 1 would mean, don't add this into the audio stream, i got this
+    return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
 
