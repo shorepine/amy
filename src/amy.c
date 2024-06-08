@@ -1556,8 +1556,10 @@ struct event amy_parse_message(char * message) {
                         case 'f': parse_coef_message(message + start, e.freq_coefs);break;
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
+                        /* g used for Alles for client # */
                         case 'H': if(AMY_HAS_REVERB) config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
                         case 'h': if(AMY_HAS_REVERB) config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
+                        /* i used by alles for sync index */
                         case 'I': e.ratio = atoff(message + start); break;
                         case 'j': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
                         case 'J': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
@@ -1583,12 +1585,19 @@ struct event amy_parse_message(char * message) {
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 's': e.pitch_bend = atoff(message + start); break;
+                        /* t used for time */
+                        /* T unused */
+                        /* U used by Alles for sync */
                         case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
+                        /* W used by Tulip for CV, external_channel */
+                        /* X available */
                         case 'x': e.eq_l = atoff(message+start); break;
+                        /* Y available */
                         case 'y': e.eq_m = atoff(message+start); break;
+                        /* Z available */
                         case 'z': e.eq_h = atoff(message+start); break;
                         default:
                             break;
