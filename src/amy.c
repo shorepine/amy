@@ -107,6 +107,9 @@ SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
+// Optional render hook that's called per oscillator during rendering
+void (*amy_external_render_hook)(uint16_t, SAMPLE*, uint8_t*) = NULL;
+
 #ifndef malloc_caps
 void * malloc_caps(uint32_t size, uint32_t flags) {
 #ifdef ESP_PLATFORM
@@ -1178,7 +1181,12 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             if(synth[osc].wave != WAVE_OFF) {
                 // apply filter to osc if set
                 if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
-                mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
+                uint8_t handled = 0;
+                if(amy_external_render_hook!=NULL) {
+                    amy_external_render_hook(osc, per_osc_fb[core], &handled);
+                }
+                // only mix the audio in if the external hook did not handle it 
+                if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
                 //printf("render5 %d %d %d %d\n", osc, start, end, core);
 
             }

@@ -130,6 +130,9 @@ typedef int amy_err_t;
 #define PROGMEM 
 #endif
 
+extern void (*amy_external_render_hook)(uint16_t, SAMPLE*, uint8_t*);
+
+
 enum params{
     WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2
     AMP,                                 // 3..9

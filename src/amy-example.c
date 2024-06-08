@@ -12,6 +12,13 @@ void delay_ms(uint32_t ms) {
     while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
 }
 
+// Example how to use external render hook
+void render(uint16_t osc, SAMPLE * buf, uint8_t * handled) {
+    //fprintf(stderr, "render hook %d\n", osc);
+    *handled = 0; // handled = 1 would mean, don't add this into the audio stream, i got this
+}
+
+
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
     //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
@@ -47,6 +54,8 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
+    amy_external_render_hook = render;
+
     uint32_t start = amy_sysclock();
     
     #if AMY_HAS_CUSTOM == 1
