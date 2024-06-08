@@ -87,7 +87,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_times[0][2] = 0;
                 synth[o].breakpoint_values[0][2] = 0.0;  // Release amp target value
                 AMY_UNSET(synth[o].breakpoint_times[0][3]);
-                synth[o].breakpoint_target[0] = TARGET_AMP + TARGET_LINEAR;
+                synth[o].eg_type[0] = ENVELOPE_LINEAR;
                 synth[o].amp_coefs[COEF_VEL] = 0;
                 synth[o].amp_coefs[COEF_EG0] = 1.0;
 
@@ -101,7 +101,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_times[1][2] = 0; 
                 synth[o].breakpoint_values[1][2] = 0.0;  // Release freq mod target value.
                 AMY_UNSET(synth[o].breakpoint_times[1][3]);
-                synth[o].breakpoint_target[1] = TARGET_FREQ + TARGET_LINEAR;
+                synth[o].eg_type[1] = ENVELOPE_LINEAR;
                 synth[o].amp_coefs[COEF_NOTE] = 0;
                 synth[o].logfreq_coefs[COEF_EG1] = 1.0;
                 

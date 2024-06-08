@@ -27,7 +27,7 @@ It supports
  * Stereo pan or mono operation 
  * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves
  * Oscillators can be specified by frequency in floating point or midi note 
- * Each oscillator has 2 breakpoint sets, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
+ * Each oscillator has 2 envelope generators, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band EQ
  * Built in patches for PCM, DX7, Juno and partials
@@ -214,20 +214,19 @@ v0w4f440.0l0.9
 
 Here's the full list:
 
-| Code | Python |  Type-range      | Notes                                 |
-| ---- | ------ |  ---------- | ------------------------------------- |
-| a    | amp    |  float 0-1+ | use after a note on is triggered with velocity to adjust amplitude without re-triggering the note |
-| A    | bp0    | string      | in commas, like 100,0.5,150,0.25,200,0 -- envelope generator with breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
-| B    | bp1    | string      | the second breakpoint generator. See bp0 |
+| Code | Python | Type-range  | Notes                                 |
+| ---- | ------ | ----------  | ------------------------------------- |
+| a    | amp    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
+| A    | bp0    | string      | in commas, like 100,0.5,150,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
+| B    | bp1    | string      | breakpoints for Envelope Generator 1. See bp0 |
 | b    | feedback | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | C    | clone_osc | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |  
-| d    | duty   |  float 0.001-0.999 | duty cycle for pulse wave, default 0.5 |
+| d    | duty   |  float[,float...] | duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
 | D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| f    | freq   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients |
+| f    | freq   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
 | F    | filter_freq | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
-| g    | mod_target | uint mask | Which parameter modulation/LFO controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. Can handle any combo, add them together. **Deprecated**, subsumed by ControlCoefficients. |
-| G    | filter_type | 0-4 |  0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass, 4 = double-order low pass. |
+| G    | filter_type | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
 | H    | reverb_liveness | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
 | h    | reverb_level | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
 | I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
@@ -251,13 +250,11 @@ Here's the full list:
 | r    | voices | int[,int] | String comma separated list of voices to send message to, or load patch into | 
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
 | s    | pitch_bend | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| T    | bp0_target | uint mask | Which parameter bp0 controls. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential. **Deprecated** for setting targets, subsumbed by ControlCoefficients. |
 | t    | time | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
 | u    | store_patch | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |  
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
 | w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
-| W    | bp1_target | uint mask | see bp0_target |
 | x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
 | y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
 | z    | eq_h | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. | 
@@ -358,7 +355,7 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use a breakpoint set! A breakpoint set is a simple list of (time, value) pairs - you can have up to 8 of these per set, and 2 different sets to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with a breakpoint set. It gets triggered when the note begins. So let's make a breakpoint set that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time, value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with an EG. It gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
@@ -366,24 +363,24 @@ amy.send(osc=0, filter_freq="50,0,0,0,1,0", bp1="0,6.0,1000,3.0,200,0")
 amy.send(osc=0, vel=1, note=40)
 ```
 
-There are two things to note here:  Firstly, the filter frequency is controlled by the breakpoint set using a "unit per octave" rule.  So when the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency, or 3200 Hz.  It then decays to 3.0 over the first second, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it returns back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first second, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
 
 Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
  * A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero or not specified.
  * The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-Hz relative to middle C).
  * The velocity from the note-on event.
- * The output of breakpoint set 0.
- * The output of breakpoint set 1.
+ * The output of Envelope Generator 0.
+ * The output of Envelope Generator 1.
  * The output of the modulating oscillator, specified by the `mod_source` parameter.
  * The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
 
-The set "50,0,0,0,1" means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and breakpoint set 0, but we also add the output of breakpoint set 1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0,0"`.
+The set "50,0,0,0,1" means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0,0"`.
 
-You can use the same breakpoint set to control several things at once.  For example, we could include `freq="50,0,0,0,0.125,0"`, which says to modify a base note frequency of 50 Hz from the same breakpoint set as the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+You can use the same EG to control several things at once.  For example, we could include `freq="50,0,0,0,0.125"`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq="261.63,1"` (which is its default setting before any `freq` parameter is passed).  Setting it to `freq="523.26,1"` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq="261.3,0.5"` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
-Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq="0,1,0,0,0,0,1"` also yields the default behavior.  `amp` also has a set of defaults `amp="0,0,1,1,0,0,0"`, i.e. tracking note-on velocity plus modulation by breakpoint set 0 (which just tracks the note-on status if it is empty).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, we add 1.0 to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around identity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
+Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq="0,1,0,0,0,0,1"` also yields the default behavior.  `amp` also has a set of defaults `amp="0,0,1,1,0,0,0"`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it is empty).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, we add 1.0 to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around identity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
 
 We also have LFOs, which are implemented as one oscillator modulating another. You set up the lower-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
@@ -394,7 +391,7 @@ amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.4", mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
-You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  Then we set up the oscillator to be modulated, a pulse wave with mod source of oscillator 1 and the duty **ControlCoefficients** to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be multiplied by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with breakpoints, you can modulate duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
+You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  Then we set up the oscillator to be modulated, a pulse wave with mod source of oscillator 1 and the duty **ControlCoefficients** to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be multiplied by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with envelope generators, the modulation oscillator has a 'slot' in the ControlCoefficients - the 6th coefficient - so it can modulate PWM duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
 
 ```python
 amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=1)
@@ -416,11 +413,11 @@ amy.reset()
 
 We support bandlimited saw, pulse/square and triangle waves, alongside sine and noise. Use the wave parameter: 0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE. Each oscillator can have a frequency (or set by midi note), amplitude and phase (set in 0-1.). You can also set `duty` for the pulse type. We also have a karplus-strong type (KS=6). 
 
-Oscillators will not become audible until a `velocity` over 0 is set for the oscillator. This is a "note on" and will trigger any modulators or breakpoints / ADSRs set for that oscillator. Setting `velocity` to 0 sets a note off, which will stop modulators and also finish the breakpoint at its release pair. `velocity` also internally sets `amplitude`, but you can manually set `amplitude` after `velocity` starts a note on.
+Oscillators will not become audible until a `velocity` over 0 is set for the oscillator. This is a "note on" and will trigger any modulators or envelope generators set for that oscillator. Setting `velocity` to 0 sets a note off, which will stop modulators and also finish the envelopes at their release pair. `velocity` also internally sets `amplitude`, but you can manually set `amplitude` after `velocity` starts a note on.
 
 ## LFOs & modulators
 
-Any oscillator can modulate any other oscillator. For example, a LFO can be specified by setting oscillator 0 to 0.25Hz sine, with oscillator 1 being a 440Hz sine. Using `mod_target`, you can have oscillator 0 modulate frequency, amplitude, filter frequency, resonance, duty or feedback of oscillator 1. You can also add targets together, for example amplitude+frequency. Set the `mod_target` and `mod_source` on the audible oscillator (in this case, oscillator 1.) The source mod oscillator will not be audible once it is referred to as a `mod_source` by another oscillator. The amplitude of the modulating oscillator indicates how strong the modulation is (aka "LFO depth.")
+Any oscillator can modulate any other oscillator. For example, a LFO can be specified by setting oscillator 0 to 0.25Hz sine, with oscillator 1 being a 440Hz sine. Using the 6th parameter of **ControlCoefficient** lists, you can have oscillator 0 modulate frequency, amplitude, filter frequency, or pan of oscillator 1. You can also add targets together, for example amplitude+frequency. Set the `mod_target` and `mod_source` on the audible oscillator (in this case, oscillator 1.) The source mod oscillator will not be audible once it is referred to as a `mod_source` by another oscillator. The amplitude of the modulating oscillator indicates how strong the modulation is (aka "LFO depth.")
 
 ## Filters
 
@@ -430,21 +427,19 @@ We support lowpass, bandpass and hipass filters in AMY. You can set `resonance` 
 
 You can set a synth-wide volume (in practice, 0-10), or set the EQ of the entire synths's output. 
 
-## Breakpoints
+## Envelope Generators
 
-AMY allows you to set 2 "breakpoint generators" per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per breakpoint) of time (specified in milliseconds) and ratio. You can specify any amount of pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time in the aggregate from note on, e.g. 10ms, then 100ms is 90ms later, then 250ms is 150ms after the last one. The last "release" pair counts from ms from the note-off. 
+AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per EG) of time (specified in milliseconds) and ratio. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time in the aggregate from note on, e.g. 10ms, then 100ms is 90ms later, then 250ms is 150ms after the last one. The last "release" pair counts from ms from the note-off. 
 
-A breakpoint can target amplitude, duty, frequency, filter frequency, resonance or feedback of an oscillator.
+An EG can control amplitude, frequency, filter frequency, duty or pan of an oscillator via the 4th (EG0) and 5th (EG1) entries in the corresponding ControlCoefficients.
 
-For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms at ratio to be 1.0, then 150ms with ratio .5, then a 250ms release with ratio 0. You then set the target of this breakpoint to be amplitude. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the breakpoint modifier. In AMY wire parlance, this would look like "`v0f220w0A50,1.0,150,0.5,250,0T1`" to specify a sine wave at 220Hz with this envelope. 
+For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms at ratio to be 1.0, then 150ms with ratio .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like "`v0f220w0A50,1.0,150,0.5,250,0`" to specify a sine wave at 220Hz with this envelope. 
 
 When using `amy.py`, use the string form of the breakpoint: `bp0="50,1.0,150,0.5,250,0"`. 
 
 Every note on (specified by setting velocity / `l` to anything > 0) will trigger this envelope, and setting `l` to 0 will trigger the note off / release section. 
 
-Adding 64 to the target mask `T` will set the breakpoints to compute in linear, while the default is an exponential curve. (There are 2 more breakpoint curve types defined, for use in the DX7 simulation.)
-
-You can set a completely separate breakpoints using the second and third breakpoint operator and target mask, for example, to change pitch and amplitude at different rates.
+You can set a completely separate envelope using the second envelope generator, for example, to change pitch and amplitude at different rates.
 
 
 ## FM & ALGO type
@@ -472,7 +467,7 @@ amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
 
 Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
 
-What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator to the base note. So oscillator 0 will be played at 20% of the base note frequency, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using a breakpoint. That's key to the "bell ringing out" effect.
+What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator to the base note. So oscillator 0 will be played at 20% of the base note frequency, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using an envelope generator. That's key to the "bell ringing out" effect.
 
 Ok, we've set up the oscillators. Now, let's hear it!
 
@@ -491,7 +486,7 @@ amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp="2", bp0="0,0,5000,1,0,0")  # Op 2
 amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
 ```
 
-Just a refresher on breakpoints; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
+Just a refresher on envelope generators; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
 
 ```python
 amy.send(osc=2, vel=2, note=50)
@@ -506,7 +501,7 @@ amy.send(osc=2, vel=0)
 
 ## Partials
 
-Additive synthesis is simply adding together oscillators to make more complex tones. You can modulate the breakpoints of these oscillators over time, for example, changing their pitch or time without artifacts, as the synthesis is simply playing sine waves back at certain amplitudes and frequencies (and phases.) It's well suited to certain types of instruments. 
+Additive synthesis is simply adding together oscillators to make more complex tones. You can modulate the breakpoints of these oscillators over time, for example, changing their pitch or time without artifacts, as the synthesis is simply playing sine waves back at certain amplitudes and frequencies (and phases). It's well suited to certain types of instruments. 
 
 ![Partials](https://raw.githubusercontent.com/bwhitman/alles/main/pics/partials.png)
 

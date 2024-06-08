@@ -213,11 +213,10 @@ void example_drums(uint32_t start, int loops) {
     e.time = start;
     e.osc = 5;
     e.wave = SAW_DOWN;
-    e.filter_freq_coefs[0] = 650.0;  // LOWEST filter center frequency.
-    e.filter_freq_coefs[3] = 2.0;  // When env0 is 1.0, filter is shifted up by 2.0 octaves (x4, so 2600.0).
+    e.filter_freq_coefs[COEF_CONST] = 650.0;  // LOWEST filter center frequency.
+    e.filter_freq_coefs[COEF_EG0] = 2.0;  // When env0 is 1.0, filter is shifted up by 2.0 octaves (x4, so 2600.0).
     e.resonance = 5.0;
     e.filter_type = FILTER_LPF;
-    e.bp0_target = TARGET_AMP + TARGET_FILTER_FREQ;
     strcpy(e.bp0, "0,1,500,0.2,25,0");
     amy_add_event(e);
 

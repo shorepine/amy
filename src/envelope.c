@@ -61,6 +61,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     const SAMPLE exponential_rate_overshoot_factor = F2S(1.0f / (1.0f - exp2f(EXP_RATE_VAL)));
     uint32_t elapsed = 0;    
     SAMPLE scale = F2S(1.0f);
+    int eg_type = synth[osc].eg_type[bp_set];
 
     // Find out which one is release (the last one)
     
@@ -143,9 +144,9 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         // OK, we are transition from v0 to v1 , and we're at elapsed time between t0 and t1
         float time_ratio = ((float)(elapsed - t0) / (float)(t1 - t0));
         // Compute scale based on which type we have
-        if(synth[osc].breakpoint_target[bp_set] & TARGET_LINEAR) {
+        if(eg_type == ENVELOPE_LINEAR) {
             scale = v0 + MUL4_SS(v1 - v0, F2S(time_ratio));
-        } else if(synth[osc].breakpoint_target[bp_set] & TARGET_TRUE_EXPONENTIAL) {
+        } else if(eg_type == ENVELOPE_TRUE_EXPONENTIAL) {
             v0 = MAX(v0, F2S(BREAKPOINT_EPS));
             v1 = MAX(v1, F2S(BREAKPOINT_EPS));
             SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v1) - log2_lut(v0))
@@ -153,7 +154,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             scale = MUL4_SS(v0,
                             exp2_lut(MUL4_SS(dx7_exponential_rate,
                                              F2S(0.001f * (elapsed - t0)))));
-        } else if(synth[osc].breakpoint_target[bp_set] & TARGET_DX7_EXPONENTIAL) {
+        } else if(eg_type == ENVELOPE_DX7) {
             // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
             // in SAMPLE version, DX7 levels are div 8 i.e. 0 to 12.375 instead of 0 to 99.
 #define LINEAR_SAMP_TO_DX7_LEVEL(samp) (MIN(12.375, S2F(log2_lut(MAX(F2S(BREAKPOINT_EPS), samp))) + 12.375))
@@ -180,7 +181,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                                 exp2_lut(MUL4_SS(dx7_exponential_rate,
                                                  F2S(0.001f * (elapsed - t0)))));
             }
-        } else { // "false exponential?"
+        } else { // ENVELOPE_NORMAL - "false exponential"?
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
             // so make the target gap a little bit bigger, to ensure we meet v1
             //scale = v0 + MUL4_SS(v1 - v0, F2S(exponential_rate_overshoot_factor * (1.0f - exp2f(-exponential_rate * time_ratio))));
@@ -200,7 +201,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
  return_label:
     if (!release) synth[osc].last_scale[bp_set] = scale;
     //if (osc < AMY_OSCS)
-    //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)
     return scale;
 }

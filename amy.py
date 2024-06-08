@@ -5,9 +5,9 @@ AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
 MAX_QUEUE = 400
-[SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, CUSTOM, OFF] = range(13)
-TARGET_AMP, TARGET_DUTY, TARGET_FREQ, TARGET_FILTER_FREQ, TARGET_RESONANCE, TARGET_FEEDBACK, TARGET_LINEAR, TARGET_TRUE_EXPONENTIAL, TARGET_DX7_EXPONENTIAL, TARGET_PAN = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)
+SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, CUSTOM, OFF = range(13)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
+ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
 AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
 
@@ -79,8 +79,8 @@ def trunc3(number):
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
-            client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, bp0_target=None, bp1_target=None, 
-            mod_target=None, debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, 
+            client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
+            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, 
             algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, 
             reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, store_patch=None, voices=None):
 
@@ -108,12 +108,11 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(algorithm is not None): m = m + "o" + str(algorithm)
     if(bp0 is not None): m = m +"A%s" % (bp0)
     if(bp1 is not None): m = m +"B%s" % (bp1)
+    if(eg0_type is not None): m = m + "T" + str(eg0_type)
+    if(eg1_type is not None): m = m + "W" + str(eg1_type)
     if(algo_source is not None): m = m +"O%s" % (algo_source)
-    if(bp0_target is not None): m = m + "T" +str(bp0_target)
-    if(bp1_target is not None): m = m + "W" +str(bp1_target)
     if(chained_osc is not None): m = m + "c" + str(chained_osc)
     if(clone_osc is not None): m = m + "C" + str(clone_osc)
-    if(mod_target is not None): m = m + "g" + str(mod_target)
     if(mod_source is not None): m = m + "L" + str(mod_source)
     if(reset is not None): m = m + "S" + str(reset)
     if(debug is not None): m = m + "D" + str(debug)

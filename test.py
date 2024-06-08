@@ -135,7 +135,6 @@ class TestSineEnv(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    # amy.send(time=0, osc=0, bp0_target=amy.TARGET_AMP, bp0='50,1,250,0.1,50,0')
     amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,250,0.1,50,0')
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
@@ -189,7 +188,7 @@ class TestLFO(AmyTest):
     #amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
     # With unit-per-octave scaling, that's approx log2(0.9) = -0.152, log2(1.1) = 0.138
     amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.138)
-    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, mod_target=amy.TARGET_FREQ)
+    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq='0,1,0,0,0,1')
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
     
@@ -244,7 +243,7 @@ class TestBrass(AmyTest):
     #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
     #         resonance=0.167, bp0='60,1,400,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,400,0.3,200,0')
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0.0',
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0',
              amp='0,0,0.85,1,0,0', bp0='30,1,702,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,702,0.354,100,0',
@@ -394,7 +393,7 @@ class TestChainedOsc(AmyTest):
     #amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
-    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0,0,0.2,1", freq='130.81,1')
+    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0,0,0.2,1", freq='130.81,1,0,0,0,0,1')
     amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=900, osc=0, vel=0)
