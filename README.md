@@ -251,12 +251,10 @@ Here's the full list:
 | S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
 | s    | pitch_bend | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
 | t    | time | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
-| T    | eg0_type | 0-3 | Type of Envelope Generator 0: 0=Normal RC-like exponential; 1=linear; 2=DX7-style exponentiated; 3=True exponential |
 | u    | store_patch | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |  
 | v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
 | V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
 | w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
-| W    | eg1_type | 0-3 | Type of EG1 - see eg0_type (T) |
 | x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
 | y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
 | z    | eq_h | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. | 

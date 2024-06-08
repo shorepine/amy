@@ -1583,12 +1583,10 @@ struct event amy_parse_message(char * message) {
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 's': e.pitch_bend = atoff(message + start); break;
-                        case 'T': e.eg_type[0] = atoi(message + start); break;
                         case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
-                        case 'W': e.eg_type[1] = atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
                         case 'y': e.eq_m = atoff(message+start); break;
                         case 'z': e.eq_h = atoff(message+start); break;
