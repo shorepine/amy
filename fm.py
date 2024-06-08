@@ -183,7 +183,7 @@ class AMYPatch:
     lfo_ampmoddepth: float = 0
     lfo_waveform: int = 0
     name: str = ""
-    exp_type: float = amy.TARGET_DX7_EXPONENTIAL
+    exp_type: float = amy.ENVELOPE_DX7
     amp_lfo_amp: float = 0 
     pitch_lfo_amp: float = 0
 
@@ -239,20 +239,18 @@ class AMYPatch:
             #       osc.op_amp, osc.ampmodsens))
 
             # Make them all in cosine phase, to be like DX7.  Important for slow oscs
-            args = {"osc":i+1,
-                    "bp0_target":amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
-                    "bp0":oscbp, "amp":t(osc.op_amp), "phase":0.25}
+            args = {"osc": i + 1,
+                    "eg0_type": amy.ENVELOPE_DX7,
+                    "bp0": oscbp, "phase": 0.25}
             if osc.freq_is_ratio:
                 args["ratio"] = t(osc.frequency)
             else:
                 args["freq"] = t(osc.frequency)
-            if(osc.ampmodsens > 0):
-                # TODO: we ignore intensity of amp mod sens, just on/off
-                args.update({"mod_source": 7, "mod_target":amy.TARGET_AMP})
+            # TODO: we ignore intensity of amp mod sens, just on/off
+            args.update({"mod_source": 7, "amp": "%s,0,0,1,0,%d" % (t(osc.op_amp), osc.ampmodsens > 0)})
 
             # We are _NOT_ updating operators with pitch bp, per dan tuesday 7/5 morning (but not monday 7/4 morning)
-            #args.update({"bp1": pitchbp,
-            #             "bp1_target": amy.TARGET_FREQ+amy.TARGET_TRUE_EXPONENTIAL})
+            #args.update({"bp1": pitchbp, "eg1_type": amy.ENVELOPE_TRUE_EXPONENTIAL})
 
             amy.send(**args)
 
@@ -275,9 +273,9 @@ class AMYPatch:
         #    self.algo, self.feedback, pitchbp, ampbp))
         amy.send(osc=0, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
                    algo_source="1,2,3,4,5,6",
-                   bp0=ampbp, bp0_target=amy.TARGET_AMP+amy.TARGET_DX7_EXPONENTIAL,
-                   bp1=pitchbp, bp1_target=amy.TARGET_FREQ+amy.TARGET_TRUE_EXPONENTIAL,
-                   mod_target=amy.TARGET_FREQ, mod_source=8)
+                   bp0=ampbp, eg0_type=amy.ENVELOPE_DX7,
+                   bp1=pitchbp, eg1_type=amy.ENVELOPE_TRUE_EXPONENTIAL,
+                   freq="0,1,0,0,1,1", mod_source=8)
 
 def dx7level_to_linear(dx7level):
     """Map the dx7 0..99 levels to linear amplitude."""

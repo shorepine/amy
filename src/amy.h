@@ -55,18 +55,6 @@ typedef int16_t output_sample_type;
 #define ZERO_LOGFREQ_IN_HZ 261.63
 #define ZERO_MIDI_NOTE 60
 
-// modulation/breakpoint target mask (int16)
-#define TARGET_AMP 1
-#define TARGET_DUTY 2
-#define TARGET_FREQ 4
-#define TARGET_FILTER_FREQ 8
-#define TARGET_RESONANCE 0x10
-#define TARGET_FEEDBACK 0x20
-#define TARGET_LINEAR 0x40 // default exp, linear as an option
-#define TARGET_TRUE_EXPONENTIAL 0x80 // default exp, "true exp" for FM as an option
-#define TARGET_DX7_EXPONENTIAL 0x100 // Asymmetric attack/decay behavior per DX7.
-#define TARGET_PAN 0x200
-
 #define NUM_COMBO_COEFS 7  // 7 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend
 enum coefs{
     COEF_CONST = 0,
@@ -110,6 +98,13 @@ enum coefs{
 #define IS_ALGO_SOURCE 5
 #define STATUS_OFF 6
 
+// Envelope generator types (for synth[osc].env_type[eg]).
+#define ENVELOPE_NORMAL 0
+#define ENVELOPE_LINEAR 1
+#define ENVELOPE_DX7 2
+#define ENVELOPE_TRUE_EXPONENTIAL 3
+
+
 #define true 1
 #define false 0
 
@@ -147,9 +142,10 @@ enum params{
     FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 37..43
     RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 44
     RESONANCE, CHAINED_OSC,              // 45, 46
-    MOD_SOURCE, MOD_TARGET, FILTER_TYPE, // 47, 48, 49
-    EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
-    BP0_TARGET, BP1_TARGET, ALGORITHM, LATENCY,  // 53, 54, 55, 56
+    MOD_SOURCE, FILTER_TYPE,             // 47, 48
+    EQ_L, EQ_M, EQ_H,                    // 49, 50, 51
+    ALGORITHM, LATENCY,                  // 52, 53
+    EG0_TYPE, EG1_TYPE,                  // 54, 55
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -274,7 +270,6 @@ struct event {
     float resonance;
     uint16_t chained_osc;
     uint16_t mod_source;
-    uint16_t mod_target;
     uint8_t algorithm;
     uint8_t filter_type;
     float eq_l;
@@ -284,9 +279,8 @@ struct event {
     char algo_source[MAX_PARAM_LEN];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
+    uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
-    uint16_t bp0_target;
-    uint16_t bp1_target;
     uint16_t clone_osc;  // Only used as a flag.
     uint16_t reset_osc;
     uint8_t status;
@@ -318,7 +312,6 @@ struct synthinfo {
     float resonance;
     uint16_t chained_osc;
     uint16_t mod_source;
-    uint16_t mod_target;
     uint8_t algorithm;
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
@@ -329,9 +322,9 @@ struct synthinfo {
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
-    uint16_t breakpoint_target[MAX_BREAKPOINT_SETS];
     uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
+    uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
   
     // State variable for the dc-removal filter.
@@ -374,6 +367,7 @@ extern struct profile profiles[NO_TAG];
 extern int64_t amy_get_us();
 #endif
 
+// Chorus gets is modulator from a special osc one beyond the normal range.
 #define CHORUS_MOD_SOURCE AMY_OSCS
 
 
@@ -446,8 +440,6 @@ void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
 
 uint32_t ms_to_samples(uint32_t ms) ;
-
-void apply_target_to_coefs(uint16_t osc, int target_val, int which_coef);
 
 
 // external functions

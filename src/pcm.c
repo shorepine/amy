@@ -20,9 +20,9 @@ void pcm_note_on(uint16_t osc) {
     //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
     if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
-    if(synth[osc].logfreq_coefs[0] <= 0) {
+    if(synth[osc].logfreq_coefs[COEF_CONST] <= 0) {
         // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.
-        synth[osc].logfreq_coefs[0] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
+        synth[osc].logfreq_coefs[COEF_CONST] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
     }
     synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
 }
