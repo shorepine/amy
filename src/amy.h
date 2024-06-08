@@ -145,7 +145,6 @@ enum params{
     MOD_SOURCE, FILTER_TYPE,             // 47, 48
     EQ_L, EQ_M, EQ_H,                    // 49, 50, 51
     ALGORITHM, LATENCY,                  // 52, 53
-    EG0_TYPE, EG1_TYPE,                  // 54, 55
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138

@@ -460,8 +460,6 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eg_type[0])) { d.param=EG0_TYPE; d.data = *(uint32_t*)&e.eg_type[0]; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eg_type[1])) { d.param=EG1_TYPE; d.data = *(uint32_t*)&e.eg_type[1]; add_delta_to_queue(d); }
 
     if(e.algo_source[0] != 0) {
         struct synthinfo t;
@@ -861,8 +859,6 @@ void play_event(struct delta d) {
         synth[d.osc].duty_coefs[d.param - DUTY] = *(float *)&d.data;
     if(d.param >= PAN && d.param < PAN + NUM_COMBO_COEFS)
         synth[d.osc].pan_coefs[d.param - PAN] = *(float *)&d.data;
-    if(d.param == EG0_TYPE) synth[d.osc].eg_type[0] = *(uint8_t *)&d.data;
-    if(d.param == EG1_TYPE) synth[d.osc].eg_type[1] = *(uint8_t *)&d.data;
 
     // todo, i really should clean this up
     if(d.param >= BP_START && d.param < BP_END) {
