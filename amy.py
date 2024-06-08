@@ -82,7 +82,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
             client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, 
             algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, 
-            reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, store_patch=None, voices=None):
+            reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, store_patch=None, voices=None, external_channel=None):
 
     m = ""
     if(store_patch is not None): return "u" + str(store_patch)
@@ -130,6 +130,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(reverb_xover is not None): m = m + "J" + str(reverb_xover)
     if(load_patch is not None): m = m + 'K' + str(load_patch)
     if(voices is not None): m = m + 'r' + str(voices)
+    if(external_channel is not None): m = m + 'W' + str(external_channel)
     #print("message " + m)
     return m+'Z'
 
