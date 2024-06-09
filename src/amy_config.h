@@ -8,7 +8,11 @@
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
 #define AMY_OSCS 120
 #define AMY_SAMPLE_RATE 44100 
+#ifdef ALLES
+#define AMY_NCHANS 1
+#else
 #define AMY_NCHANS 2
+#endif
 #define AMY_USE_FIXEDPOINT
 
 
