@@ -714,13 +714,18 @@ int8_t oscs_init() {
     return 0;
 }
 
-
+#ifdef ALLES
+extern void esp_show_debug();
+#endif
 // types: 0 - show profile if set
 //        1 - show profile, queue
 //        2 - show profile, queue, osc data
 void show_debug(uint8_t type) {
     debug_flag = type;
     amy_profiles_print();
+    #ifdef ALLES
+    esp_show_debug();
+    #endif
     if(type>0) {
         struct delta * ptr = amy_global.event_start;
         uint16_t q = amy_global.event_qsize;
