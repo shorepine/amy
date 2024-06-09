@@ -180,9 +180,9 @@ class JunoPatch:
   # Map of setup_fn: [params triggering setup]
   post_set_fn = {'lfo': ['lfo_rate', 'lfo_delay_time'],
                  'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub', 'stop_16', 'stop_8', 'stop_4',
-                         'pulse', 'saw', 'pwm_manual', 'vca_level'],
+                         'pulse', 'saw', 'pwm_manual', 'vca_level', 'vca_gate'],
                  'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
-                 'env': ['env_a', 'env_d', 'env_s', 'env_r', 'vca_gate'],
+                 'env': ['env_a', 'env_d', 'env_s', 'env_r'],
                  'cho': ['chorus', 'hpf']}
 
   # These lists name the fields in the order they appear in the sysex.
@@ -280,6 +280,26 @@ class JunoPatch:
       ffmt(to_level(self.env_s)), to_release_time(self.env_r)
     )
 
+  def _amp_coef_string(self, level):
+    if self.vca_gate:
+      # 'Gate' is provided by EG1, which is left unset == gate.
+      return ',,%s,,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
+    else:
+      return ',,%s,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
+
+  def _freq_coef_string(self, base_freq):
+    return '%s,1,,,,%s,1' % (
+      ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo)))
+
+  def base_freq(self):
+    # Only one of stop_{16,8,4} should be set.
+    base_freq = 261.63  # The mid note
+    if self.stop_16:
+      base_freq /= 2
+    elif self.stop_4:
+      base_freq *= 2
+    return base_freq
+
   def init_AMY(self):
     """Output AMY commands to set up patches on all the allocated voices.
     Send amy.send(osc=0, note=50, vel=1) afterwards."""
@@ -300,64 +320,33 @@ class JunoPatch:
     self.voice_oscs = [
       self.pwm_osc, self.saw_osc, self.sub_osc, self.nse_osc
     ]
-    # One-time args to oscs.
-    self.amy_send(osc=self.lfo_osc, wave=amy.TRIANGLE, amp='1,0,0,1,0,0')
-    osc_setup = {'mod_source': self.lfo_osc}
-    self.amy_send(osc=self.pwm_osc, wave=amy.PULSE, **osc_setup)
+    # One-time setup of oscs.
+    self.amy_send(osc=self.lfo_osc, wave=amy.TRIANGLE, amp='1,,,1')
+    filter_type = amy.FILTER_LPF if self.cheap_filter else amy.FILTER_LPF24
+    self.amy_send(osc=self.pwm_osc, wave=amy.PULSE,
+                  mod_source=self.lfo_osc, chained_osc=self.saw_osc,
+                  filter_type=filter_type)
+    self.amy_send(osc=self.saw_osc, wave=amy.SAW_UP,
+                  mod_source=self.lfo_osc, chained_osc=self.sub_osc)
+    self.amy_send(osc=self.sub_osc, wave=amy.PULSE,
+                  mod_source=self.lfo_osc, chained_osc=self.nse_osc)
+    self.amy_send(osc=self.nse_osc, wave=amy.NOISE,
+                  mod_source=self.lfo_osc)
     # Setup all the variable params.
     self.update_lfo()
     self.update_dco()
     self.update_vcf()
     self.update_env()
     self.update_cho()
-    self.clone_oscs()
     
-  def _amp_coef_string(self, level):
-    return '0,0,%s,1,0,0' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
-
-  def _freq_coef_string(self, base_freq):
-    return '%s,1,0,0,0,%s,1' % (
-      ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo)))
-
-  def clone_oscs(self):
-    """Clone modifications on osc 0 to remaining oscs, then fixup."""
-    clone_osc = self.pwm_osc
-    # After the filter-once-at-end-of-chain modification, each secondary osc
-    # needs to have its filter turned off.
-    self.amy_send(osc=self.saw_osc, clone_osc=clone_osc)
-    self.amy_send(osc=self.saw_osc, wave=amy.SAW_UP,
-                  filter_type=amy.FILTER_NONE,
-                  amp=self._amp_coef_string(float(self.saw)),
-                  chained_osc=self.sub_osc)
-    self.amy_send(osc=self.sub_osc, clone_osc=clone_osc)
-    self.amy_send(osc=self.sub_osc, wave=amy.PULSE,
-                  filter_type=amy.FILTER_NONE,
-                  amp=self._amp_coef_string(self.dco_sub),
-                  freq=self.sub_freq,
-                  chained_osc=self.nse_osc)
-    self.amy_send(osc=self.nse_osc, clone_osc=clone_osc)
-    self.amy_send(osc=self.nse_osc, wave=amy.NOISE,
-                  filter_type=amy.FILTER_NONE,
-                  amp=self._amp_coef_string(self.dco_noise))  # No chained_osc.
-    # Enable chaining on PWM osc.
-    self.amy_send(osc=clone_osc, chained_osc=self.saw_osc)
-
   def update_lfo(self):
     lfo_args = {'freq': to_lfo_freq(self.lfo_rate),
-                'bp0': '%i,1.0,%i,1.0,10000,0' % (
-                  to_lfo_delay(self.lfo_delay_time),
-                  to_lfo_delay(self.lfo_delay_time))}
+                'bp0': '%i,1.0,10000,0' % to_lfo_delay(self.lfo_delay_time)}
     self.amy_send(osc=self.lfo_osc, **lfo_args)
-    self.recloning_needed = True
 
   def update_dco(self):
-    # Only one of stop_{16,8,4} should be set.
-    base_freq = 261.63  # The mid note
-    if self.stop_16:
-      base_freq /= 2
-    elif self.stop_4:
-      base_freq *= 2
-
+    base_freq = self.base_freq()
+    freq_str = self._freq_coef_string(base_freq)
     # PWM square wave.
     const_duty = 0
     lfo_duty = to_level(self.dco_pwm)
@@ -367,36 +356,41 @@ class JunoPatch:
     self.amy_send(
       osc=self.pwm_osc,
       amp=self._amp_coef_string(float(self.pulse)),
-      freq=self._freq_coef_string(base_freq),
-      duty='%s,0,0,0,0,%s' % (
-        ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)))
-    # Setup the unique freq_coef for the sub_osc.
-    self.sub_freq = self._freq_coef_string(base_freq / 2.0)
-    self.recloning_needed = True
+      freq=freq_str,
+      duty='%s,,,,,%s' % (
+        ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)
+      ),
+    )
+    self.amy_send(
+      osc=self.saw_osc,
+      amp=self._amp_coef_string(float(self.saw)),
+      freq=freq_str,
+    )
+    self.amy_send(
+      osc=self.sub_osc,
+      amp=self._amp_coef_string(float(self.dco_sub)),
+      freq=self._freq_coef_string(base_freq / 2.0),
+    )
+    self.amy_send(
+      osc=self.nse_osc,
+      amp=self._amp_coef_string(float(self.dco_noise)),
+    )
 
   def update_vcf(self):
     vcf_env_polarity = -1.0 if self.vcf_neg else 1.0
     self.amy_send(osc=self.pwm_osc, resonance=to_resonance(self.vcf_res),
-                  filter_freq='%s,%s,0,0,%s,%s' % (
+                  filter_freq='%s,%s,,%s,,%s' % (
                     ffmt(to_filter_freq(self.vcf_freq)),
                     ffmt(to_level(self.vcf_kbd)),
                     ffmt(11 * vcf_env_polarity * to_level(self.vcf_env)),
                     ffmt(1.25 * to_level(self.vcf_lfo))))
-    # Optionally back off to the "cheap" LPF.
-    if self.cheap_filter:
-      self.amy_send(osc=self.pwm_osc, filter_type=amy.FILTER_LPF)
-    else:
-      self.amy_send(osc=self.pwm_osc, filter_type=amy.FILTER_LPF24)
-    self.recloning_needed = True
 
   def update_env(self):
-    bp1_coefs = self._breakpoint_string()
-    if self.vca_gate:
-      bp0_coefs='0,1,0,0'
-    else:
-      bp0_coefs = self._breakpoint_string()
-    self.amy_send(osc=self.pwm_osc, bp0=bp0_coefs, bp1=bp1_coefs)
-    self.recloning_needed = True
+    bp0_coefs = self._breakpoint_string()
+    self.amy_send(osc=self.pwm_osc, bp0=bp0_coefs)
+    self.amy_send(osc=self.saw_osc, bp0=bp0_coefs)
+    self.amy_send(osc=self.sub_osc, bp0=bp0_coefs)
+    self.amy_send(osc=self.nse_osc, bp0=bp0_coefs)
 
   def update_cho(self):
     # Chorus & HPF
@@ -436,18 +430,14 @@ class JunoPatch:
     if self.defer_param_updates:
       self.dirty_params.add(param)
     else:
-      self.recloning_needed = False
       for group, params in self.post_set_fn.items():
         if param in params:
           getattr(self, 'update_' + group)()
-      if self.recloning_needed:
-        self.clone_oscs()
 
   def send_deferred_params(self):
     for group, params in self.post_set_fn.items():
       if self.dirty_params.intersection(params):
         getattr(self, 'update_' + group)()
-    self.clone_oscs()
     self.dirty_params = set()
     self.defer_param_updates = False
 

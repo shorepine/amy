@@ -30,7 +30,7 @@ extern const uint16_t pcm_samples;
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
 #define AMY_HAS_CUSTOM 1         // 1 = Make custom oscillators available
 #define PCM_AMY_SAMPLE_RATE 22050
-#define AMY_EVENT_FIFO_LEN 2000
+#define AMY_EVENT_FIFO_LEN 2400
 
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
