@@ -19,7 +19,7 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 
 */
 
-#define MAX_VOICES 16
+#define MAX_VOICES 32
 #define MEMORY_PATCHES 32
 char * memory_patch[MEMORY_PATCHES];
 uint16_t memory_patch_oscs[MEMORY_PATCHES];
