@@ -46,7 +46,6 @@ void patches_store_patch(char * message) {
     uint16_t patch_number = atoi(message);
     char * patch = message + 5; // always 4 digit patch + ,
     // Now find out how many oscs this message uses
-
     uint16_t max_osc = 0;
     char sub_message[255];
     uint16_t start = 0;
@@ -59,10 +58,11 @@ void patches_store_patch(char * message) {
             start = i+1;
         }
     }
-    if(memory_patch[patch_number-1024] != NULL) free(memory_patch[patch_number-1024]);
-    memory_patch[patch_number-1024] = malloc(strlen(patch));
+    if(memory_patch[patch_number-1024] != NULL) { free(memory_patch[patch_number-1024]); }
+    memory_patch[patch_number-1024] = malloc(strlen(patch)+1);
     memory_patch_oscs[patch_number-1024] = max_osc + 1;
     strcpy(memory_patch[patch_number-1024], patch);
+
 }
 
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 

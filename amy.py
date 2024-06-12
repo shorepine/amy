@@ -152,6 +152,33 @@ def retrieve_patch():
     mess =[]
     return s
 
+# Convenience function to store an in-memory AMY patch
+# Call this, then call stop_store_patch(patch_number) when you're done
+saved_override = None
+
+def amy_do_nothing(message):
+    return
+
+def start_store_patch():
+    global saved_override, override_send
+    saved_override = override_send
+    override_send = amy_do_nothing
+    log_patch()
+
+def stop_store_patch(patch_number):
+    global saved_override, override_send
+    override_send = saved_override
+
+    if(patch_number<1023 or patch_number>1055):
+        print("invalid memory patch number (1024-1055)")
+        return
+
+    m = "u"+str(patch_number)+retrieve_patch()
+    if(override_send is not None):
+        override_send(m)
+    else:
+        send_raw(m)
+
 # Send an AMY message to amy
 def send(**kwargs):
     global override_send
