@@ -26,6 +26,12 @@ uint16_t memory_patch_oscs[MEMORY_PATCHES];
 uint8_t osc_to_voice[AMY_OSCS];
 uint16_t voice_to_base_osc[MAX_VOICES];
 
+void patches_init() {
+    for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
+        memory_patch_oscs[i]  = 0;
+        memory_patch[i] = NULL;
+    }    
+}
 
 void patches_reset() {
     for(uint8_t v=0;v<MAX_VOICES;v++) {
@@ -35,7 +41,8 @@ void patches_reset() {
         AMY_UNSET(osc_to_voice[i]);
     }
     for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
-        if(memory_patch[i] != NULL) free(memory_patch[i]);
+        if(memory_patch_oscs[i] > 0) free(memory_patch[i]);
+        memory_patch[i] = NULL;
         memory_patch_oscs[i] = 0; 
     }
 }
@@ -58,7 +65,7 @@ void patches_store_patch(char * message) {
             start = i+1;
         }
     }
-    if(memory_patch[patch_number-1024] != NULL) { free(memory_patch[patch_number-1024]); }
+    if(memory_patch_oscs[patch_number-1024] >0) { free(memory_patch[patch_number-1024]); }
     memory_patch[patch_number-1024] = malloc(strlen(patch)+1);
     memory_patch_oscs[patch_number-1024] = max_osc + 1;
     strcpy(memory_patch[patch_number-1024], patch);
@@ -93,8 +100,12 @@ void patches_load_patch(struct event e) {
     char *message;
     uint16_t patch_osc = 0;
     if(e.load_patch > 1023) {
-        message = memory_patch[e.load_patch-1024];
         patch_osc = memory_patch_oscs[e.load_patch-1024];
+        if(patch_osc > 0){
+            message = memory_patch[e.load_patch-1024];
+        } else {
+            num_voices = 0; // don't do anything
+        }
     } else {
         message = (char*)patch_commands[e.load_patch];    
         patch_osc = patch_oscs[e.load_patch];

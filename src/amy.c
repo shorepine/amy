@@ -655,6 +655,7 @@ int8_t oscs_init() {
         ks_init();
     filters_init();
     algo_init();
+    patches_init();
 
     if(pcm_samples) {
         pcm_init();
