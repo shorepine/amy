@@ -82,7 +82,7 @@ void patches_event_has_voices(struct event e) {
     AMY_UNSET(e.load_patch);
     // for each voice, send the event to the base osc (+ e.osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
-        if(AMY_IS_SET(voice_to_base_osc[i])) {
+        if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
             amy_add_event_internal(e, target_osc);
         }
