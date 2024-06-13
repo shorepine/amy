@@ -63,6 +63,19 @@ def preset(which,osc=0, **kwargs):
         send(wave=ALGO, patch=62, filter_freq="125,0,0,4", resonance=2.5, filter_type=FILTER_LPF, bp0="1,1,500,0,0,0")
 
 
+# Return a millis() epoch number for use in AMY timing
+# On most computers, this uses ms since midnight using datetime
+# On things like Tulip, this use ms since boot
+def millis():
+    try:
+        import datetime
+        d = datetime.datetime.now()
+        return int((datetime.datetime.utcnow() - datetime.datetime(d.year, d.month, d.day)).total_seconds()*1000)
+    except ImportError:
+        import tulip
+        return tulip.ticks_ms()
+
+
 # Removes trailing 0s and x.0000s from floating point numbers to trim wire message size
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
