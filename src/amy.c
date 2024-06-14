@@ -468,7 +468,11 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         parse_algorithm_source(&t, e.algo_source);
         for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { 
             d.param = ALGO_SOURCE_START + i;
-            d.data = t.algo_source[i] + base_osc;
+            if (AMY_IS_SET(t.algo_source[i])) {
+                d.data = t.algo_source[i] + base_osc;
+            } else{
+                d.data = t.algo_source[i];
+            }
             add_delta_to_queue(d); 
         }
     }
@@ -1331,7 +1335,7 @@ int16_t * amy_fill_buffer() {
             // One-pole high-pass filter to remove large low-frequency excursions from
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             //SAMPLE new_state = fsample + SMULR6(F2S(0.995f), amy_global.hpf_state);  // High-output-range, rounded MUL is critical here.
-#ifdef HPF_OUTPUT
+#ifdef AMY_HPF_OUTPUT
             SAMPLE new_state = fsample + amy_global.hpf_state - SHIFTR(amy_global.hpf_state + (1 << 7), 8);  // i.e. 0.9961*hpf_state
             fsample = new_state - amy_global.hpf_state;
             amy_global.hpf_state = new_state;
