@@ -1336,7 +1336,8 @@ int16_t * amy_fill_buffer() {
             // some FM patches. b = [1 -1]; a = [1 -0.995]
             //SAMPLE new_state = fsample + SMULR6(F2S(0.995f), amy_global.hpf_state);  // High-output-range, rounded MUL is critical here.
 #ifdef AMY_HPF_OUTPUT
-            SAMPLE new_state = fsample + amy_global.hpf_state - SHIFTR(amy_global.hpf_state + (1 << 7), 8);  // i.e. 0.9961*hpf_state
+            SAMPLE new_state = fsample + amy_global.hpf_state
+                - SHIFTR(amy_global.hpf_state + SHIFTR(F2S(1.0), 16), 8);  // i.e. 0.9961*hpf_state
             fsample = new_state - amy_global.hpf_state;
             amy_global.hpf_state = new_state;
 #endif

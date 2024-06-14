@@ -32,6 +32,8 @@ extern const uint16_t pcm_samples;
 #define PCM_AMY_SAMPLE_RATE 22050
 #define AMY_EVENT_FIFO_LEN 2400
 
+//#define AMY_HPF_OUTPUT 1   // To remove large DC excursions from some FM voices.
+
 //If using an ESP, tell us how to allocate ram here. Not used on other platforms.
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
