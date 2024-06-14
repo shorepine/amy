@@ -128,9 +128,8 @@ void patches_load_patch(struct event e) {
         // Now find some oscs
         uint8_t good = 0;
 
-        // If voice % 2 = 1, start at AMY_OSCS/2, to distribute across both "halves" for mulitcore on platforms that use it
         uint16_t osc_start = 0;
-        if(voices[v]%2) osc_start = (AMY_OSCS/2);
+        if(voices[v]%3==2) osc_start = (AMY_OSCS/2);
 
         for(uint16_t i=0;i<AMY_OSCS;i++) {
             uint16_t osc = (osc_start + i) % AMY_OSCS;
