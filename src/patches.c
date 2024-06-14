@@ -26,6 +26,28 @@ uint16_t memory_patch_oscs[MEMORY_PATCHES];
 uint8_t osc_to_voice[AMY_OSCS];
 uint16_t voice_to_base_osc[MAX_VOICES];
 
+void patches_debug() {
+    for(uint8_t v=0;v<MAX_VOICES;v++) {
+        if (AMY_IS_SET(voice_to_base_osc[v]))
+            fprintf(stderr, "voice %d base osc %d\n", v, voice_to_base_osc[v]);
+    }
+    fprintf(stderr, "osc_to_voice:\n");
+    for(uint16_t i=0;i<AMY_OSCS;) {
+        uint16_t j = 0;
+        fprintf(stderr, "%d: ", i);
+        for (j=0; j < 16; ++j) {
+            if ((i + j) >= AMY_OSCS)  break;
+            fprintf(stderr, "%d ", osc_to_voice[i + j]);
+        }
+        i += j;
+        fprintf(stderr, "\n");
+    }
+    for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
+        if(memory_patch_oscs[i])
+            fprintf(stderr, "memory_patch %d oscs %d patch %s\n", i, memory_patch_oscs[i], memory_patch[i]);
+    }
+}
+
 void patches_init() {
     for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
         memory_patch_oscs[i]  = 0;
