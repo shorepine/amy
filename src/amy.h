@@ -481,6 +481,7 @@ extern void partials_note_off(uint16_t osc);
 extern void patches_load_patch(struct event e); 
 extern void patches_event_has_voices(struct event e);
 extern void patches_reset();
+extern void patches_debug();
 extern void patches_store_patch(char * message);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);

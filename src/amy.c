@@ -770,6 +770,9 @@ void show_debug(uint8_t type) {
                 fprintf(stderr,"mod osc %d: amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i].amp, msynth[i].logfreq, msynth[i].duty, msynth[i].filter_logfreq, msynth[i].resonance, msynth[i].feedback, msynth[i].pan);
             }
         }
+        if (type > 4) {
+            patches_debug();
+        }
         fprintf(stderr, "\n");
     }
 }
