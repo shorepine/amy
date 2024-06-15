@@ -276,7 +276,7 @@ class JunoPatch:
   def _breakpoint_string(self):
     """Format a breakpoint string from the ADSR parameters reaching a peak."""
     return "%d,%s,%d,%s,%d,0" % (
-      to_attack_time(self.env_a), ffmt(1.0), to_attack_time(self.env_a) + to_decay_time(self.env_d),
+      to_attack_time(self.env_a), ffmt(1.0), to_decay_time(self.env_d),
       ffmt(to_level(self.env_s)), to_release_time(self.env_r)
     )
 

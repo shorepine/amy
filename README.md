@@ -217,7 +217,7 @@ Here's the full list:
 | Code | Python | Type-range  | Notes                                 |
 | ---- | ------ | ----------  | ------------------------------------- |
 | a    | amp    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
-| A    | bp0    | string      | in commas, like 100,0.5,150,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
+| A    | bp0    | string      | in commas, like 100,0.5,50,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
 | B    | bp1    | string      | breakpoints for Envelope Generator 1. See bp0 |
 | b    | feedback | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
@@ -355,7 +355,7 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time, value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with an EG. It gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time-delta, target-value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with an EG. It gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
@@ -429,13 +429,13 @@ You can set a synth-wide volume (in practice, 0-10), or set the EQ of the entire
 
 ## Envelope Generators
 
-AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per EG) of time (specified in milliseconds) and ratio. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time in the aggregate from note on, e.g. 10ms, then 100ms is 90ms later, then 250ms is 150ms after the last one. The last "release" pair counts from ms from the note-off. 
+AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per EG) of time deltas (specified in milliseconds) and target value. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time deltas relative to the previous segment, so `100,1,100,0,0,0` goes up to 1 over 100 ms, then back down to zero over the next 100ms. The last "release" pair counts from ms from the note-off. 
 
 An EG can control amplitude, frequency, filter frequency, duty or pan of an oscillator via the 4th (EG0) and 5th (EG1) entries in the corresponding ControlCoefficients.
 
-For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms at ratio to be 1.0, then 150ms with ratio .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like "`v0f220w0A50,1.0,150,0.5,250,0`" to specify a sine wave at 220Hz with this envelope. 
+For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms and target to be 1.0, then 100ms with target .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like "`v0f220w0A50,1.0,100,0.5,250,0`" to specify a sine wave at 220Hz with this envelope. 
 
-When using `amy.py`, use the string form of the breakpoint: `bp0="50,1.0,150,0.5,250,0"`. 
+When using `amy.py`, use the string form of the breakpoint: `bp0="50,1.0,100,0.5,250,0"`. 
 
 Every note on (specified by setting velocity / `l` to anything > 0) will trigger this envelope, and setting `l` to 0 will trigger the note off / release section. 
 

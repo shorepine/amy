@@ -311,8 +311,8 @@ def calc_loglin_eg_breakpoints(rates, levels, dx7_attacks=True,
         level_to_lin_fn = pitchval_to_ratio
     # This is the part we precompute in fm.py to get breakpoints to send to amy.
     current_level = levels[-1]
-    cumulated_time = 0
-    breakpoints = [(cumulated_time, level_to_lin_fn(current_level))]
+    # EG at time 0 has final value from release.
+    breakpoints = [(0, level_to_lin_fn(current_level))]
 
     MIN_LEVEL = 34
     ATTACK_RANGE = 75
@@ -353,8 +353,7 @@ def calc_loglin_eg_breakpoints(rates, levels, dx7_attacks=True,
                 #print("** Goosing release amp")
             segment_duration = level_difference / level_change_per_sec
             #print("lcps=", level_change_per_sec, "dur=", segment_duration)
-        cumulated_time += segment_duration
-        breakpoints.append((cumulated_time, level_to_lin_fn(target_level)))
+        breakpoints.append((segment_duration, level_to_lin_fn(target_level)))
         current_level = target_level
     return breakpoints
 
@@ -365,8 +364,6 @@ def eg_to_bp(egrate, eglevel, calc_eg_args={}):
     for time, level in breakpoints:
         times.append(int(1000 * time))
         rates.append(level)
-    # Fix release time to be relative to 0, not previous
-    times[-1] -= times[-2]
     return rates, times
 
 def eg_to_bp_pitch(egrate, eglevel):

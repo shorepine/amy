@@ -62,27 +62,36 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     uint32_t elapsed = 0;    
     SAMPLE scale = F2S(1.0f);
     int eg_type = synth[osc].eg_type[bp_set];
+    uint32_t bp_end_times[MAX_BREAKPOINTS];
+    uint32_t cumulated_time = 0;
 
-    // Find out which one is release (the last one)
-    
-    while(AMY_IS_SET(synth[osc].breakpoint_times[bp_set][bp_r]) && bp_r < MAX_BREAKPOINTS) bp_r++;
-    bp_r--;
-    if(bp_r<0) {
+    // Scan breakpoints to find which one is release (the last one)
+    bp_r = -1;
+    for(int i = 0; i < MAX_BREAKPOINTS; ++i) {
+        uint32_t this_seg_time = synth[osc].breakpoint_times[bp_set][i];
+        if (!AMY_IS_SET(this_seg_time))
+            break;
+        bp_r = i;  // Last good segment.
+        cumulated_time +=  this_seg_time;
+        bp_end_times[i] = cumulated_time;
+    }
+    if(bp_r < 0) {
         // no breakpoints, return key gate.
         if(AMY_IS_SET(synth[osc].note_off_clock)) scale = 0;
         synth[osc].last_scale[bp_set] = scale;
         //return scale;
         goto return_label;
     }
+    // Fix up bp_end_times for release segment to be relative to note-off time.
+    bp_end_times[bp_r] = synth[osc].breakpoint_times[bp_set][bp_r];
 
     // Find out which BP we're in
     if(AMY_IS_SET(synth[osc].note_on_clock)) {
         elapsed = (total_samples - synth[osc].note_on_clock + sample_offset) + 1;
         for(uint8_t i = 0; i < bp_r; i++) {
-            if(elapsed < synth[osc].breakpoint_times[bp_set][i]) {
+            if(elapsed < bp_end_times[i]) {
                 // We found a segment.
                 found = i;
-                //i = bp_r;
                 break;
             }
         }
@@ -124,10 +133,10 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         }
     }
 
-    t1 = synth[osc].breakpoint_times[bp_set][found]; 
+    t1 = bp_end_times[found];
     v1 = F2S(synth[osc].breakpoint_values[bp_set][found]);
     if(found>0 && bp_r != found && !release) {
-        t0 = synth[osc].breakpoint_times[bp_set][found-1];
+        t0 = bp_end_times[found-1];
         v0 = F2S(synth[osc].breakpoint_values[bp_set][found-1]);
     }
     scale = v0;

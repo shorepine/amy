@@ -135,7 +135,7 @@ class TestSineEnv(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,250,0.1,50,0')
+    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,50,0')
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
 
@@ -238,24 +238,24 @@ class TestBrass(AmyTest):
 
   def run(self):
     #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
-    #         resonance=0.167, bp0='60,1,800,0.9,200,0', filter_freq='6000,0.5,0,0,1,0',
-    #         bp1='60,1,800,0.9,200,0')
+    #         resonance=0.167, bp0='60,1,740,0.9,200,0', filter_freq='6000,0.5,0,0,1,0',
+    #         bp1='60,1,740,0.9,200,0')
     #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
-    #         resonance=0.167, bp0='60,1,400,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
-    #         bp1='60,1,400,0.3,200,0')
+    #         resonance=0.167, bp0='60,1,340,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
+    #         bp1='60,1,340,0.3,200,0')
     amy.send(time=0, osc=1, wave=amy.SAW_UP, freq='130.81,1,0,0,0,0',
-             amp='0,0,0.85,1,0,0', bp0='30,1,702,0.354,100,0',
+             amp='0,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
-             filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,702,0.354,100,0',
+             filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2,
              )
     amy.send(time=0, osc=2,
-             wave=amy.SINE, freq=0.974, bp0='156,1.0,256,1.0,100,0')  # amp='1,0,0,0,0,0') #
+             wave=amy.SINE, freq=0.974, bp0='156,1.0,100,1.0,100,0')  # amp='1,0,0,0,0,0') #
     amy.send(time=100, osc=1, note=76, vel=1.0)
     amy.send(time=300, osc=1, vel=0)
     amy.send(time=600, osc=1, note=76, vel=1.0)
     amy.send(time=800, osc=1, vel=0)
-    # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,702,0.354,232,0'
+    # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,672,0.354,232,0'
 
 
 class TestBrass2(AmyTest):
@@ -264,7 +264,7 @@ class TestBrass2(AmyTest):
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1', freq='130.815,1', 
              resonance=0.713, filter_type=amy.FILTER_LPF24, filter_freq='93.726,0.677,0,0,9.134',
-             bp0='30,1,702,0.354,232,0', bp1='30,1,702,0.354,232,0')
+             bp0='30,1,672,0.354,232,0', bp1='30,1,672,0.354,232,0')
     amy.send(time=100, osc=0, note=60, vel=1.0)
     amy.send(time=600, osc=0, vel=0)
 
@@ -274,8 +274,8 @@ class TestGuitar(AmyTest):
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.756,1', freq='130.815,1',
              filter_freq='16.23,0.236,0,0,11.181', resonance=0.753, filter_type=amy.FILTER_LPF24,
-             bp0='6,1,57,0.425,153,0',
-             bp1='6,1,57,0.425,153,0')
+             bp0='6,1,51,0.425,153,0',
+             bp1='6,1,51,0.425,153,0')
     amy.send(time=100, osc=0, note=60, vel=4.0)
     amy.send(time=150, osc=0, vel=0)
     amy.send(time=500, osc=0, note=60, vel=4.0)
@@ -360,8 +360,8 @@ class TestFlutesEq(AmyTest):
   def run(self):
     amy.send(time=0, eq_l=-15, eq_m=8, eq_h=8)
     amy.send(time=0, osc=0, wave=amy.SAW_UP, filter_type=amy.FILTER_LPF24, resonance=1.75,
-             bp0='200,1,10000,0,100,0',
-             bp1='200,1,10000,0,100,0',
+             bp0='200,1,9800,0,100,0',
+             bp1='200,1,9800,0,100,0',
              filter_freq='242,0.323'),
     amy.send(time=0, osc=1, clone_osc=0)
     amy.send(time=0, osc=2, clone_osc=0)
