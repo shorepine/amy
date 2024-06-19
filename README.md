@@ -4,11 +4,11 @@ AMY is a fast, small and accurate music synthesizer library written in C with Py
 
 It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a drum machine (PCM samples included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
 
-AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/bwhitman/alles), as well as the [Tulip Creative Computer](https://github.com/bwhitman/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
+AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/shorepine/alles), as well as the [Tulip Creative Computer](https://github.com/shorepine/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
 AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogram.com), and would love your contributions.
 
-[![shore pine sound systems discord](https://raw.githubusercontent.com/bwhitman/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)
+[![shore pine sound systems discord](https://raw.githubusercontent.com/shorepine/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)
 
 
 It supports
@@ -35,11 +35,11 @@ It supports
  * Built-in clock for short term sequencing of events
  * Can use multi-core (including microcontrollers) for rendering if available
 
-The FM synth provides a Python library, [`fm.py`](https://github.com/bwhitman/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/bwhitman/amy/blob/main/dx7_simulator.py).
+The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/shorepine/amy/blob/main/dx7_simulator.py).
 
-The partial tone synthesizer provides [`partials.py`](https://github.com/bwhitman/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+The partial tone synthesizer provides [`partials.py`](https://github.com/shorepine/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
 
-The Juno-6 emulation is in [`juno.py`](https://github.com/bwhitman/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands and generate patches.
+The Juno-6 emulation is in [`juno.py`](https://github.com/shorepine/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands and generate patches.
 
 
 ## Using AMY in Arduino
@@ -52,7 +52,7 @@ The examples rely on the following board packages and libraries:
  * ESP32/ESP32-S3/etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html) - use a 2.0.14+ version when installing
  * The USB MIDI example requires the [MIDI Library](https://www.arduino.cc/reference/en/libraries/midi-library/)
 
-You can use both cores of supported chips (RP2040 or ESP32) for more oscillators and voices. We provide Arduino examples for the Arduino ESP32 in multicore, and a `pico-sdk` example for the RP2040 that renders in multicore. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. You can use [Alles](https://github.com/bwhitman/alles) for a `ESP-IDF` example.
+You can use both cores of supported chips (RP2040 or ESP32) for more oscillators and voices. We provide Arduino examples for the Arduino ESP32 in multicore, and a `pico-sdk` example for the RP2040 that renders in multicore. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. You can use [Alles](https://github.com/shorepine/alles) for a `ESP-IDF` example.
 
 ## Using AMY in Python on any platform
 
@@ -380,7 +380,7 @@ You can use the same EG to control several things at once.  For example, we coul
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq="261.63,1"` (which is its default setting before any `freq` parameter is passed).  Setting it to `freq="523.26,1"` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq="261.3,0.5"` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
-Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq="0,1,0,0,0,0,1"` also yields the default behavior.  `amp` also has a set of defaults `amp="0,0,1,1,0,0,0"`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it is empty).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, we add 1.0 to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around identity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
+Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq="0,1,0,0,0,0,1"` also yields the default behavior.  `amp` also has a set of defaults `amp="0,0,1,1,0,0,0"`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it is empty).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, we add 1.0 to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around identity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
 
 We also have LFOs, which are implemented as one oscillator modulating another. You set up the lower-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
@@ -453,7 +453,7 @@ amy.send(voices="0", note=50,vel=1)
 
 The `load_patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
 
-![DX7 Algorithms](https://raw.githubusercontent.com/bwhitman/alles/main/pics/dx7_algorithms.jpg)
+![DX7 Algorithms](https://raw.githubusercontent.com/shorepine/alles/main/pics/dx7_algorithms.jpg)
 
 When building your own algorithm sets, assign a separate oscillator as wave=`ALGO`, but the source oscillators as `SINE`. The algorithm #s are borrowed from the DX7. You don't have to use all 6 operators, any operators specified as `-1` will be ignored. Note that the `algo_source` parameter counts backwards from operator 6. When building operators, they can have their frequencies specified directly with `freq` or as a ratio of the root `ALGO` oscillator via `ratio`.
 
@@ -475,7 +475,7 @@ Ok, we've set up the oscillators. Now, let's hear it!
 amy.send(osc=2, note=60, vel=3)
 ```
 
-You should hear a bell-like tone. Nice. (This example is also implemented using the C API in [`src/examples.c:example_fm()`](https://github.com/bwhitman/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/examples.c#L281).)
+You should hear a bell-like tone. Nice. (This example is also implemented using the C API in [`src/examples.c:example_fm()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/examples.c#L281).)
 
 Another classic two operator tone is to instead modulate the higher tone with the lower one, to make a filter sweep. Let's do it over 5 seconds.
 
@@ -503,7 +503,7 @@ amy.send(osc=2, vel=0)
 
 Additive synthesis is simply adding together oscillators to make more complex tones. You can modulate the breakpoints of these oscillators over time, for example, changing their pitch or time without artifacts, as the synthesis is simply playing sine waves back at certain amplitudes and frequencies (and phases). It's well suited to certain types of instruments. 
 
-![Partials](https://raw.githubusercontent.com/bwhitman/alles/main/pics/partials.png)
+![Partials](https://raw.githubusercontent.com/shorepine/alles/main/pics/partials.png)
 
 We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
 
