@@ -13,7 +13,7 @@ def wavread(filename):
   file_handle = open(filename, 'rb')
   samplerate, wave_data = wav.read(file_handle)
   # Normalize short ints to floats in range [-1..1).
-  data = np.asfarray(wave_data) / 32768.0
+  data = (wave_data.astype(np.float32)) / 32768.0
   return data, samplerate
 
 
