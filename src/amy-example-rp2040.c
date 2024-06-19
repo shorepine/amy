@@ -5,7 +5,7 @@
 gh repo clone raspberrypi/pico-extras
 gh repo clone raspberrypi/pico-sdk
 # Do whatever installs you need for the pico-sdk
-gh repo clone bwhitman/amy
+gh repo clone shorepine/amy
 cd amy/src; mkdir build; cd build
 export PICO_SDK_PATH=../../../pico-sdk
 export PICO_EXTRAS_PATH=../../../pico-extras
