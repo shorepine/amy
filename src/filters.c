@@ -37,7 +37,7 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     float Fs = 1;
 
     float w0 = 2 * M_PI * f / Fs;
-    w0 = MAX(0.01, w0);
+    w0 = MAX(0.01, w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
     float c = cosf(w0);
     float s = sinf(w0);
     float alpha = s / (2 * qFactor);

@@ -356,6 +356,7 @@ struct mod_synthinfo {
     float last_duty;   // Duty history for interpolation.
     float logfreq;
     float filter_logfreq;
+    float last_filter_logfreq;  // filter freq history for smoothing.
     float resonance;
     float feedback;
 };

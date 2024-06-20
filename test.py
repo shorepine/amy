@@ -422,6 +422,15 @@ class TestJunoCheapTrumpetPatch(AmyTest):
     amy.send(time=450, voices="1", vel=0)
 
 
+class TestFilterReleaseGlitch(AmyTest):
+  """See https://github.com/shorepine/amy/issues/126."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, filter_freq='100,0,0,6')
+    amy.send(time=100, note=60, vel=1)
+    amy.send(time=500, vel=0)
+
+
 
 def main(argv):
   if len(argv) > 1:
@@ -442,13 +451,13 @@ def main(argv):
     #TestBrass2().test()
     #TestSineEnv().test()
     #TestSawDownOsc().test()
-    #TestGuitar().test()
+    TestGuitar().test()
     #TestFilter().test()
     #TestAlgo().test()
     #TestBleep().test()
     #TestChainedOsc().test()
     #TestJunoPatch().test()
-    TestJunoTrumpetPatch().test()
+    #TestJunoTrumpetPatch().test()
 
   amy.send(debug=0)
   print("tests done.")
