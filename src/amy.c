@@ -581,6 +581,7 @@ void reset_osc(uint16_t i ) {
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].filter_logfreq_coefs[j] = 0;
     msynth[i].filter_logfreq = 0;
+    AMY_UNSET(msynth[i].last_filter_logfreq);
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].duty_coefs[j] = 0;
     synth[i].duty_coefs[COEF_CONST] = 0.5f;
@@ -1045,7 +1046,19 @@ void hold_and_modify(uint16_t osc) {
 
     // copy all the modifier variables
     msynth[osc].logfreq = combine_controls(ctrl_inputs, synth[osc].logfreq_coefs);
-    msynth[osc].filter_logfreq = combine_controls(ctrl_inputs, synth[osc].filter_logfreq_coefs);
+    float filter_logfreq = combine_controls(ctrl_inputs, synth[osc].filter_logfreq_coefs);
+    #define MIN_FILTER_LOGFREQ -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
+    if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
+    if (AMY_IS_SET(msynth[osc].last_filter_logfreq)) {
+        #define MAX_DELTA_FILTER_LOGFREQ_DOWN 2.0
+        float last_logfreq = msynth[osc].last_filter_logfreq;
+        if (filter_logfreq < last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN) {
+            // Filter cutoff downward slew-rate limit.
+            filter_logfreq = last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN;
+        }
+    }
+    msynth[osc].filter_logfreq = filter_logfreq;
+    msynth[osc].last_filter_logfreq = filter_logfreq;
     msynth[osc].duty = combine_controls(ctrl_inputs, synth[osc].duty_coefs);
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
