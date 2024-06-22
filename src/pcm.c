@@ -71,7 +71,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             synth[osc].status = STATUS_OFF;// is this right? 
             sample = 0;
         } else {
-            if(msynth[osc].feedback) { // still looping.  The feedback flag is cleared by pcm_note_off.
+            if(msynth[osc].feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
                 if(base_index >= patch->loopend) { // loopend
                     // back to loopstart
                     int32_t loop_len = patch->loopend - patch->loopstart;
