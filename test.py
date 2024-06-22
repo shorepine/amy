@@ -124,6 +124,14 @@ class TestPcmShift(AmyTest):
     amy.send(time=500, note=70, vel=1)
 
 
+class TestPcmLoop(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PCM, patch=10, feedback=1)
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=500, osc=0, vel=0)
+
+
 class TestPartial(AmyTest):
 
   def run(self):
@@ -427,7 +435,7 @@ class TestFilterReleaseGlitch(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, filter_freq='100,0,0,6')
-    amy.send(time=100, note=60, vel=1)
+    amy.send(time=100, note=64, vel=1)
     amy.send(time=500, vel=0)
 
 
@@ -451,13 +459,14 @@ def main(argv):
     #TestBrass2().test()
     #TestSineEnv().test()
     #TestSawDownOsc().test()
-    TestGuitar().test()
+    #TestGuitar().test()
     #TestFilter().test()
     #TestAlgo().test()
     #TestBleep().test()
     #TestChainedOsc().test()
     #TestJunoPatch().test()
     #TestJunoTrumpetPatch().test()
+    TestPcmLoop().test()
 
   amy.send(debug=0)
   print("tests done.")

@@ -488,7 +488,7 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
             for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) {
                 d.param=BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d);
                 // Stop adding deltas after first UNSET time sent, just to mark the end of the set when overwriting.
-                if(!AMY_IS_SET(t.breakpoint_times[i][j])) break;
+                if(AMY_IS_UNSET(t.breakpoint_times[i][j])) break;
                 d.param=BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d);
             }
         }
@@ -980,26 +980,27 @@ void play_event(struct delta d) {
                 #if AMY_KS_OSCS > 0
                 ks_note_off(d.osc);
                 #endif
-            }
-            else if(synth[d.osc].wave==ALGO) { algo_note_off(d.osc); }
-            else if(synth[d.osc].wave==PARTIAL) {
+            } else if(synth[d.osc].wave==ALGO) {
+                algo_note_off(d.osc);
+            } else if(synth[d.osc].wave==PARTIAL) {
                 #if AMY_HAS_PARTIALS == 1
                 partial_note_off(d.osc);
                 #endif
-            }
-            else if(synth[d.osc].wave==PARTIALS) {
+            } else if(synth[d.osc].wave==PARTIALS) {
                 #if AMY_HAS_PARTIALS == 1
                 partials_note_off(d.osc);
                 #endif
-            }
-            else if(synth[d.osc].wave==PCM) { pcm_note_off(d.osc); }
-            else if(synth[d.osc].wave==CUSTOM) {
+            } else if(synth[d.osc].wave==PCM) {
+                pcm_note_off(d.osc);
+            } else if(synth[d.osc].wave==CUSTOM) {
                 #if AMY_HAS_CUSTOM == 1
                 custom_note_off(d.osc);
                 #endif
-            }
-            else {
+            } else {
                 // osc note off, start release
+                // For now, note_off_clock signals note of BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
+                // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
+                // those waves on note-off.
                 AMY_UNSET(synth[d.osc].note_on_clock);
                 synth[d.osc].note_off_clock = total_samples;
             }
@@ -1073,7 +1074,9 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
     if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
 
-    msynth[osc].feedback = synth[osc].feedback;
+    // synth[osc].feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
+    // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
+    if (synth[osc].wave != PCM)  msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].resonance = synth[osc].resonance;
 
     if (osc == 999) {
