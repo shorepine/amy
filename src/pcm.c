@@ -24,7 +24,9 @@ void pcm_note_on(uint16_t osc) {
         // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.
         synth[osc].logfreq_coefs[COEF_CONST] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
     }
-    synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table. 
+    synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
+    // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
+    msynth[osc].feedback = synth[osc].feedback;
 }
 
 void pcm_mod_trigger(uint16_t osc) {
@@ -32,12 +34,13 @@ void pcm_mod_trigger(uint16_t osc) {
 }
 
 void pcm_note_off(uint16_t osc) {
-    // if looping set, disable looping; sample should play through to end.
-    if(msynth[osc].feedback > 0) {
-        msynth[osc].feedback = 0;
-    } else {
-        // Set phase to the end to cause immediate stop.
+    if(msynth[osc].feedback == 0) {
+        // Non-looping note: Set phase to the end to cause immediate stop.
         synth[osc].phase = F2P(pcm_map[synth[osc].patch].length / (float)(1 << PCM_INDEX_FRAC_BITS));
+    } else {
+        // Looping is requested, disable future looping, sample will play through to end.
+        // (sending a second note-off will stop it immediately).
+        msynth[osc].feedback = 0;
     }
 }
 
@@ -47,7 +50,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     const pcm_map_t* patch = &pcm_map[synth[osc].patch];
     float logfreq = msynth[osc].logfreq;
     // If osc[midi_note] is unset, apply patch's default here.
-    if (!AMY_IS_SET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch->midinote);
+    if (AMY_IS_UNSET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch->midinote);
     float playback_freq = freq_of_logfreq(logfreq);  // PCM_SAMPLE_RATE modified by
 
     SAMPLE max_value = 0;
@@ -55,6 +58,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
     const LUTSAMPLE* table = pcm + patch->offset;
     uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
+    //fprintf(stderr, "render_pcm: time=%.3f patch=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", total_samples / (float)AMY_SAMPLE_RATE, synth[osc].patch, base_index, patch->length, patch->loopstart, patch->loopend, msynth[osc].feedback, AMY_IS_UNSET(synth[osc].note_off_clock));
     for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
         SAMPLE frac = S_FRAC_OF_P(synth[osc].phase, PCM_INDEX_BITS);
         LUTSAMPLE b = table[base_index];
@@ -67,11 +71,11 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             synth[osc].status = STATUS_OFF;// is this right? 
             sample = 0;
         } else {
-            if(msynth[osc].feedback > 0) { // loop       
+            if(msynth[osc].feedback) { // still looping.  The feedback flag is cleared by pcm_note_off.
                 if(base_index >= patch->loopend) { // loopend
                     // back to loopstart
                     int32_t loop_len = patch->loopend - patch->loopstart;
-                    synth[osc].phase -= F2P(loop_len / (float)(1 << PCM_INDEX_FRAC_BITS));
+                    synth[osc].phase -= F2P(loop_len / (float)(1 << PCM_INDEX_BITS));
                     base_index -= loop_len;
                 }
             }
