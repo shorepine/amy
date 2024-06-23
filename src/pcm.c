@@ -11,7 +11,7 @@ void pcm_init() {
 }
 
 // How many bits used for fractional part of PCM table index.
-#define PCM_INDEX_FRAC_BITS 15
+#define PCM_INDEX_FRAC_BITS 8
 // The number of bits used to hold the table index.
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
 
