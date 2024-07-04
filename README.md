@@ -241,7 +241,7 @@ Here's the full list:
 | N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
 | n    | note | uint 0-127 | midi note, sets frequency | 
 | o    | algorithm | uint 1-32 | DX7 algorithm to use for ALGO type |
-| O    | algo_source | string | which oscillators to use for the algorithm. list of six (starting with op 6), use -1 for not used, e.g 0,1,2,-1,-1-1 |
+| O    | algo_source | string | which oscillators to use for the algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | p    | P-patch | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
 | P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
 | Q    | pan   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
@@ -455,17 +455,17 @@ The `load_patch` lets you set which preset is used (0 to 127 are the Juno 106 an
 
 ![DX7 Algorithms](https://raw.githubusercontent.com/shorepine/alles/main/pics/dx7_algorithms.jpg)
 
-When building your own algorithm sets, assign a separate oscillator as wave=`ALGO`, but the source oscillators as `SINE`. The algorithm #s are borrowed from the DX7. You don't have to use all 6 operators, any operators specified as `-1` will be ignored. Note that the `algo_source` parameter counts backwards from operator 6. When building operators, they can have their frequencies specified directly with `freq` or as a ratio of the root `ALGO` oscillator via `ratio`.
+When building your own algorithm sets, assign a separate oscillator as wave=`ALGO`, but the source oscillators as `SINE`. The algorithm #s are borrowed from the DX7. You don't have to use all 6 operators. Note that the `algo_source` parameter counts backwards from operator 6. When building operators, they can have their frequencies specified directly with `freq` or as a ratio of the root `ALGO` oscillator via `ratio`.
 
 
 ```python
 amy.reset()
 amy.send(osc=0, wave=amy.SINE, ratio=0.2, amp="0.1,0,0,1", bp0="0,1,1000,0,0,0")
 amy.send(osc=1, wave=amy.SINE, ratio=1, amp="1")
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=",,,,1,0")
 ```
 
-Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly -1s (not used) and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
+Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
 
 What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator to the base note. So oscillator 0 will be played at 20% of the base note frequency, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using an envelope generator. That's key to the "bell ringing out" effect.
 
@@ -483,7 +483,7 @@ Another classic two operator tone is to instead modulate the higher tone with th
 amy.reset()
 amy.send(osc=0, wave=amy.SINE, ratio=1, amp="1")  # Op 1, carrier
 amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp="2", bp0="0,0,5000,1,0,0")  # Op 2, modulator
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source="-1,-1,-1,-1,1,0")
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=",,,,1,0")
 ```
 
 Just a refresher on envelope generators; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
