@@ -155,7 +155,7 @@ amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1);
 
 ```
 
-On storage connstrained devices, you may want to limit the amount of PCM samples we ship with AMY. To do this, include a smaller set after including `amy.h`, like:
+On storage constrained devices, you may want to limit the amount of PCM samples we ship with AMY. To do this, include a smaller set after including `amy.h`, like:
 
 ```c
 #include "amy.h"
