@@ -310,7 +310,7 @@ void example_fm(uint32_t start) {
     e.osc = 2;
     e.wave = ALGO;
     e.algorithm = 1;  // algo 1 has op 2 driving op 1 driving output (plus a second chain for ops 6,5,4,3).
-    strcpy(e.algo_source, "-1,-1,-1,-1,1,0");
+    strcpy(e.algo_source, ",,,,1,0");
     amy_add_event(e);
 
     // Add a note on event.
