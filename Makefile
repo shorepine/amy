@@ -58,6 +58,10 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 amy-example: $(OBJECTS) src/amy-example.o
 	$(CC) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
 
+
+amy-crasher: $(OBJECTS) src/amy-crasher.o
+	$(CC) $(OBJECTS) src/amy-crasher.o -Wall $(LIBS) -o $@
+
 amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 

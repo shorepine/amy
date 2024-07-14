@@ -19,7 +19,6 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
 }
 
 
-
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
     //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
@@ -78,23 +77,20 @@ int main(int argc, char ** argv) {
     }
 
 
+
     example_voice_chord(0, 0);
 
+    // Reset the oscs 
+    struct event e;
+    e.osc = 0;
+    e.reset_osc = 1000;
+    e.time = 4500;
+    amy_add_event(e);
 
-    // Now just spin for 5s
-    while(amy_sysclock() < 5000) {
-        if (output_filename) {
-            int16_t * frames = amy_simple_fill_buffer();
-            int num_frames = AMY_BLOCK_SIZE;
-            ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
-        }
-        usleep(THREAD_USLEEP);
-    }
+    example_fm(5000);
+
+    // Now just spin for 6s
     
-    amy_reset_oscs();
-    example_fm(0);
-
-    // Now just spin for 1s
     while(amy_sysclock() < 6000) {
         if (output_filename) {
             int16_t * frames = amy_simple_fill_buffer();
@@ -103,6 +99,8 @@ int main(int argc, char ** argv) {
         }
         usleep(THREAD_USLEEP);
     }
+    show_debug(9);
+
 
     if (output_filename) {
         ma_encoder_uninit(&encoder);
