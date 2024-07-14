@@ -218,7 +218,9 @@ void config_reverb(float level, float liveness, float damping, float xover_hz) {
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
-        if (reverb.level == 0) init_stereo_reverb();  // In case it's the first time
+        if (reverb.level == 0) { 
+            init_stereo_reverb();  // In case it's the first time
+        }
         config_stereo_reverb(liveness, xover_hz, damping);
     }
     reverb.level = F2S(level);
@@ -899,7 +901,7 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
-    if(d.param == RESET_OSC) { if(*(int16_t *)&d.data>AMY_OSCS) { amy_reset_oscs(); } else { reset_osc(*(int16_t *)&d.data); } }
+    if(d.param == RESET_OSC) { if(*(int16_t *)&d.data>(AMY_OSCS+1)) { amy_reset_oscs(); } else { reset_osc(*(int16_t *)&d.data); } }
     // todo: event-only side effect, remove
     if(d.param == MOD_SOURCE) { synth[d.osc].mod_source = *(uint16_t *)&d.data; synth[*(uint16_t *)&d.data].status = IS_MOD_SOURCE; }
 
@@ -1622,7 +1624,7 @@ struct event amy_parse_message(char * message) {
                         /* T unused */
                         /* U used by Alles for sync */
                         case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
-                        case 'v': e.osc=((atoi(message + start)) % AMY_OSCS);  break; // allow osc wraparound
+                        case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
                         /* W used by Tulip for CV, external_channel */
@@ -1697,5 +1699,5 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     amy_global.has_chorus = chorus;
     amy_global.has_reverb = reverb;
     oscs_init();
-    amy_reset_oscs();
+    //amy_reset_oscs();
 }

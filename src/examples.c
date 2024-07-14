@@ -284,7 +284,7 @@ void example_fm(uint32_t start) {
     // Output oscillator (op 1)
     e = amy_default_event();
     e.time = start;
-    e.osc = 0;
+    e.osc = 7;
     e.wave = SINE;
     e.ratio = 0.2f;
     e.amp_coefs[COEF_CONST] = 0.1f;
@@ -296,7 +296,7 @@ void example_fm(uint32_t start) {
     // Modulating oscillator (op 2)
     e = amy_default_event();
     e.time = start;
-    e.osc = 1;
+    e.osc = 8;
     e.wave = SINE;
     e.ratio = 1.0f;
     e.amp_coefs[COEF_CONST] = 1.0f;
@@ -307,18 +307,18 @@ void example_fm(uint32_t start) {
     // ALGO control oscillator
     e = amy_default_event();
     e.time = start;
-    e.osc = 2;
+    e.osc = 9;
     e.wave = ALGO;
     e.algorithm = 1;  // algo 1 has op 2 driving op 1 driving output (plus a second chain for ops 6,5,4,3).
-    strcpy(e.algo_source, ",,,,1,0");
+    strcpy(e.algo_source, ",,,,8,7");
     amy_add_event(e);
 
     // Add a note on event.
     e = amy_default_event();
     e.time = start + 100;
-    e.osc = 2;
+    e.osc = 9;
     e.midi_note = 60;
-    e.velocity = 1.0f;
+    e.velocity = 25.0f; // this is very quiet as constructed -- just two ops
     amy_add_event(e);
 }
 
@@ -328,7 +328,7 @@ void example_fm(uint32_t start) {
 #if AMY_HAS_CUSTOM == 1
 
 void beeper_init(void) {
-    printf("Beeper init\n");
+    //printf("Beeper init\n");
 }
 
 void beeper_note_on(uint16_t osc, float freq) {

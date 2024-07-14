@@ -56,7 +56,6 @@ int main(int argc, char ** argv) {
     }
     amy_external_render_hook = render;
 
-    uint32_t start = amy_sysclock();
     
     #if AMY_HAS_CUSTOM == 1
     example_init_custom();
@@ -78,12 +77,11 @@ int main(int argc, char ** argv) {
     }
 
 
-    amy_reset_oscs();
-    //example_voice_chord(0, 128);
-    //example_drums(0, 4);
-    example_fm(0);
+    example_voice_chord(0, 0);
 
-    // Now just spin for 10s
+
+    // Now just spin for 5s
+    uint32_t start = amy_sysclock();
     while(amy_sysclock() - start < 5000) {
         if (output_filename) {
             int16_t * frames = amy_simple_fill_buffer();
@@ -92,7 +90,20 @@ int main(int argc, char ** argv) {
         }
         usleep(THREAD_USLEEP);
     }
-    show_debug(9);
+    
+    amy_reset_oscs();
+    example_fm(0);
+
+    // Now just spin for 1s
+    while(amy_sysclock() - start < 6000) {
+        if (output_filename) {
+            int16_t * frames = amy_simple_fill_buffer();
+            int num_frames = AMY_BLOCK_SIZE;
+            ma_encoder_write_pcm_frames(&encoder, frames, num_frames, NULL);
+        }
+        usleep(THREAD_USLEEP);
+    }
+
 
     if (output_filename) {
         ma_encoder_uninit(&encoder);
