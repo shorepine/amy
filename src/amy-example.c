@@ -79,10 +79,19 @@ int main(int argc, char ** argv) {
 
     example_voice_chord(0, 0);
 
+    // Reset the oscs 
+    struct event e = amy_default_event();
+    e.osc = 0;
+    e.reset_osc = 1000;
+    e.time = 4500;
+    amy_add_event(e);
 
-    // Now just spin for 5s
+    example_fm(5000);
+
+
+    // Now just spin for 6s
     uint32_t start = amy_sysclock();
-    while(amy_sysclock() - start < 5000) {
+    while(amy_sysclock() - start < 6000) {
         if (output_filename) {
             int16_t * frames = amy_simple_fill_buffer();
             int num_frames = AMY_BLOCK_SIZE;
