@@ -37,6 +37,10 @@ void AMY::reset() {
 }
 
 
+void AMY::reset(uint32_t start) {
+    example_reset(start);
+}
+
 void AMY::restart() {
     amy_restart();
 }
@@ -72,6 +76,7 @@ void AMY::send_message(char * message) {
 void AMY::drums(uint32_t start, uint16_t loops) {
     example_drums(start, loops);
 }
+
 
 void AMY::voice_chord(uint32_t start, uint16_t patch) {
     example_voice_chord(start, patch);

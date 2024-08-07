@@ -10,6 +10,8 @@
 #define AMY_SAMPLE_RATE 44100 
 #ifdef ALLES
 #define AMY_NCHANS 1
+#elif defined ARDUINO
+#define AMY_NCHANS 1
 #else
 #define AMY_NCHANS 2
 #endif
