@@ -35,10 +35,8 @@ void setup() {
   e.time = clock+2500;
   amy.add_event(e);
 
-  // Run an example at 5s from now
-  amy.voice_chord(clock+5000, 0);
-  // Run an example drum loop to start 10s from now, play twice, stop
-  amy.drums(clock+7500, 2);
+  // Run an example drum loop to start 5s from now, play twice, stop
+  amy.drums(clock+5000, 2);
 
 }
 
