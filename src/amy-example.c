@@ -89,9 +89,12 @@ int main(int argc, char ** argv) {
     example_fm(5000);
 
 
-    // Now just spin for 6s
+
+    example_drums(10000,2);
+
+    // Now just spin for 15s
     uint32_t start = amy_sysclock();
-    while(amy_sysclock() - start < 6000) {
+    while(amy_sysclock() - start < 15000) {
         if (output_filename) {
             int16_t * frames = amy_simple_fill_buffer();
             int num_frames = AMY_BLOCK_SIZE;

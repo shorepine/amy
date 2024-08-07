@@ -33,6 +33,7 @@ class AMY
     void voice_chord(uint32_t start, uint16_t patch);
     void fm(uint32_t start);
     void reset();
+    void reset(uint32_t start);
     struct event default_event();
     void add_event(struct event e);
     void send_message(char * message);

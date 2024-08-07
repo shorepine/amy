@@ -1,8 +1,8 @@
 #include <AMY-Arduino.h>
-#include <I2S.h>
+#include <ESP_I2S.h>
 
 AMY amy;
-
+I2SClass I2S;
 
 void setup() {
   // This is if you're using an Alles board, you have to poke 5V_EN to turn on the speaker
@@ -11,10 +11,9 @@ void setup() {
   digitalWrite(21, 1);
 
   // Set your I2S pins. Data/SD/DIN/DOUT, SCK/BLCK, FS/WS/LRCLK. 
-  I2S.setDataPin(27); // 27
-  I2S.setSckPin(26); // 26
-  I2S.setFsPin(25); // 25
-  I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, BYTES_PER_SAMPLE*8);
+//  int8_t bclk, int8_t ws, int8_t dout,
+  I2S.setPins(4, 6, 5, -1, -1);
+  I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, BYTES_PER_SAMPLE8);
 
   // Start up AMY
   amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
@@ -35,9 +34,11 @@ void setup() {
   e.velocity = 1;
   e.time = clock+2500;
   amy.add_event(e);
-   
-  // Run an example script to start 5s from now
-  amy.drums(clock+5000, 2);
+
+  // Run an example at 5s from now
+  amy.voice_chord(clock+5000, 0);
+  // Run an example drum loop to start 10s from now, play twice, stop
+  amy.drums(clock+7500, 2);
 
 }
 
@@ -45,6 +46,6 @@ void setup() {
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
   short * samples = amy.render_to_buffer();
-  I2S.write_blocking(samples, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
+  I2S.write((uint8_t*)samples, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
 }
 

@@ -6,6 +6,14 @@
 // set by the arch
 extern void delay_ms(uint32_t ms);
 
+void example_reset(uint32_t start) {
+    struct event e = amy_default_event();
+    e.osc = 0;
+    e.reset_osc = 1000;
+    e.time = start;
+    amy_add_event(e);
+}
+
 void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
     struct event e = amy_default_event();
@@ -185,17 +193,27 @@ void example_multimbral_fm() {
 
 // Emulate the Tulip "drums()" example via event calls.
 void example_drums(uint32_t start, int loops) {
-    struct event e = amy_default_event();
-    e.time = start;
-
-    float volume = 0.5;
 
     // bd, snare, hat, cow, hicow
     int oscs[] = {0, 1, 2, 3, 4};
     int patches[] = {1, 5, 0, 10, 10};
+
+    
+    // Reset all used oscs first, just in case
+    for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
+        struct event e_reset = amy_default_event();
+        e_reset.time = start;
+        e_reset.osc = oscs[i];    
+        e_reset.reset_osc = oscs[i];
+        amy_add_event(e_reset);
+    }
+    
+    struct event e = amy_default_event();
+    e.time = start + 1;
+    float volume = 0.5;
     e.wave = PCM;
-    //e.freq = 0;
     e.velocity = 0;
+
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         e.osc = oscs[i];
         e.patch = patches[i];
@@ -203,14 +221,14 @@ void example_drums(uint32_t start, int loops) {
     }
     // Update high cowbell.
     e = amy_default_event();
-    e.time = start;
+    e.time = start+1;
     e.osc = 4;
     e.midi_note = 70;
     amy_add_event(e);
 
     // osc 5 : bass
     e = amy_default_event();
-    e.time = start;
+    e.time = start+1;
     e.osc = 5;
     e.wave = SAW_DOWN;
     e.filter_freq_coefs[COEF_CONST] = 650.0;  // LOWEST filter center frequency.
@@ -231,7 +249,7 @@ void example_drums(uint32_t start, int loops) {
     int bassline[] = {50, 0, 0, 0, 50, 52, 51, 0};
 
     e = amy_default_event();
-    e.time = start;
+    e.time = start+1;
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
             e.time += 250;
