@@ -198,7 +198,6 @@ void example_drums(uint32_t start, int loops) {
     int oscs[] = {0, 1, 2, 3, 4};
     int patches[] = {1, 5, 0, 10, 10};
 
-    
     // Reset all used oscs first, just in case
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         struct event e_reset = amy_default_event();
@@ -207,7 +206,7 @@ void example_drums(uint32_t start, int loops) {
         e_reset.reset_osc = oscs[i];
         amy_add_event(e_reset);
     }
-    
+
     struct event e = amy_default_event();
     e.time = start + 1;
     float volume = 0.5;

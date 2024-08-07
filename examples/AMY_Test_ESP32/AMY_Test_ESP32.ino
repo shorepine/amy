@@ -11,7 +11,7 @@ void setup() {
   digitalWrite(21, 1);
 
   // Set your I2S pins. Data/SD/DIN/DOUT, SCK/BLCK, FS/WS/LRCLK. 
-//  int8_t bclk, int8_t ws, int8_t dout,
+  //  int8_t bclk, int8_t ws, int8_t dout,
   I2S.setPins(4, 6, 5, -1, -1);
   I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, BYTES_PER_SAMPLE8);
 
@@ -24,8 +24,6 @@ void setup() {
   
   // The second way is to use the structure directly 
   // We fill in an event struct with what we want and "schedule" it for 2.5 seconds from now
-
-
   long clock = amy.sysclock();
   struct event e = amy.default_event();
   e.osc = 0;
@@ -35,8 +33,17 @@ void setup() {
   e.time = clock+2500;
   amy.add_event(e);
 
-  // Run an example drum loop to start 5s from now, play twice, stop
-  amy.drums(clock+5000, 2);
+  // reset everything at 5000ms
+  amy.reset(clock+5000);
+
+  // Constructed FM example, plays a bell-like tone
+  amy.fm(clock+5001);
+
+  // Reset everything at 7500ms
+  amy.reset(clock+7500);
+
+  // Run an example drum loop to start 7500ms from now, play twice, stop
+  amy.drums(clock+7501, 2);
 
 }
 
