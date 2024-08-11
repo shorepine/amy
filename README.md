@@ -535,7 +535,7 @@ import partials, amy
 153 partials and 977 breakpoints, max oscs used at once was 8
 
 amy.live() # Start AMY playing audio
-partials.play(s, amp_ratio=2)
+partials.play(s)
 ```
 
 https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4
