@@ -517,23 +517,25 @@ The presets are just the start of what you can do with partials in AMY. You can 
 
 ```bash
 brew install python3 swig ffmpeg
-python3.9 -m pip install pydub numpy --user
+python3 -m pip install pydub numpy --user
 tar xvf loris-1.8.tar
 cd loris-1.8
-CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python
+mkdir $HOME/.local # Just in case this doesn't exist
+CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python --prefix=$HOME/.local
 make
-sudo make install
+make install
 cd ..
 ```
 
-And then in python:
+And then in python (run `python3`):
 
 ```python
-import partials
-(m,s) = partials.sequence("sleepwalk.mp3") # Any audio file
-109 partials and 1029 breakpoints, max oscs used at once was 8
+import partials, amy
+(m,s) = partials.sequence("sounds/sleepwalk_original_45s.mp3") # Any audio file
+153 partials and 977 breakpoints, max oscs used at once was 8
 
-partials.play(s, amp_ratio=2)
+amy.live() # Start AMY playing audio
+partials.play(s)
 ```
 
 https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4

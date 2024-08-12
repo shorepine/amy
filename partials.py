@@ -1,11 +1,9 @@
 import amy, sys
 import pydub
-# I will fix this eventually, loris is v py2.0 and hard to install
-sys.path.append('/usr/local/lib/python3.8/site-packages')
 import loris
 import time
 import numpy as np
-from math import pi
+from math import pi, log2
 from collections import deque
 
 
@@ -37,7 +35,7 @@ def loris_synth(filename, freq_res=150, analysis_window=100,amp_floor=-30, max_l
     loris.scaleNoiseRatio(partials, noise_ratio)
     return loris.synthesize(partials,44100)
 
-def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=amy.OSCS, freq_res = 10, freq_drift=20, analysis_window = 100):
+def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=amy.AMY_OSCS, freq_res = 10, freq_drift=20, analysis_window = 100):
     # my job: take a file, analyze it, output a sequence + some metadata
     # i do voice stealing to keep maximum partials at once to max_oscs 
     # my sequence is an ordered list of partials/oscillators, a list with (ms, osc, freq, amp, phase, time_delta, amp_delta, freq_delta)
@@ -140,6 +138,9 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     metadata["oscs_alloc"] = max_oscs-min_q_len
     return (metadata, sequence)
 
+def log2_or_0(x):
+    if x <= 0: return 0
+    return log2(x)
 
 def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio = 1, pitch_ratio = 1, amp_ratio = 1):
     # i take a sequence and play it to AMY, just like native AMY will do from a .h file
@@ -166,7 +167,7 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
 
         # Make envelope strings
         bp0 = "0,1.0,%d,%s,0,0" % (s[5] / time_ratio, amy.trunc(s[6]))
-        bp1 = "0,1.0,%d,%s,0,1.0" % (s[5] / time_ratio, amy.trunc(s[7]))
+        bp1 = "0,0.0,%d,%s,0,0" % (s[5] / time_ratio, amy.trunc(log2_or_0(s[7])))
         if(sustain_ms > 0 and sustain_offset == 0):
             if(s[0]/time_ratio > sustain_ms/time_ratio):
                 sustain_offset = sustain_len_ms/time_ratio
@@ -178,14 +179,13 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
         partial_args.update({"time":my_start_time + (s[0]/time_ratio + sustain_offset),
             "osc":s[1]+osc_offset,
             "wave":amy.PARTIAL,
-            "amp":s[3]*amp_ratio,
-            "freq":s[2]*pitch_ratio,
-            "bp0":bp0, "bp1":bp1,
-            "bp0_target":amy.TARGET_AMP+amy.TARGET_LINEAR,
-            "bp1_target":amy.TARGET_FREQ+amy.TARGET_LINEAR,
+            "amp": "%s,0,0,1,0" % amy.trunc(s[3]*amp_ratio),
+            "freq":"%s,0,0,0,1" % amy.trunc(s[2]*pitch_ratio),
+            "bp0":bp0, "bp1":bp1, "eg0_type": amy.ENVELOPE_LINEAR, "eg1_type":amy.ENVELOPE_LINEAR
         })
 
         if(s[4]==-2): #end, add note off
+            partial_args['amp'] = "0,0,0,1,0"
             amy.send(**partial_args, vel=0)
         elif(s[4]==-1): # continue
             amy.send(**partial_args)
