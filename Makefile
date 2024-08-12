@@ -14,6 +14,10 @@ ifeq ($(shell uname -m), armv7l)
 LIBS += -ldl  -latomic
 endif
 
+ifeq ($(shell uname -m), armv6l)
+LIBS += -ldl  -latomic
+endif
+
 CC = gcc
 CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations
 CFLAGS += -DAMY_DEBUG

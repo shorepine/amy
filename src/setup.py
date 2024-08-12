@@ -12,6 +12,9 @@ if os.uname()[0] == 'Darwin':
 	for f in frameworks:
 		link_args += ['-framework', f]
 
+if os.uname()[4] == 'armv7l' or os.uname()[4] == 'armv6l':
+	link_args += ['-latomic', '-ldl']
+
 extension_mod = Extension("libamy", sources=sources, \
 	extra_compile_args=["-I/opt/homebrew/include", "-DAMY_DEBUG"], \
 	extra_link_args=link_args)
