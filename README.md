@@ -520,7 +520,6 @@ brew install python3 swig ffmpeg
 python3 -m pip install pydub numpy --user
 tar xvf loris-1.8.tar
 cd loris-1.8
-mkdir $HOME/.local # Just in case this doesn't exist
 CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python --prefix=`python3-config --prefix`
 make
 make install
