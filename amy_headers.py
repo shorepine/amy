@@ -424,7 +424,10 @@ def generate_all():
     make_clipping_lut('src/clipping_lookup_table.h')
 
     # PCM LUT
-    generate_both_pcm_headers()
+    try:
+        generate_both_pcm_headers()
+    except ImportError:
+        print("If you want to regenerate the PCM headers (not required!) you need to `pip install resampy sf2utils`.")
 
     # Juno & FM patches
     make_patches("src/patches.h")
