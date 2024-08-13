@@ -1,11 +1,11 @@
 import amy, sys
 import pydub
+sys.path.append('/usr/local/lib/python' + '.'.join(sys.version.split('.', 2)[:2]) + '/site-packages')
 import loris
 import time
 import numpy as np
 from math import pi, log2
-from collections import deque
-
+from collections import deque, defaultdict
 
 def list_from_py2_iterator(obj, how_many):
     # Oof, the loris object uses some form of iteration that py3 doesn't like. 
@@ -160,37 +160,54 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
             print("Moving sustain_ms from %d to %d" % (sustain_ms, sequence[-1][0]-100))
             sustain_ms = sequence[-1][0] - 100
 
+    # Use a default dict so that values we haven't written yet appear as zeros.
+    time_since_osc_onset = defaultdict(int)
+
     for i,s in enumerate(sequence):
         # Wait for the item in the sequence to be close, so I don't overflow the synthesizers' state
         while(my_start_time + (s[0] / time_ratio) > (amy.millis() - 500)):
             time.sleep(0.01)
 
-        # Make envelope strings
-        bp0 = "0,1.0,%d,%s,0,0" % (s[5] / time_ratio, amy.trunc(s[6]))
-        bp1 = "0,0.0,%d,%s,0,0" % (s[5] / time_ratio, amy.trunc(log2_or_0(s[7])))
+        # Make envelope strings.  This is weird because we rewrite the envelopes while the oscillator
+        # is running (and the envelopes are part-evaluated) to allow an unlimited number of segments.
+        # To make it work, each time we change it we have to make a placeholder first interval to get
+        # us to the right time offset after the start of the partial (the time frame used by the
+        # envelope generator).
+        osc = s[1] + osc_offset
+        delta_time = int(round(s[5] / time_ratio))
+        bp0 = "%d,1.0,%d,%s,0,0" % (time_since_osc_onset[osc], delta_time, amy.trunc(s[6]))
+        bp1 = "%d,0.0,%d,%s,0,0" % (time_since_osc_onset[osc], delta_time, amy.trunc(log2_or_0(s[7])))
+        # Update the base time for the next segment.
+        time_since_osc_onset[osc] += delta_time
+
         if(sustain_ms > 0 and sustain_offset == 0):
             if(s[0]/time_ratio > sustain_ms/time_ratio):
                 sustain_offset = sustain_len_ms/time_ratio
 
-        osc = s[1]+osc_offset
-
-        partial_args = {}
-
-        partial_args.update({"time":my_start_time + (s[0]/time_ratio + sustain_offset),
-            "osc":s[1]+osc_offset,
-            "wave":amy.PARTIAL,
+        partial_args = {
+            "time": my_start_time + (s[0]/time_ratio + sustain_offset),
+            "osc": s[1]+osc_offset,
+            "wave": amy.PARTIAL,
             "amp": "%s,0,0,1,0" % amy.trunc(s[3]*amp_ratio),
-            "freq":"%s,0,0,0,1" % amy.trunc(s[2]*pitch_ratio),
-            "bp0":bp0, "bp1":bp1, "eg0_type": amy.ENVELOPE_LINEAR, "eg1_type":amy.ENVELOPE_LINEAR
-        })
+            "freq": "%s,0,0,0,1" % amy.trunc(s[2]*pitch_ratio),
+            "bp0": bp0,
+            "bp1": bp1,
+            "eg0_type": amy.ENVELOPE_LINEAR,
+            "eg1_type": amy.ENVELOPE_LINEAR
+        }
 
         if(s[4]==-2): #end, add note off
             partial_args['amp'] = "0,0,0,1,0"
-            amy.send(**partial_args, vel=0)
+            partial_args['vel'] = 0
+            # Reset the incremental envelope segment start time.
+            time_since_osc_onset[osc] = 0
         elif(s[4]==-1): # continue
-            amy.send(**partial_args)
+            pass
         else: #start, add phase and note on
-            amy.send(**partial_args, vel=s[3]*amp_ratio, phase=s[4])
+            partial_args['vel'] = 1.0  # Velocity value is ignored?
+            partial_args['phase'] = s[4]
+
+        amy.send(**partial_args)
 
     return sequence[-1][0]/time_ratio
 
