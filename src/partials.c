@@ -141,6 +141,9 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             // For partials, retard it again to preserve the old behavior.
             float last_amp_on_entry = msynth[o].last_amp;
             hold_and_modify(o);
+            // Restore the msynth last_amp .. amp transition to be the actual last_amp from prev
+            // frame through to the "previous frame terminating amp" calculated by hold_and_mod.
+            // "This frame terminating amp" calculated by hold_and_mod is discarded.
             msynth[o].amp = msynth[o].last_amp;
             msynth[o].last_amp = last_amp_on_entry;
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
