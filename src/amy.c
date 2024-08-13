@@ -578,7 +578,7 @@ void reset_osc(uint16_t i ) {
         synth[i].amp_coefs[j] = 0;
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
     synth[i].amp_coefs[COEF_EG0] = 1.0f;
-    msynth[i].amp = 1.0f;
+    msynth[i].amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
     msynth[i].last_amp = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].logfreq_coefs[j] = 0;
@@ -1074,16 +1074,22 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
     // Also, we advance one frame by writing both last_amp and amp (=next amp)
-    float new_last_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
-    // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
-    if (new_last_amp > 0) {
-        msynth[osc].last_amp = new_last_amp;
+    // *Except* for partials, where we allow one frame of ramp-on.
+    float new_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    if (synth[osc].wave == PARTIAL) {
+        msynth[osc].last_amp = msynth[osc].amp;
+        msynth[osc].amp = new_amp;
+    } else {
+        // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
+        if (new_amp > 0) {
+            msynth[osc].last_amp = new_amp;
+        }
+        // Advance the envelopes to the beginning of the next frame.
+        ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
+        ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
+        msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+        if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
     }
-    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
-    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
-    msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
-    if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
-
     // synth[osc].feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
     if (synth[osc].wave != PCM)  msynth[osc].feedback = synth[osc].feedback;

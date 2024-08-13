@@ -137,15 +137,10 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==IS_ALGO_SOURCE) {
-            // msynth amp used to lag one frame behind, but we advanced it one frame.
-            // For partials, retard it again to preserve the old behavior.
-            float last_amp_on_entry = msynth[o].last_amp;
+            // hold_and_modify contains a special case for wave == PARTIAL so that
+            // envelope value are delayed by 1 frame compared to other oscs
+            // so that partials fade in over one frame from zero amp.
             hold_and_modify(o);
-            // Restore the msynth last_amp .. amp transition to be the actual last_amp from prev
-            // frame through to the "previous frame terminating amp" calculated by hold_and_mod.
-            // "This frame terminating amp" calculated by hold_and_mod is discarded.
-            msynth[o].amp = msynth[o].last_amp;
-            msynth[o].last_amp = last_amp_on_entry;
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
