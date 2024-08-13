@@ -467,6 +467,9 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
+    if(AMY_IS_SET(e.eg_type[0]))  { d.param=EG0_TYPE; d.data = e.eg_type[0]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eg_type[1]))  { d.param=EG1_TYPE; d.data = e.eg_type[1]; add_delta_to_queue(d); }
+
     if(e.algo_source[0] != 0) {
         struct synthinfo t;
         parse_algorithm_source(&t, e.algo_source);
@@ -920,6 +923,9 @@ void play_event(struct delta d) {
         if(AMY_IS_SET(synth[d.osc].algo_source[which_source]))
             synth[synth[d.osc].algo_source[which_source]].status = IS_ALGO_SOURCE;
     }
+
+    if (d.param == EG0_TYPE) synth[d.osc].eg_type[0] = d.data;
+    if (d.param == EG1_TYPE) synth[d.osc].eg_type[1] = d.data;
 
     // for global changes, just make the change, no need to update the per-osc synth
     if(d.param == VOLUME) amy_global.volume = *(float *)&d.data;
@@ -1623,14 +1629,14 @@ struct event amy_parse_message(char * message) {
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 's': e.pitch_bend = atoff(message + start); break;
                         /* t used for time */
-                        /* T unused */
+                        case 'T': e.eg_type[0] = atoi(message + start); break;
                         /* U used by Alles for sync */
                         case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
                         /* W used by Tulip for CV, external_channel */
-                        /* X available */
+                        case 'X': e.eg_type[1] = atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
                         /* Y available */
                         case 'y': e.eq_m = atoff(message+start); break;
