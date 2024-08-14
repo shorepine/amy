@@ -140,9 +140,9 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
                 sequence.append(s)
                 if(s[4] == -2): # last bp
                     # Put the oscillator back
-                    # per dan, ONLY put this osc back once at least 6ms has gone by after we get a -2
+                    # per dan, ONLY put this osc back once at least 12ms (i.e., def 1 AMY frame) has gone by after we get a -2
                     #print("not letting osc %d die until 6ms from now %d = %d" % (s[1], s[0], s[0]+6))
-                    osc_free_at[s[1]] = s[0] + 6
+                    osc_free_at[s[1]] = s[0] + 12
                     #osc_q.appendleft(osc)
 
         if(len(osc_q) < min_q_len): min_q_len = len(osc_q)
