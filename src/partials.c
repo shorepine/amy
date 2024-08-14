@@ -48,6 +48,8 @@ void partials_note_off(uint16_t osc) {
     synth[osc].step = -1;
 }
 
+
+
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all patches have sustain point?
@@ -58,6 +60,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     float time_ratio = 1;
     if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
     uint32_t ms_since_started = (uint32_t) ((((total_samples - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
+    uint16_t oscs = patch.oscs_alloc;
     if(synth[osc].step >= 0) {
         // do we either have no sustain, or are we past sustain? 
         // TODO: sustain is likely more complicated --we want to bounce between the closest bps for loopstart & loopend
@@ -76,6 +79,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
+                synth[o].velocity = synth[osc].velocity;
                 synth[o].amp_coefs[0] = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
@@ -88,7 +92,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_values[0][2] = 0.0;  // Release amp target value
                 AMY_UNSET(synth[o].breakpoint_times[0][3]);
                 synth[o].eg_type[0] = ENVELOPE_LINEAR;
-                synth[o].amp_coefs[COEF_VEL] = 0;
+                synth[o].amp_coefs[COEF_VEL] = 1.0;
                 synth[o].amp_coefs[COEF_EG0] = 1.0;
 
                 synth[o].breakpoint_times[1][0] = 0; 
@@ -130,9 +134,23 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 pb = partial_breakpoints[(uint32_t)synth[osc].step]; // for the while loop version.
             }
         }
+    } else {
+        // note off was sent
+        // TODO -- we should play the remainder of the breakpoints 
+        for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
+            uint16_t o = i % AMY_OSCS;
+            if(synth[o].status ==IS_ALGO_SOURCE) {
+                AMY_UNSET(synth[o].note_on_clock); 
+                synth[o].note_off_clock = total_samples;
+                synth[o].status = STATUS_OFF;
+            }
+        }
+        // osc note off, start release
+        AMY_UNSET(synth[osc].note_on_clock);
+        synth[osc].note_off_clock = total_samples;                    
+        synth[osc].status = STATUS_OFF;
     }
     // now, render everything, add it up
-    uint16_t oscs = patch.oscs_alloc;
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==IS_ALGO_SOURCE) {
