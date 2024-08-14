@@ -1,11 +1,13 @@
 import amy, sys
 import pydub
+# We keep this path hack around for dan, whose system needs it to get Loris to work. You shouldn't need it.
 sys.path.append('/usr/local/lib/python' + '.'.join(sys.version.split('.', 2)[:2]) + '/site-packages')
 import loris
 import time
 import numpy as np
 from math import pi, log2
 from collections import deque, defaultdict
+from copy import copy
 
 def list_from_py2_iterator(obj, how_many):
     # Oof, the loris object uses some form of iteration that py3 doesn't like. 
@@ -96,6 +98,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
     min_q_len = max_oscs
     # Now add in a voice / osc # 
     osc_map = {}
+    osc_free_at = {} # map of osc# -> time to safely free at (6ms after you want)
     osc_q = deque(range(max_oscs)) 
     for i,s in enumerate(time_ordered):
         next_idx = -1
@@ -116,6 +119,13 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
         # Start the partials at 0
         s[0] = s[0] - first_time
 
+        # Free oscs if it's time to
+        oscs_to_consider_freeing = copy(list(osc_free_at.keys()))
+        for osc in oscs_to_consider_freeing:
+            if(osc_free_at[osc]>=s[0]):
+                osc_q.appendleft(osc)
+                del osc_free_at[osc]
+
         if(s[4]>=0): #new partial
             if(len(osc_q)):
                 osc_map[s[1]] = osc_q.popleft()
@@ -129,7 +139,10 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
                 sequence.append(s)
                 if(s[4] == -2): # last bp
                     # Put the oscillator back
-                    osc_q.appendleft(osc)
+                    # TODO: per dan, ONLY put this osc back once at least 6ms  has gone by after we get a -2
+                    osc_free_at[osc] = s[0] + 6
+                    #osc_q.appendleft(osc)
+
         if(len(osc_q) < min_q_len): min_q_len = len(osc_q)
     print("%d partials and %d breakpoints, max oscs used at once was %d" % (partial_count, len(sequence), max_oscs - min_q_len))
     # Fix sustain_ms
