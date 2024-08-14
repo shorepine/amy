@@ -52,7 +52,9 @@ The examples rely on the following board packages and libraries:
  * ESP32/ESP32-S3/etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html) - use a 2.0.14+ version when installing
  * The USB MIDI example requires the [MIDI Library](https://www.arduino.cc/reference/en/libraries/midi-library/)
 
-You can use both cores of supported chips (RP2040 or ESP32) for more oscillators and voices. We provide Arduino examples for the Arduino ESP32 in multicore, and a `pico-sdk` example for the RP2040 that renders in multicore. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. You can use [Alles](https://github.com/shorepine/alles) for a `ESP-IDF` example.
+You can use both cores of supported chips (RP2040 or ESP32) for more oscillators and voices. We provide Arduino examples for the Arduino ESP32 in multicore, and a `pico-sdk` example for the RP2040 that renders in multicore. If you really want to push the chips to the limit, we recommend using native C code using the `pico-sdk`  or `ESP-IDF`. 
+
+We have a simple [dual core ESP-IDF example available](https://github.com/shorepine/amy_dual_core_esp32) or you can see [Alles](https://github.com/shorepine/alles).
 
 ## Using AMY in Python on any platform
 
