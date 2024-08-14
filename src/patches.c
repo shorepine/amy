@@ -150,9 +150,14 @@ void patches_load_patch(struct event e) {
         // Now find some oscs
         uint8_t good = 0;
 
-        // On tulip. core 0 (oscs0-60) is shared with the display, who does GDMA a lot. so we favor core1 (oscs60-120)
         uint16_t osc_start = (AMY_OSCS/2);
-        if(voices[v]%3==2) osc_start = 0; // (AMY_OSCS/2);
+
+        #ifdef TULIP
+        // On tulip. core 0 (oscs0-60) is shared with the display, who does GDMA a lot. so we favor core1 (oscs60-120)
+        if(voices[v]%3==2) osc_start = 0;
+        #else
+        if(voices[v]%2==1) osc_start = 0;
+        #endif
 
         for(uint16_t i=0;i<AMY_OSCS;i++) {
             uint16_t osc = (osc_start + i) % AMY_OSCS;

@@ -132,6 +132,8 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             goto return_label;
         }
     }
+    
+    if(found<0) return scale;
 
     t1 = bp_end_times[found];
     v1 = F2S(synth[osc].breakpoint_values[bp_set][found]);
