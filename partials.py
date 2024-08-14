@@ -197,8 +197,8 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
         }
 
         if(s[4]==-2): #end, add note off
-            partial_args['amp'] = "0,0,0,1,0"
-            partial_args['vel'] = 0
+            #partial_args['amp'] = "0,0,0,1,0"
+            #partial_args['vel'] = 0
             # Reset the incremental envelope segment start time.
             time_since_osc_onset[osc] = 0
         elif(s[4]==-1): # continue

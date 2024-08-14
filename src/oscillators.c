@@ -522,7 +522,7 @@ SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     SAMPLE last_amp = F2S(msynth[osc].last_amp);
-    //printf("render_partial: time %lld logfreq %f freq %f amp %f step %f\n", total_samples, msynth[osc].logfreq, freq, S2F(amp), P2F(step) * synth[osc].lut->table_size); 
+    //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)total_samples/(float)AMY_SAMPLE_RATE, msynth[osc].logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc].lut->table_size); 
     SAMPLE max_value;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, last_amp, amp, synth[osc].lut, &max_value);
     msynth[osc].last_amp = msynth[osc].amp;
@@ -533,6 +533,8 @@ void partial_note_on(uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
+    // Partials ramp up from zero.
+    msynth[osc].amp = 0;
 }
 
 void partial_note_off(uint16_t osc) {

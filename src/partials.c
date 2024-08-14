@@ -71,7 +71,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 // Find our ratio using the midi note of the analyzed partial
                 float freq_logratio = msynth[osc].logfreq - logfreq_for_midi_note(patch.midi_note);
 
-                //printf("time %f rel %f: freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", total_samples / (float)AMY_SAMPLE_RATE, ms_since_started / (float)AMY_SAMPLE_RATE, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
+                //printf("time %.3f rel %f: freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", total_samples / (float)AMY_SAMPLE_RATE, ms_since_started / (float)AMY_SAMPLE_RATE, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
 
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
@@ -116,11 +116,10 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
                     //printf("[%d %d] o %d continue partial\n", total_samples, ms_since_started, o);
                 } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
-                    synth[o].amp_coefs[0] = 0;
+                    synth[o].amp_coefs[0] = 0.0001;
                     //partial_note_off(o);
                 } else { // start of a partial, 
                     //printf("[%d %d] o %d start partial\n", total_samples,ms_since_started, o);
-                    msynth[o].last_amp = 0;
                     partial_note_on(o);
                 }
                 synth[osc].step++;
