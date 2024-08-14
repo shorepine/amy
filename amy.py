@@ -122,7 +122,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(bp0 is not None): m = m +"A%s" % (bp0)
     if(bp1 is not None): m = m +"B%s" % (bp1)
     if(eg0_type is not None): m = m + "T" + str(eg0_type)
-    if(eg1_type is not None): m = m + "W" + str(eg1_type)
+    if(eg1_type is not None): m = m + "X" + str(eg1_type)
     if(algo_source is not None): m = m +"O%s" % (algo_source)
     if(chained_osc is not None): m = m + "c" + str(chained_osc)
     if(clone_osc is not None): m = m + "C" + str(clone_osc)

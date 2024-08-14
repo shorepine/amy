@@ -152,9 +152,10 @@ enum params{
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
     BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2), // 139
-    CLONE_OSC,                           // 140
-    RESET_OSC,                           // 141
-    NO_PARAM                             // 142
+    EG0_TYPE, EG1_TYPE,                  // 140, 141
+    CLONE_OSC,                           // 142
+    RESET_OSC,                           // 143
+    NO_PARAM                             // 144
 };
 
 #ifdef AMY_DEBUG

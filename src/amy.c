@@ -467,6 +467,9 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
 
+    if(AMY_IS_SET(e.eg_type[0]))  { d.param=EG0_TYPE; d.data = e.eg_type[0]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eg_type[1]))  { d.param=EG1_TYPE; d.data = e.eg_type[1]; add_delta_to_queue(d); }
+
     if(e.algo_source[0] != 0) {
         struct synthinfo t;
         parse_algorithm_source(&t, e.algo_source);
@@ -575,7 +578,7 @@ void reset_osc(uint16_t i ) {
         synth[i].amp_coefs[j] = 0;
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
     synth[i].amp_coefs[COEF_EG0] = 1.0f;
-    msynth[i].amp = 1.0f;
+    msynth[i].amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
     msynth[i].last_amp = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].logfreq_coefs[j] = 0;
@@ -921,6 +924,9 @@ void play_event(struct delta d) {
             synth[synth[d.osc].algo_source[which_source]].status = IS_ALGO_SOURCE;
     }
 
+    if (d.param == EG0_TYPE) synth[d.osc].eg_type[0] = d.data;
+    if (d.param == EG1_TYPE) synth[d.osc].eg_type[1] = d.data;
+
     // for global changes, just make the change, no need to update the per-osc synth
     if(d.param == VOLUME) amy_global.volume = *(float *)&d.data;
     if(d.param == PITCH_BEND) amy_global.pitch_bend = *(float *)&d.data;
@@ -1068,16 +1074,22 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc].pan = combine_controls(ctrl_inputs, synth[osc].pan_coefs);
     // amp is a special case - coeffs apply in log domain.
     // Also, we advance one frame by writing both last_amp and amp (=next amp)
-    float new_last_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
-    // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
-    if (new_last_amp > 0) {
-        msynth[osc].last_amp = new_last_amp;
+    // *Except* for partials, where we allow one frame of ramp-on.
+    float new_amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+    if (synth[osc].wave == PARTIAL) {
+        msynth[osc].last_amp = msynth[osc].amp;
+        msynth[osc].amp = new_amp;
+    } else {
+        // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
+        if (new_amp > 0) {
+            msynth[osc].last_amp = new_amp;
+        }
+        // Advance the envelopes to the beginning of the next frame.
+        ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
+        ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
+        msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
+        if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
     }
-    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
-    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
-    msynth[osc].amp = combine_controls_mult(ctrl_inputs, synth[osc].amp_coefs);
-    if (msynth[osc].amp <= 0.001)  msynth[osc].amp = 0;
-
     // synth[osc].feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
     if (synth[osc].wave != PCM)  msynth[osc].feedback = synth[osc].feedback;
@@ -1623,14 +1635,14 @@ struct event amy_parse_message(char * message) {
                         case 'S': e.reset_osc = atoi(message + start); break;
                         case 's': e.pitch_bend = atoff(message + start); break;
                         /* t used for time */
-                        /* T unused */
+                        case 'T': e.eg_type[0] = atoi(message + start); break;
                         /* U used by Alles for sync */
                         case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
                         /* W used by Tulip for CV, external_channel */
-                        /* X available */
+                        case 'X': e.eg_type[1] = atoi(message + start); break;
                         case 'x': e.eq_l = atoff(message+start); break;
                         /* Y available */
                         case 'y': e.eq_m = atoff(message+start); break;
