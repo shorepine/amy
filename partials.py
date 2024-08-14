@@ -139,7 +139,7 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
                 sequence.append(s)
                 if(s[4] == -2): # last bp
                     # Put the oscillator back
-                    # TODO: per dan, ONLY put this osc back once at least 6ms  has gone by after we get a -2
+                    # per dan, ONLY put this osc back once at least 6ms has gone by after we get a -2
                     osc_free_at[osc] = s[0] + 6
                     #osc_q.appendleft(osc)
 
