@@ -7,6 +7,9 @@ LIBS = -lpthread  -lm
 # on macOS, need to link to AudioUnit, CoreAudio, and CoreFoundation
 ifeq ($(shell uname -s), Darwin)
 LIBS += -framework AudioUnit -framework CoreAudio -framework CoreFoundation
+
+# Needed for brew's python3.12+ on MacOS
+EXTRA_PIP_ENV = PIP_BREAK_SYSTEM_PACKAGES=1 
 endif
 
 # on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
@@ -28,9 +31,6 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']"
 
 PYTHON = python3
-
-# Needed for brew's python3.12+ on MacOS
-EXTRA_PIP_FLAGS = --break-system-packages
 
 .PHONY: default all clean amy-module test
 
@@ -69,7 +69,7 @@ amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 amy-module: amy-example
-	${PYTHON} -m pip install -r requirements.txt ${EXTRA_PIP_FLAGS}; touch src/amy.c; cd src; ${PYTHON} -m pip install . --force-reinstall ${EXTRA_PIP_FLAGS}; cd ..
+	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; cd src; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall; cd ..
 
 test: amy-module
 	${PYTHON} test.py
