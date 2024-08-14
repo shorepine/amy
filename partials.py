@@ -226,7 +226,7 @@ def play(sequence, osc_offset=0, sustain_ms = -1, sustain_len_ms = 0, time_ratio
 
     return sequence[-1][0]/time_ratio
 
-#In [6]: partials.generate_partials_header(fns,amp_floor=-40,analysis_window=40,freq_drift=5,hop_time=0.04,freq_res=5)
+# partials.generate_partials_header(filenames=None,amp_floor=-40,analysis_window=40,freq_drift=5,hop_time=0.08,freq_res=5)
 def generate_partials_header(filenames=None, **kwargs):
     # given a list of filenames, output a partials.h
     if(filenames is None):
