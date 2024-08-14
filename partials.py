@@ -122,7 +122,8 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
         # Free oscs if it's time to
         oscs_to_consider_freeing = copy(list(osc_free_at.keys()))
         for osc in oscs_to_consider_freeing:
-            if(osc_free_at[osc]>=s[0]):
+            if(s[0]>=osc_free_at[osc]):
+                #print("freeing osc %d, it's %d and it waited until %d" % (osc, s[0], osc_free_at[osc]))
                 osc_q.appendleft(osc)
                 del osc_free_at[osc]
 
@@ -140,7 +141,8 @@ def sequence(filename, max_len_s = 10, amp_floor=-30, hop_time=0.04, max_oscs=am
                 if(s[4] == -2): # last bp
                     # Put the oscillator back
                     # per dan, ONLY put this osc back once at least 6ms has gone by after we get a -2
-                    osc_free_at[osc] = s[0] + 6
+                    #print("not letting osc %d die until 6ms from now %d = %d" % (s[1], s[0], s[0]+6))
+                    osc_free_at[s[1]] = s[0] + 6
                     #osc_q.appendleft(osc)
 
         if(len(osc_q) < min_q_len): min_q_len = len(osc_q)
