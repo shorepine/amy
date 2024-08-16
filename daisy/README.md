@@ -10,5 +10,4 @@ make clean && make && make program-boot; sleep 1.5; make program-dfu
 
 After it flashes, you should hear 15 Juno-6 notes out the line out port. 
 
-This example could use some work to work better with the Daisy. Please let us know if you can help!
-
+This example could use some work to work better with the Daisy. [Please let us know if you can help!](https://github.com/shorepine/amy/issues/159)
