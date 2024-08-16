@@ -18,15 +18,6 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
                    size_t                                size)
 {
-    //Nobody likes a bouncy button
-    button1.Debounce();
-
-    //If you push the button,...
-    if(button1.RisingEdge())
-    {
-        example_voice_chord(0,amy_sysclock());
-    }
-
     short int * block = amy_simple_fill_buffer();
 
     //Fill the block with samples
