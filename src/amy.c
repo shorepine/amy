@@ -75,6 +75,8 @@ void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i)
 #include "pcm_large.h"
 #elif defined ARDUINO
 #include "pcm_tiny.h"
+#elif defined AMY_DAISY
+#include "pcm_tiny.h"
 #else
 #include "pcm_small.h"
 #endif
