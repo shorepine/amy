@@ -4,10 +4,21 @@
 #include "amy.h"
 
 // You can edit these here if you want to 
+#ifdef AMY_DAISY
+#define AMY_BLOCK_SIZE 128
+#define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE
+#else
 #define AMY_BLOCK_SIZE 256
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
+#endif
+
 #define AMY_OSCS 120
+
+#ifdef AMY_DAISY
+#define AMY_SAMPLE_RATE 48000
+#else
 #define AMY_SAMPLE_RATE 44100 
+#endif
 #ifdef ALLES
 #define AMY_NCHANS 1
 #elif defined ARDUINO
@@ -29,7 +40,11 @@ extern const uint16_t pcm_samples;
 #define AMY_HAS_CHORUS amy_global.has_chorus
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
+#ifdef AMY_DAISY
+#define AMY_HAS_PARTIALS 0       // 1 = Make partials available
+#else
 #define AMY_HAS_PARTIALS 1       // 1 = Make partials available
+#endif
 #define AMY_HAS_CUSTOM 1         // 1 = Make custom oscillators available
 #define PCM_AMY_SAMPLE_RATE 22050
 #define AMY_EVENT_FIFO_LEN 2400
