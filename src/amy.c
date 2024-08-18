@@ -397,6 +397,7 @@ void amy_add_event(struct event e) {
 void amy_add_event_internal(struct event e, uint16_t base_osc) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
+    uint8_t setflag;
 
     // Synth defaults if not set, these are required for the delta struct
     if(AMY_IS_UNSET(e.osc)) { e.osc = 0; } 
@@ -425,11 +426,27 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.amp_coefs[i])) {  d.param=AMP + i; d.data = *(uint32_t *)&e.amp_coefs[i]; add_delta_to_queue(d); }
+    
 
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
-        if(AMY_IS_SET(e.freq_coefs[i])) {
+    // To match the string parser's behavior, we should set all coefs to 0 if they are not set, if any one of them is set.
+    // See https://github.com/shorepine/amy/issues/163
+
+    setflag = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.amp_coefs[i])) setflag = 1;
+    if(setflag) {
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if(AMY_IS_UNSET(e.amp_coefs[i])) e.amp_coefs[i] = 0;
+            d.param=AMP + i; 
+            d.data = *(uint32_t *)&e.amp_coefs[i]; 
+            add_delta_to_queue(d);
+        }
+    }
+    
+    setflag = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.freq_coefs[i])) setflag = 1;
+    if(setflag) {
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if(AMY_IS_UNSET(e.freq_coefs[i])) e.freq_coefs[i] = 0;
             float freq_coef = e.freq_coefs[i];
             // Const freq coef is in Hz, rest are linear.
             if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
@@ -437,20 +454,35 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         }
     }
 
-    if(AMY_IS_SET(e.filter_freq_coefs[COEF_CONST])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[COEF_CONST]); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
-        if(AMY_IS_SET(e.filter_freq_coefs[i])) {
+    setflag = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.filter_freq_coefs[i])) setflag = 1;
+    if(setflag) {
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if(AMY_IS_UNSET(e.filter_freq_coefs[i])) e.filter_freq_coefs[i] = 0;
             float freq_coef = e.filter_freq_coefs[i];
             // Const freq coef is in Hz, rest are linear.
             if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
             d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&freq_coef; add_delta_to_queue(d);
         }
     }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.duty_coefs[i])) {  d.param=DUTY + i; d.data = *(uint32_t *)&e.duty_coefs[i]; add_delta_to_queue(d); }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.pan_coefs[i])) { d.param=PAN + i; d.data = *(uint32_t *)&e.pan_coefs[i]; add_delta_to_queue(d); }
 
+    setflag = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.duty_coefs[i])) setflag = 1;
+    if(setflag) {
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if(AMY_IS_UNSET(e.duty_coefs[i])) e.duty_coefs[i] = 0;
+            d.param=DUTY + i; d.data = *(uint32_t *)&e.duty_coefs[i]; add_delta_to_queue(d); 
+        }
+    }
+
+    setflag = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) if(AMY_IS_SET(e.pan_coefs[i])) setflag = 1;
+    if(setflag) {
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if(AMY_IS_UNSET(e.pan_coefs[i])) e.pan_coefs[i] = 0;
+            d.param=PAN + i; d.data = *(uint32_t *)&e.pan_coefs[i]; add_delta_to_queue(d); 
+        }
+    }
 
     if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }

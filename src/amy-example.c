@@ -74,23 +74,23 @@ int main(int argc, char ** argv) {
         }
     } else {
         amy_live_start();
-    }
+        }
 
+    struct event a = amy_default_event();
+    a.osc = 1;
+    a.wave = SINE;
+    a.freq_coefs[COEF_CONST] = .25;
+    a.amp_coefs[COEF_CONST] = 1;
+    amy_add_event(a);
 
-    example_voice_chord(0, 0);
-
-    // Reset the oscs 
     struct event e = amy_default_event();
     e.osc = 0;
-    e.reset_osc = 1000;
-    e.time = 4500;
+    e.wave = PULSE;
+    e.freq_coefs[COEF_CONST] = 440;
+    e.mod_source = 1;
+    e.duty_coefs[COEF_MOD] = 1;
+    e.velocity = 1;
     amy_add_event(e);
-
-    example_fm(5000);
-
-
-
-    example_drums(10000,2);
 
     // Now just spin for 15s
     uint32_t start = amy_sysclock();
