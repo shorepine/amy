@@ -437,7 +437,6 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         }
     }
 
-    if(AMY_IS_SET(e.filter_freq_coefs[COEF_CONST])) { float filter_logfreq = logfreq_of_freq(e.filter_freq_coefs[COEF_CONST]); d.param=FILTER_FREQ; d.data = *(uint32_t *)&filter_logfreq; add_delta_to_queue(d); }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
         if(AMY_IS_SET(e.filter_freq_coefs[i])) {
             float freq_coef = e.filter_freq_coefs[i];
