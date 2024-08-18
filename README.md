@@ -309,16 +309,10 @@ Try to set the volume of the synth with `amy.volume(2)` -- that can be up to 10 
 Let's set a simple sine wave first
 
 ```python
-amy.send(osc=0, wave=amy.SINE, freq=220, amp=1)
+amy.send(osc=0, wave=amy.SINE, freq=220, vel=1)
 ```
 
-What we're doing here should be pretty straightforward. I'm telling oscillator 0 to be a sine wave at 220Hz and amplitude 1.  You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc.
-
-**Why can't you hear anything yet?** It's because you haven't triggered the note on for this oscillator. We accept a parameter called `vel` (velocity) that can turn a note on or off (`vel=0`.) So now that we've set up the oscillator, we just turn it on (note the oscillator remembers all its state and setup):
-
-```python
-amy.send(osc=0, vel=1)  # Note on.
-```
+What we're doing here should be pretty straightforward. I'm telling oscillator 0 to be a sine wave at 220Hz and amplitude (specified as a note-on velocity) of 1.  You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc.
 
 To turn off the note, send a note off (velocity zero):
 
@@ -326,7 +320,7 @@ To turn off the note, send a note off (velocity zero):
 amy.send(osc=0, vel=0)  # Note off.
 ```
 
-You can also make oscillators louder with `amp` or `vel` over 1.  The total amplitude comes from multiplying together the oscillator amplitude (i.e., the natural level of the oscillator) and the velocity (the particular level of this note event).
+You can also make oscillators louder with `vel` over 1.  By default, the total amplitude comes from multiplying together the oscillator amplitude (i.e., the natural level of the oscillator, which is 1 by default) and the velocity (the particular level of this note event) -- however, this can be changed by changing the default values of the `amp` **ControlCoefficients** (see below).
 
 You can also use `note` (MIDI note value) instead of `freq` to control the oscillator frequency for each note event:
 
@@ -395,7 +389,7 @@ amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.4", mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
-You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  Then we set up the oscillator to be modulated, a pulse wave with mod source of oscillator 1 and the duty **ControlCoefficients** to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be multiplied by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with envelope generators, the modulation oscillator has a 'slot' in the ControlCoefficients - the 6th coefficient - so it can modulate PWM duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
+You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  We do *not* send it a velocity, because that would make it start sending a 0.5 Hz sinewave to the audio output; we want its output only to be used internally.  Then we set up the oscillator to be modulated, a pulse wave with a modulation source of oscillator 1 and the duty **ControlCoefficients** set to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be offset by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with envelope generators, the modulation oscillator has a 'slot' in the ControlCoefficients - the 6th coefficient - so it can modulate PWM duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
 
 ```python
 amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=1)
