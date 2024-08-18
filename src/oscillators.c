@@ -486,15 +486,28 @@ SAMPLE amy_get_random() {
 
 /* noise */
 
+void noise_note_on(uint16_t osc) {
+    synth[osc].last_two[0] = 0;
+    synth[osc].last_two[1] = 0;
+}
+
 SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc].amp);
     SAMPLE max_value = 0;
+    SAMPLE last_white = synth[osc].last_two[0];
+    SAMPLE last_last_white = synth[osc].last_two[1];
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        SAMPLE value = MUL4_SS(amy_get_random(), amp);
+        SAMPLE white = MUL4_SS(amy_get_random(), amp);
+        // Two-zero LPF to make the noise a little more pink, closer to Juno noise.
+        SAMPLE value = white + last_white + last_white + last_last_white;
+        last_last_white = last_white;
+        last_white = white;
         buf[i] += value;
         if (value < 0) value = -value;
         if (value > max_value) max_value = value;
     }
+    synth[osc].last_two[0] = last_white;
+    synth[osc].last_two[1] = last_last_white;
     return max_value;
 }
 

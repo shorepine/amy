@@ -818,6 +818,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==PULSE) pulse_note_on(osc, initial_freq);
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
+    if(synth[osc].wave==NOISE) noise_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS) partials_note_on(osc);
