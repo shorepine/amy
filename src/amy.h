@@ -504,6 +504,7 @@ extern void saw_down_note_on(uint16_t osc, float initial_freq);
 extern void saw_up_note_on(uint16_t osc, float initial_freq); 
 extern void triangle_note_on(uint16_t osc, float initial_freq); 
 extern void pulse_note_on(uint16_t osc, float initial_freq); 
+extern void noise_note_on(uint16_t osc);
 extern void pcm_note_on(uint16_t osc);
 extern void pcm_note_off(uint16_t osc);
 extern void custom_note_on(uint16_t osc, float freq);
