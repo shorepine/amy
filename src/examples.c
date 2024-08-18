@@ -158,9 +158,8 @@ void bleep(uint32_t start) {
     e.time = start;
     e.wave = SINE;
     e.freq_coefs[COEF_CONST] = 220;
-    amy_add_event(e);
-    e.velocity = 1;
     e.pan_coefs[COEF_CONST] = 0.9;
+    e.velocity = 1;
     amy_add_event(e);
     e.time = start + 150;
     e.freq_coefs[COEF_CONST] = 440;

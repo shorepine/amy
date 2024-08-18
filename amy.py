@@ -149,8 +149,12 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
 
 
 def send_raw(m):
-    import libamy
-    libamy.send(m)
+    # override_send is used by e.g. Tulip, to send messages in a different way than libamy or UDP
+    if(override_send is not None):
+        override_send(m)
+    else:
+        import libamy
+        libamy.send(m)
 
 def log_patch():
     global mess, log
@@ -187,10 +191,7 @@ def stop_store_patch(patch_number):
         return
 
     m = "u"+str(patch_number)+retrieve_patch()
-    if(override_send is not None):
-        override_send(m)
-    else:
-        send_raw(m)
+    send_raw(m)
 
 # Send an AMY message to amy
 def send(**kwargs):
@@ -199,11 +200,7 @@ def send(**kwargs):
     m = message(**kwargs)
     if(log): mess.append(m)
 
-    # override_send is used by e.g. Tulip, to send messages in a different way than libamy or UDP 
-    if(override_send is not None):
-        override_send(m)
-    else:
-        send_raw(m)
+    send_raw(m)
 
 
 # Plots a time domain and spectra of audio

@@ -79,10 +79,11 @@ In Python, rendering to a buffer of samples, using the high level API:
 
 ```python
 >>> import amy
->>> m = amy.message(voices="0",load_patch=130,note=50,vel=1)
+>>> m = amy.message(voices='0', load_patch=130, note=50, vel=1)
 >>> print(m) # Show the wire protocol message
-'t76555951v0w8n50p30l1Z'
+v0n50l1K130r0Z
 >>> amy.send_raw(m)
+>>> # This plays immediately on Tulip, but if you're running Amy in regular Python, you can get the waveform from render:
 >>> audio = amy.render(5.0)
 ```
 
@@ -91,7 +92,7 @@ You can also start a thread playing live audio:
 ```python
 >>> import amy
 >>> amy.live() # can optinally pass in audio device ID, amy.live(2) 
->>> m = amy.send(voices="0",load_patch=130,note=50,vel=1)
+>>> amy.send(voices='0', load_patch=130, note=50, vel=1)
 >>> amy.stop()
 ```
 
@@ -102,19 +103,18 @@ In C, using the high level structures directly;
 #include "amy.h"
 void bleep() {
     struct event e = amy_default_event();
-    int32_t sysclock = amy_sysclock();
-    e.time = sysclock;
+    int32_t start = amy_sysclock();   // Right now..
+    e.time = start;
+    e.osc = 0;
     e.wave = SINE;
     e.freq_coefs[COEF_CONST] = 220;
-    e.velocity = 1;
+    e.velocity = 1;                   // start a 220 Hz sine.
     amy_add_event(e);
-    e.time = sysclock + 150;
-    e.freq_coefs[COEF_CONST] = 440;
+    e.time = start + 150;             // in 150 ms..
+    e.freq_coefs[COEF_CONST] = 440;   // change to 440 Hz.
     amy_add_event(e);
-    e.time = sysclock + 300;
-    e.velocity = 0;
-    e.amp = 0;
-    e.freq_coefs[COEF_CONST]=0;
+    e.time = sysclock + 300;          // in  300 ms..
+    e.velocity = 0;                   // note off.
     amy_add_event(e);
 }
 
@@ -133,7 +133,7 @@ Or in C, sending the wire protocol directly:
 void main() {
     amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
     amy_live_start();
-    amy_play_message("t76555951v0w8n50p30l1Z");
+    amy_play_message("v0n50l1K130r0Z");
 }
 ```
 
@@ -165,45 +165,6 @@ On storage constrained devices, you may want to limit the amount of PCM samples 
 // or, #include "pcm_small.h"
 ```
 
-## Voices and patches (DX7, Juno-6, custom) support
-
-With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators. 
-
-A voice in AMY is a collection of oscillators. You can assign patches to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
-
-```python
-amy.send(voices="0,1,2,3", load_patch=1) # juno patch #1 on voice 0-3
-amy.send(voices="4,5,6,7", load_patch=129) # DX7 patch #2 on voices 4-7
-amy.send(voices="0", note=60, vel=1) # Play note 60 on voice 0
-amy.send(voices="0", osc=1, filter_freq="440,0,0,0,5") # adjust the filter on the juno voice (its second oscillator)
-```
-
-Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches by "recording" AMY setup commands and adding them to `patches.h`.
-
-You can also create your own patches at runtime and use them for voices using `store_patch`=`1024,AMY_PATCH_STRING` where 1024 is a patch number from 1024-1055. This message must be the only thing in the string sent over. AMY will treat the rest of the message as a patch, not further messages.
-
-So you can do:
-```
->>> import amy; amy.live()
->>> amy.send(store_patch="1024,v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z")
->>> amy.send(voices="0",load_patch=1024)
->>> amy.send(voices='0',vel=2,note=50)
-```
-We divine the number of oscs used for the patch at store_patch time. If you store a new patch over an old one, that old memory is freed and re-allocated. We rely on malloc for all of this.
-
-Also recall you can "record" patches in amy.py, so the whole loop is:
-```
->>> amy.log_patch()
->>> amy.preset(5)
->>> bass_drum = amy.retrieve_patch()
->>> bass_drum
-'v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z'
->>> amy.send(store_patch="1024,"+bass_drum)
-```
-
-**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and managing your own oscillator mapping in your code.
-
-
 # Wire protocol
 
 AMY's wire protocol is a series of numbers delimited by ascii characters that define all possible parameters of an oscillator. This is a design decision intended to make using AMY from any sort of environment as easy as possible, with no data structure or parsing overhead on the client. It's also readable and compact, far more expressive than MIDI and can be sent over network links, UARTs, or as arguments to functions or commands. We've used AMY over multicast UDP, over Javascript, in Max/MSP, in Python, C, Micropython and many more! 
@@ -211,8 +172,9 @@ AMY's wire protocol is a series of numbers delimited by ascii characters that de
 AMY accepts commands in ASCII, like so:
 
 ```
-v0w4f440.0l0.9
+v0w4f440.0l1.0Z
 ```
+This example controls osc 0 (`v0`), sets its waveform to triangle (`w4`), sets its frequency to 4400 Hz (`f440.0`), and velocity (i.e. amplitude) to 1 (`l1.0`).  The final `Z` is a terminator indicating the message is complete.
 
 Here's the full list:
 
@@ -267,8 +229,7 @@ Here's the full list:
 
 # Synthesizer details
 
-We'll use Python for showing examples of AMY, make sure you've installed `libamy` and are running a live AMY first by running `make test` and then
-
+We'll use Python for showing examples of AMY.  Maybe you're running under [Tulip](https://github.com/shorepine/tulipcc), in which case AMY is already loaded, but if you're running under standard Python, make sure you've installed `libamy` and are running a live AMY first by running `make test` and then:
 ```bash
 python
 >>> import amy
@@ -277,7 +238,7 @@ python
 
 ## AMY and timestamps
 
-AMY is meant to receive messages in real time. It, on its own, is not a sequencer where you can schedule notes to play in the future. However, it does maintain a window of (configurable) 20 seconds in advance of its clock where events can be scheduled. This is very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
+AMY is meant to receive messages in real time. It, on its own, is not a sequencer where you can schedule notes to play in the future. However, it does maintain a window of 20 seconds in advance of its clock where events can be scheduled (the window size is configurable of course). This is very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
 
 For example, to play two notes, one a second after the first, you could do:
 
@@ -312,7 +273,7 @@ Let's set a simple sine wave first
 amy.send(osc=0, wave=amy.SINE, freq=220, vel=1)
 ```
 
-What we're doing here should be pretty straightforward. I'm telling oscillator 0 to be a sine wave at 220Hz and amplitude (specified as a note-on velocity) of 1.  You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc.
+We are simply telling oscillator 0 to be a sine wave at 220Hz and amplitude (specified as a note-on velocity) of 1.  You can also try `amy.PULSE`, or `amy.SAW_DOWN`, etc.
 
 To turn off the note, send a note off (velocity zero):
 
@@ -320,7 +281,7 @@ To turn off the note, send a note off (velocity zero):
 amy.send(osc=0, vel=0)  # Note off.
 ```
 
-You can also make oscillators louder with `vel` over 1.  By default, the total amplitude comes from multiplying together the oscillator amplitude (i.e., the natural level of the oscillator, which is 1 by default) and the velocity (the particular level of this note event) -- however, this can be changed by changing the default values of the `amp` **ControlCoefficients** (see below).
+You can also make oscillators louder with `vel` larger than 1.  By default, the total amplitude comes from multiplying together the oscillator amplitude (i.e., the natural level of the oscillator, which is 1 by default) and the velocity (the particular level of this note event) -- however, this can be changed by changing the default values of the `amp` **ControlCoefficients** (see below).
 
 You can also use `note` (MIDI note value) instead of `freq` to control the oscillator frequency for each note event:
 
@@ -357,35 +318,35 @@ Sounds nice. But we want that filter freq to go down over time, to make that cla
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
-amy.send(osc=0, filter_freq="50,0,0,0,1,0", bp1="0,6.0,1000,3.0,200,0")
+amy.send(osc=0, filter_freq='50,0,0,0,1,0', bp1='0,6.0,1000,3.0,200,0')
 amy.send(osc=0, vel=1, note=40)
 ```
 
-There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first second, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first 1000 ms, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
 
 Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
- * A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero or not specified.
- * The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-Hz relative to middle C).
- * The velocity from the note-on event.
+ * A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
+ * The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
+ * The velocity, from the note-on event.
  * The output of Envelope Generator 0.
  * The output of Envelope Generator 1.
  * The output of the modulating oscillator, specified by the `mod_source` parameter.
  * The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
 
-The set "50,0,0,0,1" means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq="5000,0,0,0,0,0,0"`.
+The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq='5000,0,0,0,0,0,0'`.
 
-You can use the same EG to control several things at once.  For example, we could include `freq="50,0,0,0,0.125"`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+You can use the same EG to control several things at once.  For example, we could include `freq='50,0,0,0,0.125'`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
 
-The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq="261.63,1"` (which is its default setting before any `freq` parameter is passed).  Setting it to `freq="523.26,1"` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq="261.3,0.5"` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
+The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='261.63,1'`.  Setting it to `freq='523.26,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='261.3,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
-Actually, the default set of ControlCoefficients for `freq` is "261.63,1,0,0,0,0,1", i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq="0,1,0,0,0,0,1"` also yields the default behavior.  `amp` also has a set of defaults `amp="0,0,1,1,0,0,0"`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it is empty).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, we add 1.0 to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around identity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
+The default set of ControlCoefficients for `freq` is `'261.63,1,0,0,0,0,1'`, i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq='0,1,0,0,0,0,1'` also yields the default behavior.  `amp` also has a set of defaults: `amp='0,0,1,1,0,0,0'`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it has not been set up).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, an offset of 1.0 is added to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around unity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
 
-We also have LFOs, which are implemented as one oscillator modulating another. You set up the lower-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
+We also have LFOs, which are implemented as one oscillator modulating another (instead of sending its waveform to the output). You set up the low-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
 ```python
 amy.reset()  # Clear the state.
-amy.send(osc=1, wave=amy.SINE, freq=0.5, amp=1)
-amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.4", mod_source=1)
+amy.send(osc=1, wave=amy.SINE, freq=0.5, amp=1)   # We set the amp but not the vel, so it doesn't sound.
+amy.send(osc=0, wave=amy.PULSE, duty='0.5,0,0,0,0,0.4', mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
@@ -393,7 +354,7 @@ You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with am
 
 ```python
 amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=1)
-amy.send(osc=0, wave=amy.PULSE, duty="0.5,0,0,0,0,0.25", freq="0,1,0,0,0,0.5", mod_source=1)
+amy.send(osc=0, wave=amy.PULSE, duty='0.5,0,0,0,0,0.25', freq='0,1,0,0,0,0.5', mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
@@ -431,9 +392,9 @@ AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see th
 
 An EG can control amplitude, frequency, filter frequency, duty or pan of an oscillator via the 4th (EG0) and 5th (EG1) entries in the corresponding ControlCoefficients.
 
-For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms and target to be 1.0, then 100ms with target .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like "`v0f220w0A50,1.0,100,0.5,250,0`" to specify a sine wave at 220Hz with this envelope. 
+For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms and target to be 1.0, then 100ms with target .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like `v0f220w0A50,1.0,100,0.5,250,0` to specify a sine wave at 220Hz with this envelope. 
 
-When using `amy.py`, use the string form of the breakpoint: `bp0="50,1.0,100,0.5,250,0"`. 
+When using `amy.py`, use the string form of the breakpoint: `bp0='50,1.0,100,0.5,250,0'`. 
 
 Every note on (specified by setting velocity / `l` to anything > 0) will trigger this envelope, and setting `l` to 0 will trigger the note off / release section. 
 
@@ -445,8 +406,8 @@ You can set a completely separate envelope using the second envelope generator, 
 Try default DX7 patches, from 128 to 256:
 
 ```python
-amy.send(voices="0", load_patch=128)
-amy.send(voices="0", note=50,vel=1)
+amy.send(voices='0', load_patch=128)
+amy.send(voices='0', note=50,vel=1)
 ```
 
 The `load_patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
@@ -458,9 +419,9 @@ When building your own algorithm sets, assign a separate oscillator as wave=`ALG
 
 ```python
 amy.reset()
-amy.send(osc=0, wave=amy.SINE, ratio=0.2, amp="0.1,0,0,1", bp0="0,1,1000,0,0,0")
-amy.send(osc=1, wave=amy.SINE, ratio=1, amp="1")
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=",,,,1,0")
+amy.send(osc=0, wave=amy.SINE, ratio=0.2, amp='0.1,0,0,1', bp0='0,1,1000,0,0,0')
+amy.send(osc=1, wave=amy.SINE, ratio=1, amp=1)
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=',,,,1,0')
 ```
 
 Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
@@ -479,9 +440,9 @@ Another classic two operator tone is to instead modulate the higher tone with th
 
 ```python
 amy.reset()
-amy.send(osc=0, wave=amy.SINE, ratio=1, amp="1")  # Op 1, carrier
-amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp="2", bp0="0,0,5000,1,0,0")  # Op 2, modulator
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=",,,,1,0")
+amy.send(osc=0, wave=amy.SINE, ratio=1, amp=1)  # Op 1, carrier
+amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp=2, bp0='0,0,5000,1,0,0')  # Op 2, modulator
+amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=',,,,1,0')
 ```
 
 Just a refresher on envelope generators; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
@@ -528,7 +489,7 @@ And then in python (run `python3`):
 
 ```python
 import partials, amy
-(m,s) = partials.sequence("sounds/sleepwalk_original_45s.mp3") # Any audio file
+(m, s) = partials.sequence('sounds/sleepwalk_original_45s.mp3')  # Any audio file
 153 partials and 977 breakpoints, max oscs used at once was 8
 
 amy.live() # Start AMY playing audio
@@ -583,6 +544,44 @@ amy.send(wave=amy.PCM,vel=1,patch=21,feedback=1) # loops forever until note off
 amy.send(vel=0) # note off
 amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 ```
+
+## Voices and patches (DX7, Juno-6, custom) support
+
+With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators.
+
+A voice in AMY is a collection of oscillators. You can assign patches to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
+
+```python
+amy.send(voices='0,1,2,3', load_patch=1)     # Juno patch #1 on voice 0-3
+amy.send(voices='4,5,6,7', load_patch=129)   # DX7 patch #2 on voices 4-7
+amy.send(voices=0, note=60, vel=1)           # Play note 60 on voice 0
+amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the juno voice (its bottom oscillator)
+```
+
+Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches by "recording" AMY setup commands and adding them to `patches.h`.
+
+You can also create your own patches at runtime and use them for voices using `store_patch`=`1024,AMY_PATCH_STRING` where 1024 is a patch number from 1024-1055. This message must be the only thing in the string sent over. AMY will treat the rest of the message as a patch, not further messages.
+
+So you can do:
+```
+>>> import amy; amy.live()  # Not needed on Tulip.
+>>> amy.send(store_patch='1024,v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
+>>> amy.send(voices=0, load_patch=1024)
+>>> amy.send(voices=0, vel=2, note=50)
+```
+We divine the number of oscs used for the patch at store_patch time. If you store a new patch over an old one, that old memory is freed and re-allocated. We rely on malloc for all of this.
+
+Also recall you can "record" patches in amy.py, so the whole loop is:
+```
+>>> amy.log_patch()
+>>> amy.preset(5)
+>>> bass_drum = amy.retrieve_patch()
+>>> bass_drum
+'v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z'
+>>> amy.send(store_patch='1024,' + bass_drum)
+```
+
+**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and managing your own oscillator mapping in your code.
 
 
 ## Developer zone
