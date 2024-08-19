@@ -283,9 +283,9 @@ class JunoPatch:
   def _amp_coef_string(self, level):
     if self.vca_gate:
       # 'Gate' is provided by EG1, which is left unset == gate.
-      return ',,%s,,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
+      return ',,%s,0,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
     else:
-      return ',,%s,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
+      return ',,%s,1,0' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
 
   def _freq_coef_string(self, base_freq):
     return '%s,1,,,,%s,1' % (
@@ -321,7 +321,7 @@ class JunoPatch:
       self.pwm_osc, self.saw_osc, self.sub_osc, self.nse_osc
     ]
     # One-time setup of oscs.
-    self.amy_send(osc=self.lfo_osc, wave=amy.TRIANGLE, amp='1,,,1')
+    self.amy_send(osc=self.lfo_osc, wave=amy.TRIANGLE, amp='1,,0,1')
     filter_type = amy.FILTER_LPF if self.cheap_filter else amy.FILTER_LPF24
     self.amy_send(osc=self.pwm_osc, wave=amy.PULSE,
                   mod_source=self.lfo_osc, chained_osc=self.saw_osc,
