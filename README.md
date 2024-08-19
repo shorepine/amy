@@ -290,7 +290,7 @@ amy.reset()
 amy.send(osc=0, wave=amy.SINE, note=57, vel=1)
 ```
 
-This won't work without the `amy.reset()`, because once you've set the oscillator to a constant frequency with `freq=220`, it will ignore the frequency specified by `note`.  (But see **ControlCoefficients** below to see how you can use both at the same time).
+This won't work as intended without the `amy.reset()`, because once you've set the oscillator to a non-default frequency with `freq=220`, it will act as an offset to the frequency specified by `note`.  (See **ControlCoefficients** below to see how to control this behavior).
 
 Now let's make a lot of sine waves! 
 
@@ -305,7 +305,7 @@ for i in range(16):
 Neat! You can see how simple / powerful it is to have control over lots of oscillators. You have up to 64 (or more, depending on your platform). Let's make it more interesting. A classic analog tone is the filtered saw wave. Let's make one.
 
 ```python
-amy.send(osc=0, wave=amy.SAW_DOWN, filter_freq=3200, resonance=5, filter_type=amy.FILTER_LPF)
+amy.send(osc=0, wave=amy.SAW_DOWN, filter_freq=400, resonance=5, filter_type=amy.FILTER_LPF)
 amy.send(osc=0, vel=1, note=40)
 ```
 
@@ -318,24 +318,26 @@ Sounds nice. But we want that filter freq to go down over time, to make that cla
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
-amy.send(osc=0, filter_freq='50,0,0,0,1,0', bp1='0,6.0,1000,3.0,200,0')
+amy.send(osc=0, filter_freq='50,0,0,0,1', bp1='0,6.0,1000,3.0,200,0')
 amy.send(osc=0, vel=1, note=40)
 ```
 
 There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first 1000 ms, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
 
 Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
- * A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
- * The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
- * The velocity, from the note-on event.
- * The output of Envelope Generator 0.
- * The output of Envelope Generator 1.
- * The output of the modulating oscillator, specified by the `mod_source` parameter.
- * The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
+ * `const`: A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
+ * `note`: The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
+ * `vel`: The velocity, from the note-on event.
+ * `eg0`: The output of Envelope Generator 0.
+ * `eg1`: The output of Envelope Generator 1.
+ * `mod`: The output of the modulating oscillator, specified by the `mod_source` parameter.
+ * `bend`: The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
 
-The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. If you specify fewer than 7 coefficients, the remaining ones are taken as zero, so `filter_freq=5000` is equivalent to `filter_freq='5000,0,0,0,0,0,0'`.
+The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. Any coefficients that you do not specify, for instance by providing fewer than 7 values, are not modified.  You can also use empty strings to skip positional values, so `filter_freq=',,,,1'` couples EG1 to the filter frequency without changing any of the other coefficients.  (Note that when we passed `freq=220` in the first example, that was interpreted setting the `const` coefficient to 220, but leaving all the remaining coefficients untouched.)
 
-You can use the same EG to control several things at once.  For example, we could include `freq='50,0,0,0,0.125'`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+Because entering lists of commas is error prone, you can also specify control coefficients as Python dicts consisting of value with keys from the list above, i.e. `filter_freq={'const': 50, 'eg1': 1}` is equivalent to `filter_freq='50,,,,1'`.
+
+You can use the same EG to control several things at once.  For example, we could include `freq='50,,,,0.125'`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='261.63,1'`.  Setting it to `freq='523.26,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='261.3,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
@@ -346,15 +348,15 @@ We also have LFOs, which are implemented as one oscillator modulating another (i
 ```python
 amy.reset()  # Clear the state.
 amy.send(osc=1, wave=amy.SINE, freq=0.5, amp=1)   # We set the amp but not the vel, so it doesn't sound.
-amy.send(osc=0, wave=amy.PULSE, duty='0.5,0,0,0,0,0.4', mod_source=1)
+amy.send(osc=0, wave=amy.PULSE, duty={'const': 0.5, 'mod': 0.4}, mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
-You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  We do *not* send it a velocity, because that would make it start sending a 0.5 Hz sinewave to the audio output; we want its output only to be used internally.  Then we set up the oscillator to be modulated, a pulse wave with a modulation source of oscillator 1 and the duty **ControlCoefficients** set to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be offset by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with envelope generators, the modulation oscillator has a 'slot' in the ControlCoefficients - the 6th coefficient - so it can modulate PWM duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
+You see we first set up the modulation oscillator (a sine wave at 0.5Hz, with amplitude of 1).  We do *not* send it a velocity, because that would make it start sending a 0.5 Hz sinewave to the audio output; we want its output only to be used internally.  Then we set up the oscillator to be modulated, a pulse wave with a modulation source of oscillator 1 and the duty **ControlCoefficients** set to have a constant value of 0.5 plus 0.4 times the modulating input (i.e., the depth of the pulse width modulation, where 0.4 modulates between 0.1 and 0.9, almost the maximum depth).  The initial duty cycle will start at 0.5 and be offset by the state of oscillator 1 every tick, to make that classic thick saw line from the C64 et al. The modulation will re-trigger every note on. Just like with envelope generators, the modulation oscillator has a 'slot' in the ControlCoefficients - the 6th coefficient, `mod` - so it can modulate PWM duty cycle, amplitude, frequency, filter frequency, or pan! And if you want to modulate more than one thing, like frequency and duty, just specify multiple ControlCoefficients:
 
 ```python
 amy.send(osc=1, wave=amy.TRIANGLE, freq=5, amp=1)
-amy.send(osc=0, wave=amy.PULSE, duty='0.5,0,0,0,0,0.25', freq='0,1,0,0,0,0.5', mod_source=1)
+amy.send(osc=0, wave=amy.PULSE, duty={'const': 0.5, 'mod': 0.25}, freq={'mod': 0.5}, mod_source=1)
 amy.send(osc=0, note=60, vel=0.5)
 ```
 

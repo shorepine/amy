@@ -1472,16 +1472,24 @@ float atoff(const char *s) {
     return whole + frac;
 }
 
-int parse_float_list_message(char *message, float *vals, int max_num_vals) {
+int parse_float_list_message(char *message, float *vals, int max_num_vals, float skipped_val) {
     // Return the number of values extracted from message.
-    uint16_t c = 0;
+    uint16_t c = 0, last_c;
     uint16_t stop = strspn(message, " -0123456789,.");  // Note: space AND period.
     int num_vals_received = 0;
     while(c < stop && num_vals_received < max_num_vals) {
-        *vals++ = atoff(message + c);
-        ++num_vals_received;
+        *vals = atoff(message + c);
+        // Skip spaces in front of number.
+        while (message[c] == ' ') ++c;
+        // Figure length of number string.
+        last_c = c;
+        c += strspn(message + c, "-0123456789.");  // No space, just minus, digits, and decimal point.
+        if (last_c == c)  // Zero-length number.
+            *vals = skipped_val;  // Rewrite with special value for skips.
         while(message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
-        c++;
+        ++c;  // Step over the comma (if that's where we landed).
+        ++vals;  // Move to next output.
+        ++num_vals_received;
     }
     if (c < stop) {
         fprintf(stderr, "WARNING: parse_float_list: More than %d values in \"%s\"\n",
@@ -1542,7 +1550,8 @@ void parse_algorithm_source(struct synthinfo * t, char *message) {
 void parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
     float vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
-    int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS);
+    int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS,
+                                            AMY_UNSET_VALUE(vals[0]));
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
         if ((i % 2) == 0)
@@ -1560,10 +1569,11 @@ void parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) 
 }
 
 void parse_coef_message(char *message, float *coefs) {
-    int num_coefs = parse_float_list_message(message, coefs, NUM_COMBO_COEFS);
-    // Clear the unspecified coefs to zero.
+    int num_coefs = parse_float_list_message(message, coefs, NUM_COMBO_COEFS,
+                                             AMY_UNSET_VALUE(coefs[0]));
+    // Clear the unspecified coefs to unset.
     for (int i = num_coefs; i < NUM_COMBO_COEFS; ++i)
-        coefs[i] = 0;
+        coefs[i] = AMY_UNSET_VALUE(coefs[0]);
 }
 
 // given a string return an event
