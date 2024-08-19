@@ -909,10 +909,11 @@ void play_event(struct delta d) {
     }
     if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
     if(d.param == RESET_OSC) { if(*(int16_t *)&d.data>(AMY_OSCS+1)) { amy_reset_oscs(); } else { reset_osc(*(int16_t *)&d.data); } }
-    // todo: event-only side effect, remove
     if(d.param == MOD_SOURCE) {
         uint16_t mod_osc = *(uint16_t *)&d.data;
         synth[d.osc].mod_source = mod_osc;
+        // NOTE: These are event-only side effects.  A purist would strive to remove them.
+        // When an oscillator is named as a modulator, we change its state.
         synth[mod_osc].status = IS_MOD_SOURCE;
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc].amp_coefs[COEF_VEL] = 0;
