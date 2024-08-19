@@ -305,7 +305,7 @@ for i in range(16):
 Neat! You can see how simple / powerful it is to have control over lots of oscillators. You have up to 64 (or more, depending on your platform). Let's make it more interesting. A classic analog tone is the filtered saw wave. Let's make one.
 
 ```python
-amy.send(osc=0, wave=amy.SAW_DOWN, filter_freq=3200, resonance=5, filter_type=amy.FILTER_LPF)
+amy.send(osc=0, wave=amy.SAW_DOWN, filter_freq=400, resonance=5, filter_type=amy.FILTER_LPF)
 amy.send(osc=0, vel=1, note=40)
 ```
 
@@ -333,7 +333,7 @@ Secondly, the filter frequency is controlled by a list of numbers, not just the 
  * `mod`: The output of the modulating oscillator, specified by the `mod_source` parameter.
  * `bend`: The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
 
-The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. Any coefficients that you do not specify, for instance by providing fewer than 7 values, are not modified.  You can also use empty strings to skip positional values, so `filter_freq=',,,,1'` couples EG1 to the filter frequency without changing any of the other coefficients.
+The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. Any coefficients that you do not specify, for instance by providing fewer than 7 values, are not modified.  You can also use empty strings to skip positional values, so `filter_freq=',,,,1'` couples EG1 to the filter frequency without changing any of the other coefficients.  (Note that when we passed `freq=220` in the first example, that was interpreted setting the `const` coefficient to 220, but leaving all the remaining coefficients untouched.)
 
 Because entering lists of commas is error prone, you can also specify control coefficients as Python dicts consisting of value with keys from the list above, i.e. `filter_freq={'const': 50, 'eg1': 1}` is equivalent to `filter_freq='50,,,,1'`.
 
