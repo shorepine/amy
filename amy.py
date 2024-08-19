@@ -89,6 +89,59 @@ def trunc3(number):
         return ('%.3f' % number).rstrip('0').rstrip('.')
     return str(number)
 
+def trim_trailing(vals, pred):
+    """Remove any contiguous suffix of values that return False under pred."""
+    bools = [pred(x) for x in vals[::-1]]
+    suffix_len = bools.index(True)
+    if suffix_len:
+        return vals[:-suffix_len]
+    return vals
+
+def parse_ctrl_coefs(coefs):
+    """Convert various acceptable forms of ControlCoefficient specs to the canonical string.
+
+    ControlCoefficients determine how amplitude, frequency, filter frequency, PWM duty, and pan
+    are calculated from underlying parameters on the fly.  For each control input, they specify
+    seven coefficients which are multiplied by (0) a constant value of 1, (1) the log-frequency from
+    the note-on command, (2) the velocity from the note-on command, (3) Envelope Generator 0's value,
+    (4) Envelope Generator 1's value, (5) the modulating osicllator input, and (6) the global pitch
+    bend value.  The sum of these scaled values is used as the control input. (Amplitude is a special
+    case where the individual values are *multiplied* rather than added, and values whose coefficients
+    are zero are skipped).
+
+    The wire protocol expects these coefficients to be specified as a single vector, e.g. "f220,1,0,0,0,0,1".
+    It also accepts some values to be left unspecified; only the specified values are changed.  So "f,,,,0.01"
+    will add EG1 modulation to pitch but not change its base value etc.  As a special case, a single value
+    (e.g. "f440") will change the constant offset for a parameter but leave its other modulations in place.
+
+    The Python API accepts multiple kinds of input:
+     * A scalar numeric value: freq=440
+     * A list of values in the format accepted by the wire protocol: freq=',,,,0.01'.
+     * A Python list of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 7 values, the remainder are treated as None (analogous to the wire-protocol string).
+     * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', and 'bend'.
+    """
+    # Pass through ready-formed strings, and convert single values to single value strings
+    if isinstance(coefs, str) or isinstance(coefs, int) or isinstance(coefs, float):
+        return str(coefs)
+    # Convert a dict into a list of values.
+    dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend']
+    if isinstance(coefs, dict):
+        coef_list = [None] * len(dict_fields)
+        for key, value in coefs.items():
+            if key not in dict_fields:
+                raise ValueError('\'%s\' is not a recognized CtrlCoef field %s' % (key, str(dict_fields)))
+            coef_list[dict_fields.index(key)] = value
+        coefs = coef_list
+    assert isinstance(coefs, list)
+    coefs = trim_trailing(coefs, lambda x: x is not None)
+
+    def to_str(x):
+        if x is None:
+            return ''
+        return str(x)
+
+    return ','.join([to_str(x) for x in coefs])
+
 
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
@@ -102,25 +155,25 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(time is not None): m = m + "t" + str(time)
     if(osc is not None): m = m + "v" + str(osc)
     if(wave is not None): m = m + "w" + str(wave)
-    if(duty is not None): m = m + "d%s" % duty
+    if(duty is not None): m = m + "d%s" % parse_ctrl_coefs(duty)
     if(feedback is not None): m = m + "b" + trunc(feedback)
-    if(freq is not None): m = m + "f%s" % freq
+    if(freq is not None): m = m + "f%s" % parse_ctrl_coefs(freq)
     if(note is not None): m = m + "n" + str(note)
     if(patch is not None): m = m + "p" + str(patch)
     if(phase is not None): m = m + "P" + trunc(phase)
-    if(pan is not None): m = m + "Q%s" % pan
+    if(pan is not None): m = m + "Q%s" % parse_ctrl_coefs(pan)
     if(client is not None): m = m + "c" + str(client)
-    if(amp is not None): m = m + "a%s" % amp
+    if(amp is not None): m = m + "a%s" % parse_ctrl_coefs(amp)
     if(vel is not None): m = m + "l" + trunc(vel)
     if(volume is not None): m = m + "V" + trunc(volume)
     if(pitch_bend is not None): m = m + "s" + trunc(pitch_bend)
     if(latency_ms is not None): m = m + "N" + str(latency_ms)
     if(resonance is not None): m = m + "R" + trunc(resonance)
-    if(filter_freq is not None): m = m + "F%s" % filter_freq
+    if(filter_freq is not None): m = m + "F%s" % parse_ctrl_coefs(filter_freq)
     if(ratio is not None): m = m + "I" + trunc(ratio)
     if(algorithm is not None): m = m + "o" + str(algorithm)
-    if(bp0 is not None): m = m +"A%s" % (bp0)
-    if(bp1 is not None): m = m +"B%s" % (bp1)
+    if(bp0 is not None): m = m +"A%s" % bp0
+    if(bp1 is not None): m = m +"B%s" % bp1
     if(eg0_type is not None): m = m + "T" + str(eg0_type)
     if(eg1_type is not None): m = m + "X" + str(eg1_type)
     if(algo_source is not None): m = m +"O%s" % (algo_source)
