@@ -619,7 +619,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].mod_source);
     AMY_UNSET(synth[i].render_clock);
     AMY_UNSET(synth[i].note_on_clock);
-    AMY_UNSET(synth[i].note_off_clock);
+    synth[i].note_off_clock = 0;  // Used to check that last event seen by note was off.
     AMY_UNSET(synth[i].zero_amp_clock);
     AMY_UNSET(synth[i].mod_value_clock);
     synth[i].filter_type = FILTER_NONE;
@@ -842,11 +842,15 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     return false;
 }
 
+// Helpers to identify if param is in a range.
+#define PARAM_IS_COMBO_COEF(param, base)   ((param) >= (base) && (param) < (base) + NUM_COMBO_COEFS)
+#define PARAM_IS_BP_COEF(param)    ((param) >= BP_START && (param) < BP_END)
+
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
     AMY_PROFILE_START(PLAY_EVENT)
     //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", total_samples, d.osc, d.param, d.data, global.event_qsize);
-    uint8_t trig=0;
+    //uint8_t trig=0;
     // todo: event-only side effect, remove
     if(d.param == MIDI_NOTE) {
         synth[d.osc].midi_note = *(uint16_t *)&d.data;
@@ -873,20 +877,22 @@ void play_event(struct delta d) {
     if(d.param == PATCH) synth[d.osc].patch = *(uint16_t *)&d.data;
     if(d.param == FEEDBACK) synth[d.osc].feedback = *(float *)&d.data;
 
-    if(d.param >= AMP && d.param < AMP + NUM_COMBO_COEFS)
+    if(PARAM_IS_COMBO_COEF(d.param, AMP)) {
         synth[d.osc].amp_coefs[d.param - AMP] = *(float *)&d.data;
-    if(d.param >= FREQ && d.param < FREQ + NUM_COMBO_COEFS) {
+    }
+    if(PARAM_IS_COMBO_COEF(d.param, FREQ)) {
         synth[d.osc].logfreq_coefs[d.param - FREQ] = *(float *)&d.data;
     }
-    if(d.param >= FILTER_FREQ && d.param < FILTER_FREQ + NUM_COMBO_COEFS)
+    if(PARAM_IS_COMBO_COEF(d.param, FILTER_FREQ)) {
         synth[d.osc].filter_logfreq_coefs[d.param - FILTER_FREQ] = *(float *)&d.data;
-    if(d.param >= DUTY && d.param < DUTY + NUM_COMBO_COEFS)
+    }
+    if(PARAM_IS_COMBO_COEF(d.param, DUTY))
         synth[d.osc].duty_coefs[d.param - DUTY] = *(float *)&d.data;
-    if(d.param >= PAN && d.param < PAN + NUM_COMBO_COEFS)
+    if(PARAM_IS_COMBO_COEF(d.param, PAN))
         synth[d.osc].pan_coefs[d.param - PAN] = *(float *)&d.data;
 
     // todo, i really should clean this up
-    if(d.param >= BP_START && d.param < BP_END) {
+    if (PARAM_IS_BP_COEF(d.param)) {
         uint8_t pos = d.param - BP_START;
         uint8_t bp_set = 0;
         if(pos > (MAX_BREAKPOINTS * 2)) { bp_set = 1; pos = pos - (MAX_BREAKPOINTS * 2); }
@@ -897,7 +903,16 @@ void play_event(struct delta d) {
         }
         //trig=1;
     }
-    if(trig) synth[d.osc].note_on_clock = total_samples;
+    //if(trig) synth[d.osc].note_on_clock = total_samples;
+
+    if ( PARAM_IS_COMBO_COEF(d.param, AMP) ||
+         PARAM_IS_COMBO_COEF(d.param, FILTER_FREQ) ||
+         PARAM_IS_BP_COEF(d.param)) {
+        // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
+        // Revive the note if it hasn't seen a note_off since the last note_on.
+        if (synth[d.osc].status == AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d.osc].note_off_clock))
+            synth[d.osc].status = AUDIBLE;
+    }
 
     if(d.param == CHAINED_OSC) {
         int chained_osc = *(int16_t *)&d.data;
@@ -915,6 +930,8 @@ void play_event(struct delta d) {
         // NOTE: These are event-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
         synth[mod_osc].status = IS_MOD_SOURCE;
+        // No longer record this osc in note_off state.
+        AMY_UNSET(synth[mod_osc].note_off_clock);
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc].amp_coefs[COEF_VEL] = 0;
     }
@@ -960,7 +977,8 @@ void play_event(struct delta d) {
             }  else {
                 // an osc came in with a note on.
                 // start the bp clock
-                AMY_UNSET(synth[d.osc].note_off_clock);
+                AMY_UNSET(synth[d.osc].note_off_clock);  // Most recent note event is not note-off.
+                AMY_UNSET(synth[d.osc].zero_amp_clock);
                 synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
 
                 // if there was a filter active for this voice, reset it
@@ -1017,7 +1035,7 @@ void play_event(struct delta d) {
                 #endif
             } else {
                 // osc note off, start release
-                // For now, note_off_clock signals note of BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
+                // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
                 AMY_UNSET(synth[d.osc].note_on_clock);
@@ -1206,9 +1224,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             } else {
                 if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
-                    synth[osc].status = STATUS_OFF;
-                    AMY_UNSET(synth[osc].note_off_clock);
-                    AMY_UNSET(synth[osc].zero_amp_clock);
+                    synth[osc].status = AUDIBLE_SUSPENDED;  // It *could* come back...
                 }
             }
         } else if (max_val == 0) {
@@ -1227,22 +1243,20 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
-        if(synth[osc].status==AUDIBLE) { // skip oscs that are silent or mod sources from playback
+        if(synth[osc].status == AUDIBLE) { // skip oscs that are silent or mod sources from playback
             bzero(per_osc_fb[core], AMY_BLOCK_SIZE * sizeof(SAMPLE));
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
-            if(synth[osc].wave != WAVE_OFF) {
-                // apply filter to osc if set
-                if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
-                uint8_t handled = 0;
-                if(amy_external_render_hook!=NULL) {
-                    handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
-                }
-                // only mix the audio in if the external hook did not handle it 
-                if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
-                //printf("render5 %d %d %d %d\n", osc, start, end, core);
-
+            // apply filter to osc if set
+            if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
+            uint8_t handled = 0;
+            if(amy_external_render_hook!=NULL) {
+                handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
             }
+            // only mix the audio in if the external hook did not handle it
+            if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
+            //printf("render5 %d %d %d %d\n", osc, start, end, core);
+
             if (max_val > max_max) max_max = max_val;
         }
     }

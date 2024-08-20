@@ -94,9 +94,10 @@ enum coefs{
 #define SCHEDULED 1
 #define PLAYED 2
 #define AUDIBLE 3
-#define IS_MOD_SOURCE 4
-#define IS_ALGO_SOURCE 5
-#define STATUS_OFF 6
+#define AUDIBLE_SUSPENDED 4
+#define IS_MOD_SOURCE 5
+#define IS_ALGO_SOURCE 6
+#define STATUS_OFF 7
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
