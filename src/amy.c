@@ -906,7 +906,6 @@ void play_event(struct delta d) {
     //if(trig) synth[d.osc].note_on_clock = total_samples;
 
     if ( PARAM_IS_COMBO_COEF(d.param, AMP) ||
-         PARAM_IS_COMBO_COEF(d.param, FILTER_FREQ) ||
          PARAM_IS_BP_COEF(d.param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
         // Revive the note if it hasn't seen a note_off since the last note_on.
@@ -1248,7 +1247,8 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
-            if(synth[osc].filter_type != FILTER_NONE) max_val = filter_process(per_osc_fb[core], osc, max_val);
+            if(synth[osc].filter_type != FILTER_NONE)
+                max_val = filter_process(per_osc_fb[core], osc, max_val);
             uint8_t handled = 0;
             if(amy_external_render_hook!=NULL) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
