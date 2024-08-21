@@ -342,7 +342,7 @@ The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the
 
 Because entering lists of commas is error prone, you can also specify control coefficients as Python dicts consisting of value with keys from the list above, i.e. `filter_freq={'const': 50, 'eg1': 1}` is equivalent to `filter_freq='50,,,,1'`.
 
-You can use the same EG to control several things at once.  For example, we could include `freq='50,,,,0.125'`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+You can use the same EG to control several things at once.  For example, we could include `freq=',,,,0.333'`, which says to modify the note frequency from the same EG1 as is controlling the filter frequency, but scaled down by 1/3rd so the initial decay is over 1 octave, not 3.  Give it a go!
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='261.63,1'`.  Setting it to `freq='523.26,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='261.3,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
