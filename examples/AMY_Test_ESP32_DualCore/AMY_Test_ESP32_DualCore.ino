@@ -12,6 +12,7 @@ I2SClass I2S;
 // mutex that locks writes to the delta queue
 SemaphoreHandle_t xQueueSemaphore;
 
+// Task handles 
 TaskHandle_t amy_render_handle;
 TaskHandle_t amy_fill_buffer_handle;
 
@@ -27,16 +28,16 @@ TaskHandle_t amy_fill_buffer_handle;
 #define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
 #define AMY_FILL_BUFFER_TASK_STACK_SIZE (8 * 1024)
 
-
+// Play 10 Juno-6 notes 
 void polyphony(uint32_t start, uint16_t patch) {
     struct event e = amy.default_event();
     e.time = start;
     e.load_patch = patch;
-    strcpy(e.voices, "0,1,2,3,4,5,6,7,8,9,10");
+    strcpy(e.voices, "0,1,2,3,4,5,6,7,8,9");
     amy.add_event(e);
     start += 250;
     uint8_t note = 40;
-    for(uint8_t i=0;i<11;i++) {
+    for(uint8_t i=0;i<10;i++) {
         e = amy.default_event();
         e.time = start;
         e.velocity=0.5;
@@ -51,8 +52,10 @@ void polyphony(uint32_t start, uint16_t patch) {
 // Render the second core
 void* esp_render_task( void *) {
     while(1) {
+        // Wait for a message that it's time to start rendering
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         amy_render(0, AMY_OSCS/2, 1);
+        // Tell the other core we're done rendering
         xTaskNotifyGive(amy_fill_buffer_handle);
     }
 }
@@ -71,7 +74,6 @@ void* esp_fill_audio_buffer_task(void*) {
 
         // Write to i2s
         int16_t *block = amy_fill_buffer();
-
         I2S.write((uint8_t*)block, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
 
     }
