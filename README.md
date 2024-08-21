@@ -178,52 +178,52 @@ This example controls osc 0 (`v0`), sets its waveform to triangle (`w4`), sets i
 
 Here's the full list:
 
-| Code | Python | Type-range  | Notes                                 |
-| ---- | ------ | ----------  | ------------------------------------- |
-| a    | amp    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
-| A    | bp0    | string      | in commas, like 100,0.5,50,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
-| B    | bp1    | string      | breakpoints for Envelope Generator 1. See bp0 |
-| b    | feedback | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
-| c    | chained_osc |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
-| C    | clone_osc | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |  
-| d    | duty   |  float[,float...] | duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
-| D    | debug  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| f    | freq   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
-| F    | filter_freq | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
-| G    | filter_type | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
-| H    | reverb_liveness | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
-| h    | reverb_level | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
-| I    | ratio  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
-| j    | reverb_damping  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
-| J    | reverb_xover_hz | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
-| k    | chorus_level | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
-| K    | load_patch | uint 0-X | Apply a saved patch to start at the selected oscillator |
-| L    | mod_source | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
-| l    | vel | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
-| M    | chorus_freq | float | LFO freq of chorus | 
-| m    | chorus_delay | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320 |
-| N    | latency_ms | uint | sets latency in ms. default 0 (see LATENCY) | 
-| n    | note | uint 0-127 | midi note, sets frequency | 
-| o    | algorithm | uint 1-32 | DX7 algorithm to use for ALGO type |
-| O    | algo_source | string | which oscillators to use for the algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| p    | P-patch | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
-| P    | phase | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
-| Q    | pan   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
-| q    | chorus_depth | float | chorus depth | 
-| R    | resonance | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 | 
-| r    | voices | int[,int] | String comma separated list of voices to send message to, or load patch into | 
-| S    | reset  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
-| s    | pitch_bend | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| t    | time | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
-| T    | eg0_type | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| u    | store_patch | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |  
-| v    | osc | uint 0 to OSCS-1 | which oscillator to control | 
-| V    | volume | float 0-10 | volume knob for entire synth, default 1.0 | 
-| w    | wave | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
-| x    | eq_l | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
-| X    | eg1_type | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| y    | eq_m | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
-| z    | eq_h | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. | 
+| Code   | Python   | Type-range  | Notes                                 |
+| ------ | -------- | ----------  | ------------------------------------- |
+| `a`    | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
+| `A`    | `bp0`    | string      | in commas, like 100,0.5,50,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
+| `B`    | `bp1`    | string      | breakpoints for Envelope Generator 1. See bp0 |
+| `b`    | `feedback` | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| `c`    | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
+| `C`    | `clone_osc` | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |
+| `d`    | `duty`   |  float[,float...] | duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
+| `D`    | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
+| `f`    | `freq`   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
+| `F`    | `filter_freq` | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
+| `G`    | `filter_type` | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
+| `H`    | `reverb_liveness` | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
+| `h`    | `reverb_level` | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
+| `I`    | `ratio`  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
+| `j`    | `reverb_damping`  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
+| `J`    | `reverb_xover_hz` | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
+| `k`    | `chorus_level` | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
+| `K`    | `load_patch` | uint 0-X | Apply a saved patch to start at the selected oscillator |
+| `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
+| `l`    | `vel` | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
+| `M`    | `chorus_freq` | float | LFO freq of chorus |
+| `m`    | `chorus_delay` | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320 |
+| `N`    | `latency_ms` | uint | sets latency in ms. default 0 (see LATENCY) |
+| `n`    | `note` | uint 0-127 | midi note, sets frequency |
+| `o`    | `algorithm` | uint 1-32 | DX7 algorithm to use for ALGO type |
+| `O`    | `algo_source` | string | which oscillators to use for the algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
+| `p`    | `P-patch` | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
+| `P`    | `phase` | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
+| `Q`    | `pan`   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| `q`    | `chorus_depth` | float | chorus depth |
+| `R`    | `resonance` | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 |
+| `r`    | `voices` | int[,int] | String comma separated list of voices to send message to, or load patch into |
+| `S`    | `reset`  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
+| `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
+| `t`    | `time` | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
+| `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
+| `u`    | `store_patch` | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
+| `v`    | `osc` | uint 0 to OSCS-1 | which oscillator to control |
+| `V`    | `volume` | float 0-10 | volume knob for entire synth, default 1.0 |
+| `w`    | `wave` | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
+| `x`    | `eq_l` | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
+| `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
+| `y`    | `eq_m` | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
+| `z`    | `eq_h` | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. |
 
 
 
@@ -314,7 +314,7 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time-delta, target-value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with an EG. It gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time-delta, target-value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can use an EG to control amplitude, oscillator frequency, filter cutoff frequency, PWM duty cycle, or stereo pan. The EG gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
@@ -322,9 +322,14 @@ amy.send(osc=0, filter_freq='50,0,0,0,1', bp1='0,6.0,1000,3.0,200,0')
 amy.send(osc=0, vel=1, note=40)
 ```
 
-There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first 1000 ms, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+There are two things to note here:  Firstly, the envelope is defined by the set of breakpoints in `bp1` (defining the second EG; the first is controlled by `bp0`).  The `bp` strings alternate time intervals in milliseconds with target values.  So `0,6.0,1000,3.0,200,0` means to move to 6.0 after 0 ms (i.e., the initial value is 6), then to decay to 3.0 over the next 1000 ms (1 second).  The final pair is always taken as the "release", and does not begin until the note-off event is received.  In this case, the EG decays to 0 in the 200 ms after the note-off.
 
-Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
+
+Secondly, EG1 is coupled to the filter frequency with `filter_freq='50,0,0,0,1'`.  `filter_freq` is an example of a set of **ControlCoefficients** where the control value is calculated on-the-fly by combining a set of inputs scaled by the coefficients.  This is explained fully below, but for now the first coefficient (here 50) is taken as a constant, and the 5th coefficient (here 1) is applied to the output of EG1.  To get good "musical" behavior, the filter frequency is controlled using a "unit per octave" rule.  So if the envelope is zero, the filter is at its base frequency of 50 Hz.  But the envelope starts at 6.0, which, after scaling by the control coefficient of 1, drives the filter frequency 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  As the envelope decays to 3.0 over the first 1000 ms, the filter moves to 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+
+### ControlCoefficients
+
+The full set of parameters accepting **ControlCoefficients** is `amp`, `freq`, `filter_freq`, `duty`, and `pan`.  ControlCoefficients are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
  * `const`: A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
  * `note`: The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
  * `vel`: The velocity, from the note-on event.
@@ -337,7 +342,7 @@ The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the
 
 Because entering lists of commas is error prone, you can also specify control coefficients as Python dicts consisting of value with keys from the list above, i.e. `filter_freq={'const': 50, 'eg1': 1}` is equivalent to `filter_freq='50,,,,1'`.
 
-You can use the same EG to control several things at once.  For example, we could include `freq='50,,,,0.125'`, which says to modify a base note frequency of 50 Hz from the same EG1 as is controlling the filter frequency, but scaled down by 1/8th so the initial decay is over 1 octave, not 3.  Give it a go!
+You can use the same EG to control several things at once.  For example, we could include `freq=',,,,0.333'`, which says to modify the note frequency from the same EG1 as is controlling the filter frequency, but scaled down by 1/3rd so the initial decay is over 1 octave, not 3.  Give it a go!
 
 The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='261.63,1'`.  Setting it to `freq='523.26,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='261.3,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
 
