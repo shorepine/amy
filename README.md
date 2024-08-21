@@ -73,6 +73,8 @@ make
 
 # Using AMY
 
+> This section introduces AMY starting from the primitive oscillators.  If your interest is mainly in using the preset patches to emulate a full synthesizer, you might skip to [Voices and patches](#voices_and_patches) section.
+
 AMY can be controlled using its wire protocol or by fillng its data structures directly. It's up to what's easier for you and your application. 
 
 In Python, rendering to a buffer of samples, using the high level API:
@@ -552,7 +554,7 @@ amy.send(vel=0) # note off
 amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 ```
 
-## Voices and patches (DX7, Juno-6, custom) support
+## <a name="voices_and_patches"></a>Voices and patches (DX7, Juno-6, custom) support
 
 With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators.
 
