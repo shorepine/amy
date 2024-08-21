@@ -314,7 +314,7 @@ You want to be able to stop the note too by sending a note off:
 amy.send(osc=0, vel=0)
 ```
 
-Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time-delta, target-value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can control amplitude, oscillator frequency, filter frequency, PWM duty cycle, or pan, with an EG. It gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
+Sounds nice. But we want that filter freq to go down over time, to make that classic filter sweep tone. Let's use an Envelope Generator! An Envelope Generator (EG) creates a smooth time envelope based on a breakpoint set, which is a simple list of (time-delta, target-value) pairs - you can have up to 8 of these per EG, and 2 different EGs to control different things. They're just like ADSRs, but more powerful. You can use an EG to control amplitude, oscillator frequency, filter cutoff frequency, PWM duty cycle, or stereo pan. The EG gets triggered when the note begins. So let's make an EG that turns the filter frequency down from its start at 3200 Hz to 400 Hz over 1000 milliseconds. And when the note goes off, it tapers the frequency to 50 Hz over 200 milliseconds.
 
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, resonance=5, filter_type=amy.FILTER_LPF)
@@ -322,9 +322,14 @@ amy.send(osc=0, filter_freq='50,0,0,0,1', bp1='0,6.0,1000,3.0,200,0')
 amy.send(osc=0, vel=1, note=40)
 ```
 
-There are two things to note here:  Firstly, the filter frequency is controlled by the EG using a "unit per octave" rule.  So if the envelope is zero, the filter is at its default frequency (50 Hz, the first value in the `filter_freq` list).  But the envelope starts at 6.0, which is 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  It then decays to 3.0 over the first 1000 ms, which is 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+There are two things to note here:  Firstly, the envelope is defined by the set of breakpoints in `bp1` (defining the second EG; the first is controlled by `bp0`).  The `bp` strings alternate time intervals in milliseconds with target values.  So `0,6.0,1000,3.0,200,0` means to move to 6.0 after 0 ms (i.e., the initial value is 6), then to decay to 3.0 over the next 1000 ms (1 second).  The final pair is always taken as the "release", and does not begin until the note-off event is received.  In this case, the EG decays to 0 in the 200 ms after the note-off.
 
-Secondly, the filter frequency is controlled by a list of numbers, not just the initial 50.  `filter_freq` is an example of a set of **ControlCoefficients**, the others being `amp`, `freq`, `duty`, and `pan`.  **ControlCoefficients** are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
+
+Secondly, EG1 is coupled to the filter frequency with `filter_freq='50,0,0,0,1'`.  `filter_freq` is an example of a set of **ControlCoefficients** where the control value is calculated on-the-fly by combining a set of inputs scaled by the coefficients.  This is explained fully below, but for now the first coefficient (here 50) is taken as a constant, and the 5th coefficient (here 1) is applied to the output of EG1.  To get good "musical" behavior, the filter frequency is controlled using a "unit per octave" rule.  So if the envelope is zero, the filter is at its base frequency of 50 Hz.  But the envelope starts at 6.0, which, after scaling by the control coefficient of 1, drives the filter frequency 6 octaves higher, or 2^6 = 64x the frequency -- 3200 Hz.  As the envelope decays to 3.0 over the first 1000 ms, the filter moves to 2^3 = 8x the default frequency, giving 400 Hz.  It's only during the final release of 200 ms that it falls back to 0, giving a final filter frequency of (2^0 = 1x) 50 Hz.
+
+### ControlCoefficients
+
+The full set of parameters accepting **ControlCoefficients** is `amp`, `freq`, `filter_freq`, `duty`, and `pan`.  ControlCoefficients are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).  The control signals are:
  * `const`: A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
  * `note`: The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
  * `vel`: The velocity, from the note-on event.
