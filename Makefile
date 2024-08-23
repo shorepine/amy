@@ -84,7 +84,7 @@ timing: amy-module
 
 
 web: $(TARGET)
-	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o src/www/amy.js
+	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o docs/amy.js
 
 clean:
 	-rm -f src/*.o
