@@ -11,25 +11,22 @@
         <script type="text/javascript" src="amy.js"></script>
         <script language="javascript">
     
-    var web_audio_buffer = null;
+    var amy_simple_fill_buffer = null;
     var amy_play_message = null;
-    var amy_AMY_SAMPLE_RATE = null;
-    var amy_start_web = null;
+    var AMY_SAMPLE_RATE = 44100;
+    var amy_start = null;
     var startDate = new Date();
     var startTime = startDate.getTime();
     // you can only start calling c++ functions once emscripten's "runtime" has started
     Module.onRuntimeInitialized = function() {
         web_audio_buffer = Module.cwrap(
-            'web_audio_buffer', 'number', ['number', 'number']
+            'web_audio_buffer', 'number', ['number', 'number']        
         );
         amy_play_message = Module.cwrap(
             'amy_play_message', null, ['string']
         );
-        amy_AMY_SAMPLE_RATE = Module.cwrap(
-            'amy_AMY_SAMPLE_RATE', 'number', ['number']
-        );
-        amy_start_web = Module.cwrap(
-            'amy_start_web', null, ['number']
+        amy_start = Module.cwrap(
+            'amy_start', null, ['number', 'number', 'number']
         );
     }
 
@@ -40,10 +37,10 @@
     var data = new Float32Array();
 
     // l and r are float arrays for the left and right channels that need to be filled
-    function audioCallback(l) {
+    function audioCallback(l,r) {
         // lazy loading of the audio buffer we use to talk to c++/emscripten
         if(dataHeap == null) {
-            data = new Float32Array(l.length);
+            data = new Float32Array(l.length*2);
             // Get data byte size, allocate memory on Emscripten heap, and get pointer
             var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
             dataPtr = Module._malloc(nDataBytes);
@@ -62,7 +59,8 @@
 
         // deinterleave the result
         for(i = 0; i < l.length; i++) {
-            l[i] = result[i];
+            l[i] = result[i*2];
+            r[i] = result[i*2+1];
         }
     }
 
@@ -83,13 +81,13 @@ function setupAudio(fn) {
         alert("Sorry, but the Web Audio API is not supported by your browser.");
     }
   // create a context with the sample rate compiled into amy.wasm
-  audioCtx = new AudioContext({sampleRate: amy_AMY_SAMPLE_RATE()});
+  audioCtx = new AudioContext({sampleRate: AMY_SAMPLE_RATE});
   source = audioCtx.createBufferSource();
 
   // buff size, ins, outs
-  scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+  scriptNode = audioCtx.createScriptProcessor(256, 0, 2);
   scriptNode.onaudioprocess = function(audioProcessingEvent) {
-    fn(audioProcessingEvent.outputBuffer.getChannelData(0)); 
+    fn(audioProcessingEvent.outputBuffer.getChannelData(0), audioProcessingEvent.outputBuffer.getChannelData(1)); 
   };
 }
 function millis() {
@@ -101,7 +99,7 @@ function millis() {
 }
 function reset() {
     if(amy_started) {
-        var code = "S65";
+        var code = "S121";
         amy_play_message(code); //+"t"+millis());
     }
 }
@@ -119,7 +117,7 @@ function send(osc) {
 var amy_started = false;
 function startAudio() {
 
-  amy_start_web();
+  amy_start(1,1,1);
   amy_started = true;
   send(0);
   send(9);
@@ -187,7 +185,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n50p14I4' id='code0'/><a href="javascript:send(0)">send</a>
+    <input type='text' value='w7p0' id='code0'/><a href="javascript:send(0)">send</a>
 
 
   </div>
@@ -212,7 +210,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n62p103I4' id='code9'/><a href="javascript:send(9)">send</a>
+    <input type='text' value='w7p1' id='code9'/><a href="javascript:send(9)">send</a>
 
   </div>
   <div class="seqrow">
@@ -236,7 +234,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n46p14I4' id='code18'/><a href="javascript:send(18)">send</a>
+    <input type='text' value='w7p2' id='code18'/><a href="javascript:send(18)">send</a>
 
   </div>
     <div class="seqrow">
@@ -260,7 +258,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w7p2n60' id='code27'/><a href="javascript:send(27)">send</a>
+    <input type='text' value='w7p3' id='code27'/><a href="javascript:send(27)">send</a>
 
   </div>
     <div class="seqrow">
@@ -342,13 +340,12 @@ function stopAudio() {
 <span id="bpmText">120</span> bpm
 </div>
 <hr/>
-<h2>AMY DX7 patch player</h2>
-<P>Play any of AMY's built in 1024 DX7 patches. They're very accurate! If you want to generate your own FM patches, see AMY's fm.py module.</P>
-<input id="patch" type="range" min="0" max="1023" step="1" value="498">
-Patch #: <span id="patchText">498</span> 
+<h2>AMY Juno-6 and DX7 patch player</h2>
+<P>Play any of AMY's built in 256 Juno-6 and DX7 patches. They're very accurate! If you want to generate your own patches see AMY's fm.py and juno.py modules.</P>
+<input id="patch" type="range" min="0" max="255" step="1" value="0">
+Patch #: <span id="patchText">0</span> 
 <P>
-<input id="ratio" type="range" min="0.01" max="4" step="0.01" value="1.0">
-Playback time ratio: <span id="ratioText">1.0</span> 
+
 
 <ul class="set">
   <a onpointerdown="javascript:piano_down(53);" onpointerup="javascript:piano_up(53);"><li class="white b"></li></a>
@@ -368,58 +365,10 @@ Playback time ratio: <span id="ratioText">1.0</span>
 
 <hr/>
 <h2>AMY message creator</h2>
-<P>Construct your own AMY messages. Hover over a parameter to see a longer description. The message will be generated as you type. Paste the message into the drum machine above to hear it there, or just click "send message to AMY" to directly hear it without the drum machine.
-<P>Constructed message: <input id="constructed" length=40/><a href="javascript:send(-1)">send message to AMY</a>   <a href="javascript: reset()">reset voices</a>
+<P>Construct your own AMY messages.
 
-<table id="params">
-    <tr>
-        <td title="0-63. Choose which voice to modify. (Note: the drum machine will use its own voice number.)">voice</td><td><input type=text id="e-v" onkeyup="javascript:message_up('v');" /></td>
-        <td title="0.0 to X. Amplitude of the voice. Note: velocity overrides amplitude for note ons.">amplitude</td><td><input type=text id="e-a" onkeyup="javascript:message_up('a');"/></td>
-        <td title="String determining the breakpoint 0 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint0</td><td><input type=text id="e-A" onkeyup="javascript:message_up('A');"/></td>
-    </tr><tr>
-        <td title="String determining the breakpoint 1 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint1</td><td><input type=text id="e-B" onkeyup="javascript:message_up('B');"/></td>
-        <td title="use for the ALGO synthesis type in FM, or partial synthesis (for bandwidth) or for karplus-strong, or to indicate PCM looping (0 off, >0, on)">feedback</td><td><input type=text id="e-b" onkeyup="javascript:message_up('b');"/></td>
-        <td title="String determining the breakpoint 2 in ms,rate pairs. Example: 100,0.5,150,0.25,200,0">breakpoint2</td><td><input type=text id="e-C" onkeyup="javascript:message_up('C');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="float 0.001-0.999 | duty cycle for pulse wave, default 0.5">duty</td><td><input type=text id="e-d" onkeyup="javascript:message_up('d');"/></td>
-        <td title="frequency of oscillator, Hz, in float">frequency</td><td><input type=text id="e-f" onkeyup="javascript:message_up('f');"/></td>
-        <td title="frequency of center of filter. Hz, in float">filter center freq</td><td><input type=text id="e-F" onkeyup="javascript:message_up('F');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="target parameter of modulation. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback. can be added together, e.g res+feedback = 48">mod target</td><td><input type=text id="e-g" onkeyup="javascript:message_up('g');"/></td>
-        <td title="type of filter 0 = none (default.) 1 = low pass, 2 = band pass, 3 = hi pass.">filter type</td><td><input type=text id="e-G" onkeyup="javascript:message_up('G');"/></td>
-        <td title="for ALGO types, where the base note frequency controls the modulators, or for the ALGO base note and PARTIALS base note, where the ratio controls the speed of the playback.">ratio</td><td><input type=text id="e-I" onkeyup="javascript:message_up('I');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="source oscillator for modulation">mod source</td><td><input type=text id="e-L" onkeyup="javascript:message_up('L');"/></td>
-        <td title="set to >0 to trigger note on, which will also set amplitude to the value. set to 0 for note off">velocity</td><td><input type=text id="e-l" onkeyup="javascript:message_up('l');"/></td>
-        <td title="midi note, 0-127. will also set frequency">midi note</td><td><input type=text id="e-n" onkeyup="javascript:message_up('n');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="dx7 algorithm, 1-32.">algorithm</td><td><input type=text id="e-o" onkeyup="javascript:message_up('o');"/></td>
-        <td title="string of source algorithm voices for ALGO. counts backwards from operator 6, e.g. 0,1,2,3,4,5 . -1 means do not use">algo source</td><td><input type=text id="e-O" onkeyup="javascript:message_up('O');"/></td>
-        <td title="patch number for ALGO, PCM, PARTIALS">patch</td><td><input type=text id="e-p" onkeyup="javascript:message_up('p');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0. float 0-1">phase</td><td><input type=text id="e-P" onkeyup="javascript:message_up('P');"/></td>
-        <td title="resonance of biquad filter. default 0.7">resonance</td><td><input type=text id="e-R" onkeyup="javascript:message_up('R');"/></td>
-        <td title="target parameter for bp0. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential">breakpoint 0 target</td><td><input type=text id="e-T" onkeyup="javascript:message_up('T');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="volume of entire synth. 0.0 - 10.0 in practice">volume</td><td><input type=text id="e-V" onkeyup="javascript:message_up('V');"/></td>
-        <td title="0=SINE, 1=PULSE, 2=SAW_DOWN, 3=SAW_UP, 4=TRIANGLE, 5=NOISE, 6=KS, 7=PCM, 8=ALGO, 9=PARTIAL, 10=PARTIALS, 11=OFF]. default: 0/SINE">wave</td><td><input type=text id="e-w" onkeyup="javascript:message_up('w');"/></td>
-        <td title="target parameter for bp1. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential">breakpoint 1 target</td><td><input type=text id="e-W" onkeyup="javascript:message_up('W');"/></td>
-    </tr>
-    </tr><tr>
-        <td title="in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0.">eq L</td><td><input type=text id="e-x" onkeyup="javascript:message_up('x');"/></td>
-        <td title="target parameter for bp2. 1=amp, 2=duty, 4=freq, 8=filter freq, 16=resonance, 32=feedback (can be added together). Can add 64 for linear ramp, otherwise exponential">breakpoint 2 target</td><td><input type=text id="e-X" onkeyup="javascript:message_up('X');"/></td>
-        <td title="in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0.">eq M</td><td><input type=text id="e-y" onkeyup="javascript:message_up('y');"></td>
-    </tr>
-    </tr><tr>
-        <td title="in dB, fc=7500 amount, -15 to 15. 0 is off. default 0.">eq H</td><td><input type=text id="e-z" onkeyup="javascript:message_up('z');"/></td>
-    </tr>
-</table>
+<P>Message: <input id="constructed" length=40/><a href="javascript:send(-1)">send message to AMY</a>   <a href="javascript: reset()">reset voices</a>
+
 
 <P>Powered by <A href="https://github.com/shorepine/amy">AMY - the additive music synthesizer library</A>. Thanks to <a href="https://github.com/elf-audio/cpp-to-webaudio-example">elf-audio/cpp-to-webaudio-example</a>.
     </div>
@@ -436,20 +385,13 @@ rngPatch.oninput = function(){
 };
 const txtPatch = document.getElementById("patchText");
 
-var curRatio = 1.0;
-const rngRatio = document.getElementById("ratio");
-rngRatio.oninput = function(){
-  txtRatio.innerText = this.value;
-  curRatio = this.value;
-};
-const txtRatio = document.getElementById("ratioText");
 
     function piano_down(note) {
-        mess = "v54l1w8n" + note + "p" + curPatch + "I" + curRatio;
+        mess = "r0l1n" + note + "K" + curPatch 
         if(amy_started) amy_play_message(mess);
     }
     function piano_up(note) {
-        mess = "v54l0";
+        mess = "r0l0";
         if(amy_started) amy_play_message(mess);
     }
     function message_up(code) {
