@@ -1,6 +1,6 @@
 # AMY - the Additive Music synthesizer librarY
 
-AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
+AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
 
 It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a drum machine (PCM samples included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
 
@@ -59,6 +59,10 @@ We have a simple [dual core ESP-IDF example available](https://github.com/shorep
 ## Using AMY in Python on any platform
 
 You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `libamy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
+
+## Using AMY on the web
+
+We provide an `emscripten` port of AMY that runs in javascript. [See the AMY web demo](https://shorepine.github.io/amy/). To build for the web, use `make web`. It will generate `amy.js` in `src/www`. 
 
 ## Using AMY in any other software
 
