@@ -11,25 +11,22 @@
         <script type="text/javascript" src="amy.js"></script>
         <script language="javascript">
     
-    var web_audio_buffer = null;
+    var amy_simple_fill_buffer = null;
     var amy_play_message = null;
-    var amy_AMY_SAMPLE_RATE = null;
-    var amy_start_web = null;
+    var AMY_SAMPLE_RATE = 44100;
+    var amy_start = null;
     var startDate = new Date();
     var startTime = startDate.getTime();
     // you can only start calling c++ functions once emscripten's "runtime" has started
     Module.onRuntimeInitialized = function() {
         web_audio_buffer = Module.cwrap(
-            'web_audio_buffer', 'number', ['number', 'number']
+            'web_audio_buffer', 'number', ['number', 'number']        
         );
         amy_play_message = Module.cwrap(
             'amy_play_message', null, ['string']
         );
-        amy_AMY_SAMPLE_RATE = Module.cwrap(
-            'amy_AMY_SAMPLE_RATE', 'number', ['number']
-        );
-        amy_start_web = Module.cwrap(
-            'amy_start_web', null, ['number']
+        amy_start = Module.cwrap(
+            'amy_start', null, ['number', 'number', 'number']
         );
     }
 
@@ -40,10 +37,10 @@
     var data = new Float32Array();
 
     // l and r are float arrays for the left and right channels that need to be filled
-    function audioCallback(l) {
+    function audioCallback(l,r) {
         // lazy loading of the audio buffer we use to talk to c++/emscripten
         if(dataHeap == null) {
-            data = new Float32Array(l.length);
+            data = new Float32Array(l.length*2);
             // Get data byte size, allocate memory on Emscripten heap, and get pointer
             var nDataBytes = data.length * data.BYTES_PER_ELEMENT;
             dataPtr = Module._malloc(nDataBytes);
@@ -62,7 +59,8 @@
 
         // deinterleave the result
         for(i = 0; i < l.length; i++) {
-            l[i] = result[i];
+            l[i] = result[i*2];
+            r[i] = result[i*2+1];
         }
     }
 
@@ -83,13 +81,13 @@ function setupAudio(fn) {
         alert("Sorry, but the Web Audio API is not supported by your browser.");
     }
   // create a context with the sample rate compiled into amy.wasm
-  audioCtx = new AudioContext({sampleRate: amy_AMY_SAMPLE_RATE()});
+  audioCtx = new AudioContext({sampleRate: AMY_SAMPLE_RATE});
   source = audioCtx.createBufferSource();
 
   // buff size, ins, outs
-  scriptNode = audioCtx.createScriptProcessor(256, 0, 1);
+  scriptNode = audioCtx.createScriptProcessor(256, 0, 2);
   scriptNode.onaudioprocess = function(audioProcessingEvent) {
-    fn(audioProcessingEvent.outputBuffer.getChannelData(0)); 
+    fn(audioProcessingEvent.outputBuffer.getChannelData(0), audioProcessingEvent.outputBuffer.getChannelData(1)); 
   };
 }
 function millis() {
@@ -101,7 +99,7 @@ function millis() {
 }
 function reset() {
     if(amy_started) {
-        var code = "S65";
+        var code = "S121";
         amy_play_message(code); //+"t"+millis());
     }
 }
@@ -119,7 +117,7 @@ function send(osc) {
 var amy_started = false;
 function startAudio() {
 
-  amy_start_web();
+  amy_start(1,1,1);
   amy_started = true;
   send(0);
   send(9);
@@ -187,7 +185,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n50p14I4' id='code0'/><a href="javascript:send(0)">send</a>
+    <input type='text' value='w7p0' id='code0'/><a href="javascript:send(0)">send</a>
 
 
   </div>
@@ -212,7 +210,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n62p103I4' id='code9'/><a href="javascript:send(9)">send</a>
+    <input type='text' value='w7p1' id='code9'/><a href="javascript:send(9)">send</a>
 
   </div>
   <div class="seqrow">
@@ -236,7 +234,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w8n46p14I4' id='code18'/><a href="javascript:send(18)">send</a>
+    <input type='text' value='w7p2' id='code18'/><a href="javascript:send(18)">send</a>
 
   </div>
     <div class="seqrow">
@@ -260,7 +258,7 @@ function stopAudio() {
       <input type="checkbox"></input>
       <input type="checkbox"></input>
     </div>
-    <input type='text' value='w7p2n60' id='code27'/><a href="javascript:send(27)">send</a>
+    <input type='text' value='w7p3' id='code27'/><a href="javascript:send(27)">send</a>
 
   </div>
     <div class="seqrow">
@@ -342,13 +340,12 @@ function stopAudio() {
 <span id="bpmText">120</span> bpm
 </div>
 <hr/>
-<h2>AMY DX7 patch player</h2>
-<P>Play any of AMY's built in 1024 DX7 patches. They're very accurate! If you want to generate your own FM patches, see AMY's fm.py module.</P>
-<input id="patch" type="range" min="0" max="1023" step="1" value="498">
-Patch #: <span id="patchText">498</span> 
+<h2>AMY Juno-6 and DX7 patch player</h2>
+<P>Play any of AMY's built in 256 Juno-6 and DX7 patches. They're very accurate! If you want to generate your own patches see AMY's fm.py and juno.py modules.</P>
+<input id="patch" type="range" min="0" max="255" step="1" value="0">
+Patch #: <span id="patchText">0</span> 
 <P>
-<input id="ratio" type="range" min="0.01" max="4" step="0.01" value="1.0">
-Playback time ratio: <span id="ratioText">1.0</span> 
+
 
 <ul class="set">
   <a onpointerdown="javascript:piano_down(53);" onpointerup="javascript:piano_up(53);"><li class="white b"></li></a>
@@ -436,20 +433,13 @@ rngPatch.oninput = function(){
 };
 const txtPatch = document.getElementById("patchText");
 
-var curRatio = 1.0;
-const rngRatio = document.getElementById("ratio");
-rngRatio.oninput = function(){
-  txtRatio.innerText = this.value;
-  curRatio = this.value;
-};
-const txtRatio = document.getElementById("ratioText");
 
     function piano_down(note) {
-        mess = "v54l1w8n" + note + "p" + curPatch + "I" + curRatio;
+        mess = "r0l1n" + note + "K" + curPatch 
         if(amy_started) amy_play_message(mess);
     }
     function piano_up(note) {
-        mess = "v54l0";
+        mess = "r0l0";
         if(amy_started) amy_play_message(mess);
     }
     function message_up(code) {

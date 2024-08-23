@@ -1336,11 +1336,23 @@ void amy_prepare_buffer() {
 
 }
 
+
+
 int16_t * amy_simple_fill_buffer() {
     amy_prepare_buffer();
     amy_render(0, AMY_OSCS, 0);
     return amy_fill_buffer();
 }
+
+#ifdef WEBAUDIO
+int web_audio_buffer(float *samples, int length) {
+     int16_t *s = amy_simple_fill_buffer();
+     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
+         samples[i] = (float)s[i]/32767.0f;
+     }
+     return AMY_BLOCK_SIZE;
+ }
+ #endif
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)

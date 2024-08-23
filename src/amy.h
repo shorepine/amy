@@ -381,6 +381,7 @@ struct event amy_default_event();
 void amy_add_event(struct event e);
 void amy_add_event_internal(struct event e, uint16_t base_osc);
 int16_t * amy_simple_fill_buffer() ;
+int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
