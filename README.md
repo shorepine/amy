@@ -560,20 +560,22 @@ amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 
 ## <a name="voices_and_patches"></a>Voices and patches (DX7, Juno-6, custom) support
 
-With AMY, you can control the low level oscillators that make up a synthesizer "voice", or you can control voices directly and load in groups of oscillators by sending AMY a patch. A patch is a list of AMY commands that setup one or more oscillators.
+Up until now, we have been directly controlling the AMY oscillators, which are the fundamental building blocks for sound production.  However, as we've seen, most interesting tones involve multiple oscillators.  AMY provides a second layer of organization, **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.
 
-A voice in AMY is a collection of oscillators. You can assign patches to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. You can then play those patches (and modify them) by their voice number. For example, a multitimbral Juno/DX7 synth can be set up like:
+A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
+
+To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers, you allocate them to one or more voices, then send note events, or parameter moidifications, to those voices. For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
 amy.send(voices='0,1,2,3', load_patch=1)     # Juno patch #1 on voice 0-3
 amy.send(voices='4,5,6,7', load_patch=129)   # DX7 patch #2 on voices 4-7
 amy.send(voices=0, note=60, vel=1)           # Play note 60 on voice 0
-amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the juno voice (its bottom oscillator)
+amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the Juno voice (using its bottom oscillator)
 ```
 
-Our code in `amy_headers.py` generates and bakes in these patches into AMY so they're ready for playback on any device. You can add your own patches by "recording" AMY setup commands and adding them to `patches.h`.
+The code in `amy_headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches by storing alternative wire-protocol setup strings in `patches.h`.
 
-You can also create your own patches at runtime and use them for voices using `store_patch`=`1024,AMY_PATCH_STRING` where 1024 is a patch number from 1024-1055. This message must be the only thing in the string sent over. AMY will treat the rest of the message as a patch, not further messages.
+You can also create your own patches at runtime and use them for voices with `store_patch='PATCH_NUMBER,AMY_PATCH_STRING'` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
 
 So you can do:
 ```
@@ -582,11 +584,12 @@ So you can do:
 >>> amy.send(voices=0, load_patch=1024)
 >>> amy.send(voices=0, vel=2, note=50)
 ```
-We divine the number of oscs used for the patch at store_patch time. If you store a new patch over an old one, that old memory is freed and re-allocated. We rely on malloc for all of this.
+AMY infers the number of oscs needed for the patch at `store_patch` time. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
 
-Also recall you can "record" patches in amy.py, so the whole loop is:
+You can "record" patches in a sequence of commands like this:
 ```
 >>> amy.log_patch()
+>>> # Execute any commands to set up the oscillators.
 >>> amy.preset(5)
 >>> bass_drum = amy.retrieve_patch()
 >>> bass_drum
@@ -594,7 +597,7 @@ Also recall you can "record" patches in amy.py, so the whole loop is:
 >>> amy.send(store_patch='1024,' + bass_drum)
 ```
 
-**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and managing your own oscillator mapping in your code.
+**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and manage your own oscillator mapping in your code.
 
 
 ## Developer zone
