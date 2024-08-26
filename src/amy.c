@@ -1344,15 +1344,6 @@ int16_t * amy_simple_fill_buffer() {
     return amy_fill_buffer();
 }
 
-#ifdef WEBAUDIO
-int web_audio_buffer(float *samples, int length) {
-     int16_t *s = amy_simple_fill_buffer();
-     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
-         samples[i] = (float)s[i]/32767.0f;
-     }
-     return AMY_BLOCK_SIZE;
- }
- #endif
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
@@ -1748,6 +1739,8 @@ void amy_stop() {
     oscs_deinit();
 }
 
+
+
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
@@ -1760,3 +1753,52 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     oscs_init();
     //amy_reset_oscs();
 }
+
+#ifdef WEBAUDIO
+// https://github.com/TheBouteillacBear/webaudioworklet-wasm/tree/main/src/minimal
+
+uint8_t amy_web_running = 0;
+pthread_t amy_web_thread;
+#include <emscripten.h>
+
+static float inputBuffer[AMY_BLOCK_SIZE];
+static float outputBuffer[AMY_BLOCK_SIZE];
+
+int web_audio_buffer(float *samples, int length) {
+     int16_t *s = amy_simple_fill_buffer();
+     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
+         samples[i] = (float)s[i]/32767.0f;
+     }
+     return AMY_BLOCK_SIZE;
+ }
+
+
+EMSCRIPTEN_KEEPALIVE
+    float* inputBufferPtr() {
+        return inputBuffer;
+    }
+EMSCRIPTEN_KEEPALIVE
+    float* outputBufferPtr() {
+        return outputBuffer;
+    }
+EMSCRIPTEN_KEEPALIVE
+    void filter() {
+        web_audio_buffer(outputBuffer, AMY_BLOCK_SIZE);
+    }
+
+/*
+void *webaudio_run(void *vargp) {
+    amy_start(1,1,1);
+    while(amy_web_running) {
+        sleep(1);
+    }
+    return NULL;
+}
+*/
+void amy_web_start(uint8_t c) {
+    amy_web_running = 1;
+    amy_start(1,1,1);
+    //pthread_create(&amy_web_thread, NULL, webaudio_run, NULL);
+}
+#endif
+

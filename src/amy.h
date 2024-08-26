@@ -452,6 +452,9 @@ void amy_play_message(char *message);
 struct event amy_parse_message(char * message);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus);
+#ifdef WEBAUDIO
+void amy_web_start(uint8_t c);
+#endif
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();

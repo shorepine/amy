@@ -27,9 +27,11 @@ CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \
+-sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_web_audio_buffer', '_amy_play_message', '_amy_start', '_malloc', '_free']" \
--DWEBAUDIO
+-s EXPORTED_FUNCTIONS="['_web_audio_buffer', '_amy_play_message', '_amy_web_start', '_malloc', '_free', '_filter']" \
+-DWEBAUDIO -pthread -O3
+
 
 PYTHON = python3
 

@@ -7,6 +7,9 @@
 #ifdef AMY_DAISY
 #define AMY_BLOCK_SIZE 128
 #define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE
+#elif defined WEBAUDIO
+#define AMY_BLOCK_SIZE 128
+#define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE
 #else
 #define AMY_BLOCK_SIZE 256
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
@@ -22,6 +25,8 @@
 #ifdef ALLES
 #define AMY_NCHANS 1
 #elif defined ARDUINO
+#define AMY_NCHANS 1
+#elif defined WEBAUDIO
 #define AMY_NCHANS 1
 #else
 #define AMY_NCHANS 2
