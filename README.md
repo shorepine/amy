@@ -1,4 +1,4 @@
-# AMY - the Additive Music synthesizer librarY
+# AMY - A high-performance fixed-point Music synthesizer librarY for microcontrollers
 
 AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
 
