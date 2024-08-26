@@ -26,10 +26,11 @@ CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-a
 CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
+-DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1 -sASYNCIFY -sASSERTIONS \
 -s ALLOW_MEMORY_GROWTH=1 \
+-sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_web_audio_buffer', '_amy_play_message', '_amy_start', '_malloc', '_free']" \
--DWEBAUDIO
+-s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_live_start', '_amy_start', '_malloc', '_free']" 
 
 PYTHON = python3
 
@@ -84,7 +85,7 @@ timing: amy-module
 
 
 web: $(TARGET)
-	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o docs/amy.js
+	 emcc $(SOURCES) src/libminiaudio-audio.c $(EMSCRIPTEN_OPTIONS) -O3 -o docs/amy.js
 
 clean:
 	-rm -f src/*.o

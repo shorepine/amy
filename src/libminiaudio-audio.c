@@ -34,6 +34,14 @@ int16_t amy_device_id = -1;
 uint8_t amy_running = 0;
 pthread_t amy_live_thread;
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+
+void main_loop__em()
+{
+}
+#endif
+
 
 void amy_print_devices() {
     ma_context context;
@@ -57,13 +65,13 @@ void amy_print_devices() {
 
     ma_context_uninit(&context);
 }
-
+#ifdef __EMSCRIPTEN__
+//#include "console.h"
+#endif
 static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
     // Different audio devices on mac have wildly different frame_count_maxes, so we have to be ok with 
     // an audio buffer that is not an even multiple of BLOCK_SIZE. my iMac's speakers were always 512 frames, but
     // external headphones on a MBP is 432 or 431, and airpods were something like 1440.
-
-    //printf("BLOCK_SIZE:%d frame_count:%d leftover_samples:%d\n", BLOCK_SIZE, frame_count, leftover_samples);
     short int *poke = (short *)pOutput;
 
     // First send over the leftover samples, if any
@@ -158,6 +166,7 @@ amy_err_t miniaudio_init() {
 
 void *miniaudio_run(void *vargp) {
     miniaudio_init();
+    
     while(amy_running) {
         sleep(1);
     }
@@ -167,7 +176,12 @@ void *miniaudio_run(void *vargp) {
 void amy_live_start() {
     // kick off a thread running miniaudio_run
     amy_running = 1;
+    #ifdef __EMSCRIPTEN__
+    miniaudio_init();
+    emscripten_set_main_loop(main_loop__em, 0, 0);
+    #else
     pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+    #endif
 }
 
 

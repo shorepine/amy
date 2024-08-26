@@ -8,6 +8,8 @@
 // Flag set momentarily by debug message to report state on-demand.
 int debug_flag = 0;
 
+
+
 #ifdef AMY_DEBUG
 
 const char* profile_tag_name(enum itags tag) {
@@ -1344,7 +1346,8 @@ int16_t * amy_simple_fill_buffer() {
     return amy_fill_buffer();
 }
 
-#ifdef WEBAUDIO
+
+#if 0
 int web_audio_buffer(float *samples, int length) {
      int16_t *s = amy_simple_fill_buffer();
      for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
@@ -1352,7 +1355,7 @@ int web_audio_buffer(float *samples, int length) {
      }
      return AMY_BLOCK_SIZE;
  }
- #endif
+#endif
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
