@@ -43,10 +43,9 @@ void setup() {
 
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
-  uint8_t * samples = (uint8_t*)amy.render_to_buffer();
-  // Block until ready
-  while(i2s.availableForWrite()<AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
-  size_t written = i2s.write((const uint8_t*)samples, (size_t)AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
-  Serial.println(written);
+  int16_t * samples = (int16_t*)amy.render_to_buffer();
+  for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+    i2s.write16(samples[i], samples[i]);
+  }
 }
 
