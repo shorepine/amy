@@ -7,10 +7,10 @@ AMY amy;
 void setup() {
 
   // Set your I2S pins. 
-  i2s.setBCLK(9); // BCLK = SCLK. MCLK = SCLK + 1
+  i2s.setBCLK(9); // BCLK = SCLK. LRCLK = SCLK + 1
   i2s.setDATA(8); // DATA = DIN, SD, SDOUT, DOUT
   i2s.setBitsPerSample(16); 
-  i2s.setBuffers(2, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE/4, 0);
+  i2s.setBuffers(2, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE/2, 0);
   i2s.begin(AMY_SAMPLE_RATE);
 
 
