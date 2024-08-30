@@ -146,9 +146,9 @@ def parse_ctrl_coefs(coefs):
 # Construct an AMY message
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
-            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq_l = None, eq_m = None, eq_h = None, filter_type= None, 
+            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq=None, filter_type= None, 
             algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, 
-            reverb_level=None, reverb_liveness=None, reverb_damping=None, reverb_xover=None, load_patch=None, store_patch=None, voices=None, external_channel=None):
+            reverb=None, load_patch=None, store_patch=None, voices=None, external_channel=None):
 
     m = ""
     if(store_patch is not None): return "u" + str(store_patch)
@@ -182,18 +182,13 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(mod_source is not None): m = m + "L" + str(mod_source)
     if(reset is not None): m = m + "S" + str(reset)
     if(debug is not None): m = m + "D" + str(debug)
-    if(eq_l is not None): m = m + "x" + trunc(eq_l)
-    if(eq_m is not None): m = m + "y" + trunc(eq_m)
-    if(eq_h is not None): m = m + "z" + trunc(eq_h)
+    if(eq is not None): m = m + "x%s" % eq
     if(filter_type is not None): m = m + "G" + str(filter_type)
     if(chorus_level is not None): m = m + "k" + str(chorus_level)
     if(chorus_delay is not None): m = m + "m" + str(chorus_delay)
     if(chorus_depth is not None): m = m + 'q' + trunc(chorus_depth)
     if(chorus_freq is not None): m =m + 'M' + trunc(chorus_freq)
-    if(reverb_level is not None): m = m + "h" + str(reverb_level)
-    if(reverb_liveness is not None): m = m + "H" + str(reverb_liveness)
-    if(reverb_damping is not None): m = m + "j" + str(reverb_damping)
-    if(reverb_xover is not None): m = m + "J" + str(reverb_xover)
+    if(reverb is not None): m = m + "h%s" % reverb
     if(load_patch is not None): m = m + 'K' + str(load_patch)
     if(voices is not None): m = m + 'r' + str(voices)
     if(external_channel is not None): m = m + 'W' + str(external_channel)
@@ -383,8 +378,8 @@ def eq_test():
     reset()
     eqs = [ [0,0,0], [15,0,0], [0,0,15], [0,15,0],[-15,-15,15],[-15,-15,30],[-15,30,-15], [30,-15,-15] ]
     for eq in eqs:
-        print("eq_l = %ddB eq_m = %ddB eq_h = %ddB" % (eq[0], eq[1], eq[2]))
-        send(eq_l=eq[0], eq_m=eq[1], eq_h=eq[2])
+        print("eq_l = %f dB, eq_m = %f dB, eq_h = %f dB" % (eq[0], eq[1], eq[2]))
+        send(eq="%.2f,%.2f,%.2f" % (eq[0], eq[1], eq[2]))
         drums(loops=2)
         time.sleep(1)
         reset()
@@ -465,15 +460,20 @@ def chorus(level=-1, max_delay=-1, freq=-1, amp=-1):
 """
 def reverb(level=-1, liveness=-1, damping=-1, xover_hz=-1):
     args = {}
+    reverb_level = ''
+    reverb_liveness = ''
+    reverb_damping = ''
+    reverb_xover = ''
     if (level >= 0):
-        args['reverb_level'] = level
+        reverb_level = str(level)
     if (liveness >= 0):
-        args['reverb_liveness'] = liveness
+        reverb_liveness = str(liveness)
     if (damping >= 0):
-        args['reverb_damping'] = damping
+        reverb_damping = str(damping)
     if (xover_hz >= 0):
-        args['reverb_xover'] = xover_hz
-    send(**args)
+        reverb_xover = str(xover_hz)
+    reverb_arg = "%s,%s,%s,%s" % (reverb_level, reverb_liveness, reverb_damping, reverb_xover)
+    send(reverb=reverb_arg)
 
 
 

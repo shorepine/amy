@@ -1654,12 +1654,22 @@ struct event amy_parse_message(char * message) {
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
-                        case 'H': if(AMY_HAS_REVERB) config_reverb(S2F(reverb.level), atoff(message + start), reverb.damping, reverb.xover_hz); break;
-                        case 'h': if(AMY_HAS_REVERB) config_reverb(atoff(message + start), reverb.liveness, reverb.damping, reverb.xover_hz); break;
+                        /* H, j, J available */
+                       case 'h': if (AMY_HAS_REVERB) {
+                            float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
+                                                      AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
+                            parse_float_list_message(message + start, reverb_params, 4, AMY_UNSET_VALUE(reverb.liveness));
+                            // config_reverb doesn't understand UNSET, so copy in the current values.
+                            if (AMY_IS_UNSET(reverb_params[0])) reverb_params[0] = S2F(reverb.level);
+                            if (AMY_IS_UNSET(reverb_params[1])) reverb_params[1] = reverb.liveness;
+                            if (AMY_IS_UNSET(reverb_params[2])) reverb_params[2] = reverb.damping;
+                            if (AMY_IS_UNSET(reverb_params[3])) reverb_params[3] = reverb.xover_hz;
+                            config_reverb(reverb_params[0], reverb_params[1], reverb_params[2], reverb_params[3]);
+                        }
+                        break;
                         /* i used by alles for sync index */
                         case 'I': e.ratio = atoff(message + start); break;
-                        case 'j': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, atoff(message + start), reverb.xover_hz); break;
-                        case 'J': if(AMY_HAS_REVERB)config_reverb(S2F(reverb.level), reverb.liveness, reverb.damping, atoff(message + start)); break;
+                        /* j, J available */
                         // chorus.level 
                         case 'k': if(AMY_HAS_CHORUS)config_chorus(atoff(message + start), chorus.max_delay, chorus.lfo_freq, chorus.depth); break;
                         case 'K': e.load_patch = atoi(message+start); break; 
@@ -1691,11 +1701,16 @@ struct event amy_parse_message(char * message) {
                         case 'w': e.wave=atoi(message + start); break;
                         /* W used by Tulip for CV, external_channel */
                         case 'X': e.eg_type[1] = atoi(message + start); break;
-                        case 'x': e.eq_l = atoff(message+start); break;
-                        /* Y available */
-                        case 'y': e.eq_m = atoff(message+start); break;
+                        case 'x': {
+                              float eq[3] = {AMY_UNSET_VALUE(e.eq_l), AMY_UNSET_VALUE(e.eq_m), AMY_UNSET_VALUE(e.eq_h)};
+                              parse_float_list_message(message + start, eq, 3, AMY_UNSET_VALUE(e.eq_l));
+                              e.eq_l = eq[0];
+                              e.eq_m = eq[1];
+                              e.eq_h = eq[2];
+                            }
+                            break;
+                        /* Y,y,z available */
                         /* Z used for end of message */
-                        case 'z': e.eq_h = atoff(message+start); break;
                         default:
                             break;
                     }

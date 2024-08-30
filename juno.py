@@ -408,7 +408,7 @@ class JunoPatch:
       eq_m = 8
       eq_h = 8
     chorus_args = {
-      'eq_l': eq_l, 'eq_m': eq_m, 'eq_h': eq_h,
+      'eq': '%s,%s,%s' % (str(eq_l), str(eq_m), str(eq_h)),
       'chorus_level': float(self.chorus > 0)
     }
     if self.chorus:
