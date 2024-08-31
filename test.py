@@ -439,6 +439,24 @@ class TestFilterReleaseGlitch(AmyTest):
     amy.send(time=500, vel=0)
 
 
+class TestPortamento(AmyTest):
+
+  def run(self):
+    amy.send(time=0, voices="0,1,2", load_patch=0)
+    amy.send(time=0, voices="0,1,2", osc=0, portamento=100)
+    amy.send(time=0, voices="0,1,2", osc=1, portamento=100)
+    amy.send(time=0, voices="0,1,2", osc=2, portamento=100)
+
+    amy.send(time=50, voices="0", note=60, vel=1)
+    amy.send(time=50, voices="1", note=64, vel=1)
+    amy.send(time=50, voices="2", note=67, vel=1)
+
+    amy.send(time=300, voices="0", note=65)
+    amy.send(time=300, voices="1", note=69)
+    amy.send(time=300, voices="2", note=72)
+
+    amy.send(time=800, voices="0,1,2", vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
