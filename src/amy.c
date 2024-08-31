@@ -1654,7 +1654,7 @@ struct event amy_parse_message(char * message) {
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
-                        /* H, j, J available */
+                        /* H available */
                        case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
                                                       AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
