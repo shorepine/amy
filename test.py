@@ -447,13 +447,15 @@ class TestPortamento(AmyTest):
     amy.send(time=0, voices="0,1,2", osc=1, portamento=100)
     amy.send(time=0, voices="0,1,2", osc=2, portamento=100)
 
+    # Starting-point pitches...
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=50, voices="1", note=64, vel=1)
     amy.send(time=50, voices="2", note=67, vel=1)
 
-    amy.send(time=300, voices="0", note=65)
-    amy.send(time=300, voices="1", note=69)
-    amy.send(time=300, voices="2", note=72)
+    # .. immediately start bending towards final pitches.
+    amy.send(time=50, voices="0", note=65)
+    amy.send(time=50, voices="1", note=69)
+    amy.send(time=50, voices="2", note=72)
 
     amy.send(time=800, voices="0,1,2", vel=0)
 
