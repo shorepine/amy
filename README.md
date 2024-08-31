@@ -203,7 +203,8 @@ Here's the full list:
 | `K`    | `load_patch` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified voice (or starting at the selected oscillator). |
 | `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
-| `n`    | `note` | uint 0-127 | Midi note, sets frequency |
+| `m`    | `portamento` | uint | Time constant (in ms) for pitch changes when note is changed without intervening note-off.  default 0 (immediate), 100 is good. |
+| `N`    | `note` | uint 0-127 | Midi note, sets frequency |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |

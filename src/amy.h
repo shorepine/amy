@@ -145,10 +145,10 @@ enum params{
     PAN,                                 // 30..36
     FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 37..43
     RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 44
-    RESONANCE, CHAINED_OSC,              // 45, 46
-    MOD_SOURCE, FILTER_TYPE,             // 47, 48
-    EQ_L, EQ_M, EQ_H,                    // 49, 50, 51
-    ALGORITHM, LATENCY,                  // 52, 53
+    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 45, 46, 47
+    MOD_SOURCE, FILTER_TYPE,             // 48, 49
+    EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
+    ALGORITHM, LATENCY,                  // 53, 54
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -272,6 +272,7 @@ struct event {
     uint16_t latency_ms;
     float ratio;
     float resonance;
+    uint16_t portamento_ms;
     uint16_t chained_osc;
     uint16_t mod_source;
     uint8_t algorithm;
@@ -314,6 +315,7 @@ struct synthinfo {
     float volume;
     float logratio;
     float resonance;
+    uint16_t portamento_ms;
     uint16_t chained_osc;
     uint16_t mod_source;
     uint8_t algorithm;
@@ -357,6 +359,7 @@ struct mod_synthinfo {
     float duty;
     float last_duty;   // Duty history for interpolation.
     float logfreq;
+    float last_logfreq;  // for portamento
     float filter_logfreq;
     float last_filter_logfreq;  // filter freq history for smoothing.
     float resonance;
