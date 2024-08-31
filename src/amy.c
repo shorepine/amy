@@ -1671,23 +1671,30 @@ struct event amy_parse_message(char * message) {
                         case 'I': e.ratio = atoff(message + start); break;
                         /* j, J available */
                         // chorus.level 
-                        case 'k': if(AMY_HAS_CHORUS)config_chorus(atoff(message + start), chorus.max_delay, chorus.lfo_freq, chorus.depth); break;
+                        case 'k': if(AMY_HAS_CHORUS) {
+                            float chorus_params[4] = {AMY_UNSET_VALUE(chorus.depth), AMY_UNSET_VALUE(chorus.depth),
+                                                      AMY_UNSET_VALUE(chorus.depth), AMY_UNSET_VALUE(chorus.depth)};
+                            parse_float_list_message(message + start, chorus_params, 4, AMY_UNSET_VALUE(chorus.depth));
+                            // cpnfig_chorus doesn't understand UNSET, copy existing values.
+                            if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(chorus.level);
+                            if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)chorus.max_delay;
+                            if (AMY_IS_UNSET(chorus_params[2])) chorus_params[2] = chorus.lfo_freq;
+                            if (AMY_IS_UNSET(chorus_params[3])) chorus_params[3] = chorus.depth;
+                            config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
+                        }
+                        break;
                         case 'K': e.load_patch = atoi(message+start); break; 
                         case 'l': e.velocity=atoff(message + start); break;
                         case 'L': e.mod_source=atoi(message + start); break;
-                        // chorus.lfo_freq
-                        case 'M': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), chorus.max_delay, atoff(message + start), chorus.depth); break;
-                        // chorus.max_delay
-                        case 'm': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), atoi(message + start), chorus.lfo_freq, chorus.depth); break;
+                        /* m, M unused */
                         case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atoi(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
                         case 'O': copy_param_list_substring(e.algo_source, message+start); break;
                         case 'p': e.patch=atoi(message + start); break;
                         case 'P': e.phase=F2P(atoff(message + start)); break;
+                        /* q unused */
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
-                        // chorus.depth
-                        case 'q': if(AMY_HAS_CHORUS)config_chorus(S2F(chorus.level), chorus.max_delay, chorus.lfo_freq, atoff(message+start)); break;
                         case 'R': e.resonance=atoff(message + start); break;
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
                         case 'S': e.reset_osc = atoi(message + start); break;

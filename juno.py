@@ -407,22 +407,19 @@ class JunoPatch:
       eq_l = -15
       eq_m = 8
       eq_h = 8
-    chorus_args = {
+    cho_args = {
       'eq': '%s,%s,%s' % (str(eq_l), str(eq_m), str(eq_h)),
-      'chorus_level': float(self.chorus > 0)
     }
-    if self.chorus:
-      chorus_args['chorus_depth'] = 0.5
-      if self.chorus == 1:
-        chorus_args['chorus_freq'] = 0.5
-      elif self.chorus == 2:
-        chorus_args['chorus_freq'] = 0.83
-      elif self.chorus == 3:
-        # We choose juno 60-style I+II.  Juno 6-style would be freq=8 depth=0.25
-        chorus_args['chorus_freq'] = 1
-        chorus_args['chorus_depth'] = 0.08
+    if self.chorus == 0:
+      cho_args['chorus'] = '0'
+    else:
+      # We choose juno 60-style I+II for chorus=3.  Juno 6-style would be freq=8 depth=0.25
+      cho_args['chorus'] = '1,,%s,%s' % (
+        (0, 0.5, 0.83, 1)[self.chorus],  # chorus_freq
+        (0, 0.5, 0.5, 0.08)[self.chorus],  # chorus_depth
+      )
     # *Don't* send to oscs, these ones are global.
-    amy.send(**chorus_args)
+    amy.send(**cho_args)
 
   # Setters for each Juno UI control
   def set_param(self, param, val):

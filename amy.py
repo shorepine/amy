@@ -147,7 +147,7 @@ def parse_ctrl_coefs(coefs):
 def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
             client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq=None, filter_type= None, 
-            algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus_level=None, chorus_delay=None, chorus_freq=None, chorus_depth=None, 
+            algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus=None,
             reverb=None, load_patch=None, store_patch=None, voices=None, external_channel=None):
 
     m = ""
@@ -184,10 +184,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(debug is not None): m = m + "D" + str(debug)
     if(eq is not None): m = m + "x%s" % eq
     if(filter_type is not None): m = m + "G" + str(filter_type)
-    if(chorus_level is not None): m = m + "k" + str(chorus_level)
-    if(chorus_delay is not None): m = m + "m" + str(chorus_delay)
-    if(chorus_depth is not None): m = m + 'q' + trunc(chorus_depth)
-    if(chorus_freq is not None): m =m + 'M' + trunc(chorus_freq)
+    if(chorus is not None): m = m + 'k%s' % chorus
     if(reverb is not None): m = m + "h%s" % reverb
     if(load_patch is not None): m = m + 'K' + str(load_patch)
     if(voices is not None): m = m + 'r' + str(voices)
@@ -444,22 +441,25 @@ def c_major(octave=2,wave=SINE, **kwargs):
     Chorus control
 """
 def chorus(level=-1, max_delay=-1, freq=-1, amp=-1):
-    args = {}
-    if (freq >= 0):
-        args['chorus_freq'] = freq
-    if (amp >= 0):
-        args['chorus_depth'] = amp
+    chorus_level = ''
+    chorus_delay = ''
+    chorus_freq = ''
+    chorus_depth = ''
     if (level >= 0):
-        args['chorus_level'] = level
+        chorus_level = str(level)
     if (max_delay >= 0):
-        args['chorus_delay'] = max_delay
-    send(**args)
+        chorus_delay = str(max_delay)
+    if (freq >= 0):
+        chorus_freq = str(freq)
+    if (amp >= 0):
+        chorus_depth = str(amp)
+    chorus_arg = "%s,%s,%s,%s" % (chorus_level, chorus_delay, chorus_freq, chorus_depth)
+    send(chorus=chorus_arg)
 
 """
     Reverb control
 """
 def reverb(level=-1, liveness=-1, damping=-1, xover_hz=-1):
-    args = {}
     reverb_level = ''
     reverb_liveness = ''
     reverb_damping = ''
@@ -474,9 +474,3 @@ def reverb(level=-1, liveness=-1, damping=-1, xover_hz=-1):
         reverb_xover = str(xover_hz)
     reverb_arg = "%s,%s,%s,%s" % (reverb_level, reverb_liveness, reverb_damping, reverb_xover)
     send(reverb=reverb_arg)
-
-
-
-
-
-

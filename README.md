@@ -197,14 +197,12 @@ Here's the full list:
 | `f`    | `freq`   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
 | `F`    | `filter_freq` | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
 | `G`    | `filter_type` | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
-| `h`    | `reverb` | float[,float,float,float] | Reverb parameters: level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default = 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
+| `h`    | `reverb` | float[,float,float,float] | Reverb parameters level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default = 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `I`    | `ratio`  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
-| `k`    | `chorus_level` | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
+| `k`    | `chorus` | float[,float,float,float] | Chorus parameters level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `K`    | `load_patch` | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `l`    | `vel` | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
-| `M`    | `chorus_freq` | float | LFO freq of chorus |
-| `m`    | `chorus_delay` | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320 |
 | `N`    | `latency_ms` | uint | sets latency in ms. default 0 (see LATENCY) |
 | `n`    | `note` | uint 0-127 | midi note, sets frequency |
 | `o`    | `algorithm` | uint 1-32 | DX7 algorithm to use for ALGO type |
@@ -212,7 +210,6 @@ Here's the full list:
 | `p`    | `P-patch` | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
 | `P`    | `phase` | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
-| `q`    | `chorus_depth` | float | chorus depth |
 | `R`    | `resonance` | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 |
 | `r`    | `voices` | int[,int] | String comma separated list of voices to send message to, or load patch into |
 | `S`    | `reset`  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
