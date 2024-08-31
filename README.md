@@ -393,17 +393,29 @@ You can set a synth-wide volume (in practice, 0-10), or set the EQ of the entire
 
 ## Envelope Generators
 
-AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per EG) of time deltas (specified in milliseconds) and target value. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time deltas relative to the previous segment, so `100,1,100,0,0,0` goes up to 1 over 100 ms, then back down to zero over the next 100ms. The last "release" pair counts from ms from the note-off. 
+AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs of time deltas (specified in milliseconds) and target value. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All preceding pairs have time deltas relative to the previous segment, so `100,1,100,0,0,0` goes up to 1 over 100 ms, then back down to zero over the next 100ms. The last "release" pair counts from ms from the note-off.
 
 An EG can control amplitude, frequency, filter frequency, duty or pan of an oscillator via the 4th (EG0) and 5th (EG1) entries in the corresponding ControlCoefficients.
 
 For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms and target to be 1.0, then 100ms with target .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like `v0f220w0A50,1.0,100,0.5,250,0` to specify a sine wave at 220Hz with this envelope. 
 
-When using `amy.py`, use the string form of the breakpoint: `bp0='50,1.0,100,0.5,250,0'`. 
+When using `amy.py`, use the string form of the breakpoint: `amy.send(osc=0, bp0='50,1.0,100,0.5,250,0')`.
 
-Every note on (specified by setting velocity / `l` to anything > 0) will trigger this envelope, and setting `l` to 0 will trigger the note off / release section. 
+Every note on (specified by setting `vel` / `l` to anything > 0) will trigger this envelope, and setting velocity to 0 will trigger the note off / release section.
 
 You can set a completely separate envelope using the second envelope generator, for example, to change pitch and amplitude at different rates.
+
+As with ControlCoefficients, missing values in the comma-separated parameter strings mean to leave the existing value unchanged.  However, unlike ControlCoefficients, it's important to explicitly indicate every value you want to leave unchanged, since the number of parameters provided determines the number of breakpoints in the set.  So in the following sequence:
+```
+amy.send(osc=0, bp0='0,1,1000,0.1,200,0')
+amy.send(osc=0, bp0=',,,0.9,,')
+```
+.. we end up with the same effect as `bp0='0,1,1000,0.9,200,0`.  However, if we do:
+```
+amy.send(osc=0, bp0='0,1,1000,0.1,200,0')
+amy.send(osc=0, bp0=',,,0.9')  # No trailing commas.
+```
+.. we effectively end up with `bp0='0,1,1000,0.9`, i.e. the 4 elements in the second `bp0` string change the first breakpoint set to have only 2 breakpoints, meaning a constant amplitude during note-on, then a final slow release to 0.9 -- not at all like the first form, and likely not what we wanted.
 
 
 ## FM & ALGO type
