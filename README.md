@@ -188,8 +188,8 @@ Here's the full list:
 | ------ | -------- | ----------  | ------------------------------------- |
 | `a`    | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
 | `A`    | `bp0`    | string      | Envelope Generator 0's comma-separated breakpoint pairs of time(ms) and level, e.g. `100,0.5,50,0.25,200,0`. The last pair triggers on note off (release) |
-| `B`    | `bp1`    | string      | Breakpoints for Envelope Generator 1. See bp0 |
 | `b`    | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| `B`    | `bp1`    | string      | Breakpoints for Envelope Generator 1. See bp0 |
 | `c`    | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | `C`    | `clone_osc` | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |
 | `d`    | `duty`   |  float[,float...] | Duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
@@ -201,19 +201,19 @@ Here's the full list:
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `K`    | `load_patch` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified voice (or starting at the selected oscillator). |
-| `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
-| `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
+| `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `n`    | `note` | uint 0-127 | Midi note, sets frequency |
+| `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `patch` | uint | Choose a preloaded PCM sample or partial patch. See `load_patch` for DX7 and Juno patches. |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
-| `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
-| `S`    | `reset`  | uint | Resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ. |
+| `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
+| `S`    | `reset`  | uint | Resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ. |
 | `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
