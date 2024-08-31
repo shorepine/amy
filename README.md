@@ -197,17 +197,12 @@ Here's the full list:
 | `f`    | `freq`   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
 | `F`    | `filter_freq` | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
 | `G`    | `filter_type` | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
-| `H`    | `reverb_liveness` | float 0-1 | Reverb decay time, 1 = longest, default = 0.85. |
-| `h`    | `reverb_level` | float | Level at which reverb is mixed in to final output.  Default 0, typically 1. |
+| `h`    | `reverb` | float[,float,float,float] | Reverb parameters level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default = 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `I`    | `ratio`  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
-| `j`    | `reverb_damping`  | float 0-1 | Reverb extra decay of high frequencies, default = 0.5. |
-| `J`    | `reverb_xover_hz` | float  | Crossover frequency (in Hz) for damping decay, default = 3000. |
-| `k`    | `chorus_level` | float 0-1 | Gain applied to chorus when mixing into output.  Set to 0 to turn off chorus. |
+| `k`    | `chorus` | float[,float,float,float] | Chorus parameters level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `K`    | `load_patch` | uint 0-X | Apply a saved patch to start at the selected oscillator |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `l`    | `vel` | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
-| `M`    | `chorus_freq` | float | LFO freq of chorus |
-| `m`    | `chorus_delay` | uint 1-512 | Maximum delay in chorus delay lines, in samples. Default 320 |
 | `N`    | `latency_ms` | uint | sets latency in ms. default 0 (see LATENCY) |
 | `n`    | `note` | uint 0-127 | midi note, sets frequency |
 | `o`    | `algorithm` | uint 1-32 | DX7 algorithm to use for ALGO type |
@@ -215,7 +210,6 @@ Here's the full list:
 | `p`    | `P-patch` | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
 | `P`    | `phase` | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
-| `q`    | `chorus_depth` | float | chorus depth |
 | `R`    | `resonance` | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 |
 | `r`    | `voices` | int[,int] | String comma separated list of voices to send message to, or load patch into |
 | `S`    | `reset`  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
@@ -226,10 +220,8 @@ Here's the full list:
 | `v`    | `osc` | uint 0 to OSCS-1 | which oscillator to control |
 | `V`    | `volume` | float 0-10 | volume knob for entire synth, default 1.0 |
 | `w`    | `wave` | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
-| `x`    | `eq_l` | float | in dB, fc=800Hz amount, -15 to 15. 0 is off. default 0. |
+| `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `y`    | `eq_m` | float |  in dB, fc=2500Hz amount, -15 to 15. 0 is off. default 0. |
-| `z`    | `eq_h` | float | in dB, fc=7500Hz amount, -15 to 15. 0 is off. default 0. |
 
 
 
