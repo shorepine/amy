@@ -494,12 +494,19 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
         // but direct calls to amy_add_event can just put a nonempty string into bp0/1.
         if(AMY_IS_SET(e.bp_is_set[i]) || bps[i][0] != 0) {
             struct synthinfo t;
-            parse_breakpoint(&t, bps[i], i);
-            for(uint8_t j=0;j<MAX_BREAKPOINTS;j++) {
-                d.param=BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d);
-                // Stop adding deltas after first UNSET time sent, just to mark the end of the set when overwriting.
-                if(AMY_IS_UNSET(t.breakpoint_times[i][j])) break;
-                d.param=BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d);
+            int num_bps = parse_breakpoint(&t, bps[i], i);
+            for(uint8_t j = 0; j < num_bps; j++) {
+                if(AMY_IS_SET(t.breakpoint_times[i][j])) {
+                    d.param = BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d);
+                }
+                if(AMY_IS_SET(t.breakpoint_values[i][j])) {
+                    d.param = BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d);
+                }
+            }
+            // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
+            if (num_bps < MAX_BREAKPOINTS) {
+                uint32_t unset_time = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
+                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2); d.data = *(uint32_t *)&unset_time; add_delta_to_queue(d);
             }
         }
     }
@@ -1576,25 +1583,32 @@ void parse_algorithm_source(struct synthinfo * t, char *message) {
 }
 
 // helper to parse the special bp string
-void parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
+int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
     float vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
     int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS,
                                             AMY_UNSET_VALUE(vals[0]));
+    for (int i = 0; i < 2 * MAX_BREAKPOINTS; ++i)
+        fprintf(stderr, "bpset %d val %d = %f\n", which_bpset, i, vals[i]);
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
         if ((i % 2) == 0)
-            e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples((int)vals[i]);
+            if (AMY_IS_SET(vals[i]))
+                e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples((int)vals[i]);
+            else  // Have to translate the "unset" value for the non-float type.
+                e->breakpoint_times[which_bpset][i >> 1] = AMY_UNSET_VALUE(e->breakpoint_times[which_bpset][i >> 1]);
         else
             e->breakpoint_values[which_bpset][i >> 1] = vals[i];
     }
-    // Unset remaining vals.
+    // But values that are not specified at the end of the list indicate the total length of the BP set.
     for (int i = num_vals; i < 2 * MAX_BREAKPOINTS; ++i) {
         if ((i % 2) == 0)
             AMY_UNSET(e->breakpoint_times[which_bpset][i >> 1]);
         else
             AMY_UNSET(e->breakpoint_values[which_bpset][i >> 1]);
     }
+    // Return the number of breakpoints that were present.
+    return (num_vals + 1) >> 1;
 }
 
 void parse_coef_message(char *message, float *coefs) {
@@ -1643,9 +1657,9 @@ struct event amy_parse_message(char * message) {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
                         case 'a': parse_coef_message(message + start, e.amp_coefs);break;
-                        case 'A': copy_param_list_substring(e.bp0, message+start); e.bp_is_set[0] = 1; break;
-                        case 'B': copy_param_list_substring(e.bp1, message+start); e.bp_is_set[1] = 1; break;
-                        case 'b': e.feedback=atoff(message+start); break;
+                        case 'A': copy_param_list_substring(e.bp0, message + start); e.bp_is_set[0] = 1; break;
+                        case 'B': copy_param_list_substring(e.bp1, message + start); e.bp_is_set[1] = 1; break;
+                        case 'b': e.feedback = atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
                         case 'C': e.clone_osc = atoi(message + start); break;
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
@@ -1655,7 +1669,7 @@ struct event amy_parse_message(char * message) {
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
                         /* H available */
-                       case 'h': if (AMY_HAS_REVERB) {
+                        case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
                                                       AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
                             parse_float_list_message(message + start, reverb_params, 4, AMY_UNSET_VALUE(reverb.liveness));
