@@ -1588,8 +1588,6 @@ int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
     // Read all the values as floats.
     int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS,
                                             AMY_UNSET_VALUE(vals[0]));
-    for (int i = 0; i < 2 * MAX_BREAKPOINTS; ++i)
-        fprintf(stderr, "bpset %d val %d = %f\n", which_bpset, i, vals[i]);
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
         if ((i % 2) == 0)
