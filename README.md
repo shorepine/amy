@@ -187,39 +187,39 @@ Here's the full list:
 | Code   | Python   | Type-range  | Notes                                 |
 | ------ | -------- | ----------  | ------------------------------------- |
 | `a`    | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
-| `A`    | `bp0`    | string      | in commas, like 100,0.5,50,0.25,200,0 -- Envelope Generator 0's breakpoint pairs of time(ms) and level. The last pair triggers on note off (release) |
-| `B`    | `bp1`    | string      | breakpoints for Envelope Generator 1. See bp0 |
-| `b`    | `feedback` | float 0-1 | use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| `A`    | `bp0`    | string      | Envelope Generator 0's comma-separated breakpoint pairs of time(ms) and level, e.g. `100,0.5,50,0.25,200,0`. The last pair triggers on note off (release) |
+| `b`    | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
+| `B`    | `bp1`    | string      | Breakpoints for Envelope Generator 1. See bp0 |
 | `c`    | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | `C`    | `clone_osc` | uint 0 to OSCS-1 | Clone oscillator.  Most parameters from the named other oscillator are copied into this one. |
-| `d`    | `duty`   |  float[,float...] | duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
-| `D`    | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. will interrupt audio! |
-| `f`    | `freq`   |  float[,float...]      | frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
-| `F`    | `filter_freq` | float[,float...]  | center frequency for biquad filter, set of ControlCoefficients |
-| `G`    | `filter_type` | 0-4 |  0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
-| `h`    | `reverb` | float[,float,float,float] | Reverb parameters level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default = 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
-| `I`    | `ratio`  | float | for ALGO types, where the base note frequency controls the modulators, or for the PARTIALS base note, where the ratio controls the speed of the playback |
-| `k`    | `chorus` | float[,float,float,float] | Chorus parameters level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
-| `K`    | `load_patch` | uint 0-X | Apply a saved patch to start at the selected oscillator |
+| `d`    | `duty`   |  float[,float...] | Duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
+| `D`    | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
+| `f`    | `freq`   |  float[,float...]      | Frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
+| `F`    | `filter_freq` | float[,float...]  | Center/break frequency for variable filter, set of ControlCoefficients |
+| `G`    | `filter_type` | 0-4 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
+| `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
+| `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
+| `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
+| `K`    | `load_patch` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified voice (or starting at the selected oscillator). |
+| `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
-| `l`    | `vel` | float 0-1+ | velocity: > 0 to trigger note on, 0 to trigger note off |
-| `N`    | `latency_ms` | uint | sets latency in ms. default 0 (see LATENCY) |
-| `n`    | `note` | uint 0-127 | midi note, sets frequency |
-| `o`    | `algorithm` | uint 1-32 | DX7 algorithm to use for ALGO type |
-| `O`    | `algo_source` | string | which oscillators to use for the algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `P-patch` | uint | choose a preloaded PCM sample or partial patch. Not for DX7 or Juno, use load_patch for those |
-| `P`    | `phase` | float 0-1 | where in the oscillator's cycle to start sampling from (also works on the PCM buffer). default 0 |
-| `Q`    | `pan`   | float[,float...] | panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
-| `R`    | `resonance` | float | q factor of biquad filter. in practice, 0.5-16.0. default 0.7 |
-| `r`    | `voices` | int[,int] | String comma separated list of voices to send message to, or load patch into |
-| `S`    | `reset`  | uint | resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ |
+| `n`    | `note` | uint 0-127 | Midi note, sets frequency |
+| `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
+| `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
+| `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
+| `p`    | `patch` | uint | Choose a preloaded PCM sample or partial patch. See `load_patch` for DX7 and Juno patches. |
+| `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
+| `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
+| `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| `t`    | `time` | uint | ms of expected playback since some fixed start point on your host. you should always give this if you can. |
+| `S`    | `reset`  | uint | Resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ. |
+| `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `u`    | `store_patch` | number,string | store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
-| `v`    | `osc` | uint 0 to OSCS-1 | which oscillator to control |
-| `V`    | `volume` | float 0-10 | volume knob for entire synth, default 1.0 |
-| `w`    | `wave` | uint 0-11 | waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
+| `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
+| `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
+| `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
+| `w`    | `wave` | uint 0-11 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 
@@ -393,17 +393,29 @@ You can set a synth-wide volume (in practice, 0-10), or set the EQ of the entire
 
 ## Envelope Generators
 
-AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs (up to 8 per EG) of time deltas (specified in milliseconds) and target value. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All other pairs previously have time deltas relative to the previous segment, so `100,1,100,0,0,0` goes up to 1 over 100 ms, then back down to zero over the next 100ms. The last "release" pair counts from ms from the note-off. 
+AMY allows you to set 2 Envelope Generators (EGs) per oscillator. You can see these as ADSR / envelopes (and they can perform the same task), but they are slightly more capable. Breakpoints are defined as pairs of time deltas (specified in milliseconds) and target value. You can specify up to 8 pairs, but the last pair you specify will always be seen as the "release" pair, which doesn't trigger until note off. All preceding pairs have time deltas relative to the previous segment, so `100,1,100,0,0,0` goes up to 1 over 100 ms, then back down to zero over the next 100ms. The last "release" pair counts from ms from the note-off.
 
 An EG can control amplitude, frequency, filter frequency, duty or pan of an oscillator via the 4th (EG0) and 5th (EG1) entries in the corresponding ControlCoefficients.
 
 For example, to define a common ADSR curve where a sound sweeps up in volume from note on over 50ms, then has a 100ms decay stage to 50% of the volume, then is held until note off at which point it takes 250ms to trail off to 0, you'd set time to be 50ms and target to be 1.0, then 100ms with target .5, then a 250ms release with ratio 0. By default, amplitude is set up to be controlled by EG0. At every synthesizer tick, the given amplitude (default of 1.0) will be multiplied by the EG0 value. In AMY wire parlance, this would look like `v0f220w0A50,1.0,100,0.5,250,0` to specify a sine wave at 220Hz with this envelope. 
 
-When using `amy.py`, use the string form of the breakpoint: `bp0='50,1.0,100,0.5,250,0'`. 
+When using `amy.py`, use the string form of the breakpoint: `amy.send(osc=0, bp0='50,1.0,100,0.5,250,0')`.
 
-Every note on (specified by setting velocity / `l` to anything > 0) will trigger this envelope, and setting `l` to 0 will trigger the note off / release section. 
+Every note on (specified by setting `vel` / `l` to anything > 0) will trigger this envelope, and setting velocity to 0 will trigger the note off / release section.
 
 You can set a completely separate envelope using the second envelope generator, for example, to change pitch and amplitude at different rates.
+
+As with ControlCoefficients, missing values in the comma-separated parameter strings mean to leave the existing value unchanged.  However, unlike ControlCoefficients, it's important to explicitly indicate every value you want to leave unchanged, since the number of parameters provided determines the number of breakpoints in the set.  So in the following sequence:
+```
+amy.send(osc=0, bp0='0,1,1000,0.1,200,0')
+amy.send(osc=0, bp0=',,,0.9,,')
+```
+.. we end up with the same effect as `bp0='0,1,1000,0.9,200,0`.  However, if we do:
+```
+amy.send(osc=0, bp0='0,1,1000,0.1,200,0')
+amy.send(osc=0, bp0=',,,0.9')  # No trailing commas.
+```
+.. we effectively end up with `bp0='0,1,1000,0.9`, i.e. the 4 elements in the second `bp0` string change the first breakpoint set to have only 2 breakpoints, meaning a constant amplitude during note-on, then a final slow release to 0.9 -- not at all like the first form, and likely not what we wanted.
 
 
 ## FM & ALGO type
