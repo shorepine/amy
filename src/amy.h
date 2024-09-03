@@ -315,7 +315,7 @@ struct synthinfo {
     float volume;
     float logratio;
     float resonance;
-    uint16_t portamento_ms;
+    float portamento_alpha;
     uint16_t chained_osc;
     uint16_t mod_source;
     uint8_t algorithm;
