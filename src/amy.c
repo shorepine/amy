@@ -1006,8 +1006,8 @@ void play_event(struct delta d) {
                     initial_logfreq += synth[d.osc].logfreq_coefs[COEF_NOTE] * logfreq_for_midi_note(synth[d.osc].midi_note);
                 }
                 // If we're coming out of note-off, set the freq history for portamento.
-                if (AMY_IS_SET(synth[d.osc].note_off_clock))
-                    msynth[d.osc].last_logfreq = initial_logfreq;
+                //if (AMY_IS_SET(synth[d.osc].note_off_clock))
+                //    msynth[d.osc].last_logfreq = initial_logfreq;
                 // Now we've tested that, we can reset note-off clocks.
                 AMY_UNSET(synth[d.osc].note_off_clock);  // Most recent note event is not note-off.
                 AMY_UNSET(synth[d.osc].zero_amp_clock);

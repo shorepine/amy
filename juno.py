@@ -177,10 +177,13 @@ class JunoPatch:
   vca_gate = False  # else env
   vcf_neg = False  # else pos
   hpf = 0
+  portamento = 0
   # Map of setup_fn: [params triggering setup]
   post_set_fn = {'lfo': ['lfo_rate', 'lfo_delay_time'],
-                 'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub', 'stop_16', 'stop_8', 'stop_4',
-                         'pulse', 'saw', 'pwm_manual', 'vca_level', 'vca_gate'],
+                 'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub',
+                         'stop_16', 'stop_8', 'stop_4',
+                         'pulse', 'saw', 'pwm_manual', 'vca_level', 'vca_gate',
+                         'portamento'],
                  'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
                  'env': ['env_a', 'env_d', 'env_s', 'env_r'],
                  'cho': ['chorus', 'hpf']}
@@ -300,6 +303,12 @@ class JunoPatch:
       base_freq *= 2
     return base_freq
 
+  def _portamento_ms(self, port_val):
+    # Portamento maps exponentially from 1 = 10 ms to 127 = 2560 ms
+    if port_val == 0:
+      return 0
+    return int(round(20 * math.pow(2, port_val * 127 / 30)))
+
   def init_AMY(self):
     """Output AMY commands to set up patches on all the allocated voices.
     Send amy.send(osc=0, note=50, vel=1) afterwards."""
@@ -353,10 +362,12 @@ class JunoPatch:
     if self.pwm_manual:
       # Swap duty parameters.
       const_duty, lfo_duty = lfo_duty, const_duty
+    port_ms = self._portamento_ms(self.portamento)
     self.amy_send(
       osc=self.pwm_osc,
       amp=self._amp_coef_string(float(self.pulse)),
       freq=freq_str,
+      portamento=port_ms,
       duty='%s,,,,,%s' % (
         ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)
       ),
@@ -365,11 +376,13 @@ class JunoPatch:
       osc=self.saw_osc,
       amp=self._amp_coef_string(float(self.saw)),
       freq=freq_str,
+      portamento=port_ms,
     )
     self.amy_send(
       osc=self.sub_osc,
       amp=self._amp_coef_string(float(self.dco_sub)),
       freq=self._freq_coef_string(base_freq / 2.0),
+      portamento=port_ms,
     )
     self.amy_send(
       osc=self.nse_osc,
