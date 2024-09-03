@@ -148,7 +148,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
             client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq=None, filter_type= None, 
             algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus=None,
-            reverb=None, load_patch=None, store_patch=None, voices=None, external_channel=None):
+            reverb=None, load_patch=None, store_patch=None, voices=None, external_channel=None, portamento=None):
 
     m = ""
     if(store_patch is not None): return "u" + str(store_patch)
@@ -189,6 +189,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(load_patch is not None): m = m + 'K' + str(load_patch)
     if(voices is not None): m = m + 'r' + str(voices)
     if(external_channel is not None): m = m + 'W' + str(external_channel)
+    if(portamento is not None): m = m + 'm' + str(portamento)
     #print("message " + m)
     return m+'Z'
 
@@ -367,7 +368,7 @@ def polyphony(max_voices=AMY_OSCS,**kwargs):
     while(1):
         osc = oscs[note % max_voices]
         print("osc %d note %d filter %f " % (osc, 30+note, note*50))
-        send(osc=osc, **kwargs, patch=note, filter_type=FILTER_NONE, filter_freq=note*50, note=30+(note), client = None, vel=1)
+        send(osc=osc, **kwargs, patch=note, filter_type=FILTER_NONE, filter_freq=note*50, note=30+(note), client=None, vel=1)
         time.sleep(0.5)
         note =(note + 1) % 64
 
