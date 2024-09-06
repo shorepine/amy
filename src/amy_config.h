@@ -40,6 +40,7 @@ extern const uint16_t pcm_samples;
 #define AMY_CORES amy_global.cores
 #define AMY_HAS_REVERB amy_global.has_reverb
 #define AMY_HAS_CHORUS amy_global.has_chorus
+#define AMY_HAS_ECHO amy_global.has_echo
 #define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #ifdef AMY_DAISY
@@ -61,23 +62,20 @@ extern const uint16_t pcm_samples;
 #define SYNTH_RAM_CAPS MALLOC_CAP_SPIRAM
 #define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
 #define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
-#define CHORUS_RAM_CAPS MALLOC_CAP_SPIRAM 
-#define REVERB_RAM_CAPS MALLOC_CAP_SPIRAM 
+#define DELAY_RAM_CAPS MALLOC_CAP_SPIRAM 
 #else
 #define EVENTS_RAM_CAPS MALLOC_CAP_DEFAULT
 #define SYNTH_RAM_CAPS MALLOC_CAP_DEFAULT
 #define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
 #define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
-#define CHORUS_RAM_CAPS MALLOC_CAP_DEFAULT
-#define REVERB_RAM_CAPS MALLOC_CAP_DEFAULT
+#define DELAY_RAM_CAPS MALLOC_CAP_DEFAULT
 #endif
 #else
 #define EVENTS_RAM_CAPS 0
 #define SYNTH_RAM_CAPS 0
 #define BLOCK_RAM_CAPS 0
 #define FBL_RAM_CAPS 0
-#define CHORUS_RAM_CAPS 0 
-#define REVERB_RAM_CAPS 0 
+#define DELAY_RAM_CAPS 0 
 #endif
 
 // 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
@@ -96,6 +94,13 @@ extern const uint16_t pcm_samples;
 #define REVERB_DEFAULT_LIVENESS 0.85f
 #define REVERB_DEFAULT_DAMPING 0.5f
 #define REVERB_DEFAULT_XOVER_HZ 3000.0f
+
+// echo setup,  Levels etc are SAMPLE (fxpoint), delays are in samples.
+#define ECHO_DEFAULT_LEVEL 0
+#define ECHO_DEFAULT_DELAY  (AMY_SAMPLE_RATE / 2)
+#define ECHO_DEFAULT_MAX_DELAY AMY_SAMPLE_RATE
+#define ECHO_DEFAULT_FEEDBACK 0
+#define ECHO_DEFAULT_FILTER_COEF 0
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 

@@ -148,7 +148,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
             client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
             debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq=None, filter_type= None, 
             algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus=None,
-            reverb=None, load_patch=None, store_patch=None, voices=None, external_channel=None, portamento=None):
+            reverb=None, echo=None, load_patch=None, store_patch=None, voices=None, external_channel=None, portamento=None):
 
     m = ""
     if(store_patch is not None): return "u" + str(store_patch)
@@ -186,6 +186,7 @@ def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=No
     if(filter_type is not None): m = m + "G" + str(filter_type)
     if(chorus is not None): m = m + 'k%s' % chorus
     if(reverb is not None): m = m + "h%s" % reverb
+    if(echo is not None): m = m + "M%s" % echo
     if(load_patch is not None): m = m + 'K' + str(load_patch)
     if(voices is not None): m = m + 'r' + str(voices)
     if(external_channel is not None): m = m + 'W' + str(external_channel)
@@ -475,3 +476,25 @@ def reverb(level=-1, liveness=-1, damping=-1, xover_hz=-1):
         reverb_xover = str(xover_hz)
     reverb_arg = "%s,%s,%s,%s" % (reverb_level, reverb_liveness, reverb_damping, reverb_xover)
     send(reverb=reverb_arg)
+
+"""
+    Echo control
+"""
+def echo(level=None, delay_ms=None, max_delay_ms=None, feedback=None, filter_coef=None):
+    echo_level = ''
+    echo_delay_ms = ''
+    echo_max_delay_ms = ''
+    echo_feedback = ''
+    echo_filter_coef = ''
+    if level is not None:
+        echo_level = str(level)
+    if delay_ms is not None:
+        echo_delay_ms = str(delay_ms)
+    if max_delay_ms is not None:
+        echo_max_delay_ms = str(max_delay_ms)
+    if feedback is not None:
+        echo_feedback = str(feedback)
+    if filter_coef is not None:
+        echo_filter_coef = str(filter_coef)
+    echo_arg = '%s,%s,%s,%s,%s' % (echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef)
+    send(echo=echo_arg)

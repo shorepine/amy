@@ -36,7 +36,7 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
     return Py_None;
 }
 
@@ -87,7 +87,7 @@ static struct PyModuleDef libamyDef =
 
 PyMODINIT_FUNC PyInit_libamy(void)
 {   
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1);
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
     return PyModule_Create(&libamyDef);
 
 }
