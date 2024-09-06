@@ -104,15 +104,19 @@ static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain
     return SMULR6(SHIFTR(gain, 1), state + SMULR6(lpgain, samp - state));
 }
 
-void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, int delay_samples, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level, SAMPLE filter_coef0, SAMPLE filter_coef1) {
+void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, int delay_samples, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level, SAMPLE filter_coef) {
     // Read and write the next n_samples from/to the delay line.
     // Simplified version of delay_line_in_out() that uses a fixed integer delay
     // for the whole block.
     while(n_samples-- > 0) {
         SAMPLE next_in = *in++;
-        SAMPLE sample_1 = DEL_OUT(delay_line, 1);
-        SAMPLE sample_0 = DEL_OUT(delay_line, 0);
-        SAMPLE sample = SMULR6(filter_coef0, sample_0) + SMULR6(filter_coef1, sample_1);
+        SAMPLE last_out = delay_line->samples[(delay_line->next_in - 1) & (delay_line->len - 1)];
+        //SAMPLE sample_1 = DEL_OUT(delay_line, 1);
+        SAMPLE sample = DEL_OUT(delay_line, 0);
+        if (filter_coef > 0)
+            sample += SMULR6(filter_coef, last_out - sample);
+        else if (filter_coef < 0)
+            sample += SMULR6(filter_coef, last_out + sample);
         DEL_IN(delay_line, next_in + SMULR6(feedback_level, sample));
         *out++ += MUL8_SS(mix_level, sample);  // mix delayed + original.
     }
@@ -123,8 +127,8 @@ void apply_variable_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE *delay
     delay_line_in_out(block, block, AMY_BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
 }
 
-void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, uint32_t delay_samples, SAMPLE mix_level, SAMPLE feedback, SAMPLE filter_coef0, SAMPLE filter_coef1) {
-    delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_samples, delay_line, mix_level, feedback, filter_coef0, filter_coef1);
+void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, uint32_t delay_samples, SAMPLE mix_level, SAMPLE feedback, SAMPLE filter_coef) {
+    delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_samples, delay_line, mix_level, feedback, filter_coef);
 }
 
 SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
