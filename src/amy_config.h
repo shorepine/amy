@@ -97,10 +97,11 @@ extern const uint16_t pcm_samples;
 
 // echo setup,  Levels etc are SAMPLE (fxpoint), delays are in samples.
 #define ECHO_DEFAULT_LEVEL 0
-#define ECHO_DEFAULT_DELAY  (AMY_SAMPLE_RATE / 2)
-#define ECHO_DEFAULT_MAX_DELAY AMY_SAMPLE_RATE
+#define ECHO_DEFAULT_DELAY_MS  500.f
+#define ECHO_DEFAULT_MAX_DELAY_MS 1000.f
 #define ECHO_DEFAULT_FEEDBACK 0
 #define ECHO_DEFAULT_FILTER_COEF 0
+
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 
