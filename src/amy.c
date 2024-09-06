@@ -152,7 +152,7 @@ typedef struct echo_config {
     uint32_t delay_samples;  // Current delay, quantized to samples.
     uint32_t max_delay_samples;  // Maximum delay, i.e. size of allocated delay line.
     SAMPLE feedback;  // Gain applied when feeding back output to input.
-    SAMPLE filter_coef;  // Echo is filtered by a single real zero, this is its location.  1 = max higpass, -1 = max lowpass.
+    SAMPLE filter_coef;  // Echo is filtered by a single real zero, this is its location.  -1 = max higpass, 1 = max lowpass.
 } echo_config_t;
 
 echo_config_t echo = {ECHO_DEFAULT_LEVEL, ECHO_DEFAULT_DELAY, ECHO_DEFAULT_MAX_DELAY, ECHO_DEFAULT_FEEDBACK, ECHO_DEFAULT_FILTER_COEF};
