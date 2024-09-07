@@ -601,7 +601,7 @@ void clone_osc(uint16_t i, uint16_t f) {
     synth[i].eq_h = synth[f].eq_h;
     synth[i].logratio = synth[f].logratio;
     synth[i].resonance = synth[f].resonance;
-    synth[i].portamento_ms = synth[f].portamento_ms;
+    synth[i].portamento_alpha = synth[f].portamento_alpha;
     //synth[i].velocity = synth[f].velocity;
     //synth[i].step = synth[f].step;
     //synth[i].sample = synth[f].sample;
@@ -675,7 +675,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].logratio);
     synth[i].resonance = 0.7f;
     msynth[i].resonance = 0.7f;
-    synth[i].portamento_ms = 0;
+    synth[i].portamento_alpha = 0;
     synth[i].velocity = 0;
     synth[i].step = 0;
     synth[i].sample = F2S(0);
@@ -831,9 +831,9 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f bend %f eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
-            fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_ms %d step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
+            fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
                     i, synth[i].status, synth[i].wave, synth[i].mod_source,
-                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].filter_type, synth[i].resonance, synth[i].portamento_ms, P2F(synth[i].step), synth[i].chained_osc, 
+                    synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].filter_type, synth[i].resonance, synth[i].portamento_alpha, P2F(synth[i].step), synth[i].chained_osc, 
                     synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
             fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i].amp_coefs[0], synth[i].amp_coefs[1], synth[i].amp_coefs[2], synth[i].amp_coefs[3], synth[i].amp_coefs[4], synth[i].amp_coefs[5], synth[i].amp_coefs[6]);
@@ -919,6 +919,10 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
 // Helpers to identify if param is in a range.
 #define PARAM_IS_COMBO_COEF(param, base)   ((param) >= (base) && (param) < (base) + NUM_COMBO_COEFS)
 #define PARAM_IS_BP_COEF(param)    ((param) >= BP_START && (param) < BP_END)
+
+float portamento_ms_to_alpha(uint16_t portamento_ms) {
+    return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
+}
 
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
@@ -1014,7 +1018,7 @@ void play_event(struct delta d) {
     if(d.param == FILTER_TYPE) synth[d.osc].filter_type = *(uint8_t *)&d.data;
     if(d.param == RESONANCE) synth[d.osc].resonance = *(float *)&d.data;
 
-    if(d.param == PORTAMENTO) synth[d.osc].portamento_ms = *(uint16_t *)&d.data;
+    if(d.param == PORTAMENTO) synth[d.osc].portamento_alpha = portamento_ms_to_alpha(*(uint16_t *)&d.data);
 
     if(d.param == ALGORITHM) synth[d.osc].algorithm = *(uint8_t *)&d.data;
 
@@ -1067,8 +1071,8 @@ void play_event(struct delta d) {
                     initial_logfreq += synth[d.osc].logfreq_coefs[COEF_NOTE] * logfreq_for_midi_note(synth[d.osc].midi_note);
                 }
                 // If we're coming out of note-off, set the freq history for portamento.
-                if (AMY_IS_SET(synth[d.osc].note_off_clock))
-                    msynth[d.osc].last_logfreq = initial_logfreq;
+                //if (AMY_IS_SET(synth[d.osc].note_off_clock))
+                //    msynth[d.osc].last_logfreq = initial_logfreq;
                 // Now we've tested that, we can reset note-off clocks.
                 AMY_UNSET(synth[d.osc].note_off_clock);  // Most recent note event is not note-off.
                 AMY_UNSET(synth[d.osc].zero_amp_clock);
@@ -1164,11 +1168,10 @@ void hold_and_modify(uint16_t osc) {
 
     // copy all the modifier variables
     float logfreq = combine_controls(ctrl_inputs, synth[osc].logfreq_coefs);
-    if (synth[osc].portamento_ms > 0) {
-        float portamento_alpha = 1.0f / (1 + synth[osc].portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
-        msynth[osc].logfreq = msynth[osc].last_logfreq + portamento_alpha * (logfreq - msynth[osc].last_logfreq);
-    } else {
+    if (synth[osc].portamento_alpha == 0) {
         msynth[osc].logfreq = logfreq;
+    } else {
+        msynth[osc].logfreq = logfreq + synth[osc].portamento_alpha * (msynth[osc].last_logfreq - logfreq);
     }
     msynth[osc].last_logfreq = msynth[osc].logfreq;
     float filter_logfreq = combine_controls(ctrl_inputs, synth[osc].filter_logfreq_coefs);
