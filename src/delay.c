@@ -85,43 +85,9 @@ void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, S
     delay_line->next_in = index_in;
 }
 
-void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE mod_val, delay_line_t *delay_line, SAMPLE mix_level) {
-    // Read and write the next n_samples from/to the delay line.
-    // Simplified version of delay_line_in_out() that uses a single, fixed (but fractional)
-    // mod_val for the whole block.
-    int delay_len = delay_line->len;
-    int index_mask = delay_len - 1; // will be all 1s because len is guaranteed 2**n.
-    int index_bits = delay_line->log_2_len;
-
-    int index_in = delay_line->next_in;
-
-    SAMPLE *delay = delay_line->samples;
-    PHASOR delay_phase = SHIFTR(S2P(F2S(1.0f) + mod_val), 1);
-    while(n_samples-- > 0) {
-        SAMPLE next_in = *in++;
-
-        PHASOR phase_out = I2P(index_in, index_bits) - delay_phase;
-        SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
-        *out++ += MUL8_SS(mix_level, sample);  // mix delayed + original.
-        delay[index_in++] = next_in;
-        index_in &= index_mask;
-    }
-    delay_line->next_in = index_in;
-}
-
-
-void apply_variable_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE *delay_mod, SAMPLE delay_scale, SAMPLE mix_level, SAMPLE feedback_level) {
-    delay_line_in_out(block, block, AMY_BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
-}
-
-void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE delay_mod_val, SAMPLE mix_level) {
-    delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_mod_val, delay_line, mix_level);
-}
-
-
-static inline SAMPLE DEL_OUT(delay_line_t *delay_line) {
+static inline SAMPLE DEL_OUT(delay_line_t *delay_line, int extra_delay) {
     int out_index =
-        (delay_line->next_in - delay_line->fixed_delay) & (delay_line->len - 1);
+        (delay_line->next_in - (delay_line->fixed_delay + extra_delay)) & (delay_line->len - 1);
     return delay_line->samples[out_index];
 }
 
@@ -136,6 +102,52 @@ static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain
     state += SMULR6(lpcoef, samp - state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
     return SMULR6(SHIFTR(gain, 1), state + SMULR6(lpgain, samp - state));
+}
+
+void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, int delay_samples, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level, SAMPLE filter_coef) {
+    // Read and write the next n_samples from/to the delay line.
+    // Simplified version of delay_line_in_out() that uses a fixed integer delay
+    // for the whole block.
+    if (filter_coef == 0) {
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, delay_out);
+            DEL_IN(delay_line, next_in);
+            *out++ += MUL8_SS(mix_level, delay_out);
+        }
+    } else if (filter_coef > 0) {
+        // Positive filter coef is a pole on the positive real line, to get low-pass effect.
+        // We apply the filter on the way *in* to the delay line.
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, delay_out);
+            // Peek at the last value we wrote to the delay line to get the most recent filter output.
+            SAMPLE last_filter_result = delay_line->samples[(delay_line->next_in - 1) & (delay_line->len - 1)];
+            SAMPLE filter_result = next_in + SMULR6(filter_coef, last_filter_result - next_in);
+            DEL_IN(delay_line, filter_result);
+            *out++ += MUL8_SS(mix_level, delay_out);
+        }
+    } else {
+        // Negative filter coef is a zero on the positive real axis to get high-pass.
+        // We apply the FIR zero on the way *out* of the delay line.
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE prev_delay_out = DEL_OUT(delay_line, 1);
+            SAMPLE output = delay_out + SMULR6(filter_coef, prev_delay_out);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, output);
+            DEL_IN(delay_line, next_in);
+            *out++ += MUL8_SS(mix_level, output);
+        }
+    }
+}
+
+
+void apply_variable_delay(SAMPLE *block, delay_line_t *delay_line, SAMPLE *delay_mod, SAMPLE delay_scale, SAMPLE mix_level, SAMPLE feedback_level) {
+    delay_line_in_out(block, block, AMY_BLOCK_SIZE, delay_mod, delay_scale, delay_line, mix_level, feedback_level);
+}
+
+void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, uint32_t delay_samples, SAMPLE mix_level, SAMPLE feedback, SAMPLE filter_coef) {
+    delay_line_in_out_fixed_delay(block, block, AMY_BLOCK_SIZE, delay_samples, delay_line, mix_level, feedback, filter_coef);
 }
 
 SAMPLE f1state = 0, f2state = 0, f3state = 0, f4state = 0;
@@ -188,17 +200,17 @@ void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
 
 void init_stereo_reverb(void) {
     if (delay_1 == NULL) {
-        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, REVERB_RAM_CAPS);
-        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, REVERB_RAM_CAPS);
-        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, REVERB_RAM_CAPS);
-        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, REVERB_RAM_CAPS);
+        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, DELAY_RAM_CAPS);
+        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, DELAY_RAM_CAPS);
+        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, DELAY_RAM_CAPS);
+        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, DELAY_RAM_CAPS);
 
-        ref_1 = new_delay_line(4096, REF1SAMPS, REVERB_RAM_CAPS);
-        ref_2 = new_delay_line(2048, REF2SAMPS, REVERB_RAM_CAPS);
-        ref_3 = new_delay_line(2048, REF3SAMPS, REVERB_RAM_CAPS);
-        ref_4 = new_delay_line(1024, REF4SAMPS, REVERB_RAM_CAPS);
-        ref_5 = new_delay_line(1024, REF5SAMPS, REVERB_RAM_CAPS);
-        ref_6 = new_delay_line(1024, REF6SAMPS, REVERB_RAM_CAPS);
+        ref_1 = new_delay_line(4096, REF1SAMPS, DELAY_RAM_CAPS);
+        ref_2 = new_delay_line(2048, REF2SAMPS, DELAY_RAM_CAPS);
+        ref_3 = new_delay_line(2048, REF3SAMPS, DELAY_RAM_CAPS);
+        ref_4 = new_delay_line(1024, REF4SAMPS, DELAY_RAM_CAPS);
+        ref_5 = new_delay_line(1024, REF5SAMPS, DELAY_RAM_CAPS);
+        ref_6 = new_delay_line(1024, REF6SAMPS, DELAY_RAM_CAPS);
         
         config_stereo_reverb(INITIAL_LIVENESS, INITIAL_XOVER_HZ, INITIAL_DAMPING);
     }
@@ -222,49 +234,49 @@ void stereo_reverb(SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int
         l_acc = MUL0_SS(F2S(0.0625f), in_l);
 
         DEL_IN(ref_1, l_acc);
-        SAMPLE d_out = DEL_OUT(ref_1);
+        SAMPLE d_out = DEL_OUT(ref_1, 0);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
         DEL_IN(ref_2, l_acc);
-        d_out = DEL_OUT(ref_2);
+        d_out = DEL_OUT(ref_2, 0);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
         DEL_IN(ref_3, l_acc);
-        d_out = DEL_OUT(ref_3);
+        d_out = DEL_OUT(ref_3, 0);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
         DEL_IN(ref_4, l_acc);
-        d_out = DEL_OUT(ref_4);
+        d_out = DEL_OUT(ref_4, 0);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
         DEL_IN(ref_5, l_acc);
-        d_out = DEL_OUT(ref_5);
+        d_out = DEL_OUT(ref_5, 0);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
         DEL_IN(ref_6, l_acc);
-        l_acc = DEL_OUT(ref_6);
+        l_acc = DEL_OUT(ref_6, 0);
         
         
         // Reverb delays & matrix.
-        SAMPLE d1 = DEL_OUT(delay_1);
+        SAMPLE d1 = DEL_OUT(delay_1, 0);
         d1 = LPF(d1, f1state, lpfcoef, lpfgain, liveness);
         d1 += r_acc;
         *r_out++ = in_r + MUL8_SS(level, d1);
 
-        SAMPLE d2 = DEL_OUT(delay_2);
+        SAMPLE d2 = DEL_OUT(delay_2, 0);
         d2 = LPF(d2, f2state, lpfcoef, lpfgain, liveness);
         d2 += l_acc;
         if (l_out != NULL)  *l_out++ = in_l + MUL8_SS(level, d2);
 
-        SAMPLE d3 = DEL_OUT(delay_3);
+        SAMPLE d3 = DEL_OUT(delay_3, 0);
         d3 = LPF(d3, f3state, lpfcoef, lpfgain, liveness);
 
-        SAMPLE d4 = DEL_OUT(delay_4);
+        SAMPLE d4 = DEL_OUT(delay_4, 0);
         d4 = LPF(d4, f3state, lpfcoef, lpfgain, liveness);
 
         // Mixing and feedback.

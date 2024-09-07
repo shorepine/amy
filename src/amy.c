@@ -86,7 +86,8 @@ void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i)
 #include "clipping_lookup_table.h"
 #include "delay.h"
 // Final output delay lines.
-delay_line_t **delay_lines; 
+delay_line_t **chorus_delay_lines; 
+delay_line_t **echo_delay_lines; 
 
 #ifdef _POSIX_THREADS
 #include <pthread.h>
@@ -146,12 +147,67 @@ int32_t computed_delta; // can be negative no prob, but usually host is larger #
 uint8_t computed_delta_set; // have we set a delta yet?
 
 
+typedef struct echo_config {
+    SAMPLE level;  // Mix of echo into output.  0 = Echo off.
+    uint32_t delay_samples;  // Current delay, quantized to samples.
+    uint32_t max_delay_samples;  // Maximum delay, i.e. size of allocated delay line.
+    SAMPLE feedback;  // Gain applied when feeding back output to input.
+    SAMPLE filter_coef;  // Echo is filtered by a two-point normalize IIR.  This is the real pole location.
+} echo_config_t;
+
+uint32_t enclosing_power_of_2(uint32_t n) {
+    uint32_t result = 1;
+    while (result < n)  result <<= 1;
+    return result;
+}
+
+echo_config_t echo = {F2S(ECHO_DEFAULT_LEVEL),
+                      (uint32_t)(ECHO_DEFAULT_DELAY_MS * 1000.f / AMY_SAMPLE_RATE),
+                      65536, // enclosing_power_of_2((uint32_t)(ECHO_DEFAULT_MAX_DELAY_MS * 1000.f / AMY_SAMPLE_RATE)),
+                      F2S(ECHO_DEFAULT_FEEDBACK),
+                      F2S(ECHO_DEFAULT_FILTER_COEF)};
+
+SAMPLE *echo_delays[AMY_NCHANS];
+
+void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
+    uint32_t delay_samples = (uint32_t)(delay_ms / 1000.f * AMY_SAMPLE_RATE);
+    //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
+    if (level > 0) {
+        if (echo_delay_lines[0] == NULL) {
+            // Delay line len must be power of 2.
+            uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
+            for (int c = 0; c < AMY_NCHANS; ++c)
+                echo_delay_lines[c] = new_delay_line(max_delay_samples, 0, DELAY_RAM_CAPS);
+            echo.max_delay_samples = max_delay_samples;
+            //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
+        }
+        // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.
+        if (delay_samples > echo.max_delay_samples - 1) delay_samples = echo.max_delay_samples - 1;
+        for (int c = 0; c < AMY_NCHANS; ++c) {
+            echo_delay_lines[c]->fixed_delay = delay_samples;
+        }
+    }
+    echo.level = F2S(level);
+    echo.delay_samples = delay_samples;
+    // Filter is IIR [1, filter_coef] normalized for filter_coef > 0 (LPF), or FIR [1, filter_coef] normalized for filter_coef < 0 (HPF).
+    if (filter_coef > 0.99)  filter_coef = 0.99;  // Avoid unstable filters.
+    echo.filter_coef = F2S(filter_coef);
+    // FIR filter potentially has gain > 1 for high frequencies, so discount the loop feedback to stop things exploding.
+    if (filter_coef < 0)  feedback /= 1.f - filter_coef;
+    echo.feedback = F2S(feedback);
+    //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
+}
+
+void dealloc_echo_delay_lines(void) {
+    for (uint16_t c = 0; c < AMY_NCHANS; ++c)
+        if (echo_delay_lines[c]) free(echo_delay_lines[c]);
+}
 
 SAMPLE *delay_mod = NULL;
 
 typedef struct chorus_config {
     SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
-    int max_delay;   // Max delay when modulating.  Must be <= DELAY_LINE_LEN
+    int max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
     float lfo_freq;
     float depth;
 } chorus_config_t;
@@ -161,27 +217,26 @@ chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS
 
 void alloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
-        delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, CHORUS_RAM_CAPS);
+        chorus_delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, DELAY_RAM_CAPS);
     }
-    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, CHORUS_RAM_CAPS);
+    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, DELAY_RAM_CAPS);
 }
 
 void dealloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
-        if (delay_lines[c]) free(delay_lines[c]);
-        delay_lines[c] = NULL;
+        if (chorus_delay_lines[c]) free(chorus_delay_lines[c]);
+        chorus_delay_lines[c] = NULL;
     }
     free(delay_mod);
     delay_mod = NULL;
 }
-
 
 void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
     //fprintf(stderr, "config_chorus: level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
     //        level, max_delay, lfo_freq, depth);
     if (level > 0) {
         // only allocate delay lines if chorus is more than inaudible.
-        if (delay_lines[0] == NULL) {
+        if (chorus_delay_lines[0] == NULL) {
             alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
@@ -197,11 +252,9 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             osc_note_on(CHORUS_MOD_SOURCE, freq_of_logfreq(synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST]));
         }
         // apply max_delay.
-        for (int core=0; core<AMY_CORES; ++core) {
-            for (int chan=0; chan<AMY_NCHANS; ++chan) {
-                //delay_lines[chan]->max_delay = max_delay;
-                delay_lines[chan]->fixed_delay = (int)max_delay / 2;
-            }
+        for (int chan=0; chan<AMY_NCHANS; ++chan) {
+            //chorus_delay_lines[chan]->max_delay = max_delay;
+            chorus_delay_lines[chan]->fixed_delay = (int)max_delay / 2;
         }
     }
     chorus.max_delay = max_delay;
@@ -264,6 +317,7 @@ int8_t global_init() {
     amy_global.cores = 1;
     amy_global.has_reverb = 1;
     amy_global.has_chorus = 1;
+    amy_global.has_echo = 1;
     return 0;
 }
 
@@ -666,9 +720,10 @@ void amy_reset_oscs() {
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
     reset_parametric();
-    // Reset chorus oscillator
+    // Reset chorus oscillator etc.
     if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
-    if( AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    if (AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    if (AMY_HAS_ECHO) config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
     // Reset patches
     patches_reset();
 }
@@ -727,10 +782,15 @@ int8_t oscs_init() {
         }
     }
     // we only alloc delay lines if the chorus is turned on.
-    if (delay_lines == NULL)
-        delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
-    if(AMY_HAS_CHORUS > 0 || AMY_HAS_REVERB > 0) {
-        for (int c = 0; c < AMY_NCHANS; ++c)  delay_lines[c] = NULL;
+    if (chorus_delay_lines == NULL)
+        chorus_delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
+    if(AMY_HAS_CHORUS > 0) {
+        for (int c = 0; c < AMY_NCHANS; ++c)  chorus_delay_lines[c] = NULL;
+    }
+    if (echo_delay_lines == NULL)
+        echo_delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
+    if(AMY_HAS_ECHO > 0) {
+        for (int c = 0; c < AMY_NCHANS; ++c)  echo_delay_lines[c] = NULL;
     }
     //init_stereo_reverb();
 
@@ -817,6 +877,7 @@ void oscs_deinit() {
         ks_deinit();
     filters_deinit();
     dealloc_chorus_delay_lines();
+    dealloc_echo_delay_lines();
 }
 
 
@@ -1399,16 +1460,24 @@ int16_t * amy_fill_buffer() {
 
         if(AMY_HAS_CHORUS==1) {
             // apply chorus.
-            if(chorus.level > 0 && delay_lines[0] != NULL) {
+            if(chorus.level > 0 && chorus_delay_lines[0] != NULL) {
                 // apply time-varying delays to both chans.
                 // delay_mod_val, the modulated delay amount, is set up before calling render_*.
                 SAMPLE scale = F2S(1.0f);
                 for (int16_t c=0; c < AMY_NCHANS; ++c) {
-                    apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, delay_lines[c],
+                    apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, chorus_delay_lines[c],
                                          delay_mod, scale, chorus.level, 0);
                     // flip delay direction for alternating channels.
                     scale = -scale;
                 }
+            }
+        }
+    }
+    if (AMY_HAS_ECHO == 1) {
+        // Apply echo.
+        if (echo.level > 0 && echo_delay_lines[0] != NULL ) {
+            for (int16_t c=0; c < AMY_NCHANS; ++c) {
+                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, echo_delay_lines[c], echo.delay_samples, echo.level, echo.feedback, echo.filter_coef);
             }
         }
     }
@@ -1702,10 +1771,9 @@ struct event amy_parse_message(char * message) {
                         /* j, J available */
                         // chorus.level 
                         case 'k': if(AMY_HAS_CHORUS) {
-                            float chorus_params[4] = {AMY_UNSET_VALUE(chorus.depth), AMY_UNSET_VALUE(chorus.depth),
-                                                      AMY_UNSET_VALUE(chorus.depth), AMY_UNSET_VALUE(chorus.depth)};
-                            parse_float_list_message(message + start, chorus_params, 4, AMY_UNSET_VALUE(chorus.depth));
-                            // cpnfig_chorus doesn't understand UNSET, copy existing values.
+                            float chorus_params[4] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
+                            parse_float_list_message(message + start, chorus_params, 4, AMY_UNSET_FLOAT);
+                            // config_chorus doesn't understand UNSET, copy existing values.
                             if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(chorus.level);
                             if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)chorus.max_delay;
                             if (AMY_IS_UNSET(chorus_params[2])) chorus_params[2] = chorus.lfo_freq;
@@ -1713,11 +1781,20 @@ struct event amy_parse_message(char * message) {
                             config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
                         }
                         break;
-                        case 'K': e.load_patch = atoi(message+start); break; 
+                        case 'K': e.load_patch = atoi(message+start); break;
                         case 'l': e.velocity=atoff(message + start); break;
                         case 'L': e.mod_source=atoi(message + start); break;
                         case 'm': e.portamento_ms=atoi(message + start); break;
-                        /* M unused */
+                        case 'M': if (AMY_HAS_ECHO) {
+                            float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
+                            parse_float_list_message(message + start, echo_params, 5, AMY_UNSET_FLOAT);
+                            if (AMY_IS_UNSET(echo_params[0])) echo_params[0] = S2F(echo.level);
+                            if (AMY_IS_UNSET(echo_params[1])) echo_params[1] = (float)echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
+                            if (AMY_IS_UNSET(echo_params[2])) echo_params[2] = (float)echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
+                            if (AMY_IS_UNSET(echo_params[3])) echo_params[3] = S2F(echo.feedback);
+                            if (AMY_IS_UNSET(echo_params[4])) echo_params[4] = S2F(echo.filter_coef);
+                            config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
+                        }
                         case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atoi(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
@@ -1804,7 +1881,7 @@ void amy_stop() {
     oscs_deinit();
 }
 
-void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
     #endif
@@ -1813,6 +1890,7 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus) {
     amy_global.cores = cores;
     amy_global.has_chorus = chorus;
     amy_global.has_reverb = reverb;
+    amy_global.has_echo = echo;
     oscs_init();
     //amy_reset_oscs();
 }
