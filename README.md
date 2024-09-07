@@ -204,7 +204,7 @@ Here's the full list:
 | `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `m`    | `portamento` | uint | Time constant (in ms) for pitch changes when note is changed without intervening note-off.  default 0 (immediate), 100 is good. |
-| `M`    | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, 1st order IIR zero location. |
+| `M`    | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, filter_coef (-1 is HPF, 0 is flat, +1 is LPF). |
 | `N`    | `note` | uint 0-127 | Midi note, sets frequency |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |

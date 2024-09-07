@@ -98,7 +98,8 @@ extern const uint16_t pcm_samples;
 // echo setup,  Levels etc are SAMPLE (fxpoint), delays are in samples.
 #define ECHO_DEFAULT_LEVEL 0
 #define ECHO_DEFAULT_DELAY_MS  500.f
-#define ECHO_DEFAULT_MAX_DELAY_MS 1000.f
+// Delay line allocates in 2^n samples at 44k; 743ms is just under 32768 samples.
+#define ECHO_DEFAULT_MAX_DELAY_MS 743.f
 #define ECHO_DEFAULT_FEEDBACK 0
 #define ECHO_DEFAULT_FILTER_COEF 0
 

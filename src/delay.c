@@ -85,9 +85,9 @@ void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, S
     delay_line->next_in = index_in;
 }
 
-static inline SAMPLE DEL_OUT(delay_line_t *delay_line, int offset) {
+static inline SAMPLE DEL_OUT(delay_line_t *delay_line, int extra_delay) {
     int out_index =
-        (delay_line->next_in - (delay_line->fixed_delay - offset)) & (delay_line->len - 1);
+        (delay_line->next_in - (delay_line->fixed_delay + extra_delay)) & (delay_line->len - 1);
     return delay_line->samples[out_index];
 }
 
@@ -108,17 +108,36 @@ void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, int d
     // Read and write the next n_samples from/to the delay line.
     // Simplified version of delay_line_in_out() that uses a fixed integer delay
     // for the whole block.
-    while(n_samples-- > 0) {
-        SAMPLE next_in = *in++;
-        SAMPLE last_out = delay_line->samples[(delay_line->next_in - 1) & (delay_line->len - 1)];
-        //SAMPLE sample_1 = DEL_OUT(delay_line, 1);
-        SAMPLE sample = DEL_OUT(delay_line, 0);
-        if (filter_coef > 0)
-            sample += SMULR6(filter_coef, last_out - sample);
-        else if (filter_coef < 0)
-            sample += SMULR6(filter_coef, last_out + sample);
-        DEL_IN(delay_line, next_in + SMULR6(feedback_level, sample));
-        *out++ += MUL8_SS(mix_level, sample);  // mix delayed + original.
+    if (filter_coef == 0) {
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, delay_out);
+            DEL_IN(delay_line, next_in);
+            *out++ += MUL8_SS(mix_level, delay_out);
+        }
+    } else if (filter_coef > 0) {
+        // Positive filter coef is a pole on the positive real line, to get low-pass effect.
+        // We apply the filter on the way *in* to the delay line.
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, delay_out);
+            // Peek at the last value we wrote to the delay line to get the most recent filter output.
+            SAMPLE last_filter_result = delay_line->samples[(delay_line->next_in - 1) & (delay_line->len - 1)];
+            SAMPLE filter_result = next_in + SMULR6(filter_coef, last_filter_result - next_in);
+            DEL_IN(delay_line, filter_result);
+            *out++ += MUL8_SS(mix_level, delay_out);
+        }
+    } else {
+        // Negative filter coef is a zero on the positive real axis to get high-pass.
+        // We apply the FIR zero on the way *out* of the delay line.
+        while(n_samples-- > 0) {
+            SAMPLE delay_out = DEL_OUT(delay_line, 0);
+            SAMPLE prev_delay_out = DEL_OUT(delay_line, 1);
+            SAMPLE output = delay_out + SMULR6(filter_coef, prev_delay_out);
+            SAMPLE next_in = *in++ + SMULR6(feedback_level, output);
+            DEL_IN(delay_line, next_in);
+            *out++ += MUL8_SS(mix_level, output);
+        }
     }
 }
 

@@ -467,7 +467,25 @@ class TestEcho(AmyTest):
     amy.send(time=0, osc=0, bp0="0,1,200,0,0,0")
 
     amy.send(time=100, osc=0, note=48, vel=1)
-    
+
+
+class TestEchoLPF(AmyTest):
+
+  def run(self):
+    amy.echo(level=0.5, delay_ms=200, feedback=0.7, filter_coef=0.9)
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
+
+    amy.send(time=100, osc=0, note=48, vel=1)
+
+
+class TestEchoHPF(AmyTest):
+
+  def run(self):
+    amy.echo(level=0.5, delay_ms=200, feedback=0.7, filter_coef=-0.9)
+    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
+
+    amy.send(time=100, osc=0, note=48, vel=1)
+
 
 def main(argv):
   if len(argv) > 1:

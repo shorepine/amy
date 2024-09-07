@@ -181,17 +181,20 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
             echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
-        // Apply delay.
-        if (delay_samples > echo.max_delay_samples) delay_samples = echo.max_delay_samples;
+        // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.
+        if (delay_samples > echo.max_delay_samples - 1) delay_samples = echo.max_delay_samples - 1;
         for (int c = 0; c < AMY_NCHANS; ++c) {
             echo_delay_lines[c]->fixed_delay = delay_samples;
         }
     }
     echo.level = F2S(level);
     echo.delay_samples = delay_samples;
-    echo.feedback = F2S(feedback);
-    // FIR filter is [1], [1, filter_coef] but scaled to have peak gain of 1.0.
+    // Filter is IIR [1, filter_coef] normalized for filter_coef > 0 (LPF), or FIR [1, filter_coef] normalized for filter_coef < 0 (HPF).
+    if (filter_coef > 0.99)  filter_coef = 0.99;  // Avoid unstable filters.
     echo.filter_coef = F2S(filter_coef);
+    // FIR filter potentially has gain > 1 for high frequencies, so discount the loop feedback to stop things exploding.
+    if (filter_coef < 0)  feedback /= 1.f - filter_coef;
+    echo.feedback = F2S(feedback);
     //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
 }
 
