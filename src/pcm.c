@@ -17,7 +17,7 @@ void pcm_init() {
 
 void pcm_note_on(uint16_t osc) {
     //printf("pcm_note_on: osc=%d patch=%d logfreq=%f amp=%f\n",
-    //       osc, synth[osc].patch, synth[osc].logfreq_coefs[0], synth[osc].amp_coefs[0]);
+    //       osc, synth[osc].patch, synth[osc].logfreq, synth[osc].amp);
     if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
     // if no freq given, just play it at midinote
     if(synth[osc].logfreq_coefs[COEF_CONST] <= 0) {
@@ -34,8 +34,6 @@ void pcm_mod_trigger(uint16_t osc) {
 }
 
 void pcm_note_off(uint16_t osc) {
-    //printf("pcm_note_off: osc=%d feedback=%f phase=%f\n",
-    //       osc, synth[osc].feedback, P2F(synth[osc].phase));
     if(msynth[osc].feedback == 0) {
         // Non-looping note: Set phase to the end to cause immediate stop.
         synth[osc].phase = F2P(pcm_map[synth[osc].patch].length / (float)(1 << PCM_INDEX_BITS));
