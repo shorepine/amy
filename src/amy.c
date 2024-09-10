@@ -1209,7 +1209,8 @@ void hold_and_modify(uint16_t osc) {
     }
     // synth[osc].feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
-    if (synth[osc].wave != PCM)  msynth[osc].feedback = synth[osc].feedback;
+    // we also check for custom, for tulips' memorypcm 
+    if (synth[osc].wave != PCM && synth[osc].wave != CUSTOM)  msynth[osc].feedback = synth[osc].feedback;
     msynth[osc].resonance = synth[osc].resonance;
 
     if (osc == 999) {
