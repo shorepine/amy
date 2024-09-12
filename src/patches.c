@@ -69,6 +69,7 @@ void patches_reset() {
     }
 }
 
+
 void patches_store_patch(char * message) {
     // patch#,amy patch string
     // put it in ram
@@ -79,8 +80,8 @@ void patches_store_patch(char * message) {
     char sub_message[255];
     uint16_t start = 0;
     for(uint16_t i=0;i<strlen(patch);i++) {
-        if(message[i] == 'Z') {
-            strncpy(sub_message, message + start, i - start + 1);
+        if(patch[i] == 'Z') {
+            strncpy(sub_message, patch + start, i - start + 1);
             sub_message[i-start+1]= 0;
             struct event patch_event = amy_parse_message(sub_message);
             if(patch_event.osc > max_osc) max_osc = patch_event.osc;
