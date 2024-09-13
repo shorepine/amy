@@ -1799,6 +1799,7 @@ struct event amy_parse_message(char * message) {
                             if (AMY_IS_UNSET(echo_params[4])) echo_params[4] = S2F(echo.filter_coef);
                             config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
                         }
+                        break;
                         case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atoi(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
