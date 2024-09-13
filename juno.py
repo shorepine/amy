@@ -466,7 +466,8 @@ class JunoPatch:
     amy.send(pitch_bend=value)
 
   def amy_send(self, osc, **kwargs):
-    voices_str = None
     if self.amy_voices:
       voices_str = ','.join([str(v) for v in self.amy_voices])
-    amy.send(voices=voices_str, osc=osc, **kwargs)
+      amy.send(voices=voices_str, osc=osc, **kwargs)
+    else:
+      amy.send(osc=osc, **kwargs)
