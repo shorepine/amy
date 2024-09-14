@@ -49,14 +49,6 @@ void partials_note_off(uint16_t osc) {
 }
 
 
-static inline SAMPLE ABS(SAMPLE a) {
-    if (a > 0)
-        return a;
-    else
-        return -a;
-}
-
-
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all patches have sustain point?
@@ -86,10 +78,11 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
-                synth[o].velocity = 1.0f; // synth[osc].velocity;
-                synth[o].amp_coefs[0] = pb.amp;
+                //synth[o].velocity = synth[osc].velocity;
+                // velocity is set directly before rendering each partial according to the parent osc's amplitude envelope.
                 synth[o].note_on_clock = total_samples; // start breakpoints
-                synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
+                synth[o].amp_coefs[COEF_CONST] = pb.amp;
+                synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq(pb.freq) + freq_logratio;
 
                 synth[o].breakpoint_times[0][0] = 0;
                 synth[o].breakpoint_values[0][0] = 1.0;
@@ -113,7 +106,6 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 synth[o].breakpoint_values[1][2] = 0.0;  // Release freq mod target value.
                 AMY_UNSET(synth[o].breakpoint_times[1][3]);
                 synth[o].eg_type[1] = ENVELOPE_LINEAR;
-                synth[o].amp_coefs[COEF_NOTE] = 0;
                 synth[o].logfreq_coefs[COEF_EG1] = 1.0;
                 
                 uint8_t partial_code = 0; // control code for partial patches
@@ -158,31 +150,22 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
         synth[osc].status = STATUS_OFF;
     }
     // now, render everything, add it up
-    SAMPLE partials_buf[AMY_BLOCK_SIZE];
-    bzero(partials_buf, AMY_BLOCK_SIZE * sizeof(SAMPLE));
-    for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
+    for(uint16_t i = osc + 1; i < osc + 1 + oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==IS_ALGO_SOURCE) {
+            // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
+            synth[o].velocity = msynth[osc].amp; // 1.0f; // synth[osc].velocity;
             // hold_and_modify contains a special case for wave == PARTIAL so that
             // envelope value are delayed by 1 frame compared to other oscs
             // so that partials fade in over one frame from zero amp.
             hold_and_modify(o);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
-            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
-            //render_partial(pbuf, o);
-            //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j], F2S(msynth[osc].amp)));
-            //SAMPLE value = render_partial(partials_buf, o);
-            render_partial(partials_buf, o);
-            //if (value > max_value) max_value = value;
+            SAMPLE value = render_partial(buf, o);
+            if (value > max_value) max_value = value;
             // Deferred termination of this partial, after final ramp-out.
             if (synth[o].amp_coefs[0] == 0)  partial_note_off(o);
         }
-    }
-    // Apply the parent osc gain and sum into buf.
-    for (uint16_t j = 0; j < AMY_BLOCK_SIZE; ++j) {
-        buf[j] += MUL4_SS(partials_buf[j], F2S(msynth[osc].amp));
-        if (ABS(buf[j]) > max_value)  max_value = ABS(buf[j]);
     }
     return max_value;
 }
