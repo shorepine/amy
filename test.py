@@ -152,6 +152,26 @@ class TestPartial(AmyTest):
     amy.send(time=100, note=60, vel=1)
 
 
+class TestPartialNoteOff(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PARTIALS, patch=5)
+    amy.send(time=100, note=60, vel=5)
+    amy.send(time=500, note=60, vel=0)
+
+
+class TestPartialEnvFiltMod(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PARTIALS, patch=5)
+    amy.send(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='2000,0,0,0,3', bp1='0,1,500,0,200,0')
+    amy.send(time=0, osc=0, bp0='100,1,1000,0,1000,0')
+    amy.send(time=0, osc=1, freq='1')
+    amy.send(time=0, osc=0, mod_source=1, freq=',,,,,-0.1')
+    amy.send(time=100, note=60, vel=5)
+    amy.send(time=500, note=60, vel=0)
+
+
 class TestSineEnv(AmyTest):
 
   def run(self):

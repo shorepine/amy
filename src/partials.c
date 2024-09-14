@@ -49,6 +49,13 @@ void partials_note_off(uint16_t osc) {
 }
 
 
+static inline SAMPLE ABS(SAMPLE a) {
+    if (a > 0)
+        return a;
+    else
+        return -a;
+}
+
 
 // render a full partial set at offset osc (with patch)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
@@ -79,7 +86,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 // All the types share these params or are overwritten
                 synth[o].wave = PARTIAL;
                 synth[o].status = IS_ALGO_SOURCE;
-                synth[o].velocity = synth[osc].velocity;
+                synth[o].velocity = 1.0f; // synth[osc].velocity;
                 synth[o].amp_coefs[0] = pb.amp;
                 synth[o].note_on_clock = total_samples; // start breakpoints
                 synth[o].logfreq_coefs[0] = logfreq_of_freq(pb.freq) + freq_logratio;
@@ -151,6 +158,8 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
         synth[osc].status = STATUS_OFF;
     }
     // now, render everything, add it up
+    SAMPLE partials_buf[AMY_BLOCK_SIZE];
+    bzero(partials_buf, AMY_BLOCK_SIZE * sizeof(SAMPLE));
     for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==IS_ALGO_SOURCE) {
@@ -163,11 +172,17 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) pbuf[j] = 0;
             //render_partial(pbuf, o);
             //for(uint16_t j=0;j<AMY_BLOCK_SIZE;j++) buf[j] = buf[j] + (MUL4_SS(pbuf[j], F2S(msynth[osc].amp)));
-            SAMPLE value = render_partial(buf, o);
-            if (value > max_value) max_value = value;
+            //SAMPLE value = render_partial(partials_buf, o);
+            render_partial(partials_buf, o);
+            //if (value > max_value) max_value = value;
             // Deferred termination of this partial, after final ramp-out.
             if (synth[o].amp_coefs[0] == 0)  partial_note_off(o);
         }
+    }
+    // Apply the parent osc gain and sum into buf.
+    for (uint16_t j = 0; j < AMY_BLOCK_SIZE; ++j) {
+        buf[j] += MUL4_SS(partials_buf[j], F2S(msynth[osc].amp));
+        if (ABS(buf[j]) > max_value)  max_value = ABS(buf[j]);
     }
     return max_value;
 }
