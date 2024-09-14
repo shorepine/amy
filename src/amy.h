@@ -393,6 +393,7 @@ void oscs_deinit() ;
 uint32_t amy_sysclock();
 float freq_for_midi_note(float midi_note);
 float logfreq_for_midi_note(float midi_note);
+float midi_note_for_logfreq(float logfreq);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);

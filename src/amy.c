@@ -348,6 +348,10 @@ float logfreq_for_midi_note(float midi_note) {
     return (midi_note - ZERO_MIDI_NOTE) / 12.0f;
 }
 
+float midi_note_for_logfreq(float logfreq) {
+    return 12.0f * logfreq + ZERO_MIDI_NOTE;
+}
+
 
 // create a new default API accessible event
 struct event amy_default_event() {
