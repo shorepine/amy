@@ -15,6 +15,8 @@ override_send = None
 mess = []
 log = False
 
+show_warnings = True
+
 """
     A bunch of useful presets
     TODO : move this to patches.c
@@ -144,53 +146,34 @@ def parse_ctrl_coefs(coefs):
 
 
 # Construct an AMY message
-def message(osc=0, wave=None, patch=None, note=None, vel=None, amp=None, freq=None, duty=None, feedback=None, time=None, reset=None, phase=None, pan=None,
-            client=None, retries=None, volume=None, pitch_bend=None, filter_freq = None, resonance = None, bp0=None, bp1=None, eg0_type=None, eg1_type=None,
-            debug=None, chained_osc=None, mod_source=None, clone_osc=None, eq=None, filter_type= None, 
-            algorithm=None, ratio = None, latency_ms = None, algo_source=None, chorus=None,
-            reverb=None, echo=None, load_patch=None, store_patch=None, voices=None, external_channel=None, portamento=None):
-
+def message(**kwargs):
+    # Each keyword maps to two chars, first is the wire protocol prefix, second is an arg type code
+    # I=int, F=float, S=str, L=list, C=ctrl_coefs
+    kw_map = {'osc': 'vI', 'wave': 'wI', 'patch': 'pI', 'note': 'nI', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
+              'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'cI', 'volume': 'vF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
+              'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 'clone_osc': 'CI',
+              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL',
+              'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
+              'external_channel': 'WI', 'portamento': 'mI'}
+    arg_handlers = {
+        'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
+    }
+    unrecognized_keywords = set(kwargs).difference(set(kw_map))
+    if unrecognized_keywords:
+        raise ValueError('Unrecognized keyword(s): %s' % unrecognized_keywords)
+    if show_warnings:
+        # Check for possible user confusions.
+        if 'voices' in kwargs and 'patch' in kwargs and 'osc' not in kwargs:
+            print('You specified \'voices\' and \'patch\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
+        if 'store_patch' in kwargs and len(kwargs) > 1:
+            print('\'store_patch\' should be the only arg in a message.')
+            # And yet we plow ahead...
     m = ""
-    if(store_patch is not None): return "u" + str(store_patch)
-    if(time is not None): m = m + "t" + str(time)
-    if(osc is not None): m = m + "v" + str(osc)
-    if(wave is not None): m = m + "w" + str(wave)
-    if(duty is not None): m = m + "d%s" % parse_ctrl_coefs(duty)
-    if(feedback is not None): m = m + "b" + trunc(feedback)
-    if(freq is not None): m = m + "f%s" % parse_ctrl_coefs(freq)
-    if(note is not None): m = m + "n" + str(note)
-    if(patch is not None): m = m + "p" + str(patch)
-    if(phase is not None): m = m + "P" + trunc(phase)
-    if(pan is not None): m = m + "Q%s" % parse_ctrl_coefs(pan)
-    if(client is not None): m = m + "c" + str(client)
-    if(amp is not None): m = m + "a%s" % parse_ctrl_coefs(amp)
-    if(vel is not None): m = m + "l" + trunc(vel)
-    if(volume is not None): m = m + "V" + trunc(volume)
-    if(pitch_bend is not None): m = m + "s" + trunc(pitch_bend)
-    if(latency_ms is not None): m = m + "N" + str(latency_ms)
-    if(resonance is not None): m = m + "R" + trunc(resonance)
-    if(filter_freq is not None): m = m + "F%s" % parse_ctrl_coefs(filter_freq)
-    if(ratio is not None): m = m + "I" + trunc(ratio)
-    if(algorithm is not None): m = m + "o" + str(algorithm)
-    if(bp0 is not None): m = m +"A%s" % bp0
-    if(bp1 is not None): m = m +"B%s" % bp1
-    if(eg0_type is not None): m = m + "T" + str(eg0_type)
-    if(eg1_type is not None): m = m + "X" + str(eg1_type)
-    if(algo_source is not None): m = m +"O%s" % (algo_source)
-    if(chained_osc is not None): m = m + "c" + str(chained_osc)
-    if(clone_osc is not None): m = m + "C" + str(clone_osc)
-    if(mod_source is not None): m = m + "L" + str(mod_source)
-    if(reset is not None): m = m + "S" + str(reset)
-    if(debug is not None): m = m + "D" + str(debug)
-    if(eq is not None): m = m + "x%s" % eq
-    if(filter_type is not None): m = m + "G" + str(filter_type)
-    if(chorus is not None): m = m + 'k%s' % chorus
-    if(reverb is not None): m = m + "h%s" % reverb
-    if(echo is not None): m = m + "M%s" % echo
-    if(load_patch is not None): m = m + 'K' + str(load_patch)
-    if(voices is not None): m = m + 'r' + str(voices)
-    if(external_channel is not None): m = m + 'W' + str(external_channel)
-    if(portamento is not None): m = m + 'm' + str(portamento)
+    for key, arg in kwargs.items():
+        if arg is None:
+            raise ValueError
+        wire_code, type_code = kw_map[key]
+        m += wire_code + arg_handlers[type_code](arg)
     #print("message " + m)
     return m+'Z'
 
