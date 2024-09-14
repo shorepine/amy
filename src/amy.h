@@ -258,7 +258,7 @@ struct event {
     uint16_t osc;
     uint16_t wave;
     uint16_t patch;
-    uint16_t midi_note;
+    float midi_note;
     uint16_t load_patch;
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];
@@ -298,7 +298,7 @@ struct synthinfo {
     uint16_t osc; // self-reference
     uint16_t wave;
     uint16_t patch;
-    uint16_t midi_note;
+    float midi_note;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
     float filter_logfreq_coefs[NUM_COMBO_COEFS];
@@ -391,8 +391,9 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();
-float freq_for_midi_note(uint8_t midi_note);
-float logfreq_for_midi_note(uint8_t midi_note);
+float freq_for_midi_note(float midi_note);
+float logfreq_for_midi_note(float midi_note);
+float midi_note_for_logfreq(float logfreq);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);

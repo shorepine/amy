@@ -339,13 +339,17 @@ float freq_of_logfreq(float logfreq) {
     return ZERO_LOGFREQ_IN_HZ * exp2f(logfreq);
 }
 
-float freq_for_midi_note(uint8_t midi_note) {
-    return 440.0f*powf(2, (midi_note - 69.0f) / 12.0f);
+float freq_for_midi_note(float midi_note) {
+    return 440.0f*powf(2.f, (midi_note - 69.0f) / 12.0f);
 }
 
-float logfreq_for_midi_note(uint8_t midi_note) {
+float logfreq_for_midi_note(float midi_note) {
     // TODO: Precompensate for EPS_FOR_LOG
     return (midi_note - ZERO_MIDI_NOTE) / 12.0f;
+}
+
+float midi_note_for_logfreq(float logfreq) {
+    return 12.0f * logfreq + ZERO_MIDI_NOTE;
 }
 
 
@@ -931,10 +935,7 @@ void play_event(struct delta d) {
     //uint8_t trig=0;
     // todo: event-only side effect, remove
     if(d.param == MIDI_NOTE) {
-        synth[d.osc].midi_note = *(uint16_t *)&d.data;
-        //synth[d.osc].freq = freq_for_midi_note(*(uint16_t *)&d.data);
-        //synth[d.osc].logfreq_coefs[0] = logfreq_for_midi_note(*(uint16_t *)&d.data);
-        //printf("time %lld osc %d midi_note %d logfreq %f\n", total_samples, d.osc, synth[d.osc].midi_note, synth[d.osc].logfreq);
+        synth[d.osc].midi_note = *(float *)&d.data;
         // Midi note and Velocity are propagated to chained_osc.
         if (AMY_IS_SET(synth[d.osc].chained_osc)) {
             d.osc = synth[d.osc].chained_osc;
@@ -1801,7 +1802,7 @@ struct event amy_parse_message(char * message) {
                         }
                         break;
                         case 'N': e.latency_ms = atoi(message + start);  break;
-                        case 'n': e.midi_note=atoi(message + start); break;
+                        case 'n': e.midi_note=atof(message + start); break;
                         case 'o': e.algorithm=atoi(message+start); break;
                         case 'O': copy_param_list_substring(e.algo_source, message+start); break;
                         case 'p': e.patch=atoi(message + start); break;
