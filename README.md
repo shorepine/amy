@@ -208,7 +208,7 @@ Here's the full list:
 | `n`    | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
-| `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
+| `O`    | `algo_source` | string | Number of partials for build-your-own PARTIALS, or which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `patch` | uint | Choose a preloaded PCM sample or partial patch. See `load_patch` for DX7 and Juno patches. |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |

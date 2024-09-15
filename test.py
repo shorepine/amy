@@ -172,6 +172,20 @@ class TestPartialEnvFiltMod(AmyTest):
     amy.send(time=100, osc=1, note=60, vel=5)
     amy.send(time=500, osc=1, note=60, vel=0)
 
+class TestBuildYourOwnPartials(AmyTest):
+
+  def run(self):
+    # PARTIALS but you have to configure the freq and amp of each partial yourself
+    num_partials = 16
+    base_freq = 261.63
+    base_osc = 0
+    amy.send(time=0, osc=base_osc, wave=amy.PARTIALS, algo_source=num_partials)
+    for i in range(1, num_partials + 1):
+      # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
+      amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
+    amy.send(time=100, osc=0, note=60, vel=0.5)
+    amy.send(time=200, osc=0, note=72, vel=1)
+    
 
 class TestSineEnv(AmyTest):
 
