@@ -32,20 +32,9 @@ typedef struct {
 // choose a patch from the .h file
 void partials_note_on(uint16_t osc) {
     // just like PCM, start & end breakpoint are stored here
-    if (AMY_IS_SET(synth[osc].patch)) {
-        partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch];
-        // s[o].step is used to track which breakpoint we're currently using.
-        synth[osc].step = patch.bp_offset;
-        synth[osc].substep = synth[osc].step + patch.bp_length;
-        // Now let's start the oscillators (silently)
-        uint16_t oscs = patch.oscs_alloc;
-        if(osc + 1 + oscs > AMY_OSCS) {
-            fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
-        }
-    } else {
-        // No patch, this must be build-your-own.
-        int num_partials = 0;
-        if (AMY_IS_SET(synth[osc].algo_source[0]))  num_partials = synth[osc].algo_source[0];
+    if (synth[osc].patch < 0) {
+        // Patch_num < 0 meanse build-your-own with (-patch_num) oscs.
+        int num_partials = -synth[osc].patch;
         for (int i = 0; i < num_partials; ++i) {
             int o = osc + 1 + i;
             if (synth[o].wave == PARTIAL) {  // User has marked this as a partial.
@@ -62,6 +51,17 @@ void partials_note_on(uint16_t osc) {
                 partial_note_on(o);
             }
         }
+    } else {
+        // Regular patch number.
+        partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch];
+        // s[o].step is used to track which breakpoint we're currently using.
+        synth[osc].step = patch.bp_offset;
+        synth[osc].substep = synth[osc].step + patch.bp_length;
+        // Now let's start the oscillators (silently)
+        uint16_t oscs = patch.oscs_alloc;
+        if(osc + 1 + oscs > AMY_OSCS) {
+            fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
+        }
     }
 }
 
@@ -77,9 +77,9 @@ void partials_note_off(uint16_t osc) {
 SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     SAMPLE max_value = 0;
     uint16_t oscs = 0;
-    if (AMY_IS_UNSET(synth[osc].patch)) {
+    if (synth[osc].patch < 0) {
         // No preset partials map, we are in "build-your-own".  The max number of oscs is taken from algo_source[0].
-        if (AMY_IS_SET(synth[osc].algo_source[0]))  oscs = synth[osc].algo_source[0];
+        oscs = -synth[osc].patch;
     } else {
         // Set up from partials map.
         partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];

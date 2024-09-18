@@ -82,6 +82,10 @@ def millis():
 # Fun historical trivia: this function caused a bug so bad that Dan had to file a week-long PR for micropython
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
+    if type(number) == str:
+        if number.strip() == '':
+            return ''
+        number = float(number)
     if(type(number)==float):
         return ('%.6f' % number).rstrip('0').rstrip('.')
     return str(number)
@@ -123,8 +127,10 @@ def parse_ctrl_coefs(coefs):
      * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', and 'bend'.
     """
     # Pass through ready-formed strings, and convert single values to single value strings
-    if isinstance(coefs, str) or isinstance(coefs, int) or isinstance(coefs, float):
-        return str(coefs)
+    if isinstance(coefs, str):
+        return ','.join(trunc(x) for x in coefs.split(','))
+    if isinstance(coefs, int) or isinstance(coefs, float):
+        return trunc(coefs)
     # Convert a dict into a list of values.
     dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend']
     if isinstance(coefs, dict):
@@ -174,8 +180,8 @@ def message(**kwargs):
             raise ValueError
         wire_code, type_code = kw_map[key]
         m += wire_code + arg_handlers[type_code](arg)
-    #print("message " + m)
-    return m+'Z'
+    #print("message:", m)
+    return m + 'Z'
 
 
 def send_raw(m):

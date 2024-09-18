@@ -179,13 +179,27 @@ class TestBuildYourOwnPartials(AmyTest):
     num_partials = 16
     base_freq = 261.63
     base_osc = 0
-    amy.send(time=0, osc=base_osc, wave=amy.PARTIALS, algo_source=num_partials)
+    amy.send(time=0, osc=base_osc, wave=amy.PARTIALS, patch=-num_partials)
     for i in range(1, num_partials + 1):
       # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
       amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
     amy.send(time=100, osc=0, note=60, vel=0.5)
     amy.send(time=200, osc=0, note=72, vel=1)
-    
+
+class TestBYOPVoices(AmyTest):
+
+  def run(self):
+    # Does build-your-own-partials work with the voices mechanism?
+    num_partials = 4
+    s = '1024,v0w%dp%dZ' % (amy.PARTIALS, -num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
+    amy.send(time=0, store_patch=s)
+    amy.send(time=0, voices='0,1,2,3', load_patch=1024)
+    for i in range(num_partials):
+      amy.send(voices='0,1,2,3', osc=i + 1, freq=220 * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
+    amy.send(time=100, voices=0, note=60, vel=1)
+    amy.send(time=200, voices=1, note=63, vel=1)
+    amy.send(time=300, voices=2, note=67, vel=1)
+    amy.send(time=400, voices=3, note=70, vel=1)
 
 class TestSineEnv(AmyTest):
 

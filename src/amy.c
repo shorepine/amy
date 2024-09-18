@@ -1816,7 +1816,7 @@ struct event amy_parse_message(char * message) {
                         /* t used for time */
                         case 'T': e.eg_type[0] = atoi(message + start); break;
                         /* U used by Alles for sync */
-                        case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
+                        case 'u': patches_store_patch(message + start); AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;

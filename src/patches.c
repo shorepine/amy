@@ -84,7 +84,8 @@ void patches_store_patch(char * message) {
             strncpy(sub_message, patch + start, i - start + 1);
             sub_message[i-start+1]= 0;
             struct event patch_event = amy_parse_message(sub_message);
-            if(patch_event.osc > max_osc) max_osc = patch_event.osc;
+            if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
+                max_osc = patch_event.osc;
             start = i+1;
         }
     }
@@ -92,7 +93,7 @@ void patches_store_patch(char * message) {
     memory_patch[patch_number-1024] = malloc(strlen(patch)+1);
     memory_patch_oscs[patch_number-1024] = max_osc + 1;
     strcpy(memory_patch[patch_number-1024], patch);
-
+    //fprintf(stderr, "store_patch: patch %d n_osc %d patch %s\n", patch_number, max_osc, patch);
 }
 
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 

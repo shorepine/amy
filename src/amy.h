@@ -257,7 +257,7 @@ struct event {
     uint32_t time;
     uint16_t osc;
     uint16_t wave;
-    uint16_t patch;
+    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
     float midi_note;
     uint16_t load_patch;
     float amp_coefs[NUM_COMBO_COEFS];
@@ -297,7 +297,7 @@ struct event {
 struct synthinfo {
     uint16_t osc; // self-reference
     uint16_t wave;
-    uint16_t patch;
+    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
     float midi_note;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
