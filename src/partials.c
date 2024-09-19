@@ -38,15 +38,18 @@ void partials_note_on(uint16_t osc) {
         for (int i = 0; i < num_partials; ++i) {
             int o = osc + 1 + i;
             if (synth[o].wave == PARTIAL) {  // User has marked this as a partial.
-                synth[o].amp_coefs[COEF_CONST] = 1.0f;
+                // Mark this PARTIAL as part of a build-your own with a flag value in its patch field.
+                synth[o].patch = synth[osc].patch;
+                synth[o].amp_coefs[COEF_CONST] = 1.0f;  // This is apparently necessary.
                 synth[o].amp_coefs[COEF_VEL] = 1.0f;
                 synth[o].amp_coefs[COEF_EG0] = 1.0f;
                 //synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq((o + 1) * 220.f);
                 synth[o].logfreq_coefs[COEF_NOTE] = 1.0;
-                synth[o].logfreq_coefs[COEF_EG1] = 1.0;
+                //synth[o].logfreq_coefs[COEF_EG1] = 1.0;  // Let the user turn this on if they want.
                 synth[o].logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
                 synth[o].status = IS_ALGO_SOURCE;
                 synth[o].note_on_clock = total_samples;
+                AMY_UNSET(synth[o].note_off_clock);
                 msynth[o].logfreq = synth[o].logfreq_coefs[COEF_CONST] + msynth[osc].logfreq;
                 partial_note_on(o);
             }
@@ -66,8 +69,18 @@ void partials_note_on(uint16_t osc) {
 }
 
 void partials_note_off(uint16_t osc) {
-    // todo; finish the sustain
-    synth[osc].step = -1;
+    if (synth[osc].patch < 0) {
+        // Build-your-own-partials: Push each partial into release.
+        int num_oscs = -synth[osc].patch;
+        for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
+            uint16_t o = i % AMY_OSCS;
+            AMY_UNSET(synth[o].note_on_clock);
+            synth[o].note_off_clock = total_samples;
+        }
+    } else {
+        // todo; finish the sustain
+        synth[osc].step = -1;
+    }
 }
 
 
@@ -103,6 +116,8 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     // All the types share these params or are overwritten
                     synth[o].wave = PARTIAL;
                     synth[o].status = IS_ALGO_SOURCE;
+                    // Copy the patch number here just as a way to tell what kind of patch is employed when looking only at osc.
+                    synth[o].patch = synth[osc].patch;
                     //synth[o].velocity = synth[osc].velocity;
                     // velocity is set directly before rendering each partial according to the parent osc's amplitude envelope.
                     synth[o].note_on_clock = total_samples; // start breakpoints
