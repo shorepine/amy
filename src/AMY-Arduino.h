@@ -26,7 +26,7 @@ class AMY
   public:
     AMY();
     void begin();
-    void begin(uint8_t cores, uint8_t reverb, uint8_t chorus);
+    void begin(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo);
 
     int32_t sysclock();
     void drums(uint32_t start, uint16_t loops);
