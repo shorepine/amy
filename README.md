@@ -209,7 +209,7 @@ Here's the full list:
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - ee `load_patch`). |
+| `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
