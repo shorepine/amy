@@ -573,20 +573,25 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     SAMPLE max_value = 0;
     if(freq >= 55) { // lowest note we can play
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
-        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+        for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
             uint16_t index = (uint16_t)(synth[osc].step);
             synth[osc].sample = ks_buffer[ks_polyphony_index][index];
             ks_buffer[ks_polyphony_index][index] =                 
-                MUL4_SS(
+                SMULR7(
                     (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
                     half);
             synth[osc].step = (index + 1) % buflen;
-            SAMPLE value = MUL4_SS(synth[osc].sample, amp);
-            buf[i] = value;
-            if (value < 0) value = -value;
-            if (value > max_value) max_value = value;
+            SAMPLE value = SMULR7(synth[osc].sample, amp);
+            buf[i] += value;
+            if (i == 0) {
+                max_value = value;
+            } else {
+                if (value > max_value) max_value = value;
+                else if (-value > max_value) max_value = -value;
+            }
         }
     }
+    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", total_samples, osc, freq, S2F(amp), S2F(max_value));
     return max_value;
 }
 
@@ -596,11 +601,20 @@ void ks_note_on(uint16_t osc) {
     uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
     if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
     // init KS buffer with noise up to max
-    for(uint16_t i=0;i<buflen;i++) {
-        ks_buffer[ks_polyphony_index][i] = amy_get_random();
+    SAMPLE sum = 0;
+    for(uint16_t i = 0; i < buflen; i++) {
+        SAMPLE val = amy_get_random();
+        ks_buffer[ks_polyphony_index][i] = val;
+        sum += val;
+    }
+    // Remove dc, to avoid ending up with a dc-offset residual.
+    SAMPLE mean = sum / buflen;
+    for(uint16_t i = 0; i < buflen; i++) {
+        ks_buffer[ks_polyphony_index][i] -= mean;
     }
     ks_polyphony_index++;
     if(ks_polyphony_index == AMY_KS_OSCS) ks_polyphony_index = 0;
+    //fprintf(stderr, "ks_note_on: osc %d buflen %d poly_index %d\n", osc, buflen, ks_polyphony_index);
 }
 
 void ks_note_off(uint16_t osc) {
