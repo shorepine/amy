@@ -221,7 +221,7 @@ Here's the full list:
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
 | `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
-| `w`    | `wave` | uint 0-11 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, OFF]. default: 0/SINE |
+| `w`    | `wave` | uint 0-11 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 
@@ -486,9 +486,9 @@ Additive synthesis is simply adding together oscillators to make more complex to
 We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
 
 ```python
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=5) # a nice organ tone
-amy.send(osc=0,vel=1,note=55,wave=amy.PARTIALS,patch=5) # change the frequency
-amy.send(osc=0,vel=1,note=50,wave=amy.PARTIALS,patch=6,ratio=0.2) # ratio slows down the partial playback
+amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, patch=5) # a nice organ tone
+amy.send(osc=0, vel=1, note=55, wave=amy.PARTIALS, patch=5) # change the frequency
+amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, patch=6, ratio=0.2) # ratio slows down the partial playback
 ```
 
 The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
@@ -524,32 +524,32 @@ There's a lot of parameters you can (and should!) play with in Loris. `partials.
 
 ```python
 def sequence(filename, # any audio filename
-                max_len_s = 10, # analyze first N seconds
-                amp_floor=-30, # only accept partials at this amplitude in dB, lower #s == more partials
-                hop_time=0.04, # time between analysis windows, impacts distance between breakpoints
-                max_oscs=amy.OSCS, # max AMY oscs to take up
-                freq_res = 10, # freq resolution of analyzer, higher # -- less partials & breakpoints 
-                freq_drift=20, # max difference in Hz within a single partial
-                analysis_window = 100 # analysis window size 
-                ) # returns (metadata, sequence)
+             max_len_s = 10, # analyze first N seconds
+             amp_floor=-30, # only accept partials at this amplitude in dB, lower #s == more partials
+             hop_time=0.04, # time between analysis windows, impacts distance between breakpoints
+             max_oscs=amy.OSCS, # max AMY oscs to take up
+             freq_res = 10, # freq resolution of analyzer, higher # -- less partials & breakpoints 
+             freq_drift=20, # max difference in Hz within a single partial
+             analysis_window = 100 # analysis window size 
+             ) # returns (metadata, sequence)
 
 def play(sequence, # from partials.sequence
-                osc_offset=0, # start at this oscillator #
-                sustain_ms = -1, # if the instrument should sustain, here's where (in ms)
-                sustain_len_ms = 0, # how long to sustain for
-                time_ratio = 1, # playback speed -- 0.5 , half speed
-                pitch_ratio = 1, # frequency scale, 0.5 , half freq
-                amp_ratio = 1, # amplitude scale
-                )
+         osc_offset=0, # start at this oscillator #
+         sustain_ms = -1, # if the instrument should sustain, here's where (in ms)
+         sustain_len_ms = 0, # how long to sustain for
+         time_ratio = 1, # playback speed -- 0.5 , half speed
+         pitch_ratio = 1, # frequency scale, 0.5 , half freq
+         amp_ratio = 1, # amplitude scale
+         )
 ```
 
 ## Build-your-own Partials
 
-You can also explicitly control partials in "build-your-own partials" mode.  Specifying a negative value for `patch` instructs AMY to leave the amplitude and frequency control of the partials to you, and it decides how many partials to expect with the negative of the patch value you give it.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
+You can also explicitly control partials in "build-your-own partials" mode, accessed via `wave=amy.BYO_PARTIALS`.  This sets up a string of oscs as individual sinusoids, just like `PARTIALS` mode, but it's up to you to control the details of each partial via its parameters, envelopes, etc.  You just have to say how many partials you want with `num_partials`.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
 
 ```
 num_partials = 8
-amy.send(osc=0, wave=amy.PARTIALS, patch=-num_partials)
+amy.send(osc=0, wave=amy.BYO_PARTIALS, num_partials=num_partials)
 for i in range(1, num_partials + 1):
     # Set up each partial as the corresponding harmonic of 261.63
     # with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N.

@@ -5,7 +5,7 @@ AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
 MAX_QUEUE = 400
-SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, CUSTOM, OFF = range(13)
+SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, CUSTOM, OFF = range(14)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
 AMY_LATENCY_MS = 0
@@ -155,12 +155,14 @@ def parse_ctrl_coefs(coefs):
 def message(**kwargs):
     # Each keyword maps to two chars, first is the wire protocol prefix, second is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
-    kw_map = {'osc': 'vI', 'wave': 'wI', 'patch': 'pI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
+    kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'cI', 'volume': 'vF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 'clone_osc': 'CI',
               'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI'}
+              'external_channel': 'WI', 'portamento': 'mI',
+              'patch': 'pI', 'num_partials': 'pI', # Note alaising.
+              }
     arg_handlers = {
         'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
     }
@@ -174,6 +176,11 @@ def message(**kwargs):
         if 'store_patch' in kwargs and len(kwargs) > 1:
             print('\'store_patch\' should be the only arg in a message.')
             # And yet we plow ahead...
+        if 'num_partials' in kwargs:
+            if 'patch' in kwargs:
+                raise ValueError('You cannot use \'num_partials\' and \'patch\' in the same message.')
+            if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
+                raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
     m = ""
     for key, arg in kwargs.items():
         if arg is None:
