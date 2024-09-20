@@ -209,7 +209,7 @@ Here's the full list:
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `patch` | uint | Choose a preloaded PCM sample or partial patch. See `load_patch` for DX7 and Juno patches. |
+| `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
@@ -543,6 +543,29 @@ def play(sequence, # from partials.sequence
                 )
 ```
 
+## Build-your-own Partials
+
+You can also explicitly control partials in "build-your-own partials" mode.  Specifying a negative value for `patch` instructs AMY to leave the amplitude and frequency control of the partials to you, and it decides how many partials to expect with the negative of the patch value you give it.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
+
+```
+num_partials = 8
+amy.send(osc=0, wave=amy.PARTIALS, patch=-num_partials)
+for i in range(1, num_partials + 1):
+    # Set up each partial as the corresponding harmonic of 261.63
+    # with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N.
+    amy.send(osc=i, wave=amy.PARTIAL, freq=261.63 * i,
+             bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
+amy.send(osc=0, note=60, vel=1)
+```
+
+You can add a filter (or an envelope etc.) to the sum of all the `PARTIAL` oscs by configuring it on the parent `PARTIALS` osc:
+
+```
+amy.send(osc=0, filter=amy.FILTER_HPF, resonance=4, filter_freq={'const': 200, 'eg1': 4}, bp1='0,0,1000,1,0,0')
+amy.send(osc=0, note=60, vel=1)
+# etc.
+```
+Note that the default `bp0` amplitude envelope of the `PARTIALS` osc is a gate, so if you want to have a nonzero release on your partials, you'll need to add a slower release to the `PARTIALS` osc to avoid it cutting them off.
 
 
 ## PCM
@@ -611,10 +634,3 @@ You can "record" patches in a sequence of commands like this:
 ### Generate header files for patches and LUTs
 
 Run `python amy_headers.py` to generate all the LUTs and patch .h files compiled into AMY.
-
-
-
-
-
-
-

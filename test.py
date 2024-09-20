@@ -44,7 +44,7 @@ class AmyTest:
     samples = amy.render(1.0)
     amy.write(samples, os.path.join(self.test_dir, name + '.wav'))
     rms_x = dB(rms(samples))
-    message = ('%-32s:' % name) + (' signal=%.1f dB' % rms_x)
+    message = ('%-32s:' % name) + (' signal=%5.1f dB' % rms_x)
 
     ref_file = os.path.join(self.ref_dir, name + '.wav')
     try:
@@ -172,6 +172,48 @@ class TestPartialEnvFiltMod(AmyTest):
     amy.send(time=100, osc=1, note=60, vel=5)
     amy.send(time=500, osc=1, note=60, vel=0)
 
+class TestBuildYourOwnPartials(AmyTest):
+
+  def run(self):
+    # PARTIALS but you have to configure the freq and amp of each partial yourself
+    num_partials = 16
+    base_freq = 261.63
+    base_osc = 0
+    amy.send(time=0, osc=base_osc, wave=amy.PARTIALS, patch=-num_partials)
+    for i in range(1, num_partials + 1):
+      # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
+      amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
+    amy.send(time=100, osc=0, note=60, vel=0.5)
+    amy.send(time=200, osc=0, note=72, vel=1)
+
+class TestBYOPVoices(AmyTest):
+
+  def run(self):
+    # Does build-your-own-partials work with the voices mechanism?
+    num_partials = 4
+    s = '1024,v0w%dp%dZ' % (amy.PARTIALS, -num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
+    amy.send(store_patch=s)
+    amy.send(time=0, voices='0,1,2,3', load_patch=1024)
+    for i in range(num_partials):
+      amy.send(voices='0,1,2,3', osc=i + 1, freq=220 * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
+    amy.send(time=100, voices=0, note=60, vel=1)
+    amy.send(time=200, voices=1, note=63, vel=1)
+    amy.send(time=300, voices=2, note=67, vel=1)
+    amy.send(time=400, voices=3, note=70, vel=1)
+
+class TestBYOPNoteOff(AmyTest):
+
+  def run(self):
+    # Partials were not seeing note-offs.
+    num_partials = 8
+    s = '1024,v0w%dp%dZ' % (amy.PARTIALS, -num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
+    amy.send(store_patch=s)
+    amy.send(time=0, voices='0,1', load_patch=1024)
+    for i in range(num_partials):
+      amy.send(voices='0,1', osc=i + 1, freq=220 * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
+    amy.send(voices='0,1', bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
+    amy.send(time=100, voices=1, note=60, vel=1)
+    amy.send(time=700, voices=1, vel=0)
 
 class TestSineEnv(AmyTest):
 
@@ -547,7 +589,8 @@ def main(argv):
     #TestChainedOsc().test()
     #TestJunoPatch().test()
     #TestJunoTrumpetPatch().test()
-    TestPcmLoop().test()
+    #TestPcmLoop().test()
+    TestBYOPNoteOff().test()
 
   amy.send(debug=0)
   print("tests done.")

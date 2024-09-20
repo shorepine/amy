@@ -898,7 +898,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==ALGO) algo_note_on(osc);
     if(synth[osc].wave==NOISE) noise_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
-        if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
+        //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS) partials_note_on(osc);
     }
     if(AMY_HAS_CUSTOM == 1) {
@@ -1106,10 +1106,14 @@ void play_event(struct delta d) {
                 algo_note_off(d.osc);
             } else if(synth[d.osc].wave==PARTIAL) {
                 #if AMY_HAS_PARTIALS == 1
-                partial_note_off(d.osc);
+                //AMY_UNSET(synth[d.osc].note_on_clock);
+                //synth[d.osc].note_off_clock = total_samples;
+                //partial_note_off(d.osc);
                 #endif
             } else if(synth[d.osc].wave==PARTIALS) {
                 #if AMY_HAS_PARTIALS == 1
+                AMY_UNSET(synth[d.osc].note_on_clock);
+                synth[d.osc].note_off_clock = total_samples;
                 partials_note_off(d.osc);
                 #endif
             } else if(synth[d.osc].wave==PCM) {
@@ -1290,7 +1294,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if(synth[osc].wave == PCM) max_val = render_pcm(buf, osc);
             if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS == 1) {
-                if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
+                //if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
                 if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
             }
         }
@@ -1816,7 +1820,7 @@ struct event amy_parse_message(char * message) {
                         /* t used for time */
                         case 'T': e.eg_type[0] = atoi(message + start); break;
                         /* U used by Alles for sync */
-                        case 'u': patches_store_patch(message+start);     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
+                        case 'u': patches_store_patch(message + start); AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;
