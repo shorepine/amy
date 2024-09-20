@@ -86,8 +86,9 @@ enum coefs{
 #define ALGO 8
 #define PARTIAL 9
 #define PARTIALS 10
-#define CUSTOM 11
-#define WAVE_OFF 12
+#define BYO_PARTIALS 11
+#define CUSTOM 12
+#define WAVE_OFF 13
 
 // synth[].status values
 #define EMPTY 0

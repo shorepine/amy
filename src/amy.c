@@ -903,7 +903,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==NOISE) noise_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
-        if(synth[osc].wave==PARTIALS) partials_note_on(osc);
+        if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
     }
     if(AMY_HAS_CUSTOM == 1) {
         if(synth[osc].wave==CUSTOM) custom_note_on(osc, initial_freq);
@@ -957,7 +957,8 @@ void play_event(struct delta d) {
         }
     }
     if(d.param == PHASE) { synth[d.osc].phase = *(PHASOR *)&d.data;  synth[d.osc].trigger_phase = *(PHASOR*)&d.data; } // PHASOR
-    if(d.param == PATCH) synth[d.osc].patch = *(uint16_t *)&d.data;
+    // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
+    if(d.param == PATCH) synth[d.osc].patch = ((synth[d.osc].wave == BYO_PARTIALS) ? -1 : 1) * *(uint16_t *)&d.data;
     if(d.param == FEEDBACK) synth[d.osc].feedback = *(float *)&d.data;
 
     if(PARAM_IS_COMBO_COEF(d.param, AMP)) {
@@ -1106,7 +1107,7 @@ void play_event(struct delta d) {
                 //synth[d.osc].note_off_clock = total_samples;
                 //partial_note_off(d.osc);
                 #endif
-            } else if(synth[d.osc].wave==PARTIALS) {
+            } else if(synth[d.osc].wave==PARTIALS || synth[d.osc].wave==BYO_PARTIALS) {
                 #if AMY_HAS_PARTIALS == 1
                 AMY_UNSET(synth[d.osc].note_on_clock);
                 synth[d.osc].note_off_clock = total_samples;
@@ -1291,7 +1292,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS == 1) {
                 //if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
-                if(synth[osc].wave == PARTIALS) max_val = render_partials(buf, osc);
+                if(synth[osc].wave == PARTIALS || synth[osc].wave == BYO_PARTIALS) max_val = render_partials(buf, osc);
             }
         }
         if(AMY_HAS_CUSTOM == 1) {
