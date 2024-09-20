@@ -889,6 +889,10 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     //printf("Note on: osc %d wav %d filter_freq_coefs=%f %f %f %f %f %f\n", osc, synth[osc].wave, 
     //       synth[osc].filter_logfreq_coefs[0], synth[osc].filter_logfreq_coefs[1], synth[osc].filter_logfreq_coefs[2],
     //       synth[osc].filter_logfreq_coefs[3], synth[osc].filter_logfreq_coefs[4], synth[osc].filter_logfreq_coefs[5]);
+            // take care of fm & ks first -- no special treatment for bp/mod
+#if AMY_KS_OSCS > 0
+    if(synth[osc].wave==KS) ks_note_on(osc);
+#endif
     if(synth[osc].wave==SINE) sine_note_on(osc, initial_freq);
     if(synth[osc].wave==SAW_DOWN) saw_down_note_on(osc, initial_freq);
     if(synth[osc].wave==SAW_UP) saw_up_note_on(osc, initial_freq);
@@ -1049,51 +1053,43 @@ void play_event(struct delta d) {
             //synth[d.osc].amp_coefs[COEF_CONST] = *(float *)&d.data; // these could be decoupled, later
             synth[d.osc].velocity = *(float *)&d.data;
             synth[d.osc].status = AUDIBLE;
-            // take care of fm & ks first -- no special treatment for bp/mod
-            if(synth[d.osc].wave==KS) {
-                #if AMY_KS_OSCS > 0
-                ks_note_on(d.osc);
-                #endif
-            }  else {
-                // an osc came in with a note on.
-                // start the bp clock
-                synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
+            // an osc came in with a note on.
+            // start the bp clock
+            synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
 
-                // if there was a filter active for this voice, reset it
-                if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
-                // For repeatability, start at zero phase.
-                synth[d.osc].phase = 0;
+            // if there was a filter active for this voice, reset it
+            if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
+            // For repeatability, start at zero phase.
+            synth[d.osc].phase = 0;
                 
-                // restart the waveforms
-                // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
-                float initial_logfreq = synth[d.osc].logfreq_coefs[COEF_CONST];
-                if (AMY_IS_SET(synth[d.osc].midi_note)) {
-                    // synth[d.osc].logfreq_coefs[COEF_CONST] = 0;
-                    initial_logfreq += synth[d.osc].logfreq_coefs[COEF_NOTE] * logfreq_for_midi_note(synth[d.osc].midi_note);
-                }
-                // If we're coming out of note-off, set the freq history for portamento.
-                //if (AMY_IS_SET(synth[d.osc].note_off_clock))
-                //    msynth[d.osc].last_logfreq = initial_logfreq;
-                // Now we've tested that, we can reset note-off clocks.
-                AMY_UNSET(synth[d.osc].note_off_clock);  // Most recent note event is not note-off.
-                AMY_UNSET(synth[d.osc].zero_amp_clock);
+            // restart the waveforms
+            // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
+            float initial_logfreq = synth[d.osc].logfreq_coefs[COEF_CONST];
+            if (AMY_IS_SET(synth[d.osc].midi_note)) {
+                // synth[d.osc].logfreq_coefs[COEF_CONST] = 0;
+                initial_logfreq += synth[d.osc].logfreq_coefs[COEF_NOTE] * logfreq_for_midi_note(synth[d.osc].midi_note);
+            }
+            // If we're coming out of note-off, set the freq history for portamento.
+            //if (AMY_IS_SET(synth[d.osc].note_off_clock))
+            //    msynth[d.osc].last_logfreq = initial_logfreq;
+            // Now we've tested that, we can reset note-off clocks.
+            AMY_UNSET(synth[d.osc].note_off_clock);  // Most recent note event is not note-off.
+            AMY_UNSET(synth[d.osc].zero_amp_clock);
 
-                float initial_freq = freq_of_logfreq(initial_logfreq);
-                osc_note_on(d.osc, initial_freq);
-                // trigger the mod source, if we have one
-                if(AMY_IS_SET(synth[d.osc].mod_source)) {
-                    synth[synth[d.osc].mod_source].phase = synth[synth[d.osc].mod_source].trigger_phase;
+            float initial_freq = freq_of_logfreq(initial_logfreq);
+            osc_note_on(d.osc, initial_freq);
+            // trigger the mod source, if we have one
+            if(AMY_IS_SET(synth[d.osc].mod_source)) {
+                synth[synth[d.osc].mod_source].phase = synth[synth[d.osc].mod_source].trigger_phase;
 
-                    synth[synth[d.osc].mod_source].note_on_clock = total_samples;  // Need a note_on_clock to have envelope work correctly.
-                    if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
-                    if(synth[synth[d.osc].mod_source].wave==CUSTOM) custom_mod_trigger(synth[d.osc].mod_source);
-                }
-
+                synth[synth[d.osc].mod_source].note_on_clock = total_samples;  // Need a note_on_clock to have envelope work correctly.
+                if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
+                if(synth[synth[d.osc].mod_source].wave==CUSTOM) custom_mod_trigger(synth[d.osc].mod_source);
             }
         } else if(synth[d.osc].velocity > 0 && *(float *)&d.data == 0) { // new note off
             // DON'T clear velocity, we still need to reference it in decay.
