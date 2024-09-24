@@ -438,42 +438,43 @@ When building your own algorithm sets, assign a separate oscillator as wave=`ALG
 
 ```python
 amy.reset()
-amy.send(osc=0, wave=amy.SINE, ratio=0.2, amp='0.1,0,0,1', bp0='0,1,1000,0,0,0')
-amy.send(osc=1, wave=amy.SINE, ratio=1, amp=1)
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=',,,,1,0')
+amy.send(osc=2, wave=amy.SINE, ratio=1, amp={'const': 1, 'vel': 0, 'eg0': 0})
+amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp={'const': 1, 'vel': 0, 'eg0': 1}, bp0='0,1,1000,0,0,0')
+amy.send(osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1')
 ```
 
-Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 1 modulate oscillator 0. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (oscillator 1) and operator 1 (oscillator 0).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have oscillator 1 providing the frequency-modulation input to oscillator 0.
+Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 2 modulate oscillator 1. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (osc 2 in this case) and operator 1 (osc 1).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have osc 2 providing the frequency-modulation input to osc 1.
 
-What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator to the base note. So oscillator 0 will be played at 20% of the base note frequency, and oscillator 1 will be the frequency of the base note. And for `amp`, that's something called "beta" in FM synthesis, which describes the strength of the modulation. Note we are having beta go down over 1,000 milliseconds using an envelope generator. That's key to the "bell ringing out" effect.
+What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator relative to the base note. So oscillator 1 will be played at 20% of the base note frequency, and oscillator 2 will take the frequency of the base note. In FM synthesis, the `amp` of a modulator input is  called "beta", which describes the strength of the modulation.  Here, osc 2 is providing the modulation with a constant beta of 1, which will result in a range of sinusoids with frequencies around the carrier at multiples of the modulator.  We set osc 2's amp ControlCoefficients for velocity and envelope generator 0 to 0 because they default to 1, but we don't want them for this example (FM sines don't receive the parent note's velocity, so we need to disable its influence).  Osc 1 has `bp0` decaying its amplitude to 0 over 1000 ms, but because beta is fixed there's no other change to the sound over that time.
 
 Ok, we've set up the oscillators. Now, let's hear it!
 
 ```python
-amy.send(osc=2, note=60, vel=3)
+amy.send(osc=0, note=60, vel=1)
 ```
 
 You should hear a bell-like tone. Nice. (This example is also implemented using the C API in [`src/examples.c:example_fm()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/examples.c#L281).)
 
-Another classic two operator tone is to instead modulate the higher tone with the lower one, to make a filter sweep. Let's do it over 5 seconds.
+FM gets much more exciting when we vary beta, which just means varying the amplitide envelope of the modulator.  The spectral effects of the frequency modulation depend on beta in a rich, nonlinear way, leading to the glistening FM sounds.  Let's try fading in the modulator over 5 seconds:
+
 
 ```python
 amy.reset()
-amy.send(osc=0, wave=amy.SINE, ratio=1, amp=1)  # Op 1, carrier
-amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp=2, bp0='0,0,5000,1,0,0')  # Op 2, modulator
-amy.send(osc=2, wave=amy.ALGO, algorithm=1, algo_source=',,,,1,0')
+amy.send(osc=2, wave=amy.SINE, ratio=0.2, amp={'const': 1, 'vel': 0, 'eg0': 2}, bp0='0,0,5000,1,0,0')  # Op 2, modulator
+amy.send(osc=1, wave=amy.SINE, ratio=1, amp={'const': 1, 'vel': 0, 'eg0': 0})  # Op 1, carrier
+amy.send(osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1')
 ```
 
-Just a refresher on envelope generators; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2 but have it start at 0 at time 0 (actually, this is the default), then be at 1.0x of 2 (so, 2.0) at time 5000ms. At the release of the note, set beta immediately to 0. We can play it with
+Just a refresher on envelope generators; here we are saying to set the beta parameter (amplitude of the modulating tone) to 2x envelope generator 0's output, which starts at 0 at time 0 (actually, this is the default), then grows to 1.0 at time 5000ms - so beta grows to 2.0. At the release of the note, beta immediately drops back to 0. We can play it with:
 
 ```python
-amy.send(osc=2, vel=2, note=50)
+amy.send(osc=0, note=60, vel=1)
 ```
 
 and stop it with
 
 ```python
-amy.send(osc=2, vel=0)
+amy.send(osc=0, vel=0)
 ```
 
 
