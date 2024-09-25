@@ -170,7 +170,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         } else if(eg_type == ENVELOPE_DX7) {
             // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
             // in SAMPLE version, DX7 levels are div 8 i.e. 0 to 12.375 instead of 0 to 99.
-#define LINEAR_SAMP_TO_DX7_LEVEL(samp) (MIN(12.375, S2F(log2_lut(MAX(F2S(BREAKPOINT_EPS), samp))) + 12.375))
+#define LINEAR_SAMP_TO_DX7_LEVEL(samp) (S2F(log2_lut(MAX(F2S(BREAKPOINT_EPS), samp))) + 12.375)
 #define DX7_LEVEL_TO_LINEAR_SAMP(level) (exp2_lut(F2S(level - 12.375)))
 #define MIN_LEVEL_S 4.25
 #define ATTACK_RANGE_S 9.375
