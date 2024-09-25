@@ -466,6 +466,8 @@ void amy_live_stop();
 void amy_reset_oscs();
 void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
+void amy_reset_sysclock();
+
 extern int parse_int_list_message(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
 extern void reset_osc(uint16_t i );
 
