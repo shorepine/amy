@@ -1870,6 +1870,10 @@ struct event amy_parse_message(char * message) {
     return amy_default_event();
 }
 
+void amy_reset_sysclock() {
+    total_samples = 0;
+}
+
 // given a string play / schedule the event directly
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);

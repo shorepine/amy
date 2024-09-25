@@ -27,10 +27,12 @@ CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1 -sASYNCIFY -sASSERTIONS \
+-s INITIAL_MEMORY=128mb \
+-s TOTAL_STACK=64mb \
 -s ALLOW_MEMORY_GROWTH=1 \
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_live_start', '_amy_start', '_malloc', '_free']" 
+-s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_live_start', '_amy_start', '_malloc', '_free']" 
 
 PYTHON = python3
 
