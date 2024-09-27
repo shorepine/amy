@@ -4,6 +4,9 @@
 
 import json
 import time
+import tulip
+import amy
+import midi
 
 params_file = 'track02-C4-bps.json'
 #residu_file = 'M1_Piano_C3_hprModel_residual_0.25s.wav'
@@ -62,3 +65,6 @@ print(voices)
 setup_piano(bp_dict, pcm_patch, voices=voices)
 
 midi.config.add_synth_object(channel=1, synth_object=synth_obj)
+
+
+
