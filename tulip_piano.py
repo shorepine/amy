@@ -39,7 +39,7 @@ def setup_piano(bp_dict, pcm_patch=None, voices=None, base_osc=0, base_freq=261.
     #print(bp_string)
     amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=harm_freqs[i - 1], bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
-  if pcm_patch is not none:
+  if pcm_patch is not None:
     pcm_osc = num_partials + 1
     #pcm_patch = tulip.load_sample(residu_file)
     patch_note = 60 - 6  # Empirically
