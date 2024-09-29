@@ -318,7 +318,7 @@ def reset(osc=None, **kwargs):
     if(osc is not None):
         send(reset=osc, **kwargs)
     else:
-        send(reset=10000, **kwargs) # reset > AMY_OSCS resets all oscs
+        send(reset=1000, **kwargs) # reset > AMY_OSCS resets all oscs
 
 def volume(volume, client = None):
     send(client=client, volume=volume)
