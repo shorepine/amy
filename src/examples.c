@@ -9,7 +9,7 @@ extern void delay_ms(uint32_t ms);
 void example_reset(uint32_t start) {
     struct event e = amy_default_event();
     e.osc = 0;
-    e.reset_osc = 1000;
+    e.reset_osc = RESET_ALL_OSCS;
     e.time = start;
     amy_add_event(e);
 }

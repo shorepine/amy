@@ -214,7 +214,7 @@ Here's the full list:
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| `S`    | `reset`  | uint | Resets given oscillator. set to > OSCS to reset all oscillators, gain and EQ. |
+| `S`    | `reset_osc`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock. RESET_AMY restarts AMY.|
 | `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
