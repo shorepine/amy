@@ -8,9 +8,12 @@ import tulip
 import amy
 import midi
 
-params_file = 'track02-C4-bps.json'
+#params_file = 'track02-C4-bps.json'
 #residu_file = 'M1_Piano_C3_hprModel_residual_0.25s.wav'
-residu_file = 'track02-C4-resid-0.25s.wav'
+#residu_file = 'track02-C4-resid-0.25s.wav'
+
+params_file = 'Piano.ff.D5.json'
+residu_file = 'resid-0.25s.wav'
 
 # Read in the params file.
 with open(params_file, 'r') as f:
@@ -35,15 +38,15 @@ def setup_piano(bp_dict, pcm_patch=None, voices=None, base_osc=0, base_freq=261.
     # Predelay in ms
     bp_vals[0][0] = 20
     bp_string = ','.join("%d,%.3f" % (n, val) for n, val in bp_vals)
-    bp_string += ',1000,0'
+    bp_string += ',200,0'
     #print(bp_string)
     amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=harm_freqs[i - 1], bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
   if pcm_patch is not None:
     pcm_osc = num_partials + 1
     #pcm_patch = tulip.load_sample(residu_file)
-    patch_note = 60 - 6  # Empirically
-    amy.send(osc=pcm_osc, wave=amy.CUSTOM, patch=pcm_patch, amp=10, **kwargs)
+    patch_note = 60  # Empirically
+    amy.send(osc=pcm_osc, wave=amy.CUSTOM, patch=pcm_patch, amp=1, **kwargs)
     amy.send(osc=base_osc, chained_osc=pcm_osc, **kwargs)
 
 
