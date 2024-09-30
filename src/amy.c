@@ -1006,7 +1006,21 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
-    if(d.param == RESET_OSC) { if(*(int16_t *)&d.data>(AMY_OSCS+1)) { amy_reset_oscs(); } else { reset_osc(*(int16_t *)&d.data); } }
+    if(d.param == RESET_OSC) { 
+        if(*(int16_t *)&d.data & RESET_AMY) {
+            amy_stop();
+            amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
+        }
+        if(*(int16_t *)&d.data & RESET_TIMEBASE) {
+            amy_reset_sysclock();
+        }
+        if(*(int16_t *)&d.data & RESET_ALL_OSCS) { 
+            amy_reset_oscs(); 
+        }
+        if(*(int16_t *)&d.data < AMY_OSCS+1) { 
+            reset_osc(*(int16_t *)&d.data); 
+        } 
+    }
     if(d.param == MOD_SOURCE) {
         uint16_t mod_osc = *(uint16_t *)&d.data;
         synth[d.osc].mod_source = mod_osc;

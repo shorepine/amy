@@ -8,6 +8,7 @@ MAX_QUEUE = 400
 SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, CUSTOM, OFF = range(14)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
+RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (8192, 16384, 32768)
 AMY_LATENCY_MS = 0
 AMY_MAX_DRIFT_MS = 20000
 
@@ -318,7 +319,7 @@ def reset(osc=None, **kwargs):
     if(osc is not None):
         send(reset=osc, **kwargs)
     else:
-        send(reset=10000, **kwargs) # reset > AMY_OSCS resets all oscs
+        send(reset=RESET_ALL_OSCS, **kwargs) 
 
 def volume(volume, client = None):
     send(client=client, volume=volume)
