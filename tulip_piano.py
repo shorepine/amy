@@ -23,7 +23,7 @@ def setup_piano(bp_dict, pcm_patch=None, voices=None, base_osc=0, base_freq=261.
   if voices is not None:
     kwargs = {'voices': voices}
   num_partials = len(bp_dict)
-  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
+  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
 
   harm_nums = range(1, num_partials + 1)
   # Quadratic partial stretching
@@ -35,7 +35,7 @@ def setup_piano(bp_dict, pcm_patch=None, voices=None, base_osc=0, base_freq=261.
     # Predelay in ms
     bp_vals[0][0] = 20
     bp_string = ','.join("%d,%.3f" % (n, val) for n, val in bp_vals)
-    bp_string += ',200,0'
+    bp_string += ',1000,0'
     #print(bp_string)
     amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=harm_freqs[i - 1], bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
