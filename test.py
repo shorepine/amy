@@ -443,12 +443,11 @@ class TestFlutesEq(AmyTest):
 
   def run(self):
     amy.send(time=0, eq="-15,8,8")
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, filter_type=amy.FILTER_LPF24, resonance=1.75,
-             bp0='200,1,9800,0,100,0',
-             bp1='200,1,9800,0,100,0',
-             filter_freq='242,0.323'),
-    amy.send(time=0, osc=1, clone_osc=0)
-    amy.send(time=0, osc=2, clone_osc=0)
+    osc_args = {'time':0, 'wave':amy.SAW_UP, 'filter_type':amy.FILTER_LPF24, 'resonance':1.75, 
+        'bp0':'200,1,9800,0,100,0', 'bp1':'200,1,9800,0,100,0', 'filter_freq':'242,0.323'}
+    amy.send(osc=0, **osc_args)
+    amy.send(osc=1, **osc_args)
+    amy.send(osc=2, **osc_args)
     amy.send(time=100, osc=0, note=48, vel=0.5)
     amy.send(time=200, osc=1, note=52, vel=0.5)
     amy.send(time=300, osc=2, note=55, vel=0.5)

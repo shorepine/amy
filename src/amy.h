@@ -289,7 +289,6 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
-    uint16_t clone_osc;  // Only used as a flag.
     uint16_t reset_osc;
     uint8_t status;
 };
