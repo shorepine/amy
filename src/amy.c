@@ -1007,16 +1007,17 @@ void play_event(struct delta d) {
     }
     if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
     if(d.param == RESET_OSC) { 
-        // If reset_osc > 9999, also reset time base
-        // In the future, we want to use this as a "hard reset" that e.g. resets the chip this is running on, or resets the audio driver.
-        if(*(int16_t *)&d.data>9999) {
+        if(*(int16_t *)&d.data & RESET_AMY) {
+            amy_stop();
+            amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
+        }
+        if(*(int16_t *)&d.data & RESET_TIMEBASE) {
             amy_reset_sysclock();
-            amy_reset_oscs();
-        // If reset_osc > AMY_OSCS but < 10000, then just reset oscs
-        } else if(*(int16_t *)&d.data>(AMY_OSCS+1)) { 
+        }
+        if(*(int16_t *)&d.data & RESET_ALL_OSCS) { 
             amy_reset_oscs(); 
-        // Else, just reset the given osc.
-        } else { 
+        }
+        if(*(int16_t *)&d.data < AMY_OSCS+1) { 
             reset_osc(*(int16_t *)&d.data); 
         } 
     }
