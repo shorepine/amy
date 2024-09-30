@@ -12,6 +12,7 @@
 
 
 
+// This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.
 typedef struct {
     uint32_t offset;
     uint32_t length;
@@ -19,6 +20,7 @@ typedef struct {
     uint32_t loopend;
     uint8_t midinote;
 } pcm_map_t;
+
 
 #ifndef AMY_CONFIG_H
 #define AMY_CONFIG_H amy_config.h
