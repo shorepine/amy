@@ -87,8 +87,10 @@ enum coefs{
 #define PARTIAL 9
 #define PARTIALS 10
 #define BYO_PARTIALS 11
-#define CUSTOM 12
-#define WAVE_OFF 13
+#define AUDIO_IN0 12
+#define AUDIO_IN1 13
+#define CUSTOM 14
+#define WAVE_OFF 15
 
 // synth[].status values
 #define EMPTY 0
