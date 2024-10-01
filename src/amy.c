@@ -799,6 +799,12 @@ int8_t oscs_init() {
     if(AMY_HAS_ECHO > 0) {
         for (int c = 0; c < AMY_NCHANS; ++c)  echo_delay_lines[c] = NULL;
     }
+
+    // Set the optional input to 0
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
+        amy_in_block[i] = 0;
+    }
+
     //init_stereo_reverb();
 
     total_samples = 0;
@@ -893,13 +899,12 @@ void audio_in_note_on(uint16_t osc, uint8_t channel) {
 
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
-    SAMPLE max_value = 0;
     for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+AMY_NCHANS) {
         buf[c] = F2S(((float)amy_in_block[i]/32767.0) * msynth[osc].amp);
-        if(buf[c]>max_value) max_value = buf[c];
         c++;
     }
-    return max_value;
+    // We have to return something for max_value or else the zero-amp reaper will come along. 
+    return F2S(1.0); //max_value;
 }
 
 
