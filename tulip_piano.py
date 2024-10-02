@@ -36,7 +36,7 @@ def setup_piano(bp_params, pcm_patch=None, voices=None, base_osc=0, base_freq=26
     # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
     f0 = bp_params[i - 1][0]
     bp_vals = bp_params[i - 1][1]
-    bp_string = ','.join("%d,%.3f" % (n, 100*val) for n, val in bp_vals)
+    bp_string = ','.join("%d,%.3f" % (n, max(0, 100 * val - 0.001)) for n, val in bp_vals)
     bp_string += ',200,0'
     #print(bp_string)
     amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=f0, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
