@@ -295,9 +295,9 @@ def render(seconds):
 def start():
     live()
 
-def live(audio_device=-1):
+def live(audio_playback_device=-1, audio_capture_device=-1):
     import libamy
-    libamy.live(audio_device)
+    libamy.live(audio_playback_device, audio_capture_device)
 
 # Stops live mode
 def pause():

@@ -17,7 +17,10 @@ int main(int argc, char ** argv) {
         switch(opt) 
         { 
             case 'd': 
-                amy_device_id = atoi(optarg);
+                amy_playback_device_id = atoi(optarg);
+                break;
+            case 'c': 
+                amy_capture_device_id = atoi(optarg);
                 break;
             case 'l':
                 amy_print_devices();

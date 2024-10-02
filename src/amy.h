@@ -35,7 +35,7 @@ typedef struct {
 #define MAX_BREAKPOINTS 8
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
-#define BYTES_PER_SAMPLE 2
+#define AMY_BYTES_PER_SAMPLE 2
 
 // Constants for filters.c, needed for synth structure.
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).

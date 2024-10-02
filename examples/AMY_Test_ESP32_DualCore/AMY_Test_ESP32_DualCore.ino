@@ -74,7 +74,7 @@ void* esp_fill_audio_buffer_task(void*) {
 
         // Write to i2s
         int16_t *block = amy_fill_buffer();
-        I2S.write((uint8_t*)block, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE);
+        I2S.write((uint8_t*)block, AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BYTES_PER_SAMPLE);
 
     }
 }
@@ -88,7 +88,7 @@ void setup() {
 
   // Set your I2S pins. 
   I2S.setPins(CONFIG_I2S_BCLK, CONFIG_I2S_LRCLK, CONFIG_I2S_DIN, -1, -1);
-  I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, BYTES_PER_SAMPLE8);
+  I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, AMY_BYTES_PER_SAMPLE8);
 
   // Start up AMY
   amy.begin(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1);
