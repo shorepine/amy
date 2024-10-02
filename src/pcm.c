@@ -28,7 +28,9 @@ memorypcm_map_t *memorypcm_map[MAX_MEMORYPCM_PATCHES];
 // Test if an in-memory patch exists
 uint8_t osc_memory_patch_exists(uint16_t osc) {
     if(AMY_IS_UNSET(synth[osc].patch)) return 0;
-    if(memorypcm_map[synth[osc].patch-MEMORYPCM_PATCHES_START_AT] != NULL) return 1;
+    if(synth[osc].patch>=MEMORYPCM_PATCHES_START_AT) {
+        if(memorypcm_map[synth[osc].patch-MEMORYPCM_PATCHES_START_AT] != NULL) return 1;
+    }
     return 0;
 }
 
