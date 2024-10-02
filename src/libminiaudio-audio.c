@@ -85,21 +85,21 @@ uint16_t ring_read_ptr = 0 ;
 uint16_t in_ptr = 0;
 extern int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 
-static void data_callback_pro(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
+static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
     // Lag input and render only when we have 256 frames of input
 
     short int *poke = (short *)pOutput;
     short int *peek = (short *)pInput;
 
     // We lag a AMY block behind input here because our frame size is never a multiple of AMY block size
-
     for(uint16_t frame=0;frame<frame_count;frame++) {
         for(uint8_t c=0;c<AMY_NCHANS;c++) {
             amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
-            // render and copy into output
+            // render and copy into output ring buffer
             int16_t * buf = amy_simple_fill_buffer();
+            // reset the input pointer for future input data
             in_ptr = 0;
             // copy this output to a ring buffer
             for(uint16_t amy_frame=0;amy_frame<AMY_BLOCK_SIZE;amy_frame++) {
@@ -109,7 +109,7 @@ static void data_callback_pro(ma_device* pDevice, void* pOutput, const void* pIn
                 }
             }
         }
-
+        // Per audio frame, copy (lagged by AMY_BLOCK_SIZE) output data from AMY into expected audio out buffer
         for(uint8_t c=0;c<AMY_NCHANS;c++) {
             poke[frame*AMY_NCHANS + c] = output_ring[ring_read_ptr];
             ring_read_ptr++; if(ring_read_ptr == OUTPUT_RING_LENGTH ) ring_read_ptr = 0;
@@ -119,48 +119,6 @@ static void data_callback_pro(ma_device* pDevice, void* pOutput, const void* pIn
 }
 
 
-static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
-    // Different audio devices on mac have wildly different frame_count_maxes, so we have to be ok with 
-    // an audio buffer that is not an even multiple of BLOCK_SIZE. my iMac's speakers were always 512 frames, but
-    // external headphones on a MBP is 432 or 431, and airpods were something like 1440.
-    short int *poke = (short *)pOutput;
-
-    // Deal with the output. The output gets filled into poke[], and likely requires multiple amy_simple_fill_buffer() calls.
-    // First send over the leftover samples, if any
-    int ptr = 0;
-
-    for(uint16_t frame=0;frame<leftover_samples;frame++) {
-        for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-            poke[ptr++] = leftover_buf[AMY_NCHANS * frame + c];
-        }
-    }
-
-    frame_count -= leftover_samples;
-    leftover_samples = 0;
-
-    // Now send the bulk of the frames
-    for(uint8_t i=0;i<(uint8_t)(frame_count / AMY_BLOCK_SIZE);i++) {
-        int16_t * buf = amy_simple_fill_buffer();
-        for(uint16_t frame=0;frame<AMY_BLOCK_SIZE;frame++) {
-            for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-                poke[ptr++] = buf[AMY_NCHANS * frame + c];
-            }
-        }
-    } 
-
-    // If any leftover, let's put those in the outgoing buf and the rest in leftover_samples
-    uint16_t still_need = frame_count % AMY_BLOCK_SIZE;
-    if(still_need != 0) {
-        int16_t * buf = amy_simple_fill_buffer();
-        for(uint16_t frame=0;frame<still_need;frame++) {
-            for(uint8_t c=0;c<pDevice->playback.channels;c++) {
-                poke[ptr++] = buf[AMY_NCHANS * frame + c];
-            }
-        }
-        memcpy(leftover_buf, buf+(still_need*AMY_NCHANS), (AMY_BLOCK_SIZE - still_need)*AMY_BYTES_PER_SAMPLE*AMY_NCHANS);
-        leftover_samples = AMY_BLOCK_SIZE - still_need;
-    }
-}
 
 ma_device_config deviceConfig;
 ma_device device;
@@ -210,7 +168,7 @@ amy_err_t miniaudio_init() {
     deviceConfig.capture.channels = AMY_NCHANS;
 
     deviceConfig.sampleRate        = AMY_SAMPLE_RATE;
-    deviceConfig.dataCallback      = data_callback_pro;
+    deviceConfig.dataCallback      = data_callback;
     deviceConfig.pUserData         = _custom;
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {
