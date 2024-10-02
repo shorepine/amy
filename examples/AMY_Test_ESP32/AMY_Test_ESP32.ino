@@ -13,7 +13,7 @@ void setup() {
   // Set your I2S pins. Data/SD/DIN/DOUT, SCK/BLCK, FS/WS/LRCLK. 
   //  int8_t bclk, int8_t ws, int8_t dout,
   I2S.setPins(4, 6, 5, -1, -1);
-  I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, AMY_BYTES_PER_SAMPLE8);
+  I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, AMY_BYTES_PER_SAMPLE);
 
   // Start up AMY
   amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
