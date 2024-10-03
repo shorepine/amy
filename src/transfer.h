@@ -22,10 +22,6 @@ typedef struct b64_buffer {
  // Start buffered memory
 int b64_buf_malloc(b64_buffer_t * buffer);
 
-// Update memory size. Returns the same pointer if we
-// have enough space in the buffer. Otherwise, we add
-// additional buffers.
-int b64_buf_realloc(b64_buffer_t * buffer, size_t size);
 
 /**
  * Base64 index table.
@@ -50,21 +46,14 @@ void parse_transfer_message(char * message, uint16_t len) ;
  * Returns a `char *' base64 encoded string.
  */
 
-char *
-b64_encode (const unsigned char *, size_t);
+char * b64_encode (const unsigned char *src, b64_buffer_t * encbuf, size_t len);
 
-/**
- * Decode `char *' source with `size_t' size.
- * Returns a `unsigned char *' base64 decoded string.
- */
-unsigned char *
-b64_decode (const char *, size_t);
 
 /**
  * Decode `char *' source with `size_t' size.
  * Returns a `unsigned char *' base64 decoded string + size of decoded string.
  */
 unsigned char *
-b64_decode_ex (const char *, size_t, size_t *);
+b64_decode_ex (const char *, size_t, b64_buffer_t * decbuf, size_t *);
 
 #endif

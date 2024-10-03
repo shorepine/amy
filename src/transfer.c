@@ -12,23 +12,28 @@ uint8_t * amy_transfer_storage = NULL;
 uint32_t amy_transfer_length = 0;
 uint32_t amy_transfer_stored =0;
 
+// We keep one decbuf around and reuse it during transfer
+b64_buffer_t decbuf;
+
 // signals to AMY that i'm now receiving a transfer of length (bytes!) into allocated storage
 void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     amy_transfer_flag = 1;
     amy_transfer_storage = storage;
     amy_transfer_length = length;
     amy_transfer_stored = 0;
+    b64_buf_malloc(&decbuf);
 }
 
 // takes a wire message and adds it to storage after decoding it. stops transfer when it's done
 void parse_transfer_message(char * message, uint16_t len) {
     size_t decoded = 0;
-    uint8_t * block = b64_decode_ex (message, len, &decoded);
+    uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
     for(uint16_t i=0;i<decoded;i++) {
         amy_transfer_storage[amy_transfer_stored++] = block[i];
     }
     if(amy_transfer_stored>=amy_transfer_length) { // we're done
         amy_transfer_flag = 0;
+        free(decbuf.ptr);
     }
 }
 
@@ -42,30 +47,15 @@ int b64_buf_malloc(b64_buffer_t * buf)
     return 0;
 }
 
-int b64_buf_realloc(b64_buffer_t* buf, size_t size)
-{
-    if (size > (size_t) (buf->bufc * B64_BUFFER_SIZE))
-    {
-        while (size > (size_t)(buf->bufc * B64_BUFFER_SIZE)) buf->bufc++;
-        buf->ptr = realloc(buf->ptr, B64_BUFFER_SIZE * buf->bufc);
-        if (!buf->ptr) return -1;
-    }
-
-    return 0;
-}
-
-
-char *
-b64_encode (const unsigned char *src, size_t len) {
+// We don't do encoding in AMY, we rely on python for that, but we'll leave it here if you want it in C
+// Just like decode you pass it an allocated encbuf. 
+char * b64_encode (const unsigned char *src, b64_buffer_t * encbuf, size_t len) {
   int i = 0;
   int j = 0;
-  b64_buffer_t encbuf;
   size_t size = 0;
   unsigned char buf[4];
   unsigned char tmp[3];
 
-  // alloc
-  if(b64_buf_malloc(&encbuf) == -1) { return NULL; }
 
   // parse until end of source
   while (len--) {
@@ -83,10 +73,9 @@ b64_encode (const unsigned char *src, size_t len) {
       // then translate each encoded buffer
       // part by index from the base 64 index table
       // into `encbuf.ptr' unsigned char array
-      if (b64_buf_realloc(&encbuf, size + 4) == -1) return NULL;
 
       for (i = 0; i < 4; ++i) {
-        encbuf.ptr[size++] = b64_table[buf[i]];
+        encbuf->ptr[size++] = b64_table[buf[i]];
       }
 
       // reset index
@@ -109,45 +98,35 @@ b64_encode (const unsigned char *src, size_t len) {
 
     // perform same write to `encbuf->ptr` with new allocation
     for (j = 0; (j < i + 1); ++j) {
-      if (b64_buf_realloc(&encbuf, size + 1) == -1) return NULL;
-
-      encbuf.ptr[size++] = b64_table[buf[j]];
+      encbuf->ptr[size++] = b64_table[buf[j]];
     }
 
     // while there is still a remainder
     // append `=' to `encbuf.ptr'
     while ((i++ < 3)) {
-      if (b64_buf_realloc(&encbuf, size + 1) == -1) return NULL;
-
-      encbuf.ptr[size++] = '=';
+      encbuf->ptr[size++] = '=';
     }
   }
 
   // Make sure we have enough space to add '\0' character at end.
-  if (b64_buf_realloc(&encbuf, size + 1) == -1) return NULL;
-  encbuf.ptr[size] = '\0';
+  encbuf->ptr[size] = '\0';
 
-  return encbuf.ptr;
+  return encbuf->ptr;
 }
 
 
-unsigned char *
-b64_decode (const char *src, size_t len) {
-  return b64_decode_ex(src, len, NULL);
-}
 
 unsigned char *
-b64_decode_ex (const char *src, size_t len, size_t *decsize) {
+b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsize) {
   int i = 0;
   int j = 0;
   int l = 0;
   size_t size = 0;
-  b64_buffer_t decbuf;
   unsigned char buf[3];
   unsigned char tmp[4];
 
   // alloc
-  if (b64_buf_malloc(&decbuf) == -1) { return NULL; }
+  //if (b64_buf_malloc(&decbuf) == -1) { return NULL; }
 
   // parse until end of source
   while (len--) {
@@ -177,9 +156,9 @@ b64_decode_ex (const char *src, size_t len, size_t *decsize) {
       buf[2] = ((tmp[2] & 0x3) << 6) + tmp[3];
 
       // write decoded buffer to `decbuf.ptr'
-      if (b64_buf_realloc(&decbuf, size + 3) == -1)  return NULL;
+      //if (b64_buf_realloc(&decbuf, size + 3) == -1)  return NULL;
       for (i = 0; i < 3; ++i) {
-        ((unsigned char*)decbuf.ptr)[size++] = buf[i];
+        ((unsigned char*)decbuf->ptr)[size++] = buf[i];
       }
 
       // reset
@@ -211,20 +190,20 @@ b64_decode_ex (const char *src, size_t len, size_t *decsize) {
     buf[2] = ((tmp[2] & 0x3) << 6) + tmp[3];
 
     // write remainer decoded buffer to `decbuf.ptr'
-    if (b64_buf_realloc(&decbuf, size + (i - 1)) == -1)  return NULL;
+    //if (b64_buf_realloc(&decbuf, size + (i - 1)) == -1)  return NULL;
     for (j = 0; (j < i - 1); ++j) {
-      ((unsigned char*)decbuf.ptr)[size++] = buf[j];
+      ((unsigned char*)decbuf->ptr)[size++] = buf[j];
     }
   }
 
   // Make sure we have enough space to add '\0' character at end.
-  if (b64_buf_realloc(&decbuf, size + 1) == -1)  return NULL;
-  ((unsigned char*)decbuf.ptr)[size] = '\0';
+  //if (b64_buf_realloc(&decbuf, size + 1) == -1)  return NULL;
+  ((unsigned char*)decbuf->ptr)[size] = '\0';
 
   // Return back the size of decoded string if demanded.
   if (decsize != NULL) {
     *decsize = size;
   }
 
-  return (unsigned char*) decbuf.ptr;
+  return (unsigned char*) decbuf->ptr;
 }
