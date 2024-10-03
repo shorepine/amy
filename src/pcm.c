@@ -204,7 +204,7 @@ int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t
     return memorypcm_map[mp]->sample_ram;
 }
 
-void pcm_unload_patch(uint8_t patch) {
+void pcm_unload_patch(uint16_t patch) {
     if(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT] == NULL) return;
     free(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT]->sample_ram);
     free(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT]);
