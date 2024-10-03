@@ -21,9 +21,10 @@ It supports
    * noise
    * PCM, reading from a baked-in buffer of percussive and misc samples
    * karplus-strong string with adjustable feedback 
+   * Audio input can be used as an oscillator for real time audio effects
    * An operator / algorithm-based frequency modulation (FM) synth
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
- * Reverb and chorus effects, set globally
+ * Reverb, echo and chorus effects, set globally
  * Stereo pan or mono operation 
  * An additive partial synthesizer with an analysis front end to play back long strings of breakpoint-based sine waves
  * Oscillators can be specified by frequency in floating point or midi note 
@@ -97,7 +98,7 @@ You can also start a thread playing live audio:
 
 ```python
 >>> import amy
->>> amy.live() # can optinally pass in audio device ID, amy.live(2) 
+>>> amy.live() # can optinally pass in playback and capture audio device IDs, amy.live(2, 1) 
 >>> amy.send(voices='0', load_patch=130, note=50, vel=1)
 >>> amy.stop()
 ```
@@ -125,7 +126,7 @@ void bleep() {
 }
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0); // initializes amy 
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0,  /* echo */ 1); // initializes amy 
     amy_live_start(); // render live audio
     bleep();
 }
@@ -137,7 +138,7 @@ Or in C, sending the wire protocol directly:
 #include "amy.h"
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 1);
     amy_live_start();
     amy_play_message("v0n50l1K130r0Z");
 }
@@ -148,7 +149,7 @@ If you want to receive buffers of samples, or have more control over the renderi
 ```c
 #include "amy.h"
 ...
-amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1);
+amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo */ 1);
 ...
 ... {
     // For each sample block:
@@ -221,7 +222,7 @@ Here's the full list:
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
 | `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
-| `w`    | `wave` | uint 0-11 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, OFF]. default: 0/SINE |
+| `w`    | `wave` | uint 0-15 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `z`    | `load_sample` | uint x 6 | Signal to start loading sample. patch, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. |
@@ -420,6 +421,16 @@ amy.send(osc=0, bp0=',,,0.9')  # No trailing commas.
 ```
 .. we effectively end up with `bp0='0,1,1000,0.9`, i.e. the 4 elements in the second `bp0` string change the first breakpoint set to have only 2 breakpoints, meaning a constant amplitude during note-on, then a final slow release to 0.9 -- not at all like the first form, and likely not what we wanted.
 
+## Audio input and effects
+
+By setting `wave` to `AUDIO_IN0` or `AUDIO_IN1`, you can have either channel of a stereo input act as an AMY oscillator. You can use this oscillator like you would any other in AMY, apply global effects to it, add filters, change amplitude, etc. 
+
+```
+amy.send(osc=0, wave=amy.AUDIO_IN0, vel=1)
+amy.echo(1, 250, 250, 0.5, 0.5)
+```
+
+If you are building your own audio system around AMY you will want to fill in the buffer `amy_in_block` before rendering. Our included `miniaudio`-based system does this for you. See [`amychip`](https://github.com/shorepine/amychip) for a demo of this in hardware. 
 
 ## FM & ALGO type
 

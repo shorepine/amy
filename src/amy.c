@@ -119,6 +119,9 @@ SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
+// Audio input block. Filled by the audio implementation before rendering.
+int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+
 // Optional render hook that's called per oscillator during rendering
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
 
@@ -798,6 +801,12 @@ int8_t oscs_init() {
     if(AMY_HAS_ECHO > 0) {
         for (int c = 0; c < AMY_NCHANS; ++c)  echo_delay_lines[c] = NULL;
     }
+
+    // Set the optional input to 0
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
+        amy_in_block[i] = 0;
+    }
+
     //init_stereo_reverb();
 
     total_samples = 0;
@@ -886,6 +895,20 @@ void oscs_deinit() {
     dealloc_echo_delay_lines();
 }
 
+void audio_in_note_on(uint16_t osc, uint8_t channel) {
+    // do i need to do anything here? probably not
+}
+
+SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
+    uint16_t c = 0;
+    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+AMY_NCHANS) {
+        buf[c] = F2S(((float)amy_in_block[i]/32767.0) * msynth[osc].amp);
+        c++;
+    }
+    // We have to return something for max_value or else the zero-amp reaper will come along. 
+    return F2S(1.0); //max_value;
+}
+
 
 void osc_note_on(uint16_t osc, float initial_freq) {
     //printf("Note on: osc %d wav %d filter_freq_coefs=%f %f %f %f %f %f\n", osc, synth[osc].wave, 
@@ -903,6 +926,8 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==PCM) pcm_note_on(osc);
     if(synth[osc].wave==ALGO) algo_note_on(osc);
     if(synth[osc].wave==NOISE) noise_note_on(osc);
+    if(synth[osc].wave==AUDIO_IN0) audio_in_note_on(osc, 0);
+    if(synth[osc].wave==AUDIO_IN1) audio_in_note_on(osc, 1);
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
@@ -1298,6 +1323,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == PULSE) max_val = render_pulse(buf, osc);
             if(synth[osc].wave == TRIANGLE) max_val = render_triangle(buf, osc);
             if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
+            if(synth[osc].wave == AUDIO_IN0) max_val = render_audio_in(buf, osc, 0);
+            if(synth[osc].wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
             if(synth[osc].wave == KS) {
                 #if AMY_KS_OSCS > 0
                 max_val = render_ks(buf, osc);
