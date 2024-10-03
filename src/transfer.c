@@ -57,8 +57,8 @@ int b64_buf_realloc(b64_buffer_t* buf, size_t size)
 
 char *
 b64_encode (const unsigned char *src, size_t len) {
-  int32_t i = 0;
-  int32_t j = 0;
+  int i = 0;
+  int j = 0;
   b64_buffer_t encbuf;
   size_t size = 0;
   unsigned char buf[4];
@@ -138,9 +138,9 @@ b64_decode (const char *src, size_t len) {
 
 unsigned char *
 b64_decode_ex (const char *src, size_t len, size_t *decsize) {
-  int32_t i = 0;
-  int32_t j = 0;
-  int32_t l = 0;
+  int i = 0;
+  int j = 0;
+  int l = 0;
   size_t size = 0;
   b64_buffer_t decbuf;
   unsigned char buf[3];
@@ -153,7 +153,7 @@ b64_decode_ex (const char *src, size_t len, size_t *decsize) {
   while (len--) {
     // break if char is `=' or not base64 char
     if ('=' == src[j]) { break; }
-    if (!(isalnum(src[j]) || '+' == src[j] || '/' == src[j])) { break; }
+    if (!(isalnum((unsigned char)src[j]) || '+' == src[j] || '/' == src[j])) { break; }
 
     // read up to 4 bytes at a time into `tmp'
     tmp[i++] = src[j++];
