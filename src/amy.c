@@ -386,7 +386,6 @@ struct event amy_default_event() {
     AMY_UNSET(e.portamento_ms);
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.chained_osc);
-    AMY_UNSET(e.clone_osc);
     AMY_UNSET(e.mod_source);
     AMY_UNSET(e.eq_l);
     AMY_UNSET(e.eq_m);
@@ -526,7 +525,6 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.clone_osc)) { e.clone_osc += base_osc; d.param=CLONE_OSC; d.data = *(uint32_t *)&e.clone_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
@@ -585,63 +583,7 @@ end:
 }
 
 
-void clone_osc(uint16_t i, uint16_t f) {
-    // Set all the synth state to the values from another osc.
-    //fprintf(stderr, "cloning osc %d from %d\n", i, f);
-    //reset_osc(i);  // Causes current voices to stop on param change...
-    synth[i].wave = synth[f].wave;
-    synth[i].patch = synth[f].patch;
-    //synth[i].midi_note = synth[f].midi_note;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].amp_coefs[j] = synth[f].amp_coefs[j];
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].logfreq_coefs[j] = synth[f].logfreq_coefs[j];
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].filter_logfreq_coefs[j] = synth[f].filter_logfreq_coefs[j];
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].duty_coefs[j] = synth[f].duty_coefs[j];
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i].pan_coefs[j] = synth[f].pan_coefs[j];
-    synth[i].feedback = synth[f].feedback;
-    //synth[i].phase = synth[f].phase;
-    //synth[i].volume = synth[f].volume;
-    synth[i].eq_l = synth[f].eq_l;
-    synth[i].eq_m = synth[f].eq_m;
-    synth[i].eq_h = synth[f].eq_h;
-    synth[i].logratio = synth[f].logratio;
-    synth[i].resonance = synth[f].resonance;
-    synth[i].portamento_alpha = synth[f].portamento_alpha;
-    //synth[i].velocity = synth[f].velocity;
-    //synth[i].step = synth[f].step;
-    //synth[i].sample = synth[f].sample;
-    //synth[i].mod_value = synth[f].mod_value;
-    //synth[i].substep = synth[f].substep;
-    //synth[i].status = synth[f].status;
-    //synth[i].chained_osc = synth[f].chained_osc + (f - i);  // Can't do this because we don't have a way to unset it afterwards.  Have to manually set chained_osc after clone.
-    AMY_UNSET(synth[i].chained_osc);
-    synth[i].mod_source = synth[f].mod_source;    // It's OK to have multiple oscs with the same mod source.  But if we set it, then clone other params, we overwrite it.
-    //synth[i].note_on_clock = synth[f].note_on_clock;
-    //synth[i].note_off_clock = synth[f].note_off_clock;
-    //synth[i].zero_amp_clock = synth[f].zero_amp_clock;
-    //synth[i].mod_value_clock = synth[f].mod_value_clock;
-    synth[i].filter_type = synth[f].filter_type;
-    //synth[i].hpf_state[0] = synth[f].hpf_state[0];
-    //synth[i].hpf_state[1] = synth[f].hpf_state[1];
-    //synth[i].dc_offset = synth[f].dc_offset;
-    synth[i].algorithm = synth[f].algorithm;
-    //for(uint8_t j=0;j<MAX_ALGO_OPS;j++) synth[i].algo_source[j] = synth[f].algo_source[j];  // RISKY - end up allocating secondary oscs to multiple mains.
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-        for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) {
-            synth[i].breakpoint_times[j][k] = synth[f].breakpoint_times[j][k];
-            synth[i].breakpoint_values[j][k] = synth[f].breakpoint_values[j][k];
-        }
-        synth[i].eg_type[j] = synth[f].eg_type[j];
-    }
-    //for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = synth[f].last_scale[j]; }
-    //synth[i].last_two[0] = synth[f].last_two[0];
-    //synth[i].last_two[1] = synth[f].last_two[1];
-    //synth[i].lut = synth[f].lut;
-}
+
 
 void reset_osc(uint16_t i ) {
     // set all the synth state to defaults
@@ -1032,7 +974,6 @@ void play_event(struct delta d) {
         else
             AMY_UNSET(synth[d.osc].chained_osc);
     }
-    if(d.param == CLONE_OSC) { clone_osc(d.osc, *(int16_t *)&d.data); }
     if(d.param == RESET_OSC) { 
         if(*(int16_t *)&d.data & RESET_AMY) {
             amy_stop();
@@ -1830,7 +1771,7 @@ struct event amy_parse_message(char * message) {
                         case 'B': copy_param_list_substring(e.bp1, message + start); e.bp_is_set[1] = 1; break;
                         case 'b': e.feedback = atoff(message+start); break;
                         case 'c': e.chained_osc = atoi(message + start); break;
-                        case 'C': e.clone_osc = atoi(message + start); break;
+                        /* C available */
                         case 'd': parse_coef_message(message + start, e.duty_coefs);break;
                         case 'D': show_debug(atoi(message + start)); break;
                         case 'f': parse_coef_message(message + start, e.freq_coefs);break;
