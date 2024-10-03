@@ -1733,7 +1733,9 @@ struct event amy_parse_message(char * message) {
     if(amy_transfer_flag) {
         parse_transfer_message(message, length);
         AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
-        return amy_default_event();
+        struct event e = amy_default_event();
+        e.status = TRANSFER_DATA;
+        return e;
     }
 
     struct event e = amy_default_event();

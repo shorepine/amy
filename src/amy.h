@@ -102,7 +102,8 @@ enum coefs{
 #define AUDIBLE_SUSPENDED 4
 #define IS_MOD_SOURCE 5
 #define IS_ALGO_SOURCE 6
-#define STATUS_OFF 7
+#define TRANSFER_DATA 7
+#define STATUS_OFF 8
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
