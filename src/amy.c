@@ -89,6 +89,8 @@ void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i)
 delay_line_t **chorus_delay_lines; 
 delay_line_t **echo_delay_lines; 
 
+#include "transfer.h"
+
 #ifdef _POSIX_THREADS
 #include <pthread.h>
 pthread_mutex_t amy_queue_lock; 
@@ -1627,7 +1629,34 @@ int parse_float_list_message(char *message, float *vals, int max_num_vals, float
     return num_vals_received;
 }
 
-int parse_int_list_message(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val) {
+int parse_int_list_message32(char *message, int32_t *vals, int max_num_vals, int32_t skipped_val) {
+    // Return the number of values extracted from message.
+    uint16_t c = 0, last_c;
+    uint16_t stop = strspn(message, " -0123456789,");  // Space, no period.
+    int num_vals_received = 0;
+    while(c < stop && num_vals_received < max_num_vals) {
+        *vals = atoi(message + c);
+        // Skip spaces in front of number.
+        while (message[c] == ' ') ++c;
+        // Figure length of number string.
+        last_c = c;
+        c += strspn(message + c, "-0123456789");  // No space, just minus and digits.
+        if (last_c == c)  // Zero-length number.
+            *vals = skipped_val;  // Rewrite with special value for skips.
+        // Step through (spaces?) to next comma, or end of string or region.
+        while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
+        ++c;  // Step over the comma (if that's where we landed).
+        ++vals;  // Move to next output.
+        ++num_vals_received;
+    }
+    if (c < stop) {
+        fprintf(stderr, "WARNING: parse_int_list: More than %d values in \"%s\"\n",
+                max_num_vals, message);
+    }
+    return num_vals_received;
+}
+
+int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val) {
     // Return the number of values extracted from message.
     uint16_t c = 0, last_c;
     uint16_t stop = strspn(message, " -0123456789,");  // Space, no period.
@@ -1667,7 +1696,7 @@ void copy_param_list_substring(char *dest, const char *src) {
 
 // helper to parse the list of source voices for an algorithm
 void parse_algorithm_source(struct synthinfo * t, char *message) {
-    int num_parsed = parse_int_list_message(message, t->algo_source, MAX_ALGO_OPS,
+    int num_parsed = parse_int_list_message16(message, t->algo_source, MAX_ALGO_OPS,
                                             AMY_UNSET_VALUE(t->algo_source[0]));
     // Clear unspecified values.
     for (int i = num_parsed; i < MAX_ALGO_OPS; ++i) {
@@ -1717,6 +1746,14 @@ struct event amy_parse_message(char * message) {
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
+
+    // Check if we're in a transfer block, if so, parse it and leave this loop 
+    if(amy_transfer_flag) {
+        parse_transfer_message(message, length);
+        AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
+        return amy_default_event();
+    }
+
     struct event e = amy_default_event();
     uint32_t sysclock = amy_sysclock();
 
@@ -1831,6 +1868,14 @@ struct event amy_parse_message(char * message) {
                               e.eq_h = eq[2];
                             }
                             break;
+                        case 'z': {
+                            int32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
+                            parse_int_list_message32(message+start, sm, 6, 0);
+                            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
+                            start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+                            break;
+
+                        }
                         /* Y,y,z available */
                         /* Z used for end of message */
                         default:

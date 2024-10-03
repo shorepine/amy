@@ -380,6 +380,9 @@ extern struct profile profiles[NO_TAG];
 extern int64_t amy_get_us();
 #endif
 
+extern uint8_t amy_transfer_flag ;
+
+
 // Chorus gets is modulator from a special osc one beyond the normal range.
 #define CHORUS_MOD_SOURCE AMY_OSCS
 
@@ -470,7 +473,8 @@ void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
 void amy_reset_sysclock();
 
-extern int parse_int_list_message(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
+extern int parse_int_list_message32(char *message, int32_t *vals, int max_num_vals, int32_t skipped_val);
+extern int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
 extern void reset_osc(uint16_t i );
 
 
@@ -539,6 +543,7 @@ extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
 //extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 
+extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 
 // filters
 extern void filters_init();

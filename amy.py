@@ -158,7 +158,7 @@ def message(**kwargs):
     kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'cI', 'volume': 'vF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 'clone_osc': 'CI',
-              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL',
+              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
               'external_channel': 'WI', 'portamento': 'mI',
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
@@ -309,7 +309,48 @@ def stop():
 def restart():
     import libamy
     libamy.restart()
+
+def transfer_wav(wavfilename, patch=1024, midinote=0, loopstart=0, loopend=0):
+    from math import ceil
+    import amy_wave # our version of a wave file reader that looks for sampler metadata
+    # tulip has ubinascii, normal has base64
+    try:
+        import base64
+        def b64(b):
+            return base64.b64encode(b)
+    except ImportError:
+        import ubinascii
+        def b64(b):
+            return ubinascii.b2a_base64(b)[:-1]
+
+    w = amy_wave.open(wavfilename, 'r')
     
+    if(w.getnchannels()>1):
+        # de-interleave and just choose the first channel
+        f = bytes([f[j] for i in range(0,len(f),4) for j in (i,i+1)])
+    if(loopstart==0): 
+        if(hasattr(w,'_loopstart')): 
+            loopstart = w._loopstart
+    if(loopend==0): 
+        if(hasattr(w,'_loopend')): 
+            loopend = w._loopend
+    if(midinote==0): 
+        if(hasattr(w,'_midinote')): 
+            midinote = w._midinote
+        else:
+            midinote=60
+
+    # Tell AMY we're sending over a sample
+    s = "%d,%d,%d,%d,%d,%d" % (patch, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
+    send(load_sample=s)
+    # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
+    # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
+    for i in range(ceil(w.getnframes()/94)):
+        message = b64(w.readframes(94))
+        send_raw(message.decode('ascii'))
+    print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, w.getnframes()*2, w.getnframes(), midinote))
+
+
 """
     Convenience functions
 """

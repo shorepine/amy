@@ -181,50 +181,39 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
 
 // load mono samples (let python parse wave files) into patch # 
 // set loopstart, loopend, midinote, samplerate (and log2sr)
-int8_t pcm_load(int16_t * samples, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend) {
-    // find the next free patch #
-    int8_t patch = -1;
-    for(uint8_t i=0;i<MAX_MEMORYPCM_PATCHES;i++) {
-        if(memorypcm_map[i]==NULL) {
-            patch = i;
-            i = MAX_MEMORYPCM_PATCHES+1;
-        }
-    }
-    if(patch<0) return patch;
-    patch = patch + MEMORYPCM_PATCHES_START_AT;
-
+int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend) {
     // alloc the map
-    memorypcm_map[patch] = malloc_caps(sizeof(memorypcm_map_t), SAMPLE_RAM_CAPS);
-    memorypcm_map[patch]->samplerate = samplerate;
-    memorypcm_map[patch]->log2sr = log2f((float)samplerate / ZERO_LOGFREQ_IN_HZ);
-    memorypcm_map[patch]->midinote = midinote;
-    memorypcm_map[patch]->loopstart = loopstart;
-    memorypcm_map[patch]->length = length;
-    memorypcm_map[patch]->sample_ram = malloc_caps(length*2, SAMPLE_RAM_CAPS);
-    if(memorypcm_map[patch]->sample_ram  == NULL) {
-        free(memorypcm_map[patch]);
-        return -1; // no ram for sample
+    uint16_t mp = patch - MEMORYPCM_PATCHES_START_AT;
+    memorypcm_map[mp] = malloc_caps(sizeof(memorypcm_map_t), SAMPLE_RAM_CAPS);
+    memorypcm_map[mp]->samplerate = samplerate;
+    memorypcm_map[mp]->log2sr = log2f((float)samplerate / ZERO_LOGFREQ_IN_HZ);
+    memorypcm_map[mp]->midinote = midinote;
+    memorypcm_map[mp]->loopstart = loopstart;
+    memorypcm_map[mp]->length = length;
+    memorypcm_map[mp]->sample_ram = malloc_caps(length*2, SAMPLE_RAM_CAPS);
+    if(memorypcm_map[mp]->sample_ram  == NULL) {
+        free(memorypcm_map[mp]);
+        return NULL; // no ram for sample
     }
 
     if(loopend == 0) {  // loop whole sample
-        memorypcm_map[patch]->loopend = memorypcm_map[patch]->length-1;
+        memorypcm_map[mp]->loopend = memorypcm_map[mp]->length-1;
     } else {
-        memorypcm_map[patch]->loopend = loopend;        
+        memorypcm_map[mp]->loopend = loopend;        
     }
-    memcpy(memorypcm_map[patch]->sample_ram, samples, length*2);
-    return patch; // patch number 
+    return memorypcm_map[mp]->sample_ram;
 }
 
 void pcm_unload_patch(uint8_t patch) {
-    if(memorypcm_map[patch] == NULL) return;
-    free(memorypcm_map[patch]->sample_ram);
-    free(memorypcm_map[patch]);
-    memorypcm_map[patch] = NULL;
+    if(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT] == NULL) return;
+    free(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT]->sample_ram);
+    free(memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT]);
+    memorypcm_map[patch-MEMORYPCM_PATCHES_START_AT] = NULL;
 }
 
 //free all patches
 void pcm_unload_all() {
-    for(uint8_t i=0;i<MAX_MEMORYPCM_PATCHES;i++) {
+    for(uint16_t i=MEMORYPCM_PATCHES_START_AT;i<MEMORYPCM_PATCHES_START_AT+MAX_MEMORYPCM_PATCHES;i++) {
         pcm_unload_patch(i);
     }
 }
