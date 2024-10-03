@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include "transfer.h"
 #include <stdio.h>
+#include <stdint.h>
 
 uint8_t amy_transfer_flag = 0;
 uint8_t * amy_transfer_storage = NULL; 
