@@ -9,6 +9,7 @@
 
 #ifndef TRANSFER_H
 #define TRANSFER_H 1
+#include <stdint.h>
 
 typedef struct b64_buffer {
     char * ptr;
