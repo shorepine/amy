@@ -25,7 +25,7 @@ void setup() {
   i2s.setBCLK(9); // BCLK = SCLK. MCLK = SCLK + 1
   i2s.setDATA(8); // DATA = DIN, SD, SDOUT, DOUT
   i2s.setBitsPerSample(16); 
-  i2s.setBuffers(2, AMY_BLOCK_SIZE*AMY_NCHANS*BYTES_PER_SAMPLE/4, 0);
+  i2s.setBuffers(2, AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BYTES_PER_SAMPLE/4, 0);
   i2s.begin(AMY_SAMPLE_RATE);
 
 #if defined(ARDUINO_ARCH_MBED) && defined(ARDUINO_ARCH_RP2040)
@@ -78,8 +78,8 @@ void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
   uint8_t * samples = (uint8_t*)amy.render_to_buffer();
   // Block until ready
-  while(i2s.availableForWrite()<AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
-  size_t written = i2s.write((const uint8_t*)samples, (size_t)AMY_BLOCK_SIZE*BYTES_PER_SAMPLE*AMY_NCHANS);
+  while(i2s.availableForWrite()<AMY_BLOCK_SIZE*AMY_BYTES_PER_SAMPLE*AMY_NCHANS);
+  size_t written = i2s.write((const uint8_t*)samples, (size_t)AMY_BLOCK_SIZE*AMY_BYTES_PER_SAMPLE*AMY_NCHANS);
   MIDI.read();  
 
 }

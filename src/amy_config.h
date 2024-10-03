@@ -63,12 +63,14 @@ extern const uint16_t pcm_samples;
 #define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
 #define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
 #define DELAY_RAM_CAPS MALLOC_CAP_SPIRAM 
+#define SAMPLE_RAM_CAPS MALLOC_CAP_SPIRAM
 #else
 #define EVENTS_RAM_CAPS MALLOC_CAP_DEFAULT
 #define SYNTH_RAM_CAPS MALLOC_CAP_DEFAULT
 #define BLOCK_RAM_CAPS MALLOC_CAP_DEFAULT
 #define FBL_RAM_CAPS MALLOC_CAP_DEFAULT
 #define DELAY_RAM_CAPS MALLOC_CAP_DEFAULT
+#define SAMPLE_RAM_CAPS MALLOC_CAP_DEFAULT
 #endif
 #else
 #define EVENTS_RAM_CAPS 0
@@ -76,6 +78,7 @@ extern const uint16_t pcm_samples;
 #define BLOCK_RAM_CAPS 0
 #define FBL_RAM_CAPS 0
 #define DELAY_RAM_CAPS 0 
+#define SAMPLE_RAM_CAPS 0
 #endif
 
 // 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
