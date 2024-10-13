@@ -86,8 +86,6 @@ uint16_t in_ptr = 0;
 extern int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 
 static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
-    // Lag input and render only when we have 256 frames of input
-
     short int *poke = (short *)pOutput;
     short int *peek = (short *)pInput;
 
@@ -104,15 +102,15 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
             // copy this output to a ring buffer
             for(uint16_t amy_frame=0;amy_frame<AMY_BLOCK_SIZE;amy_frame++) {
                 for(uint8_t c=0;c<AMY_NCHANS;c++) {
-                    output_ring[ring_write_ptr % OUTPUT_RING_LENGTH] = buf[AMY_NCHANS * amy_frame + c];
-                    ring_write_ptr++; if(ring_write_ptr == OUTPUT_RING_LENGTH) ring_write_ptr = 0;
+                    output_ring[ring_write_ptr++] = buf[AMY_NCHANS * amy_frame + c];
+                    if(ring_write_ptr == OUTPUT_RING_LENGTH) ring_write_ptr = 0;
                 }
             }
         }
         // Per audio frame, copy (lagged by AMY_BLOCK_SIZE) output data from AMY into expected audio out buffer
         for(uint8_t c=0;c<AMY_NCHANS;c++) {
-            poke[frame*AMY_NCHANS + c] = output_ring[ring_read_ptr];
-            ring_read_ptr++; if(ring_read_ptr == OUTPUT_RING_LENGTH ) ring_read_ptr = 0;
+            poke[frame*AMY_NCHANS + c] = output_ring[ring_read_ptr++];
+            if(ring_read_ptr == OUTPUT_RING_LENGTH ) ring_read_ptr = 0;
         }
     }
 

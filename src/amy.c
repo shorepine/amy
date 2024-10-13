@@ -148,9 +148,6 @@ uint32_t message_counter ;
 char *message_start_pointer;
 int16_t message_length;
 
-int32_t computed_delta; // can be negative no prob, but usually host is larger # than client
-uint8_t computed_delta_set; // have we set a delta yet?
-
 
 typedef struct echo_config {
     SAMPLE level;  // Mix of echo into output.  0 = Echo off.
@@ -752,8 +749,6 @@ int8_t oscs_init() {
     //init_stereo_reverb();
 
     total_samples = 0;
-    computed_delta = 0;
-    computed_delta_set = 0;
     event_counter = 0;
     message_counter = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
@@ -1023,7 +1018,7 @@ void play_event(struct delta d) {
     // for global changes, just make the change, no need to update the per-osc synth
     if(d.param == VOLUME) amy_global.volume = *(float *)&d.data;
     if(d.param == PITCH_BEND) amy_global.pitch_bend = *(float *)&d.data;
-    if(d.param == LATENCY) { amy_global.latency_ms = *(uint16_t *)&d.data; computed_delta_set = 0; computed_delta = 0; }
+    if(d.param == LATENCY) { amy_global.latency_ms = *(uint16_t *)&d.data; }
     if(d.param == EQ_L) amy_global.eq[0] = F2S(powf(10, *(float *)&d.data / 20.0));
     if(d.param == EQ_M) amy_global.eq[1] = F2S(powf(10, *(float *)&d.data / 20.0));
     if(d.param == EQ_H) amy_global.eq[2] = F2S(powf(10, *(float *)&d.data / 20.0));
@@ -1757,14 +1752,6 @@ struct event amy_parse_message(char * message) {
         if( ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) || b == 0) {  // new mode or end
             if(mode=='t') {
                 e.time=atol(message + start);
-                // if we have set latency AND haven't yet synced our times, do it now
-                if(amy_global.latency_ms != 0) {
-                    if(!computed_delta_set) {
-                        computed_delta = e.time - sysclock;
-                        //fprintf(stderr,"setting computed delta to %lld (e.time is %lld sysclock %lld) max_drift_ms %d latency %d\n", computed_delta, e.time, sysclock, AMY_MAX_DRIFT_MS, amy_global.latency_ms);
-                        computed_delta_set = 1;
-                    }
-                }
             } else {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
@@ -1876,22 +1863,14 @@ struct event amy_parse_message(char * message) {
 
     // Only do this if we got some data
     if(length >0) {
-        // TODO -- should time adjustment happen during parsing or playback?
-
-        // Now adjust time in some useful way:
-        // if we have a delta OR latency is 0 , AND got a time in this message, use it schedule it properly
-        if(( (computed_delta_set || amy_global.latency_ms==0) && AMY_IS_SET(e.time))) {
-            // OK, so check for potentially negative numbers here (or really big numbers-sysclock)
-            int32_t potential_time = (int32_t)((int32_t)e.time - (int32_t)computed_delta) + amy_global.latency_ms;
-            if(potential_time < 0 || (potential_time > (int32_t)(sysclock + amy_global.latency_ms + AMY_MAX_DRIFT_MS))) {
-                //fprintf(stderr,"recomputing time base: message came in with %lld, mine is %lld, computed delta was %lld\n", e.time, sysclock, computed_delta);
-                computed_delta = e.time - sysclock;
-                //fprintf(stderr,"computed delta now %lld\n", computed_delta);
-            }
-            e.time = (e.time - computed_delta) + amy_global.latency_ms;
-        } else { // else play it asap
-            e.time = sysclock + amy_global.latency_ms;
-        }
+        // if time is set, play then
+        // if time and latency is set, play in time + latency
+        // if time is not set, play now
+        // if time is not set + latency is set, play in latency
+        uint32_t playback_time = sysclock;
+        if(AMY_IS_SET(e.time)) playback_time = e.time;
+        playback_time += amy_global.latency_ms;
+        e.time = playback_time;
         e.status = SCHEDULED;
         return e;
         

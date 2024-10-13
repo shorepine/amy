@@ -41,7 +41,6 @@ extern const uint16_t pcm_samples;
 #define AMY_HAS_REVERB amy_global.has_reverb
 #define AMY_HAS_CHORUS amy_global.has_chorus
 #define AMY_HAS_ECHO amy_global.has_echo
-#define AMY_MAX_DRIFT_MS 20000   // ms of time you can schedule ahead before synth recomputes time base
 #define AMY_KS_OSCS 1            // How many karplus-strong oscillators to keep track of (0 disables KS)
 #ifdef AMY_DAISY
 #define AMY_HAS_PARTIALS 0       // 1 = Make partials available

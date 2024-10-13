@@ -33,7 +33,7 @@ class AmyTest:
 
   def __init__(self):
     amy.restart()
-    amy.send(time=0)  # Defeat "computed_delta" offset.
+    amy.send(reset=amy.RESET_TIMEBASE)  # start from 0
 
   def test(self):
 
