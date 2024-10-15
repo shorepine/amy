@@ -583,6 +583,12 @@ end:
 
 
 void reset_osc(uint16_t i ) {
+    // reset PCM patch if type = PCM
+    if(synth[i].wave == PCM) {
+        if(AMY_IS_SET(synth[i].patch)) {
+            pcm_unload_patch(synth[i].patch);
+        }
+    }
     // set all the synth state to defaults
     synth[i].osc = i; // self-reference to make updating oscs easier
     synth[i].wave = SINE;
@@ -1842,8 +1848,12 @@ struct event amy_parse_message(char * message) {
                         case 'z': {
                             int32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
                             parse_int_list_message32(message+start, sm, 6, 0);
-                            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
-                            start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+                            if(sm[1]==0) { // remove patch
+                                pcm_unload_patch(sm[0]);
+                            } else {
+                                int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
+                                start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+                            }
                             break;
 
                         }

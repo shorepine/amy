@@ -10,7 +10,6 @@ FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
 RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (8192, 16384, 32768)
 AMY_LATENCY_MS = 0
-AMY_MAX_DRIFT_MS = 20000
 
 override_send = None
 mess = []
@@ -233,10 +232,6 @@ def stop_store_patch(patch_number):
     global saved_override, override_send
     override_send = saved_override
 
-    if(patch_number<1023 or patch_number>1055):
-        print("invalid memory patch number (1024-1055)")
-        return
-
     m = "u"+str(patch_number)+retrieve_patch()
     send_raw(m)
 
@@ -311,7 +306,12 @@ def restart():
     import libamy
     libamy.restart()
 
-def transfer_wav(wavfilename, patch=1024, midinote=0, loopstart=0, loopend=0):
+def unload_sample(patch=0):
+    s= "%d,%d" % (patch, 0)
+    send(load_sample=s)
+    print("Patch %d unloaded from RAM" % (patch))
+    
+def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil
     import amy_wave # our version of a wave file reader that looks for sampler metadata
     # tulip has ubinascii, normal has base64

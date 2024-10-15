@@ -552,6 +552,7 @@ extern SAMPLE amy_get_random();
 //extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern void pcm_unload_patch(uint16_t patch_number);
 
 // filters
 extern void filters_init();
