@@ -2,7 +2,7 @@
 
 AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, the Pi Pico 2 RP2530, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
 
-It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a drum machine (PCM samples included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
+It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a sampler (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/shorepine/alles), as well as the [Tulip Creative Computer](https://github.com/shorepine/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -19,9 +19,9 @@ It supports
    * saw (up and down)
    * triangle
    * noise
-   * PCM, reading from a baked-in buffer of percussive and misc samples
+   * PCM, reading from a baked-in buffer of percussive and misc samples, or by loading samples with looping and base midi note
    * karplus-strong string with adjustable feedback 
-   * Audio input can be used as an oscillator for real time audio effects
+   * Stereo audio input can be used as an oscillator for real time audio effects
    * An operator / algorithm-based frequency modulation (FM) synth
  * Biquad low-pass, bandpass or hi-pass filters with cutoff and resonance, can be assigned to any oscillator
  * Reverb, echo and chorus effects, set globally
@@ -224,7 +224,7 @@ Here's the full list:
 | `w`    | `wave` | uint 0-15 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `z`    | `load_sample` | uint x 6 | Signal to start loading sample. patch, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. |
+| `z`    | `load_sample` | uint x 6 | Signal to start loading sample. patch, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `patch` and `length=0` to unload a sample from RAM. |
 
 
 
@@ -582,7 +582,7 @@ Note that the default `bp0` amplitude envelope of the `PARTIALS` osc is a gate, 
 
 ## PCM
 
-AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the PCM sample bank using `amy_headers.py`. 
+AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the basked-in PCM sample bank using `amy_headers.py`. 
 
 
 ```python
@@ -598,6 +598,25 @@ amy.send(wave=amy.PCM,vel=1,patch=21,feedback=1) # loops forever until note off
 amy.send(vel=0) # note off
 amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 ```
+
+## Sampler (aka Memory PCM)
+
+You can also load your own samples into AMY at runtime. We support sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
+
+```python
+amy.load_sample("G1.wav", patch=3)
+amy.send(osc=0, wave=amy.PCM, patch=3, vel=1) # plays the sample
+```
+
+You can use any patch number. If it overlaps with an existing PCM baked in number, it will play the memory sample instead of the baked in sample until you `unload_sample` the patch.
+
+If the WAV file has sampler metadata like loop points or base MIDI note, we use that in AMY. You can set it directly as well using `loopstart`, `loopend`, `midinote` or `length` in the `load_sample` call. To unload a sample:
+
+```python
+amy.unload_sample(3) # unloads the RAM for patch 3
+```
+
+Under the hood, if AMY receives a `load_sample` message (with patch number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
 
 ## <a name="voices_and_patches"></a>Voices and patches (DX7, Juno-6, custom) support
 
