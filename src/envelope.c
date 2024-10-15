@@ -126,7 +126,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             }
             //printf("cbp: time %f osc %d amp %f OFF\n", total_samples / (float)AMY_SAMPLE_RATE, osc, msynth[osc].amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
-            //synth[osc].status=OFF;
+            //synth[osc].status=SYNTH_OFF;
             //AMY_UNSET(synth[osc].note_off_clock);
             scale = F2S(synth[osc].breakpoint_values[bp_set][bp_r]);
             synth[osc].last_scale[bp_set] = scale;

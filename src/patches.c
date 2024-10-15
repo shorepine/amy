@@ -100,7 +100,7 @@ void patches_store_patch(char * message) {
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(struct event e) {
     int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = parse_int_list_message16(e.voices, voices, MAX_VOICES, 0);
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
     e.voices[0] = 0;
     AMY_UNSET(e.load_patch);
@@ -120,7 +120,7 @@ void patches_load_patch(struct event e) {
     char sub_message[255];
     
     int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message(e.voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = parse_int_list_message16(e.voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
     if(e.load_patch > 1023) {
@@ -193,7 +193,7 @@ void patches_load_patch(struct event e) {
                     sub_message[i-start+1]= 0;
                     struct event patch_event = amy_parse_message(sub_message);
                     patch_event.time = e.time;
-                    if(patch_event.status == SCHEDULED) {
+                    if(patch_event.status == EVENT_SCHEDULED) {
                         amy_add_event_internal(patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;

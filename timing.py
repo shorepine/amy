@@ -33,7 +33,7 @@ class AmyTest:
 
   def __init__(self):
     amy.restart()
-    amy.send(time=0)  # Defeat "computed_delta" offset.
+    amy.send(reset=amy.RESET_TIMEBASE)  # start from 0
 
   def test(self):
 
@@ -287,12 +287,13 @@ class TestTiming(AmyTest):
   """Run LPF24 to see how it times."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, filter_freq='16,0,0,0,10', resonance=0.75, filter_type=amy.FILTER_LPF24,
-             bp1='3,1,200,0.5,200,0')
-    amy.send(time=0, osc=1, clone_osc=0)
-    amy.send(time=0, osc=2, clone_osc=0)
-    amy.send(time=0, osc=3, clone_osc=0)
-    amy.send(time=0, osc=4, clone_osc=0)
+    osc_args = {"time":0, 'wave':amy.SAW_UP, 'filter_freq':'16,0,0,0,10', 'resonance':0.75, 'filter_type':amy.FILTER_LPF24,
+        'bp1':'3,1,200,0.5,200,0'}
+    amy.send(osc=0, **osc_args)
+    amy.send(osc=1, **osc_args)
+    amy.send(osc=2, **osc_args)
+    amy.send(osc=3, **osc_args)
+    amy.send(osc=4, **osc_args)
     amy.send(time=50, osc=0, note=48, vel=1)
     amy.send(time=100, osc=1, note=51, vel=1)
     amy.send(time=150, osc=2, note=54, vel=1)

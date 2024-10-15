@@ -29,7 +29,10 @@ int main(int argc, char ** argv) {
         switch(opt) 
         { 
             case 'd': 
-                amy_device_id = atoi(optarg);
+                amy_playback_device_id = atoi(optarg);
+                break;
+            case 'c': 
+                amy_capture_device_id = atoi(optarg);
                 break;
             case 'l':
                 amy_print_devices();
@@ -40,7 +43,8 @@ int main(int argc, char ** argv) {
                 break;
             case 'h':
                 printf("usage: amy-example\n");
-                printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
+                printf("\t[-d playback sound device id, use -l to list, default, autodetect]\n");
+                printf("\t[-c capture sound device id, use -l to list, default, autodetect]\n");
                 printf("\t[-l list all sound devices and exit]\n");
                 printf("\t[-o filename.wav - write to filename.wav instead of playing live]\n");
                 printf("\t[-h show this help and exit]\n");

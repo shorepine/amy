@@ -5,12 +5,11 @@ AMY_SAMPLE_RATE = 44100.0
 AMY_NCHANS = 2
 AMY_OSCS = 120
 MAX_QUEUE = 400
-SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, CUSTOM, OFF = range(14)
+SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF = range(16)
 FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
 RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (8192, 16384, 32768)
 AMY_LATENCY_MS = 0
-AMY_MAX_DRIFT_MS = 20000
 
 override_send = None
 mess = []
@@ -158,8 +157,8 @@ def message(**kwargs):
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'cI', 'volume': 'vF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
-              'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 'clone_osc': 'CI',
-              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL',
+              'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
+              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
               'external_channel': 'WI', 'portamento': 'mI',
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
@@ -233,10 +232,6 @@ def stop_store_patch(patch_number):
     global saved_override, override_send
     override_send = saved_override
 
-    if(patch_number<1023 or patch_number>1055):
-        print("invalid memory patch number (1024-1055)")
-        return
-
     m = "u"+str(patch_number)+retrieve_patch()
     send_raw(m)
 
@@ -295,9 +290,9 @@ def render(seconds):
 def start():
     live()
 
-def live(audio_device=-1):
+def live(audio_playback_device=-1, audio_capture_device=-1):
     import libamy
-    libamy.live(audio_device)
+    libamy.live(audio_playback_device, audio_capture_device)
 
 # Stops live mode
 def pause():
@@ -310,7 +305,53 @@ def stop():
 def restart():
     import libamy
     libamy.restart()
+
+def unload_sample(patch=0):
+    s= "%d,%d" % (patch, 0)
+    send(load_sample=s)
+    print("Patch %d unloaded from RAM" % (patch))
+
+def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
+    from math import ceil
+    import amy_wave # our version of a wave file reader that looks for sampler metadata
+    # tulip has ubinascii, normal has base64
+    try:
+        import base64
+        def b64(b):
+            return base64.b64encode(b)
+    except ImportError:
+        import ubinascii
+        def b64(b):
+            return ubinascii.b2a_base64(b)[:-1]
+
+    w = amy_wave.open(wavfilename, 'r')
     
+    if(w.getnchannels()>1):
+        # de-interleave and just choose the first channel
+        f = bytes([f[j] for i in range(0,len(f),4) for j in (i,i+1)])
+    if(loopstart==0): 
+        if(hasattr(w,'_loopstart')): 
+            loopstart = w._loopstart
+    if(loopend==0): 
+        if(hasattr(w,'_loopend')): 
+            loopend = w._loopend
+    if(midinote==0): 
+        if(hasattr(w,'_midinote')): 
+            midinote = w._midinote
+        else:
+            midinote=60
+
+    # Tell AMY we're sending over a sample
+    s = "%d,%d,%d,%d,%d,%d" % (patch, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
+    send(load_sample=s)
+    # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
+    # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
+    for i in range(ceil(w.getnframes()/94)):
+        message = b64(w.readframes(94))
+        send_raw(message.decode('ascii'))
+    print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, w.getnframes()*2, w.getnframes(), midinote))
+
+
 """
     Convenience functions
 """

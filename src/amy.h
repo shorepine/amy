@@ -12,6 +12,7 @@
 
 
 
+// This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.
 typedef struct {
     uint32_t offset;
     uint32_t length;
@@ -19,6 +20,7 @@ typedef struct {
     uint32_t loopend;
     uint8_t midinote;
 } pcm_map_t;
+
 
 #ifndef AMY_CONFIG_H
 #define AMY_CONFIG_H amy_config.h
@@ -35,7 +37,7 @@ typedef struct {
 #define MAX_BREAKPOINTS 8
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
-#define BYTES_PER_SAMPLE 2
+#define AMY_BYTES_PER_SAMPLE 2
 
 // Constants for filters.c, needed for synth structure.
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
@@ -87,18 +89,23 @@ enum coefs{
 #define PARTIAL 9
 #define PARTIALS 10
 #define BYO_PARTIALS 11
-#define CUSTOM 12
-#define WAVE_OFF 13
+#define AUDIO_IN0 12
+#define AUDIO_IN1 13
+#define CUSTOM 14
+#define WAVE_OFF 15
 
 // synth[].status values
-#define EMPTY 0
-#define SCHEDULED 1
-#define PLAYED 2
-#define AUDIBLE 3
-#define AUDIBLE_SUSPENDED 4
-#define IS_MOD_SOURCE 5
-#define IS_ALGO_SOURCE 6
-#define STATUS_OFF 7
+#define SYNTH_OFF 0
+#define SYNTH_AUDIBLE 1
+#define SYNTH_AUDIBLE_SUSPENDED 2
+#define SYNTH_IS_MOD_SOURCE 3
+#define SYNTH_IS_ALGO_SOURCE 4
+
+// event.status values
+#define EVENT_EMPTY 0
+#define EVENT_SCHEDULED 1
+#define EVENT_TRANSFER_DATA 2
+
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
@@ -247,6 +254,7 @@ static inline int isnan_c11(float test)
 
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
+
 // Delta holds the individual changes from an event, it's sorted in order of playback time 
 // this is more efficient in memory than storing entire events per message 
 struct delta {
@@ -294,7 +302,6 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
-    uint16_t clone_osc;  // Only used as a flag.
     uint16_t reset_osc;
     uint8_t status;
 };
@@ -382,6 +389,9 @@ extern struct mod_state mglobal;
 extern struct profile profiles[NO_TAG];
 extern int64_t amy_get_us();
 #endif
+
+extern uint8_t amy_transfer_flag ;
+
 
 // Chorus gets is modulator from a special osc one beyond the normal range.
 #define CHORUS_MOD_SOURCE AMY_OSCS
@@ -473,7 +483,8 @@ void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
 void amy_reset_sysclock();
 
-extern int parse_int_list_message(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
+extern int parse_int_list_message32(char *message, int32_t *vals, int max_num_vals, int32_t skipped_val);
+extern int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
 extern void reset_osc(uint16_t i );
 
 
@@ -542,6 +553,9 @@ extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
 //extern void algo_custom_setup_patch(uint16_t osc, uint16_t * target_oscs);
 
+extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern void pcm_unload_patch(uint16_t patch_number);
+extern void pcm_unload_all_patches();
 
 // filters
 extern void filters_init();

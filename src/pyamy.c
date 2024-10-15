@@ -17,13 +17,14 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 }
 
 
-// TODO, take an optional arg for sound device ID
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
-    int arg1 = -1;
-    if(! PyArg_ParseTuple(args, "i", &arg1)) {
-        amy_device_id = -1;
+    int arg1 = -1; int arg2 = -1;
+    if(! PyArg_ParseTuple(args, "ii", &arg1, &arg2)) {
+        amy_playback_device_id = -1;
+        amy_capture_device_id = -1;
     } else {
-        amy_device_id = arg1;
+        amy_playback_device_id = arg1;
+        amy_capture_device_id = arg2;
     }
     amy_live_start();
     return Py_None;

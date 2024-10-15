@@ -555,7 +555,7 @@ void partial_note_off(uint16_t osc) {
     AMY_UNSET(synth[osc].note_on_clock);
     synth[osc].note_off_clock = total_samples;   
     msynth[osc].last_amp = 0;
-    synth[osc].status = STATUS_OFF;
+    synth[osc].status = SYNTH_OFF;
 }
 
 
