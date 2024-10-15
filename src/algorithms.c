@@ -98,7 +98,7 @@ SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, 
 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     synth[osc].note_on_clock = total_samples;
-    synth[osc].status = IS_ALGO_SOURCE; // to ensure it's rendered
+    synth[osc].status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
     synth[osc].eg_type[0] = ENVELOPE_DX7;
     if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
@@ -166,7 +166,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     
     SAMPLE amp = SHIFTR(F2S(msynth[osc].amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
-        if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == IS_ALGO_SOURCE) {
+        if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == SYNTH_IS_ALGO_SOURCE) {
             SAMPLE feedback_level = 0;
             SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 

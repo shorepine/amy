@@ -242,7 +242,7 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             alloc_chorus_delay_lines();
         }
         // if we're turning on for the first time, start the oscillator.
-        if (synth[CHORUS_MOD_SOURCE].status == STATUS_OFF) {  //chorus.level == 0) {
+        if (synth[CHORUS_MOD_SOURCE].status == SYNTH_OFF) {  //chorus.level == 0) {
             // Setup chorus oscillator.
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
             synth[CHORUS_MOD_SOURCE].logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
@@ -358,7 +358,7 @@ float midi_note_for_logfreq(float logfreq) {
 // create a new default API accessible event
 struct event amy_default_event() {
     struct event e;
-    e.status = EMPTY;
+    e.status = EVENT_EMPTY;
     AMY_UNSET(e.time);
     AMY_UNSET(e.osc);
     AMY_UNSET(e.patch);
@@ -583,12 +583,6 @@ end:
 
 
 void reset_osc(uint16_t i ) {
-    // reset PCM patch if type = PCM
-    if(synth[i].wave == PCM) {
-        if(AMY_IS_SET(synth[i].patch)) {
-            pcm_unload_patch(synth[i].patch);
-        }
-    }
     // set all the synth state to defaults
     synth[i].osc = i; // self-reference to make updating oscs easier
     synth[i].wave = SINE;
@@ -635,7 +629,7 @@ void reset_osc(uint16_t i ) {
     synth[i].sample = F2S(0);
     synth[i].mod_value = F2S(0);
     synth[i].substep = 0;
-    synth[i].status = STATUS_OFF;
+    synth[i].status = SYNTH_OFF;
     AMY_UNSET(synth[i].chained_osc);
     AMY_UNSET(synth[i].mod_source);
     AMY_UNSET(synth[i].render_clock);
@@ -680,6 +674,8 @@ void amy_reset_oscs() {
     if (AMY_HAS_ECHO) config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
     // Reset patches
     patches_reset();
+    // Reset memorypcm
+    pcm_unload_all_patches();
 }
 
 
@@ -845,7 +841,8 @@ void audio_in_note_on(uint16_t osc, uint8_t channel) {
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
     for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+AMY_NCHANS) {
-        buf[c] = F2S(((float)amy_in_block[i]/32767.0) * msynth[osc].amp);
+        buf[c] = SMULR6(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
+        //buf[c] = F2S(((float)amy_in_block[i]/32767.0) * msynth[osc].amp);
         c++;
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
@@ -963,8 +960,8 @@ void play_event(struct delta d) {
          PARAM_IS_BP_COEF(d.param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
         // Revive the note if it hasn't seen a note_off since the last note_on.
-        if (synth[d.osc].status == AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d.osc].note_off_clock))
-            synth[d.osc].status = AUDIBLE;
+        if (synth[d.osc].status == SYNTH_AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d.osc].note_off_clock))
+            synth[d.osc].status = SYNTH_AUDIBLE;
     }
 
     if(d.param == CHAINED_OSC) {
@@ -995,7 +992,7 @@ void play_event(struct delta d) {
         synth[d.osc].mod_source = mod_osc;
         // NOTE: These are event-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
-        synth[mod_osc].status = IS_MOD_SOURCE;
+        synth[mod_osc].status = SYNTH_IS_MOD_SOURCE;
         // No longer record this osc in note_off state.
         AMY_UNSET(synth[mod_osc].note_off_clock);
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
@@ -1015,7 +1012,7 @@ void play_event(struct delta d) {
         uint16_t which_source = d.param - ALGO_SOURCE_START;
         synth[d.osc].algo_source[which_source] = d.data;
         if(AMY_IS_SET(synth[d.osc].algo_source[which_source]))
-            synth[synth[d.osc].algo_source[which_source]].status = IS_ALGO_SOURCE;
+            synth[synth[d.osc].algo_source[which_source]].status = SYNTH_IS_ALGO_SOURCE;
     }
 
     if (d.param == EG0_TYPE) synth[d.osc].eg_type[0] = d.data;
@@ -1036,7 +1033,7 @@ void play_event(struct delta d) {
         if (*(float *)&d.data > 0) { // new note on (even if something is already playing on this osc)
             //synth[d.osc].amp_coefs[COEF_CONST] = *(float *)&d.data; // these could be decoupled, later
             synth[d.osc].velocity = *(float *)&d.data;
-            synth[d.osc].status = AUDIBLE;
+            synth[d.osc].status = SYNTH_AUDIBLE;
             // an osc came in with a note on.
             // start the bp clock
             synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
@@ -1286,7 +1283,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_IS_SET(synth[osc].chained_osc)) {
             // Stack oscillators - render next osc into same buffer.
             uint16_t chained_osc = synth[osc].chained_osc;
-            if (synth[chained_osc].status == AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
+            if (synth[chained_osc].status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
                 SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
                 if (new_max_val > max_val)  max_val = new_max_val;
             }
@@ -1302,7 +1299,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             } else {
                 if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
-                    synth[osc].status = AUDIBLE_SUSPENDED;  // It *could* come back...
+                    synth[osc].status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
                 }
             }
         } else if (max_val == 0) {
@@ -1321,7 +1318,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
-        if(synth[osc].status == AUDIBLE) { // skip oscs that are silent or mod sources from playback
+        if(synth[osc].status == SYNTH_AUDIBLE) { // skip oscs that are silent or mod sources from playback
             bzero(per_osc_fb[core], AMY_BLOCK_SIZE * sizeof(SAMPLE));
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
@@ -1735,7 +1732,7 @@ struct event amy_parse_message(char * message) {
         parse_transfer_message(message, length);
         AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
         struct event e = amy_default_event();
-        e.status = TRANSFER_DATA;
+        e.status = EVENT_TRANSFER_DATA;
         return e;
     }
 
@@ -1855,9 +1852,8 @@ struct event amy_parse_message(char * message) {
                                 start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
                             }
                             break;
-
                         }
-                        /* Y,y,z available */
+                        /* Y,y available */
                         /* Z used for end of message */
                         default:
                             break;
@@ -1881,7 +1877,7 @@ struct event amy_parse_message(char * message) {
         if(AMY_IS_SET(e.time)) playback_time = e.time;
         playback_time += amy_global.latency_ms;
         e.time = playback_time;
-        e.status = SCHEDULED;
+        e.status = EVENT_SCHEDULED;
         return e;
         
     }
@@ -1896,7 +1892,7 @@ void amy_reset_sysclock() {
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_parse_message(message);
-    if(e.status == SCHEDULED) {
+    if(e.status == EVENT_SCHEDULED) {
         amy_add_event(e);
     }
 }

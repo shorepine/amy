@@ -95,15 +95,17 @@ enum coefs{
 #define WAVE_OFF 15
 
 // synth[].status values
-#define EMPTY 0
-#define SCHEDULED 1
-#define PLAYED 2
-#define AUDIBLE 3
-#define AUDIBLE_SUSPENDED 4
-#define IS_MOD_SOURCE 5
-#define IS_ALGO_SOURCE 6
-#define TRANSFER_DATA 7
-#define STATUS_OFF 8
+#define SYNTH_OFF 0
+#define SYNTH_AUDIBLE 1
+#define SYNTH_AUDIBLE_SUSPENDED 2
+#define SYNTH_IS_MOD_SOURCE 3
+#define SYNTH_IS_ALGO_SOURCE 4
+
+// event.status values
+#define EVENT_EMPTY 0
+#define EVENT_SCHEDULED 1
+#define EVENT_TRANSFER_DATA 2
+
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
@@ -553,6 +555,7 @@ extern SAMPLE amy_get_random();
 
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern void pcm_unload_patch(uint16_t patch_number);
+extern void pcm_unload_all_patches();
 
 // filters
 extern void filters_init();

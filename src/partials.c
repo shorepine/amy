@@ -47,7 +47,7 @@ void partials_note_on(uint16_t osc) {
                 synth[o].logfreq_coefs[COEF_NOTE] = 1.0;
                 //synth[o].logfreq_coefs[COEF_EG1] = 1.0;  // Let the user turn this on if they want.
                 synth[o].logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
-                synth[o].status = IS_ALGO_SOURCE;
+                synth[o].status = SYNTH_IS_ALGO_SOURCE;
                 synth[o].note_on_clock = total_samples;
                 AMY_UNSET(synth[o].note_off_clock);
                 msynth[o].logfreq = synth[o].logfreq_coefs[COEF_CONST] + msynth[osc].logfreq;
@@ -115,7 +115,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
 
                     // All the types share these params or are overwritten
                     synth[o].wave = PARTIAL;
-                    synth[o].status = IS_ALGO_SOURCE;
+                    synth[o].status = SYNTH_IS_ALGO_SOURCE;
                     // Copy the patch number here just as a way to tell what kind of patch is employed when looking only at osc.
                     synth[o].patch = synth[osc].patch;
                     //synth[o].velocity = synth[osc].velocity;
@@ -183,16 +183,16 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             // TODO -- we should play the remainder of the breakpoints
             for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
                 uint16_t o = i % AMY_OSCS;
-                if(synth[o].status ==IS_ALGO_SOURCE) {
+                if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
                     AMY_UNSET(synth[o].note_on_clock);
                     synth[o].note_off_clock = total_samples;
-                    synth[o].status = STATUS_OFF;
+                    synth[o].status = SYNTH_OFF;
                 }
             }
             // osc note off, start release
             AMY_UNSET(synth[osc].note_on_clock);
             synth[osc].note_off_clock = total_samples;
-            synth[osc].status = STATUS_OFF;
+            synth[osc].status = SYNTH_OFF;
         }
     }  // End of block for handling preset patches.
     // now, render everything, add it up
@@ -200,7 +200,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     //fprintf(stderr, "t=%u partials o=%d msynth[osc].logfreq=%f midi_note=%f msynth[amp]=%f\n", total_samples, osc, msynth[osc].logfreq, midi_note, msynth[osc].amp);
     for(uint16_t i = osc + 1; i < osc + 1 + oscs; i++) {
         uint16_t o = i % AMY_OSCS;
-        if(synth[o].status ==IS_ALGO_SOURCE) {
+        if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
             // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
             synth[o].velocity = msynth[osc].amp;
             // We also use dynamic, fractional note to propagate parent freq modulation.

@@ -149,7 +149,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             synth[osc].phase = P_WRAPPED_SUM(synth[osc].phase, step);
             base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
             if(base_index >= patch.length) { // end
-                synth[osc].status = STATUS_OFF;// is this right? 
+                synth[osc].status = SYNTH_OFF;// is this right? 
                 sample = 0;
             } else {
                 if(msynth[osc].feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
@@ -184,7 +184,7 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
         uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
         SAMPLE sample;
         if(base_index >= patch.length) { // end
-            synth[osc].status = STATUS_OFF;// is this right? 
+            synth[osc].status = SYNTH_OFF;// is this right? 
             sample = 0;
         } else {
             sample = L2S(table[base_index]);
@@ -273,7 +273,22 @@ void pcm_unload_patch(uint16_t patch_number) {
     }
 }
 
-
+void pcm_unload_all_patches() {
+    memorypcm_ll_t *patch_pointer = memorypcm_ll_start;
+    while(patch_pointer != NULL) {
+        memorypcm_ll_t *next_pointer = patch_pointer->next;
+        if(patch_pointer->patch->sample_ram != NULL) {
+            free(patch_pointer->patch->sample_ram);
+        }
+        // free the patch
+        free(patch_pointer->patch);
+        // free the LL entry
+        free(patch_pointer);
+        // Go to the next one
+        patch_pointer = next_pointer;
+    }
+    memorypcm_ll_start = NULL;
+}
 
 
 

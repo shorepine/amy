@@ -193,7 +193,7 @@ void patches_load_patch(struct event e) {
                     sub_message[i-start+1]= 0;
                     struct event patch_event = amy_parse_message(sub_message);
                     patch_event.time = e.time;
-                    if(patch_event.status == SCHEDULED) {
+                    if(patch_event.status == EVENT_SCHEDULED) {
                         amy_add_event_internal(patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;

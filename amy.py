@@ -158,7 +158,7 @@ def message(**kwargs):
     kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'cI', 'volume': 'vF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
-              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL','load_sample': 'zL',
+              'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
               'external_channel': 'WI', 'portamento': 'mI',
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
@@ -310,7 +310,7 @@ def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)
     send(load_sample=s)
     print("Patch %d unloaded from RAM" % (patch))
-    
+
 def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil
     import amy_wave # our version of a wave file reader that looks for sampler metadata

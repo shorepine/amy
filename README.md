@@ -582,7 +582,7 @@ Note that the default `bp0` amplitude envelope of the `PARTIALS` osc is a gate, 
 
 ## PCM
 
-AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the basked-in PCM sample bank using `amy_headers.py`. 
+AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the baked-in PCM sample bank using `amy_headers.py`. 
 
 
 ```python
