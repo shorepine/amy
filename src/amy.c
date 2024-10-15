@@ -841,9 +841,7 @@ void audio_in_note_on(uint16_t osc, uint8_t channel) {
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
     for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+AMY_NCHANS) {
-        buf[c] = SMULR6(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
-        //buf[c] = F2S(((float)amy_in_block[i]/32767.0) * msynth[osc].amp);
-        c++;
+        buf[c++] = SMULR6(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
     return F2S(1.0); //max_value;
