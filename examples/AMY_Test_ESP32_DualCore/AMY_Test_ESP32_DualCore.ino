@@ -91,7 +91,7 @@ void setup() {
   I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, AMY_BYTES_PER_SAMPLE);
 
   // Start up AMY
-  amy.begin(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1);
+  amy.begin(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
 
   // We create a mutex for changing the event queue and pointers as two tasks do it at once
   xQueueSemaphore = xSemaphoreCreateMutex();
