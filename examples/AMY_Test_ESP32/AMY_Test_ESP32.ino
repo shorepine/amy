@@ -16,7 +16,7 @@ void setup() {
   I2S.begin(I2S_MODE_STD, AMY_SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO); // I2S.begin(I2S_PHILIPS_MODE, AMY_SAMPLE_RATE, AMY_BYTES_PER_SAMPLE);
 
   // Start up AMY
-  amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0);
+  amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo= */ 0);
 
   // Send AMY messages in two ways: first, using the wire protocol:
   // This sends a sine wave at 220Hz on osc 0 with velocity 1

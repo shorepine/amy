@@ -48,7 +48,7 @@ void setup() {
   while( !TinyUSBDevice.mounted() ) delay(1);
 
   // Start up AMY
-  amy.begin(1, 0, 0);
+  amy.begin(1, 0, 0, 0);
 
   // Setup the voice with a Juno patch
   struct event e = amy.default_event();
