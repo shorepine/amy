@@ -153,7 +153,7 @@ amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo */ 1);
 ...
 ... {
     // For each sample block:
-    amy_prepare(); // prepare to render this block
+    amy_prepare_buffer(); // prepare to render this block
     amy_render(0, OSCS/2, 0); // render oscillators 0 - OSCS/2 on core 0
     // on the other core... 
     amy_render(OSCS/2, OSCS, 1); // render oscillators OSCS/2-OSCS on core 1
