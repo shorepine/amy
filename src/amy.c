@@ -652,7 +652,11 @@ void reset_osc(uint16_t i ) {
         }
         synth[i].eg_type[j] = ENVELOPE_NORMAL;
     }
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i].last_scale[j] = 0; }
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
+        synth[i].last_scale[j] = 0;
+        synth[i].seg_start_val[j] = 0;
+        AMY_UNSET(synth[i].current_seg[j]);
+    }
     synth[i].last_two[0] = 0;
     synth[i].last_two[1] = 0;
     synth[i].lut = NULL;
@@ -1039,7 +1043,7 @@ void play_event(struct delta d) {
             // if there was a filter active for this voice, reset it
             if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
             // For repeatability, start at zero phase.
-            synth[d.osc].phase = 0;
+            //synth[d.osc].phase = 0;
                 
             // restart the waveforms
             // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.

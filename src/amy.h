@@ -347,7 +347,9 @@ struct synthinfo {
     float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
-  
+    float seg_start_val[MAX_BREAKPOINT_SETS];  // remembers starting point of current envelope segment.
+    uint8_t current_seg[MAX_BREAKPOINT_SETS];  // which envelope seg we are currently in.
+    
     // State variable for the dc-removal filter.
     SAMPLE hpf_state[2];
     // Constant offset to add to sawtooth before integrating.
