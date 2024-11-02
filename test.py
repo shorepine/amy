@@ -222,17 +222,18 @@ class TestSineEnv(AmyTest):
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
 
-
 class TestEnvRetrig(AmyTest):
 
   def run(self):
     # Retriggering an envelope that hasn't fully decayed should restart from current value, not zero.
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,50,0')
+    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,100,0')
     amy.send(time=100, vel=8)
-    amy.send(time=200, vel=8)
-    amy.send(time=600, vel=0)
-
+    amy.send(time=200, vel=8)  # Retrigger during Decay
+    amy.send(time=300, vel=0)
+    amy.send(time=350, vel=8)  # Retrigger during Release
+    amy.send(time=500, vel=0)
+    amy.send(time=600, vel=0)  # Repeated note-off
 
 class TestAlgo(AmyTest):
 

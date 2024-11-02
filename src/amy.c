@@ -1106,8 +1106,11 @@ void play_event(struct delta d) {
                 // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
-                AMY_UNSET(synth[d.osc].note_on_clock);
-                synth[d.osc].note_off_clock = total_samples;
+                if (AMY_IS_SET(synth[d.osc].note_on_clock)) {
+                    // Only if the note-on clock is running, i.e. ignore repeated note-offs (which could restart release...).
+                    AMY_UNSET(synth[d.osc].note_on_clock);
+                    synth[d.osc].note_off_clock = total_samples;
+                }
             }
         }
         // Now maybe propagate the velocity event to the chained osc.
