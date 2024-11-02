@@ -1302,6 +1302,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
                     synth[osc].status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
+                    // .. but reset osc just in case.
+                    synth[osc].phase = 0;
                 }
             }
         } else if (max_val == 0) {
