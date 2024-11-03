@@ -1041,7 +1041,7 @@ void play_event(struct delta d) {
             synth[d.osc].note_on_clock = total_samples; //esp_timer_get_time() / 1000;
 
             // if there was a filter active for this voice, reset it
-            if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
+            //if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
             // For repeatability, start at zero phase.
             //synth[d.osc].phase = 0;
                 
@@ -1107,7 +1107,7 @@ void play_event(struct delta d) {
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
                 if (AMY_IS_SET(synth[d.osc].note_on_clock)) {
-                    // Only if the note-on clock is running, i.e. ignore repeated note-offs (which could restart release...).
+                    // Only if the note-on clock is running, i.e. ignore repeated note-offs (which could restart release).
                     AMY_UNSET(synth[d.osc].note_on_clock);
                     synth[d.osc].note_off_clock = total_samples;
                 }
@@ -1305,8 +1305,9 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
                     synth[osc].status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
-                    // .. but reset osc just in case.
+                    // .. but reset osc and filter just in case.
                     synth[osc].phase = 0;
+                    if(synth[osc].filter_type != FILTER_NONE) reset_filter(osc);
                 }
             }
         } else if (max_val == 0) {
