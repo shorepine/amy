@@ -11,8 +11,10 @@ ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = rang
 RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (8192, 16384, 32768)
 AMY_LATENCY_MS = 0
 
-# If set, inserts millis() as time for every call to send(). Will not override an explicitly set time
-insert_time = False
+# If set, inserts func as time for every call to send(). Will not override an explicitly set time
+insert_time = None
+
+# If set, calls this instead of amy.send()
 override_send = None
 
 mess = []
@@ -185,8 +187,8 @@ def message(**kwargs):
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 
-    if(insert_time and 'time' not in kwargs):
-        kwargs['time'] = millis()
+    if(insert_time is not None and 'time' not in kwargs):
+        kwargs['time'] = insert_time()
 
     m = ""
     for key, arg in kwargs.items():
