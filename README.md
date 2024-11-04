@@ -264,7 +264,7 @@ Both `amy.send()`s will return immediately, but you'll hear the second note play
 
 `amy.drums()` should play a test pattern.
 
-Try to set the volume of the synth with `amy.volume(2)` -- that can be up to 10 or so.  The default is 1. 
+Try to set the volume of the synth with `amy.send(volume=2)` -- that can be up to 10 or so.  The default is 1. 
 
 `amy.reset()` resets all oscillators to default. You can also do `amy.reset(osc=5)` to do just one oscillator.
 
