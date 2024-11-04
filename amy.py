@@ -371,11 +371,6 @@ def reset(osc=None, **kwargs):
     else:
         send(reset=RESET_ALL_OSCS, **kwargs) 
 
-def volume(volume, client = None):
-    send(client=client, volume=volume)
-
-def latency_ms(latency, client=None):
-    send(client=client, latency_ms =latency)
 
 """
     Run a scale through all the synth's sounds
@@ -406,22 +401,6 @@ def play_patches(wait=1, patch_total = 256, **kwargs):
         reset()
         time.sleep(wait/4.0)
 
-"""
-    Play up to AMY_OSCS patches at once
-"""
-def polyphony(max_voices=AMY_OSCS,**kwargs):
-    note = 0
-    oscs = []
-    for i in range(int(max_voices/2)):
-        oscs.append(int(i))
-        oscs.append(int(i+(AMY_OSCS/2)))
-    print(str(oscs))
-    while(1):
-        osc = oscs[note % max_voices]
-        print("osc %d note %d filter %f " % (osc, 30+note, note*50))
-        send(osc=osc, **kwargs, patch=note, filter_type=FILTER_NONE, filter_freq=note*50, note=30+(note), client=None, vel=1)
-        time.sleep(0.5)
-        note =(note + 1) % 64
 
 def eq_test():
     reset()
