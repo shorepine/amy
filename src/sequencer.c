@@ -1,37 +1,3 @@
-// timer.c 
-// handle timer-like events for music
-// runs in a thread / task
-
-/* 
-AMY style sequencer spec
-for now: fixed ppq (48)
-
-you can pass "sequence" / H as a string,up to 3 values, tick,divider,tag 
-if divider is 4, then it's every 4 ticks (48 ppq at bpm)
-tag is a numerical constant, can be whatever (uint32)
-sequence=",4,123" -- no tick, just divider, tag = 123
-sequence is passed along other messages, but is treated like time=X  -- not played until the sequence fires
-if sequence="59320,,123" then this is an absolute tick in the future and played only once
-you can remove scheduled sequences with sequencer=",,123" -- nothing in the tick section will delete a message if there is a tag
-tick takes precedence over divider if both given
-
-ok, how we deal with it internally:
-
-in the parse_amy_message, we check for sequence, if it's there, we set the event type to EVENT_SEQUENCE and send it to
-sequence_add_event(struct event e, tick, divider, tag) 
-
-sequence_add_event checks / parses the sequence string and fills in a new entry in the seqeunce entry LL
-it also can remove sequence entries if no tick is given and the tag exists 
-
-a thread/timer that checks every 48ppq tick with BPM 
-and then adds it when it's time to play
-it adds it by amy_adding_event with a re-set time variable and status = EVENT_SCHEDULED
-entries that have ticks get deleted after adding
-
-we also call a callback function if set void sequencer_callback(uint32_t tick)
-
-*/
-
 #include "sequencer.h"
 
 typedef struct  {
@@ -81,7 +47,7 @@ void parse_tick_and_tag(char * message, uint32_t *tick, uint16_t *divider, uint3
 uint8_t sequencer_add_event(struct event e, uint32_t tick, uint16_t divider, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/divider, overwrite, if there's no tick / divider, we should remove the entry
-    if(divider != 0 && tick != 0) { divider = 0; } // only use tick if both set
+    if(divider != 0 && tick != 0) { divider = 0; } // if tick is set ignore divider 
 
     sequence_entry_ll_t *entry_ll = sequence_entry_ll_start;
     sequence_entry_ll_t *prev_entry_ll = NULL;
