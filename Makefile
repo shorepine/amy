@@ -43,12 +43,12 @@ all: default
 
 SOURCES = src/algorithms.c src/amy.c src/envelope.c src/examples.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/custom.c \
-	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c
+	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c
 
 OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c \
 	src/delay.c src/partials.c src/custom.c src/patches.c \
 	src/examples.c src/filters.c src/oscillators.c src/pcm.c src/log2_exp2.c \
-	src/libminiaudio-audio.c src/transfer.c)
+	src/libminiaudio-audio.c src/transfer.c src/sequencer.c)
  
 HEADERS = $(wildcard src/*.h) src/amy_config.h
 HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))

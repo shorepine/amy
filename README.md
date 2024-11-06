@@ -197,6 +197,7 @@ Here's the full list:
 | `f`    | `freq`   |  float[,float...]      | Frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
 | `F`    | `filter_freq` | float[,float...]  | Center/break frequency for variable filter, set of ControlCoefficients |
 | `G`    | `filter_type` | 0-4 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
+| `H`    | `sequence` | int,int,int | Tick number, divider number, tag number for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |

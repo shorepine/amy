@@ -90,6 +90,7 @@ delay_line_t **chorus_delay_lines;
 delay_line_t **echo_delay_lines; 
 
 #include "transfer.h"
+#include "sequencer.h"
 
 #ifdef _POSIX_THREADS
 #include <pthread.h>
@@ -1725,6 +1726,12 @@ struct event amy_parse_message(char * message) {
     uint16_t c = 0;
     int16_t length = strlen(message);
 
+    // default values for sequence message
+    uint16_t divider = 0;
+    uint32_t tag = 0;
+    uint32_t tick = 0;
+    uint8_t sequence_message = 0;
+
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_transfer_flag) {
         parse_transfer_message(message, length);
@@ -1768,7 +1775,7 @@ struct event amy_parse_message(char * message) {
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
-                        /* H available */
+                        case 'H': parse_tick_and_tag(message+start, &tick, &divider, &tag); sequence_message = 1; break;
                         case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
                                                       AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
@@ -1781,7 +1788,7 @@ struct event amy_parse_message(char * message) {
                             config_reverb(reverb_params[0], reverb_params[1], reverb_params[2], reverb_params[3]);
                         }
                         break;
-                        /* i used by alles for sync index */
+                        /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
                         case 'I': e.ratio = atoff(message + start); break;
                         /* j, J available */
                         // chorus.level 
@@ -1865,19 +1872,23 @@ struct event amy_parse_message(char * message) {
     }
     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
 
-    // Only do this if we got some data
-    if(length >0) {
-        // if time is set, play then
-        // if time and latency is set, play in time + latency
-        // if time is not set, play now
-        // if time is not set + latency is set, play in latency
-        uint32_t playback_time = sysclock;
-        if(AMY_IS_SET(e.time)) playback_time = e.time;
-        playback_time += amy_global.latency_ms;
-        e.time = playback_time;
-        e.status = EVENT_SCHEDULED;
-        return e;
-        
+    if(sequence_message) {
+        sequencer_add_event(e, tick, divider, tag);
+    } else {
+        // Only do this if we got some data
+        if(length >0) {
+            // if time is set, play then
+            // if time and latency is set, play in time + latency
+            // if time is not set, play now
+            // if time is not set + latency is set, play in latency
+            uint32_t playback_time = sysclock;
+            if(AMY_IS_SET(e.time)) playback_time = e.time;
+            playback_time += amy_global.latency_ms;
+            e.time = playback_time;
+            e.status = EVENT_SCHEDULED;
+            return e;
+            
+        }
     }
     return amy_default_event();
 }
@@ -1909,6 +1920,7 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
         pthread_mutex_init(&amy_queue_lock, NULL);
     #endif
     amy_profiles_init();
+    sequencer_init();
     global_init();
     amy_global.cores = cores;
     amy_global.has_chorus = chorus;

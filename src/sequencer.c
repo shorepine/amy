@@ -1,0 +1,233 @@
+// timer.c 
+// handle timer-like events for music
+// runs in a thread / task
+
+/* 
+AMY style sequencer spec
+for now: fixed ppq (48)
+
+you can pass "sequence" / H as a string,up to 3 values, tick,divider,tag 
+if divider is 4, then it's every 4 ticks (48 ppq at bpm)
+tag is a numerical constant, can be whatever (uint32)
+sequence=",4,123" -- no tick, just divider, tag = 123
+sequence is passed along other messages, but is treated like time=X  -- not played until the sequence fires
+if sequence="59320,,123" then this is an absolute tick in the future and played only once
+you can remove scheduled sequences with sequencer=",,123" -- nothing in the tick section will delete a message if there is a tag
+tick takes precedence over divider if both given
+
+ok, how we deal with it internally:
+
+in the parse_amy_message, we check for sequence, if it's there, we set the event type to EVENT_SEQUENCE and send it to
+sequence_add_event(struct event e, tick, divider, tag) 
+
+sequence_add_event checks / parses the sequence string and fills in a new entry in the seqeunce entry LL
+it also can remove sequence entries if no tick is given and the tag exists 
+
+a thread/timer that checks every 48ppq tick with BPM 
+and then adds it when it's time to play
+it adds it by amy_adding_event with a re-set time variable and status = EVENT_SCHEDULED
+entries that have ticks get deleted after adding
+
+we also call a callback function if set void sequencer_callback(uint32_t tick)
+
+*/
+
+#include "sequencer.h"
+
+// Things that people can change
+float sequencer_bpm = 108; // verified optimal BPM 
+
+
+typedef struct  {
+    struct event e; // parsed event -- we clear out sequence and time here obv
+    uint32_t tag;
+    uint32_t tick; // 0 means not used 
+    uint16_t divider; // 0 means not used 
+} sequence_entry;
+
+// linked list of sequence_entries
+typedef struct sequence_entry_ll_t{
+    sequence_entry *sequence;
+    struct sequence_entry_ll_t *next;
+} sequence_entry_ll_t;
+
+sequence_entry_ll_t * sequence_entry_ll_start;
+
+// Optional sequencer hook that's called every tick
+void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+
+// Our internal accounting
+uint32_t sequencer_tick_count = 0;
+uint64_t next_amy_tick_us = 0;
+uint32_t us_per_tick = 0;
+
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+esp_timer_handle_t periodic_timer;
+#else
+#include <pthread.h>
+#endif
+
+void sequencer_recompute() {
+    us_per_tick = (uint32_t) (1000000.0 / ((sequencer_bpm/60.0) * (float)AMY_SEQUENCER_PPQ));    
+    next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
+}
+
+
+
+// Parses the tick, divider and tag out of a sequence message
+void parse_tick_and_tag(char * message, uint32_t *tick, uint16_t *divider, uint32_t *tag) {
+    //eg
+    // 1234,,987 -- tick = 1234, divider = 0, tag = 987
+    // ,,987 -- tick = 0, divider = 0, tag = 987
+    // ,4,987 -- tick = 0, divider = 4, tag = 987
+    int32_t vals[3];
+    parse_int_list_message32(message, vals, 3, 0);
+    *tick = (uint32_t)vals[0]; *divider = (uint16_t)vals[1]; *tag = (uint32_t)vals[2];
+}
+
+void sequencer_add_event(struct event e, uint32_t tick, uint16_t divider, uint32_t tag) {
+    fprintf(stderr, "adding event tick %d, divider %d tag %d\n", tick, divider, tag);
+    // add this event to the list of sequencer events in the LL
+    // if the tag already exists - if there's tick/divider, overwrite, if there's no tick / divider, we should remove the entry
+    if(divider != 0 && tick != 0) { divider = 0; } // only use tick if both set
+
+    sequence_entry_ll_t *entry_ll = sequence_entry_ll_start;
+    sequence_entry_ll_t *prev_entry_ll = NULL;
+    uint8_t found = 0;
+    while(entry_ll != NULL) {
+        uint8_t already_deleted = 0;
+        if(entry_ll->sequence->tag == tag) {
+            found = 1;
+            if(divider == 0 && tick == 0) { // delete 
+               fprintf(stderr, "deleting event with tag %d\n", tag);
+               if(prev_entry_ll == NULL) { // start
+                    sequence_entry_ll_start = entry_ll->next;
+                } else {
+                    prev_entry_ll->next = entry_ll->next;
+                }
+                free(entry_ll->sequence);
+                free(entry_ll);
+                entry_ll = prev_entry_ll->next;
+                already_deleted = 1;
+            } else { //replace 
+                fprintf(stderr, "replacing event with tag %d\n", tag);
+                entry_ll->sequence->divider = divider;
+                entry_ll->sequence->tick = tick;
+                entry_ll->sequence->e = e;
+            }
+        }
+        if(!already_deleted) {
+            prev_entry_ll = entry_ll;
+            entry_ll = entry_ll->next;
+        }
+    }
+    if(!found) {
+        if(tick != 0 || divider != 0) {
+            fprintf(stderr, "adding event with tag %d\n", tag);
+            sequence_entry_ll_t *new_entry_ll = malloc(sizeof(sequence_entry_ll_t));
+            new_entry_ll->sequence = malloc(sizeof(sequence_entry));
+            new_entry_ll->sequence->e = e;
+            new_entry_ll->sequence->tick = tick;
+            new_entry_ll->sequence->divider = divider;
+            new_entry_ll->sequence->tag = tag;
+            new_entry_ll->next = NULL;
+
+            if(prev_entry_ll == NULL) { // start 
+                sequence_entry_ll_start = new_entry_ll;
+            } else {
+                prev_entry_ll->next = new_entry_ll;
+            }
+        }
+    }
+}
+
+
+static void sequencer_check_and_fill() {
+    // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops), we can still use our latency to keep up
+    while(amy_sysclock()  >= (next_amy_tick_us/1000)) {
+        sequencer_tick_count++;
+
+        // Scan through LL looking for matches
+        sequence_entry_ll_t *entry_ll = sequence_entry_ll_start;
+        sequence_entry_ll_t *prev_entry_ll = NULL;
+        while(entry_ll != NULL) {
+            uint8_t already_deleted = 0;
+            if(entry_ll->sequence->tick == sequencer_tick_count || (entry_ll->sequence->divider > 0 && (sequencer_tick_count % entry_ll->sequence->divider == 0))) {
+                // hit
+                struct event to_add = entry_ll->sequence->e;
+                to_add.status = EVENT_SCHEDULED;
+                to_add.time = 0; // play now
+                amy_add_event(to_add);
+
+                // Delete tick addressed sequence entry if sent
+                if(entry_ll->sequence->tick > 0) {
+                    if(prev_entry_ll == NULL) { // start
+                        sequence_entry_ll_start = entry_ll->next;
+                    } else {
+                        prev_entry_ll->next = entry_ll->next;
+                    }
+                    free(entry_ll->sequence);
+                    free(entry_ll);
+                    entry_ll = prev_entry_ll->next;
+                    already_deleted = 1;
+                }
+            }
+            if(!already_deleted) {
+                prev_entry_ll = entry_ll;
+                entry_ll = entry_ll->next;
+            }
+        }
+
+        if(amy_external_sequencer_hook!=NULL) {
+            amy_external_sequencer_hook(sequencer_tick_count);
+        }
+        next_amy_tick_us = next_amy_tick_us + us_per_tick;
+    }
+}
+
+// Desktop: called from a thread
+#ifndef ESP_PLATFORM
+void * run_sequencer(void *vargs) {
+    // Loop forever, checking for time and sleeping
+    while(1) {
+        sequencer_check_and_fill();            
+        // 500000nS = 500uS = 0.5mS
+        nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
+    }
+}
+
+// ESP: do it with hardware timer
+#else
+static void sequencer_timer_callback(void* arg) {
+    sequencer_check_and_fill();
+}
+
+void run_sequencer() {
+    const esp_timer_create_args_t periodic_timer_args = {
+            .callback = &sequencer_timer_callback,
+            //.dispatch_method = ESP_TIMER_ISR,
+            .name = "sequencer"
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+    // 500uS = 0.5mS
+    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
+}
+#endif
+
+
+void sequencer_init() {
+    sequence_entry_ll_start = NULL;
+    sequencer_recompute();        
+
+    #ifdef ESP_PLATFORM
+    // This kicks off a timer 
+    run_sequencer();
+    #else
+    // This kicks off a thread
+    pthread_t sequencer_thread_id;
+    pthread_create(&sequencer_thread_id, NULL, run_sequencer, NULL);
+    #endif
+
+}
+

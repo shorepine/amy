@@ -105,7 +105,7 @@ enum coefs{
 #define EVENT_EMPTY 0
 #define EVENT_SCHEDULED 1
 #define EVENT_TRANSFER_DATA 2
-
+#define EVENT_SEQUENCE 3
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
