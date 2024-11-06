@@ -200,6 +200,7 @@ Here's the full list:
 | `H`    | `sequence` | int,int,int | Tick number, divider number, tag number for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
+| `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `K`    | `load_patch` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified voice (or starting at the selected oscillator). |
 | `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
@@ -238,9 +239,11 @@ python
 >>> amy.live()
 ```
 
-## AMY and timestamps
+## AMY's sequencer and timestamps
 
-AMY is meant to receive messages in real time. It, on its own, is not a sequencer where you can schedule notes to play in the future. However, it does maintain a window of 20 seconds in advance of its clock where events can be scheduled (the window size is configurable of course). This is very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
+AMY is meant to either receive messages in real time or scheduled events in the future. It can be used as a sequencer where you can schedule notes to play in the future or on a divider of the clock.
+
+The scheduled events are very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
 
 For example, to play two notes, one a second after the first, you could do:
 
@@ -260,6 +263,32 @@ amy.send(osc=0, note=52, vel=1, time=start + 1000)
 
 Both `amy.send()`s will return immediately, but you'll hear the second note play precisely a second after the first. AMY uses this internal clock to schedule step changes in breakpoints as well. 
 
+
+### The sequencer
+
+On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from starting. You can reset the `ticks` to 0 with an `amy.send(reset_osc=amy.RESET_TIMEBASE)`. 
+
+Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
+
+You can schedule an event to happen at a precise tick with `amy.send(... ,sequence="tick,divider,tag")`. `tick` is an absolute tick number. If given, `divider` is ignored. Once AMY reaches `tick`, the rest of your event will play and the saved event will be removed from memory. If `tick` is in the past, AMY will ignore it. 
+
+You can schedule repeating events (like a step sequencer or drum machine) with `divider`. For example a `divider` of 48 will trigger once every quarter note. A `divider` of 24 will happen twice every quarter note. A `divider` of 96 will happen every two quarter notes. `divider` can be any number to allow for complex rhythms. 
+
+`tag` should be given, and will be `0` if not. You should set `tag` to a random or incrementing number in your code that you can refer to later. `tag` allows you to replace or delete the event once scheduled. 
+
+If you are including AMY in a program, you can set the hook `void (*amy_external_sequencer_hook)(uint32_t)` to any function. This will be called at every tick with the current tick number as an argument. 
+
+Sequencer examples:
+
+```python
+
+amy.send(osc=0, vel=1, wave=amy.PCM, patch=0, sequence=",24,1") # play a PCM drum every eighth note.
+amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, sequence=",48,2") # play a PCM drum every quarter note.
+amy.send(sequence=",,1") # remove the eighth note sequence
+amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, note=70, sequence=",48,2") # change the quarter note event
+
+amy.send(osc=2, vel=1, wave=amy.PCM, patch=2, sequence="1000,,3") # play a PCM drum at absolute tick 1000 
+```
 
 ## Examples
 

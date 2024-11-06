@@ -161,7 +161,7 @@ enum params{
     RESONANCE, PORTAMENTO, CHAINED_OSC,  // 45, 46, 47
     MOD_SOURCE, FILTER_TYPE,             // 48, 49
     EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
-    ALGORITHM, LATENCY,                  // 53, 54
+    ALGORITHM, LATENCY, TEMPO,           // 53, 54, 55
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -285,6 +285,7 @@ struct event {
     float detune;
     float volume;
     float pitch_bend;
+    float tempo;
     uint16_t latency_ms;
     float ratio;
     float resonance;
@@ -439,6 +440,7 @@ struct state {
     int16_t next_event_write;
     struct delta * event_start; // start of the sorted list
     int16_t latency_ms;
+    float tempo;
 };
 
 // custom oscillator
