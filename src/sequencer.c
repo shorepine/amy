@@ -144,8 +144,8 @@ static void sequencer_check_and_fill() {
     }
 }
 
-// Desktop: called from a thread
-#ifndef ESP_PLATFORM
+// posix: called from a thread
+#if defined _POSIX_THREADS
 void * run_sequencer(void *vargs) {
     // Loop forever, checking for time and sleeping
     while(1) {
@@ -156,7 +156,7 @@ void * run_sequencer(void *vargs) {
 }
 
 // ESP: do it with hardware timer
-#else
+#elif defined ESP_PLATFORM
 static void sequencer_timer_callback(void* arg) {
     sequencer_check_and_fill();
 }
