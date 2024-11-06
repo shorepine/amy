@@ -90,6 +90,7 @@ delay_line_t **chorus_delay_lines;
 delay_line_t **echo_delay_lines; 
 
 #include "transfer.h"
+#include "sequencer.h"
 
 #ifdef _POSIX_THREADS
 #include <pthread.h>
@@ -312,6 +313,7 @@ int8_t global_init() {
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
+    amy_global.tempo = 108.0; 
     amy_global.eq[0] = F2S(1.0f);
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
@@ -370,6 +372,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.midi_note);
     AMY_UNSET(e.volume);
     AMY_UNSET(e.pitch_bend);
+    AMY_UNSET(e.tempo);
     AMY_UNSET(e.latency_ms);
     AMY_UNSET(e.ratio);
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
@@ -518,6 +521,7 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.pitch_bend)) { d.param=PITCH_BEND; d.data = *(uint32_t *)&e.pitch_bend; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.tempo)) { d.param=TEMPO; d.data = *(uint32_t *)&e.tempo; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; add_delta_to_queue(d); }
@@ -1020,6 +1024,7 @@ void play_event(struct delta d) {
     if(d.param == VOLUME) amy_global.volume = *(float *)&d.data;
     if(d.param == PITCH_BEND) amy_global.pitch_bend = *(float *)&d.data;
     if(d.param == LATENCY) { amy_global.latency_ms = *(uint16_t *)&d.data; }
+    if(d.param == TEMPO) { amy_global.tempo = *(float *)&d.data; sequencer_recompute(); }
     if(d.param == EQ_L) amy_global.eq[0] = F2S(powf(10, *(float *)&d.data / 20.0));
     if(d.param == EQ_M) amy_global.eq[1] = F2S(powf(10, *(float *)&d.data / 20.0));
     if(d.param == EQ_H) amy_global.eq[2] = F2S(powf(10, *(float *)&d.data / 20.0));
@@ -1581,85 +1586,63 @@ float atoff(const char *s) {
     return whole + frac;
 }
 
-int parse_float_list_message(char *message, float *vals, int max_num_vals, float skipped_val) {
-    // Return the number of values extracted from message.
-    uint16_t c = 0, last_c;
-    uint16_t stop = strspn(message, " -0123456789,.");  // Note: space AND period.
-    int num_vals_received = 0;
-    while(c < stop && num_vals_received < max_num_vals) {
-        *vals = atoff(message + c);
-        // Skip spaces in front of number.
-        while (message[c] == ' ') ++c;
-        // Figure length of number string.
-        last_c = c;
-        c += strspn(message + c, "-0123456789.");  // No space, just minus, digits, and decimal point.
-        if (last_c == c)  // Zero-length number.
-            *vals = skipped_val;  // Rewrite with special value for skips.
-        while(message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
-        ++c;  // Step over the comma (if that's where we landed).
-        ++vals;  // Move to next output.
-        ++num_vals_received;
-    }
-    if (c < stop) {
-        fprintf(stderr, "WARNING: parse_float_list: More than %d values in \"%s\"\n",
-                max_num_vals, message);
-    }
-    return num_vals_received;
-}
 
-int parse_int_list_message32(char *message, int32_t *vals, int max_num_vals, int32_t skipped_val) {
-    // Return the number of values extracted from message.
-    uint16_t c = 0, last_c;
-    uint16_t stop = strspn(message, " -0123456789,");  // Space, no period.
-    int num_vals_received = 0;
-    while(c < stop && num_vals_received < max_num_vals) {
-        *vals = atoi(message + c);
-        // Skip spaces in front of number.
-        while (message[c] == ' ') ++c;
-        // Figure length of number string.
-        last_c = c;
-        c += strspn(message + c, "-0123456789");  // No space, just minus and digits.
-        if (last_c == c)  // Zero-length number.
-            *vals = skipped_val;  // Rewrite with special value for skips.
-        // Step through (spaces?) to next comma, or end of string or region.
-        while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
-        ++c;  // Step over the comma (if that's where we landed).
-        ++vals;  // Move to next output.
-        ++num_vals_received;
-    }
-    if (c < stop) {
-        fprintf(stderr, "WARNING: parse_int_list: More than %d values in \"%s\"\n",
-                max_num_vals, message);
-    }
-    return num_vals_received;
-}
+#define PARSE_LIST_STRSPN1(var) _Generic((var), \
+    float:    " -0123456789,.", \
+    uint32_t: " 0123456789,", \
+    uint16_t: " 0123456789,", \
+    int16_t:  " -0123456789,", \
+    int32_t:  " -0123456789," \
+)
 
-int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val) {
-    // Return the number of values extracted from message.
-    uint16_t c = 0, last_c;
-    uint16_t stop = strspn(message, " -0123456789,");  // Space, no period.
-    int num_vals_received = 0;
-    while(c < stop && num_vals_received < max_num_vals) {
-        *vals = atoi(message + c);
-        // Skip spaces in front of number.
-        while (message[c] == ' ') ++c;
-        // Figure length of number string.
-        last_c = c;
-        c += strspn(message + c, "-0123456789");  // No space, just minus and digits.
-        if (last_c == c)  // Zero-length number.
-            *vals = skipped_val;  // Rewrite with special value for skips.
-        // Step through (spaces?) to next comma, or end of string or region.
-        while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
-        ++c;  // Step over the comma (if that's where we landed).
-        ++vals;  // Move to next output.
-        ++num_vals_received;
+#define PARSE_LIST_STRSPN2(var) _Generic((var), \
+    float:    "-0123456789.", \
+    uint32_t: "0123456789", \
+    uint16_t: "0123456789", \
+    int16_t:  "-0123456789", \
+    int32_t:  "-0123456789" \
+)
+
+#define PARSE_LIST_ATO(var) _Generic((var), \
+    float:    atoff, \
+    uint32_t: atoi, \
+    uint16_t: atoi, \
+    int32_t:  atoi, \
+    int16_t:  atoi \
+)
+
+#define PARSE_LIST(type) \
+    int parse_list_##type(char *message, type *vals, int max_num_vals, type skipped_val) { \
+        uint16_t c = 0, last_c; \
+        uint16_t stop = strspn(message, PARSE_LIST_STRSPN1(skipped_val)); \
+        int num_vals_received = 0; \
+        while(c < stop && num_vals_received < max_num_vals) { \
+            *vals = PARSE_LIST_ATO(skipped_val)(message + c); \
+            while (message[c] == ' ') ++c; \
+            last_c = c; \
+            c += strspn(message + c, PARSE_LIST_STRSPN2(skipped_val));  \
+            if (last_c == c)  \
+                *vals = skipped_val;  \
+            while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++; \
+            ++c; \
+            ++vals; \
+            ++num_vals_received; \
+        } \
+        if (c < stop) { \
+            fprintf(stderr, "WARNING: parse__list_##type: More than %d values in \"%s\"\n", \
+                max_num_vals, message); \
+        } \
+        return num_vals_received; \
     }
-    if (c < stop) {
-        fprintf(stderr, "WARNING: parse_int_list: More than %d values in \"%s\"\n",
-                max_num_vals, message);
-    }
-    return num_vals_received;
-}
+
+
+PARSE_LIST(float)
+PARSE_LIST(uint32_t)
+PARSE_LIST(uint16_t)
+PARSE_LIST(int32_t)
+PARSE_LIST(int16_t)
+
+
 
 void copy_param_list_substring(char *dest, const char *src) {
     // Copy wire command string up to next parameter char.
@@ -1674,7 +1657,7 @@ void copy_param_list_substring(char *dest, const char *src) {
 
 // helper to parse the list of source voices for an algorithm
 void parse_algorithm_source(struct synthinfo * t, char *message) {
-    int num_parsed = parse_int_list_message16(message, t->algo_source, MAX_ALGO_OPS,
+    int num_parsed = parse_list_int16_t(message, t->algo_source, MAX_ALGO_OPS,
                                             AMY_UNSET_VALUE(t->algo_source[0]));
     // Clear unspecified values.
     for (int i = num_parsed; i < MAX_ALGO_OPS; ++i) {
@@ -1686,7 +1669,7 @@ void parse_algorithm_source(struct synthinfo * t, char *message) {
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
     float vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
-    int num_vals = parse_float_list_message(message, vals, 2 * MAX_BREAKPOINTS,
+    int num_vals = parse_list_float(message, vals, 2 * MAX_BREAKPOINTS,
                                             AMY_UNSET_VALUE(vals[0]));
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
@@ -1710,7 +1693,7 @@ int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
 }
 
 void parse_coef_message(char *message, float *coefs) {
-    int num_coefs = parse_float_list_message(message, coefs, NUM_COMBO_COEFS,
+    int num_coefs = parse_list_float(message, coefs, NUM_COMBO_COEFS,
                                              AMY_UNSET_VALUE(coefs[0]));
     // Clear the unspecified coefs to unset.
     for (int i = num_coefs; i < NUM_COMBO_COEFS; ++i)
@@ -1724,6 +1707,12 @@ struct event amy_parse_message(char * message) {
     uint16_t start = 0;
     uint16_t c = 0;
     int16_t length = strlen(message);
+
+    // default values for sequence message
+    uint16_t divider = 0;
+    uint32_t tag = 0;
+    uint32_t tick = 0;
+    uint8_t sequence_message = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_transfer_flag) {
@@ -1768,11 +1757,11 @@ struct event amy_parse_message(char * message) {
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
-                        /* H available */
+                        case 'H': parse_tick_and_tag(message+start, &tick, &divider, &tag); sequence_message = 1; break;
                         case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
                                                       AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
-                            parse_float_list_message(message + start, reverb_params, 4, AMY_UNSET_VALUE(reverb.liveness));
+                            parse_list_float(message + start, reverb_params, 4, AMY_UNSET_VALUE(reverb.liveness));
                             // config_reverb doesn't understand UNSET, so copy in the current values.
                             if (AMY_IS_UNSET(reverb_params[0])) reverb_params[0] = S2F(reverb.level);
                             if (AMY_IS_UNSET(reverb_params[1])) reverb_params[1] = reverb.liveness;
@@ -1781,13 +1770,14 @@ struct event amy_parse_message(char * message) {
                             config_reverb(reverb_params[0], reverb_params[1], reverb_params[2], reverb_params[3]);
                         }
                         break;
-                        /* i used by alles for sync index */
+                        /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
                         case 'I': e.ratio = atoff(message + start); break;
+                        case 'j': e.tempo = atof(message+start); break;
                         /* j, J available */
                         // chorus.level 
                         case 'k': if(AMY_HAS_CHORUS) {
                             float chorus_params[4] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_float_list_message(message + start, chorus_params, 4, AMY_UNSET_FLOAT);
+                            parse_list_float(message + start, chorus_params, 4, AMY_UNSET_FLOAT);
                             // config_chorus doesn't understand UNSET, copy existing values.
                             if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(chorus.level);
                             if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)chorus.max_delay;
@@ -1802,7 +1792,7 @@ struct event amy_parse_message(char * message) {
                         case 'm': e.portamento_ms=atoi(message + start); break;
                         case 'M': if (AMY_HAS_ECHO) {
                             float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_float_list_message(message + start, echo_params, 5, AMY_UNSET_FLOAT);
+                            parse_list_float(message + start, echo_params, 5, AMY_UNSET_FLOAT);
                             if (AMY_IS_UNSET(echo_params[0])) echo_params[0] = S2F(echo.level);
                             if (AMY_IS_UNSET(echo_params[1])) echo_params[1] = (float)echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
                             if (AMY_IS_UNSET(echo_params[2])) echo_params[2] = (float)echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
@@ -1834,15 +1824,15 @@ struct event amy_parse_message(char * message) {
                         case 'X': e.eg_type[1] = atoi(message + start); break;
                         case 'x': {
                               float eq[3] = {AMY_UNSET_VALUE(e.eq_l), AMY_UNSET_VALUE(e.eq_m), AMY_UNSET_VALUE(e.eq_h)};
-                              parse_float_list_message(message + start, eq, 3, AMY_UNSET_VALUE(e.eq_l));
+                              parse_list_float(message + start, eq, 3, AMY_UNSET_VALUE(e.eq_l));
                               e.eq_l = eq[0];
                               e.eq_m = eq[1];
                               e.eq_h = eq[2];
                             }
                             break;
                         case 'z': {
-                            int32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
-                            parse_int_list_message32(message+start, sm, 6, 0);
+                            uint32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
+                            parse_list_uint32_t(message+start, sm, 6, 0);
                             if(sm[1]==0) { // remove patch
                                 pcm_unload_patch(sm[0]);
                             } else {
@@ -1865,19 +1855,23 @@ struct event amy_parse_message(char * message) {
     }
     AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
 
-    // Only do this if we got some data
-    if(length >0) {
-        // if time is set, play then
-        // if time and latency is set, play in time + latency
-        // if time is not set, play now
-        // if time is not set + latency is set, play in latency
-        uint32_t playback_time = sysclock;
-        if(AMY_IS_SET(e.time)) playback_time = e.time;
-        playback_time += amy_global.latency_ms;
-        e.time = playback_time;
-        e.status = EVENT_SCHEDULED;
-        return e;
-        
+    if(length>0) { // only do this if we got some data 
+        if(sequence_message) {
+            uint8_t added = sequencer_add_event(e, tick, divider, tag);
+            (void)added; // we don't need to do anything with this info at this time
+        } else {
+            // if time is set, play then
+            // if time and latency is set, play in time + latency
+            // if time is not set, play now
+            // if time is not set + latency is set, play in latency
+            uint32_t playback_time = sysclock;
+            if(AMY_IS_SET(e.time)) playback_time = e.time;
+            playback_time += amy_global.latency_ms;
+            e.time = playback_time;
+            e.status = EVENT_SCHEDULED;
+            return e;
+            
+        }
     }
     return amy_default_event();
 }
@@ -1910,6 +1904,7 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
     #endif
     amy_profiles_init();
     global_init();
+    sequencer_init();
     amy_global.cores = cores;
     amy_global.has_chorus = chorus;
     amy_global.has_reverb = reverb;

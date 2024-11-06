@@ -96,11 +96,14 @@ void patches_store_patch(char * message) {
     //fprintf(stderr, "store_patch: patch %d n_osc %d patch %s\n", patch_number, max_osc, patch);
 }
 
+extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, uint16_t skipped_val);
+
+
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(struct event e) {
-    int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message16(e.voices, voices, MAX_VOICES, 0);
+    uint16_t voices[MAX_VOICES];
+    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
     e.voices[0] = 0;
     AMY_UNSET(e.load_patch);
@@ -119,8 +122,8 @@ void patches_event_has_voices(struct event e) {
 void patches_load_patch(struct event e) {
     char sub_message[255];
     
-    int16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_int_list_message16(e.voices, voices, MAX_VOICES, 0);
+    uint16_t voices[MAX_VOICES];
+    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
     if(e.load_patch > 1023) {
