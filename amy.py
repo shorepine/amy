@@ -10,6 +10,7 @@ FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
 ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
 RESET_SEQUENCER, RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (4096, 8192, 16384, 32768)
 AMY_LATENCY_MS = 0
+SEQUENCER_PPQ = 48
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
 insert_time = None
