@@ -49,51 +49,37 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint16_t divider, uin
     // if the tag already exists - if there's tick/divider, overwrite, if there's no tick / divider, we should remove the entry
     if(divider != 0 && tick != 0) { divider = 0; } // if tick is set ignore divider 
 
-    sequence_entry_ll_t *entry_ll = sequence_entry_ll_start;
-    sequence_entry_ll_t *prev_entry_ll = NULL;
-    uint8_t found = 0;
-    while(entry_ll != NULL) {
-        if(entry_ll->sequence->tag == tag) {
-            found = 1;
-            if(divider == 0 && tick == 0) { // delete 
-               if(prev_entry_ll == NULL) { // start
-                    sequence_entry_ll_start = entry_ll->next;
-                } else {
-                    prev_entry_ll->next = entry_ll->next;
-                }
-                free(entry_ll->sequence);
-                free(entry_ll);
+    // Dan's version
+    sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+    while ((*entry_ll_ptr) != NULL) {
+        if ((*entry_ll_ptr)->sequence->tag == tag) {
+            if (divider == 0 && tick == 0) { // delete
+                sequence_entry_ll_t *doomed = *entry_ll_ptr;
+                *entry_ll_ptr = doomed->next; // close up list.
+                free(doomed->sequence);
+                free(doomed);
                 return 0;
-            } else { //replace 
-                entry_ll->sequence->divider = divider;
-                entry_ll->sequence->tick = tick;
-                entry_ll->sequence->e = e;
+            } else { // replace
+                (*entry_ll_ptr)->sequence->divider = divider;
+                (*entry_ll_ptr)->sequence->tick = tick;
+                (*entry_ll_ptr)->sequence->e = e;
                 return 0;
             }
         }
-        prev_entry_ll = entry_ll;
-        entry_ll = entry_ll->next;
+        entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
     }
-    if(!found) {
-        if(tick != 0 || divider != 0) {
-            if(tick != 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
-            sequence_entry_ll_t *new_entry_ll = malloc(sizeof(sequence_entry_ll_t));
-            new_entry_ll->sequence = malloc(sizeof(sequence_entry));
-            new_entry_ll->sequence->e = e;
-            new_entry_ll->sequence->tick = tick;
-            new_entry_ll->sequence->divider = divider;
-            new_entry_ll->sequence->tag = tag;
-            new_entry_ll->next = NULL;
 
-            if(prev_entry_ll == NULL) { // start 
-                sequence_entry_ll_start = new_entry_ll;
-            } else {
-                prev_entry_ll->next = new_entry_ll;
-            }
-            return 1;
-        }
-    }
-    return 0;
+    // If we got here, we didn't find the tag in the list, so add it at the end.
+    if(tick == 0 && divider == 0) return 0; // Ignore non-schedulable event.
+    if(tick != 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
+    (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
+    (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
+    (*entry_ll_ptr)->sequence->e = e;
+    (*entry_ll_ptr)->sequence->tick = tick;
+    (*entry_ll_ptr)->sequence->divider = divider;
+    (*entry_ll_ptr)->sequence->tag = tag;
+    (*entry_ll_ptr)->next = NULL;
+    return 1;
 }
 
 
