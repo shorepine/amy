@@ -114,6 +114,7 @@ enum coefs{
 #define ENVELOPE_TRUE_EXPONENTIAL 3
 
 // Reset masks
+#define RESET_SEQUENCER 4096
 #define RESET_ALL_OSCS 8192
 #define RESET_TIMEBASE 16384
 #define RESET_AMY 32768
