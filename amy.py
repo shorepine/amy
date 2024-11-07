@@ -193,9 +193,9 @@ def message(**kwargs):
     m = ""
     for key, arg in kwargs.items():
         if arg is None:
-            if key != 'time':
+            # Just ignore time or sequence=None
+            if key != 'time' and key != 'sequence':
                 raise ValueError('No arg for key ' + key)
-            # Just ignore time=None
         else:
             wire_code, type_code = kw_map[key]
             m += wire_code + arg_handlers[type_code](arg)
