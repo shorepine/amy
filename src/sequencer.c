@@ -127,19 +127,8 @@ static void sequencer_check_and_fill() {
     }
 }
 
-// posix: called from a thread
-#if defined _POSIX_THREADS
-void * run_sequencer(void *vargs) {
-    // Loop forever, checking for time and sleeping
-    while(1) {
-        sequencer_check_and_fill();            
-        // 500000nS = 500uS = 0.5mS
-        nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
-    }
-}
-
+#ifdef ESP_PLATFORM
 // ESP: do it with hardware timer
-#elif defined ESP_PLATFORM
 static void sequencer_timer_callback(void* arg) {
     sequencer_check_and_fill();
 }
@@ -153,6 +142,15 @@ void run_sequencer() {
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
     // 500uS = 0.5mS
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
+}
+#elif defined _POSIX_THREADS
+void * run_sequencer(void *vargs) {
+    // Loop forever, checking for time and sleeping
+    while(1) {
+        sequencer_check_and_fill();            
+        // 500000nS = 500uS = 0.5mS
+        nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
+    }
 }
 #endif
 
