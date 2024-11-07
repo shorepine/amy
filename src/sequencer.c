@@ -4,7 +4,7 @@ typedef struct  {
     struct event e; // parsed event -- we clear out sequence and time here obv
     uint32_t tag;
     uint32_t tick; // 0 means not used 
-    uint32_t length; // 0 means not used 
+    uint32_t period; // 0 means not used 
 } sequence_entry;
 
 // linked list of sequence_entries
@@ -47,20 +47,20 @@ void sequencer_recompute() {
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
-uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t length, uint32_t tag) {
+uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
-    // if the tag already exists - if there's tick/length, overwrite, if there's no tick / length, we should remove the entry
+    // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
         if ((*entry_ll_ptr)->sequence->tag == tag) {
-            if (length == 0 && tick == 0) { // delete
+            if (period == 0 && tick == 0) { // delete
                 sequence_entry_ll_t *doomed = *entry_ll_ptr;
                 *entry_ll_ptr = doomed->next; // close up list.
                 free(doomed->sequence);
                 free(doomed);
                 return 0;
             } else { // replace
-                (*entry_ll_ptr)->sequence->length = length;
+                (*entry_ll_ptr)->sequence->period = period;
                 (*entry_ll_ptr)->sequence->tick = tick;
                 (*entry_ll_ptr)->sequence->e = e;
                 return 0;
@@ -70,13 +70,13 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t length, uint
     }
 
     // If we got here, we didn't find the tag in the list, so add it at the end.
-    if(tick == 0 && length == 0) return 0; // Ignore non-schedulable event.
-    if(tick != 0 && length == 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
+    if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
+    if(tick != 0 && period == 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
     (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
     (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
     (*entry_ll_ptr)->sequence->e = e;
     (*entry_ll_ptr)->sequence->tick = tick;
-    (*entry_ll_ptr)->sequence->length = length;
+    (*entry_ll_ptr)->sequence->period = period;
     (*entry_ll_ptr)->sequence->tag = tag;
     (*entry_ll_ptr)->next = NULL;
     return 1;
@@ -93,11 +93,11 @@ static void sequencer_check_and_fill() {
             uint8_t deleted = 0;
             uint8_t hit = 0;
             uint8_t delete = 0;
-            if((*entry_ll_ptr)->sequence->length != 0) { // length set 
-                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->sequence->length;
+            if((*entry_ll_ptr)->sequence->period != 0) { // period set 
+                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->sequence->period;
                 if(offset == (*entry_ll_ptr)->sequence->tick) hit = 1;
             } else {
-                // Test for absolute tick (no length set)
+                // Test for absolute tick (no period set)
                 if ((*entry_ll_ptr)->sequence->tick == sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {

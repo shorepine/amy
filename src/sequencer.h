@@ -12,7 +12,7 @@ extern uint32_t us_per_tick ;
 
 void sequencer_init();
 void sequencer_recompute();
-uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t length, uint32_t tag);
+uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag);
 void sequencer_reset();
 extern void (*amy_external_sequencer_hook)(uint32_t);
 
