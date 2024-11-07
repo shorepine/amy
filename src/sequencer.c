@@ -4,7 +4,7 @@ typedef struct  {
     struct event e; // parsed event -- we clear out sequence and time here obv
     uint32_t tag;
     uint32_t tick; // 0 means not used 
-    uint16_t divider; // 0 means not used 
+    uint32_t length; // 0 means not used 
 } sequence_entry;
 
 // linked list of sequence_entries
@@ -30,37 +30,37 @@ esp_timer_handle_t periodic_timer;
 #include <pthread.h>
 #endif
 
+void sequencer_reset() {
+    // Remove all events
+    sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+    while ((*entry_ll_ptr) != NULL) {
+        sequence_entry_ll_t *doomed = *entry_ll_ptr;
+        *entry_ll_ptr = doomed->next; // close up list.
+        free(doomed->sequence);
+        free(doomed);
+    }
+    sequence_entry_ll_start = NULL;
+}
+
 void sequencer_recompute() {
     us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
-extern int parse_list_uint32_t(char *message, uint32_t *vals, int max_num_vals, uint32_t skipped_val);
-
-// Parses the tick, divider and tag out of a sequence message
-void parse_tick_and_tag(char * message, uint32_t *tick, uint16_t *divider, uint32_t *tag) {
-    uint32_t vals[3];
-    parse_list_uint32_t(message, vals, 3, 0);
-    *tick = (uint32_t)vals[0]; *divider = (uint16_t)vals[1]; *tag = (uint32_t)vals[2];
-}
-
-uint8_t sequencer_add_event(struct event e, uint32_t tick, uint16_t divider, uint32_t tag) {
+uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t length, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
-    // if the tag already exists - if there's tick/divider, overwrite, if there's no tick / divider, we should remove the entry
-    if(divider != 0 && tick != 0) { divider = 0; } // if tick is set ignore divider 
-
-    // Dan's version
+    // if the tag already exists - if there's tick/length, overwrite, if there's no tick / length, we should remove the entry
     sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
         if ((*entry_ll_ptr)->sequence->tag == tag) {
-            if (divider == 0 && tick == 0) { // delete
+            if (length == 0 && tick == 0) { // delete
                 sequence_entry_ll_t *doomed = *entry_ll_ptr;
                 *entry_ll_ptr = doomed->next; // close up list.
                 free(doomed->sequence);
                 free(doomed);
                 return 0;
             } else { // replace
-                (*entry_ll_ptr)->sequence->divider = divider;
+                (*entry_ll_ptr)->sequence->length = length;
                 (*entry_ll_ptr)->sequence->tick = tick;
                 (*entry_ll_ptr)->sequence->e = e;
                 return 0;
@@ -70,13 +70,13 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint16_t divider, uin
     }
 
     // If we got here, we didn't find the tag in the list, so add it at the end.
-    if(tick == 0 && divider == 0) return 0; // Ignore non-schedulable event.
-    if(tick != 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
+    if(tick == 0 && length == 0) return 0; // Ignore non-schedulable event.
+    if(tick != 0 && length == 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
     (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
     (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
     (*entry_ll_ptr)->sequence->e = e;
     (*entry_ll_ptr)->sequence->tick = tick;
-    (*entry_ll_ptr)->sequence->divider = divider;
+    (*entry_ll_ptr)->sequence->length = length;
     (*entry_ll_ptr)->sequence->tag = tag;
     (*entry_ll_ptr)->next = NULL;
     return 1;
@@ -88,38 +88,35 @@ static void sequencer_check_and_fill() {
     while(amy_sysclock()  >= (next_amy_tick_us/1000)) {
         sequencer_tick_count++;
         // Scan through LL looking for matches
-        sequence_entry_ll_t *entry_ll = sequence_entry_ll_start;
-        sequence_entry_ll_t *prev_entry_ll = NULL;
-        while(entry_ll != NULL) {
-            uint8_t already_deleted = 0;
-            if(entry_ll->sequence->tick == sequencer_tick_count || (entry_ll->sequence->divider > 0 && (sequencer_tick_count % entry_ll->sequence->divider == 0))) {
-                // hit
-                struct event to_add = entry_ll->sequence->e;
+        sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+        while ((*entry_ll_ptr) != NULL) {
+            uint8_t deleted = 0;
+            uint8_t hit = 0;
+            uint8_t delete = 0;
+            if((*entry_ll_ptr)->sequence->length != 0) { // length set 
+                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->sequence->length;
+                if(offset == (*entry_ll_ptr)->sequence->tick) hit = 1;
+            } else {
+                // Test for absolute tick (no length set)
+                if ((*entry_ll_ptr)->sequence->tick == sequencer_tick_count) { hit = 1; delete = 1; }
+            }
+            if(hit) {
+                struct event to_add = (*entry_ll_ptr)->sequence->e;
                 to_add.status = EVENT_SCHEDULED;
                 to_add.time = 0; // play now
                 amy_add_event(to_add);
 
-                // Delete tick addressed sequence entry if sent
-                if(entry_ll->sequence->tick > 0) {
-                    if(prev_entry_ll == NULL) { // start
-                        sequence_entry_ll_start = entry_ll->next;
-                    } else {
-                        prev_entry_ll->next = entry_ll->next;
-                    }
-                    free(entry_ll->sequence);
-                    free(entry_ll);
-
-                    if(prev_entry_ll != NULL) {
-                        entry_ll = prev_entry_ll->next;
-                    } else {
-                        entry_ll = NULL;
-                    }
-                    already_deleted = 1;
+                // Delete absolute tick addressed sequence entry if sent
+                if(delete) {
+                    sequence_entry_ll_t *doomed = *entry_ll_ptr;
+                    *entry_ll_ptr = doomed->next; // close up list.
+                    free(doomed->sequence);
+                    free(doomed);
+                    deleted = 1;
                 }
             }
-            if(!already_deleted) {
-                prev_entry_ll = entry_ll;
-                entry_ll = entry_ll->next;
+            if(!deleted) {
+                entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
             }
         }
 

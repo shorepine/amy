@@ -985,6 +985,9 @@ void play_event(struct delta d) {
         if(*(int16_t *)&d.data & RESET_ALL_OSCS) { 
             amy_reset_oscs(); 
         }
+        if(*(int16_t *)&d.data & RESET_SEQUENCER) { 
+            sequencer_reset(); 
+        }
         if(*(int16_t *)&d.data < AMY_OSCS+1) { 
             reset_osc(*(int16_t *)&d.data); 
         } 
@@ -1709,9 +1712,7 @@ struct event amy_parse_message(char * message) {
     int16_t length = strlen(message);
 
     // default values for sequence message
-    uint16_t divider = 0;
-    uint32_t tag = 0;
-    uint32_t tick = 0;
+    uint32_t seq_message[3] = {0,0,0};
     uint8_t sequence_message = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
@@ -1757,7 +1758,7 @@ struct event amy_parse_message(char * message) {
                         case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
                         case 'G': e.filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
-                        case 'H': parse_tick_and_tag(message+start, &tick, &divider, &tag); sequence_message = 1; break;
+                        case 'H': parse_list_uint32_t(message+start, seq_message, 3, 0); sequence_message = 1; break;
                         case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
                                                       AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
@@ -1857,7 +1858,7 @@ struct event amy_parse_message(char * message) {
 
     if(length>0) { // only do this if we got some data 
         if(sequence_message) {
-            uint8_t added = sequencer_add_event(e, tick, divider, tag);
+            uint8_t added = sequencer_add_event(e, seq_message[0], seq_message[1], seq_message[2]);
             (void)added; // we don't need to do anything with this info at this time
         } else {
             // if time is set, play then

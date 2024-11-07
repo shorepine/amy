@@ -33,7 +33,7 @@ It supports
  * Control of overall gain and 3-band EQ
  * Built in patches for PCM, DX7, Juno and partials
  * A front end for Juno-6 patches and conversion setup commands 
- * Built-in clock for short term sequencing of events
+ * Built-in clock and pattern sequencer
  * Can use multi-core (including microcontrollers) for rendering if available
 
 The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/shorepine/amy/blob/main/dx7_simulator.py).
@@ -197,7 +197,7 @@ Here's the full list:
 | `f`    | `freq`   |  float[,float...]      | Frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
 | `F`    | `filter_freq` | float[,float...]  | Center/break frequency for variable filter, set of ControlCoefficients |
 | `G`    | `filter_type` | 0-4 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
-| `H`    | `sequence` | int,int,int | Tick number, divider number, tag number for sequencing | 
+| `H`    | `sequence` | int,int,int | Tick offset, length, tag for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
@@ -217,7 +217,7 @@ Here's the full list:
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| `S`    | `reset_osc`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock. RESET_AMY restarts AMY.|
+| `S`    | `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock. RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
@@ -266,13 +266,15 @@ Both `amy.send()`s will return immediately, but you'll hear the second note play
 
 ### The sequencer
 
-On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from starting. You can reset the `ticks` to 0 with an `amy.send(reset_osc=amy.RESET_TIMEBASE)`. 
+On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. 
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
-You can schedule an event to happen at a precise tick with `amy.send(... ,sequence="tick,divider,tag")`. `tick` is an absolute tick number. If given, `divider` is ignored. Once AMY reaches `tick`, the rest of your event will play and the saved event will be removed from memory. If `tick` is in the past, AMY will ignore it. 
+You can schedule an event to happen at a precise tick with `amy.send(... ,sequence="tick,length,tag")`. `tick` can be an absolute or offset tick number. If `length` is ommited or 0, `tick` is assumed to be absolute and once AMY reaches `tick`, the rest of your event will play and the saved event will be removed from memory. If an absolute `tick` is in the past, AMY will ignore it. 
 
-You can schedule repeating events (like a step sequencer or drum machine) with `divider`. For example a `divider` of 48 will trigger once every quarter note. A `divider` of 24 will happen twice every quarter note. A `divider` of 96 will happen every two quarter notes. `divider` can be any number to allow for complex rhythms. 
+You can schedule repeating events (like a step sequencer or drum machine) with `length`, which is the length of the sequence in ticks. For example a `length` of 48 with `ticks` omitted or 0 will trigger once every quarter note. A `length` of 24 will happen twice every quarter note. A `length` of 96 will happen every two quarter notes. `length` can be any whole number to allow for complex rhythms. 
+
+For pattern sequencers like drum machines, you will also want to use `tick` alongisde `length`. If both are given and nonzero, `tick` is assumed to be an offset on the `length`. For example, for a 16-step drum machine pattern running on eighth notes (PPQ/2), you would use a `length` of `16 * 24 = 384`. The first slot of the drum machine would have a `tick` of 0, the 2nd would have a `tick` offset of 24, and so on. 
 
 `tag` should be given, and will be `0` if not. You should set `tag` to a random or incrementing number in your code that you can refer to later. `tag` allows you to replace or delete the event once scheduled. 
 
@@ -281,13 +283,19 @@ If you are including AMY in a program, you can set the hook `void (*amy_external
 Sequencer examples:
 
 ```python
+amy.send(osc=2, vel=1, wave=amy.PCM, patch=2, sequence="1000,,3") # play a PCM drum at absolute tick 1000 
 
 amy.send(osc=0, vel=1, wave=amy.PCM, patch=0, sequence=",24,1") # play a PCM drum every eighth note.
 amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, sequence=",48,2") # play a PCM drum every quarter note.
 amy.send(sequence=",,1") # remove the eighth note sequence
 amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, note=70, sequence=",48,2") # change the quarter note event
 
-amy.send(osc=2, vel=1, wave=amy.PCM, patch=2, sequence="1000,,3") # play a PCM drum at absolute tick 1000 
+amy.send(reset=amy.RESET_SEQUENCER) # clears the sequence
+
+amy.send(osc=0, vel=1, wave=amy.PCM, patch=0, sequence="0,384,1") # first slot of a 16 1/8th note drum machine
+amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, sequence="216,384,2") # ninth slot of a 16 1/8th note drum machine
+
+
 ```
 
 ## Examples
