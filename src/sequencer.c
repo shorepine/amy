@@ -30,6 +30,13 @@ esp_timer_handle_t periodic_timer;
 #include <pthread.h>
 #endif
 
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+uint32_t sequencer_ticks() { return sequencer_tick_count; }
+
 void sequencer_reset() {
     // Remove all events
     sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
@@ -83,7 +90,7 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 }
 
 
-static void sequencer_check_and_fill() {
+void sequencer_check_and_fill() {
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
     while(amy_sysclock()  >= (next_amy_tick_us/1000)) {
         sequencer_tick_count++;
@@ -119,7 +126,12 @@ static void sequencer_check_and_fill() {
                 entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
             }
         }
-
+        // call the right hook:
+#ifdef __EMSCRIPTEN__
+        EM_ASM({
+            amy_sequencer_js_hook($0);
+        }, sequencer_tick_count);
+#endif
         if(amy_external_sequencer_hook!=NULL) {
             amy_external_sequencer_hook(sequencer_tick_count);
         }

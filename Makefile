@@ -32,7 +32,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_live_start', '_amy_start', '_malloc', '_free']" 
+-s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_live_start', '_amy_start', '_sequencer_ticks', '_malloc', '_free']"
 
 PYTHON = python3
 
@@ -43,12 +43,10 @@ all: default
 
 SOURCES = src/algorithms.c src/amy.c src/envelope.c src/examples.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/custom.c \
-	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c
+	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c \
+	src/libminiaudio-audio.c
 
-OBJECTS = $(patsubst %.c, %.o, src/algorithms.c src/amy.c src/envelope.c \
-	src/delay.c src/partials.c src/custom.c src/patches.c \
-	src/examples.c src/filters.c src/oscillators.c src/pcm.c src/log2_exp2.c \
-	src/libminiaudio-audio.c src/transfer.c src/sequencer.c)
+OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
  
 HEADERS = $(wildcard src/*.h) src/amy_config.h
 HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
@@ -85,9 +83,8 @@ timing: amy-module
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
-
-web: $(TARGET)
-	 emcc $(SOURCES) src/libminiaudio-audio.c $(EMSCRIPTEN_OPTIONS) -O3 -o docs/amy.js
+docs/amy.js: $(TARGET)
+	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o

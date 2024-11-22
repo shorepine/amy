@@ -22,6 +22,7 @@ if (TARGET tinyusb_device)
             algorithms.c
             amy.c
             transfer.c
+            sequencer.c
             delay.c
             envelope.c
             custom.c
