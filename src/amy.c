@@ -126,7 +126,8 @@ int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 // Optional render hook that's called per oscillator during rendering
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
 
-#ifndef malloc_caps
+#ifndef MALLOC_CAPS_DEFINED
+#define MALLOC_CAPS_DEFINED
 void * malloc_caps(uint32_t size, uint32_t flags) {
 #ifdef ESP_PLATFORM
     //fprintf(stderr, "allocing size %ld flags %ld\n", size, flags);
@@ -137,7 +138,6 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 }
 #endif
-
 
 
 // block -- what gets sent to the dac -- -32768...32767 (int16 le)

@@ -37,12 +37,13 @@ pthread_t amy_live_thread;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-
+extern void sequencer_check_and_fill();
 void main_loop__em()
 {
+    // We call repeatedly here to fill the sequencer, for webassembly (no threads)
+    sequencer_check_and_fill();
 }
 #endif
-
 
 void amy_print_devices() {
     ma_context context;
@@ -71,9 +72,7 @@ void amy_print_devices() {
 
     ma_context_uninit(&context);
 }
-#ifdef __EMSCRIPTEN__
-//#include "console.h"
-#endif
+
 
 // I've seen frame counts as big as 1440, I think *8 is enough room (2048)
 #define OUTPUT_RING_FRAMES (AMY_BLOCK_SIZE*8)
