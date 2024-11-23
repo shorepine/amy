@@ -975,12 +975,10 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == RESET_OSC) { 
+        // Remember that RESET_TIMEBASE happens immediately in the parse, so we don't deal with it here.
         if(*(int16_t *)&d.data & RESET_AMY) {
             amy_stop();
             amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
-        }
-        if(*(int16_t *)&d.data & RESET_TIMEBASE) {
-            amy_reset_sysclock();
         }
         if(*(int16_t *)&d.data & RESET_ALL_OSCS) { 
             amy_reset_oscs(); 
@@ -1812,7 +1810,13 @@ struct event amy_parse_message(char * message) {
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
                         case 'R': e.resonance=atoff(message + start); break;
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
-                        case 'S': e.reset_osc = atoi(message + start); break;
+                        case 'S': 
+                            e.reset_osc = atoi(message + start);
+                            // if we're resetting timebase, do it NOW
+                            if(e.reset_osc & RESET_TIMEBASE) {
+                                amy_reset_sysclock();
+                            }
+                            break;
                         case 's': e.pitch_bend = atoff(message + start); break;
                         /* t used for time */
                         case 'T': e.eg_type[0] = atoi(message + start); break;

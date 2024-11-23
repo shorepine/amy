@@ -217,7 +217,7 @@ Here's the full list:
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `s`    | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| `S`    | `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock. RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
+| `S`    | `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock (immediately, ignoring `time`). RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
@@ -266,7 +266,7 @@ Both `amy.send()`s will return immediately, but you'll hear the second note play
 
 ### The sequencer
 
-On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. 
+On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. Note this will happen immediately, ignoring any `time` or `sequence`.
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
