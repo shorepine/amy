@@ -19,7 +19,8 @@ residu_file = 'resid-0.25s.wav'
 with open(params_file, 'r') as f:
   bp_params = json.load(f)
 
-pcm_patch = tulip.load_sample(residu_file)
+amy.load_sample(residu_file, patch=50)
+
 
 def setup_piano(bp_params, pcm_patch=None, voices=None, base_osc=0, base_freq=261.63, stretch_coef=0.038):
   kwargs = {}
@@ -44,7 +45,7 @@ def setup_piano(bp_params, pcm_patch=None, voices=None, base_osc=0, base_freq=26
   if pcm_patch is not None:
     pcm_osc = num_partials + 1
     #pcm_patch = tulip.load_sample(residu_file)
-    amy.send(osc=pcm_osc, wave=amy.CUSTOM, patch=pcm_patch, amp=1, freq='0,0,0,0,0,0', **kwargs)
+    amy.send(osc=pcm_osc, wave=amy.PCM, patch=pcm_patch, amp=1, freq='0,0,0,0,0,0', **kwargs)
     amy.send(osc=base_osc, chained_osc=pcm_osc, **kwargs)
 
 
@@ -63,14 +64,15 @@ time.sleep(0.1)  # to let reset happen.
 #amy.send(voices='0,1,2,3', load_patch=1024)
 num_partials = len(bp_params)
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
-synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
+synth_obj = midi.Synth(num_voices=8, patch_string=patch_string)
 #voices = '0,1,2,3'
 voices = ",".join([str(a) for a in synth_obj.amy_voice_nums])
 
 print("voices=", voices)
 
-setup_piano(bp_params, pcm_patch, voices=voices)
+setup_piano(bp_params, 50, voices=voices)
 
 midi.config.add_synth_object(channel=1, synth_object=synth_obj)
+
 
 
