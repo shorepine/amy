@@ -206,11 +206,14 @@ def message(**kwargs):
 
 def send_raw(m):
     # override_send is used by e.g. Tulip, to send messages in a different way than libamy or UDP
+    global mess, log
+    global override_send
     if(override_send is not None):
         override_send(m)
     else:
         import libamy
         libamy.send(m)
+    if(log): mess.append(m)
 
 def log_patch():
     global mess, log
@@ -247,10 +250,7 @@ def stop_store_patch(patch_number):
 
 # Send an AMY message to amy
 def send(**kwargs):
-    global override_send
-    global mess, log
     m = message(**kwargs)
-    if(log): mess.append(m)
 
     send_raw(m)
 

@@ -34,7 +34,7 @@ typedef struct {
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
-#define MAX_BREAKPOINTS 8
+#define MAX_BREAKPOINTS 16
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define AMY_BYTES_PER_SAMPLE 2
