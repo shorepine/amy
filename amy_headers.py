@@ -346,6 +346,36 @@ def make_clipping_lut(filename):
         f.write("#endif\n")
     print("wrote", filename)
 
+def make_piano_patch():
+    import json, amy
+    params_file = 'Piano.ff.D5.json'
+
+    # Read in the params file.
+    with open(params_file, 'r') as f:
+        bp_params = json.load(f)
+    base_osc=0
+    base_freq=261.63
+    stretch_coef=0.038
+
+    kwargs = {}
+    num_partials = len(bp_params)
+    amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
+
+    harm_nums = range(1, num_partials + 1)
+    # Quadratic partial stretching
+    #harm_freqs = [n * (261.8 + stretch_coef * n * n) for n in harm_nums]
+  
+    for i in harm_nums:
+        # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
+        f0 = bp_params[i - 1][0]
+        bp_vals = bp_params[i - 1][1]
+        bp_string = ','.join("%d,%.3f" % (n, max(0, 100 * val - 0.001)) for n, val in bp_vals)
+        bp_string += ',200,0'
+        #print(bp_string)
+        amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=f0, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
+
+    return len(harm_nums)+1
+
 def make_patches(filename):
     def nothing(message):
         return
@@ -358,8 +388,7 @@ def make_patches(filename):
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
-        f.write("static const char * const patch_commands[256] PROGMEM = {\n")
-        #f.write("const char * patch_commands[256] PROGMEM = {\n")
+        f.write("static const char * const patch_commands[257] PROGMEM = {\n")
         # Do juno
         for i in range(128):
             amy.log_patch()
@@ -374,8 +403,15 @@ def make_patches(filename):
             p.send_to_AMY(reset=False)
             f.write("\t/* %d: DX7 %s */ \"%s\",\n" % (i+128, p.name, amy.retrieve_patch()))  
             num_oscs.append(9)
+
+        # do piano
+        amy.log_patch()
+        num_osc_piano = make_piano_patch()
+        f.write("\t/* 256: Piano */ \"%s\",\n" % (amy.retrieve_patch()))  
+        num_oscs.append(num_osc_piano)
+
         f.write("};\n")
-        f.write("const uint16_t patch_oscs[256] PROGMEM = {\n")
+        f.write("const uint16_t patch_oscs[257] PROGMEM = {\n")
         for i in num_oscs:
             f.write("%d," % (i))
         f.write("\n};\n#endif\n")
