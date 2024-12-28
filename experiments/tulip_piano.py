@@ -9,13 +9,6 @@ import amy
 import midi
 import math
 
-#params_file = 'track02-C4-bps.json'
-#residu_file = 'M1_Piano_C3_hprModel_residual_0.25s.wav'
-#residu_file = 'track02-C4-resid-0.25s.wav'
-
-residu_file = 'resid-0.25s.wav'
-#pcm_patch = tulip.load_sample(residu_file)
-
 # Read in the params file written by piano_heterodyne.ipynb
 # Contents are:
 #   sample_times_ms - single vector of fixed log-spaced envelope sample times (in int16 integer ms)

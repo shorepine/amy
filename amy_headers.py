@@ -348,7 +348,7 @@ def make_clipping_lut(filename):
 
 def make_piano_patch():
     import json, amy
-    params_file = 'Piano.ff.D5.json'
+    params_file = 'experiments/Piano.ff.D5.json'
 
     # Read in the params file.
     with open(params_file, 'r') as f:
