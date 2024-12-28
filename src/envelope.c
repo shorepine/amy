@@ -60,10 +60,10 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     // We have to aim to overshoot to the desired gap so that we hit the target by exponential_rate time.
     const SAMPLE exponential_rate_overshoot_factor = F2S(1.0f / (1.0f - exp2f(EXP_RATE_VAL)));
     uint32_t elapsed = 0;    
-    SAMPLE scale = F2S(1.0f);
     int eg_type = synth[osc].eg_type[bp_set];
     uint32_t bp_end_times[MAX_BREAKPOINTS];
     uint32_t cumulated_time = 0;
+    SAMPLE scale = F2S(1.0f);
 
     // Scan breakpoints to find which one is release (the last one)
     bp_r = -1;
@@ -78,9 +78,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     if(bp_r < 0) {
         // no breakpoints, return key gate.
         if(AMY_IS_SET(synth[osc].note_off_clock)) scale = 0;
-        synth[osc].last_scale[bp_set] = scale;
-        //return scale;
-        goto return_label;
+        goto return_scale;
     }
     // Fix up bp_end_times for release segment to be relative to note-off time.
     bp_end_times[bp_r] = synth[osc].breakpoint_times[bp_set][bp_r];
@@ -99,10 +97,8 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             // We didn't find anything, so we are in sustain.
             found = bp_r - 1; // segment before release defines sustain
             scale = F2S(synth[osc].breakpoint_values[bp_set][found]);
-            synth[osc].last_scale[bp_set] = scale;
             //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", total_samples, bp_set, found, S2F(scale));
-            //return scale;
-            goto return_label;
+            goto return_scale;
         }
     } else if(AMY_IS_SET(synth[osc].note_off_clock)) {
         release = 1;
@@ -110,8 +106,6 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         // Get the last t/v pair , for release
         found = bp_r;
         t0 = 0; // start the elapsed clock again
-        // Release starts from wherever we got to
-        v0 = synth[osc].last_scale[bp_set];
         if(elapsed > synth[osc].breakpoint_times[bp_set][bp_r]) {
             // OK. partials (et al) need a frame to fade out to avoid clicks. This is in conflict with the breakpoint release, 
             // which will set it to the bp end value before the fade out, often 0 so the fadeout never gets to hit. 
@@ -120,24 +114,25 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             // to fully respect the actual envelope, else it pops up to full amplitude after the release.
             if(synth[osc].wave==PARTIAL && synth[osc].patch >= 0) {
                 scale = F2S(1.0f);
-                synth[osc].last_scale[bp_set] = scale;
-                //return scale;
-                goto return_label;
+                goto return_scale;
             }
             //printf("cbp: time %f osc %d amp %f OFF\n", total_samples / (float)AMY_SAMPLE_RATE, osc, msynth[osc].amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
             //synth[osc].status=SYNTH_OFF;
             //AMY_UNSET(synth[osc].note_off_clock);
             scale = F2S(synth[osc].breakpoint_values[bp_set][bp_r]);
-            synth[osc].last_scale[bp_set] = scale;
-            //return scale;
-            goto return_label;
+            goto return_scale;
         }
     }
+    if (found != synth[osc].current_seg[bp_set]) {
+        // This is the first time we've been in this segment.
+        synth[osc].current_seg[bp_set] = found;
+        // Initialize the segment value from wherever we have gotten to so far.
+        synth[osc].seg_start_val[bp_set] = synth[osc].last_scale[bp_set];
+    }
     
-    if(found<0) return scale;
-
     t1 = bp_end_times[found];
+    v0 = synth[osc].seg_start_val[bp_set];
     v1 = F2S(synth[osc].breakpoint_values[bp_set][found]);
     if(found>0 && bp_r != found && !release) {
         t0 = bp_end_times[found-1];
@@ -211,8 +206,8 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         scale = -scale;
     }
     // Keep track of the most-recently returned non-release scale.
- return_label:
-    if (!release) synth[osc].last_scale[bp_set] = scale;
+ return_scale:
+    synth[osc].last_scale[bp_set] = scale;
     //if (osc < AMY_OSCS && found != -1)
     //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)

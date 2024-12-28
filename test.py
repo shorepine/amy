@@ -222,6 +222,32 @@ class TestSineEnv(AmyTest):
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
 
+class TestEnvRetrig(AmyTest):
+
+  def run(self):
+    # Retriggering an envelope that hasn't fully decayed should restart from current value, not zero.
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,100,0')
+    amy.send(time=100, vel=8)
+    amy.send(time=200, vel=8)  # Retrigger during Decay
+    amy.send(time=300, vel=0)
+    amy.send(time=350, vel=8)  # Retrigger during Release
+    amy.send(time=500, vel=0)
+    amy.send(time=600, vel=0)  # Repeated note-off
+
+class TestFiltRetrig(AmyTest):
+
+  def run(self):
+    # Retriggering with filter state.
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,100,0',
+             filter_type=amy.FILTER_LPF, filter_freq=500, resonance=8)
+    amy.send(time=100, vel=8)
+    amy.send(time=200, vel=8)  # Retrigger during Decay
+    amy.send(time=300, vel=0)
+    amy.send(time=350, vel=8)  # Retrigger during Release
+    amy.send(time=500, vel=0)
+    amy.send(time=600, vel=0)  # Repeated note-off
 
 class TestAlgo(AmyTest):
 
@@ -578,7 +604,6 @@ def main(argv):
     #TestBleep().test()
     #TestBrass().test()
     #TestBrass2().test()
-    #TestSineEnv().test()
     #TestSawDownOsc().test()
     #TestGuitar().test()
     #TestFilter().test()
@@ -589,6 +614,7 @@ def main(argv):
     #TestJunoTrumpetPatch().test()
     #TestPcmLoop().test()
     TestBYOPNoteOff().test()
+    TestSineEnv().test()
 
   amy.send(debug=0)
   print("tests done.")
