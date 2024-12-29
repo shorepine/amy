@@ -4,11 +4,18 @@
 
 import json
 import time
-import tulip
 import amy
-import midi
 
-from ulab import numpy as np
+try:
+    import midi
+    have_midi = True
+except:
+    have_midi = False
+
+try:
+    from ulab import numpy as np
+except:
+    import numpy as np
 
 # Read in the params file written by piano_heterodyne.ipynb
 # Contents are:
@@ -24,7 +31,7 @@ with open(params_file, 'r') as f:
     notes_params = json.load(f)
 NOTES = np.array(notes_params['notes'], dtype=np.int8)
 VELOCITIES = np.array(notes_params['velocities'], dtype=np.int8)
-NUM_HARMONICS = np.array(notes_params['num_harmonics'], dtype=np.int8)
+NUM_HARMONICS = np.array(notes_params['num_harmonics'], dtype=np.int16)
 assert len(NUM_HARMONICS) == len(NOTES) * len(VELOCITIES)
 NUM_MAGS = len(notes_params['harmonics_mags'][0])
 FREQ_MAGS = np.zeros((np.sum(NUM_HARMONICS), 1 + NUM_MAGS), dtype=np.int16)
@@ -41,7 +48,8 @@ start_h = 0
 for i, n in enumerate(NUM_HARMONICS):
     START_HARMONIC[i] = start_h
     start_h += n
-    
+#print(f'{NUM_HARMONICS=} {START_HARMONIC=}')
+
 
 def interp_harms_params(hp0, hp1, alpha):
     """Return harm_param list that is alpha of the way to hp1 from hp0."""
@@ -57,8 +65,8 @@ def cents_to_hz(cents):
   
 
 def db_to_lin(d):
-    # There's a -90 (-130 + 40) dB downshift.  Clip anything below 0.001 to zero, to avoid E-05 format etc.
-    return np.maximum(0, 10.0 ** ((d - 90) / 20.0) - 0.001)
+    # There's a -100 (-130 + 30) dB downshift.  Clip anything below 0.001 to zero, to avoid E-05 format etc.
+    return np.maximum(0, 10.0 ** ((d - 100) / 20.0) - 0.001)
 
 
 def harm_param_to_lin(bps):
@@ -76,7 +84,9 @@ def harms_params_from_note_index_vel_index(note_index, vel_index):
     note_vel_index = note_index * len(VELOCITIES) + vel_index
     num_harmonics = NUM_HARMONICS[note_vel_index]
     start_harmonic = START_HARMONIC[note_vel_index]
-    return FREQ_MAGS[start_harmonic : start_harmonic + num_harmonics, :]
+    harms_params = FREQ_MAGS[start_harmonic : start_harmonic + num_harmonics, :]
+    #print(f'{note_index=} {vel_index=} {start_harmonic=} {harms_params=}')
+    return harms_params
 
 
 def harms_params_for_note_vel(note, vel):
@@ -84,13 +94,14 @@ def harms_params_for_note_vel(note, vel):
     note = np.clip(note, NOTES[0], NOTES[-1])
     vel = np.clip(vel, VELOCITIES[0], VELOCITIES[-1])
     note_index = -1 + np.sum(NOTES[:-1] <= note)  # at most the last-but-one value.
-    strike_index = -1 + np.sum(VELOCITIES <= vel)
+    strike_index = -1 + np.sum(VELOCITIES[:-1] <= vel)
     lower_note = NOTES[note_index]
     upper_note = NOTES[note_index + 1]
     note_alpha = (note - lower_note) / (upper_note - lower_note)
     lower_strike = VELOCITIES[strike_index]
     upper_strike = VELOCITIES[strike_index + 1]
     strike_alpha = (vel - lower_strike) / (upper_strike - lower_strike)
+    #print(f'{lower_note=} {note_alpha=} {lower_strike=} {strike_alpha=}')
     harms_params = interp_harms_params(
         interp_harms_params(
             harms_params_from_note_index_vel_index(note_index, strike_index),
@@ -140,44 +151,45 @@ def piano_note_on(note, vel=1, osc=0, **kwargs):
 #time.sleep(1.0)
 #piano_note_on(60, 0)
 
+def amy_send(**kwargs):
+    amy.send(**kwargs)
+    #m = amy.message(**kwargs)
+    #print('amy.send(' + m + ')')
+    #amy.send_raw(m)
+
+
 amy.reset()
 time.sleep(0.1)  # to let reset happen.
 #amy.send(store_patch='1024,v0w10Zv%dw%dZ')
 #amy.send(voices='0,1,2,3', load_patch=1024)
 num_partials = NUM_HARMONICS[0]
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
-synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
-#voices = '0,1,2,3'
-voices = ",".join([str(a) for a in synth_obj.amy_voice_nums])
-print("voices=", voices)
 
 
-def amy_send(**kwargs):
-    amy.send(**kwargs)
-    #m = amy.message(**kwargs)
-    #print('amy.send(' + m + ')')
-    #amy.send_raw(m)
-    
+if have_midi:
+    synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
+    #voices = '0,1,2,3'
+    voices = ",".join([str(a) for a in synth_obj.amy_voice_nums])
+    #print("voices=", voices)
+    # We have to intercept the note-on events of the Synth voice objects.
+    class PianoVoiceObject:
+        """Substitute for midi.VoiceObject for Piano voices."""
+
+        def __init__(self, amy_voice):
+            self.amy_voice = amy_voice
+
+        def note_on(self, note, vel, time=None, sequence=None):
+            #amy.send(time=time, voices=self.amy_voice, note=note, vel=vel, sequence=sequence)
+            piano_note_on(note, vel, osc=0, voices=self.amy_voice, time=time, sequence=sequence)
+
+        def note_off(self, time=None, sequence=None):
+            amy.send(time=time, voices=self.amy_voice, vel=0, sequence=sequence)
 
 
-# We have to intercept the note-on events of the Synth voice objects.
-class PianoVoiceObject:
-    """Substitute for midi.VoiceObject for Piano voices."""
+    # Intercept the voice objects for our synth
+    synth_obj.voice_objs = [PianoVoiceObject(obj.amy_voice) for obj in synth_obj.voice_objs]
+    for voice_obj in synth_obj.voice_objs:
+        init_piano_voice(num_partials, base_osc=0, voices=voice_obj.amy_voice)
+        time.sleep(0.05)  # Let the amy queue catch up.
 
-    def __init__(self, amy_voice):
-        self.amy_voice = amy_voice
-
-    def note_on(self, note, vel, time=None, sequence=None):
-        #amy.send(time=time, voices=self.amy_voice, note=note, vel=vel, sequence=sequence)
-        piano_note_on(note, vel, osc=0, voices=self.amy_voice, time=time, sequence=sequence)
-
-    def note_off(self, time=None, sequence=None):
-        amy.send(time=time, voices=self.amy_voice, vel=0, sequence=sequence)
-
-
-# Intercept the voice objects for our synth
-synth_obj.voice_objs = [PianoVoiceObject(obj.amy_voice) for obj in synth_obj.voice_objs]
-for voice_obj in synth_obj.voice_objs:
-    init_piano_voice(num_partials, base_osc=0, voices=voice_obj.amy_voice)
-
-midi.config.add_synth_object(channel=1, synth_object=synth_obj)
+    midi.config.add_synth_object(channel=1, synth_object=synth_obj)
