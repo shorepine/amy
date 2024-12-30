@@ -10,7 +10,7 @@ Here's an example of 5 notes played on a real piano:
 
 https://github.com/user-attachments/assets/a8851901-a46e-42a5-a612-79bd5b6112be
 
-![piano_example_original](https://github.com/user-attachments/assets/852a57f2-745d-4c20-86a0-752112318973)
+![uiowa](https://github.com/user-attachments/assets/67f6a35c-bbc9-47bb-9440-41c85c9ba8b4)
 
 This clip starts with a D4 note played at three loudnesses - _pp_, _mf_, and _ff_.  These are followed by a D2 (two octaves lower), and a D6 (two octaves higher).
 (I made this example by adding together isolated recordings of single piano notes from the [University of Iowa Electronic Music Studios Instrument Samples](https://theremin.music.uiowa.edu/mispiano.html), which are the basis of the AMY piano.  I combined them with the code in [make_piano_examples.ipynb](../experiments/make_piano_examples.ipynb).)
@@ -36,7 +36,7 @@ amy.send(voices='0,1', vel=0)
 
 https://github.com/user-attachments/assets/06d3d8cb-5338-4da5-9bba-9ec14044423c
 
-![piano_example_juno60](https://github.com/user-attachments/assets/75d30548-97db-45f7-9037-7536fb865e12)
+![juno](https://github.com/user-attachments/assets/11d61f1b-1c04-4740-a97c-b60f9b62369d)
 
 This synthetic piano gets the stable harmonic structure and steady decay of each note, but there's no change in timbre with the different note velocities; every harmonic gets louder by the same factor.  (In fact, the Juno-60 was not velocity sensitive, but its usual practice to scale the whole note in proportion to velocity). There's no complexity to the harmonic decays, they are uniformly monotonic.  And the overall note decay time doesn't vary with the pitch.
 
@@ -53,7 +53,7 @@ amy.send(voices='0,1', vel=0)
 
 https://github.com/user-attachments/assets/25d5b663-a708-463b-ab35-3efeb0ab6d63
 
-![piano_example_dx7](https://github.com/user-attachments/assets/67c8ccd8-229d-44a6-bbf1-c7b4dd0418e8)
+![dx7](https://github.com/user-attachments/assets/5e1f0ec5-beac-4476-86e2-27f24e3c0bc5)
 
 This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.
 
@@ -79,7 +79,7 @@ The setup here is a bit complicated - we're setting 20 breakpoints independently
 
 https://github.com/user-attachments/assets/2176741f-13e5-46c4-b34f-b2f15e3e1ec6
 
-![piano_example_fixed](https://github.com/user-attachments/assets/bb272194-29b1-43a1-9629-d4a521ca4276)
+![fixed](https://github.com/user-attachments/assets/37f45670-fb31-4672-a354-6364f42113a9)
 
 The _mf_ D4 note now sounds quite realistic, because it's a reasonably accurate reproduction of the original recording.  However, we're still simply scaling its overall magnitude in to get different veloicities.  And when we change the pitch, we just squeeze or stretch the harmonics (and hence the notes' spectral envelopes), which is not at all realistic sounding.
 
@@ -101,7 +101,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0)
 
 https://github.com/user-attachments/assets/c1feccc0-7559-4fbd-b38b-d60b6679644c
 
-![piano_example_interpolated](https://github.com/user-attachments/assets/d6e23607-2c52-40e4-ab57-573f71eff9c2)
+![interpolated](https://github.com/user-attachments/assets/bcdf9711-3186-45cd-8c06-937a67b10afa)
 
 This recovers both the spectral complexity of the original piano notes, *and* the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.
 
@@ -109,4 +109,23 @@ This recovers both the spectral complexity of the original piano notes, *and* th
 
 While there are plenty of details that have not been exactly preserved (most notably the noisy "clunk" visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and "acoustic" than any of the previous syntheses.
 
+# Extracting harmonic envelopes
+
+How exactly to we capture the envelopes for each harmonic in our additive model?  In principle, this is simply a matter of dissecting a spectrogram of the individual note (like the images above) to measure the intensity of each individual horizontal line.  In practice, however, I wanted something with finer resolution in time and frequency to obtain very accurate parameters.  I used [heterodyne analysis](https://en.wikipedia.org/wiki/Heterodyne), which I'll now explain.
+
+The [Fourier series](https://en.wikipedia.org/wiki/Fourier_series) expresses a periodic waveform as the sum of sinusoids at multiples of the fundamental frequency ("harmonics"), with the phases as amplitudes of each harmonic determining the resulting waveform.  It's mathematically convenient to describe these sinusoids with [complex exponentials](https://medium.com/@theorose49/meaning-of-complex-exponential-for-electric-engineering-68de0625603f), essentially sinusoids with two-dimensional values at each moment, where the real axis part is our regular sine, and the imaginary (2nd) axis part is the cosine (sine phase-shifted by 90 degrees):
+
+
+![1*t6wVEZv6CkhACEyY2pFe2A](https://github.com/user-attachments/assets/556d8102-b741-4942-82f7-832878833097)
+
+
+Each sinusoid is constructed as the sum of a pair of complex exponentials with positive and negative frequencies; the imaginary parts cancel out leaving the real sinusoid.  Thus, the full Fourier spectrum of a real signal has mirror-image positive and negative parts (although we generally only plot the positive half):
+
+![download-2](https://github.com/user-attachments/assets/e6c553f8-a802-4324-a75f-22ac96fb4c0e)
+
+The neat thing about this complex-exponential Fourier representation is that multiplying a signal by a complex exponential is a pure shift in the Fourier spectrum domain.  So, by multiplying by the complex exponential at the negative of a particular harmonic frequency, we can shift that harmonic down to 0 Hz (d.c.).  Then, by low-pass filtering (i.e., smoothing) that waveform, we can cancel out all the other harmonics leaving only the envelope of the one harmonic we are targeting.  (By smoothing over a window that exactly matches the fundamental period, we can exactly cancel all the other sinusoid components because they will complete a whole number of cycles in that period).  See [make_piano_examples.ipynb](../experiments/make_piano_examples.ipynb) for how these figures were prepared:
+
+![download-1](https://github.com/user-attachments/assets/183f00b6-b507-44c9-9d36-96a1c5382912)
+
+![download](https://github.com/user-attachments/assets/7070eb86-c184-411e-9833-402a867ca7c8)
 
