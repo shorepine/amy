@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.48.4/codemirror.min.css" /> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/codemirror.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/mode/python/python.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="micropython.mjs" type="module"></script>
+    <script type="text/javascript" src="enable-threads.js"></script>
+    <script type="text/javascript" src="amy.js"></script>
+    <script type="text/javascript" src="amyrepl.js"></script>
+  </head>
+  <body>
+    <script type="module">
+      // For the notebook, we print python messages to JS console. use the REPL if you want more interaction
+      mp = await loadMicroPython({
+        stdout:(line) => { console.log(line); }, 
+        linebuffer: true,
+      });
+    </script>
+
+    <div class="container-fluid"> 
+      <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+        <h1 id="the-amy-additive-piano-voice">The AMY Additive Piano Voice</h1>
+        <p>The piano is a versatile and mature instrument.  One reason for its popularity is its wide timbral range; in fact, its main innovation was the ability to play notes both loud and soft, hence &quot;<a href="https://en.wikipedia.org/wiki/Piano#History">Pianoforte</a>&quot; (its full original name).</p>
+        
+        <p>To make AMY into a truly general-purpose music synthesizer, we wanted to add a good piano voice.  But it&#39;s not simple to synthesize a good piano voice.  This page explains some of what makes piano synthesis challenging, and how we addressed it.  Our approach was to use <a href="https://en.wikipedia.org/wiki/Additive_synthesis">additive synthesis</a>, which nicely fills out the demonstration of the primary synthesis techniques implemented in AMY, after subtractive (the Juno-6 patches) and FM (the DX7 patches).</p>
+      </div>
+      <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+
+        <h2 id="the-sound-of-a-piano">The sound of a piano</h2>
+        <p>Here&#39;s an example of 5 notes played on a real piano:</p>
+
+        <audio controls><source src="realpiano.mp4"/></audio>
+
+        <p><img src="uiowa.png" alt="uiowa"></p>
+        <p>This clip starts with a D4 note played at three loudnesses - <em>pp</em>, <em>mf</em>, and <em>ff</em>.  These are followed by a D2 (two octaves lower), and a D6 (two octaves higher).
+  (I made this example by adding together isolated recordings of single piano notes from the <a href="https://theremin.music.uiowa.edu/mispiano.html">University of Iowa Electronic Music Studios Instrument Samples</a>, which are the basis of the AMY piano.  I combined them with the code in <a href="../experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a>.)</p>
+        <p>Some things to notice:</p>
+        <ul>
+          <li>Piano sounds consist of very strong, stable sets of harmonics (fixed-frequency Fourier components), visible as horizontal lines in the spectrogram.  The harmonics appear mostly uniformly-spaced (as expected for a Fourier series of a periodic signal) (although there are a few extra components e.g. around 4.5 kHz at 0.8 seconds for the <em>ff</em> D4).</li>
+          <li>Each harmonic starts at its peak amplitude, then decays away.  The higher harmonics decay more quickly.  Higher notes, whose harmonics are naturally all at higher frequencies, die away more quickly than lower notes.</li>
+          <li>The first three notes have the same pitch, so the harmonics have the same frequencies.  However, as the note gets louder, not only do the lower harmonics grow in intensity (brighter color), we also see additional higher harmonics appearing.  This is the vital &quot;brightening&quot; of piano sounds as the strike strength increases.</li>
+          <li>The D2 is too low for the harmonics to be resolved in this spectrogam, but we can see a complex pattern of time modulation in its energy.  We can also see a complex pattern of per-harmonic modulations in the D6.</li>
+      </ul>
+    </div>
+    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+      <h2 id="synthesizing-piano-sounds">Synthesizing piano sounds</h2>
+      <p>Electronic musical instruments have always taken inspiration from their acoustic forbears, and most electronic keyboards will attempt to simulate a piano.  The Roland Juno-60 included a preset called Piano, which we can deploy with
+      <div class="editor mb-4">
+amy.send(voices='0,1', load_patch=7, time=0)
+amy.send(voices='0', note=74, vel=0.05, time=500)
+amy.send(voices='0', note=74, vel=0.63, time=1500)
+amy.send(voices='0', note=74, vel=1.0,  time=2000)
+amy.send(voices='0', note=50, vel=0.6,  time=2500)
+amy.send(voices='1', note=98, vel=1.0,  time=3000)
+amy.send(voices='0,1', vel=0, time=3500)
+      </div>
+      <img src="juno.png">
+      <p>This synthetic piano gets the stable harmonic structure and steady decay of each note, but there&#39;s no change in timbre with the different note velocities; every harmonic gets louder by the same factor.  (In fact, the Juno-60 was not velocity sensitive, but its usual practice to scale the whole note in proportion to velocity). There&#39;s no complexity to the harmonic decays, they are uniformly monotonic.  And the overall note decay time doesn&#39;t vary with the pitch.</p>
+      <p>The DX7 similarly provides a number of presets claiming to be pianos:</p>
+      <div class="editor mb-4">
+amy.send(voices='0,1', load_patch=137, time=0)
+amy.send(voices='0', note=50, vel=0.05, time=1500)
+amy.send(voices='0', note=50, vel=0.63, time=2000)
+amy.send(voices='0', note=50, vel=1.0, time=2500)
+amy.send(voices='0', note=26, vel=0.6, time=3000)
+amy.send(voices='1', note=74, vel=1.0, time=3500)
+amy.send(voices='0,1', vel=0, time=4000)
+      </div>
+      <img src="juno.png">
+      <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
+    </div>
+    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+      <h2 id="additive-synthesis">Additive synthesis</h2>
+      <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essesnce of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
+      <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes and play those:</p>
+      <div class="editor mb-4">
+import tulip_piano  # Make sure you have piano-params.json too.
+amy.send(store_patch='1024,' + tulip_piano.patch_string)
+amy.send(voices='0,1', load_patch=1024)
+tulip_piano.init_piano_voice(tulip_piano.num_partials, voices='0,1')
+tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1')
+amy.send(voices='0', note=62, vel=0.05)
+amy.send(voices='0', note=62, vel=0.63)
+amy.send(voices='0', note=62, vel=1.0)
+amy.send(voices='0', note=38, vel=0.6)
+amy.send(voices='1', note=86, vel=1.0)
+amy.send(voices='0,1', vel=0)
+      </div>
+      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="../experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
+      
+      <p><img src="fixed.png" alt="fixed"></p>
+      <p>The <em>mf</em> D4 note now sounds quite realistic, because it&#39;s a reasonably accurate reproduction of the original recording.  However, we&#39;re still simply scaling its overall magnitude in to get different veloicities.  And when we change the pitch, we just squeeze or stretch the harmonics (and hence the notes&#39; spectral envelopes), which is not at all realistic sounding.</p>
+      <p>Instead, we need to analyze many different real piano samples, then interpolate them to get the actual envelopes we synthesize.  The UIowa samples provide recordings of all 88 notes on the piano they sampled, at three strike strengths.  We <em>could</em> include harmonic data for all of them, but adjacent notes are quite similar, so instead we encode 3 notes per octave (C, E, and Ab) and interpolate the 3 semitones between each adjacent pair.  (We currently store only 7 octaves, C1 to Ab7, so 21 pitches).</p>
+      <p>For velocity, we have no choice but to interpolate, since the three recorded strikes do not provide enough expressivity for performance.  We analyze all three (for each pitch stored, so 63 notes total).</p>
+      <p>Playing a note, then, involves interpolating between <em>four</em> of the stored harmonic envelope sets (recall that each set consists of 20 breakpoints for up to 20 harmonics): To synthesize the D4 at, say, velocity 90, we use C4 at <em>mf</em> and <em>ff</em> (which I interpreted as velocities 80 and 120) as well as E4 <em>mf</em> and <em>ff</em>.  By doing this interpolation separately for every <code>(note, velocity)</code> event, we get a much richer range of tones:</p>
+      <div class="editor mb-4">
+# We use the tulip_piano setup of the previous example, but now we have a special function
+# to handle adjusting all the harmonic envelopes for each distinct note-on event:
+tulip_piano.piano_note_on(voices='0', note=62, vel=0.05)
+tulip_piano.piano_note_on(voices='0', note=62, vel=0.63)
+tulip_piano.piano_note_on(voices='0', note=62, vel=1.0)
+tulip_piano.piano_note_on(voices='0', note=38, vel=0.6)
+tulip_piano.piano_note_on(voices='1', note=86, vel=1.0)
+tulip_piano.piano_note_on(voices='0,1', vel=0)
+      </div>
+      <p><img src="interpolated.png" alt="interpolated"></p>
+      <p>This recovers both the spectral complexity of the original piano notes, <em>and</em> the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.</p>
+      <p><img src="uiowa.png" alt="uiowa"></p>
+      <p>While there are plenty of details that have not been exactly preserved (most notably the noisy &quot;clunk&quot; visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and &quot;acoustic&quot; than any of the previous syntheses.</p>
+
+    </div>
+    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+
+      <h1 id="extracting-harmonic-envelopes">Extracting harmonic envelopes</h1>
+      <p>How exactly to we capture the envelopes for each harmonic in our additive model?  In principle, this is simply a matter of dissecting a spectrogram of the individual note (like the images above) to measure the intensity of each individual horizontal line.  In practice, however, I wanted something with finer resolution in time and frequency to obtain very accurate parameters.  I used <a href="https://en.wikipedia.org/wiki/Heterodyne">heterodyne analysis</a>, which I&#39;ll now explain.</p>
+      <p>The <a href="https://en.wikipedia.org/wiki/Fourier_series">Fourier series</a> expresses a periodic waveform as the sum of sinusoids at multiples of the fundamental frequency (&quot;harmonics&quot;), with the phases as amplitudes of each harmonic determining the resulting waveform.  It&#39;s mathematically convenient to describe these sinusoids with <a href="https://medium.com/@theorose49/meaning-of-complex-exponential-for-electric-engineering-68de0625603f">complex exponentials</a>, essentially sinusoids with two-dimensional values at each moment, where the real axis part is our regular sine, and the imaginary (2nd) axis part is the cosine (sine phase-shifted by 90 degrees):</p>
+      <p><img src="env1.gif" alt="1*t6wVEZv6CkhACEyY2pFe2A"></p>
+      <p>Each sinusoid is constructed as the sum of a pair of complex exponentials with positive and negative frequencies; the imaginary parts cancel out leaving the real sinusoid.  Thus, the full Fourier spectrum of a real signal has mirror-image positive and negative parts (although we generally only plot the positive half):</p>
+      <p><img src="d4ff.png" alt="download-2"></p>
+      <p>The neat thing about this complex-exponential Fourier representation is that multiplying a signal by a complex exponential is a pure shift in the Fourier spectrum domain.  So, by multiplying by the complex exponential at the negative of a particular harmonic frequency, we can shift that harmonic down to 0 Hz (d.c.).  Then, by low-pass filtering (i.e., smoothing) that waveform, we can cancel out all the other harmonics leaving only the envelope of the one harmonic we are targeting.  (By smoothing over a window that exactly matches the fundamental period, we can exactly cancel all the other sinusoid components because they will complete a whole number of cycles in that period).  See <a href="../experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a> for how these figures were prepared:</p>
+      <p><img src="d4ffshift.png" alt="download-1"></p>
+      <p><img src="d4harm.png" alt="download"></p>
+    </div>
+    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+      <h2 id="finding-harmonic-frequencies-and-piano-inharmonicity">Finding harmonic frequencies and piano inharmonicity</h2>
+      <p>The heterodyne extraction allows us to extract sample-precise envelopes for harmonics at specific frequencies, but we need to give it the exact frequencies we want it to extract.  Again, in principle, this is straightforward: The harmonics should occur at integer-multiples of the fundamental frequency, and if the piano is tuned right, we already know the <a href="https://en.wikipedia.org/wiki/Piano_key_frequencies">fundamental frequences for each note</a>.</p>
+      <p>It turns out, however, that piano notes are not perfectly harmonic: They can be well modeled as the sum of fixed-frequency sinusoids, but those sinusoids are not exact integer multiples of a common fundamental.  This is a consequence of the stiffness of the steel strings (I&#39;m told!) which makes the speed of wave propagation down the strings higher for higher harmonics.  This <a href="https://en.wikipedia.org/wiki/Inharmonicity#Pianos">piano inharmonicity</a> has been credited with some of the &quot;warmth&quot; of piano sounds, and is something we want to preserve in our synthesis.  In order to precisely extract each harmonic for each note, we need to individually estimate the inharmonicity coefficient for each string (because the strings are all different thicknesses, the inharmonicity varies across the range of the piano).</p>
+      <p>I estimated the inharmonicity by extracting very precise peak frequencies from a long Fourier transform of the piano note, then fitting the theoretical equation $f_n \propto n \sqrt{1 + B n^2}$ (from <a href="https://physics.stackexchange.com/questions/268568/why-are-the-harmonics-of-a-piano-tone-not-multiples-of-the-base-frequency">this StackExchange explanation</a>) to those values.</p>
+      <p><img src="spectralpeaks.png" alt="download-4"></p>
+      <p><img src="fundamental.png" alt="download-5"></p>
+      <p>These plots come from the &quot;Inharmonicity estimation&quot; part of <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we&#39;re looking at the same harmonic in both notes.</p>
+    </div>
+    <div class="">
+      <h2 id="describing-envelopes">Describing envelopes</h2>
+
+      <P>We can extract sample-accurate envelopes for as many harmonics as we want for each of the real piano note recordings we have.  But to turn them into a practical additive-synthesis instrument on AMY we need to think about efficiency.  Right now, the harmonic envelopes are represented as 44,100 values per second of recording, and we're modeling something like the first 5 seconds of each note (the low notes can easily be 20 seconds long before they decay into oblivion).  But the AMY envelopes can only handle up to 24 breakpoints (it used to be 8 before I changed it to serve this project!) so we need some way to summarize the envelopes in a smaller number of straight-line segments (which is what the envelope breakpoints define).</P>
+
+      <P>Additive synthesis of individual harmonics is so powerful because sounds like piano notes are so well described by a small number of harmonics with constant or slowly-changing frequency and amplitude.  Looking at the four harmonic envelopes extracted in the previous section, it's obvious that the long tails are almost entirely smooth and could be described with a small number of parameters.  The initial portions are more complex, however, including going up and down.  Reproducing them will need more breakpoints, and it's not immediately obvious how to choose those breakpoints to give the best approximation.</P>
+
+      <P>I spent a while trying to come up with ad-hoc algorithms to accurately match an arbitrary envelope with a few line segments - see the "Adaptive magnitude sampling" section of [piano_heterodyne.ipynb](../experiments/piano_heterodyne.ipynb).  The goal was to choose breakpoint times (and values) that preserved the most detail of the original envelope, even though I couldn't define exactly what I wanted.  However, the outcome was naturally that there would be different breakpoint times for each note, which made interpolation between different notes very problematic - can we interpolate the breakpoint times too?  (I tried it, and it fared badly in practice because of wildly varying allocations of breakpoints to different time regions).</P>
+
+      <P>In the end I gave up and used a much simpler strategy of predefining a set of breakpoint sample times that are constant for all notes.  Although this is inevitably sub-optimal for any given note, it gives a much more solid foundation for interpolating between notes.  And it turns out that the accuracy lost in modeling the envelopes doesn't seem to be too important perceptually.  To respect the idea that the envelopes have an initial period of considerable detail, followed by a longer, smoother evolution, I used exponential spacing of the sampling times.  Specifically each envelope is described by samples at 20 instants: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096 milliseconds after onset.  After the initial value, these are in a pattern of $2^n$ and $1.5 * 2^n$ milliseconds, giving the exponential spacing.  This plot shows the original envelope with the breakpoint approximation superimposed, on two timescales - the first 150 msec on the left, and the full 4.1 sec on the right (with the 150 msec edge of the left plot shown as a dotted line).</P>
+      <P><img src="envelope.png"></P>
+
+      <P>Although a bunch of detail has been lost, it still provides a suitably complex character to the resyntheses.
+
+      <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in `piano-params.json` and read by `tulip_piano.py`.
+
+
+  </div>
+  <!-- End your notebook content -->
+
+  <script language="javascript">
+    document.querySelectorAll('.editor').forEach(create_editor);
+  </script>
+  </body>
+</html>
+
+
+
