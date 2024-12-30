@@ -70,7 +70,7 @@ amy.send(voices='0', note=26, vel=0.6, time=3000)
 amy.send(voices='1', note=74, vel=1.0, time=3500)
 amy.send(voices='0,1', vel=0, time=4000)
       </div>
-      <img src="juno.png">
+      <img src="dx7.png">
       <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
     </div>
     <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
@@ -78,17 +78,16 @@ amy.send(voices='0,1', vel=0, time=4000)
       <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essesnce of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
       <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes and play those:</p>
       <div class="editor mb-4">
-import tulip_piano  # Make sure you have piano-params.json too.
 amy.send(store_patch='1024,' + tulip_piano.patch_string)
 amy.send(voices='0,1', load_patch=1024)
 tulip_piano.init_piano_voice(tulip_piano.num_partials, voices='0,1')
 tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1')
-amy.send(voices='0', note=62, vel=0.05)
-amy.send(voices='0', note=62, vel=0.63)
-amy.send(voices='0', note=62, vel=1.0)
-amy.send(voices='0', note=38, vel=0.6)
-amy.send(voices='1', note=86, vel=1.0)
-amy.send(voices='0,1', vel=0)
+amy.send(voices='0', note=62, vel=0.05, time=500)
+amy.send(voices='0', note=62, vel=0.63, time=1500)
+amy.send(voices='0', note=62, vel=1.0, time=2000)
+amy.send(voices='0', note=38, vel=0.6, time=2500)
+amy.send(voices='1', note=86, vel=1.0, time=3000)
+amy.send(voices='0,1', vel=0, time=3500)
       </div>
       <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="../experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
       
@@ -100,12 +99,12 @@ amy.send(voices='0,1', vel=0)
       <div class="editor mb-4">
 # We use the tulip_piano setup of the previous example, but now we have a special function
 # to handle adjusting all the harmonic envelopes for each distinct note-on event:
-tulip_piano.piano_note_on(voices='0', note=62, vel=0.05)
-tulip_piano.piano_note_on(voices='0', note=62, vel=0.63)
-tulip_piano.piano_note_on(voices='0', note=62, vel=1.0)
-tulip_piano.piano_note_on(voices='0', note=38, vel=0.6)
-tulip_piano.piano_note_on(voices='1', note=86, vel=1.0)
-tulip_piano.piano_note_on(voices='0,1', vel=0)
+tulip_piano.piano_note_on(voices='0', note=62, vel=0.05, time=500)
+tulip_piano.piano_note_on(voices='0', note=62, vel=0.63, time=1500)
+tulip_piano.piano_note_on(voices='0', note=62, vel=1.0, time=2000)
+tulip_piano.piano_note_on(voices='0', note=38, vel=0.6, time=2500)
+tulip_piano.piano_note_on(voices='1', note=86, vel=1.0, time=3000)
+tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       </div>
       <p><img src="interpolated.png" alt="interpolated"></p>
       <p>This recovers both the spectral complexity of the original piano notes, <em>and</em> the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.</p>

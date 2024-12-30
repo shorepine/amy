@@ -80,8 +80,7 @@ function locateFile(path) {
 // Hooks that are implemented differently in different runtime environments.
 var read_,
     readAsync,
-    readBinary,
-    setWindowTitle;
+    readBinary;
 
 if (ENVIRONMENT_IS_NODE) {
   if (typeof process == 'undefined' || !process.release || process.release.name !== 'node') throw new Error('not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)');
@@ -293,8 +292,6 @@ read_ = (url) => {
 
 // end include: web_or_worker_shell_read.js
   }
-
-  setWindowTitle = (title) => document.title = title;
 } else
 {
   throw new Error('environment detection error');
@@ -330,7 +327,7 @@ assert(typeof Module['filePackagePrefixURL'] == 'undefined', 'Module.filePackage
 assert(typeof Module['read'] == 'undefined', 'Module.read option was removed (modify read_ in JS)');
 assert(typeof Module['readAsync'] == 'undefined', 'Module.readAsync option was removed (modify readAsync in JS)');
 assert(typeof Module['readBinary'] == 'undefined', 'Module.readBinary option was removed (modify readBinary in JS)');
-assert(typeof Module['setWindowTitle'] == 'undefined', 'Module.setWindowTitle option was removed (modify setWindowTitle in JS)');
+assert(typeof Module['setWindowTitle'] == 'undefined', 'Module.setWindowTitle option was removed (modify emscripten_set_window_title in JS)');
 assert(typeof Module['TOTAL_MEMORY'] == 'undefined', 'Module.TOTAL_MEMORY has been renamed Module.INITIAL_MEMORY');
 legacyModuleProp('asm', 'wasmExports');
 legacyModuleProp('read', 'read_');
@@ -340,6 +337,11 @@ legacyModuleProp('setWindowTitle', 'setWindowTitle');
 var IDBFS = 'IDBFS is no longer included by default; build with -lidbfs.js';
 var PROXYFS = 'PROXYFS is no longer included by default; build with -lproxyfs.js';
 var WORKERFS = 'WORKERFS is no longer included by default; build with -lworkerfs.js';
+var FETCHFS = 'FETCHFS is no longer included by default; build with -lfetchfs.js';
+var ICASEFS = 'ICASEFS is no longer included by default; build with -licasefs.js';
+var JSFILEFS = 'JSFILEFS is no longer included by default; build with -ljsfilefs.js';
+var OPFS = 'OPFS is no longer included by default; build with -lopfs.js';
+
 var NODEFS = 'NODEFS is no longer included by default; build with -lnodefs.js';
 
 assert(!ENVIRONMENT_IS_SHELL, "shell environment detected but not enabled at build time.  Add 'shell' to `-sENVIRONMENT` to enable.");
@@ -357,9 +359,8 @@ assert(!ENVIRONMENT_IS_SHELL, "shell environment detected but not enabled at bui
 // An online HTML version (which may be of a different version of Emscripten)
 //    is up at http://kripken.github.io/emscripten-site/docs/api_reference/preamble.js.html
 
-var wasmBinary;
+var wasmBinary; 
 if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];legacyModuleProp('wasmBinary', 'wasmBinary');
-var noExitRuntime = Module['noExitRuntime'] || true;legacyModuleProp('noExitRuntime', 'noExitRuntime');
 
 if (typeof WebAssembly != 'object') {
   abort('no native wasm support detected');
@@ -368,7 +369,6 @@ if (typeof WebAssembly != 'object') {
 // Wasm globals
 
 var wasmMemory;
-var wasmExports;
 
 //========================================
 // Runtime essentials
@@ -383,6 +383,10 @@ var ABORT = false;
 // but only when noExitRuntime is false.
 var EXITSTATUS;
 
+// In STRICT mode, we only define assert() when ASSERTIONS is set.  i.e. we
+// don't define it at all in release modes.  This matches the behaviour of
+// MINIMAL_RUNTIME.
+// TODO(sbc): Make this the default even without STRICT enabled.
 /** @type {function(*, string=)} */
 function assert(condition, text) {
   if (!condition) {
@@ -417,9 +421,9 @@ function updateMemoryViews() {
   var b = wasmMemory.buffer;
   Module['HEAP8'] = HEAP8 = new Int8Array(b);
   Module['HEAP16'] = HEAP16 = new Int16Array(b);
-  Module['HEAP32'] = HEAP32 = new Int32Array(b);
   Module['HEAPU8'] = HEAPU8 = new Uint8Array(b);
   Module['HEAPU16'] = HEAPU16 = new Uint16Array(b);
+  Module['HEAP32'] = HEAP32 = new Int32Array(b);
   Module['HEAPU32'] = HEAPU32 = new Uint32Array(b);
   Module['HEAPF32'] = HEAPF32 = new Float32Array(b);
   Module['HEAPF64'] = HEAPF64 = new Float64Array(b);
@@ -434,12 +438,6 @@ assert(typeof Int32Array != 'undefined' && typeof Float64Array !== 'undefined' &
 assert(!Module['wasmMemory'], 'Use of `wasmMemory` detected.  Use -sIMPORTED_MEMORY to define wasmMemory externally');
 assert(!Module['INITIAL_MEMORY'], 'Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically');
 
-// include: runtime_init_table.js
-// In regular non-RELOCATABLE mode the table is exported
-// from the wasm module and this will be assigned once
-// the exports are available.
-var wasmTable;
-// end include: runtime_init_table.js
 // include: runtime_stack_check.js
 // Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
 function writeStackCookie() {
@@ -494,12 +492,6 @@ var __ATEXIT__    = []; // functions called during shutdown
 var __ATPOSTRUN__ = []; // functions called after the main() is called
 
 var runtimeInitialized = false;
-
-var runtimeKeepaliveCounter = 0;
-
-function keepRuntimeAlive() {
-  return noExitRuntime || runtimeKeepaliveCounter > 0;
-}
 
 function preRun() {
   if (Module['preRun']) {
@@ -612,7 +604,7 @@ function addRunDependency(id) {
             shown = true;
             err('still waiting on run dependencies:');
           }
-          err('dependency: ' + dep);
+          err(`dependency: ${dep}`);
         }
         if (shown) {
           err('(end of list)');
@@ -697,16 +689,17 @@ function abort(what) {
 // Prefix of data URIs emitted by SINGLE_FILE and related options.
 var dataURIPrefix = 'data:application/octet-stream;base64,';
 
-// Indicates whether filename is a base64 data URI.
-function isDataURI(filename) {
-  // Prefix of data URIs emitted by SINGLE_FILE and related options.
-  return filename.startsWith(dataURIPrefix);
-}
+/**
+ * Indicates whether filename is a base64 data URI.
+ * @noinline
+ */
+var isDataURI = (filename) => filename.startsWith(dataURIPrefix);
 
-// Indicates whether filename is delivered via file protocol (as opposed to http/https)
-function isFileURI(filename) {
-  return filename.startsWith('file://');
-}
+/**
+ * Indicates whether filename is delivered via file protocol (as opposed to http/https)
+ * @noinline
+ */
+var isFileURI = (filename) => filename.startsWith('file://');
 // end include: URIUtils.js
 function createExportWrapper(name) {
   return function() {
@@ -776,11 +769,11 @@ function instantiateArrayBuffer(binaryFile, imports, receiver) {
   }).then((instance) => {
     return instance;
   }).then(receiver, (reason) => {
-    err('failed to asynchronously prepare wasm: ' + reason);
+    err(`failed to asynchronously prepare wasm: ${reason}`);
 
     // Warn on some common problems.
     if (isFileURI(wasmBinaryFile)) {
-      err('warning: Loading from a file URI (' + wasmBinaryFile + ') is not supported in most browsers. See https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-run-a-local-webserver-for-testing-why-does-my-program-stall-in-downloading-or-preparing');
+      err(`warning: Loading from a file URI (${wasmBinaryFile}) is not supported in most browsers. See https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-run-a-local-webserver-for-testing-why-does-my-program-stall-in-downloading-or-preparing`);
     }
     abort(reason);
   });
@@ -813,7 +806,7 @@ function instantiateAsync(binary, binaryFile, imports, callback) {
         function(reason) {
           // We expect the most common failure cause to be a bad MIME type for the binary,
           // in which case falling back to ArrayBuffer instantiation should work.
-          err('wasm streaming compile failed: ' + reason);
+          err(`wasm streaming compile failed: ${reason}`);
           err('falling back to ArrayBuffer instantiation');
           return instantiateArrayBuffer(binaryFile, imports, callback);
         });
@@ -835,11 +828,10 @@ function createWasm() {
   // performing other necessary setup
   /** @param {WebAssembly.Module=} module*/
   function receiveInstance(instance, module) {
-    var exports = instance.exports;
+    wasmExports = instance.exports;
 
-    exports = Asyncify.instrumentWasmExports(exports);
+    wasmExports = Asyncify.instrumentWasmExports(wasmExports);
 
-    wasmExports = exports;
     
 
     wasmMemory = wasmExports['memory'];
@@ -858,7 +850,7 @@ function createWasm() {
     addOnInit(wasmExports['__wasm_call_ctors']);
 
     removeRunDependency('wasm-instantiate');
-    return exports;
+    return wasmExports;
   }
   // wait for the pthread pool (if any)
   addRunDependency('wasm-instantiate');
@@ -889,7 +881,7 @@ function createWasm() {
     try {
       return Module['instantiateWasm'](info, receiveInstance);
     } catch(e) {
-      err('Module.instantiateWasm callback failed with error: ' + e);
+      err(`Module.instantiateWasm callback failed with error: ${e}`);
         // If instantiation fails, reject the module ready promise.
         readyPromiseReject(e);
     }
@@ -942,7 +934,7 @@ function missingGlobal(sym, msg) {
     Object.defineProperty(globalThis, sym, {
       configurable: true,
       get() {
-        warnOnce('`' + sym + '` is not longer defined by emscripten. ' + msg);
+        warnOnce(`\`${sym}\` is not longer defined by emscripten. ${msg}`);
         return undefined;
       }
     });
@@ -950,6 +942,7 @@ function missingGlobal(sym, msg) {
 }
 
 missingGlobal('buffer', 'Please use HEAP8.buffer or wasmMemory.buffer');
+missingGlobal('asm', 'Please use wasmExports instead');
 
 function missingLibrarySymbol(sym) {
   if (typeof globalThis !== 'undefined' && !Object.getOwnPropertyDescriptor(globalThis, sym)) {
@@ -958,7 +951,7 @@ function missingLibrarySymbol(sym) {
       get() {
         // Can't `abort()` here because it would break code that does runtime
         // checks.  e.g. `if (typeof SDL === 'undefined')`.
-        var msg = '`' + sym + '` is a library symbol and not included by default; add it to your library.js __deps or to DEFAULT_LIBRARY_FUNCS_TO_INCLUDE on the command line';
+        var msg = `\`${sym}\` is a library symbol and not included by default; add it to your library.js __deps or to DEFAULT_LIBRARY_FUNCS_TO_INCLUDE on the command line`;
         // DEFAULT_LIBRARY_FUNCS_TO_INCLUDE requires the name as it appears in
         // library.js, which means $name for a JS name with no prefix, or name
         // for a JS name like _name.
@@ -966,7 +959,7 @@ function missingLibrarySymbol(sym) {
         if (!librarySymbol.startsWith('_')) {
           librarySymbol = '$' + sym;
         }
-        msg += " (e.g. -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE='" + librarySymbol + "')";
+        msg += ` (e.g. -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE='${librarySymbol}')`;
         if (isExportedByForceFilesystem(sym)) {
           msg += '. Alternatively, forcing filesystem support (-sFORCE_FILESYSTEM) can export this for you';
         }
@@ -985,7 +978,7 @@ function unexportedRuntimeSymbol(sym) {
     Object.defineProperty(Module, sym, {
       configurable: true,
       get() {
-        var msg = "'" + sym + "' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ)";
+        var msg = `'${sym}' was not exported. add it to EXPORTED_RUNTIME_METHODS (see the Emscripten FAQ)`;
         if (isExportedByForceFilesystem(sym)) {
           msg += '. Alternatively, forcing filesystem support (-sFORCE_FILESYSTEM) can export this for you';
         }
@@ -1065,6 +1058,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       default: abort(`invalid type for getValue: ${type}`);
     }
   }
+
+  var noExitRuntime = Module['noExitRuntime'] || true;
 
   var ptrToString = (ptr) => {
       assert(typeof ptr === 'number');
@@ -1172,9 +1167,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         var paths = Array.prototype.slice.call(arguments);
         return PATH.normalize(paths.join('/'));
       },
-  join2:(l, r) => {
-        return PATH.normalize(l + '/' + r);
-      },
+  join2:(l, r) => PATH.normalize(l + '/' + r),
   };
   
   var initRandomFill = () => {
@@ -1345,7 +1338,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
     };
   
   var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
-      assert(typeof str === 'string');
+      assert(typeof str === 'string', `stringToUTF8Array expects a string (got ${typeof str})`);
       // Parameter maxBytesToWrite is not optional. Negative values, 0, null,
       // undefined and false each don't write out any bytes.
       if (!(maxBytesToWrite > 0))
@@ -1418,7 +1411,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           var fd = process.stdin.fd;
   
           try {
-            bytesRead = fs.readSync(fd, buf, 0, BUFSIZE, -1);
+            bytesRead = fs.readSync(fd, buf);
           } catch(e) {
             // Cross-platform differences: on Windows, reading EOF throws an exception, but on other OSes,
             // reading EOF returns 0. Uniformize behavior by treating the EOF exception to return 0.
@@ -1455,7 +1448,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
     };
   var TTY = {
   ttys:[],
-  init:function () {
+  init() {
         // https://github.com/emscripten-core/emscripten/pull/1555
         // if (ENVIRONMENT_IS_NODE) {
         //   // currently, FS.init does not distinguish if process.stdin is a file or TTY
@@ -1465,7 +1458,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         //   process.stdin.setEncoding('utf8');
         // }
       },
-  shutdown:function() {
+  shutdown() {
         // https://github.com/emscripten-core/emscripten/pull/1555
         // if (ENVIRONMENT_IS_NODE) {
         //   // inolen: any idea as to why node -e 'process.stdin.read()' wouldn't exit immediately (with process.stdin being a tty)?
@@ -1476,12 +1469,12 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         //   process.stdin.pause();
         // }
       },
-  register:function(dev, ops) {
+  register(dev, ops) {
         TTY.ttys[dev] = { input: [], output: [], ops: ops };
         FS.registerDevice(dev, TTY.stream_ops);
       },
   stream_ops:{
-  open:function(stream) {
+  open(stream) {
           var tty = TTY.ttys[stream.node.rdev];
           if (!tty) {
             throw new FS.ErrnoError(43);
@@ -1489,14 +1482,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           stream.tty = tty;
           stream.seekable = false;
         },
-  close:function(stream) {
+  close(stream) {
           // flush any pending line data
           stream.tty.ops.fsync(stream.tty);
         },
-  fsync:function(stream) {
+  fsync(stream) {
           stream.tty.ops.fsync(stream.tty);
         },
-  read:function(stream, buffer, offset, length, pos /* ignored */) {
+  read(stream, buffer, offset, length, pos /* ignored */) {
           if (!stream.tty || !stream.tty.ops.get_char) {
             throw new FS.ErrnoError(60);
           }
@@ -1520,7 +1513,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           }
           return bytesRead;
         },
-  write:function(stream, buffer, offset, length, pos) {
+  write(stream, buffer, offset, length, pos) {
           if (!stream.tty || !stream.tty.ops.put_char) {
             throw new FS.ErrnoError(60);
           }
@@ -1538,10 +1531,10 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         },
   },
   default_tty_ops:{
-  get_char:function(tty) {
+  get_char(tty) {
           return FS_stdin_getChar();
         },
-  put_char:function(tty, val) {
+  put_char(tty, val) {
           if (val === null || val === 10) {
             out(UTF8ArrayToString(tty.output, 0));
             tty.output = [];
@@ -1549,13 +1542,13 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
             if (val != 0) tty.output.push(val); // val == 0 would cut text output off in the middle.
           }
         },
-  fsync:function(tty) {
+  fsync(tty) {
           if (tty.output && tty.output.length > 0) {
             out(UTF8ArrayToString(tty.output, 0));
             tty.output = [];
           }
         },
-  ioctl_tcgets:function(tty) {
+  ioctl_tcgets(tty) {
           // typical setting
           return {
             c_iflag: 25856,
@@ -1569,16 +1562,16 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
             ]
           };
         },
-  ioctl_tcsets:function(tty, optional_actions, data) {
+  ioctl_tcsets(tty, optional_actions, data) {
           // currently just ignore
           return 0;
         },
-  ioctl_tiocgwinsz:function(tty) {
+  ioctl_tiocgwinsz(tty) {
           return [24, 80];
         },
   },
   default_tty1_ops:{
-  put_char:function(tty, val) {
+  put_char(tty, val) {
           if (val === null || val === 10) {
             err(UTF8ArrayToString(tty.output, 0));
             tty.output = [];
@@ -1586,7 +1579,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
             if (val != 0) tty.output.push(val);
           }
         },
-  fsync:function(tty) {
+  fsync(tty) {
           if (tty.output && tty.output.length > 0) {
             err(UTF8ArrayToString(tty.output, 0));
             tty.output = [];
@@ -1954,13 +1947,17 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
     };
   
   
+  var FS_createDataFile = (parent, name, fileData, canRead, canWrite, canOwn) => {
+      FS.createDataFile(parent, name, fileData, canRead, canWrite, canOwn);
+    };
+  
   var preloadPlugins = Module['preloadPlugins'] || [];
-  function FS_handledByPreloadPlugin(byteArray, fullname, finish, onerror) {
+  var FS_handledByPreloadPlugin = (byteArray, fullname, finish, onerror) => {
       // Ensure plugins are ready.
       if (typeof Browser != 'undefined') Browser.init();
   
       var handled = false;
-      preloadPlugins.forEach(function(plugin) {
+      preloadPlugins.forEach((plugin) => {
         if (handled) return;
         if (plugin['canHandle'](fullname)) {
           plugin['handle'](byteArray, fullname, finish, onerror);
@@ -1968,8 +1965,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
       });
       return handled;
-    }
-  function FS_createPreloadedFile(parent, name, url, canRead, canWrite, onload, onerror, dontCreateFile, canOwn, preFinish) {
+    };
+  var FS_createPreloadedFile = (parent, name, url, canRead, canWrite, onload, onerror, dontCreateFile, canOwn, preFinish) => {
       // TODO we should allow people to just pass in a complete filename instead
       // of parent and name being that we just join them anyways
       var fullname = name ? PATH_FS.resolve(PATH.join2(parent, name)) : parent;
@@ -1978,7 +1975,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         function finish(byteArray) {
           if (preFinish) preFinish();
           if (!dontCreateFile) {
-            FS.createDataFile(parent, name, byteArray, canRead, canWrite, canOwn);
+            FS_createDataFile(parent, name, byteArray, canRead, canWrite, canOwn);
           }
           if (onload) onload();
           removeRunDependency(dep);
@@ -1997,9 +1994,9 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       } else {
         processData(url);
       }
-    }
+    };
   
-  function FS_modeStringToFlags(str) {
+  var FS_modeStringToFlags = (str) => {
       var flagModes = {
         'r': 0,
         'r+': 2,
@@ -2013,14 +2010,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         throw new Error(`Unknown file open mode: ${str}`);
       }
       return flags;
-    }
+    };
   
-  function FS_getMode(canRead, canWrite) {
+  var FS_getMode = (canRead, canWrite) => {
       var mode = 0;
       if (canRead) mode |= 292 | 73;
       if (canWrite) mode |= 146;
       return mode;
-    }
+    };
   
   
   
@@ -2148,13 +2145,134 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   };
   
   var ERRNO_CODES = {
-  };
+      'EPERM': 63,
+      'ENOENT': 44,
+      'ESRCH': 71,
+      'EINTR': 27,
+      'EIO': 29,
+      'ENXIO': 60,
+      'E2BIG': 1,
+      'ENOEXEC': 45,
+      'EBADF': 8,
+      'ECHILD': 12,
+      'EAGAIN': 6,
+      'EWOULDBLOCK': 6,
+      'ENOMEM': 48,
+      'EACCES': 2,
+      'EFAULT': 21,
+      'ENOTBLK': 105,
+      'EBUSY': 10,
+      'EEXIST': 20,
+      'EXDEV': 75,
+      'ENODEV': 43,
+      'ENOTDIR': 54,
+      'EISDIR': 31,
+      'EINVAL': 28,
+      'ENFILE': 41,
+      'EMFILE': 33,
+      'ENOTTY': 59,
+      'ETXTBSY': 74,
+      'EFBIG': 22,
+      'ENOSPC': 51,
+      'ESPIPE': 70,
+      'EROFS': 69,
+      'EMLINK': 34,
+      'EPIPE': 64,
+      'EDOM': 18,
+      'ERANGE': 68,
+      'ENOMSG': 49,
+      'EIDRM': 24,
+      'ECHRNG': 106,
+      'EL2NSYNC': 156,
+      'EL3HLT': 107,
+      'EL3RST': 108,
+      'ELNRNG': 109,
+      'EUNATCH': 110,
+      'ENOCSI': 111,
+      'EL2HLT': 112,
+      'EDEADLK': 16,
+      'ENOLCK': 46,
+      'EBADE': 113,
+      'EBADR': 114,
+      'EXFULL': 115,
+      'ENOANO': 104,
+      'EBADRQC': 103,
+      'EBADSLT': 102,
+      'EDEADLOCK': 16,
+      'EBFONT': 101,
+      'ENOSTR': 100,
+      'ENODATA': 116,
+      'ETIME': 117,
+      'ENOSR': 118,
+      'ENONET': 119,
+      'ENOPKG': 120,
+      'EREMOTE': 121,
+      'ENOLINK': 47,
+      'EADV': 122,
+      'ESRMNT': 123,
+      'ECOMM': 124,
+      'EPROTO': 65,
+      'EMULTIHOP': 36,
+      'EDOTDOT': 125,
+      'EBADMSG': 9,
+      'ENOTUNIQ': 126,
+      'EBADFD': 127,
+      'EREMCHG': 128,
+      'ELIBACC': 129,
+      'ELIBBAD': 130,
+      'ELIBSCN': 131,
+      'ELIBMAX': 132,
+      'ELIBEXEC': 133,
+      'ENOSYS': 52,
+      'ENOTEMPTY': 55,
+      'ENAMETOOLONG': 37,
+      'ELOOP': 32,
+      'EOPNOTSUPP': 138,
+      'EPFNOSUPPORT': 139,
+      'ECONNRESET': 15,
+      'ENOBUFS': 42,
+      'EAFNOSUPPORT': 5,
+      'EPROTOTYPE': 67,
+      'ENOTSOCK': 57,
+      'ENOPROTOOPT': 50,
+      'ESHUTDOWN': 140,
+      'ECONNREFUSED': 14,
+      'EADDRINUSE': 3,
+      'ECONNABORTED': 13,
+      'ENETUNREACH': 40,
+      'ENETDOWN': 38,
+      'ETIMEDOUT': 73,
+      'EHOSTDOWN': 142,
+      'EHOSTUNREACH': 23,
+      'EINPROGRESS': 26,
+      'EALREADY': 7,
+      'EDESTADDRREQ': 17,
+      'EMSGSIZE': 35,
+      'EPROTONOSUPPORT': 66,
+      'ESOCKTNOSUPPORT': 137,
+      'EADDRNOTAVAIL': 4,
+      'ENETRESET': 39,
+      'EISCONN': 30,
+      'ENOTCONN': 53,
+      'ETOOMANYREFS': 141,
+      'EUSERS': 136,
+      'EDQUOT': 19,
+      'ESTALE': 72,
+      'ENOTSUP': 138,
+      'ENOMEDIUM': 148,
+      'EILSEQ': 25,
+      'EOVERFLOW': 61,
+      'ECANCELED': 11,
+      'ENOTRECOVERABLE': 56,
+      'EOWNERDEAD': 62,
+      'ESTRPIPE': 135,
+    };
   
-  function demangle(func) {
+  var demangle = (func) => {
       warnOnce('warning: build with -sDEMANGLE_SUPPORT to link in libcxxabi demangling');
       return func;
-    }
-  function demangleAll(text) {
+    };
+  var demangleAll = (text) => {
       var regex =
         /\b_Z[\w\d_]+/g;
       return text.replace(regex,
@@ -2162,7 +2280,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           var y = demangle(x);
           return x === y ? x : (y + ' [' + x + ']');
         });
-    }
+    };
   var FS = {
   root:null,
   mounts:[],
@@ -2179,7 +2297,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   },
   filesystems:null,
   syncFSRequests:0,
-  lookupPath:(path, opts = {}) => {
+  lookupPath(path, opts = {}) {
         path = PATH_FS.resolve(path);
   
         if (!path) return { path: '', node: null };
@@ -2238,7 +2356,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
         return { path: current_path, node: current };
       },
-  getPath:(node) => {
+  getPath(node) {
         var path;
         while (true) {
           if (FS.isRoot(node)) {
@@ -2250,7 +2368,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           node = node.parent;
         }
       },
-  hashName:(parentid, name) => {
+  hashName(parentid, name) {
         var hash = 0;
   
         for (var i = 0; i < name.length; i++) {
@@ -2258,12 +2376,12 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return ((parentid + hash) >>> 0) % FS.nameTable.length;
       },
-  hashAddNode:(node) => {
+  hashAddNode(node) {
         var hash = FS.hashName(node.parent.id, node.name);
         node.name_next = FS.nameTable[hash];
         FS.nameTable[hash] = node;
       },
-  hashRemoveNode:(node) => {
+  hashRemoveNode(node) {
         var hash = FS.hashName(node.parent.id, node.name);
         if (FS.nameTable[hash] === node) {
           FS.nameTable[hash] = node.name_next;
@@ -2278,7 +2396,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           }
         }
       },
-  lookupNode:(parent, name) => {
+  lookupNode(parent, name) {
         var errCode = FS.mayLookup(parent);
         if (errCode) {
           throw new FS.ErrnoError(errCode, parent);
@@ -2293,7 +2411,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         // if we failed to find it in the cache, call into the VFS
         return FS.lookup(parent, name);
       },
-  createNode:(parent, name, mode, rdev) => {
+  createNode(parent, name, mode, rdev) {
         assert(typeof parent == 'object')
         var node = new FS.FSNode(parent, name, mode, rdev);
   
@@ -2301,44 +2419,44 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
         return node;
       },
-  destroyNode:(node) => {
+  destroyNode(node) {
         FS.hashRemoveNode(node);
       },
-  isRoot:(node) => {
+  isRoot(node) {
         return node === node.parent;
       },
-  isMountpoint:(node) => {
+  isMountpoint(node) {
         return !!node.mounted;
       },
-  isFile:(mode) => {
+  isFile(mode) {
         return (mode & 61440) === 32768;
       },
-  isDir:(mode) => {
+  isDir(mode) {
         return (mode & 61440) === 16384;
       },
-  isLink:(mode) => {
+  isLink(mode) {
         return (mode & 61440) === 40960;
       },
-  isChrdev:(mode) => {
+  isChrdev(mode) {
         return (mode & 61440) === 8192;
       },
-  isBlkdev:(mode) => {
+  isBlkdev(mode) {
         return (mode & 61440) === 24576;
       },
-  isFIFO:(mode) => {
+  isFIFO(mode) {
         return (mode & 61440) === 4096;
       },
-  isSocket:(mode) => {
+  isSocket(mode) {
         return (mode & 49152) === 49152;
       },
-  flagsToPermissionString:(flag) => {
+  flagsToPermissionString(flag) {
         var perms = ['r', 'w', 'rw'][flag & 3];
         if ((flag & 512)) {
           perms += 'w';
         }
         return perms;
       },
-  nodePermissions:(node, perms) => {
+  nodePermissions(node, perms) {
         if (FS.ignorePermissions) {
           return 0;
         }
@@ -2352,13 +2470,13 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return 0;
       },
-  mayLookup:(dir) => {
+  mayLookup(dir) {
         var errCode = FS.nodePermissions(dir, 'x');
         if (errCode) return errCode;
         if (!dir.node_ops.lookup) return 2;
         return 0;
       },
-  mayCreate:(dir, name) => {
+  mayCreate(dir, name) {
         try {
           var node = FS.lookupNode(dir, name);
           return 20;
@@ -2366,7 +2484,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return FS.nodePermissions(dir, 'wx');
       },
-  mayDelete:(dir, name, isdir) => {
+  mayDelete(dir, name, isdir) {
         var node;
         try {
           node = FS.lookupNode(dir, name);
@@ -2391,7 +2509,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return 0;
       },
-  mayOpen:(node, flags) => {
+  mayOpen(node, flags) {
         if (!node) {
           return 44;
         }
@@ -2406,7 +2524,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         return FS.nodePermissions(node, FS.flagsToPermissionString(flags));
       },
   MAX_OPEN_FDS:4096,
-  nextfd:() => {
+  nextfd() {
         for (var fd = 0; fd <= FS.MAX_OPEN_FDS; fd++) {
           if (!FS.streams[fd]) {
             return fd;
@@ -2414,7 +2532,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         throw new FS.ErrnoError(33);
       },
-  getStreamChecked:(fd) => {
+  getStreamChecked(fd) {
         var stream = FS.getStream(fd);
         if (!stream) {
           throw new FS.ErrnoError(8);
@@ -2422,7 +2540,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         return stream;
       },
   getStream:(fd) => FS.streams[fd],
-  createStream:(stream, fd = -1) => {
+  createStream(stream, fd = -1) {
         if (!FS.FSStream) {
           FS.FSStream = /** @constructor */ function() {
             this.shared = { };
@@ -2470,11 +2588,11 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         FS.streams[fd] = stream;
         return stream;
       },
-  closeStream:(fd) => {
+  closeStream(fd) {
         FS.streams[fd] = null;
       },
   chrdev_stream_ops:{
-  open:(stream) => {
+  open(stream) {
           var device = FS.getDevice(stream.node.rdev);
           // override node's stream ops with the device's
           stream.stream_ops = device.stream_ops;
@@ -2483,18 +2601,18 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
             stream.stream_ops.open(stream);
           }
         },
-  llseek:() => {
+  llseek() {
           throw new FS.ErrnoError(70);
         },
   },
   major:(dev) => ((dev) >> 8),
   minor:(dev) => ((dev) & 0xff),
   makedev:(ma, mi) => ((ma) << 8 | (mi)),
-  registerDevice:(dev, ops) => {
+  registerDevice(dev, ops) {
         FS.devices[dev] = { stream_ops: ops };
       },
   getDevice:(dev) => FS.devices[dev],
-  getMounts:(mount) => {
+  getMounts(mount) {
         var mounts = [];
         var check = [mount];
   
@@ -2508,7 +2626,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
         return mounts;
       },
-  syncfs:(populate, callback) => {
+  syncfs(populate, callback) {
         if (typeof populate == 'function') {
           callback = populate;
           populate = false;
@@ -2550,7 +2668,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           mount.type.syncfs(mount, populate, done);
         });
       },
-  mount:(type, opts, mountpoint) => {
+  mount(type, opts, mountpoint) {
         if (typeof type == 'string') {
           // The filesystem was not included, and instead we have an error
           // message stored in the variable.
@@ -2603,7 +2721,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
         return mountRoot;
       },
-  unmount:(mountpoint) => {
+  unmount(mountpoint) {
         var lookup = FS.lookupPath(mountpoint, { follow_mount: false });
   
         if (!FS.isMountpoint(lookup.node)) {
@@ -2637,10 +2755,10 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         assert(idx !== -1);
         node.mount.mounts.splice(idx, 1);
       },
-  lookup:(parent, name) => {
+  lookup(parent, name) {
         return parent.node_ops.lookup(parent, name);
       },
-  mknod:(path, mode, dev) => {
+  mknod(path, mode, dev) {
         var lookup = FS.lookupPath(path, { parent: true });
         var parent = lookup.node;
         var name = PATH.basename(path);
@@ -2656,19 +2774,19 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return parent.node_ops.mknod(parent, name, mode, dev);
       },
-  create:(path, mode) => {
+  create(path, mode) {
         mode = mode !== undefined ? mode : 438 /* 0666 */;
         mode &= 4095;
         mode |= 32768;
         return FS.mknod(path, mode, 0);
       },
-  mkdir:(path, mode) => {
+  mkdir(path, mode) {
         mode = mode !== undefined ? mode : 511 /* 0777 */;
         mode &= 511 | 512;
         mode |= 16384;
         return FS.mknod(path, mode, 0);
       },
-  mkdirTree:(path, mode) => {
+  mkdirTree(path, mode) {
         var dirs = path.split('/');
         var d = '';
         for (var i = 0; i < dirs.length; ++i) {
@@ -2681,7 +2799,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           }
         }
       },
-  mkdev:(path, mode, dev) => {
+  mkdev(path, mode, dev) {
         if (typeof dev == 'undefined') {
           dev = mode;
           mode = 438 /* 0666 */;
@@ -2689,7 +2807,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         mode |= 8192;
         return FS.mknod(path, mode, dev);
       },
-  symlink:(oldpath, newpath) => {
+  symlink(oldpath, newpath) {
         if (!PATH_FS.resolve(oldpath)) {
           throw new FS.ErrnoError(44);
         }
@@ -2708,7 +2826,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return parent.node_ops.symlink(parent, newname, oldpath);
       },
-  rename:(old_path, new_path) => {
+  rename(old_path, new_path) {
         var old_dirname = PATH.dirname(old_path);
         var new_dirname = PATH.dirname(new_path);
         var old_name = PATH.basename(old_path);
@@ -2790,7 +2908,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           FS.hashAddNode(old_node);
         }
       },
-  rmdir:(path) => {
+  rmdir(path) {
         var lookup = FS.lookupPath(path, { parent: true });
         var parent = lookup.node;
         var name = PATH.basename(path);
@@ -2808,7 +2926,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         parent.node_ops.rmdir(parent, name);
         FS.destroyNode(node);
       },
-  readdir:(path) => {
+  readdir(path) {
         var lookup = FS.lookupPath(path, { follow: true });
         var node = lookup.node;
         if (!node.node_ops.readdir) {
@@ -2816,7 +2934,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return node.node_ops.readdir(node);
       },
-  unlink:(path) => {
+  unlink(path) {
         var lookup = FS.lookupPath(path, { parent: true });
         var parent = lookup.node;
         if (!parent) {
@@ -2840,7 +2958,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         parent.node_ops.unlink(parent, name);
         FS.destroyNode(node);
       },
-  readlink:(path) => {
+  readlink(path) {
         var lookup = FS.lookupPath(path);
         var link = lookup.node;
         if (!link) {
@@ -2851,7 +2969,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return PATH_FS.resolve(FS.getPath(link.parent), link.node_ops.readlink(link));
       },
-  stat:(path, dontFollow) => {
+  stat(path, dontFollow) {
         var lookup = FS.lookupPath(path, { follow: !dontFollow });
         var node = lookup.node;
         if (!node) {
@@ -2862,10 +2980,10 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return node.node_ops.getattr(node);
       },
-  lstat:(path) => {
+  lstat(path) {
         return FS.stat(path, true);
       },
-  chmod:(path, mode, dontFollow) => {
+  chmod(path, mode, dontFollow) {
         var node;
         if (typeof path == 'string') {
           var lookup = FS.lookupPath(path, { follow: !dontFollow });
@@ -2881,14 +2999,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           timestamp: Date.now()
         });
       },
-  lchmod:(path, mode) => {
+  lchmod(path, mode) {
         FS.chmod(path, mode, true);
       },
-  fchmod:(fd, mode) => {
+  fchmod(fd, mode) {
         var stream = FS.getStreamChecked(fd);
         FS.chmod(stream.node, mode);
       },
-  chown:(path, uid, gid, dontFollow) => {
+  chown(path, uid, gid, dontFollow) {
         var node;
         if (typeof path == 'string') {
           var lookup = FS.lookupPath(path, { follow: !dontFollow });
@@ -2904,14 +3022,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           // we ignore the uid / gid for now
         });
       },
-  lchown:(path, uid, gid) => {
+  lchown(path, uid, gid) {
         FS.chown(path, uid, gid, true);
       },
-  fchown:(fd, uid, gid) => {
+  fchown(fd, uid, gid) {
         var stream = FS.getStreamChecked(fd);
         FS.chown(stream.node, uid, gid);
       },
-  truncate:(path, len) => {
+  truncate(path, len) {
         if (len < 0) {
           throw new FS.ErrnoError(28);
         }
@@ -2940,21 +3058,21 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           timestamp: Date.now()
         });
       },
-  ftruncate:(fd, len) => {
+  ftruncate(fd, len) {
         var stream = FS.getStreamChecked(fd);
         if ((stream.flags & 2097155) === 0) {
           throw new FS.ErrnoError(28);
         }
         FS.truncate(stream.node, len);
       },
-  utime:(path, atime, mtime) => {
+  utime(path, atime, mtime) {
         var lookup = FS.lookupPath(path, { follow: true });
         var node = lookup.node;
         node.node_ops.setattr(node, {
           timestamp: Math.max(atime, mtime)
         });
       },
-  open:(path, flags, mode) => {
+  open(path, flags, mode) {
         if (path === "") {
           throw new FS.ErrnoError(44);
         }
@@ -3044,7 +3162,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return stream;
       },
-  close:(stream) => {
+  close(stream) {
         if (FS.isClosed(stream)) {
           throw new FS.ErrnoError(8);
         }
@@ -3060,10 +3178,10 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         stream.fd = null;
       },
-  isClosed:(stream) => {
+  isClosed(stream) {
         return stream.fd === null;
       },
-  llseek:(stream, offset, whence) => {
+  llseek(stream, offset, whence) {
         if (FS.isClosed(stream)) {
           throw new FS.ErrnoError(8);
         }
@@ -3077,7 +3195,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         stream.ungotten = [];
         return stream.position;
       },
-  read:(stream, buffer, offset, length, position) => {
+  read(stream, buffer, offset, length, position) {
         assert(offset >= 0);
         if (length < 0 || position < 0) {
           throw new FS.ErrnoError(28);
@@ -3104,7 +3222,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         if (!seeking) stream.position += bytesRead;
         return bytesRead;
       },
-  write:(stream, buffer, offset, length, position, canOwn) => {
+  write(stream, buffer, offset, length, position, canOwn) {
         assert(offset >= 0);
         if (length < 0 || position < 0) {
           throw new FS.ErrnoError(28);
@@ -3135,7 +3253,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         if (!seeking) stream.position += bytesWritten;
         return bytesWritten;
       },
-  allocate:(stream, offset, length) => {
+  allocate(stream, offset, length) {
         if (FS.isClosed(stream)) {
           throw new FS.ErrnoError(8);
         }
@@ -3153,7 +3271,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         stream.stream_ops.allocate(stream, offset, length);
       },
-  mmap:(stream, length, position, prot, flags) => {
+  mmap(stream, length, position, prot, flags) {
         // User requests writing to file (prot & PROT_WRITE != 0).
         // Checking if we have permissions to write to the file unless
         // MAP_PRIVATE flag is set. According to POSIX spec it is possible
@@ -3173,7 +3291,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return stream.stream_ops.mmap(stream, length, position, prot, flags);
       },
-  msync:(stream, buffer, offset, length, mmapFlags) => {
+  msync(stream, buffer, offset, length, mmapFlags) {
         assert(offset >= 0);
         if (!stream.stream_ops.msync) {
           return 0;
@@ -3181,13 +3299,13 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         return stream.stream_ops.msync(stream, buffer, offset, length, mmapFlags);
       },
   munmap:(stream) => 0,
-  ioctl:(stream, cmd, arg) => {
+  ioctl(stream, cmd, arg) {
         if (!stream.stream_ops.ioctl) {
           throw new FS.ErrnoError(59);
         }
         return stream.stream_ops.ioctl(stream, cmd, arg);
       },
-  readFile:(path, opts = {}) => {
+  readFile(path, opts = {}) {
         opts.flags = opts.flags || 0;
         opts.encoding = opts.encoding || 'binary';
         if (opts.encoding !== 'utf8' && opts.encoding !== 'binary') {
@@ -3207,7 +3325,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         FS.close(stream);
         return ret;
       },
-  writeFile:(path, data, opts = {}) => {
+  writeFile(path, data, opts = {}) {
         opts.flags = opts.flags || 577;
         var stream = FS.open(path, opts.flags, opts.mode);
         if (typeof data == 'string') {
@@ -3222,7 +3340,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         FS.close(stream);
       },
   cwd:() => FS.currentPath,
-  chdir:(path) => {
+  chdir(path) {
         var lookup = FS.lookupPath(path, { follow: true });
         if (lookup.node === null) {
           throw new FS.ErrnoError(44);
@@ -3236,12 +3354,12 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         FS.currentPath = lookup.path;
       },
-  createDefaultDirectories:() => {
+  createDefaultDirectories() {
         FS.mkdir('/tmp');
         FS.mkdir('/home');
         FS.mkdir('/home/web_user');
       },
-  createDefaultDevices:() => {
+  createDefaultDevices() {
         // create /dev
         FS.mkdir('/dev');
         // setup /dev/null
@@ -3273,17 +3391,17 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         FS.mkdir('/dev/shm');
         FS.mkdir('/dev/shm/tmp');
       },
-  createSpecialDirectories:() => {
+  createSpecialDirectories() {
         // create /proc/self/fd which allows /proc/self/fd/6 => readlink gives the
         // name of the stream for fd 6 (see test_unistd_ttyname)
         FS.mkdir('/proc');
         var proc_self = FS.mkdir('/proc/self');
         FS.mkdir('/proc/self/fd');
         FS.mount({
-          mount: () => {
+          mount() {
             var node = FS.createNode(proc_self, 'fd', 16384 | 511 /* 0777 */, 73);
             node.node_ops = {
-              lookup: (parent, name) => {
+              lookup(parent, name) {
                 var fd = +name;
                 var stream = FS.getStreamChecked(fd);
                 var ret = {
@@ -3299,7 +3417,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           }
         }, {}, '/proc/self/fd');
       },
-  createStandardStreams:() => {
+  createStandardStreams() {
         // TODO deprecate the old functionality of a single
         // input / output callback and that utilizes FS.createDevice
         // and instead require a unique set of stream ops
@@ -3332,7 +3450,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         assert(stdout.fd === 1, `invalid handle for stdout (${stdout.fd})`);
         assert(stderr.fd === 2, `invalid handle for stderr (${stderr.fd})`);
       },
-  ensureErrnoError:() => {
+  ensureErrnoError() {
         if (FS.ErrnoError) return;
         FS.ErrnoError = /** @this{Object} */ function ErrnoError(errno, node) {
           // We set the `name` property to be able to identify `FS.ErrnoError`
@@ -3371,7 +3489,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           FS.genericErrors[code].stack = '<generic error, no stack>';
         });
       },
-  staticInit:() => {
+  staticInit() {
         FS.ensureErrnoError();
   
         FS.nameTable = new Array(4096);
@@ -3386,7 +3504,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           'MEMFS': MEMFS,
         };
       },
-  init:(input, output, error) => {
+  init(input, output, error) {
         assert(!FS.init.initialized, 'FS.init was previously called. If you want to initialize later with custom parameters, remove any earlier calls (note that one is automatically added to the generated code)');
         FS.init.initialized = true;
   
@@ -3399,7 +3517,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
         FS.createStandardStreams();
       },
-  quit:() => {
+  quit() {
         FS.init.initialized = false;
         // force-flush all streams, so we get musl std streams printed out
         _fflush(0);
@@ -3412,14 +3530,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           FS.close(stream);
         }
       },
-  findObject:(path, dontResolveLastLink) => {
+  findObject(path, dontResolveLastLink) {
         var ret = FS.analyzePath(path, dontResolveLastLink);
         if (!ret.exists) {
           return null;
         }
         return ret.object;
       },
-  analyzePath:(path, dontResolveLastLink) => {
+  analyzePath(path, dontResolveLastLink) {
         // operate from within the context of the symlink's target
         try {
           var lookup = FS.lookupPath(path, { follow: !dontResolveLastLink });
@@ -3447,7 +3565,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         };
         return ret;
       },
-  createPath:(parent, path, canRead, canWrite) => {
+  createPath(parent, path, canRead, canWrite) {
         parent = typeof parent == 'string' ? parent : FS.getPath(parent);
         var parts = path.split('/').reverse();
         while (parts.length) {
@@ -3463,12 +3581,12 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return current;
       },
-  createFile:(parent, name, properties, canRead, canWrite) => {
+  createFile(parent, name, properties, canRead, canWrite) {
         var path = PATH.join2(typeof parent == 'string' ? parent : FS.getPath(parent), name);
         var mode = FS_getMode(canRead, canWrite);
         return FS.create(path, mode);
       },
-  createDataFile:(parent, name, data, canRead, canWrite, canOwn) => {
+  createDataFile(parent, name, data, canRead, canWrite, canOwn) {
         var path = name;
         if (parent) {
           parent = typeof parent == 'string' ? parent : FS.getPath(parent);
@@ -3489,9 +3607,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           FS.close(stream);
           FS.chmod(node, mode);
         }
-        return node;
       },
-  createDevice:(parent, name, input, output) => {
+  createDevice(parent, name, input, output) {
         var path = PATH.join2(typeof parent == 'string' ? parent : FS.getPath(parent), name);
         var mode = FS_getMode(!!input, !!output);
         if (!FS.createDevice.major) FS.createDevice.major = 64;
@@ -3499,16 +3616,16 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         // Create a fake device that a set of stream ops to emulate
         // the old behavior.
         FS.registerDevice(dev, {
-          open: (stream) => {
+          open(stream) {
             stream.seekable = false;
           },
-          close: (stream) => {
+          close(stream) {
             // flush any pending line data
             if (output && output.buffer && output.buffer.length) {
               output(10);
             }
           },
-          read: (stream, buffer, offset, length, pos /* ignored */) => {
+          read(stream, buffer, offset, length, pos /* ignored */) {
             var bytesRead = 0;
             for (var i = 0; i < length; i++) {
               var result;
@@ -3529,7 +3646,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
             }
             return bytesRead;
           },
-          write: (stream, buffer, offset, length, pos) => {
+          write(stream, buffer, offset, length, pos) {
             for (var i = 0; i < length; i++) {
               try {
                 output(buffer[offset+i]);
@@ -3545,7 +3662,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         });
         return FS.mkdev(path, mode, dev);
       },
-  forceLoadFile:(obj) => {
+  forceLoadFile(obj) {
         if (obj.isDevice || obj.isFolder || obj.link || obj.contents) return true;
         if (typeof XMLHttpRequest != 'undefined') {
           throw new Error("Lazy loading should have been performed (contents set) in createLazyFile, but it was not. Lazy loading only works in web workers. Use --embed-file or --preload-file in emcc on the main thread.");
@@ -3563,7 +3680,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           throw new Error('Cannot load without read() or XMLHttpRequest.');
         }
       },
-  createLazyFile:(parent, name, url, canRead, canWrite) => {
+  createLazyFile(parent, name, url, canRead, canWrite) {
         // Lazy chunked Uint8Array (implements get and length from Uint8Array). Actual getting is abstracted away for eventual reuse.
         /** @constructor */
         function LazyUint8Array() {
@@ -3731,22 +3848,22 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         node.stream_ops = stream_ops;
         return node;
       },
-  absolutePath:() => {
+  absolutePath() {
         abort('FS.absolutePath has been removed; use PATH_FS.resolve instead');
       },
-  createFolder:() => {
+  createFolder() {
         abort('FS.createFolder has been removed; use FS.mkdir instead');
       },
-  createLink:() => {
+  createLink() {
         abort('FS.createLink has been removed; use FS.symlink instead');
       },
-  joinPath:() => {
+  joinPath() {
         abort('FS.joinPath has been removed; use PATH.join instead');
       },
-  mmapAlloc:() => {
+  mmapAlloc() {
         abort('FS.mmapAlloc has been replaced by the top level function mmapAlloc');
       },
-  standardizePath:() => {
+  standardizePath() {
         abort('FS.standardizePath has been removed; use PATH.normalize instead');
       },
   };
@@ -3768,12 +3885,12 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
      * @return {string}
      */
   var UTF8ToString = (ptr, maxBytesToRead) => {
-      assert(typeof ptr == 'number');
+      assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
       return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
     };
   var SYSCALLS = {
   DEFAULT_POLLMASK:5,
-  calculateAt:function(dirfd, path, allowEmpty) {
+  calculateAt(dirfd, path, allowEmpty) {
         if (PATH.isAbs(path)) {
           return path;
         }
@@ -3793,7 +3910,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return PATH.join2(dir, path);
       },
-  doStat:function(func, path, buf) {
+  doStat(func, path, buf) {
         try {
           var stat = func(path);
         } catch (e) {
@@ -3809,22 +3926,22 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         HEAP32[(((buf)+(12))>>2)] = stat.uid;
         HEAP32[(((buf)+(16))>>2)] = stat.gid;
         HEAP32[(((buf)+(20))>>2)] = stat.rdev;
-        (tempI64 = [stat.size>>>0,(tempDouble=stat.size,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(24))>>2)] = tempI64[0],HEAP32[(((buf)+(28))>>2)] = tempI64[1]);
+        (tempI64 = [stat.size>>>0,(tempDouble = stat.size,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(24))>>2)] = tempI64[0],HEAP32[(((buf)+(28))>>2)] = tempI64[1]);
         HEAP32[(((buf)+(32))>>2)] = 4096;
         HEAP32[(((buf)+(36))>>2)] = stat.blocks;
         var atime = stat.atime.getTime();
         var mtime = stat.mtime.getTime();
         var ctime = stat.ctime.getTime();
-        (tempI64 = [Math.floor(atime / 1000)>>>0,(tempDouble=Math.floor(atime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(40))>>2)] = tempI64[0],HEAP32[(((buf)+(44))>>2)] = tempI64[1]);
+        (tempI64 = [Math.floor(atime / 1000)>>>0,(tempDouble = Math.floor(atime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(40))>>2)] = tempI64[0],HEAP32[(((buf)+(44))>>2)] = tempI64[1]);
         HEAPU32[(((buf)+(48))>>2)] = (atime % 1000) * 1000;
-        (tempI64 = [Math.floor(mtime / 1000)>>>0,(tempDouble=Math.floor(mtime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(56))>>2)] = tempI64[0],HEAP32[(((buf)+(60))>>2)] = tempI64[1]);
+        (tempI64 = [Math.floor(mtime / 1000)>>>0,(tempDouble = Math.floor(mtime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(56))>>2)] = tempI64[0],HEAP32[(((buf)+(60))>>2)] = tempI64[1]);
         HEAPU32[(((buf)+(64))>>2)] = (mtime % 1000) * 1000;
-        (tempI64 = [Math.floor(ctime / 1000)>>>0,(tempDouble=Math.floor(ctime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(72))>>2)] = tempI64[0],HEAP32[(((buf)+(76))>>2)] = tempI64[1]);
+        (tempI64 = [Math.floor(ctime / 1000)>>>0,(tempDouble = Math.floor(ctime / 1000),(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(72))>>2)] = tempI64[0],HEAP32[(((buf)+(76))>>2)] = tempI64[1]);
         HEAPU32[(((buf)+(80))>>2)] = (ctime % 1000) * 1000;
-        (tempI64 = [stat.ino>>>0,(tempDouble=stat.ino,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(88))>>2)] = tempI64[0],HEAP32[(((buf)+(92))>>2)] = tempI64[1]);
+        (tempI64 = [stat.ino>>>0,(tempDouble = stat.ino,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((buf)+(88))>>2)] = tempI64[0],HEAP32[(((buf)+(92))>>2)] = tempI64[1]);
         return 0;
       },
-  doMsync:function(addr, stream, len, flags, offset) {
+  doMsync(addr, stream, len, flags, offset) {
         if (!FS.isFile(stream.node.mode)) {
           throw new FS.ErrnoError(43);
         }
@@ -3838,15 +3955,17 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   varargs:undefined,
   get() {
         assert(SYSCALLS.varargs != undefined);
+        // the `+` prepended here is necessary to convince the JSCompiler that varargs is indeed a number.
+        var ret = HEAP32[((+SYSCALLS.varargs)>>2)];
         SYSCALLS.varargs += 4;
-        var ret = HEAP32[(((SYSCALLS.varargs)-(4))>>2)];
         return ret;
       },
+  getp() { return SYSCALLS.get() },
   getStr(ptr) {
         var ret = UTF8ToString(ptr);
         return ret;
       },
-  getStreamFromFD:function(fd) {
+  getStreamFromFD(fd) {
         var stream = FS.getStreamChecked(fd);
         return stream;
       },
@@ -3877,7 +3996,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
   var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
       assert(typeof maxBytesToWrite == 'number', 'stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!');
-      return stringToUTF8Array(str, HEAPU8,outPtr, maxBytesToWrite);
+      return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
     };
   
   function ___syscall_getcwd(buf, size) {
@@ -3932,8 +4051,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
                  8;                             // DT_REG, regular file.
         }
         assert(id);
-        (tempI64 = [id>>>0,(tempDouble=id,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[((dirp + pos)>>2)] = tempI64[0],HEAP32[(((dirp + pos)+(4))>>2)] = tempI64[1]);
-        (tempI64 = [(idx + 1) * struct_size>>>0,(tempDouble=(idx + 1) * struct_size,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((dirp + pos)+(8))>>2)] = tempI64[0],HEAP32[(((dirp + pos)+(12))>>2)] = tempI64[1]);
+        (tempI64 = [id>>>0,(tempDouble = id,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[((dirp + pos)>>2)] = tempI64[0],HEAP32[(((dirp + pos)+(4))>>2)] = tempI64[1]);
+        (tempI64 = [(idx + 1) * struct_size>>>0,(tempDouble = (idx + 1) * struct_size,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[(((dirp + pos)+(8))>>2)] = tempI64[0],HEAP32[(((dirp + pos)+(12))>>2)] = tempI64[1]);
         HEAP16[(((dirp + pos)+(16))>>1)] = 280;
         HEAP8[(((dirp + pos)+(18))>>0)] = type;
         stringToUTF8(name, dirp + pos + 19, 256);
@@ -4118,7 +4237,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       throw Infinity;
     };
 
-  var _emscripten_memcpy_big = (dest, src, num) => HEAPU8.copyWithin(dest, src, src + num);
+  var _emscripten_memcpy_js = (dest, src, num) => HEAPU8.copyWithin(dest, src, src + num);
 
   var getHeapMax = () =>
       HEAPU8.length;
@@ -4152,6 +4271,9 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
     };
   
   
+  var runtimeKeepaliveCounter = 0;
+  var keepRuntimeAlive = () => noExitRuntime || runtimeKeepaliveCounter > 0;
+  
   var _proc_exit = (code) => {
       EXITSTATUS = code;
       if (!keepRuntimeAlive()) {
@@ -4160,6 +4282,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       }
       quit_(code, new ExitStatus(code));
     };
+  
   /** @suppress {duplicate } */
   /** @param {boolean|number=} implicit */
   var exitJS = (status, implicit) => {
@@ -4177,6 +4300,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       _proc_exit(status);
     };
   var _exit = exitJS;
+  
   
   var maybeExit = () => {
       if (!keepRuntimeAlive()) {
@@ -4207,7 +4331,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         callUserCallback(func);
       }, timeout);
     };
-  var _emscripten_scan_registers = function(func) {
+  var _emscripten_scan_registers = (func) => {
       return Asyncify.handleSleep((wakeUp) => {
         // We must first unwind, so things are spilled to the stack. Then while
         // we are pausing we do the actual scan. After that we can resume. Note
@@ -4222,15 +4346,6 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       });
     };
   _emscripten_scan_registers.isAsync = true;
-
-  var _emscripten_sleep = function(ms) {
-      // emscripten_sleep() does not return a value, but we still need a |return|
-      // here for stack switching support (ASYNCIFY=2). In that mode this function
-      // returns a Promise instead of nothing, and that Promise is what tells the
-      // wasm VM to pause the stack.
-      return Asyncify.handleSleep((wakeUp) => safeSetTimeout(wakeUp, ms));
-    };
-  _emscripten_sleep.isAsync = true;
 
   function _fd_close(fd) {
   try {
@@ -4251,7 +4366,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         var ptr = HEAPU32[((iov)>>2)];
         var len = HEAPU32[(((iov)+(4))>>2)];
         iov += 8;
-        var curr = FS.read(stream, HEAP8,ptr, len, offset);
+        var curr = FS.read(stream, HEAP8, ptr, len, offset);
         if (curr < 0) return -1;
         ret += curr;
         if (curr < len) break; // nothing more to read
@@ -4276,11 +4391,11 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   }
 
   
-  function convertI32PairToI53Checked(lo, hi) {
+  var convertI32PairToI53Checked = (lo, hi) => {
       assert(lo == (lo >>> 0) || lo == (lo|0)); // lo should either be a i32 or a u32
       assert(hi === (hi|0));                    // hi should be a i32
       return ((hi + 0x200000) >>> 0 < 0x400001 - !!lo) ? (lo >>> 0) + hi * 4294967296 : NaN;
-    }
+    };
   function _fd_seek(fd,offset_low, offset_high,whence,newOffset) {
     var offset = convertI32PairToI53Checked(offset_low, offset_high);;
   
@@ -4290,7 +4405,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       if (isNaN(offset)) return 61;
       var stream = SYSCALLS.getStreamFromFD(fd);
       FS.llseek(stream, offset, whence);
-      (tempI64 = [stream.position>>>0,(tempDouble=stream.position,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[((newOffset)>>2)] = tempI64[0],HEAP32[(((newOffset)+(4))>>2)] = tempI64[1]);
+      (tempI64 = [stream.position>>>0,(tempDouble = stream.position,(+(Math.abs(tempDouble))) >= 1.0 ? (tempDouble > 0.0 ? (+(Math.floor((tempDouble)/4294967296.0)))>>>0 : (~~((+(Math.ceil((tempDouble - +(((~~(tempDouble)))>>>0))/4294967296.0)))))>>>0) : 0)], HEAP32[((newOffset)>>2)] = tempI64[0],HEAP32[(((newOffset)+(4))>>2)] = tempI64[1]);
       if (stream.getdents && offset === 0 && whence === 0) stream.getdents = null; // reset readdir state
       return 0;
     } catch (e) {
@@ -4300,20 +4415,20 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   ;
   }
 
-  function _fd_sync(fd) {
+  var _fd_sync = function (fd) {
   try {
   
       var stream = SYSCALLS.getStreamFromFD(fd);
-      return Asyncify.handleSleep(function(wakeUp) {
+      return Asyncify.handleSleep((wakeUp) => {
         var mount = stream.node.mount;
         if (!mount.type.syncfs) {
           // We write directly to the file system, so there's nothing to do here.
           wakeUp(0);
           return;
         }
-        mount.type.syncfs(mount, false, function(err) {
+        mount.type.syncfs(mount, false, (err) => {
           if (err) {
-            wakeUp(function() { return 29 });
+            wakeUp(29);
             return;
           }
           wakeUp(0);
@@ -4323,7 +4438,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
     if (typeof FS == 'undefined' || !(e.name === 'ErrnoError')) throw e;
     return e.errno;
   }
-  }
+  };
+  _fd_sync.isAsync = true;
 
   /** @param {number=} offset */
   var doWritev = (stream, iov, iovcnt, offset) => {
@@ -4332,7 +4448,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         var ptr = HEAPU32[((iov)>>2)];
         var len = HEAPU32[(((iov)+(4))>>2)];
         iov += 8;
-        var curr = FS.write(stream, HEAP8,ptr, len, offset);
+        var curr = FS.write(stream, HEAP8, ptr, len, offset);
         if (curr < 0) return -1;
         ret += curr;
         if (typeof offset !== 'undefined') {
@@ -4397,6 +4513,8 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   var _mp_js_time_ms = () => Date.now();
 
   var wasmTableMirror = [];
+  
+  var wasmTable;
   var getWasmTableEntry = (funcPtr) => {
       var func = wasmTableMirror[funcPtr];
       if (!func) {
@@ -4407,22 +4525,23 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       return func;
     };
 
-  function runAndAbortIfError(func) {
+  var runAndAbortIfError = (func) => {
       try {
         return func();
       } catch (e) {
         abort(e);
       }
-    }
+    };
   
   
-  function sigToWasmTypes(sig) {
+  var sigToWasmTypes = (sig) => {
       assert(!sig.includes('j'), 'i64 not permitted in function signatures when WASM_BIGINT is disabled');
       var typeNames = {
         'i': 'i32',
         'j': 'i64',
         'f': 'f32',
         'd': 'f64',
+        'e': 'externref',
         'p': 'i32',
       };
       var type = {
@@ -4434,7 +4553,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         type.parameters.push(typeNames[sig[i]]);
       }
       return type;
-    }
+    };
   
   var runtimeKeepalivePush = () => {
       runtimeKeepaliveCounter += 1;
@@ -4447,16 +4566,15 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   
   
   var Asyncify = {
-  instrumentWasmImports:function(imports) {
-        var importPatterns = [/^invoke_.*$/,/^fd_sync$/,/^__wasi_fd_sync$/,/^__asyncjs__.*$/,/^emscripten_promise_await$/,/^emscripten_idb_load$/,/^emscripten_idb_store$/,/^emscripten_idb_delete$/,/^emscripten_idb_exists$/,/^emscripten_idb_load_blob$/,/^emscripten_idb_store_blob$/,/^emscripten_sleep$/,/^emscripten_wget_data$/,/^emscripten_scan_registers$/,/^emscripten_lazy_load_code$/,/^_load_secondary_module$/,/^emscripten_fiber_swap$/,/^SDL_Delay$/];
+  instrumentWasmImports(imports) {
+        var importPattern = /^(invoke_.*|__asyncjs__.*)$/;
   
         for (var x in imports) {
           (function(x) {
             var original = imports[x];
             var sig = original.sig;
             if (typeof original == 'function') {
-              var isAsyncifyImport = original.isAsync ||
-                                     importPatterns.some(pattern => !!x.match(pattern));
+              var isAsyncifyImport = original.isAsync || importPattern.test(x);
               imports[x] = function() {
                 var originalAsyncifyState = Asyncify.state;
                 try {
@@ -4486,7 +4604,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           })(x);
         }
       },
-  instrumentWasmExports:function(exports) {
+  instrumentWasmExports(exports) {
         var ret = {};
         for (var x in exports) {
           (function(x) {
@@ -4518,7 +4636,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   Disabled:3,
   },
   state:0,
-  StackSize:8000,
+  StackSize:4096,
   currData:null,
   handleSleepReturnValue:0,
   exportCallStack:[],
@@ -4529,7 +4647,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   callStackId:0,
   asyncPromiseHandlers:null,
   sleepCallbacks:[],
-  getCallStackId:function(funcName) {
+  getCallStackId(funcName) {
         var id = Asyncify.callStackNameToId[funcName];
         if (id === undefined) {
           id = Asyncify.callStackId++;
@@ -4538,7 +4656,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return id;
       },
-  maybeStopUnwind:function() {
+  maybeStopUnwind() {
         if (Asyncify.currData &&
             Asyncify.state === Asyncify.State.Unwinding &&
             Asyncify.exportCallStack.length === 0) {
@@ -4556,14 +4674,14 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
           }
         }
       },
-  whenDone:function() {
+  whenDone() {
         assert(Asyncify.currData, 'Tried to wait for an async operation when none is in progress.');
         assert(!Asyncify.asyncPromiseHandlers, 'Cannot have multiple async operations in flight at once');
         return new Promise((resolve, reject) => {
           Asyncify.asyncPromiseHandlers = { resolve, reject };
         });
       },
-  allocateData:function() {
+  allocateData() {
         // An asyncify data structure has three fields:
         //  0  current stack pos
         //  4  max stack pos
@@ -4577,29 +4695,29 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         Asyncify.setDataRewindFunc(ptr);
         return ptr;
       },
-  setDataHeader:function(ptr, stack, stackSize) {
+  setDataHeader(ptr, stack, stackSize) {
         HEAPU32[((ptr)>>2)] = stack;
         HEAPU32[(((ptr)+(4))>>2)] = stack + stackSize;
       },
-  setDataRewindFunc:function(ptr) {
+  setDataRewindFunc(ptr) {
         var bottomOfCallStack = Asyncify.exportCallStack[0];
         var rewindId = Asyncify.getCallStackId(bottomOfCallStack);
         HEAP32[(((ptr)+(8))>>2)] = rewindId;
       },
-  getDataRewindFunc:function(ptr) {
+  getDataRewindFunc(ptr) {
         var id = HEAP32[(((ptr)+(8))>>2)];
         var name = Asyncify.callStackIdToName[id];
         var func = wasmExports[name];
         return func;
       },
-  doRewind:function(ptr) {
+  doRewind(ptr) {
         var start = Asyncify.getDataRewindFunc(ptr);
         // Once we have rewound and the stack we no longer need to artificially
         // keep the runtime alive.
         
         return start();
       },
-  handleSleep:function(startAsync) {
+  handleSleep(startAsync) {
         assert(Asyncify.state !== Asyncify.State.Disabled, 'Asyncify cannot be done during or after the runtime exits');
         if (ABORT) return;
         if (Asyncify.state === Asyncify.State.Normal) {
@@ -4689,7 +4807,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
         }
         return Asyncify.handleSleepReturnValue;
       },
-  handleAsync:function(startAsync) {
+  handleAsync(startAsync) {
         return Asyncify.handleSleep((wakeUp) => {
           // TODO: add error handling as a second param when handleSleep implements it.
           startAsync().then(wakeUp);
@@ -4697,11 +4815,11 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
       },
   };
 
-  function getCFunc(ident) {
+  var getCFunc = (ident) => {
       var func = Module['_' + ident]; // closure exported function
       assert(func, 'Cannot call unknown function ' + ident + ', make sure it is exported');
       return func;
-    }
+    };
   
   var writeArrayToMemory = (array, buffer) => {
       assert(array.length >= 0, 'writeArrayToMemory array must have a length (should be an array or typed array)')
@@ -4725,7 +4843,7 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
      * @param {Arguments|Array=} args
      * @param {Object=} opts
      */
-  var ccall = function(ident, returnType, argTypes, args, opts) {
+  var ccall = (ident, returnType, argTypes, args, opts) => {
       // For fast lookup of conversion functions
       var toC = {
         'string': (str) => {
@@ -4809,11 +4927,11 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
      * @param {Array=} argTypes
      * @param {Object=} opts
      */
-  function cwrap(ident, returnType, argTypes, opts) {
+  var cwrap = (ident, returnType, argTypes, opts) => {
       return function() {
         return ccall(ident, returnType, argTypes, arguments, opts);
       }
-    }
+    };
 
 
 
@@ -4870,201 +4988,139 @@ function create_promise(out_set,out_promise) { const out_set_js = proxy_convert_
   FS.FSNode = FSNode;
   FS.createPreloadedFile = FS_createPreloadedFile;
   FS.staticInit();;
-ERRNO_CODES = {
-      'EPERM': 63,
-      'ENOENT': 44,
-      'ESRCH': 71,
-      'EINTR': 27,
-      'EIO': 29,
-      'ENXIO': 60,
-      'E2BIG': 1,
-      'ENOEXEC': 45,
-      'EBADF': 8,
-      'ECHILD': 12,
-      'EAGAIN': 6,
-      'EWOULDBLOCK': 6,
-      'ENOMEM': 48,
-      'EACCES': 2,
-      'EFAULT': 21,
-      'ENOTBLK': 105,
-      'EBUSY': 10,
-      'EEXIST': 20,
-      'EXDEV': 75,
-      'ENODEV': 43,
-      'ENOTDIR': 54,
-      'EISDIR': 31,
-      'EINVAL': 28,
-      'ENFILE': 41,
-      'EMFILE': 33,
-      'ENOTTY': 59,
-      'ETXTBSY': 74,
-      'EFBIG': 22,
-      'ENOSPC': 51,
-      'ESPIPE': 70,
-      'EROFS': 69,
-      'EMLINK': 34,
-      'EPIPE': 64,
-      'EDOM': 18,
-      'ERANGE': 68,
-      'ENOMSG': 49,
-      'EIDRM': 24,
-      'ECHRNG': 106,
-      'EL2NSYNC': 156,
-      'EL3HLT': 107,
-      'EL3RST': 108,
-      'ELNRNG': 109,
-      'EUNATCH': 110,
-      'ENOCSI': 111,
-      'EL2HLT': 112,
-      'EDEADLK': 16,
-      'ENOLCK': 46,
-      'EBADE': 113,
-      'EBADR': 114,
-      'EXFULL': 115,
-      'ENOANO': 104,
-      'EBADRQC': 103,
-      'EBADSLT': 102,
-      'EDEADLOCK': 16,
-      'EBFONT': 101,
-      'ENOSTR': 100,
-      'ENODATA': 116,
-      'ETIME': 117,
-      'ENOSR': 118,
-      'ENONET': 119,
-      'ENOPKG': 120,
-      'EREMOTE': 121,
-      'ENOLINK': 47,
-      'EADV': 122,
-      'ESRMNT': 123,
-      'ECOMM': 124,
-      'EPROTO': 65,
-      'EMULTIHOP': 36,
-      'EDOTDOT': 125,
-      'EBADMSG': 9,
-      'ENOTUNIQ': 126,
-      'EBADFD': 127,
-      'EREMCHG': 128,
-      'ELIBACC': 129,
-      'ELIBBAD': 130,
-      'ELIBSCN': 131,
-      'ELIBMAX': 132,
-      'ELIBEXEC': 133,
-      'ENOSYS': 52,
-      'ENOTEMPTY': 55,
-      'ENAMETOOLONG': 37,
-      'ELOOP': 32,
-      'EOPNOTSUPP': 138,
-      'EPFNOSUPPORT': 139,
-      'ECONNRESET': 15,
-      'ENOBUFS': 42,
-      'EAFNOSUPPORT': 5,
-      'EPROTOTYPE': 67,
-      'ENOTSOCK': 57,
-      'ENOPROTOOPT': 50,
-      'ESHUTDOWN': 140,
-      'ECONNREFUSED': 14,
-      'EADDRINUSE': 3,
-      'ECONNABORTED': 13,
-      'ENETUNREACH': 40,
-      'ENETDOWN': 38,
-      'ETIMEDOUT': 73,
-      'EHOSTDOWN': 142,
-      'EHOSTUNREACH': 23,
-      'EINPROGRESS': 26,
-      'EALREADY': 7,
-      'EDESTADDRREQ': 17,
-      'EMSGSIZE': 35,
-      'EPROTONOSUPPORT': 66,
-      'ESOCKTNOSUPPORT': 137,
-      'EADDRNOTAVAIL': 4,
-      'ENETRESET': 39,
-      'EISCONN': 30,
-      'ENOTCONN': 53,
-      'ETOOMANYREFS': 141,
-      'EUSERS': 136,
-      'EDQUOT': 19,
-      'ESTALE': 72,
-      'ENOTSUP': 138,
-      'ENOMEDIUM': 148,
-      'EILSEQ': 25,
-      'EOVERFLOW': 61,
-      'ECANCELED': 11,
-      'ENOTRECOVERABLE': 56,
-      'EOWNERDEAD': 62,
-      'ESTRPIPE': 135,
-    };;
 if (globalThis.crypto === undefined) { globalThis.crypto = require('crypto'); };
 var MP_JS_EPOCH = Date.now();
 function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
 var wasmImports = {
+  /** @export */
   __syscall_chdir: ___syscall_chdir,
+  /** @export */
   __syscall_fstat64: ___syscall_fstat64,
+  /** @export */
   __syscall_getcwd: ___syscall_getcwd,
+  /** @export */
   __syscall_getdents64: ___syscall_getdents64,
+  /** @export */
   __syscall_lstat64: ___syscall_lstat64,
+  /** @export */
   __syscall_mkdirat: ___syscall_mkdirat,
+  /** @export */
   __syscall_newfstatat: ___syscall_newfstatat,
+  /** @export */
   __syscall_openat: ___syscall_openat,
+  /** @export */
   __syscall_poll: ___syscall_poll,
+  /** @export */
   __syscall_renameat: ___syscall_renameat,
+  /** @export */
   __syscall_rmdir: ___syscall_rmdir,
+  /** @export */
   __syscall_stat64: ___syscall_stat64,
+  /** @export */
   __syscall_statfs64: ___syscall_statfs64,
+  /** @export */
   __syscall_unlinkat: ___syscall_unlinkat,
+  /** @export */
   _emscripten_throw_longjmp: __emscripten_throw_longjmp,
+  /** @export */
   call0: call0,
+  /** @export */
   call0_kwarg: call0_kwarg,
+  /** @export */
   call1: call1,
+  /** @export */
   call1_kwarg: call1_kwarg,
+  /** @export */
   call2: call2,
+  /** @export */
   calln: calln,
+  /** @export */
   create_promise: create_promise,
-  emscripten_memcpy_big: _emscripten_memcpy_big,
+  /** @export */
+  emscripten_memcpy_js: _emscripten_memcpy_js,
+  /** @export */
   emscripten_resize_heap: _emscripten_resize_heap,
+  /** @export */
   emscripten_scan_registers: _emscripten_scan_registers,
-  emscripten_sleep: _emscripten_sleep,
+  /** @export */
   fd_close: _fd_close,
+  /** @export */
   fd_read: _fd_read,
+  /** @export */
   fd_seek: _fd_seek,
+  /** @export */
   fd_sync: _fd_sync,
+  /** @export */
   fd_write: _fd_write,
+  /** @export */
   has_attr: has_attr,
+  /** @export */
   invoke_i: invoke_i,
+  /** @export */
   invoke_ii: invoke_ii,
+  /** @export */
   invoke_iii: invoke_iii,
+  /** @export */
   invoke_iiii: invoke_iiii,
+  /** @export */
   invoke_iiiii: invoke_iiiii,
+  /** @export */
   invoke_iiiiii: invoke_iiiiii,
+  /** @export */
   invoke_v: invoke_v,
+  /** @export */
   invoke_vi: invoke_vi,
+  /** @export */
   invoke_vii: invoke_vii,
+  /** @export */
   invoke_viii: invoke_viii,
+  /** @export */
   invoke_viiii: invoke_viiii,
+  /** @export */
   js_check_existing: js_check_existing,
+  /** @export */
   js_get_error_info: js_get_error_info,
+  /** @export */
   js_get_iter: js_get_iter,
+  /** @export */
   js_get_proxy_js_ref_info: js_get_proxy_js_ref_info,
+  /** @export */
   js_iter_next: js_iter_next,
+  /** @export */
   js_reflect_construct: js_reflect_construct,
+  /** @export */
   js_subscr_load: js_subscr_load,
+  /** @export */
   js_subscr_store: js_subscr_store,
+  /** @export */
   js_then_continue: js_then_continue,
+  /** @export */
   js_then_reject: js_then_reject,
+  /** @export */
   js_then_resolve: js_then_resolve,
+  /** @export */
   lookup_attr: lookup_attr,
+  /** @export */
   mp_js_hook: _mp_js_hook,
+  /** @export */
   mp_js_random_u32: _mp_js_random_u32,
+  /** @export */
   mp_js_ticks_ms: _mp_js_ticks_ms,
+  /** @export */
   mp_js_time_ms: _mp_js_time_ms,
+  /** @export */
   proxy_convert_mp_to_js_then_js_to_js_then_js_to_mp_obj_jsside: proxy_convert_mp_to_js_then_js_to_js_then_js_to_mp_obj_jsside,
+  /** @export */
   proxy_convert_mp_to_js_then_js_to_mp_obj_jsside: proxy_convert_mp_to_js_then_js_to_mp_obj_jsside,
+  /** @export */
   proxy_js_free_obj: proxy_js_free_obj,
+  /** @export */
   store_attr: store_attr
 };
 Asyncify.instrumentWasmImports(wasmImports);
-var asm = createWasm();
+var wasmExports = createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors');
 var _malloc = Module['_malloc'] = createExportWrapper('malloc');
 var _free = Module['_free'] = createExportWrapper('free');
@@ -5117,13 +5173,15 @@ var dynCall_dd = Module['dynCall_dd'] = createExportWrapper('dynCall_dd');
 var dynCall_ddd = Module['dynCall_ddd'] = createExportWrapper('dynCall_ddd');
 var dynCall_viiiiii = Module['dynCall_viiiiii'] = createExportWrapper('dynCall_viiiiii');
 var dynCall_iiiiii = Module['dynCall_iiiiii'] = createExportWrapper('dynCall_iiiiii');
+var dynCall_di = Module['dynCall_di'] = createExportWrapper('dynCall_di');
+var dynCall_vid = Module['dynCall_vid'] = createExportWrapper('dynCall_vid');
 var dynCall_iidiiii = Module['dynCall_iidiiii'] = createExportWrapper('dynCall_iidiiii');
 var _asyncify_start_unwind = createExportWrapper('asyncify_start_unwind');
 var _asyncify_stop_unwind = createExportWrapper('asyncify_stop_unwind');
 var _asyncify_start_rewind = createExportWrapper('asyncify_start_rewind');
 var _asyncify_stop_rewind = createExportWrapper('asyncify_stop_rewind');
-var ___start_em_js = Module['___start_em_js'] = 284076;
-var ___stop_em_js = Module['___stop_em_js'] = 289696;
+var ___start_em_js = Module['___start_em_js'] = 207796;
+var ___stop_em_js = Module['___stop_em_js'] = 213416;
 function invoke_ii(index,a1) {
   var sp = stackSave();
   try {
@@ -5386,6 +5444,8 @@ var missingLibrarySymbols = [
   'setMainLoop',
   'getSocketFromFD',
   'getSocketAddress',
+  'FS_unlink',
+  'FS_mkdirTree',
   '_setNetworkCallback',
   'heapObjectForWebGLType',
   'heapAccessShiftForWebGLHeap',
@@ -5409,7 +5469,6 @@ var missingLibrarySymbols = [
   'SDL_unicode',
   'SDL_ttfContext',
   'SDL_audio',
-  'GLFW_Window',
   'ALLOC_NORMAL',
   'ALLOC_STACK',
   'allocate',
@@ -5429,18 +5488,15 @@ var unexportedSymbols = [
   'removeRunDependency',
   'FS_createFolder',
   'FS_createPath',
-  'FS_createDataFile',
   'FS_createLazyFile',
   'FS_createLink',
   'FS_createDevice',
-  'FS_unlink',
+  'FS_readFile',
   'out',
   'err',
   'callMain',
   'abort',
-  'keepRuntimeAlive',
   'wasmMemory',
-  'wasmTable',
   'wasmExports',
   'stackAlloc',
   'stackSave',
@@ -5472,14 +5528,16 @@ var unexportedSymbols = [
   'UNWIND_CACHE',
   'readEmAsmArgsArray',
   'handleException',
+  'keepRuntimeAlive',
   'runtimeKeepalivePush',
   'runtimeKeepalivePop',
   'callUserCallback',
   'maybeExit',
-  'safeSetTimeout',
   'asyncLoad',
   'alignMemory',
   'mmapAlloc',
+  'wasmTable',
+  'noExitRuntime',
   'getCFunc',
   'sigToWasmTypes',
   'freeTableIndexes',
@@ -5500,6 +5558,7 @@ var unexportedSymbols = [
   'ExitStatus',
   'doReadv',
   'doWritev',
+  'safeSetTimeout',
   'promiseMap',
   'uncaughtExceptionCount',
   'exceptionLast',
@@ -5513,6 +5572,7 @@ var unexportedSymbols = [
   'FS_getMode',
   'FS_stdin_getChar_buffer',
   'FS_stdin_getChar',
+  'FS_createDataFile',
   'MEMFS',
   'TTY',
   'PIPEFS',
@@ -5532,7 +5592,6 @@ var unexportedSymbols = [
   'Fibers',
   'SDL',
   'SDL_gfx',
-  'GLFW',
   'allocateUTF8',
   'allocateUTF8OnStack',
 ];
@@ -5660,9 +5719,9 @@ run();
 
   return moduleArg.ready
 }
-
 );
 })();
+;
 export default _createMicroPythonModule;/*
  * This file is part of the MicroPython project, http://micropython.org/
  *
@@ -5822,7 +5881,6 @@ export async function loadMicroPython(options) {
                 "number",
                 ["pointer", "number", "pointer"],
                 [buf, len, value],
-                { async: true },
             );
             Module._free(buf);
             const ret = proxy_convert_mp_to_js_obj_jsside_with_free(value);
@@ -5832,7 +5890,7 @@ export async function loadMicroPython(options) {
             return ret;
         },
         replInit() {
-            Module.ccall("mp_js_repl_init", "null", ["null"], {async:true});
+            Module.ccall("mp_js_repl_init", "null", ["null"]);
         },
         replProcessChar(chr) {
             return Module.ccall(
@@ -5843,7 +5901,7 @@ export async function loadMicroPython(options) {
             );
         },
         // Needed if the GC/asyncify is enabled.
-        replProcessCharWithAsyncify(chr) {
+        async replProcessCharWithAsyncify(chr) {
             return Module.ccall(
                 "mp_js_repl_process_char",
                 "number",

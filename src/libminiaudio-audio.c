@@ -135,19 +135,30 @@ amy_err_t miniaudio_init() {
         printf("Failed to setup context for device list.\n");
         exit(1);
     }
-
     if (ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount) != MA_SUCCESS) {
         printf("Failed to get device list.\n");
         exit(1);
     }
     
+#ifdef AMY_HAS_AUDIO_IN
     if (amy_playback_device_id >= (int32_t)playbackCount || amy_capture_device_id >= (int32_t)captureCount) {
         printf("invalid device\n");
         exit(1);
     }
+#else
+    if (amy_playback_device_id >= (int32_t)playbackCount) {
+        printf("invalid device\n");
+        exit(1);
+    }
+#endif
 
+#ifdef AMY_HAS_AUDIO_IN
+    fprintf(stdout, "playback + record\n");
     deviceConfig = ma_device_config_init(ma_device_type_duplex);
-
+#else
+    fprintf(stdout, "playback\n");
+    deviceConfig = ma_device_config_init(ma_device_type_playback);
+#endif
     if(amy_playback_device_id >= 0) {
         deviceConfig.playback.pDeviceID = &pPlaybackInfos[amy_playback_device_id].id;
     } else {
@@ -156,6 +167,7 @@ amy_err_t miniaudio_init() {
     deviceConfig.playback.format   = DEVICE_FORMAT;
     deviceConfig.playback.channels = AMY_NCHANS;
 
+#ifdef AMY_HAS_AUDIO_IN
     if(amy_capture_device_id >= 0) {
         deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_capture_device_id].id;
     } else {
@@ -163,6 +175,7 @@ amy_err_t miniaudio_init() {
     }
     deviceConfig.capture.format   = DEVICE_FORMAT;
     deviceConfig.capture.channels = AMY_NCHANS;
+#endif
 
     deviceConfig.sampleRate        = AMY_SAMPLE_RATE;
     deviceConfig.dataCallback      = data_callback;

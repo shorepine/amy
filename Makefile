@@ -57,7 +57,7 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 	${PYTHON} amy_headers.py
 
 %.o: %.c $(HEADERS) src/patches.h
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -DAMY_HAS_AUDIO_IN -c $< -o $@
 
 %.o: %.mm $(HEADERS)
 	clang $(CFLAGS) -c $< -o $@

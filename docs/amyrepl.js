@@ -44,9 +44,13 @@ async function start_python() {
 
   // Set up the micropython context, like _boot.py. 
   await mp.runPythonAsync(`
-    import amy, amy_js_message, time
+    import amy, amy_js_message, time, tulip_piano
     amy.override_send = amy_js_message
   `);
+}
+
+async function run_async(code) {
+  await mp.runPythonAsync(code);
 }
 
 async function start_python_and_audio() {
