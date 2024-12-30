@@ -137,6 +137,7 @@ def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
   """Set up a sequence of oscs to play a particular note and velocity."""
   harms_params = harms_params_for_note_vel(note, vel)
   num_partials = len(harms_params)
+  amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
   for i in range(num_partials):
     f0 = cents_to_hz(harms_params[i, 0])
     h_vals = db_to_lin(harms_params[i, 1:])
@@ -145,7 +146,7 @@ def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
     amy_send(osc=base_osc + 1 + i, freq=f0, bp0=bp_string, **kwargs)
 
 
-def piano_note_on(note, vel=1, **kwargs):
+def piano_note_on(note=60, vel=1, **kwargs):
     if vel == 0:
         # Note off.
         amy.send(vel=0, **kwargs)
