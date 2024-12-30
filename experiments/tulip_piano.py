@@ -136,8 +136,9 @@ def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
   amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
   for i in range(num_partials):
     f0 = cents_to_hz(harms_params[i, 0])
-    h_vals = db_to_lin(harms_params[i, 1:])
-    bp_string = ',,' + ','.join(",%.3f" % val for val in h_vals)
+    h_vals = harms_params[i, 1:]
+    # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
+    bp_string = '..,,' + ','.join(",%d" % val for val in h_vals)
     bp_string += ',200,0'
     amy_send(osc=base_osc + 1 + i, freq=f0, bp0=bp_string, **kwargs)
 
