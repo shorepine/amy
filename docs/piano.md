@@ -129,3 +129,19 @@ The neat thing about this complex-exponential Fourier representation is that mul
 
 ![download](https://github.com/user-attachments/assets/7070eb86-c184-411e-9833-402a867ca7c8)
 
+## Finding harmonic frequencies and piano inharmonicity
+
+The heterodyne extraction allows us to extract sample-precise envelopes for harmonics at specific frequencies, but we need to give it the exact frequencies we want it to extract.  Again, in principle, this is straightforward: The harmonics should occur at integer-multiples of the fundamental frequency, and if the piano is tuned right, we already know the [fundamental frequences for each note](https://en.wikipedia.org/wiki/Piano_key_frequencies).
+
+It turns out, however, that piano notes are not perfectly harmonic: They can be well modeled as the sum of fixed-frequency sinusoids, but those sinusoids are not exact integer multiples of a common fundamental.  This is a consequence of the stiffness of the steel strings (I'm told!) which makes the speed of wave propagation down the strings higher for higher harmonics.  This [piano inharmonicity](https://en.wikipedia.org/wiki/Inharmonicity#Pianos) has been credited with some of the "warmth" of piano sounds, and is something we want to preserve in our synthesis.  In order to precisely extract each harmonic for each note, we need to individually estimate the inharmonicity coefficient for each string (because the strings are all different thicknesses, the inharmonicity varies across the range of the piano).
+
+I estimated the inharmonicity by extracting very precise peak frequencies from a long Fourier transform of the piano note, then fitting the theoretical equation $f_n \propto n \sqrt{1 + B n^2}$ (from [this StackExchange explanation](https://physics.stackexchange.com/questions/268568/why-are-the-harmonics-of-a-piano-tone-not-multiples-of-the-base-frequency)) to those values.
+
+![download-4](https://github.com/user-attachments/assets/c8455d3d-f5bf-4010-a6f9-f1c0b3e158b8)
+
+![download-5](https://github.com/user-attachments/assets/9ee92a7d-9464-4ac3-b866-bbbade5bcf93)
+
+These plots come from the "Inharmonicity estimation" part of [piano_heterodyne.ipynb](../experiments/piano_heterodyne.ipynb).  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we're looking at the same harmonic in both notes.
+
+
+
