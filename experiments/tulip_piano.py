@@ -26,9 +26,14 @@ except:
 #   harmonics_freq - Vector of (total_num_harmonics) int16s giving freq for each harmonic in cents 6900 = 440 Hz.
 #   harmonics_mags - Array of (total_num_harmonics, num_sample_times) uint8s giving envelope samples for each harmonic.  In dB re: -130.
 
-params_file = 'piano-params.json'
-with open(params_file, 'r') as f:
-    notes_params = json.load(f)
+try:
+    with open('piano-params.json', 'r') as f:
+        notes_params = json.load(f)
+except OSError:
+    # Special case for piano_examples.py
+    with open('examples/piano-params.json', 'r') as f:
+        notes_params = json.load(f)
+
 NOTES = np.array(notes_params['notes'], dtype=np.int8)
 VELOCITIES = np.array(notes_params['velocities'], dtype=np.int8)
 NUM_HARMONICS = np.array(notes_params['num_harmonics'], dtype=np.int16)
@@ -128,7 +133,7 @@ def init_piano_voice(num_partials, base_osc=0, **kwargs):
     amy_send(osc=base_osc + i, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
 
-def setup_piano_voice_for_note_vel(base_osc, note, vel, **kwargs):
+def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
   """Set up a sequence of oscs to play a particular note and velocity."""
   harms_params = harms_params_for_note_vel(note, vel)
   num_partials = len(harms_params)
@@ -140,11 +145,17 @@ def setup_piano_voice_for_note_vel(base_osc, note, vel, **kwargs):
     amy_send(osc=base_osc + 1 + i, freq=f0, bp0=bp_string, **kwargs)
 
 
-def piano_note_on(note, vel=1, osc=0, **kwargs):
-  setup_piano_voice_for_note_vel(
-      osc, note, round(vel * 127), **kwargs
-  )
-  amy_send(osc=0, note=60, vel=1, **kwargs)  # We already put pitch and velocity into the setup.
+def piano_note_on(note, vel=1, **kwargs):
+    if vel == 0:
+        # Note off.
+        amy.send(vel=0, **kwargs)
+    else:
+        setup_piano_voice_for_note_vel(
+            note, round(vel * 127), **kwargs
+        )
+        # We already configured the freuquencies and magnitudes in setup, so
+        # the note on is completely neutral.
+        amy_send(note=60, vel=1, **kwargs)
 
 
 #piano_note_on(60, 1)
@@ -180,7 +191,7 @@ if have_midi:
 
         def note_on(self, note, vel, time=None, sequence=None):
             #amy.send(time=time, voices=self.amy_voice, note=note, vel=vel, sequence=sequence)
-            piano_note_on(note, vel, osc=0, voices=self.amy_voice, time=time, sequence=sequence)
+            piano_note_on(note, vel, voices=self.amy_voice, time=time, sequence=sequence)
 
         def note_off(self, time=None, sequence=None):
             amy.send(time=time, voices=self.amy_voice, vel=0, sequence=sequence)
@@ -189,7 +200,7 @@ if have_midi:
     # Intercept the voice objects for our synth
     synth_obj.voice_objs = [PianoVoiceObject(obj.amy_voice) for obj in synth_obj.voice_objs]
     for voice_obj in synth_obj.voice_objs:
-        init_piano_voice(num_partials, base_osc=0, voices=voice_obj.amy_voice)
+        init_piano_voice(num_partials, voices=voice_obj.amy_voice)
         time.sleep(0.05)  # Let the amy queue catch up.
 
     midi.config.add_synth_object(channel=1, synth_object=synth_obj)
