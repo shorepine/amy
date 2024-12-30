@@ -105,7 +105,7 @@ https://github.com/user-attachments/assets/c1feccc0-7559-4fbd-b38b-d60b6679644c
 
 This recovers both the spectral complexity of the original piano notes, *and* the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.
 
-![piano_example_original](https://github.com/user-attachments/assets/cedce885-f768-4a0d-be93-2aa6eefbd3d8)
+![uiowa](https://github.com/user-attachments/assets/6337d2b1-cee1-4636-bf96-ce4b7ab26544)
 
 While there are plenty of details that have not been exactly preserved (most notably the noisy "clunk" visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and "acoustic" than any of the previous syntheses.
 
