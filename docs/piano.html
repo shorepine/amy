@@ -128,7 +128,23 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       <h2 id="finding-harmonic-frequencies-and-piano-inharmonicity">Finding harmonic frequencies and piano inharmonicity</h2>
       <p>The heterodyne extraction allows us to extract sample-precise envelopes for harmonics at specific frequencies, but we need to give it the exact frequencies we want it to extract.  Again, in principle, this is straightforward: The harmonics should occur at integer-multiples of the fundamental frequency, and if the piano is tuned right, we already know the <a href="https://en.wikipedia.org/wiki/Piano_key_frequencies">fundamental frequences for each note</a>.</p>
       <p>It turns out, however, that piano notes are not perfectly harmonic: They can be well modeled as the sum of fixed-frequency sinusoids, but those sinusoids are not exact integer multiples of a common fundamental.  This is a consequence of the stiffness of the steel strings (I&#39;m told!) which makes the speed of wave propagation down the strings higher for higher harmonics.  This <a href="https://en.wikipedia.org/wiki/Inharmonicity#Pianos">piano inharmonicity</a> has been credited with some of the &quot;warmth&quot; of piano sounds, and is something we want to preserve in our synthesis.  In order to precisely extract each harmonic for each note, we need to individually estimate the inharmonicity coefficient for each string (because the strings are all different thicknesses, the inharmonicity varies across the range of the piano).</p>
-      <p>I estimated the inharmonicity by extracting very precise peak frequencies from a long Fourier transform of the piano note, then fitting the theoretical equation $f_n \propto n \sqrt{1 + B n^2}$ (from <a href="https://physics.stackexchange.com/questions/268568/why-are-the-harmonics-of-a-piano-tone-not-multiples-of-the-base-frequency">this StackExchange explanation</a>) to those values.</p>
+      <p>I estimated the inharmonicity by extracting very precise peak frequencies from a long Fourier transform of the piano note, then fitting the theoretical equation <!--$f_n \propto n \sqrt{1 + B n^2}$--> <math-renderer class="js-inline-math" style="display: inline-block" data-static-url="https://github.githubassets.com/static" data-run-id="5ed5f21f1be809a4e6580fe88941e900" data-catalyst=""><math xmlns="http://www.w3.org/1998/Math/MathML">
+  <msub>
+    <mi>f</mi>
+    <mi>n</mi>
+  </msub>
+  <mo>∝</mo>
+  <mi>n</mi>
+  <msqrt>
+    <mn>1</mn>
+    <mo>+</mo>
+    <mi>B</mi>
+    <msup>
+      <mi>n</mi>
+      <mn>2</mn>
+    </msup>
+  </msqrt>
+</math></math-renderer> (from <a href="https://physics.stackexchange.com/questions/268568/why-are-the-harmonics-of-a-piano-tone-not-multiples-of-the-base-frequency">this StackExchange explanation</a>) to those values.</p>
       <p><img src="spectralpeaks.png" alt="download-4"></p>
       <p><img src="fundamental.png" alt="download-5"></p>
       <p>These plots come from the &quot;Inharmonicity estimation&quot; part of <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we&#39;re looking at the same harmonic in both notes.</p>
@@ -142,7 +158,19 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
 
       <P>I spent a while trying to come up with ad-hoc algorithms to accurately match an arbitrary envelope with a few line segments - see the "Adaptive magnitude sampling" section of [piano_heterodyne.ipynb](../experiments/piano_heterodyne.ipynb).  The goal was to choose breakpoint times (and values) that preserved the most detail of the original envelope, even though I couldn't define exactly what I wanted.  However, the outcome was naturally that there would be different breakpoint times for each note, which made interpolation between different notes very problematic - can we interpolate the breakpoint times too?  (I tried it, and it fared badly in practice because of wildly varying allocations of breakpoints to different time regions).</P>
 
-      <P>In the end I gave up and used a much simpler strategy of predefining a set of breakpoint sample times that are constant for all notes.  Although this is inevitably sub-optimal for any given note, it gives a much more solid foundation for interpolating between notes.  And it turns out that the accuracy lost in modeling the envelopes doesn't seem to be too important perceptually.  To respect the idea that the envelopes have an initial period of considerable detail, followed by a longer, smoother evolution, I used exponential spacing of the sampling times.  Specifically each envelope is described by samples at 20 instants: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096 milliseconds after onset.  After the initial value, these are in a pattern of $2^n$ and $1.5 * 2^n$ milliseconds, giving the exponential spacing.  This plot shows the original envelope with the breakpoint approximation superimposed, on two timescales - the first 150 msec on the left, and the full 4.1 sec on the right (with the 150 msec edge of the left plot shown as a dotted line).</P>
+      <P>In the end I gave up and used a much simpler strategy of predefining a set of breakpoint sample times that are constant for all notes.  Although this is inevitably sub-optimal for any given note, it gives a much more solid foundation for interpolating between notes.  And it turns out that the accuracy lost in modeling the envelopes doesn't seem to be too important perceptually.  To respect the idea that the envelopes have an initial period of considerable detail, followed by a longer, smoother evolution, I used exponential spacing of the sampling times.  Specifically each envelope is described by samples at 20 instants: 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096 milliseconds after onset.  After the initial value, these are in a pattern of <!--$2^n$--><math-renderer class="js-inline-math" style="display: inline-block" data-static-url="https://github.githubassets.com/static" data-run-id="5ed5f21f1be809a4e6580fe88941e900" data-catalyst=""><math xmlns="http://www.w3.org/1998/Math/MathML">
+  <msup>
+    <mn>2</mn>
+    <mi>n</mi>
+  </msup>
+</math></math-renderer> and <!--$1.5 * 2^n$--><math-renderer class="js-inline-math" style="display: inline-block" data-static-url="https://github.githubassets.com/static" data-run-id="5ed5f21f1be809a4e6580fe88941e900" data-catalyst=""><math xmlns="http://www.w3.org/1998/Math/MathML">
+  <mn>1.5</mn>
+  <mo>∗</mo>
+  <msup>
+    <mn>2</mn>
+    <mi>n</mi>
+  </msup>
+</math></math-renderer> milliseconds, giving the exponential spacing.  This plot shows the original envelope with the breakpoint approximation superimposed, on two timescales - the first 150 msec on the left, and the full 4.1 sec on the right (with the 150 msec edge of the left plot shown as a dotted line).</P>
       <P><img src="envelope.png"></P>
 
       <P>Although a bunch of detail has been lost, it still provides a suitably complex character to the resyntheses.
