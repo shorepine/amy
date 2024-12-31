@@ -153,10 +153,8 @@ amy_err_t miniaudio_init() {
 #endif
 
 #ifdef AMY_HAS_AUDIO_IN
-    fprintf(stdout, "playback + record\n");
     deviceConfig = ma_device_config_init(ma_device_type_duplex);
 #else
-    fprintf(stdout, "playback\n");
     deviceConfig = ma_device_config_init(ma_device_type_playback);
 #endif
     if(amy_playback_device_id >= 0) {

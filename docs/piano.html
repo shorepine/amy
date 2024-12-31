@@ -11,13 +11,7 @@
     <script type="text/javascript" src="enable-threads.js"></script>
     <script type="text/javascript" src="amy.js"></script>
     <script type="text/javascript" src="amyrepl.js"></script>
-    <style>
-      ul {
-          list-style-type: disc !important;
-          padding-left:2em !important;
-          margin-left:2em;
-      }
-    </style>
+    <link rel="stylesheet" href="amyrepl.css"/>
   </head>
   <body>
     <script type="module">
@@ -28,14 +22,14 @@
       });
     </script>
 
-    <div class="container-fluid"> 
-      <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="container-fluid px-5 mx-5"> 
+      <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
         <h1 id="the-amy-additive-piano-voice">The AMY Additive Piano Voice</h1>
         <p>The piano is a versatile and mature instrument.  One reason for its popularity is its wide timbral range; in fact, its main innovation was the ability to play notes both loud and soft, hence &quot;<a href="https://en.wikipedia.org/wiki/Piano#History">Pianoforte</a>&quot; (its full original name).</p>
         
         <p>To make AMY into a truly general-purpose music synthesizer, we wanted to add a good piano voice.  But it&#39;s not simple to synthesize a good piano voice.  This page explains some of what makes piano synthesis challenging, and how we addressed it.  Our approach was to use <a href="https://en.wikipedia.org/wiki/Additive_synthesis">additive synthesis</a>, which nicely fills out the demonstration of the primary synthesis techniques implemented in AMY, after subtractive (the Juno-6 patches) and FM (the DX7 patches).</p>
       </div>
-      <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+      <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
 
         <h2 id="the-sound-of-a-piano">The sound of a piano</h2>
         <p>Here&#39;s an example of 5 notes played on a real piano:</p>
@@ -53,7 +47,7 @@
           <li>The D2 is too low for the harmonics to be resolved in this spectrogam, but we can see a complex pattern of time modulation in its energy.  We can also see a complex pattern of per-harmonic modulations in the D6.</li>
       </ul>
     </div>
-    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
       <h2 id="synthesizing-piano-sounds">Synthesizing piano sounds</h2>
       <p>Electronic musical instruments have always taken inspiration from their acoustic forbears, and most electronic keyboards will attempt to simulate a piano.  
       <p>Let's set up a function in AMY (which runs in this web page, you can edit it!) that plays the recorded pattern above on some 
@@ -78,28 +72,32 @@ def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=la
 piano_example(base_note=74, volume=10, 
                 init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=7))
       </div>
-      <img src="juno.png"  class="img-fluid">
+      <P><img src="juno.png"  class="img-fluid"></P>
       <p>This synthetic piano gets the stable harmonic structure and steady decay of each note, but there&#39;s no change in timbre with the different note velocities; every harmonic gets louder by the same factor.  (In fact, the Juno-60 was not velocity sensitive, but its usual practice to scale the whole note in proportion to velocity). There&#39;s no complexity to the harmonic decays, they are uniformly monotonic.  And the overall note decay time doesn&#39;t vary with the pitch.</p>
       <p>The DX7 similarly provides a number of presets claiming to be pianos:</p>
       <div class="editor mb-4">
   piano_example(base_note=50, volume=25, 
                 init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=137))
       </div>
-      <img src="dx7.png" class="img-fluid">
+      <P><img src="dx7.png" class="img-fluid"></P>
       <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
     </div>
-    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
       <h2 id="additive-synthesis">Additive synthesis</h2>
       <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essesnce of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
-      <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes and play those:</p>
-      <div class="editor mb-4">
-amy.send(store_patch='1024,' + tulip_piano.patch_string)
-amy.send(time=0, voices='0,1,2', load_patch=1024)
-tulip_piano.init_piano_voice(tulip_piano.num_partials, voices='0,1,2', time=0)
-# additive_interpolated overwrites these settings before each note,
-# but pre-configure each note to C4.mf for additive_fixed.
-tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1,2')
-piano_example(base_note=62, volume=5)
+      <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes:</p>
+      <div class="editor mb-4 preload-python">
+def init_piano_voices():
+    amy.send(store_patch='1024,' + tulip_piano.patch_string)
+    amy.send(voices='0,1,2', load_patch=1024)
+    tulip_piano.init_piano_voice(tulip_piano.num_partials, voices='0,1,2')
+    # additive_interpolated overwrites these settings before each note,
+    # but pre-configure each note to C4.mf for additive_fixed.
+    tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1,2')
+      </div>
+      <P>And play those:</P>
+      <div class="editor mb-4 preload-python">
+piano_example(base_note=62, volume=5, init_command=init_piano_voices)
       </div>
       <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
       
@@ -109,14 +107,9 @@ piano_example(base_note=62, volume=5)
       <p>For velocity, we have no choice but to interpolate, since the three recorded strikes do not provide enough expressivity for performance.  We analyze all three (for each pitch stored, so 63 notes total).</p>
       <p>Playing a note, then, involves interpolating between <em>four</em> of the stored harmonic envelope sets (recall that each set consists of 20 breakpoints for up to 20 harmonics): To synthesize the D4 at, say, velocity 90, we use C4 at <em>mf</em> and <em>ff</em> (which I interpreted as velocities 80 and 120) as well as E4 <em>mf</em> and <em>ff</em>.  By doing this interpolation separately for every <code>(note, velocity)</code> event, we get a much richer range of tones:</p>
       <div class="editor mb-4">
-# We use the tulip_piano setup of the previous example, but now we have a special function
-# to handle adjusting all the harmonic envelopes for each distinct note-on event:
-tulip_piano.piano_note_on(voices='0', note=62, vel=0.05, time=500)
-tulip_piano.piano_note_on(voices='0', note=62, vel=0.63, time=1500)
-tulip_piano.piano_note_on(voices='0', note=62, vel=1.0, time=2000)
-tulip_piano.piano_note_on(voices='0', note=38, vel=0.6, time=2500)
-tulip_piano.piano_note_on(voices='1', note=86, vel=1.0, time=3000)
-tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
+  piano_example(base_note=62,
+                init_command=init_piano_voices,
+                send_command=tulip_piano.piano_note_on)
       </div>
       <p><img src="interpolated.png" alt="interpolated" class="img-fluid"></p>
       <p>This recovers both the spectral complexity of the original piano notes, <em>and</em> the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.</p>
@@ -124,7 +117,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       <p>While there are plenty of details that have not been exactly preserved (most notably the noisy &quot;clunk&quot; visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and &quot;acoustic&quot; than any of the previous syntheses.</p>
 
     </div>
-    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
 
       <h1 id="extracting-harmonic-envelopes">Extracting harmonic envelopes</h1>
       <p>How exactly to we capture the envelopes for each harmonic in our additive model?  In principle, this is simply a matter of dissecting a spectrogram of the individual note (like the images above) to measure the intensity of each individual horizontal line.  In practice, however, I wanted something with finer resolution in time and frequency to obtain very accurate parameters.  I used <a href="https://en.wikipedia.org/wiki/Heterodyne">heterodyne analysis</a>, which I&#39;ll now explain.</p>
@@ -136,7 +129,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       <p><img src="d4ffshift.png" alt="download-1" class="img-fluid"></p>
       <p><img src="d4harm.png" alt="download" class="img-fluid"></p>
     </div>
-    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
       <h2 id="finding-harmonic-frequencies-and-piano-inharmonicity">Finding harmonic frequencies and piano inharmonicity</h2>
       <p>The heterodyne extraction allows us to extract sample-precise envelopes for harmonics at specific frequencies, but we need to give it the exact frequencies we want it to extract.  Again, in principle, this is straightforward: The harmonics should occur at integer-multiples of the fundamental frequency, and if the piano is tuned right, we already know the <a href="https://en.wikipedia.org/wiki/Piano_key_frequencies">fundamental frequences for each note</a>.</p>
       <p>It turns out, however, that piano notes are not perfectly harmonic: They can be well modeled as the sum of fixed-frequency sinusoids, but those sinusoids are not exact integer multiples of a common fundamental.  This is a consequence of the stiffness of the steel strings (I&#39;m told!) which makes the speed of wave propagation down the strings higher for higher harmonics.  This <a href="https://en.wikipedia.org/wiki/Inharmonicity#Pianos">piano inharmonicity</a> has been credited with some of the &quot;warmth&quot; of piano sounds, and is something we want to preserve in our synthesis.  In order to precisely extract each harmonic for each note, we need to individually estimate the inharmonicity coefficient for each string (because the strings are all different thicknesses, the inharmonicity varies across the range of the piano).</p>
@@ -162,7 +155,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       <p><img src="fundamental.png" alt="download-5" class="img-fluid"></p>
       <p>These plots come from the &quot;Inharmonicity estimation&quot; part of <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we&#39;re looking at the same harmonic in both notes.</p>
     </div>
-    <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-5 mx-5 bg-light bg-gradient">
       <h2 id="describing-envelopes">Describing envelopes</h2>
       <P>We can extract sample-accurate envelopes for as many harmonics as we want for each of the real piano note recordings we have.  But to turn them into a practical additive-synthesis instrument on AMY we need to think about efficiency.  Right now, the harmonic envelopes are represented as 44,100 values per second of recording, and we're modeling something like the first 5 seconds of each note (the low notes can easily be 20 seconds long before they decay into oblivion).  But the AMY envelopes can only handle up to 24 breakpoints (it used to be 8 before I changed it to serve this project!) so we need some way to summarize the envelopes in a smaller number of straight-line segments (which is what the envelope breakpoints define).</P>
 

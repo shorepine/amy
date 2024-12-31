@@ -19,7 +19,7 @@ amyModule().then(async function(am) {
     'amy_start', null, ['number', 'number', 'number']
   );
   amy_play_message = amy_module.cwrap(
-    'amy_play_message', null, ['string']
+    'amy_play_message', null, ['string'], {async: true} 
   );
   amy_reset_sysclock = amy_module.cwrap(
     'amy_reset_sysclock', null, null
@@ -79,7 +79,6 @@ async function resetAMY() {
 async function runCodeBlock(index) {
   if(!everything_started) await start_python_and_audio();
   var py = editors[index].getValue();
-  console.log(py)
   amy_reset_sysclock();
   await mp.runPythonAsync(py);
 }
@@ -106,7 +105,8 @@ function create_editor(element, index) {
     }, 
     lineNumbers: true, 
     indentUnit: 4, 
-    matchBrackets: true
+    matchBrackets: true,
+    theme: "solarized dark",
   }); 
   run_at_start = false;
   if(element.classList.contains("preload-python")) {
