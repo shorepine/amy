@@ -37,7 +37,7 @@
 
         <p><img src="uiowa.png" alt="uiowa"></p>
         <p>This clip starts with a D4 note played at three loudnesses - <em>pp</em>, <em>mf</em>, and <em>ff</em>.  These are followed by a D2 (two octaves lower), and a D6 (two octaves higher).
-  (I made this example by adding together isolated recordings of single piano notes from the <a href="https://theremin.music.uiowa.edu/mispiano.html">University of Iowa Electronic Music Studios Instrument Samples</a>, which are the basis of the AMY piano.  I combined them with the code in <a href="../experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a>.)</p>
+  (I made this example by adding together isolated recordings of single piano notes from the <a href="https://theremin.music.uiowa.edu/mispiano.html">University of Iowa Electronic Music Studios Instrument Samples</a>, which are the basis of the AMY piano.  I combined them with the code in <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a>.)</p>
         <p>Some things to notice:</p>
         <ul>
           <li>Piano sounds consist of very strong, stable sets of harmonics (fixed-frequency Fourier components), visible as horizontal lines in the spectrogram.  The harmonics appear mostly uniformly-spaced (as expected for a Fourier series of a periodic signal) (although there are a few extra components e.g. around 4.5 kHz at 0.8 seconds for the <em>ff</em> D4).</li>
@@ -75,7 +75,7 @@ amy.send(voices='0,1', vel=0, time=4000)
     </div>
     <div class="row py-3 my-5 px-3 mx-3 bg-light bg-gradient">
       <h2 id="additive-synthesis">Additive synthesis</h2>
-      <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essesnce of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
+      <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essesnce of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a ="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
       <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes and play those:</p>
       <div class="editor mb-4">
 amy.send(store_patch='1024,' + tulip_piano.patch_string)
@@ -89,7 +89,7 @@ amy.send(voices='0', note=38, vel=0.6, time=2500)
 amy.send(voices='1', note=86, vel=1.0, time=3000)
 amy.send(voices='0,1', vel=0, time=3500)
       </div>
-      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="../experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
+      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
       
       <p><img src="fixed.png" alt="fixed"></p>
       <p>The <em>mf</em> D4 note now sounds quite realistic, because it&#39;s a reasonably accurate reproduction of the original recording.  However, we&#39;re still simply scaling its overall magnitude in to get different veloicities.  And when we change the pitch, we just squeeze or stretch the harmonics (and hence the notes&#39; spectral envelopes), which is not at all realistic sounding.</p>
@@ -120,7 +120,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
       <p><img src="env1.gif" alt="1*t6wVEZv6CkhACEyY2pFe2A"></p>
       <p>Each sinusoid is constructed as the sum of a pair of complex exponentials with positive and negative frequencies; the imaginary parts cancel out leaving the real sinusoid.  Thus, the full Fourier spectrum of a real signal has mirror-image positive and negative parts (although we generally only plot the positive half):</p>
       <p><img src="d4ff.png" alt="download-2"></p>
-      <p>The neat thing about this complex-exponential Fourier representation is that multiplying a signal by a complex exponential is a pure shift in the Fourier spectrum domain.  So, by multiplying by the complex exponential at the negative of a particular harmonic frequency, we can shift that harmonic down to 0 Hz (d.c.).  Then, by low-pass filtering (i.e., smoothing) that waveform, we can cancel out all the other harmonics leaving only the envelope of the one harmonic we are targeting.  (By smoothing over a window that exactly matches the fundamental period, we can exactly cancel all the other sinusoid components because they will complete a whole number of cycles in that period).  See <a href="../experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a> for how these figures were prepared:</p>
+      <p>The neat thing about this complex-exponential Fourier representation is that multiplying a signal by a complex exponential is a pure shift in the Fourier spectrum domain.  So, by multiplying by the complex exponential at the negative of a particular harmonic frequency, we can shift that harmonic down to 0 Hz (d.c.).  Then, by low-pass filtering (i.e., smoothing) that waveform, we can cancel out all the other harmonics leaving only the envelope of the one harmonic we are targeting.  (By smoothing over a window that exactly matches the fundamental period, we can exactly cancel all the other sinusoid components because they will complete a whole number of cycles in that period).  See <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/make_piano_examples.ipynb">make_piano_examples.ipynb</a> for how these figures were prepared:</p>
       <p><img src="d4ffshift.png" alt="download-1"></p>
       <p><img src="d4harm.png" alt="download"></p>
     </div>
@@ -147,7 +147,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
 </math></math-renderer> (from <a href="https://physics.stackexchange.com/questions/268568/why-are-the-harmonics-of-a-piano-tone-not-multiples-of-the-base-frequency">this StackExchange explanation</a>) to those values.</p>
       <p><img src="spectralpeaks.png" alt="download-4"></p>
       <p><img src="fundamental.png" alt="download-5"></p>
-      <p>These plots come from the &quot;Inharmonicity estimation&quot; part of <a href="../experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we&#39;re looking at the same harmonic in both notes.</p>
+      <p>These plots come from the &quot;Inharmonicity estimation&quot; part of <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.  Estimating the inharmonicity for each note allowed me to extract harmonic envelopes precisely corresponding to each specific harmonic of each piano note.  This was important because when we are interpolating between different harmonic envelopes, we want to be sure we&#39;re looking at the same harmonic in both notes.</p>
     </div>
     <div class="">
       <h2 id="describing-envelopes">Describing envelopes</h2>
@@ -175,7 +175,7 @@ tulip_piano.piano_note_on(voices='0,1', vel=0, time=3500)
 
       <P>Although a bunch of detail has been lost, it still provides a suitably complex character to the resyntheses.
 
-      <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="../experiments/piano-params.json">piano-params.json</a> and read by <a href="../experiments/tulip_piano.py">tulip_piano.py</a>.
+      <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/piano-params.json">piano-params.json</a> and read by <a href="https://github.com/shorepine/amy/blob/piano-partials/experiments/tulip_piano.py">tulip_piano.py</a>.
 
 
   </div>
