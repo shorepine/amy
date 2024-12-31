@@ -7,6 +7,7 @@ var everything_started = false;
 var mp = null;
 var term = null;
 var editors = [];
+var run_at_starts = [];
 
 // Once AMY module is loaded, do...
 amyModule().then(async function(am) {
@@ -62,6 +63,11 @@ async function start_python_and_audio() {
   // Wait 200ms on first run only before playing amy commands back to avoid clicks
   await new Promise((r) => setTimeout(r, 200));
   everything_started = true;
+  for(i=0;i<run_at_starts.length;i++) {
+    if(run_at_starts[i]) {
+      runCodeBlock(i);
+    }
+  }
 }
 
 async function resetAMY() {
@@ -98,12 +104,17 @@ function create_editor(element, index) {
       version: 3, 
       singleLineStringErrors: false
     }, 
-    lineNumbers: false, 
+    lineNumbers: true, 
     indentUnit: 4, 
     matchBrackets: true
   }); 
+  run_at_start = false;
+  if(element.classList.contains("preload-python")) {
+    run_at_start = true;
+  }
   editor.setSize(null,200);
   editor.setValue(code.trim()); 
+  run_at_starts.push(run_at_start);
   editors.push(editor);
 }
 
