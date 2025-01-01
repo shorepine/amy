@@ -75,7 +75,7 @@ piano_example(base_note=74, volume=10,
       </div>
       <P><img src="juno.png"  class="img-fluid"></P>
       <p>This synthetic piano gets the stable harmonic structure and steady decay of each note, but there&#39;s no change in timbre with the different note velocities; every harmonic gets louder by the same factor.  (In fact, the Juno-60 was not velocity sensitive, but its usual practice to scale the whole note in proportion to velocity). There&#39;s no complexity to the harmonic decays, they are uniformly monotonic.  And the overall note decay time doesn&#39;t vary with the pitch.</p>
-      <p>The DX7 similarly provides a number of presets claiming to be pianos:</p>
+      <p>The DX7 similarly provides a number of <a href="https://www.synthmania.com/dx7.htm">presets claiming to be pianos</a>, including 135-137 (in our numbering which starts at 128):</p>
       <div class="editor mb-4">
   piano_example(base_note=50, volume=25, 
                 init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=137))
