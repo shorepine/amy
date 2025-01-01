@@ -125,12 +125,12 @@ def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
   amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
   for i in range(num_partials):
     f0_hz = cents_to_hz(harms_params[i, 0])
-    env_vals = db_to_lin(harms_params[i, 1:])
+    #env_vals = db_to_lin(harms_params[i, 1:])
+    env_vals = harms_params[i, 1:]
     # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
-    bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
-    #env_vals = harms_params[i, 1:]
+    #bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
     # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
-    #bp_string = '..,,' + ','.join(",%d" % val for val in env_vals)
+    bp_string = '..,,' + ','.join(",%d" % val for val in env_vals)
     # Add final release.
     bp_string += ',200,0'
     amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
