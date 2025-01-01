@@ -97,7 +97,7 @@ def init_piano_voices():
     tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1,2')
       </div>
       <P>And play those:</P>
-      <div class="editor mb-4 preload-python">
+      <div class="editor mb-4">
 piano_example(base_note=62, volume=5, init_command=init_piano_voices)
       </div>
       <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
