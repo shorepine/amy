@@ -79,7 +79,6 @@ async function resetAMY() {
 async function runCodeBlock(index) {
   if(!everything_started) await start_python_and_audio();
   var py = editors[index].getValue();
-  console.log(py);
   amy_reset_sysclock();
   await mp.runPythonAsync(py);
 }

@@ -51,8 +51,7 @@
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
       <h2 id="synthesizing-piano-sounds">Synthesizing piano sounds</h2>
       <p>Electronic musical instruments have always taken inspiration from their acoustic forbears, and most electronic keyboards will attempt to simulate a piano.  
-      <p>Let's set up a function in AMY (which runs in this web page, you can edit it!) that plays the recorded pattern above on some 
-        AMY presets:
+      <p>Let's set up a function in AMY (which runs in this web page in Python, you can edit the code!) that plays the recorded pattern above on some AMY presets:
       <div class="editor mb-4 preload-python">
 def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None):
     amy.send(time=0, volume=volume)
@@ -73,6 +72,7 @@ def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=la
 piano_example(base_note=74, volume=10, 
                 init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=7))
       </div>
+      <P>(Try changing the base_note or volume or the patch number and running again)</P>
       <P><img src="juno.png"  class="img-fluid"></P>
       <p>This synthetic piano gets the stable harmonic structure and steady decay of each note, but there&#39;s no change in timbre with the different note velocities; every harmonic gets louder by the same factor.  (In fact, the Juno-60 was not velocity sensitive, but its usual practice to scale the whole note in proportion to velocity). There&#39;s no complexity to the harmonic decays, they are uniformly monotonic.  And the overall note decay time doesn&#39;t vary with the pitch.</p>
       <p>The DX7 similarly provides a number of <a href="https://www.synthmania.com/dx7.htm">presets claiming to be pianos</a>, including 135-137 (in our numbering which starts at 128):</p>
