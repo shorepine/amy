@@ -89,8 +89,10 @@ http://ethanschoonover.com/solarized/img/solarized-palette.png
 }
 .cm-s-solarized .cm-error,
 .cm-s-solarized .cm-invalidchar {
+/*  
   color: #586e75;
   border-bottom: 1px dotted #dc322f;
+  */
 }
 
 .cm-s-solarized.cm-s-dark div.CodeMirror-selected { background: #073642; }

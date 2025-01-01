@@ -83,24 +83,167 @@ piano_example(base_note=74, volume=10,
       <P><img src="dx7.png" class="img-fluid"></P>
       <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
     </div>
-      <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
+    <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
       <h2 id="additive-synthesis">Additive synthesis</h2>
       <p>The horizontal lines in the spectrogram are simply sinusoids at fixed frequencies with slowly-varying amplitudes; the essence of Fourier analysis is that any periodic signal can be built up by summing sinusoids at integer multiples of the fundamental frequency (the lowest sinusoid).  We can use this directly to synthesize musical sounds, so-called &quot;additive synthesis&quot;, and AMY was originally designed for this very purpose.  We use one oscillator for each harmonic, and set up its amplitude envelope to be a copy of the corresponding harmonic in a real piano signal.  (I wrote code to analyze the UIowa piano sounds into harmonic envelopes in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.)</p>
-      <p>We can set up a <code>PARTIALS</code> patch with independent per-harmonic envelopes:</p>
+    </div>
+    <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
+      <h2 id="tulip-piano">Brian's attempt to explain tulip_piano.py</h2>
+      <p>Let's set up some code to make a piano using additive synthesis in AMY. First, let's load in the analysis written
+        by <a href="https://github.com/shorepine/amy/blob/main/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.
+        We're using <code>ulab</code>, which is a numpy-like written for Micropython (what this web page is using.)</p>
+      <div class="editor mb-4 preload-python">
+"""Piano notes generated on amy/tulip."""
+# Uses the partials amplitude breakpoints and residual written by piano-partials.ipynb.
+from ulab import numpy as np
+
+# Read in the params file written by piano_heterodyne.ipynb
+# Contents are:
+#   sample_times_ms - single vector of fixed log-spaced envelope sample times (in int16 integer ms)
+#   notes - Array of MIDI notes
+#   velocities - Array of strike velocities available for each note, the same for all notes
+#   num_harmonics - Array of (num_notes * num_velocities) counts of how many harmonics are defined for each note+vel.
+#   harmonics_freq - Vector of (total_num_harmonics) int16s giving freq for each harmonic in cents 6900 = 440 Hz.
+#   harmonics_mags - Array of (total_num_harmonics, num_sample_times) uint8s giving envelope samples for each harmonic.  In dB re: -130.
+from piano_params import notes_params
+
+NOTES = np.array(notes_params['notes'], dtype=np.int8)
+VELOCITIES = np.array(notes_params['velocities'], dtype=np.int8)
+NUM_HARMONICS = np.array(notes_params['num_harmonics'], dtype=np.int16)
+assert len(NUM_HARMONICS) == len(NOTES) * len(VELOCITIES)
+NUM_MAGS = len(notes_params['harmonics_mags'][0])
+FREQ_MAGS = np.zeros((np.sum(NUM_HARMONICS), 1 + NUM_MAGS), dtype=np.int16)
+FREQ_MAGS[:, 0] = np.array(notes_params['harmonics_freq'], dtype=np.int16)
+FREQ_MAGS[:, 1:] = np.array(notes_params['harmonics_mags'], dtype=np.int16)
+# Add in a derived diff-times and start-harmonic fields
+last_time = 0
+DIFF_TIMES = []
+for sample_time in notes_params['sample_times_ms']:
+  DIFF_TIMES.append(sample_time - last_time)
+  last_time = sample_time
+START_HARMONIC = np.zeros(len(NUM_HARMONICS), dtype=np.int16)
+start_h = 0
+for i, n in enumerate(NUM_HARMONICS):
+    START_HARMONIC[i] = start_h
+    start_h += n
+      </div>
+      <p>Now, let's set up some code to return the interpolated harmonics from a MIDI note and velocity for the piano.</p>
+
+      <div class="editor mb-4 preload-python">
+def interp_harms_params(hp0, hp1, alpha):
+    """Return harm_param list that is alpha of the way to hp1 from hp0."""
+    # hp_ is [freq, mag0, mag1, ...]
+    num_harmonics = min(hp0.shape[0], hp1.shape[0])
+    # Assume the units are log-scale, so linear interpolation is good.
+    return hp0[:num_harmonics] + alpha * (hp1[:num_harmonics] - hp0[:num_harmonics])
+
+def cents_to_hz(cents):
+    """Convert freq cents back to Hzin hz to real-valued midi: 60 = C4 = 261.63, 69 = A4 = 440.0."""
+    return 440 * (2 ** ((cents - 6900) / 1200.0))
+  
+def db_to_lin(d):
+    # There's a -100 (-130 + 30) dB downshift.  Clip anything below 0.001 to zero, to avoid E-05 format etc.
+    return np.maximum(0, 10.0 ** ((d - 100) / 20.0) - 0.001)
+
+def harm_param_to_lin(bps):
+    """Convert harm_param from (cents, db0, db1, ...) to (hz, lin0, lin1, ...)."""
+    return np.concatenate([np.array([cents_to_hz(bps[0])]), db_to_lin(bps[1:])])
+
+def harms_params_to_lin(harms_params):
+    """Convert a list of harm_params from log to lin format."""
+    return [harm_param_to_lin(hp) for hp in harms_params]
+
+def harms_params_from_note_index_vel_index(note_index, vel_index):
+    """Reconstruct a (log-domain) harms_params list from the globals given note and vel indices."""
+    note_vel_index = note_index * len(VELOCITIES) + vel_index
+    num_harmonics = NUM_HARMONICS[note_vel_index]
+    start_harmonic = START_HARMONIC[note_vel_index]
+    harms_params = FREQ_MAGS[start_harmonic : start_harmonic + num_harmonics, :]
+    return harms_params
+
+def harms_params_for_note_vel(note, vel):
+    """Convert midi note and velocity into an interpolated harms_params list of harmonic specifications."""
+    note = np.clip(note, NOTES[0], NOTES[-1])
+    vel = np.clip(vel, VELOCITIES[0], VELOCITIES[-1])
+    note_index = -1 + np.sum(NOTES[:-1] <= note)  # at most the last-but-one value.
+    strike_index = -1 + np.sum(VELOCITIES[:-1] <= vel)
+    lower_note = NOTES[note_index]
+    upper_note = NOTES[note_index + 1]
+    note_alpha = (note - lower_note) / (upper_note - lower_note)
+    lower_strike = VELOCITIES[strike_index]
+    upper_strike = VELOCITIES[strike_index + 1]
+    strike_alpha = (vel - lower_strike) / (upper_strike - lower_strike)
+    #print(f'{lower_note=} {note_alpha=} {lower_strike=} {strike_alpha=}')
+    harms_params = interp_harms_params(
+        interp_harms_params(
+            harms_params_from_note_index_vel_index(note_index, strike_index),
+            harms_params_from_note_index_vel_index(note_index + 1, strike_index),
+            note_alpha,
+        ),
+        interp_harms_params(
+            harms_params_from_note_index_vel_index(note_index, strike_index + 1),
+            harms_params_from_note_index_vel_index(note_index + 1, strike_index + 1),
+            note_alpha,
+        ),
+        strike_alpha,
+    )
+    return harms_params
+      </div>
+      <p>And then some AMY helper code to send out these parameters to the right voices when a note is played:</p>
+      <div class="editor mb-4 preload-python">
+def init_piano_voice(num_partials, base_osc=0, **kwargs):
+  # One-time initialization of the unchanging parts of the partials voices."""
+  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
+  harm_nums = range(1, num_partials + 1)
+  for i in harm_nums:
+    bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
+    bp_string += ',200,0'
+    amy.send(osc=base_osc + i, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
+
+def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
+  """Set up a sequence of oscs to play a particular note and velocity."""
+  harms_params = harms_params_for_note_vel(note, vel)
+  num_partials = len(harms_params)
+  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
+  for i in range(num_partials):
+    f0 = cents_to_hz(harms_params[i, 0])
+    h_vals = harms_params[i, 1:]
+    # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
+    bp_string = '..,,' + ','.join(",%d" % val for val in h_vals)
+    bp_string += ',200,0'
+    amy.send(osc=base_osc + 1 + i, freq=f0, bp0=bp_string, **kwargs)
+
+def piano_note_on(note=60, vel=1, **kwargs):
+    if vel == 0:
+        # Note off.
+        amy.send(vel=0, **kwargs)
+    else:
+        setup_piano_voice_for_note_vel(
+            note, round(vel * 127), **kwargs
+        )
+        # We already configured the freuquencies and magnitudes in setup, so
+        # the note on is completely neutral.
+        amy.send(note=60, vel=1, **kwargs)
+
+num_partials = NUM_HARMONICS[0]
+patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
+      </div>
+
+      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes:</p>
       <div class="editor mb-4 preload-python">
 def init_piano_voices():
-    amy.send(store_patch='1024,' + tulip_piano.patch_string)
+    amy.send(store_patch='1024,' + patch_string)
     amy.send(voices='0,1,2', load_patch=1024)
-    tulip_piano.init_piano_voice(tulip_piano.num_partials, voices='0,1,2')
+    init_piano_voice(num_partials, voices='0,1,2')
     # additive_interpolated overwrites these settings before each note,
     # but pre-configure each note to C4.mf for additive_fixed.
-    tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1,2')
+    setup_piano_voice_for_note_vel(note=60, vel=80, voices='0,1,2')
       </div>
       <P>And play those:</P>
       <div class="editor mb-4">
 piano_example(base_note=62, volume=5, init_command=init_piano_voices)
       </div>
-      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code> - which is why I&#39;m using the functions from <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py"><code>tulip_piano.py</code></a>.</p>
+      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
       
       <p><img src="fixed.png" alt="fixed" class="img-fluid"></p>
       <p>The <em>mf</em> D4 note now sounds quite realistic, because it&#39;s a reasonably accurate reproduction of the original recording.  However, we&#39;re still simply scaling its overall magnitude in to get different veloicities.  And when we change the pitch, we just squeeze or stretch the harmonics (and hence the notes&#39; spectral envelopes), which is not at all realistic sounding.</p>
@@ -110,7 +253,7 @@ piano_example(base_note=62, volume=5, init_command=init_piano_voices)
       <div class="editor mb-4">
   piano_example(base_note=62,
                 init_command=init_piano_voices,
-                send_command=tulip_piano.piano_note_on)
+                send_command=piano_note_on)
       </div>
       <p><img src="interpolated.png" alt="interpolated" class="img-fluid"></p>
       <p>This recovers both the spectral complexity of the original piano notes, <em>and</em> the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.</p>

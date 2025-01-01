@@ -45,7 +45,7 @@ async function start_python() {
 
   // Set up the micropython context, like _boot.py. 
   await mp.runPythonAsync(`
-    import amy, amy_js_message, time, tulip_piano
+    import amy, amy_js_message, time
     amy.override_send = amy_js_message
   `);
 }
@@ -101,13 +101,18 @@ function create_editor(element, index) {
     mode: { 
       name: "python", 
       version: 3, 
-      singleLineStringErrors: false
+      singleLineStringErrors: false,
+      lint: false
     }, 
     lineNumbers: true, 
     indentUnit: 4, 
     matchBrackets: true,
+    spellCheck: false,
+    autocorrect: false,
     theme: "solarized dark",
+    lint: false,
   }); 
+
   run_at_start = false;
   if(element.classList.contains("preload-python")) {
     run_at_start = true;
