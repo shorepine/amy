@@ -26,7 +26,7 @@
     <div class="container-md"> 
       <div class="row py-3 my-5 px-1 mx-1">
       <div class="alert alert-primary" role="alert">
-        This page is <strong>running live code</strong> in Python. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and maybe play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">◼︎</button> button will reset the synthesizer, if it has a stuck note. </div>
+        This page is <strong>running live code</strong> in Python. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">◼︎</button> button will reset the synthesizer, if it has a stuck note. </div>
       </div>
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
         <h1 id="the-amy-additive-piano-voice">The <A HREF="https://github.com/shorepine/amy">AMY</A> Additive Piano Voice</h1>
@@ -217,7 +217,7 @@ num_partials = NUM_HARMONICS[0]
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
       </div>
 
-      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback:</p>
+      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
       <div class="editor mb-4 preload-python">
 def init_piano_voices():
     amy.send(store_patch='1024,' + patch_string)
@@ -230,9 +230,7 @@ def init_piano_voices():
       <P>And play those:</P>
       <div class="editor mb-4">
 piano_example(base_note=62, volume=5, init_command=init_piano_voices)
-      </div>
-      <p>The setup here is a bit complicated - we&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
-      
+      </div>      
       <p><img src="fixed.png" alt="fixed" class="img-fluid"></p>
       <p>The <em>mf</em> D4 note now sounds quite realistic, because it&#39;s a reasonably accurate reproduction of the original recording.  However, we&#39;re still simply scaling its overall magnitude in to get different veloicities.  And when we change the pitch, we just squeeze or stretch the harmonics (and hence the notes&#39; spectral envelopes), which is not at all realistic sounding.</p>
       <p>Instead, we need to analyze many different real piano samples, then interpolate them to get the actual envelopes we synthesize.  The UIowa samples provide recordings of all 88 notes on the piano they sampled, at three strike strengths.  We <em>could</em> include harmonic data for all of them, but adjacent notes are quite similar, so instead we encode 3 notes per octave (C, E, and Ab) and interpolate the 3 semitones between each adjacent pair.  (We currently store only 7 octaves, C1 to Ab7, so 21 pitches).</p>
@@ -334,32 +332,23 @@ piano_example(base_note=62,
 
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
 
+      <div class="col-4 py-vh-3" data-aos="fade-up">
+            <a href="https://tulip.computer/run/"><img src="tulip.svg" width=42 height=42></a>
+            <a href="https://tulip.computer/run/"><h3 class="h5 my-2">Want more? Try Tulip</h3></a>
+            <p>Run more AMY experiments in a REPL with Tulip for the Web</p>
+      </div>
 
-    
-
-      <div class="col-md-6 py-vh-3 col-lg-6 border-end" data-aos="fade-up">
-        <div class="d-flex">
-          <div class="col-md-3 flex-fill pt-3 pe-3 pe-md-0">
+      <div class="col-4 py-vh-3" data-aos="fade-up">
             <a href="https://discord.com/invite/TzBFkUb8pG"><img src="discord-mark-black.svg" width=42 height=42></a>
-          </div>
-          <div class="col-md-6 flex-fill">
             <a href="https://discord.com/invite/TzBFkUb8pG"><h3 class="h5 my-2">Discord</h3></a>
             <p>Join the <strong>shore pine sound systems</strong> Discord to chat about Tulip, AMY and Alles. A fun small community!</p>
-          </div>
-        </div>
       </div>
 
-      <div class="col-md-6 col-lg-6 py-vh-3" data-aos="fade-up" data-aos-delay="200">
-        <div class="d-flex">
-          <div class="col-md-3 flex-fill pt-3 pt-3 pe-3 pe-md-0">
+      <div class="col-4 py-vh-3" data-aos="fade-up" data-aos-delay="200">
             <a href="https://github.com/shorepine/tulipcc"><img src="github-mark.svg" width=42 height=42/></a>
-          </div>
-          <div class="col-md-6 flex-fill">
              <a href="https://github.com/shorepine/amy"><h3 class="h5 my-2">Github</h3></a>
             <p>Check out the AMY Github page for issues, discussions and the code.</p>
-          </div>
         </div>
-      </div>
     </div>
 
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
