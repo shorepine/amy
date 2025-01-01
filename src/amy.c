@@ -595,6 +595,7 @@ void reset_osc(uint16_t i ) {
     AMY_UNSET(synth[i].midi_note);
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].amp_coefs[j] = 0;
+    synth[i].amp_coefs[COEF_CONST] = 1.0f;  // Mostly a no-op, but partials_note_on used to want this?
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
     synth[i].amp_coefs[COEF_EG0] = 1.0f;
     msynth[i].amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
@@ -1035,7 +1036,6 @@ void play_event(struct delta d) {
     // Ignore velocity events if we've already received one this frame.  This may be due to a loop in chained_oscs.
     if(d.param == VELOCITY) {
         if (*(float *)&d.data > 0) { // new note on (even if something is already playing on this osc)
-            //synth[d.osc].amp_coefs[COEF_CONST] = *(float *)&d.data; // these could be decoupled, later
             synth[d.osc].velocity = *(float *)&d.data;
             synth[d.osc].status = SYNTH_AUDIBLE;
             // an osc came in with a note on.

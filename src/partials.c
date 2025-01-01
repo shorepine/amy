@@ -33,19 +33,22 @@ typedef struct {
 void partials_note_on(uint16_t osc) {
     // just like PCM, start & end breakpoint are stored here
     if (synth[osc].patch < 0) {
-        // Patch_num < 0 meanse build-your-own with (-patch_num) oscs.
+        // Patch_num < 0 means build-your-own with (-patch_num) oscs.
         int num_partials = -synth[osc].patch;
         for (int i = 0; i < num_partials; ++i) {
             int o = osc + 1 + i;
             if (synth[o].wave == PARTIAL) {  // User has marked this as a partial.
                 // Mark this PARTIAL as part of a build-your own with a flag value in its patch field.
+                // This is used I think only at envelope.c:121 to avoid the normal partial patch special-case for PARTIALs.
                 synth[o].patch = synth[osc].patch;
-                synth[o].amp_coefs[COEF_CONST] = 1.0f;  // This is apparently necessary.
-                synth[o].amp_coefs[COEF_VEL] = 1.0f;
-                synth[o].amp_coefs[COEF_EG0] = 1.0f;
-                //synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq((o + 1) * 220.f);
-                synth[o].logfreq_coefs[COEF_NOTE] = 1.0;
-                //synth[o].logfreq_coefs[COEF_EG1] = 1.0;  // Let the user turn this on if they want.
+                // We used to reset the amp_coefs here to avoid confusing the user, but now I want to be able to
+                // manipulate the amp_coefs of individual PARTIALs before I play them, so we'll hand the user more rope...
+                //synth[o].amp_coefs[COEF_CONST] = 1.0f;  // This is apparently necessary, but is now setup in reset_osc
+                //synth[o].amp_coefs[COEF_VEL] = 1.0f;
+                //synth[o].amp_coefs[COEF_EG0] = 1.0f;
+                // //synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq((o + 1) * 220.f);
+                //synth[o].logfreq_coefs[COEF_NOTE] = 1.0;
+                // //synth[o].logfreq_coefs[COEF_EG1] = 1.0;  // Let the user turn this on if they want.
                 synth[o].logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
                 synth[o].status = SYNTH_IS_ALGO_SOURCE;
                 synth[o].note_on_clock = total_samples;
@@ -89,10 +92,10 @@ void partials_note_off(uint16_t osc) {
 // do all patches have sustain point?
 SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     SAMPLE max_value = 0;
-    uint16_t oscs = 0;
+    uint16_t num_oscs = 0;
     if (synth[osc].patch < 0) {
         // No preset partials map, we are in "build-your-own".  The max number of oscs is taken from algo_source[0].
-        oscs = -synth[osc].patch;
+        num_oscs = -synth[osc].patch;
     } else {
         // Set up from partials map.
         partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];
@@ -100,7 +103,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
         float time_ratio = 1;
         if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
         uint32_t ms_since_started = (uint32_t) ((((total_samples - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
-        oscs = patch.oscs_alloc;
+        num_oscs = patch.oscs_alloc;
         if(synth[osc].step >= 0) {
             // do we either have no sustain, or are we past sustain?
             // TODO: sustain is likely more complicated --we want to bounce between the closest bps for loopstart & loopend
@@ -181,7 +184,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
         } else {
             // Somehow, step == -1 (note off was sent?)
             // TODO -- we should play the remainder of the breakpoints
-            for(uint16_t i=osc+1;i<osc+1+oscs;i++) {
+            for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
                 uint16_t o = i % AMY_OSCS;
                 if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
                     AMY_UNSET(synth[o].note_on_clock);
@@ -198,7 +201,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc].logfreq);
     //fprintf(stderr, "t=%u partials o=%d msynth[osc].logfreq=%f midi_note=%f msynth[amp]=%f\n", total_samples, osc, msynth[osc].logfreq, midi_note, msynth[osc].amp);
-    for(uint16_t i = osc + 1; i < osc + 1 + oscs; i++) {
+    for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
             // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
@@ -214,7 +217,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             SAMPLE value = render_partial(buf, o);
             if (value > max_value) max_value = value;
             // Deferred termination of this partial, after final ramp-out.
-            if (synth[o].amp_coefs[0] == 0)  partial_note_off(o);
+            if (synth[o].amp_coefs[COEF_CONST] == 0)  partial_note_off(o);
         }
     }
     return max_value;
