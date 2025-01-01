@@ -154,10 +154,10 @@ def piano_note_on(note=60, vel=1, **kwargs):
 #piano_note_on(60, 0)
 
 def amy_send(**kwargs):
-    #amy.send(**kwargs)
-    m = amy.message(**kwargs)
-    print('amy.send(' + m + ')')
-    amy.send_raw(m)
+    amy.send(**kwargs)
+    #m = amy.message(**kwargs)
+    #print('amy.send(' + m + ')')
+    #amy.send_raw(m)
 
 
 #amy.reset()
