@@ -1,5 +1,4 @@
 """Piano notes generated on amy/tulip."""
-
 # Uses the partials amplitude breakpoints and residual written by piano-partials.ipynb.
 
 import json
@@ -10,6 +9,7 @@ try:
     import midi
     have_midi = True
 except:
+    print("midi not found")
     have_midi = False
 
 try:
@@ -18,13 +18,13 @@ except:
     import numpy as np
 
 # Read in the params file written by piano_heterodyne.ipynb
-# Contents are:
-#   sample_times_ms - single vector of fixed log-spaced envelope sample times (in int16 integer ms)
-#   notes - Array of MIDI notes
-#   velocities - Array of strike velocities available for each note, the same for all notes
-#   num_harmonics - Array of (num_notes * num_velocities) counts of how many harmonics are defined for each note+vel.
-#   harmonics_freq - Vector of (total_num_harmonics) int16s giving freq for each harmonic in cents 6900 = 440 Hz.
-#   harmonics_mags - Array of (total_num_harmonics, num_sample_times) uint8s giving envelope samples for each harmonic.  In dB re: -130.
+# Contents:
+#   sample_times_ms - single vector of fixed log-spaced envelope sample times (in int16 integer ms).
+#   notes - the MIDI numbers corresponding to each note described.
+#   velocities - The (MIDI) strike velocities available for each note, the same for all notes.
+#   num_harmonics - Array of (num_notes * num_velocities) counts of how many harmonics are defined for each note+vel combination.
+#   harmonics_freq - Vector of (total_num_harmonics) int16s giving freq for each harmonic in "MIDI cents" i.e. 6900 = 440 Hz.
+#   harmonics_mags - Array of (total_num_harmonics, num_sample_times) uint8s giving envelope samples for each harmonic.  In dB, between 0 and 100.
 
 # We load this in as a python file, it's easier for porting to systems without filesystems
 from piano_params import notes_params
@@ -35,60 +35,50 @@ VELOCITIES = np.array(notes_params['velocities'], dtype=np.int8)
 NUM_HARMONICS = np.array(notes_params['num_harmonics'], dtype=np.int16)
 assert len(NUM_HARMONICS) == len(NOTES) * len(VELOCITIES)
 NUM_MAGS = len(notes_params['harmonics_mags'][0])
+# Add in a derived diff-times and start-harmonic fields
+# Reintroduce the initial zero-time...
+SAMPLE_TIMES = np.array([0] + notes_params['sample_times_ms'])
+#.. so we can neatly calculate the time-deltas needed for BP strings.
+DIFF_TIMES = SAMPLE_TIMES[1:] - SAMPLE_TIMES[:-1]
+# Lookup to find first harmonic for nth note.
+START_HARMONIC = np.zeros(len(NUM_HARMONICS), dtype=np.int16)
+for i in range(len(NUM_HARMONICS)):  # (No cumsum in ulab.numpy)
+    START_HARMONIC[i] = np.sum(NUM_HARMONICS[:i])
+# We build a single array for all the harmonics with the frequency as the
+# first column, followed by the envelope magnitudes.  Then, we can pull
+# out the entire description for a given note/velocity pair simply by
+# pulling out NUM_HARMONICS[harmonic_index] rows starting at
+# START_HARMONIC[harmonic_index]
 FREQ_MAGS = np.zeros((np.sum(NUM_HARMONICS), 1 + NUM_MAGS), dtype=np.int16)
 FREQ_MAGS[:, 0] = np.array(notes_params['harmonics_freq'], dtype=np.int16)
 FREQ_MAGS[:, 1:] = np.array(notes_params['harmonics_mags'], dtype=np.int16)
-# Add in a derived diff-times and start-harmonic fields
-last_time = 0
-DIFF_TIMES = []
-for sample_time in notes_params['sample_times_ms']:
-  DIFF_TIMES.append(sample_time - last_time)
-  last_time = sample_time
-START_HARMONIC = np.zeros(len(NUM_HARMONICS), dtype=np.int16)
-start_h = 0
-for i, n in enumerate(NUM_HARMONICS):
-    START_HARMONIC[i] = start_h
-    start_h += n
-#print(f'{NUM_HARMONICS=} {START_HARMONIC=}')
-
-
-def interp_harms_params(hp0, hp1, alpha):
-    """Return harm_param list that is alpha of the way to hp1 from hp0."""
-    # hp_ is [freq, mag0, mag1, ...]
-    num_harmonics = min(hp0.shape[0], hp1.shape[0])
-    # Assume the units are log-scale, so linear interpolation is good.
-    return hp0[:num_harmonics] + alpha * (hp1[:num_harmonics] - hp0[:num_harmonics])
-
-
-def cents_to_hz(cents):
-    """Convert freq cents back to Hzin hz to real-valued midi: 60 = C4 = 261.63, 69 = A4 = 440.0."""
-    return 440 * (2 ** ((cents - 6900) / 1200.0))
-  
-
-def db_to_lin(d):
-    # There's a -100 (-130 + 30) dB downshift.  Clip anything below 0.001 to zero, to avoid E-05 format etc.
-    return np.maximum(0, 10.0 ** ((d - 100) / 20.0) - 0.001)
-
-
-def harm_param_to_lin(bps):
-    """Convert harm_param from (cents, db0, db1, ...) to (hz, lin0, lin1, ...)."""
-    return np.concatenate([np.array([cents_to_hz(bps[0])]), db_to_lin(bps[1:])])
-
-
-def harms_params_to_lin(harms_params):
-    """Convert a list of harm_params from log to lin format."""
-    return [harm_param_to_lin(hp) for hp in harms_params]
 
 
 def harms_params_from_note_index_vel_index(note_index, vel_index):
-    """Reconstruct a (log-domain) harms_params list from the globals given note and vel indices."""
+    """Retrieve a (log-domain) harms_params list for a given note/vel index pair."""
+    # A harmonic is represented as a [freq_cents, mag1_db, mag2_db, .. mag20_db] row.
+    # A note is represented as NUM_HARMONICS (usually 20) rows.
     note_vel_index = note_index * len(VELOCITIES) + vel_index
     num_harmonics = NUM_HARMONICS[note_vel_index]
     start_harmonic = START_HARMONIC[note_vel_index]
     harms_params = FREQ_MAGS[start_harmonic : start_harmonic + num_harmonics, :]
-    #print(f'{note_index=} {vel_index=} {start_harmonic=} {harms_params=}')
     return harms_params
 
+def interp_harms_params(hp0, hp1, alpha):
+    """Return harm_param list that is alpha of the way to hp1 from hp0."""
+    # hp_ is [[freq_h1, mag1, mag2, ...], [freq_h2, mag1, mag2, ..], ...]
+    num_harmonics = min(hp0.shape[0], hp1.shape[0])
+    # Assume the units are log-scale, so linear interpolation is good.
+    return hp0[:num_harmonics] + alpha * (hp1[:num_harmonics] - hp0[:num_harmonics])
+
+def cents_to_hz(cents):
+    """Convert 'Midi cents' frequency to Hz.  6900 cents -> 440 Hz"""
+    return 440 * (2 ** ((cents - 6900) / 1200.0))
+  
+def db_to_lin(d):
+    """Convert the db-scale magnitudes to linear.  0 dB -> 0.00001, so 100 dB -> 1.0."""
+    # Clip anything below 0.001 to zero.
+    return np.maximum(0, 10.0 ** ((d - 100) / 20.0) - 0.001)
 
 def harms_params_for_note_vel(note, vel):
     """Convert midi note and velocity into an interpolated harms_params list of harmonic specifications."""
@@ -102,7 +92,8 @@ def harms_params_for_note_vel(note, vel):
     lower_strike = VELOCITIES[strike_index]
     upper_strike = VELOCITIES[strike_index + 1]
     strike_alpha = (vel - lower_strike) / (upper_strike - lower_strike)
-    #print(f'{lower_note=} {note_alpha=} {lower_strike=} {strike_alpha=}')
+    # We interpolate to describe a note at both strike indices,
+    # then interpolate those to get the strike.
     harms_params = interp_harms_params(
         interp_harms_params(
             harms_params_from_note_index_vel_index(note_index, strike_index),
@@ -118,29 +109,31 @@ def harms_params_for_note_vel(note, vel):
     )
     return harms_params
 
-
 def init_piano_voice(num_partials, base_osc=0, **kwargs):
   """One-time initialization of the unchanging parts of the partials voices."""
   amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
-  harm_nums = range(1, num_partials + 1)
-  for i in harm_nums:
+  for partial in range(1, num_partials + 1):
     bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
+    # We append a release segment to die away to silence over 200ms on note-off.
     bp_string += ',200,0'
-    amy_send(osc=base_osc + i, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
-
+    amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
 def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
-  """Set up a sequence of oscs to play a particular note and velocity."""
+  """Configure a set of PARTIALs oscs to play a particular note and velocity."""
   harms_params = harms_params_for_note_vel(note, vel)
   num_partials = len(harms_params)
   amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
   for i in range(num_partials):
-    f0 = cents_to_hz(harms_params[i, 0])
-    h_vals = harms_params[i, 1:]
+    f0_hz = cents_to_hz(harms_params[i, 0])
+    env_vals = db_to_lin(harms_params[i, 1:])
+    # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
+    bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
+    #env_vals = harms_params[i, 1:]
     # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
-    bp_string = '..,,' + ','.join(",%d" % val for val in h_vals)
+    #bp_string = '..,,' + ','.join(",%d" % val for val in env_vals)
+    # Add final release.
     bp_string += ',200,0'
-    amy_send(osc=base_osc + 1 + i, freq=f0, bp0=bp_string, **kwargs)
+    amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
 
 
 def piano_note_on(note=60, vel=1, **kwargs):
@@ -161,10 +154,10 @@ def piano_note_on(note=60, vel=1, **kwargs):
 #piano_note_on(60, 0)
 
 def amy_send(**kwargs):
-    amy.send(**kwargs)
-    #m = amy.message(**kwargs)
-    #print('amy.send(' + m + ')')
-    #amy.send_raw(m)
+    #amy.send(**kwargs)
+    m = amy.message(**kwargs)
+    print('amy.send(' + m + ')')
+    amy.send_raw(m)
 
 
 #amy.reset()
