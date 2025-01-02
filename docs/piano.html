@@ -268,7 +268,7 @@ piano_example(base_note=62,
       <p>While there are plenty of details that have not been exactly preserved (most notably the noisy &quot;clunk&quot; visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and &quot;acoustic&quot; than any of the previous syntheses.</p>
 
       <p>Because we are representing each note as an explicit set of harmonics, we can do things that would be very hard with, e.g., a sample.  By messing with the status of the PARTIALs oscs, we can listen to each partial individually:</p>
-        <div class="editor mb-4 preload-python">
+        <div class="editor mb-4">
 # Configure the default voice for C4.ff
 setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
 # Convert each PARTIAL osc into regular SINE oscs and play them in order.
@@ -279,7 +279,7 @@ for partial in range(1, 20):
         </div>
 
       <p>By restricting the number of partials the control osc things it is driving, we can listen to syntheses with different numbers of partials:
-        <div class="editor mb-4 preload-python">
+        <div class="editor mb-4">
 # Re-initialize the voice (after flipping the oscs into SINEs).
 init_piano_voice(20, time=0, voices='0')
 setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
@@ -292,7 +292,7 @@ amy.send(time=8500, voices='0', vel=0)
         </div>
 
       <p>We can also change the tuning of each harmonic away from what was provided by the analysis.  For instance, we can retune them to have different inharmonicities (see below for a discussion of piano inharmonicity):</p>
-        <div class="editor mb-4 preload-python">
+        <div class="editor mb-4">
 def retune_partials(f0=263.3, beta=0.0003, num_partials=20, **kwargs):
         for partial in range(1, num_partials + 1):
                 amy.send(osc=partial, freq=partial * f0 * np.sqrt(1 + beta * partial * partial), **kwargs)
@@ -315,7 +315,7 @@ amy.send(time=6400, voices='0', vel=0)
         </div>
 
       <p>We can also do interesting things with interpolation.  For instance, we can interpolate pitches more finely than the standard semitones:</p>
-      <div class="editor mb-4 preload-python">
+      <div class="editor mb-4">
 hps_c4 = harms_params_for_note_vel(60, 120)
 hps_c5 = harms_params_for_note_vel(72, 120)
 for quarter_tone in range(24):
@@ -327,7 +327,7 @@ amy.send(time=time + 500, voices='0', vel=0)
       </div>
 
       <p>By using interpolation factors outside the range (0, 1) we can even extrapolate the strike strength:<p>
-<div class="editor mb-4 preload-python">
+<div class="editor mb-4">
 hps_pp = harms_params_for_note_vel(60, 40)
 hps_ff = harms_params_for_note_vel(60, 120)
 for strike in range(5):
