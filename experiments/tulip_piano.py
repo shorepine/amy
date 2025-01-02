@@ -157,14 +157,14 @@ def amy_send(**kwargs):
     #amy.send_raw(m)
 
 
-#amy.reset()
-#time.sleep(0.1)  # to let reset happen.
 
-#amy.send(store_patch='1024,v0w10Zv%dw%dZ')
-#amy.send(voices='0,1,2,3', load_patch=1024)
+amy.reset()
+time.sleep(0.1)  # to let reset happen.
+amy.send(store_patch='1024,v0w10Zv%dw%dZ')
+amy.send(voices='0,1,2,3', load_patch=1024)
 num_partials = NUM_HARMONICS[0]
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
-
+print("Loaded dpwe piano on patch #1024, AMY voices 0,1,2,3")
 
 if have_midi:
     synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
@@ -193,3 +193,5 @@ if have_midi:
         time.sleep(0.05)  # Let the amy queue catch up.
 
     midi.config.add_synth_object(channel=1, synth_object=synth_obj)
+    print("Added Tulip synth object to respond to MIDI channel 1")
+    
