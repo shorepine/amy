@@ -60,16 +60,16 @@
 def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None):
     amy.send(time=0, volume=volume)
     init_command()
-    send_command(time=50, voices="0", note=base_note, vel=0.05)
-    send_command(time=435, voices="0", note=base_note, vel=0)
-    send_command(time=450, voices="0", note=base_note, vel=0.63)
-    send_command(time=835, voices="0", note=base_note, vel=0)
-    send_command(time=850, voices="0", note=base_note, vel=1.0)
-    send_command(time=1485, voices="0", note=base_note, vel=0)
-    send_command(time=1500, voices="1", note=base_note - 24, vel=0.6)
-    send_command(time=2100, voices="2", note=base_note + 24, vel=1.0)
-    send_command(time=3000, voices="1", note=base_note - 24, vel=0)
-    send_command(time=3000, voices="2", note=base_note + 24, vel=0)
+    send_command(time=50, voices='0', note=base_note, vel=0.05)
+    send_command(time=435, voices='0', note=base_note, vel=0)
+    send_command(time=450, voices='0', note=base_note, vel=0.63)
+    send_command(time=835, voices='0', note=base_note, vel=0)
+    send_command(time=850, voices='0', note=base_note, vel=1.0)
+    send_command(time=1485, voices='0', note=base_note, vel=0)
+    send_command(time=1500, voices='1', note=base_note - 24, vel=0.6)
+    send_command(time=2100, voices='2', note=base_note + 24, vel=1.0)
+    send_command(time=3000, voices='1', note=base_note - 24, vel=0)
+    send_command(time=3000, voices='2', note=base_note + 24, vel=0)
       </div>
       <P>The Roland Juno-60 included a preset called Piano, which we can now hear with
       <div class="editor mb-4">
@@ -261,8 +261,60 @@ piano_example(base_note=62,
       <p>This recovers both the spectral complexity of the original piano notes, <em>and</em> the variation of the spectrum both across the keyboard range and across strike intensities.  The spectrogram of the original recordings is repeated below for comparison.</p>
       <p><img src="uiowa.png" alt="uiowa" class="img-fluid"></p>
       <p>While there are plenty of details that have not been exactly preserved (most notably the noisy &quot;clunk&quot; visible around each onset of the recordings, but also the cutoff at 20 harmonics, which loses a lot of high-frequency for the low note), this synthesis just feels much, much more realistic and &quot;acoustic&quot; than any of the previous syntheses.</p>
+
+      <p>Because we are representing each note as an explicit set of harmonics, we can do things that would be very hard with, e.g., a sample.  By messing with the status of the PARTIALs oscs, we can listen to each partial individually:</p>
+        <div class="editor mb-4 preload-python">
+# Configure the default voice for C4.ff
+setup_piano_voice_for_note_vel(64, 120, time=0, voices='0')
+# Convert each PARTIAL osc into regular SINE oscs and play them in order.
+for partial in range(1, 20):
+        time = partial * 400
+        amy.send(time=time, voices='0', osc=partial, wave=amy.SINE, note=60, vel=1)
+        amy.send(time=time + 390, voices='0', osc=partial, vel=0)
+        </div>
+
+      <p>By restricting the number of partials the control osc things it is driving, we can listen to syntheses with different numbers of partials:
+        <div class="editor mb-4 preload-python">
+# Re-initialize the voice (after flipping the oscs into SINEs).
+init_piano_voice(20, time=0, voices='0')
+setup_piano_voice_for_note_vel(64, 120, time=0, voices='0')
+# Add partials one by one
+for num_partials in range(1, 20):
+        time = num_partials * 400
+        amy.send(time=time, voices='0', wave=amy.BYO_PARTIALS, num_partials=num_partials)
+        amy.send(time=time + 15, voices='0', note=60, vel=1)
+amy.send(time=8500, voices='0', vel=0)
+        </div>
+
+      <p>We can also change the tuning of each harmonic away from what was provided by the analysis.  For instance, we can retune them to have different inharmonicities (see below for a discussion of piano inharmonicity):</p>
+        <div class="editor mb-4 preload-python">
+def retune_partials(f0=263.3, beta=0.0003, num_partials=20, **kwargs):
+        for partial in range(1, num_partials + 1):
+                amy.send(osc=partial, freq=partial * f0 * np.sqrt(1 + beta * partial * partial), **kwargs)
+
+# Try it for a low note
+setup_piano_voice_for_note_vel(32, 120, voices='0', time=0)
+# Tuning from analysis
+amy.send(time=0, voices='0', note=60, vel=1)
+amy.send(time=2000, voices='0', vel=0)
+
+# Unstretched tuning
+retune_partials(f0=cents_to_hz(3200), beta=0, voices='0', time=2200)
+amy.send(time=2210, voices='0', note=60, vel=1)
+amy.send(time=4200, voices='0', vel=0)
+
+# Parametric stretching tuning, exaggerated
+retune_partials(f0=cents_to_hz(3200), beta=0.0008, voices='0', time=4400)
+amy.send(time=4410, voices='0', note=60, vel=1)
+amy.send(time=6400, voices='0', vel=0)
+        </div>
+
+
+
+      <p>If you&#39;re curious about exactly how we extracted the harmonic frequencies and envelopes, the rest of this page provides an overview of the process implemented in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.
     </div>
-  
+
+
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
       <h1 id="extracting-harmonic-envelopes">Extracting harmonic envelopes</h1>
       <p>How exactly to we capture the envelopes for each harmonic in our additive model?  In principle, this is simply a matter of dissecting a spectrogram of the individual note (like the images above) to measure the intensity of each individual horizontal line.  In practice, however, I wanted something with finer resolution in time and frequency to obtain very accurate parameters.  I used <a href="https://en.wikipedia.org/wiki/Heterodyne">heterodyne analysis</a>, which I&#39;ll now explain.</p>
@@ -326,6 +378,7 @@ piano_example(base_note=62,
       <P>Although a bunch of detail has been lost, it still provides a suitably complex character to the resyntheses.
 
       <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano-params.json">piano-params.json</a> and read by <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py">tulip_piano.py</a>.
+
 
 
   <hr/>
