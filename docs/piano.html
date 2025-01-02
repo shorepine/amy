@@ -26,7 +26,7 @@
     <div class="container-md"> 
       <div class="row py-3 my-5 px-1 mx-1">
       <div class="alert alert-primary" role="alert">
-        This page is <strong>running live code</strong> in Python. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">◼︎</button> button will reset the synthesizer, if it has a stuck note. </div>
+        This page is <strong>running live Python code</strong> locally in your browser. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">Reset</button> button will reset the synthesizer, if it has a stuck note. </div>
       </div>
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
         <h1 id="the-amy-additive-piano-voice">The <A HREF="https://github.com/shorepine/amy">AMY</A> Additive Piano Voice</h1>
@@ -192,27 +192,27 @@ def harms_params_for_note_vel(note, vel):
       We're using the BYO_PARTIALS type in AMY, which allows you set up your own partial synthesis breakpoints using envelopes.</p>
       <div class="editor mb-4 preload-python">
 def init_piano_voice(num_partials, base_osc=0, **kwargs):
-  """One-time initialization of the unchanging parts of the partials voices."""
-  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
-  for partial in range(1, num_partials + 1):
-    bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
-    # We append a release segment to die away to silence over 200ms on note-off.
-    bp_string += ',200,0'
-    amy.send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
+    """One-time initialization of the unchanging parts of the partials voices."""
+    amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
+    for partial in range(1, num_partials + 1):
+        bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
+        # We append a release segment to die away to silence over 200ms on note-off.
+        bp_string += ',200,0'
+        amy.send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
 def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
-  """Configure a set of PARTIALs oscs to play a particular note and velocity."""
-  harms_params = harms_params_for_note_vel(note, vel)
-  num_partials = len(harms_params)
-  amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
-  for i in range(num_partials):
-    f0_hz = cents_to_hz(harms_params[i, 0])
-    env_vals = db_to_lin(harms_params[i, 1:])
-    # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
-    bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
-    # Add final release.
-    bp_string += ',200,0'
-    amy.send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
+    """Configure a set of PARTIALs oscs to play a particular note and velocity."""
+    harms_params = harms_params_for_note_vel(note, vel)
+    num_partials = len(harms_params)
+    amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
+    for i in range(num_partials):
+        f0_hz = cents_to_hz(harms_params[i, 0])
+        env_vals = db_to_lin(harms_params[i, 1:])
+        # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
+        bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
+        # Add final release.
+        bp_string += ',200,0'
+        amy.send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
       </div>
 
       <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>

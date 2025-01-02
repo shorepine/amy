@@ -93,7 +93,7 @@ function create_editor(element, index) {
     </section>
     <div class="align-self-center my-3"> 
       <button type="button" class="btn btn-sm btn-success" onclick="runCodeBlock(${index})">►</button> 
-      <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">◼︎</button> 
+      <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">Reset</button> 
     </div>
   </div>`;
 
