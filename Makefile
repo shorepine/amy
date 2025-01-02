@@ -87,6 +87,9 @@ timing: amy-module
 docs/amy.js: $(TARGET)
 	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
+docs/amy-audioin.js: $(TARGET)
+	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -DAMY_HAS_AUDIO_IN -O3 -o $@
+
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
