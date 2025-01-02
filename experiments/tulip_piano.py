@@ -118,9 +118,8 @@ def init_piano_voice(num_partials, base_osc=0, **kwargs):
     bp_string += ',200,0'
     amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
-def setup_piano_voice_for_note_vel(note, vel, base_osc=0, **kwargs):
+def setup_piano_voice(harms_params, base_osc=0, **kwargs):
   """Configure a set of PARTIALs oscs to play a particular note and velocity."""
-  harms_params = harms_params_for_note_vel(note, vel)
   num_partials = len(harms_params)
   amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
   for i in range(num_partials):
@@ -141,9 +140,7 @@ def piano_note_on(note=60, vel=1, **kwargs):
         # Note off.
         amy.send(vel=0, **kwargs)
     else:
-        setup_piano_voice_for_note_vel(
-            note, round(vel * 127), **kwargs
-        )
+        setup_piano_voice(harms_params_for_note_vel(note, round(vel * 127)), **kwargs)
         # We already configured the freuquencies and magnitudes in setup, so
         # the note on is completely neutral.
         amy_send(note=60, vel=1, **kwargs)
