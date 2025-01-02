@@ -1547,10 +1547,6 @@ int16_t * amy_fill_buffer() {
     return block;
 }
 
-uint32_t ms_to_samples(uint32_t ms) {
-    return (uint32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
-}
-
 float atoff(const char *s) {
     // Returns float value corresponding to parseable prefix of s.
     // Unlike atof(), it does not recognize scientific format ('e' or 'E')
@@ -1666,12 +1662,28 @@ void parse_algorithm_source(struct synthinfo * t, char *message) {
     }
 }
 
+uint32_t ms_to_samples(uint32_t ms) {
+    uint32_t samps = 0;
+    if (AMY_IS_UNSET(ms)) return AMY_UNSET_VALUE(samps);
+    samps = (uint32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
+    return samps;
+}
+
+float int_db_to_float_lin(uint32_t db) {
+    float lin = 0;
+    if (AMY_IS_UNSET(db)) return AMY_UNSET_VALUE(lin);
+    lin = powf(10.0f, ((((float)db) - 100.0f) / 20.0f)) - 0.001f;
+    if (lin < 0) return 0;
+    return lin;
+}
+
 // helper to parse the special bp string
-int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
+int parse_breakpoint_core_float_lin(struct synthinfo * e, char* message, uint8_t which_bpset) {
+    // This is the classic version, int_time_delta_ms,float_lin_val,...
     float vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
     int num_vals = parse_list_float(message, vals, 2 * MAX_BREAKPOINTS,
-                                            AMY_UNSET_VALUE(vals[0]));
+                                    AMY_UNSET_VALUE(vals[0]));
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
         if ((i % 2) == 0)
@@ -1682,7 +1694,35 @@ int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
         else
             e->breakpoint_values[which_bpset][i >> 1] = vals[i];
     }
-    // But values that are not specified at the end of the list indicate the total length of the BP set.
+    return num_vals;
+}
+
+int parse_breakpoint_core_int_db(struct synthinfo * e, char* message, uint8_t which_bpset) {
+    // This is for the special faster additive-synth version, int_time_delta_ms,uint_db_val,...
+    uint32_t vals[2 * MAX_BREAKPOINTS];
+    // Read all the values as floats.
+    int num_vals = parse_list_uint32_t(message, vals, 2 * MAX_BREAKPOINTS,
+                                       AMY_UNSET_VALUE(vals[0]));
+    // Distribute out to times and vals, casting int db values to linear floats.
+    // Both ms_to_samples and int_db_to_float_lin pass through AMY_UNSET suitably translated.
+    for (int i = 0; i < num_vals; ++i) {
+        if ((i % 2) == 0)
+            e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples(vals[i]);
+        else
+            e->breakpoint_values[which_bpset][i >> 1] = int_db_to_float_lin(vals[i]);
+    }
+    return num_vals;
+}
+
+int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
+    int num_vals;
+    // Test for special case BP string that begins ".." meaning it's unsigned integer dB values.
+    if (message[0] == '.' && message[1] == '.') {
+        num_vals = parse_breakpoint_core_int_db(e, message + 2, which_bpset);
+    } else {
+        num_vals = parse_breakpoint_core_float_lin(e, message, which_bpset);
+    }
+    // Values that are not specified at the end of the list indicate the total length of the BP set.
     for (int i = num_vals; i < 2 * MAX_BREAKPOINTS; ++i) {
         if ((i % 2) == 0)
             AMY_UNSET(e->breakpoint_times[which_bpset][i >> 1]);

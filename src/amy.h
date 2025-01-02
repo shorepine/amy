@@ -34,7 +34,7 @@ typedef struct {
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
-#define MAX_BREAKPOINTS 16
+#define MAX_BREAKPOINTS 24
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define AMY_BYTES_PER_SAMPLE 2
@@ -68,8 +68,8 @@ enum coefs{
     COEF_BEND = 6,
 };
 
-#define MAX_MESSAGE_LEN 255
-#define MAX_PARAM_LEN 80
+#define MAX_MESSAGE_LEN 1024
+#define MAX_PARAM_LEN 256
 // synth[].filter_type values
 #define FILTER_NONE 0
 #define FILTER_LPF 1
