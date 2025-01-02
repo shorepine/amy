@@ -171,7 +171,6 @@ num_partials = NUM_HARMONICS[0]
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
 print("Loaded dpwe piano on patch #1024, AMY voices 0,1,2,3")
 
-
 if have_midi:
     synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
     #voices = '0,1,2,3'

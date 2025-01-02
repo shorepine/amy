@@ -224,11 +224,10 @@ def setup_piano_voice(harms_params, base_osc=0, **kwargs):
 
       <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
       <div class="editor mb-4 preload-python">
-# The lowest note provides an upper-bound on the number of partials we need to allocate.
-num_partials = NUM_HARMONICS[0]
-patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
+patch_string = 'v0w10Zv%dw%dZ' % (NUM_HARMONICS[0] + 1, amy.PARTIAL)
 
-def init_piano_voices():
+# The lowest note provides an upper-bound on the number of partials we need to allocate.
+def init_piano_voices(num_partials=NUM_HARMONICS[0]):
     amy.send(store_patch='1024,' + patch_string)
     amy.send(voices='0,1,2', load_patch=1024)
     init_piano_voice(num_partials, voices='0,1,2')
@@ -270,6 +269,7 @@ piano_example(base_note=62,
       <p>Because we are representing each note as an explicit set of harmonics, we can do things that would be very hard with, e.g., a sample.  By messing with the status of the PARTIALs oscs, we can listen to each partial individually:</p>
         <div class="editor mb-4">
 # Configure the default voice for C4.ff
+init_piano_voices()
 setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
 # Convert each PARTIAL osc into regular SINE oscs and play them in order.
 for partial in range(1, 20):
@@ -281,7 +281,7 @@ for partial in range(1, 20):
       <p>By restricting the number of partials the control osc things it is driving, we can listen to syntheses with different numbers of partials:
         <div class="editor mb-4">
 # Re-initialize the voice (after flipping the oscs into SINEs).
-init_piano_voice(20, time=0, voices='0')
+init_piano_voices()
 setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
 # Add partials one by one
 for num_partials in range(1, 20):
@@ -297,6 +297,7 @@ def retune_partials(f0=263.3, beta=0.0003, num_partials=20, **kwargs):
         for partial in range(1, num_partials + 1):
                 amy.send(osc=partial, freq=partial * f0 * np.sqrt(1 + beta * partial * partial), **kwargs)
 
+init_piano_voices()
 # Try it for a low note
 setup_piano_voice(harms_params_for_note_vel(32, 120), voices='0', time=0)
 # Tuning from analysis
@@ -316,6 +317,7 @@ amy.send(time=6400, voices='0', vel=0)
 
       <p>We can also do interesting things with interpolation.  For instance, we can interpolate pitches more finely than the standard semitones:</p>
       <div class="editor mb-4">
+init_piano_voices()
 hps_c4 = harms_params_for_note_vel(60, 120)
 hps_c5 = harms_params_for_note_vel(72, 120)
 for quarter_tone in range(24):
@@ -328,6 +330,7 @@ amy.send(time=time + 500, voices='0', vel=0)
 
       <p>By using interpolation factors outside the range (0, 1) we can even extrapolate the strike strength:<p>
 <div class="editor mb-4">
+init_piano_voices()
 hps_pp = harms_params_for_note_vel(60, 40)
 hps_ff = harms_params_for_note_vel(60, 120)
 for strike in range(5):
@@ -405,7 +408,9 @@ amy.send(time=time + 500, voices='0', vel=0)
 
       <P>Although a bunch of detail has been lost, it still provides a suitably complex character to the resyntheses.
 
-      <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano-params.json">piano-params.json</a> and read by <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py">tulip_piano.py</a>.
+      <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano-params.json">piano-params.json</a> and read by <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py">tulip_piano.py</a>. </P>
+
+      <P>If you have a <a href="https://tulip.computer/">Tulip</a> or want to try <A href="https://tulip.computer/run">Tulip on the web</a>, simply type <code>import tulip_piano</code> to try out this new piano voice. If you have a MIDI device connected, it'll play the piano live!</P>
 
 
 
@@ -418,7 +423,7 @@ amy.send(time=time + 500, voices='0', vel=0)
       <div class="col-4 py-vh-3" data-aos="fade-up">
             <a href="https://tulip.computer/run/"><img src="tulip.svg" width=42 height=42></a>
             <a href="https://tulip.computer/run/"><h3 class="h5 my-2">Want more? Try Tulip</h3></a>
-            <p>Run more AMY experiments in a REPL with Tulip for the Web</p>
+            <p>Run more AMY experiments in a REPL with Tulip for the Web. Try to <code>import tulip_piano</code> there!</p>
       </div>
 
       <div class="col-4 py-vh-3" data-aos="fade-up">
