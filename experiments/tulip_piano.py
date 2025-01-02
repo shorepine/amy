@@ -53,7 +53,6 @@ FREQ_MAGS = np.zeros((np.sum(NUM_HARMONICS), 1 + NUM_MAGS), dtype=np.int16)
 FREQ_MAGS[:, 0] = np.array(notes_params['harmonics_freq'], dtype=np.int16)
 FREQ_MAGS[:, 1:] = np.array(notes_params['harmonics_mags'], dtype=np.int16)
 
-
 def harms_params_from_note_index_vel_index(note_index, vel_index):
     """Retrieve a (log-domain) harms_params list for a given note/vel index pair."""
     # A harmonic is represented as a [freq_cents, mag1_db, mag2_db, .. mag20_db] row.
@@ -110,51 +109,57 @@ def harms_params_for_note_vel(note, vel):
     return harms_params
 
 def init_piano_voice(num_partials, base_osc=0, **kwargs):
-  """One-time initialization of the unchanging parts of the partials voices."""
-  amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
-  for partial in range(1, num_partials + 1):
-    bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
-    # We append a release segment to die away to silence over 200ms on note-off.
-    bp_string += ',200,0'
-    amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
+    """One-time initialization of the unchanging parts of the partials voices."""
+    amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
+    for partial in range(1, num_partials + 1):
+        bp_string = '0,0,' + ','.join("%d,0" % t for t in DIFF_TIMES)
+        # We append a release segment to die away to silence over 200ms on note-off.
+        bp_string += ',200,0'
+        amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
-def setup_piano_voice(harms_params, base_osc=0, **kwargs):
-  """Configure a set of PARTIALs oscs to play a particular note and velocity."""
-  num_partials = len(harms_params)
-  amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, **kwargs)
-  for i in range(num_partials):
-    f0_hz = cents_to_hz(harms_params[i, 0])
-    #env_vals = db_to_lin(harms_params[i, 1:])
-    env_vals = harms_params[i, 1:]
-    # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
-    #bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
-    # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
-    bp_string = '..,,' + ','.join(",%d" % val for val in env_vals)
-    # Add final release.
-    bp_string += ',200,0'
-    amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
-
+def setup_piano_voice(harms_params, base_osc=0, voices=None, time=None, sequence=None):
+    """Configure a set of PARTIALs oscs to play a particular note and velocity."""
+    num_partials = len(harms_params)
+    amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials,
+           voices=voices, time=time, sequence=sequence)
+    if time is not None:
+        base_cmd = 't' + str(time)
+    else:
+        base_cmd = ''
+    if voices is not None:
+        base_cmd += 'r' + str(voices)
+    if sequence is not None:
+        base_cmd += 'H' + str(sequence)
+    for i in range(num_partials):
+        # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
+        #env_vals = db_to_lin(harms_params[i, 1:])
+        #bp_string = ',,' + ','.join(",%.3f" % val for val in env_vals)
+        # bp_strings beginning with ".." are in special integer-dB format for fast transcoding.
+        env_vals = harms_params[i, 1:]
+        bp_string = '..,,' + ','.join(",%d" % val for val in env_vals)
+        # Add final release.
+        bp_string += ',200,0'
+        f0_hz = cents_to_hz(harms_params[i, 0])
+        #amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, voices=voices, time=time)
+        # Special-case construction of the Wire Protocol message to save time
+        amy.send_raw(
+            base_cmd + 'v' + str(base_osc + i + 1) + ('f%.1f' % f0_hz) + 'A' + bp_string + 'Z'
+        )
 
 def piano_note_on(note=60, vel=1, **kwargs):
     if vel == 0:
         # Note off.
         amy.send(vel=0, **kwargs)
     else:
-        setup_piano_voice(harms_params_for_note_vel(note, round(vel * 127)), **kwargs)
+        hps = harms_params_for_note_vel(note, round(vel * 127))
+        setup_piano_voice(hps, **kwargs)
         # We already configured the freuquencies and magnitudes in setup, so
         # the note on is completely neutral.
         amy_send(note=60, vel=1, **kwargs)
 
 
-#piano_note_on(60, 1)
-#time.sleep(1.0)
-#piano_note_on(60, 0)
-
 def amy_send(**kwargs):
     amy.send(**kwargs)
-    #m = amy.message(**kwargs)
-    #print('amy.send(' + m + ')')
-    #amy.send_raw(m)
 
 
 
@@ -174,7 +179,6 @@ if have_midi:
     # We have to intercept the note-on events of the Synth voice objects.
     class PianoVoiceObject:
         """Substitute for midi.VoiceObject for Piano voices."""
-
         def __init__(self, amy_voice):
             self.amy_voice = amy_voice
 
@@ -194,4 +198,3 @@ if have_midi:
 
     midi.config.add_synth_object(channel=1, synth_object=synth_obj)
     print("Added Tulip synth object to respond to MIDI channel 1")
-    
