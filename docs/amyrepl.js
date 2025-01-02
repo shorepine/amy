@@ -5,7 +5,6 @@ var amy_reset_sysclock = null
 var amy_module = null;
 var everything_started = false;
 var mp = null;
-var term = null;
 var editors = [];
 var run_at_starts = [];
 
@@ -27,12 +26,6 @@ amyModule().then(async function(am) {
   amy_start(1,1,1,1);
 });
 
-async function start_term_and_repl() {
-  // Clear the terminal
-  await term.clear();
-  // Tell MP to start serving a REPL
-  await mp.replInit();
-}
 
 async function start_python() {
   // Let micropython call an exported AMY function
@@ -76,11 +69,21 @@ async function resetAMY() {
   }
 }      
 
+async function print_error(text) {
+    document.getElementById("python-output-text").innerHTML = "<pre>"+text+"</pre>";
+    let myModal = new bootstrap.Modal(document.getElementById('myModal'), {backdrop:false});
+    myModal.show();            
+};
+
 async function runCodeBlock(index) {
   if(!everything_started) await start_python_and_audio();
   var py = editors[index].getValue();
   amy_reset_sysclock();
-  await mp.runPythonAsync(py);
+  try {
+    mp.runPythonAsync(py);
+  } catch (e) {
+    await print_error(e.message);
+  }
 }
 
 // Create editor block for notebook mode.
@@ -122,6 +125,7 @@ function create_editor(element, index) {
   run_at_starts.push(run_at_start);
   editors.push(editor);
 }
+
 
 
 
