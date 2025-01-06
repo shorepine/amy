@@ -56,38 +56,38 @@ float _env_lin_of_db(float db) {
 }
 
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
-    if (synth[o].wave == PARTIAL) {  // Only if user has marked this osc as a PARTIAL.
-        synth[o].patch = -1;  // Flag that this is an envelope-based partial
-        // Setup the specified frequency.
-        synth[o].logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
-        // Setup envelope.
-        synth[o].breakpoint_times[0][0] = 0;
-        synth[o].breakpoint_values[0][0] = 0;
-        int last_time = 0;
-        for (int bp = 0; bp < partials_voice->num_sample_times_ms; ++bp) {
-            synth[o].breakpoint_times[0][bp + 1] = (partials_voice->sample_times_ms[bp] - last_time) * AMY_SAMPLE_RATE / 1000;
-            synth[o].breakpoint_values[0][bp + 1] = _env_lin_of_db(harm_param[bp + 1]);
-            last_time = partials_voice->sample_times_ms[bp];
-        }
-        // Final release
-        synth[o].breakpoint_times[0][partials_voice->num_sample_times_ms + 1] = 200 * AMY_SAMPLE_RATE / 1000;
-        synth[o].breakpoint_values[0][partials_voice->num_sample_times_ms + 1] = 0;
-        // Decouple osc freq and amp from note and amp.
-        synth[o].logfreq_coefs[COEF_NOTE] = 0;
-        synth[o].amp_coefs[COEF_VEL] = 0;        
-        // Other osc params.
-        synth[o].status = SYNTH_IS_ALGO_SOURCE;
-        synth[o].note_on_clock = total_samples;
-        AMY_UNSET(synth[o].note_off_clock);
-        partial_note_on(o);
+    // We coerce this voice into being a partial, regardless of user wishes.
+    synth[o].wave = PARTIAL;
+    synth[o].patch = -1;  // Flag that this is an envelope-based partial
+    // Setup the specified frequency.
+    synth[o].logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
+    // Setup envelope.
+    synth[o].breakpoint_times[0][0] = 0;
+    synth[o].breakpoint_values[0][0] = 0;
+    int last_time = 0;
+    for (int bp = 0; bp < partials_voice->num_sample_times_ms; ++bp) {
+        synth[o].breakpoint_times[0][bp + 1] = (partials_voice->sample_times_ms[bp] - last_time) * AMY_SAMPLE_RATE / 1000;
+        synth[o].breakpoint_values[0][bp + 1] = _env_lin_of_db(harm_param[bp + 1]);
+        last_time = partials_voice->sample_times_ms[bp];
     }
+    // Final release
+    synth[o].breakpoint_times[0][partials_voice->num_sample_times_ms + 1] = 200 * AMY_SAMPLE_RATE / 1000;
+    synth[o].breakpoint_values[0][partials_voice->num_sample_times_ms + 1] = 0;
+    // Decouple osc freq and amp from note and amp.
+    synth[o].logfreq_coefs[COEF_NOTE] = 0;
+    synth[o].amp_coefs[COEF_VEL] = 0;
+    // Other osc params.
+    synth[o].status = SYNTH_IS_ALGO_SOURCE;
+    synth[o].note_on_clock = total_samples;
+    AMY_UNSET(synth[o].note_off_clock);
+    partial_note_on(o);
 }
 
 void interp_partials_note_on(uint16_t osc) {
     // Choose the interp_partials patch.
     const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
-    uint8_t midi_note = synth[osc].midi_note;
-    uint8_t midi_vel = (int)roundf(synth[osc].velocity * 127.f);
+    float midi_note = synth[osc].midi_note;
+    float midi_vel = (int)roundf(synth[osc].velocity * 127.f);
     // Clip
     if (midi_vel < partials_voice->velocities[0]) midi_vel = partials_voice->velocities[0];
     if (midi_vel > partials_voice->velocities[partials_voice->num_velocities - 1]) midi_vel = partials_voice->velocities[partials_voice->num_velocities - 1];
