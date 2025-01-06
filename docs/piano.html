@@ -19,6 +19,20 @@
     <script type="text/javascript" src="amyrepl.js"></script>
     <link rel="stylesheet" href="amyrepl.css"/>
     <title>The AMY Additive Piano Voice</title>
+    <meta property="og:image" content="https://shorepine.github.io/amy/interpolated.png">
+    <meta property="og:title" content="The AMY Additive Piano Voice">
+    <meta property="og:description" content="Synthesizing a piano with partials.">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicon.png">
+    <meta name="author" content="DAn Ellis">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@shorepinesound">
+    <meta name="twitter:creator" content="@shorepinesound">
+    <meta name="twitter:title" content="The AMY Additive Piano Voice">
+    <meta name="twitter:description" content="Synthesizing a piano with partials.">
+    <meta name="twitter:image" content="https://shorepine.github.io/amy/interpolated.png">
   </head>
 
 
@@ -34,13 +48,13 @@
     <div class="container-md"> 
       <div class="row py-3 my-5 px-1 mx-1">
       <div class="alert alert-primary" role="alert">
-        This page is <strong>running live Python code</strong> locally in your browser. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">Reset</button> button will reset the synthesizer, if it has a stuck note. </div>
+        This page is <strong>running live Python code</strong> locally in your browser. Feel free to edit and run your own versions of the code in any text box. The  <button type="button" class="btn btn-sm btn-success">►</button> button will execute the code (and play AMY synthesis, if you ask it to) and the  <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">Reset</button> button will reset the synthesizer, if it has a stuck note. <A HREF="https://tulip.computer/run/">You can also try AMY in a more full featured REPL with Tulip Web.</a></div>
       </div>
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
         <h1 id="the-amy-additive-piano-voice">The <A HREF="https://github.com/shorepine/amy">AMY</A> Additive Piano Voice</h1>
         <p>The piano is a versatile and mature instrument.  One reason for its popularity is its wide timbral range; in fact, its main innovation was the ability to play notes both loud and soft, hence &quot;<a href="https://en.wikipedia.org/wiki/Piano#History">Pianoforte</a>&quot; (its full original name).</p>
         
-        <p>To make AMY into a truly general-purpose music synthesizer, we wanted to add a good piano voice.  But it&#39;s not simple to synthesize a good piano voice.  This page explains some of what makes piano synthesis challenging, and how we addressed it.  Our approach was to use <a href="https://en.wikipedia.org/wiki/Additive_synthesis">additive synthesis</a>, which nicely fills out the demonstration of the primary synthesis techniques implemented in AMY, after subtractive (the Juno-6 patches) and FM (the DX7 patches).</p>
+        <p>To make <A HREF="https://github.com/shorepine/amy">AMY</A> into a truly general-purpose music synthesizer, we wanted to add a good piano voice.  But it&#39;s not simple to synthesize a good piano voice.  This page explains some of what makes piano synthesis challenging, and how we addressed it.  Our approach was to use <a href="https://en.wikipedia.org/wiki/Additive_synthesis">additive synthesis</a>, which nicely fills out the demonstration of the primary synthesis techniques implemented in AMY, after subtractive (the Juno-6 patches) and FM (the DX7 patches).</p>
       </div>
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
 
@@ -343,6 +357,9 @@ amy.send(time=time + 500, voices='0', vel=0)
       </div>
 
       <p>If you&#39;re curious about exactly how we extracted the harmonic frequencies and envelopes, the rest of this page provides an overview of the process implemented in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.
+
+
+      <P>If you have a <a href="https://tulip.computer/">Tulip</a> or want to try <A href="https://tulip.computer/run">Tulip on the web</a>, you can play this piano synthesis live with a MIDI device. Use the Voices app to switch to the <code>dpwe piano (256)</code> patch, or type <code>midi.config.add_synth(channel=1, patch_number=256, num_voices=4)</code>.</P>
     </div>
 
 
