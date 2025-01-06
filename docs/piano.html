@@ -410,7 +410,7 @@ amy.send(time=time + 500, voices='0', vel=0)
 
       <P>These 20 envelope samples, along with the measured center frequency, are then the description for each of the up-to 20 harmonics describing each of the (7 octaves x 3 chroma x 3 strike strengths) notes, or about 1200 envelopes total.  This is the data stored in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano-params.json">piano-params.json</a> and read by <a href="https://github.com/shorepine/amy/blob/main/experiments/tulip_piano.py">tulip_piano.py</a>. </P>
 
-      <P>If you have a <a href="https://tulip.computer/">Tulip</a> or want to try <A href="https://tulip.computer/run">Tulip on the web</a>, simply type <code>import tulip_piano</code> to try out this new piano voice. If you have a MIDI device connected, it'll play the piano live!</P>
+      <P>If you have a <a href="https://tulip.computer/">Tulip</a> or want to try <A href="https://tulip.computer/run">Tulip on the web</a>, you can play this piano synthesis live with a MIDI device. Use the Voices app to switch to the <code>dpwe piano (256)</code> patch, or type <code>midi.config.add_synth(channel=1, patch_number=256, num_voices=4)</code>.</P>
 
 
 
@@ -423,7 +423,7 @@ amy.send(time=time + 500, voices='0', vel=0)
       <div class="col-4 py-vh-3" data-aos="fade-up">
             <a href="https://tulip.computer/run/"><img src="tulip.svg" width=42 height=42></a>
             <a href="https://tulip.computer/run/"><h3 class="h5 my-2">Want more? Try Tulip</h3></a>
-            <p>Run more AMY experiments in a REPL with Tulip for the Web. Try to <code>import tulip_piano</code> there!</p>
+            <p>Run more AMY experiments in a REPL with Tulip for the Web. Try the piano there!</p>
       </div>
 
       <div class="col-4 py-vh-3" data-aos="fade-up">
