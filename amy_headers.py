@@ -351,6 +351,7 @@ def make_piano_patch():
     import amy
     # This just allocates the 20 oscs needed for a INTERP_PARTIALS patch
     # dpwe wants to add a `num_suboscs` field to fix this behavior soon
+    amy.send(chorus=0) # Piano sounds weird with chorus on
     amy.send(osc=0, wave=amy.INTERP_PARTIALS, patch=0)
     amy.send(osc=20, wave=amy.PARTIAL)
     return 21
