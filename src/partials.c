@@ -96,6 +96,10 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     if (synth[osc].patch < 0) {
         // No preset partials map, we are in "build-your-own".  The max number of oscs is taken from algo_source[0].
         num_oscs = -synth[osc].patch;
+    } else if (synth[osc].wave == INTERP_PARTIALS) {
+        //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
+        //num_oscs = partials_voice->num_harmonics[0];   // Assume first patch has the max #harmonics.
+        num_oscs = 20; ///////////////////  FOR NOW!!!
     } else {
         // Set up from partials map.
         partial_breakpoint_map_t patch = partial_breakpoint_map[synth[osc].patch % PARTIALS_PATCHES];

@@ -346,38 +346,14 @@ def make_clipping_lut(filename):
         f.write("#endif\n")
     print("wrote", filename)
 
-# Generate the dpwe piano patch
+
 def make_piano_patch():
-    import json, amy
-    params_file = 'experiments/Piano.ff.D5.json'
-
-    # Read in the params file.
-    with open(params_file, 'r') as f:
-        bp_params = json.load(f)
-
-    base_osc=0
-    base_freq=261.63
-    stretch_coef=0.038
-
-    kwargs = {}
-    num_partials = len(bp_params)
-    amy.send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, amp={'eg0': 0}, **kwargs)
-
-    harm_nums = range(1, num_partials + 1)
-
-    # Quadratic partial stretching
-    #harm_freqs = [n * (261.8 + stretch_coef * n * n) for n in harm_nums]
-  
-    for i in harm_nums:
-        # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
-        f0 = bp_params[i - 1][0]
-        bp_vals = bp_params[i - 1][1]
-        bp_string = ','.join("%d,%.3f" % (n, max(0, 100 * val - 0.001)) for n, val in bp_vals)
-        bp_string += ',200,0'
-        #print(bp_string)
-        amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=f0, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
-
-    return len(harm_nums)+1
+    import amy
+    # This just allocates the 20 oscs needed for a INTERP_PARTIALS patch
+    # dpwe wants to add a `num_suboscs` field to fix this behavior soon
+    amy.send(osc=0, wave=amy.INTERP_PARTIALS, patch=0)
+    amy.send(osc=20, wave=amy.PARTIAL)
+    return 21
 
 def make_patches(filename):
     def nothing(message):

@@ -89,10 +89,12 @@ enum coefs{
 #define PARTIAL 9
 #define PARTIALS 10
 #define BYO_PARTIALS 11
-#define AUDIO_IN0 12
-#define AUDIO_IN1 13
-#define CUSTOM 14
-#define WAVE_OFF 15
+#define INTERP_PARTIALS 12
+#define AUDIO_IN0 13
+#define AUDIO_IN1 14
+#define CUSTOM 15
+#define WAVE_OFF 16
+///  !!!!!!! IF YOU CHANGE THE WAV VALUES, YOU HAVE TO KEEP amy.py:8 IN SYNC BY HAND !!!!!!!!
 
 // synth[].status values
 #define SYNTH_OFF 0
@@ -511,6 +513,8 @@ extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
 extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
 extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
+extern void interp_partials_note_on(uint16_t osc);
+extern void interp_partials_note_off(uint16_t osc);
 extern void patches_load_patch(struct event e); 
 extern void patches_event_has_voices(struct event e);
 extern void patches_reset();

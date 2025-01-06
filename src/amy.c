@@ -874,6 +874,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
+        if(synth[osc].wave==INTERP_PARTIALS) interp_partials_note_on(osc);
     }
     if(AMY_HAS_CUSTOM == 1) {
         if(synth[osc].wave==CUSTOM) custom_note_on(osc, initial_freq);
@@ -1091,11 +1092,12 @@ void play_event(struct delta d) {
                 //synth[d.osc].note_off_clock = total_samples;
                 //partial_note_off(d.osc);
                 #endif
-            } else if(synth[d.osc].wave==PARTIALS || synth[d.osc].wave==BYO_PARTIALS) {
+            } else if(synth[d.osc].wave==PARTIALS || synth[d.osc].wave==BYO_PARTIALS || synth[d.osc].wave==INTERP_PARTIALS) {
                 #if AMY_HAS_PARTIALS == 1
                 AMY_UNSET(synth[d.osc].note_on_clock);
                 synth[d.osc].note_off_clock = total_samples;
-                partials_note_off(d.osc);
+                if(synth[d.osc].wave==INTERP_PARTIALS) interp_partials_note_off(d.osc);
+                else partials_note_off(d.osc);
                 #endif
             } else if(synth[d.osc].wave==PCM) {
                 pcm_note_off(d.osc);
@@ -1278,7 +1280,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS == 1) {
                 //if(synth[osc].wave == PARTIAL) max_val = render_partial(buf, osc);
-                if(synth[osc].wave == PARTIALS || synth[osc].wave == BYO_PARTIALS) max_val = render_partials(buf, osc);
+                if(synth[osc].wave == PARTIALS || synth[osc].wave == BYO_PARTIALS || synth[osc].wave == INTERP_PARTIALS)
+                    max_val = render_partials(buf, osc);
             }
         }
         if(AMY_HAS_CUSTOM == 1) {
