@@ -32,6 +32,7 @@ if (TARGET tinyusb_device)
             examples.c
             oscillators.c
             partials.c
+            interp_partials.c
             pcm.c
     )
 
