@@ -1,8 +1,8 @@
 # AMY - A high-performance fixed-point Music synthesizer librarY for microcontrollers
 
-AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Pi Pico RP2040, the Pi Pico 2 RP2530, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
+AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Playdate, Pi Pico RP2040, the Pi Pico 2 RP2530, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and more to come. It is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many cores as you want. 
 
-It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a sampler (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
+It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a [very good synthesized piano](https://shorepine.github.io/amy/piano.html), a sampler (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
 
 AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/shorepine/alles), as well as the [Tulip Creative Computer](https://github.com/shorepine/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
 
@@ -31,16 +31,18 @@ It supports
  * Each oscillator has 2 envelope generators, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band EQ
- * Built in patches for PCM, DX7, Juno and partials
+ * Built in patches for PCM, DX7, piano, Juno and partials
  * A front end for Juno-6 patches and conversion setup commands 
  * Built-in clock and pattern sequencer
  * Can use multi-core (including microcontrollers) for rendering if available
 
-The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/shorepine/amy/blob/main/dx7_simulator.py).
+The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/shorepine/amy/blob/main/experiments/dx7_simulator.py).
 
-The partial tone synthesizer provides [`partials.py`](https://github.com/shorepine/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators.
+The partial tone synthesizer provides [`partials.py`](https://github.com/shorepine/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators. 
 
 The Juno-6 emulation is in [`juno.py`](https://github.com/shorepine/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands and generate patches.
+
+[The piano voice and the code to generate the partials are described here](https://shorepine.github.io/amy/piano.html).
 
 
 ## Using AMY in Arduino
@@ -63,7 +65,7 @@ You can `import amy` in Python and have it render either out to your speakers or
 
 ## Using AMY on the web
 
-We provide an `emscripten` port of AMY that runs in javascript. [See the AMY web demo](https://shorepine.github.io/amy/). To build for the web, use `make web`. It will generate `amy.js` in `src/www`. 
+We provide an `emscripten` port of AMY that runs in javascript. [See the AMY web demo](https://shorepine.github.io/amy/). To build for the web, use `make docs/amy.js`. It will generate `amy.js` in `docs/`.  You can also do `make docs/amy-audioin.js` to build a version of AMY for the web with audio input support -- but be warned this will ask your users for microphone access.
 
 ## Using AMY in any other software
 
@@ -223,7 +225,7 @@ Here's the full list:
 | `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
 | `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
-| `w`    | `wave` | uint 0-15 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
+| `w`    | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `z`    | `load_sample` | uint x 6 | Signal to start loading sample. patch, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `patch` and `length=0` to unload a sample from RAM. |
@@ -597,7 +599,7 @@ def play(sequence, # from partials.sequence
 
 You can also explicitly control partials in "build-your-own partials" mode, accessed via `wave=amy.BYO_PARTIALS`.  This sets up a string of oscs as individual sinusoids, just like `PARTIALS` mode, but it's up to you to control the details of each partial via its parameters, envelopes, etc.  You just have to say how many partials you want with `num_partials`.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
 
-```
+```python
 num_partials = 8
 amy.send(osc=0, wave=amy.BYO_PARTIALS, num_partials=num_partials)
 for i in range(1, num_partials + 1):
@@ -616,6 +618,11 @@ amy.send(osc=0, note=60, vel=1)
 # etc.
 ```
 Note that the default `bp0` amplitude envelope of the `PARTIALS` osc is a gate, so if you want to have a nonzero release on your partials, you'll need to add a slower release to the `PARTIALS` osc to avoid it cutting them off.
+
+
+## Interpolated partials
+
+Please see our [piano voice documentation](https://shorepine.github.io/amy/piano.html) for more on the `INTERP_PARTIALS` type. 
 
 
 ## PCM
@@ -656,13 +663,13 @@ amy.unload_sample(3) # unloads the RAM for patch 3
 
 Under the hood, if AMY receives a `load_sample` message (with patch number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
 
-## <a name="voices_and_patches"></a>Voices and patches (DX7, Juno-6, custom) support
+## <a name="voices_and_patches"></a>Voices and patches (DX7, Piano, Juno-6, custom) support
 
 Up until now, we have been directly controlling the AMY oscillators, which are the fundamental building blocks for sound production.  However, as we've seen, most interesting tones involve multiple oscillators.  AMY provides a second layer of organization, **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.
 
 A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
 
-To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers, you allocate them to one or more voices, then send note events, or parameter moidifications, to those voices. For example, a multitimbral Juno/DX7 synth can be set up like this:
+To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers and a piano, you allocate them to one or more voices, then send note events, or parameter moidifications, to those voices. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
 amy.send(voices='0,1,2,3', load_patch=1)     # Juno patch #1 on voice 0-3
@@ -698,8 +705,3 @@ You can "record" patches in a sequence of commands like this:
 **Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and manage your own oscillator mapping in your code.
 
 
-## Developer zone
-
-### Generate header files for patches and LUTs
-
-Run `python amy_headers.py` to generate all the LUTs and patch .h files compiled into AMY.
