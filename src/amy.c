@@ -386,7 +386,8 @@ struct event amy_default_event() {
     AMY_UNSET(e.portamento_ms);
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.chained_osc);
-    AMY_UNSET(e.mod_source);
+    AMY_UNSET(e.mod0_source);
+    AMY_UNSET(e.mod1_source);
     AMY_UNSET(e.eq_l);
     AMY_UNSET(e.eq_m);
     AMY_UNSET(e.eq_h);
@@ -527,7 +528,8 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod0_source)) { e.mod0_source += base_osc; d.param=MOD0_SOURCE; d.data = *(uint32_t *)&e.mod0_source; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.mod1_source)) { e.mod1_source += base_osc; d.param=MOD1_SOURCE; d.data = *(uint32_t *)&e.mod1_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
@@ -636,7 +638,8 @@ void reset_osc(uint16_t i ) {
     synth[i].substep = 0;
     synth[i].status = SYNTH_OFF;
     AMY_UNSET(synth[i].chained_osc);
-    AMY_UNSET(synth[i].mod_source);
+    AMY_UNSET(synth[i].mod_source[0]);
+    AMY_UNSET(synth[i].mod_source[1]);
     AMY_UNSET(synth[i].render_clock);
     AMY_UNSET(synth[i].note_on_clock);
     synth[i].note_off_clock = 0;  // Used to check that last event seen by note was off.
@@ -790,8 +793,8 @@ void show_debug(uint8_t type) {
         fprintf(stderr,"global: volume %f bend %f eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
         //printf("mod global: filter %f resonance %f\n", mglobal.filter_freq, mglobal.resonance);
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
-            fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
-                    i, synth[i].status, synth[i].wave, synth[i].mod_source,
+            fprintf(stderr,"osc %d: status %d wave %d mod0_source %d mod1_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
+                    i, synth[i].status, synth[i].wave, synth[i].mod_source[0], synth[i].mod_source[1],
                     synth[i].velocity, synth[i].logratio, synth[i].feedback, synth[i].filter_type, synth[i].resonance, synth[i].portamento_alpha, P2F(synth[i].step), synth[i].chained_osc, 
                     synth[i].algorithm, 
                     synth[i].algo_source[0], synth[i].algo_source[1], synth[i].algo_source[2], synth[i].algo_source[3], synth[i].algo_source[4], synth[i].algo_source[5] );
@@ -903,6 +906,19 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
 
+void trigger_mod_source(uint16_t source) {
+    synth[source].phase = synth[source].trigger_phase;
+
+    synth[source].note_on_clock = total_samples;  // Need a note_on_clock to have envelope work correctly.
+    if(synth[source].wave==SINE) sine_mod_trigger(source);
+    if(synth[source].wave==SAW_DOWN) saw_up_mod_trigger(source);
+    if(synth[source].wave==SAW_UP) saw_down_mod_trigger(source);
+    if(synth[source].wave==TRIANGLE) triangle_mod_trigger(source);
+    if(synth[source].wave==PULSE) pulse_mod_trigger(source);
+    if(synth[source].wave==PCM) pcm_mod_trigger(source);
+    if(synth[source].wave==CUSTOM) custom_mod_trigger(source);
+}
+
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
     AMY_PROFILE_START(PLAY_EVENT)
@@ -992,9 +1008,10 @@ void play_event(struct delta d) {
             reset_osc(*(int16_t *)&d.data); 
         } 
     }
-    if(d.param == MOD_SOURCE) {
+    if(d.param == MOD0_SOURCE || d.param == MOD1_SOURCE) {
         uint16_t mod_osc = *(uint16_t *)&d.data;
-        synth[d.osc].mod_source = mod_osc;
+        if (d.param == MOD0_SOURCE) synth[d.osc].mod_source[0] = mod_osc;
+        else synth[d.osc].mod_source[1] = mod_osc;
         // NOTE: These are event-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
         synth[mod_osc].status = SYNTH_IS_MOD_SOURCE;
@@ -1065,18 +1082,11 @@ void play_event(struct delta d) {
             float initial_freq = freq_of_logfreq(initial_logfreq);
             osc_note_on(d.osc, initial_freq);
             // trigger the mod source, if we have one
-            if(AMY_IS_SET(synth[d.osc].mod_source)) {
-                synth[synth[d.osc].mod_source].phase = synth[synth[d.osc].mod_source].trigger_phase;
+            if(AMY_IS_SET(synth[d.osc].mod_source[0])) 
+                trigger_mod_source(synth[d.osc].mod_source[0]);
+            if(AMY_IS_SET(synth[d.osc].mod_source[1])) 
+                trigger_mod_source(synth[d.osc].mod_source[1]);
 
-                synth[synth[d.osc].mod_source].note_on_clock = total_samples;  // Need a note_on_clock to have envelope work correctly.
-                if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==TRIANGLE) triangle_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==PULSE) pulse_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==PCM) pcm_mod_trigger(synth[d.osc].mod_source);
-                if(synth[synth[d.osc].mod_source].wave==CUSTOM) custom_mod_trigger(synth[d.osc].mod_source);
-            }
         } else if(synth[d.osc].velocity > 0 && *(float *)&d.data == 0) { // new note off
             // DON'T clear velocity, we still need to reference it in decay.
             //synth[d.osc].velocity = 0;
@@ -1149,7 +1159,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_VEL] = synth[osc].velocity;
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, 0));
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
-    ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
+    ctrl_inputs[COEF_MOD0] = S2F(compute_mod_scale(0, osc));
+    ctrl_inputs[COEF_MOD1] = S2F(compute_mod_scale(1, osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
 
     msynth[osc].last_pan = msynth[osc].pan;
@@ -1830,7 +1841,7 @@ struct event amy_parse_message(char * message) {
                         break;
                         case 'K': e.load_patch = atoi(message+start); break;
                         case 'l': e.velocity=atoff(message + start); break;
-                        case 'L': e.mod_source=atoi(message + start); break;
+                        case 'L': e.mod1_source=atoi(message + start); break;
                         case 'm': e.portamento_ms=atoi(message + start); break;
                         case 'M': if (AMY_HAS_ECHO) {
                             float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
