@@ -106,7 +106,11 @@ void interp_partials_note_on(uint16_t osc) {
         / (float)(partials_voice->velocities[vel_index + 1] - partials_voice->velocities[vel_index]);
     float harm_param[MAX_NUM_MAGNITUDES + 1];  // frequency + harmonic magnitudes.
     int note_number = partials_voice->num_velocities * pitch_index + vel_index;
-    int num_harmonics = partials_voice->num_harmonics[note_number];
+    // Find the least number of harmonics across everything we're interpolating.
+    int num_harmonics = partials_voice->num_harmonics[note_number];  // pl_vl note
+    num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + 1]);  // pl_vh note
+    num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + partials_voice->num_velocities]);  // ph_vl note
+    num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + partials_voice->num_velocities + 1]);  // ph_vh note
     // Interpolate the 4 notes.
     int harmonic_base_index_pl_vl =
         _harmonic_base_index_for_pitch_vel(pitch_index, vel_index, partials_voice);
@@ -120,8 +124,9 @@ void interp_partials_note_on(uint16_t osc) {
     int harmonic_base_index_ph_vh =
         _harmonic_base_index_for_pitch_vel(pitch_index + 1, vel_index + 1, partials_voice);
     float alpha_ph_vh = (pitch_alpha) * (vel_alpha);
-    //fprintf(stderr, "interp_partials@%u: osc %d note %d vel %d pitch_x %d vel_x %d numh %d harm_bi_ll %d pitch_a %.3f vel_a %.3f alphas %.2f %.2f %.2f %.2f\n",
-    //        total_samples, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics, harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
+    //fprintf(stderr, "interp_partials@%u: osc %d note %.1f vel %.1f pitch_x %d vel_x %d numh %d harm_bi_ll %d pitch_a %.3f vel_a %.3f alphas %.2f %.2f %.2f %.2f\n",
+    //        total_samples, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics,
+    //        harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
     for (int h = 0; h < num_harmonics; ++h) {
         for (int i = 0; i < MAX_NUM_MAGNITUDES + 1; ++i)  harm_param[i] = 0;
