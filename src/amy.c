@@ -387,6 +387,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.filter_type);
     AMY_UNSET(e.chained_osc);
     AMY_UNSET(e.mod_source);
+    AMY_UNSET(e.sync_source);
     AMY_UNSET(e.eq_l);
     AMY_UNSET(e.eq_m);
     AMY_UNSET(e.eq_h);
@@ -528,6 +529,7 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.sync_source)) { e.sync_source += base_osc; d.param=SYNC_SOURCE; d.data = *(uint32_t *)&e.sync_source; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
     if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
@@ -637,6 +639,7 @@ void reset_osc(uint16_t i ) {
     synth[i].status = SYNTH_OFF;
     AMY_UNSET(synth[i].chained_osc);
     AMY_UNSET(synth[i].mod_source);
+    AMY_UNSET(synth[i].sync_source);
     AMY_UNSET(synth[i].render_clock);
     AMY_UNSET(synth[i].note_on_clock);
     synth[i].note_off_clock = 0;  // Used to check that last event seen by note was off.
@@ -1003,6 +1006,7 @@ void play_event(struct delta d) {
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc].amp_coefs[COEF_VEL] = 0;
     }
+    if(d.param == SYNC_SOURCE) synth[d.osc].sync_source = *(uint16_t*)&d.data;
 
     if(d.param == RATIO) synth[d.osc].logratio = *(float *)&d.data;
 
@@ -1878,6 +1882,7 @@ struct event amy_parse_message(char * message) {
                               e.eq_h = eq[2];
                             }
                             break;
+                        case 'y': e.sync_source=atoi(message + start); break;
                         case 'z': {
                             uint32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
                             parse_list_uint32_t(message+start, sm, 6, 0);
@@ -1889,7 +1894,7 @@ struct event amy_parse_message(char * message) {
                             }
                             break;
                         }
-                        /* Y,y available */
+                        /* Y available */
                         /* Z used for end of message */
                         default:
                             break;
