@@ -165,6 +165,7 @@ enum params{
     MOD_SOURCE, FILTER_TYPE,             // 48, 49
     EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
     ALGORITHM, LATENCY, TEMPO,           // 53, 54, 55
+    SYNC_SOURCE,                         // 56
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -295,6 +296,7 @@ struct event {
     uint16_t portamento_ms;
     uint16_t chained_osc;
     uint16_t mod_source;
+    uint16_t sync_source;
     uint8_t algorithm;
     uint8_t filter_type;
     float eq_l;
@@ -337,6 +339,7 @@ struct synthinfo {
     float portamento_alpha;
     uint16_t chained_osc;
     uint16_t mod_source;
+    uint16_t sync_source;
     uint8_t algorithm;
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
