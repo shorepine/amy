@@ -57,15 +57,16 @@ typedef int16_t output_sample_type;
 #define ZERO_LOGFREQ_IN_HZ 261.63
 #define ZERO_MIDI_NOTE 60
 
-#define NUM_COMBO_COEFS 7  // 7 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend
+#define NUM_COMBO_COEFS 8  // 8 control-mixing params: const, note, velocity, env1, env2, mod1, mod2, pitchbend
 enum coefs{
     COEF_CONST = 0,
     COEF_NOTE = 1,
     COEF_VEL = 2,
     COEF_EG0 = 3,
     COEF_EG1 = 4,
-    COEF_MOD = 5,
-    COEF_BEND = 6,
+    COEF_MOD0 = 5,
+    COEF_MOD1 = 6,
+    COEF_BEND = 7,
 };
 
 #define MAX_MESSAGE_LEN 1024
@@ -162,9 +163,10 @@ enum params{
     FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 37..43
     RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 44
     RESONANCE, PORTAMENTO, CHAINED_OSC,  // 45, 46, 47
-    MOD_SOURCE, FILTER_TYPE,             // 48, 49
-    EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
-    ALGORITHM, LATENCY, TEMPO,           // 53, 54, 55
+    MOD0_SOURCE, MOD1_SOURCE,            // 48, 49
+    FILTER_TYPE,                         // 50
+    EQ_L, EQ_M, EQ_H,                    // 51, 52, 53
+    ALGORITHM, LATENCY, TEMPO,           // 54, 55, 56
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..138
@@ -294,7 +296,8 @@ struct event {
     float resonance;
     uint16_t portamento_ms;
     uint16_t chained_osc;
-    uint16_t mod_source;
+    uint16_t mod0_source;
+    uint16_t mod1_source;
     uint8_t algorithm;
     uint8_t filter_type;
     float eq_l;
@@ -336,7 +339,7 @@ struct synthinfo {
     float resonance;
     float portamento_alpha;
     uint16_t chained_osc;
-    uint16_t mod_source;
+    uint16_t mod_source[2];
     uint8_t algorithm;
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
@@ -588,7 +591,7 @@ esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float
 
 // envelopes
 extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset);
-extern SAMPLE compute_mod_scale(uint16_t osc);
+extern SAMPLE compute_mod_scale(uint16_t mod, uint16_t osc);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
 

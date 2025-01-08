@@ -32,8 +32,8 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     return value;
 }
 
-SAMPLE compute_mod_scale(uint16_t osc) {
-    uint16_t source = synth[osc].mod_source;
+SAMPLE compute_mod_scale(uint16_t mod, uint16_t osc) {
+    uint16_t source = synth[osc].mod_source[mod];
     if(AMY_IS_SET(source)) {
         if(source != osc) {  // that would be weird
             hold_and_modify(source);
