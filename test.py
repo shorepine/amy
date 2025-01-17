@@ -492,10 +492,11 @@ class TestOscBD(AmyTest):
   def run(self):
     # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
     amy.send(time=0, osc=1, wave=amy.SINE, amp=1, freq=0.25, phase=0.5)
-    amy.send(time=0, osc=0, wave=amy.SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,2", mod_source=1)
-    amy.send(time=100, osc=0, note=84, vel=1, phase=0)
-    amy.send(time=350, osc=0, note=84, vel=1, phase=0)
-    amy.send(time=600, osc=0, note=84, vel=1, phase=0)
+    # Sine waveform always starts at phase 0 after retrigger.
+    amy.send(time=0, osc=0, wave=amy.SINE, phase=0, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,2", mod_source=1)
+    amy.send(time=100, osc=0, note=84, vel=1)
+    amy.send(time=350, osc=0, note=84, vel=1)
+    amy.send(time=600, osc=0, note=84, vel=1)
 
 class TestChainedOsc(AmyTest):
   """Two oscillators chained together."""
