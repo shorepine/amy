@@ -106,7 +106,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         }
     } else if(AMY_IS_SET(synth[osc].note_off_clock)) {
         release = 1;
-        elapsed = (total_samples - synth[osc].note_off_clock + sample_offset) + 1;
+        elapsed = (total_samples - synth[osc].note_off_clock + sample_offset);
         // Get the last t/v pair , for release
         found = bp_r;
         t0 = 0; // start the elapsed clock again
