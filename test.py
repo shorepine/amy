@@ -222,13 +222,30 @@ class TestInterpPartials(AmyTest):
     num_partials = 20
     amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, patch=0)
     for i in range(1, num_partials + 1):
-      # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
     amy.send(time=50, osc=0, note=60, vel=0.1)
     amy.send(time=300, osc=0, note=67, vel=0.6)
     amy.send(time=550, osc=0, note=72, vel=1)
     amy.send(time=800, osc=0, vel=0)
     
+class TestInterpPartialsRetrigger(AmyTest):
+
+  def run(self):
+    # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
+    base_osc = 0
+    num_partials = 20
+    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, patch=0)
+    for i in range(1, num_partials + 1):
+      amy.send(osc=base_osc + i, wave=amy.PARTIAL)
+    amy.send(time=50, osc=0, note=52, vel=0.7)
+    amy.send(time=200, osc=0, note=52, vel=0.8)
+    amy.send(time=350, osc=0, note=52, vel=0.9)
+    amy.send(time=500, osc=0, vel=0)
+    amy.send(time=510, osc=40, wave=amy.SINE, bp0='3,1,500,0,50,0')
+    amy.send(time=550, osc=40, note=76, vel=1)
+    amy.send(time=700, osc=40, note=76, vel=1)
+    amy.send(time=850, osc=40, vel=0)
+
 class TestSineEnv(AmyTest):
 
   def run(self):
@@ -476,9 +493,9 @@ class TestOscBD(AmyTest):
     # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
     amy.send(time=0, osc=1, wave=amy.SINE, amp=1, freq=0.25, phase=0.5)
     amy.send(time=0, osc=0, wave=amy.SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,2", mod_source=1)
-    amy.send(time=100, osc=0, note=84, vel=1)
-    amy.send(time=350, osc=0, note=84, vel=1)
-    amy.send(time=600, osc=0, note=84, vel=1)
+    amy.send(time=100, osc=0, note=84, vel=1, phase=0)
+    amy.send(time=350, osc=0, note=84, vel=1, phase=0)
+    amy.send(time=600, osc=0, note=84, vel=1, phase=0)
 
 class TestChainedOsc(AmyTest):
   """Two oscillators chained together."""

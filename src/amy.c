@@ -1045,9 +1045,8 @@ void play_event(struct delta d) {
 
             // if there was a filter active for this voice, reset it
             if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
-            // For repeatability, start at zero phase.
-            synth[d.osc].phase = 0;
-                
+            // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
+
             // restart the waveforms
             // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
             float initial_logfreq = synth[d.osc].logfreq_coefs[COEF_CONST];
@@ -1306,7 +1305,10 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             } else {
                 if ( (total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %f osc %d OFF\n", total_samples/(float)AMY_SAMPLE_RATE, osc);
+                    // Oscillator has fallen silent, stop executing it.
                     synth[osc].status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
+                    // .. but force it to start at zero phase next time.
+                    synth[osc].phase = 0;
                 }
             }
         } else if (max_val == 0) {
