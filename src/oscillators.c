@@ -546,8 +546,6 @@ void partial_note_on(uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc].logfreq);
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
-    // Partials ramp up from zero.
-    msynth[osc].amp = 0;
 }
 
 void partial_note_off(uint16_t osc) {
