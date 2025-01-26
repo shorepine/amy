@@ -157,6 +157,8 @@ class Synth:
             self.note_off(note, time=time, sequence=sequence)
         else:
             # Velocity > 0, note on.
+            if note in self.sustained_notes:
+                self.sustained_notes.remove(note)
             if note in self.voice_of_note:
                 # Send another note-on to the voice already playing this note.
                 new_voice = self.voice_of_note[note]
@@ -196,7 +198,10 @@ class Synth:
 
     def control_change(self, control, value):
         if control == 64:
-            self.sustain(value > 64)
+            if value > 100 and not self.sustaining:
+                self.sustain(True)
+            if value < 60 and self.sustaining:
+                self.sustain(False)
 
     def release(self):
         """Called to terminate this synth and release its amy_voice resources."""
