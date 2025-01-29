@@ -1932,6 +1932,8 @@ struct event amy_parse_message(char * message) {
 
 void amy_reset_sysclock() {
     total_samples = 0;
+    sequencer_tick_count = 0;
+    sequencer_recompute();
 }
 
 // given a string play / schedule the event directly
