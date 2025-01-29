@@ -123,6 +123,16 @@ class TestPcmShift(AmyTest):
     amy.send(time=500, note=70, vel=1)
 
 
+class TestPcmPatchChange(AmyTest):
+  """There was a bug where switching PCM patch would persist the base note of the preceding patch."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.PCM, patch=9)  # Clap
+    amy.send(time=100, vel=1)
+    amy.send(time=450, patch=11)  # Conga low
+    amy.send(time=500, vel=1)
+
+
 class TestPcmLoop(AmyTest):
 
   def run(self):

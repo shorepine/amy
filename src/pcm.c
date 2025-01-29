@@ -55,20 +55,9 @@ void pcm_init() {
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc].patch)) {
         memorypcm_patch_t *patch = memorypatch_for_patch_number(synth[osc].patch);
-        if(patch != NULL) {
-            // memory pcm
-            if(synth[osc].logfreq_coefs[COEF_CONST] <= 0) {
-                synth[osc].logfreq_coefs[COEF_CONST] = patch->log2sr - logfreq_for_midi_note(patch->midinote);
-            }
-        } else {
-            // const PCM
+        if(patch == NULL) {
+            // baked-in PCM - don't overrun.
             if(synth[osc].patch >= pcm_samples) synth[osc].patch = 0;
-            // if no freq given, just play it at midinote
-            if(synth[osc].logfreq_coefs[COEF_CONST] <= 0) {
-                // This will result in PCM_SAMPLE_RATE when the midi_note == patch->midinote.
-                synth[osc].logfreq_coefs[COEF_CONST] = PCM_AMY_LOG2_SAMPLE_RATE - logfreq_for_midi_note(pcm_map[synth[osc].patch].midinote);
-            }
-
         }
         synth[osc].phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
@@ -130,9 +119,9 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         // Patches can be > 32768 samples long.
         // We need s16.15 fixed-point indexing.
         float logfreq = msynth[osc].logfreq;
-        // If osc[midi_note] is unset, apply patch's default here.
-        if (AMY_IS_UNSET(synth[osc].midi_note))  logfreq += logfreq_for_midi_note(patch.midinote);
-        float playback_freq = freq_of_logfreq(logfreq);  // PCM_SAMPLE_RATE modified by
+        // If osc[midi_note] is set, shift the freq by the patch's default base_note.
+        if (AMY_IS_SET(synth[osc].midi_note))  logfreq -= logfreq_for_midi_note(patch.midinote);
+        float playback_freq = freq_of_logfreq(PCM_AMY_LOG2_SAMPLE_RATE + logfreq);
 
         SAMPLE max_value = 0;
         SAMPLE amp = F2S(msynth[osc].amp);
