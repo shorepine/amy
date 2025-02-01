@@ -1011,13 +1011,23 @@ void play_event(struct delta d) {
 
     if(d.param == PORTAMENTO) synth[d.osc].portamento_alpha = portamento_ms_to_alpha(*(uint16_t *)&d.data);
 
-    if(d.param == ALGORITHM) synth[d.osc].algorithm = *(uint8_t *)&d.data;
+    if(d.param == ALGORITHM) {
+        synth[d.osc].algorithm = *(uint8_t *)&d.data;
+        // This is a DX7-style control osc; ensure eg_types are set
+        // but only when ALGO is specified, so user can override later if desired.
+        synth[d.osc].eg_type[0] = ENVELOPE_DX7;
+        synth[d.osc].eg_type[1] = ENVELOPE_TRUE_EXPONENTIAL;
+    }
 
     if(d.param >= ALGO_SOURCE_START && d.param < ALGO_SOURCE_END) {
         uint16_t which_source = d.param - ALGO_SOURCE_START;
         synth[d.osc].algo_source[which_source] = d.data;
-        if(AMY_IS_SET(synth[d.osc].algo_source[which_source]))
-            synth[synth[d.osc].algo_source[which_source]].status = SYNTH_IS_ALGO_SOURCE;
+        if(AMY_IS_SET(synth[d.osc].algo_source[which_source])) {
+            int osc = synth[d.osc].algo_source[which_source];
+            synth[osc].status = SYNTH_IS_ALGO_SOURCE;
+            // Configure the amp envelope appropriately, just once when named as an algo_source.
+            synth[osc].eg_type[0] = ENVELOPE_DX7;
+        }
     }
 
     if (d.param == EG0_TYPE) synth[d.osc].eg_type[0] = d.data;

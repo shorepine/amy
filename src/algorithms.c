@@ -99,7 +99,6 @@ SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     synth[osc].note_on_clock = total_samples;
     synth[osc].status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
-    synth[osc].eg_type[0] = ENVELOPE_DX7;
     if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 
@@ -123,9 +122,6 @@ void algo_note_on(uint16_t osc) {
             note_on_mod(synth[osc].algo_source[i], osc);
         }
     }
-    // DX7 voices have (slightly) different envelope behavior.
-    synth[osc].eg_type[0] = ENVELOPE_DX7;
-    synth[osc].eg_type[1] = ENVELOPE_TRUE_EXPONENTIAL;
 }
 
 SAMPLE *** scratch;
