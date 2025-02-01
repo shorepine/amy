@@ -256,6 +256,7 @@ class TestInterpPartialsRetrigger(AmyTest):
     amy.send(time=700, osc=40, note=76, vel=1)
     amy.send(time=850, osc=40, vel=0)
 
+
 class TestSineEnv(AmyTest):
 
   def run(self):
@@ -263,6 +264,19 @@ class TestSineEnv(AmyTest):
     amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,50,0')
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
+
+
+class TestSineEnv2(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy.send(time=0, osc=0, amp='0,0,1,1,0,0', bp0='0,0,200,5,200,00,0')
+    amy.send(time=100, vel=1)
+    amy.send(time=500, vel=0)
+    # The DX7 algo is weird - attack is different from decay, esp outside of [0, 1].
+    amy.send(time=500, osc=0, eg0_type=amy.ENVELOPE_DX7)
+    amy.send(time=550, vel=1)
+    amy.send(time=950, vel=0)
 
 
 class TestAlgo(AmyTest):
