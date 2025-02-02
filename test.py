@@ -251,10 +251,10 @@ class TestInterpPartialsRetrigger(AmyTest):
     amy.send(time=200, osc=0, note=52, vel=0.8)
     amy.send(time=350, osc=0, note=52, vel=0.9)
     amy.send(time=500, osc=0, vel=0)
-    amy.send(time=510, osc=40, wave=amy.SINE, bp0='3,1,500,0,50,0')
-    amy.send(time=550, osc=40, note=76, vel=1)
-    amy.send(time=700, osc=40, note=76, vel=1)
-    amy.send(time=850, osc=40, vel=0)
+    amy.send(time=510, osc=100, wave=amy.SINE, bp0='3,1,500,0,50,0')
+    amy.send(time=550, osc=100, note=76, vel=1)
+    amy.send(time=700, osc=100, note=76, vel=1)
+    amy.send(time=850, osc=100, vel=0)
 
 
 class TestSineEnv(AmyTest):

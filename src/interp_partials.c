@@ -27,6 +27,8 @@ typedef struct {
 
 #define MAX_NUM_MAGNITUDES 24
 
+#define MAX_NUM_HARMONICS 20
+
 void _cumulate_scaled_harmonic_params(float *harm_param, int harmonic_index, float alpha, const interp_partials_voice_t *partials_voice) {
     int num_bps = partials_voice->num_sample_times_ms;
     // Pitch
@@ -144,8 +146,9 @@ void interp_partials_note_on(uint16_t osc) {
 }
 
 void interp_partials_note_off(uint16_t osc) {
-    const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
-    int num_oscs = partials_voice->num_harmonics[0];   // Assume first patch has the max #harmonics.
+    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
+    //int num_oscs = partials_voice->num_harmonics[0];   // Assume first patch has the max #harmonics.
+    int num_oscs = MAX_NUM_HARMONICS;
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         AMY_UNSET(synth[o].note_on_clock);

@@ -398,12 +398,63 @@ def make_patches(filename):
     amy.override_send = None
 
 
+def write_vector_as_c(f, data, name, dtype='uint8_t', items_per_row=20):
+    num_name = "NUM_%s" % name.upper()
+    f.write("#define %s %d\n" % (num_name, len(data)))
+    f.write("const %s %s[%s] = {\n" % (dtype, name, num_name))
+    for start in range(0, len(data), items_per_row):
+        data_row = data[start : start + items_per_row]
+        f.write("    " + ", ".join("%d" % d for d in data_row) + ",\n")
+    f.write("};\n\n")
+
+
+def make_interp_partials(filename, data_dict):
+    """Write the json data from experiments/piano_heterodyne.ipynb into a C header."""
+    import itertools
+    # data_dict is {instrument_tag: {'sample_times_ms': [], 'notes': [], 'velocities': [], 'num_harmonics': xx, 'harmonics_freq': [], 'harmonics_mags': []}, ...}
+    with open(filename, "w") as f:
+        f.write("// Automatically generated.\n// Piano interpolated partials data table\n")
+        f.write("#ifndef __INTERP_PARTIALS_H\n#define __INTERP_PARTIALS_H\n\n")
+        f.write("#define NUM_INTERP_PARTIALS_PATCHES %d\n\n" % len(data_dict))
+        map_contents = ""
+        for tag, data in data_dict.items():
+            for varname, dtype in [('sample_times_ms', 'uint16_t'),
+                                   ('velocities', 'uint8_t'),
+                                   ('notes', 'uint8_t'),
+                                   ('num_harmonics', 'uint8_t'),
+                                   ('harmonics_freq', 'uint16_t')]:
+                write_vector_as_c(f, data[varname], tag + "_" + varname, dtype=dtype)
+            harmonics_mags = list(itertools.chain(*data['harmonics_mags']))
+            write_vector_as_c(f, harmonics_mags, tag + "_harmonics_mags")
+            TAG = tag.upper()
+            map_contents += """    {
+        NUM_%s_SAMPLE_TIMES_MS,
+        %s_sample_times_ms,
+        NUM_%s_VELOCITIES,
+        %s_velocities,
+        NUM_%s_NOTES,
+        %s_notes,
+        %s_num_harmonics,
+        %s_harmonics_freq,
+        %s_harmonics_mags,
+    },
+""" % (TAG, tag, TAG, tag, TAG, tag, tag, tag, tag)
+
+        f.write("const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PATCHES] = {\n")
+        f.write(map_contents)
+        f.write("};\n\n")
+        f.write("#endif // ndef __INTERP_PARTIALS_H\n\n")
+
+    print("wrote", filename)
+
+
 """ 
     Generate all the headers except for the partials headers
 """
 def generate_all():
     import fm
     import collections
+    import json
     # Implement the multiple lookup tables.
     # A LUT is stored as an array of values (table) and the harmonic number of the
     # highest harmonic they contain (i.e., the number of cycles it completes in the
@@ -448,6 +499,9 @@ def generate_all():
     # Juno & FM patches
     make_patches("src/patches.h")
 
+    # interp_partials data table
+    make_interp_partials("src/interp_partials.h",
+                         {'piano': json.load(open("experiments/piano-params.json", "r"))})
 
 def main():
     print("Generating all headers needed for AMY (except for partials patches, see partials.py if you want to DIY...")
