@@ -354,7 +354,7 @@ def make_piano_patch():
     amy.send(chorus=0) # Piano sounds weird with chorus on
     amy.send(osc=0, wave=amy.INTERP_PARTIALS, patch=0)
     amy.send(osc=20, wave=amy.PARTIAL)
-    return 21
+    return 25  # We now use up to 24 partials per voice + 1 control osc.
 
 def make_patches(filename):
     def nothing(message):

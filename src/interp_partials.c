@@ -27,7 +27,16 @@ typedef struct {
 
 #define MAX_NUM_MAGNITUDES 24
 
-#define MAX_NUM_HARMONICS 20
+#define MAX_NUM_HARMONICS 40
+
+// Map to drop out some higher harmonics, namely the 2x and 3x overtones above 16th harmonic
+typedef uint8_t bool;
+const bool use_this_partial_map[MAX_NUM_HARMONICS] = {
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // 1-10
+    1, 1, 1, 1, 1, 1, 1, 0, 1, 0,  // 11-20
+    0, 0, 1, 0, 1, 0, 0, 0, 1, 0,  // 21-30
+    1, 0, 0, 0, 1, 0, 1, 0, 0, 0,  // 31-40
+};
 
 void _cumulate_scaled_harmonic_params(float *harm_param, int harmonic_index, float alpha, const interp_partials_voice_t *partials_voice) {
     int num_bps = partials_voice->num_sample_times_ms;
@@ -131,24 +140,29 @@ void interp_partials_note_on(uint16_t osc) {
     //        harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
     for (int h = 0; h < num_harmonics; ++h) {
-        for (int i = 0; i < MAX_NUM_MAGNITUDES + 1; ++i)  harm_param[i] = 0;
-        _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_pl_vl + h,
-                                         alpha_pl_vl, partials_voice);
-        _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_pl_vh + h,
-                                         alpha_pl_vh, partials_voice);
-        _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vl + h,
-                                         alpha_ph_vl, partials_voice);
-        _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vh + h,
-                                         alpha_ph_vh, partials_voice);
-        //fprintf(stderr, "harm %d freq %.2f bps %.3f %.3f %.3f %.3f\n", h, harm_param[0], harm_param[1], harm_param[2], harm_param[3], harm_param[4]);
-        _osc_on_with_harm_param(osc + 1 + h, harm_param, partials_voice);
+        if (use_this_partial_map[h]) {
+            for (int i = 0; i < MAX_NUM_MAGNITUDES + 1; ++i)  harm_param[i] = 0;
+            _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_pl_vl + h,
+                                             alpha_pl_vl, partials_voice);
+            _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_pl_vh + h,
+                                             alpha_pl_vh, partials_voice);
+            _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vl + h,
+                                             alpha_ph_vl, partials_voice);
+            _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vh + h,
+                                             alpha_ph_vh, partials_voice);
+            //fprintf(stderr, "harm %d freq %.2f bps %.3f %.3f %.3f %.3f\n", h, harm_param[0], harm_param[1], harm_param[2], harm_param[3], harm_param[4]);
+            ++osc;
+            _osc_on_with_harm_param(osc, harm_param, partials_voice);
+        }
     }
 }
 
 void interp_partials_note_off(uint16_t osc) {
     //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
     //int num_oscs = partials_voice->num_harmonics[0];   // Assume first patch has the max #harmonics.
-    int num_oscs = MAX_NUM_HARMONICS;
+    int num_oscs = 0; //MAX_NUM_HARMONICS;
+    // Actual max num harmonics we may use is the number of 1s in the use_this_partial_map.
+    for (int i = 0; i < MAX_NUM_HARMONICS; ++i) num_oscs += use_this_partial_map[i];
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         AMY_UNSET(synth[o].note_on_clock);
