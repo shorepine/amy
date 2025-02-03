@@ -109,7 +109,7 @@ void interp_partials_note_on(uint16_t osc) {
     float harm_param[MAX_NUM_MAGNITUDES + 1];  // frequency + harmonic magnitudes.
     int note_number = partials_voice->num_velocities * pitch_index + vel_index;
     // Find the least number of harmonics across everything we're interpolating.
-    int num_harmonics = partials_voice->num_harmonics[note_number];  // pl_vl note
+    int num_harmonics = MIN(MAX_NUM_HARMONICS, partials_voice->num_harmonics[note_number]);  // pl_vl note
     num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + 1]);  // pl_vh note
     num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + partials_voice->num_velocities]);  // ph_vl note
     num_harmonics = MIN(num_harmonics, partials_voice->num_harmonics[note_number + partials_voice->num_velocities + 1]);  // ph_vh note
