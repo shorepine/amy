@@ -1,6 +1,7 @@
 // interp_partials - AMY kernel-side implementation of the interpolated partials-based synthesis originally implemented in tulip_piano.py.
 
 #include "amy.h"
+#include <stdbool.h>
 
 typedef struct {
     // How many sample_times_ms are there?
@@ -30,7 +31,6 @@ typedef struct {
 #define MAX_NUM_HARMONICS 40
 
 // Map to drop out some higher harmonics, namely the 2x and 3x overtones above 16th harmonic
-typedef uint8_t bool;
 const bool use_this_partial_map[MAX_NUM_HARMONICS] = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  // 1-10
     1, 1, 1, 1, 1, 1, 1, 0, 1, 0,  // 11-20
