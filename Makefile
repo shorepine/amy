@@ -55,6 +55,7 @@ HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 PYTHONS = $(wildcard *.py)
 
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
+	cat src/amy{,_config}.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f$$/\1/' | awk '{print $$2 "=" $$3}' > amy_constants.py
 	${PYTHON} amy_headers.py
 
 %.o: %.c $(HEADERS) src/patches.h
@@ -93,4 +94,5 @@ docs/amy-audioin.js: $(TARGET)
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
+	-rm -f amy_constants.py
 	-rm -f $(TARGET)

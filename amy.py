@@ -1,16 +1,5 @@
 import time
-
-BLOCK_SIZE = 256
-AMY_SAMPLE_RATE = 44100.0
-AMY_NCHANS = 2
-AMY_OSCS = 180
-MAX_QUEUE = 2400
-SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF = range(17)
-FILTER_NONE, FILTER_LPF, FILTER_BPF, FILTER_HPF, FILTER_LPF24 = range(5)
-ENVELOPE_NORMAL, ENVELOPE_LINEAR, ENVELOPE_DX7, ENVELOPE_TRUE_EXPONENTIAL = range(4)
-RESET_SEQUENCER, RESET_ALL_OSCS, RESET_TIMEBASE, RESET_AMY = (4096, 8192, 16384, 32768)
-AMY_LATENCY_MS = 0
-SEQUENCER_PPQ = 48
+from amy_constants import *
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
 insert_time = None
@@ -290,7 +279,7 @@ def render(seconds):
     import numpy as np
     import libamy
     # Output a npy array of samples
-    frame_count = int((seconds*AMY_SAMPLE_RATE)/BLOCK_SIZE)
+    frame_count = int((seconds*AMY_SAMPLE_RATE)/AMY_BLOCK_SIZE)
     frames = []
     for f in range(frame_count):
         frames.append( np.array(libamy.render())/32768.0 )
