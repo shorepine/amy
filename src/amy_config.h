@@ -12,7 +12,11 @@
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
 #endif
 
+#ifndef TULIP
 #define AMY_OSCS 120
+#else
+#define AMY_OSCS 160
+#endif
 
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
