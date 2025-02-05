@@ -111,6 +111,7 @@ extern const uint16_t pcm_samples;
 #define ECHO_DEFAULT_FEEDBACK 0
 #define ECHO_DEFAULT_FILTER_COEF 0
 
+#define AMY_SEQUENCER_PPQ 48
 
 #define DELAY_LINE_LEN 512  // 11 ms @ 44 kHz
 
