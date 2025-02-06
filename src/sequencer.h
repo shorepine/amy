@@ -16,6 +16,4 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 void sequencer_reset();
 extern void (*amy_external_sequencer_hook)(uint32_t);
 
-#define AMY_SEQUENCER_PPQ 48
-
 #endif
