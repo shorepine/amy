@@ -100,10 +100,26 @@ class MidoSynth(midi.Synth):
 
     def render(self,
                filename: str,
-               volume_db: float = 0.0) -> tuple[np.ndarray, float]:
-        start_millis = 0.0
+               volume_db: float = 0.0,
+               start_millis: float = 0.0) -> tuple[np.ndarray, float]:
+        """Renders a MIDI file to an array of samples.
+
+        This can be useful for deubgging, for more accurate timing than
+        `mido.play`, and for faster than real-time rendering.
+
+        Unlike other methods in this class, this one assumes that we are not
+        `amy.live`, since it calls `amy.render` to generate the samples.
+
+        Args:
+          filename: Path to a MIDI file to play.
+          volume_db: Output volume in dB rel AMY volume=1.0.
+          start_millis: AMY time for the start of the file. Only matters when
+            `blocking == False`.
+        """
         amy.send(volume=np.pow(10.0, volume_db / 20.0), time=start_millis)
-        samples = amy.render(self.play_file(filename, blocking=False))
+        samples = amy.render(
+            self.play_file(filename, blocking=False,
+                           start_millis=start_millis))
         return samples, amy.AMY_SAMPLE_RATE
 
     def play_input(self, name: str | None = None) -> None:
