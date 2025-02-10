@@ -19,13 +19,15 @@ from experiments.mido_piano import instrument
 def run(input_filename: str,
         output_filename: str,
         volume_db: float = 0.0) -> None:
+    duration = None
     try:
-        piano = instrument.Piano()
+        piano = instrument.Piano(patch_time=0.0)
         samples, sample_rate = piano.render(input_filename,
                                             volume_db=volume_db)
+        duration = samples.shape[0] / sample_rate
         soundfile.write(output_filename, samples, int(round(sample_rate)))
     finally:
-        piano.release()
+        piano.release(time=(duration * 1000.0))
 
 
 if __name__ == '__main__':

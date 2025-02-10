@@ -10,7 +10,7 @@ and event handler.
 the assumption that piano_recital.py will usually be run under CPython.
 """
 import collections
-import time
+import time as time_lib
 
 import amy
 
@@ -62,7 +62,11 @@ class Synth:
         cls.next_amy_patch_number = 1024
         amy.reset()
 
-    def __init__(self, num_voices=6, patch_number=None, patch_string=None):
+    def __init__(self,
+                 num_voices=6,
+                 patch_number=None,
+                 patch_string=None,
+                 patch_time=None):
         self.voice_objs = self._get_new_voices(num_voices)
         self.released_voices = collections.deque(range(num_voices))
         self.active_voices = collections.deque(tuple(), num_voices)
@@ -81,7 +85,7 @@ class Synth:
             patch_number = Synth.next_amy_patch_number
             Synth.next_amy_patch_number = patch_number + 1
             amy.send(store_patch='%d,%s' % (patch_number, patch_string))
-        self.program_change(patch_number)
+        self.program_change(patch_number, time=patch_time)
 
     def _get_new_voices(self, num_voices):
         new_voices = []
@@ -111,7 +115,7 @@ class Synth:
         vstr = ",".join([str(a) for a in self.amy_voice_nums])
         amy.send(voices=vstr, **kwargs)
 
-    def _get_next_voice(self):
+    def _get_next_voice(self, time):
         """Return the next voice to use."""
         # First try free/released_voices in order, then steal from active_voices.
         if self.released_voices:
@@ -119,7 +123,7 @@ class Synth:
         # We have to steal an active voice.
         stolen_voice = self.active_voices.popleft()
         #print('Stealing voice for', self.note_of_voice[stolen_voice])
-        self._voice_off(stolen_voice)
+        self._voice_off(stolen_voice, time=time)
         return stolen_voice
 
     def _voice_off(self, voice, time=None, sequence=None):
@@ -141,11 +145,11 @@ class Synth:
         self.active_voices.remove(old_voice)
         self.released_voices.append(old_voice)
 
-    def all_notes_off(self):
-        self.sustain(False)
+    def all_notes_off(self, time=None):
+        self.sustain(False, time=time)
         while self.active_voices:
             voice = self.active_voices.popleft()
-            self._voice_off(voice)
+            self._voice_off(voice, time=time)
             self.released_voices.append(voice)
 
     def note_on(self, note, velocity=1, time=None, sequence=None):
@@ -163,7 +167,7 @@ class Synth:
                 # Send another note-on to the voice already playing this note.
                 new_voice = self.voice_of_note[note]
             else:
-                new_voice = self._get_next_voice()
+                new_voice = self._get_next_voice(time=time)
                 self.active_voices.append(new_voice)
                 self.voice_of_note[note] = new_voice
                 self.note_of_voice[new_voice] = note
@@ -188,13 +192,13 @@ class Synth:
     def set_patch_state(self, state):
         self.patch_state = state
 
-    def program_change(self, patch_number):
+    def program_change(self, patch_number, time=None):
         if patch_number != self.patch_number:
             self.patch_number = patch_number
             # Reset any modified state due to previous patch modifications.
             self.patch_state = None
-            time.sleep(0.1)  # "AMY queue will fill if not slept."
-            self.amy_send(load_patch=patch_number)
+            time_lib.sleep(0.1)  # "AMY queue will fill if not slept."
+            self.amy_send(load_patch=patch_number, time=time)
 
     def control_change(self, control, value, time=None):
         if control == 64:
@@ -203,10 +207,10 @@ class Synth:
             if value < 60 and self.sustaining:
                 self.sustain(False, time=time)
 
-    def release(self):
+    def release(self, time=None):
         """Called to terminate this synth and release its amy_voice resources."""
         # Turn off any active notes
-        self.all_notes_off()
+        self.all_notes_off(time=time)
         # Return all the amy_voices
         for amy_voice in self.amy_voice_nums:
             Synth.allocated_amy_voices.remove(amy_voice)

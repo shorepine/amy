@@ -55,7 +55,8 @@ class MidoSynth(midi.Synth):
     def play_file(self,
                   filename: str,
                   default_velocity: int = 64,
-                  blocking: bool = True) -> float:
+                  blocking: bool = True,
+                  start_millis: float = 0.0) -> float:
         """Plays a MIDI file.
 
         Args:
@@ -66,6 +67,8 @@ class MidoSynth(midi.Synth):
             velocity 127 sound bad.
           blocking: Whether to use `mido.MidiFile.play`. The canonical use case
             for setting this to `False` is `amy.render`.
+          start_millis: AMY time for the start of the file. Only matters when
+            `blocking == False`.
 
         Returns:
           The duration of the MIDI file, in seconds.
@@ -88,15 +91,18 @@ class MidoSynth(midi.Synth):
             for m in midi_file.play():
                 self.play_message(filter_fn(m))
         else:
-            millis = 0.0
+            millis = start_millis
             for m in midi_file:
                 m = filter_fn(m)
                 millis += m.time * 1000.0
                 self.play_message(m, time=millis)
         return duration
 
-    def render(self, filename: str, volume_db: float = 0.0) -> tuple[np.ndarray, float]:
-        amy.send(volume=np.pow(10.0, volume_db / 20.0))
+    def render(self,
+               filename: str,
+               volume_db: float = 0.0) -> tuple[np.ndarray, float]:
+        start_millis = 0.0
+        amy.send(volume=np.pow(10.0, volume_db / 20.0), time=start_millis)
         samples = amy.render(self.play_file(filename, blocking=False))
         return samples, amy.AMY_SAMPLE_RATE
 
@@ -122,5 +128,7 @@ class MidoSynth(midi.Synth):
 
 class Piano(MidoSynth):
 
-    def __init__(self):
-        super().__init__(num_voices=32, patch_number=256)
+    def __init__(self, patch_time: float | None = None):
+        super().__init__(num_voices=16,
+                         patch_number=256,
+                         patch_time=patch_time)
