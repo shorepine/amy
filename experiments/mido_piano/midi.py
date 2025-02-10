@@ -172,14 +172,14 @@ class Synth:
                                                time=time,
                                                sequence=sequence)
 
-    def sustain(self, state):
+    def sustain(self, state, time=None):
         """Turn sustain on/off."""
         if state:
             self.sustaining = True
         else:
             self.sustaining = False
             for midinote in self.sustained_notes:
-                self.note_off(midinote)
+                self.note_off(midinote, time=time)
             self.sustained_notes = set()
 
     def get_patch_state(self):
@@ -196,12 +196,12 @@ class Synth:
             time.sleep(0.1)  # "AMY queue will fill if not slept."
             self.amy_send(load_patch=patch_number)
 
-    def control_change(self, control, value):
+    def control_change(self, control, value, time=None):
         if control == 64:
             if value > 100 and not self.sustaining:
-                self.sustain(True)
+                self.sustain(True, time=time)
             if value < 60 and self.sustaining:
-                self.sustain(False)
+                self.sustain(False, time=time)
 
     def release(self):
         """Called to terminate this synth and release its amy_voice resources."""

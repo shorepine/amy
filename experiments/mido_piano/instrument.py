@@ -12,12 +12,16 @@ Assumptions:
     * Patch 256 is piano, and we will use 32 voices.
     * The `libamy` and `mido` packages are installed and supported by your
       platform. `python-rtmidi` is also useful for `play_input`.
-    * You edited amy/src/amy_config.h to have `#define AMY_OSCS 1024` before
-      installing `libamy`.
+    * You edited `#define AMY_OSCS` in amy/src/amy_config.h to have enough.
+      (Enough is (32 * 21 == 672), which is the number of voices in `Piano`
+      below times the number of oscs for the dpwe piano patch, except that
+      there are chorus oscs and 999 and stuff, so why not go big?)
 """
 
-import amy
 import mido
+import numpy as np
+
+import amy
 from experiments.mido_piano import midi
 
 
@@ -27,7 +31,9 @@ class MidoSynth(midi.Synth):
     def __del__(self):
         super().release()
 
-    def play_message(self, message: mido.Message) -> None:
+    def play_message(self,
+                     message: mido.Message,
+                     time: float | None = None) -> None:
         """Plays a single MIDI message.
 
         All input values ranges are assumed to be as in standard MIDI format,
@@ -35,15 +41,21 @@ class MidoSynth(midi.Synth):
 
         Args:
           message: The message to play.
+          time: Optional time to forward to amy_send.
         """
         if message.type == 'note_on':
-            self.note_on(message.note, velocity=message.velocity / 127)
+            self.note_on(message.note,
+                         velocity=message.velocity / 127,
+                         time=time)
         elif message.type == 'note_off':
-            self.note_off(message.note)
+            self.note_off(message.note, time=time)
         elif message.is_cc():
-            self.control_change(message.control, message.value)
+            self.control_change(message.control, message.value, time=time)
 
-    def play_file(self, filename: str, default_velocity: int = 64) -> None:
+    def play_file(self,
+                  filename: str,
+                  default_velocity: int = 64,
+                  blocking: bool = True) -> float:
         """Plays a MIDI file.
 
         Args:
@@ -52,18 +64,41 @@ class MidoSynth(midi.Synth):
             note on events have the same value, then this value will replace the
             constant velocity from the file. Without this, files with constant
             velocity 127 sound bad.
+          blocking: Whether to use `mido.MidiFile.play`. The canonical use case
+            for setting this to `False` is `amy.render`.
+
+        Returns:
+          The duration of the MIDI file, in seconds.
         """
         midi_file = mido.MidiFile(filename)
+        duration = sum((m.time for m in midi_file))
         velocities = [
             m.velocity for m in midi_file
             if m.type == 'note_on' and m.velocity > 0
         ]
         if (not velocities) or min(velocities) != max(velocities):
             default_velocity = None
-        for m in midi_file.play():
+
+        def filter_fn(m: mido.Message) -> mido.Message:
             if m.type == 'note_on' and m.velocity > 0 and default_velocity:
-                m = m.copy(velocity=default_velocity)
-            self.play_message(m)
+                return m.copy(velocity=default_velocity)
+            return m
+
+        if blocking:
+            for m in midi_file.play():
+                self.play_message(filter_fn(m))
+        else:
+            millis = 0.0
+            for m in midi_file:
+                m = filter_fn(m)
+                millis += m.time * 1000.0
+                self.play_message(m, time=millis)
+        return duration
+
+    def render(self, filename: str, volume_db: float = 0.0) -> tuple[np.ndarray, float]:
+        amy.send(volume=np.pow(10.0, volume_db / 20.0))
+        samples = amy.render(self.play_file(filename, blocking=False))
+        return samples, amy.AMY_SAMPLE_RATE
 
     def play_input(self, name: str | None = None) -> None:
         """Plays MIDI messages from a `mido` input.
