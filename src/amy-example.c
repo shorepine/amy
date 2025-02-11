@@ -22,7 +22,11 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
     //fprintf(stderr, "main init. pcm is %p pcm_map is %p\n",  pcm, pcm_map);
-
+    fprintf(stderr, "sizeof synthinfo %d event %d delta %d\n",
+	sizeof(struct synthinfo),
+	sizeof(struct event),
+	sizeof(struct delta)
+	);
     int opt;
     while((opt = getopt(argc, argv, ":d:o:lh")) != -1) 
     { 

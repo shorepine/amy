@@ -1,17 +1,20 @@
 #include "sequencer.h"
 
-typedef struct  {
-    struct event e; // parsed event -- we clear out sequence and time here obv
+typedef struct sequence_entry_ll_t {
+    struct delta d;
     uint32_t tag;
     uint32_t tick; // 0 means not used 
     uint32_t period; // 0 means not used 
-} sequence_entry;
-
-// linked list of sequence_entries
-typedef struct sequence_entry_ll_t{
-    sequence_entry *sequence;
     struct sequence_entry_ll_t *next;
 } sequence_entry_ll_t;
+
+// A pointer to a sequence entry and the sequence metadata, for passing to the callback
+typedef struct sequence_callback_info_t {
+    struct sequence_entry_ll_t ** pointer;
+    uint32_t tag;
+    uint32_t tick; // 0 means not used 
+    uint32_t period; // 0 means not used 
+} sequence_callback_info_t;    
 
 sequence_entry_ll_t * sequence_entry_ll_start;
 
@@ -43,7 +46,6 @@ void sequencer_reset() {
     while ((*entry_ll_ptr) != NULL) {
         sequence_entry_ll_t *doomed = *entry_ll_ptr;
         *entry_ll_ptr = doomed->next; // close up list.
-        free(doomed->sequence);
         free(doomed);
     }
     sequence_entry_ll_start = NULL;
@@ -54,38 +56,47 @@ void sequencer_recompute() {
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
+void add_delta_to_sequencer(struct delta d, void*user_data) {
+    sequence_callback_info_t * cbinfo = (sequence_callback_info_t *)user_data;
+    sequence_entry_ll_t ***entry_ll_ptr = &(cbinfo->pointer); 
+    (**entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
+    (**entry_ll_ptr)->tick = cbinfo->tick;
+    (**entry_ll_ptr)->period = cbinfo->period;
+    (**entry_ll_ptr)->tag = cbinfo->tag;
+    (**entry_ll_ptr)->d.time = 0;
+    (**entry_ll_ptr)->d.data = d.data;
+    (**entry_ll_ptr)->d.param = d.param;
+    (**entry_ll_ptr)->d.osc = d.osc;
+    (**entry_ll_ptr)->next = NULL;
+    (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
+}
+
 uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
-        if ((*entry_ll_ptr)->sequence->tag == tag) {
-            if (period == 0 && tick == 0) { // delete
-                sequence_entry_ll_t *doomed = *entry_ll_ptr;
-                *entry_ll_ptr = doomed->next; // close up list.
-                free(doomed->sequence);
-                free(doomed);
-                return 0;
-            } else { // replace
-                (*entry_ll_ptr)->sequence->period = period;
-                (*entry_ll_ptr)->sequence->tick = tick;
-                (*entry_ll_ptr)->sequence->e = e;
-                return 0;
-            }
+        // Do this first, then add the new one / replacement one at the end. Not a big deal 
+        // This can delete all the deltas from a source event if it matches tag
+        if ((*entry_ll_ptr)->tag == tag) {
+            sequence_entry_ll_t *doomed = *entry_ll_ptr;
+            *entry_ll_ptr = doomed->next; // close up list.
+            free(doomed);
         }
         entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
     }
 
-    // If we got here, we didn't find the tag in the list, so add it at the end.
     if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
     if(tick != 0 && period == 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
-    (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
-    (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
-    (*entry_ll_ptr)->sequence->e = e;
-    (*entry_ll_ptr)->sequence->tick = tick;
-    (*entry_ll_ptr)->sequence->period = period;
-    (*entry_ll_ptr)->sequence->tag = tag;
-    (*entry_ll_ptr)->next = NULL;
+
+    // Get all the deltas for this event
+    // For each delta, add a new entry at the end
+    sequence_callback_info_t cbinfo;
+    cbinfo.tag = tag;
+    cbinfo.tick = tick;
+    cbinfo.period = period;
+    cbinfo.pointer = entry_ll_ptr;
+    amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
 
@@ -100,24 +111,19 @@ void sequencer_check_and_fill() {
             uint8_t deleted = 0;
             uint8_t hit = 0;
             uint8_t delete = 0;
-            if((*entry_ll_ptr)->sequence->period != 0) { // period set 
-                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->sequence->period;
-                if(offset == (*entry_ll_ptr)->sequence->tick) hit = 1;
+            if((*entry_ll_ptr)->period != 0) { // period set 
+                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->period;
+                if(offset == (*entry_ll_ptr)->tick) hit = 1;
             } else {
                 // Test for absolute tick (no period set)
-                if ((*entry_ll_ptr)->sequence->tick == sequencer_tick_count) { hit = 1; delete = 1; }
+                if ((*entry_ll_ptr)->tick == sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {
-                struct event to_add = (*entry_ll_ptr)->sequence->e;
-                to_add.status = EVENT_SCHEDULED;
-                to_add.time = 0; // play now
-                amy_add_event(to_add);
-
+                add_delta_to_queue((*entry_ll_ptr)->d, NULL);
                 // Delete absolute tick addressed sequence entry if sent
                 if(delete) {
                     sequence_entry_ll_t *doomed = *entry_ll_ptr;
                     *entry_ll_ptr = doomed->next; // close up list.
-                    free(doomed->sequence);
                     free(doomed);
                     deleted = 1;
                 }
