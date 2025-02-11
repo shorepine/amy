@@ -1,17 +1,13 @@
 #include "sequencer.h"
 
-typedef struct  {
+typedef struct sequence_entry_ll_t {
     struct delta d;
     uint32_t tag;
     uint32_t tick; // 0 means not used 
     uint32_t period; // 0 means not used 
-} sequence_entry;
-
-// linked list of sequence_entries
-typedef struct sequence_entry_ll_t{
-    sequence_entry *sequence;
     struct sequence_entry_ll_t *next;
 } sequence_entry_ll_t;
+
 
 sequence_entry_ll_t * sequence_entry_ll_start;
 
@@ -43,7 +39,6 @@ void sequencer_reset() {
     while ((*entry_ll_ptr) != NULL) {
         sequence_entry_ll_t *doomed = *entry_ll_ptr;
         *entry_ll_ptr = doomed->next; // close up list.
-        free(doomed->sequence);
         free(doomed);
     }
     sequence_entry_ll_start = NULL;
@@ -54,25 +49,26 @@ void sequencer_recompute() {
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
+
 void add_delta_to_sequencer(struct delta d, void*user_data) {
     sequence_entry_ll_t **entry_ll_ptr = (sequence_entry_ll_t **)user_data;
-    uint32_t tick = (*entry_ll_ptr)->sequence->tick;
-    uint32_t tag = (*entry_ll_ptr)->sequence->tag;
-    uint32_t period = (*entry_ll_ptr)->sequence->period;
+    uint32_t tick = (*entry_ll_ptr)->tick;
+    uint32_t tag = (*entry_ll_ptr)->tag;
+    uint32_t period = (*entry_ll_ptr)->period;
 
-    fprintf(stderr, "ll is %p *ll is %p tick %d tag %d period %d adding data %d param %d osc %d to deltas\n", entry_ll_ptr, *entry_ll_ptr, tick, tag, period, d.data, d.param, d.osc);
-    (*entry_ll_ptr)->sequence->d.time = 0;
-    (*entry_ll_ptr)->sequence->d.data = d.data;
-    (*entry_ll_ptr)->sequence->d.param = d.param;
-    (*entry_ll_ptr)->sequence->d.osc = d.osc;
+    //fprintf(stderr, "ll is %p *ll is %p tick %d tag %d period %d adding data %d param %d osc %d to deltas\n", entry_ll_ptr, *entry_ll_ptr, tick, tag, period, d.data, d.param, d.osc);
+    (*entry_ll_ptr)->d.time = 0;
+    (*entry_ll_ptr)->d.data = d.data;
+    (*entry_ll_ptr)->d.param = d.param;
+    (*entry_ll_ptr)->d.osc = d.osc;
 
     // Get the next one ready
     (*entry_ll_ptr)->next = malloc(sizeof(sequence_entry_ll_t));
-    (*entry_ll_ptr) = ((*entry_ll_ptr)->next);
-    (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
-    (*entry_ll_ptr)->sequence->tick = tick;
-    (*entry_ll_ptr)->sequence->period = period;
-    (*entry_ll_ptr)->sequence->tag = tag;
+    entry_ll_ptr = &((*entry_ll_ptr)->next);
+    (*entry_ll_ptr)->tick = tick;
+    (*entry_ll_ptr)->period = period;
+    (*entry_ll_ptr)->tag = tag;
+    (*entry_ll_ptr)->next = NULL;
 }
 
 uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
@@ -82,10 +78,9 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
     while ((*entry_ll_ptr) != NULL) {
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
         // This can delete all the deltas from a source event if it matches tag
-        if ((*entry_ll_ptr)->sequence->tag == tag) {
+        if ((*entry_ll_ptr)->tag == tag) {
             sequence_entry_ll_t *doomed = *entry_ll_ptr;
             *entry_ll_ptr = doomed->next; // close up list.
-            free(doomed->sequence);
             free(doomed);
         }
         entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
@@ -99,12 +94,13 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 
     // Init the first one and fill in the sequence params
     (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
-    (*entry_ll_ptr)->sequence = malloc(sizeof(sequence_entry));
-    (*entry_ll_ptr)->sequence->tick = tick;
-    (*entry_ll_ptr)->sequence->period = period;
-    (*entry_ll_ptr)->sequence->tag = tag;
+    (*entry_ll_ptr)->tick = tick;
+    (*entry_ll_ptr)->period = period;
+    (*entry_ll_ptr)->tag = tag;
     amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)entry_ll_ptr);
 
+    // I now need to remove the extra allocated tail, but i don't know how
+    
     return 1;
 }
 
@@ -121,26 +117,25 @@ void sequencer_check_and_fill() {
             uint8_t delete = 0;
             fprintf(stderr, "searching... *ll is %p tick %d period %d tag %d \n",
                 (*entry_ll_ptr),
-                (*entry_ll_ptr)->sequence->tick, (*entry_ll_ptr)->sequence->period, (*entry_ll_ptr)->sequence->tag);
-            if((*entry_ll_ptr)->sequence->period != 0) { // period set 
-                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->sequence->period;
-                if(offset == (*entry_ll_ptr)->sequence->tick) hit = 1;
+                (*entry_ll_ptr)->tick, (*entry_ll_ptr)->period, (*entry_ll_ptr)->tag);
+            if((*entry_ll_ptr)->period != 0) { // period set 
+                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->period;
+                if(offset == (*entry_ll_ptr)->tick) hit = 1;
             } else {
                 // Test for absolute tick (no period set)
-                if ((*entry_ll_ptr)->sequence->tick == sequencer_tick_count) { hit = 1; delete = 1; }
+                if ((*entry_ll_ptr)->tick == sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {
-                struct delta d= (*entry_ll_ptr)->sequence->d;
+                struct delta d= (*entry_ll_ptr)->d;
                 fprintf(stderr, "hit: tick %d period %d tag %d data %d param %d osc %d to deltas\n", 
-                    sequencer_tick_count, (*entry_ll_ptr)->sequence->period, (*entry_ll_ptr)->sequence->tag,
+                    sequencer_tick_count, (*entry_ll_ptr)->period, (*entry_ll_ptr)->tag,
                     d.data, d.param, d.osc);
-                add_delta_to_queue((*entry_ll_ptr)->sequence->d, NULL);
+                add_delta_to_queue((*entry_ll_ptr)->d, NULL);
 
                 // Delete absolute tick addressed sequence entry if sent
                 if(delete) {
                     sequence_entry_ll_t *doomed = *entry_ll_ptr;
                     *entry_ll_ptr = doomed->next; // close up list.
-                    free(doomed->sequence);
                     free(doomed);
                     deleted = 1;
                 }
