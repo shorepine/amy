@@ -60,6 +60,8 @@ void add_delta_to_sequencer(struct delta d, void*user_data) {
     sequence_callback_info_t * cbinfo = (sequence_callback_info_t *)user_data;
     sequence_entry_ll_t ***entry_ll_ptr = &(cbinfo->pointer); 
     (**entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
+    //fprintf(stderr, "ll %p adding tag %d period %d tick %d data %d param %d osc %d\n",
+    //    (**entry_ll_ptr), cbinfo->tag, cbinfo->period, cbinfo->tick, d.data, d.param, d.osc);
     (**entry_ll_ptr)->tick = cbinfo->tick;
     (**entry_ll_ptr)->period = cbinfo->period;
     (**entry_ll_ptr)->tag = cbinfo->tag;
@@ -79,11 +81,13 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
         // This can delete all the deltas from a source event if it matches tag
         if ((*entry_ll_ptr)->tag == tag) {
+            //fprintf(stderr, "ll %p found tag %d, deleting\n", (*entry_ll_ptr), tag);
             sequence_entry_ll_t *doomed = *entry_ll_ptr;
             *entry_ll_ptr = doomed->next; // close up list.
             free(doomed);
+        } else {
+            entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
         }
-        entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
     }
 
     if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
