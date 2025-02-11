@@ -404,7 +404,9 @@ extern uint8_t amy_transfer_flag ;
 
 struct event amy_default_event();
 void amy_add_event(struct event e);
+void add_delta_to_queue(struct delta d, void*user_data);
 void amy_add_event_internal(struct event e, uint16_t base_osc);
+void amy_parse_event_to_deltas(struct event e, uint16_t base_osc, void (*callback)(struct delta d, void*user_data), void*user_data );
 int16_t * amy_simple_fill_buffer() ;
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
@@ -516,7 +518,7 @@ extern void partials_note_off(uint16_t osc);
 extern void interp_partials_note_on(uint16_t osc);
 extern void interp_partials_note_off(uint16_t osc);
 extern void patches_load_patch(struct event e); 
-extern void patches_event_has_voices(struct event e);
+extern void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data );
 extern void patches_reset();
 extern void patches_debug();
 extern void patches_store_patch(char * message);

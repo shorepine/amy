@@ -101,7 +101,7 @@ extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, 
 
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 
 // So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(struct event e) {
+void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
@@ -111,7 +111,7 @@ void patches_event_has_voices(struct event e) {
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
-            amy_add_event_internal(e, target_osc);
+            amy_parse_event_to_deltas(e, target_osc, callback, user_data);
         }
     }
 }

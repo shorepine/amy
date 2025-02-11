@@ -403,7 +403,7 @@ struct event amy_default_event() {
     return e;
 }
 
-void add_delta_to_queue(struct delta d) {
+void add_delta_to_queue(struct delta d, void*user_data) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
 #if defined ESP_PLATFORM && !defined ARDUINO
     //  take the queue mutex before starting
@@ -458,8 +458,12 @@ void amy_add_event(struct event e) {
     amy_add_event_internal(e, 0);
 }
 
-// Add a API facing event, convert into delta directly
 void amy_add_event_internal(struct event e, uint16_t base_osc) {
+    amy_parse_event_to_deltas(e, base_osc, add_delta_to_queue, NULL);
+}
+
+// Add a API facing event, convert into delta directly
+void amy_parse_event_to_deltas(struct event e, uint16_t base_osc, void (*callback)(struct delta d, void*user_data), void*user_data ) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
     struct delta d;
 
@@ -474,11 +478,11 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     // you must set both voices & load_patch together to load a patch 
     if(e.voices[0] != 0 && AMY_IS_SET(e.load_patch)) {
         patches_load_patch(e);
-        patches_event_has_voices(e);
+        patches_event_has_voices(e, callback, user_data);
         goto end;
     } else {
         if(e.voices[0] != 0) {
-            patches_event_has_voices(e);
+            patches_event_has_voices(e, callback, user_data);
             goto end;
         }
     }
@@ -487,18 +491,18 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
     d.time = e.time;
     d.osc = e.osc;
     // Everything else only added to queue if set
-    if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.wave)) { d.param=WAVE; d.data = *(uint32_t *)&e.wave; callback(d, user_data); }
+    if(AMY_IS_SET(e.patch)) { d.param=PATCH; d.data = *(uint32_t *)&e.patch; callback(d, user_data); }
+    if(AMY_IS_SET(e.midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e.midi_note; callback(d, user_data); }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.amp_coefs[i])) {  d.param=AMP + i; d.data = *(uint32_t *)&e.amp_coefs[i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.amp_coefs[i])) {  d.param=AMP + i; d.data = *(uint32_t *)&e.amp_coefs[i]; callback(d, user_data); }
 
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
         if(AMY_IS_SET(e.freq_coefs[i])) {
             float freq_coef = e.freq_coefs[i];
             // Const freq coef is in Hz, rest are linear.
             if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
-            d.param=FREQ + i; d.data = *(uint32_t *)&freq_coef; add_delta_to_queue(d);
+            d.param=FREQ + i; d.data = *(uint32_t *)&freq_coef; callback(d, user_data);
         }
     }
 
@@ -507,35 +511,35 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
             float freq_coef = e.filter_freq_coefs[i];
             // Const freq coef is in Hz, rest are linear.
             if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
-            d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&freq_coef; add_delta_to_queue(d);
+            d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&freq_coef; callback(d, user_data);
         }
     }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.duty_coefs[i])) {  d.param=DUTY + i; d.data = *(uint32_t *)&e.duty_coefs[i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.duty_coefs[i])) {  d.param=DUTY + i; d.data = *(uint32_t *)&e.duty_coefs[i]; callback(d, user_data); }
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e.pan_coefs[i])) { d.param=PAN + i; d.data = *(uint32_t *)&e.pan_coefs[i]; add_delta_to_queue(d); }
+        if(AMY_IS_SET(e.pan_coefs[i])) { d.param=PAN + i; d.data = *(uint32_t *)&e.pan_coefs[i]; callback(d, user_data); }
 
 
-    if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.pitch_bend)) { d.param=PITCH_BEND; d.data = *(uint32_t *)&e.pitch_bend; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.tempo)) { d.param=TEMPO; d.data = *(uint32_t *)&e.tempo; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e.feedback; callback(d, user_data); }
+    if(AMY_IS_SET(e.phase)) { d.param=PHASE; d.data = *(uint32_t *)&e.phase; callback(d, user_data); }
+    if(AMY_IS_SET(e.volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e.volume; callback(d, user_data); }
+    if(AMY_IS_SET(e.pitch_bend)) { d.param=PITCH_BEND; d.data = *(uint32_t *)&e.pitch_bend; callback(d, user_data); }
+    if(AMY_IS_SET(e.latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e.latency_ms; callback(d, user_data); }
+    if(AMY_IS_SET(e.tempo)) { d.param=TEMPO; d.data = *(uint32_t *)&e.tempo; callback(d, user_data); }
+    if(AMY_IS_SET(e.ratio)) { float logratio = log2f(e.ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; callback(d, user_data); }
+    if(AMY_IS_SET(e.resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e.resonance; callback(d, user_data); }
+    if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; callback(d, user_data); }
+    if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; callback(d, user_data); }
+    if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; callback(d, user_data); }
+    if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; callback(d, user_data); }
+    if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; callback(d, user_data); }
+    if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; callback(d, user_data); }
+    if(AMY_IS_SET(e.eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e.eq_l; callback(d, user_data); }
+    if(AMY_IS_SET(e.eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e.eq_m; callback(d, user_data); }
+    if(AMY_IS_SET(e.eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e.eq_h; callback(d, user_data); }
 
-    if(AMY_IS_SET(e.eg_type[0]))  { d.param=EG0_TYPE; d.data = e.eg_type[0]; add_delta_to_queue(d); }
-    if(AMY_IS_SET(e.eg_type[1]))  { d.param=EG1_TYPE; d.data = e.eg_type[1]; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.eg_type[0]))  { d.param=EG0_TYPE; d.data = e.eg_type[0]; callback(d, user_data); }
+    if(AMY_IS_SET(e.eg_type[1]))  { d.param=EG1_TYPE; d.data = e.eg_type[1]; callback(d, user_data); }
 
     if(e.algo_source[0] != 0) {
         struct synthinfo t;
@@ -547,7 +551,7 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
             } else{
                 d.data = t.algo_source[i];
             }
-            add_delta_to_queue(d); 
+            callback(d, user_data); 
         }
     }
 
@@ -561,22 +565,22 @@ void amy_add_event_internal(struct event e, uint16_t base_osc) {
             int num_bps = parse_breakpoint(&t, bps[i], i);
             for(uint8_t j = 0; j < num_bps; j++) {
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
-                    d.param = BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; add_delta_to_queue(d);
+                    d.param = BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_times[i][j]; callback(d, user_data);
                 }
                 if(AMY_IS_SET(t.breakpoint_values[i][j])) {
-                    d.param = BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; add_delta_to_queue(d);
+                    d.param = BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data = *(uint32_t *)&t.breakpoint_values[i][j]; callback(d, user_data);
                 }
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
                 uint32_t unset_time = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
-                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2); d.data = *(uint32_t *)&unset_time; add_delta_to_queue(d);
+                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2); d.data = *(uint32_t *)&unset_time; callback(d, user_data);
             }
         }
     }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; add_delta_to_queue(d); }
+    if(AMY_IS_SET(e.velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e.velocity; callback(d, user_data); }
 end:
     message_counter++;
     AMY_PROFILE_STOP(AMY_ADD_EVENT)
