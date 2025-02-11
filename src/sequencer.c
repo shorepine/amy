@@ -8,6 +8,13 @@ typedef struct sequence_entry_ll_t {
     struct sequence_entry_ll_t *next;
 } sequence_entry_ll_t;
 
+// A pointer to a sequence entry and the sequence metadata, for passing to the callback
+typedef struct sequence_callback_info_t {
+    struct sequence_entry_ll_t ** pointer;
+    uint32_t tag;
+    uint32_t tick; // 0 means not used 
+    uint32_t period; // 0 means not used 
+} sequence_callback_info_t;    
 
 sequence_entry_ll_t * sequence_entry_ll_start;
 
@@ -49,26 +56,19 @@ void sequencer_recompute() {
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
-
 void add_delta_to_sequencer(struct delta d, void*user_data) {
-    sequence_entry_ll_t **entry_ll_ptr = (sequence_entry_ll_t **)user_data;
-    uint32_t tick = (*entry_ll_ptr)->tick;
-    uint32_t tag = (*entry_ll_ptr)->tag;
-    uint32_t period = (*entry_ll_ptr)->period;
-
-    //fprintf(stderr, "ll is %p *ll is %p tick %d tag %d period %d adding data %d param %d osc %d to deltas\n", entry_ll_ptr, *entry_ll_ptr, tick, tag, period, d.data, d.param, d.osc);
-    (*entry_ll_ptr)->d.time = 0;
-    (*entry_ll_ptr)->d.data = d.data;
-    (*entry_ll_ptr)->d.param = d.param;
-    (*entry_ll_ptr)->d.osc = d.osc;
-
-    // Get the next one ready
-    (*entry_ll_ptr)->next = malloc(sizeof(sequence_entry_ll_t));
-    entry_ll_ptr = &((*entry_ll_ptr)->next);
-    (*entry_ll_ptr)->tick = tick;
-    (*entry_ll_ptr)->period = period;
-    (*entry_ll_ptr)->tag = tag;
-    (*entry_ll_ptr)->next = NULL;
+    sequence_callback_info_t * cbinfo = (sequence_callback_info_t *)user_data;
+    sequence_entry_ll_t ***entry_ll_ptr = &(cbinfo->pointer); 
+    (**entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
+    (**entry_ll_ptr)->tick = cbinfo->tick;
+    (**entry_ll_ptr)->period = cbinfo->period;
+    (**entry_ll_ptr)->tag = cbinfo->tag;
+    (**entry_ll_ptr)->d.time = 0;
+    (**entry_ll_ptr)->d.data = d.data;
+    (**entry_ll_ptr)->d.param = d.param;
+    (**entry_ll_ptr)->d.osc = d.osc;
+    (**entry_ll_ptr)->next = NULL;
+    (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
 }
 
 uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
@@ -91,16 +91,12 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 
     // Get all the deltas for this event
     // For each delta, add a new entry at the end
-
-    // Init the first one and fill in the sequence params
-    (*entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
-    (*entry_ll_ptr)->tick = tick;
-    (*entry_ll_ptr)->period = period;
-    (*entry_ll_ptr)->tag = tag;
-    amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)entry_ll_ptr);
-
-    // I now need to remove the extra allocated tail, but i don't know how
-    
+    sequence_callback_info_t cbinfo;
+    cbinfo.tag = tag;
+    cbinfo.tick = tick;
+    cbinfo.period = period;
+    cbinfo.pointer = entry_ll_ptr;
+    amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
 
@@ -115,9 +111,6 @@ void sequencer_check_and_fill() {
             uint8_t deleted = 0;
             uint8_t hit = 0;
             uint8_t delete = 0;
-            fprintf(stderr, "searching... *ll is %p tick %d period %d tag %d \n",
-                (*entry_ll_ptr),
-                (*entry_ll_ptr)->tick, (*entry_ll_ptr)->period, (*entry_ll_ptr)->tag);
             if((*entry_ll_ptr)->period != 0) { // period set 
                 uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->period;
                 if(offset == (*entry_ll_ptr)->tick) hit = 1;
@@ -126,12 +119,7 @@ void sequencer_check_and_fill() {
                 if ((*entry_ll_ptr)->tick == sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {
-                struct delta d= (*entry_ll_ptr)->d;
-                fprintf(stderr, "hit: tick %d period %d tag %d data %d param %d osc %d to deltas\n", 
-                    sequencer_tick_count, (*entry_ll_ptr)->period, (*entry_ll_ptr)->tag,
-                    d.data, d.param, d.osc);
                 add_delta_to_queue((*entry_ll_ptr)->d, NULL);
-
                 // Delete absolute tick addressed sequence entry if sent
                 if(delete) {
                     sequence_entry_ll_t *doomed = *entry_ll_ptr;
