@@ -61,7 +61,7 @@ float _logfreq_of_midi_cents(float midi_cents) {
 }
 
 float _env_lin_of_db(float db) {
-    float lin =  powf(10.f, (db - 100) / 20.f) - 0.001;
+    float lin =  powf(10.f, MIN(20.f, (db - 100.f)) / 20.f) - 0.001;
     if (lin < 0)  return 0;
     return lin;
 }
