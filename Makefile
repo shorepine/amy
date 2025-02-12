@@ -33,7 +33,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_live_start', '_amy_start', '_sequencer_ticks', '_malloc', '_free']"
+-s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_live_stop', '_amy_live_start', '_amy_start', '_sequencer_ticks', '_malloc', '_free']"
 
 PYTHON = python3
 
@@ -59,7 +59,7 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 	${PYTHON} amy_headers.py
 
 %.o: %.c $(HEADERS) src/patches.h
-	$(CC) $(CFLAGS) -DAMY_HAS_AUDIO_IN -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.mm $(HEADERS)
 	clang $(CFLAGS) -c $< -o $@
@@ -89,7 +89,7 @@ docs/amy.js: $(TARGET)
 	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 docs/amy-audioin.js: $(TARGET)
-	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -DAMY_HAS_AUDIO_IN -O3 -o $@
+	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o
