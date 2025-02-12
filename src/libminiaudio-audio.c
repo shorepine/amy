@@ -128,7 +128,7 @@ ma_uint32 captureCount;
 
 // start 
 
-amy_err_t miniaudio_init() {
+amy_err_t miniaudio_init(uint8_t audio_in) {
     leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, FBL_RAM_CAPS);
 
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
@@ -140,23 +140,24 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     
-#ifdef AMY_HAS_AUDIO_IN
-    if (amy_playback_device_id >= (int32_t)playbackCount || amy_capture_device_id >= (int32_t)captureCount) {
-        printf("invalid device\n");
-        exit(1);
+    if(audio_in) {
+        if (amy_playback_device_id >= (int32_t)playbackCount || amy_capture_device_id >= (int32_t)captureCount) {
+            printf("invalid device\n");
+            exit(1);
+        }
+    } else {
+        if (amy_playback_device_id >= (int32_t)playbackCount) {
+            printf("invalid device\n");
+            exit(1);
+        }
     }
-#else
-    if (amy_playback_device_id >= (int32_t)playbackCount) {
-        printf("invalid device\n");
-        exit(1);
-    }
-#endif
 
-#ifdef AMY_HAS_AUDIO_IN
-    deviceConfig = ma_device_config_init(ma_device_type_duplex);
-#else
-    deviceConfig = ma_device_config_init(ma_device_type_playback);
-#endif
+    if(audio_in) {
+        deviceConfig = ma_device_config_init(ma_device_type_duplex);
+    } else {
+        deviceConfig = ma_device_config_init(ma_device_type_playback);
+    }
+
     if(amy_playback_device_id >= 0) {
         deviceConfig.playback.pDeviceID = &pPlaybackInfos[amy_playback_device_id].id;
     } else {
@@ -165,15 +166,15 @@ amy_err_t miniaudio_init() {
     deviceConfig.playback.format   = DEVICE_FORMAT;
     deviceConfig.playback.channels = AMY_NCHANS;
 
-#ifdef AMY_HAS_AUDIO_IN
-    if(amy_capture_device_id >= 0) {
-        deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_capture_device_id].id;
-    } else {
-        deviceConfig.capture.pDeviceID = NULL; // system default
+    if(audio_in) {
+        if(amy_capture_device_id >= 0) {
+            deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_capture_device_id].id;
+        } else {
+            deviceConfig.capture.pDeviceID = NULL; // system default
+        }
+        deviceConfig.capture.format   = DEVICE_FORMAT;
+        deviceConfig.capture.channels = AMY_NCHANS;
     }
-    deviceConfig.capture.format   = DEVICE_FORMAT;
-    deviceConfig.capture.channels = AMY_NCHANS;
-#endif
 
     deviceConfig.sampleRate        = AMY_SAMPLE_RATE;
     deviceConfig.dataCallback      = data_callback;
@@ -195,7 +196,8 @@ amy_err_t miniaudio_init() {
 }
 
 void *miniaudio_run(void *vargp) {
-    miniaudio_init();
+    // Always audio in on non-web posix platforms
+    miniaudio_init(1);
     
     while(amy_running) {
         sleep(1);
@@ -203,11 +205,11 @@ void *miniaudio_run(void *vargp) {
     return NULL;
 }
 
-void amy_live_start() {
+void amy_live_start(uint8_t audio_in) {
     // kick off a thread running miniaudio_run
     amy_running = 1;
     #ifdef __EMSCRIPTEN__
-    miniaudio_init();
+    miniaudio_init(audio_in);
     emscripten_set_main_loop(main_loop__em, 0, 0);
     #else
     pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);

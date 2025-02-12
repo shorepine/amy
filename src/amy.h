@@ -483,7 +483,7 @@ struct event amy_parse_message(char * message);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo);
 void amy_stop();
-void amy_live_start();
+void amy_live_start(uint8_t audio_in);
 void amy_live_stop();
 void amy_reset_oscs();
 void amy_print_devices();

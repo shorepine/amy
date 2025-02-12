@@ -129,7 +129,7 @@ void bleep() {
 
 void main() {
     amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0,  /* echo */ 1); // initializes amy 
-    amy_live_start(); // render live audio
+    amy_live_start(1); // render live audio
     bleep();
 }
 ```
@@ -141,7 +141,7 @@ Or in C, sending the wire protocol directly:
 
 void main() {
     amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 1);
-    amy_live_start();
+    amy_live_start(1);
     amy_play_message("v0n50l1K130r0Z");
 }
 ```

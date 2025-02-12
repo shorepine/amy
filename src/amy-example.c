@@ -83,7 +83,7 @@ int main(int argc, char ** argv) {
             exit (1) ;
         }
     } else {
-        amy_live_start();
+        amy_live_start(1);
     }
 
     /*

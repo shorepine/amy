@@ -26,7 +26,7 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args) {
         amy_playback_device_id = arg1;
         amy_capture_device_id = arg2;
     }
-    amy_live_start();
+    amy_live_start(1);
     return Py_None;
 }
 
