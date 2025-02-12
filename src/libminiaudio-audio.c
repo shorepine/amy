@@ -209,6 +209,7 @@ void amy_live_start(uint8_t audio_in) {
     // kick off a thread running miniaudio_run
     amy_running = 1;
     #ifdef __EMSCRIPTEN__
+    emscripten_cancel_main_loop();
     miniaudio_init(audio_in);
     emscripten_set_main_loop(main_loop__em, 0, 0);
     #else
