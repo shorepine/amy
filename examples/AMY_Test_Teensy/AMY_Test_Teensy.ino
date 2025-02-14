@@ -14,6 +14,8 @@
 AudioPlayQueue           queue_l;
 AudioPlayQueue           queue_r;
 AudioOutputI2S           i2s1;
+// could also be
+//AudioOutputPT8211           i2s1;
 AudioConnection          patchCord1(queue_r, 0, i2s1, 1);
 AudioConnection          patchCord2(queue_l, 0, i2s1, 0);
 
@@ -32,7 +34,6 @@ void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 10000UL);
   Serial.println("Welcome to AMY example");
-
   // Start up AMY
   amy.begin(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 0);
 
@@ -58,9 +59,16 @@ void setup() {
 void loop() {
   // In your loop you have to get the buffer of samples and then play it out your device
   int16_t * samples = amy.render_to_buffer();
-  for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-    samples_l[i] = samples[i*2];
-    samples_r[i] = samples[i*2+1];
+  if(AMY_NCHANS==1) {
+    for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+      samples_l[i] = samples[i];
+      samples_r[i] = samples[i];
+    }
+  } else {
+    for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+      samples_l[i] = samples[i*2];
+      samples_r[i] = samples[i*2+1];
+    }  
   }
   queue_l.play(samples_l, AMY_BLOCK_SIZE);
   queue_r.play(samples_r, AMY_BLOCK_SIZE);
