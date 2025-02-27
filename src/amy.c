@@ -688,6 +688,26 @@ void amy_reset_oscs() {
 }
 
 
+void amy_events_reset() {
+    // make a fencepost last event with no next, time of end-1, and call it start for now, all other events get inserted before it
+    events[0].next = NULL;
+    events[0].time = UINT32_MAX - 1;
+    events[0].osc = 0;
+    events[0].data = 0;
+    events[0].param = NO_PARAM;
+    amy_global.next_event_write = 1;
+    amy_global.event_start = &events[0];
+    amy_global.event_qsize = 1;
+
+    // set all the other events to empty
+    for(uint16_t i=1;i<AMY_EVENT_FIFO_LEN;i++) {
+        events[i].time = UINT32_MAX;
+        events[i].next = NULL;
+        events[i].osc = 0;
+        events[i].data = 0;
+        events[i].param = NO_PARAM;
+    }
+}
 
 // the synth object keeps held state, whereas events are only deltas/changes
 int8_t oscs_init() {
@@ -709,25 +729,9 @@ int8_t oscs_init() {
     block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, BLOCK_RAM_CAPS);
     // set all oscillators to their default values
     amy_reset_oscs();
+    // reset the events queue
+    amy_events_reset();
 
-    // make a fencepost last event with no next, time of end-1, and call it start for now, all other events get inserted before it
-    events[0].next = NULL;
-    events[0].time = UINT32_MAX - 1;
-    events[0].osc = 0;
-    events[0].data = 0;
-    events[0].param = NO_PARAM;
-    amy_global.next_event_write = 1;
-    amy_global.event_start = &events[0];
-    amy_global.event_qsize = 1; // queue will always have at least 1 thing in it 
-
-    // set all the other events to empty
-    for(uint16_t i=1;i<AMY_EVENT_FIFO_LEN;i++) {
-        events[i].time = UINT32_MAX;
-        events[i].next = NULL;
-        events[i].osc = 0;
-        events[i].data = 0;
-        events[i].param = NO_PARAM;
-    }
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     per_osc_fb = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, FBL_RAM_CAPS); // one per core, just core 0 used off esp32
     // clear out both as local mode won't use fbl[1] 
@@ -981,7 +985,7 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == RESET_OSC) { 
-        // Remember that RESET_TIMEBASE happens immediately in the parse, so we don't deal with it here.
+        // Remember that RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
         if(*(int16_t *)&d.data & RESET_AMY) {
             amy_stop();
             amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
@@ -1878,6 +1882,11 @@ struct event amy_parse_message(char * message) {
                             // if we're resetting timebase, do it NOW
                             if(e.reset_osc & RESET_TIMEBASE) {
                                 amy_reset_sysclock();
+                                AMY_UNSET(e.reset_osc);
+                            }
+                            if(e.reset_osc & RESET_EVENTS) {
+                                amy_events_reset();
+                                AMY_UNSET(e.reset_osc);
                             }
                             break;
                         case 's': e.pitch_bend = atoff(message + start); break;
