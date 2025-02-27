@@ -120,6 +120,7 @@ enum coefs{
 #define RESET_ALL_OSCS 8192
 #define RESET_TIMEBASE 16384
 #define RESET_AMY 32768
+#define RESET_EVENTS 65536
 
 
 #define true 1
@@ -306,7 +307,7 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
-    uint16_t reset_osc;
+    uint32_t reset_osc;
     uint8_t status;
 };
 
@@ -403,6 +404,7 @@ extern uint8_t amy_transfer_flag ;
 
 
 struct event amy_default_event();
+void amy_events_reset();
 void amy_add_event(struct event e);
 void add_delta_to_queue(struct delta d, void*user_data);
 void amy_add_event_internal(struct event e, uint16_t base_osc);
