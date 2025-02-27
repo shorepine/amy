@@ -1,11 +1,7 @@
-// esp32.c
-// functions to start AMY in esp32, esp32s3, esp32p4
+// platforms.c
+// functions to start AMY in esp32, esp32s3, esp32p4, rp2040, rp2530, posix, webassembly
 
-// Alles multicast synthesizer
-// Brian Whitman
-// brian@variogr.am
-
-#include "esp32.h"
+#include "platforms.h"
 
 uint8_t external_map[AMY_OSCS];
 
