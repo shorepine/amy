@@ -911,6 +911,8 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
 
+
+
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
     AMY_PROFILE_START(PLAY_EVENT)
@@ -986,18 +988,21 @@ void play_event(struct delta d) {
     }
     if(d.param == RESET_OSC) { 
         // Remember that RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
-        if(*(int16_t *)&d.data & RESET_AMY) {
+        if(*(uint32_t *)&d.data & RESET_AMY) {
             amy_stop();
             amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
         }
-        if(*(int16_t *)&d.data & RESET_ALL_OSCS) { 
+        if(*(uint32_t *)&d.data & RESET_ALL_OSCS) { 
             amy_reset_oscs(); 
         }
-        if(*(int16_t *)&d.data & RESET_SEQUENCER) { 
+        if(*(uint32_t *)&d.data & RESET_SEQUENCER) { 
             sequencer_reset(); 
         }
-        if(*(int16_t *)&d.data < AMY_OSCS+1) { 
-            reset_osc(*(int16_t *)&d.data); 
+        if(*(uint32_t *)&d.data & RESET_ALL_NOTES) { 
+            all_notes_off(); 
+        }
+        if(*(uint32_t *)&d.data < AMY_OSCS+1) { 
+            reset_osc(*(uint32_t *)&d.data); 
         } 
     }
     if(d.param == MOD_SOURCE) {

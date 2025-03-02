@@ -121,7 +121,7 @@ enum coefs{
 #define RESET_TIMEBASE 16384
 #define RESET_AMY 32768
 #define RESET_EVENTS 65536
-
+#define RESET_ALL_NOTES 131072
 
 #define true 1
 #define false 0
@@ -522,6 +522,7 @@ extern void interp_partials_note_off(uint16_t osc);
 extern void patches_load_patch(struct event e); 
 extern void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data );
 extern void patches_reset();
+extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(char * message);
 
