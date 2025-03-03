@@ -48,6 +48,16 @@ void patches_debug() {
     }
 }
 
+void all_notes_off() {
+    for(uint16_t i=0;i<AMY_OSCS;i++) {
+        if (AMY_IS_SET(osc_to_voice[i])) {
+            if(synth[i].status == SYNTH_AUDIBLE) {
+                synth[i].status = SYNTH_AUDIBLE_SUSPENDED;
+            }
+        }
+    }
+}
+
 void patches_init() {
     for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
         memory_patch_oscs[i]  = 0;
