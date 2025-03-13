@@ -1184,6 +1184,9 @@ void hold_and_modify(uint16_t osc) {
     if(amy_external_coef_hook != NULL) {
         ctrl_inputs[COEF_EXT0] = amy_external_coef_hook(0);
         ctrl_inputs[COEF_EXT1] = amy_external_coef_hook(1);
+    } else {
+        ctrl_inputs[COEF_EXT0] = 0;
+        ctrl_inputs[COEF_EXT1] = 0;        
     }
 
     msynth[osc].last_pan = msynth[osc].pan;
