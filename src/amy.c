@@ -606,8 +606,6 @@ void reset_osc(uint16_t i ) {
     synth[i].amp_coefs[COEF_CONST] = 1.0f;  // Mostly a no-op, but partials_note_on used to want this?
     synth[i].amp_coefs[COEF_VEL] = 1.0f;
     synth[i].amp_coefs[COEF_EG0] = 1.0f;
-    synth[i].amp_coefs[COEF_EXT0] = 1.0f;
-    synth[i].amp_coefs[COEF_EXT1] = 1.0f;
     msynth[i].amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
     msynth[i].last_amp = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
