@@ -57,7 +57,7 @@ typedef int16_t output_sample_type;
 #define ZERO_LOGFREQ_IN_HZ 261.63
 #define ZERO_MIDI_NOTE 60
 
-#define NUM_COMBO_COEFS 7  // 7 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend
+#define NUM_COMBO_COEFS 9  // 9 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend, ext0, ext1
 enum coefs{
     COEF_CONST = 0,
     COEF_NOTE = 1,
@@ -66,6 +66,8 @@ enum coefs{
     COEF_EG1 = 4,
     COEF_MOD = 5,
     COEF_BEND = 6,
+    COEF_EXT0 = 7,
+    COEF_EXT1 = 8,
 };
 
 #define MAX_MESSAGE_LEN 1024
@@ -149,6 +151,7 @@ typedef int amy_err_t;
 #endif
 
 extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
+extern float (*amy_external_coef_hook)(uint16_t);
 
 
 enum params{

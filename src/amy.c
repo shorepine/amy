@@ -126,6 +126,10 @@ int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 // Optional render hook that's called per oscillator during rendering
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
 
+// Optional external coef setter (meant for CV control of AMY)
+float (*amy_external_coef_hook)(uint16_t) = NULL;
+
+
 #ifndef MALLOC_CAPS_DEFINED
 #define MALLOC_CAPS_DEFINED
 void * malloc_caps(uint32_t size, uint32_t flags) {
@@ -1177,6 +1181,13 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
+    if(amy_external_coef_hook != NULL) {
+        ctrl_inputs[COEF_EXT0] = amy_external_coef_hook(0);
+        ctrl_inputs[COEF_EXT1] = amy_external_coef_hook(1);
+    } else {
+        ctrl_inputs[COEF_EXT0] = 0;
+        ctrl_inputs[COEF_EXT1] = 0;        
+    }
 
     msynth[osc].last_pan = msynth[osc].pan;
 
