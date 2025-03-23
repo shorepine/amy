@@ -10,6 +10,11 @@ int debug_flag = 0;
 
 
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+
 #ifdef AMY_DEBUG
 
 const char* profile_tag_name(enum itags tag) {
@@ -1185,6 +1190,10 @@ void hold_and_modify(uint16_t osc) {
         ctrl_inputs[COEF_EXT0] = amy_external_coef_hook(0);
         ctrl_inputs[COEF_EXT1] = amy_external_coef_hook(1);
     } else {
+        #ifdef __EMSCRIPTEN__
+        ctrl_inputs[COEF_EXT0] = EM_ASM_DOUBLE({ if(amy_coef_js_hook) { return amy_coef_js_hook(0);} else return 0; });
+        ctrl_inputs[COEF_EXT1] = EM_ASM_DOUBLE({ if(amy_coef_js_hook) { return amy_coef_js_hook(1);} else return 0; });
+        #endif
         ctrl_inputs[COEF_EXT0] = 0;
         ctrl_inputs[COEF_EXT1] = 0;        
     }
@@ -1375,6 +1384,13 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             uint8_t handled = 0;
             if(amy_external_render_hook!=NULL) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
+            } else {
+                #ifdef __EMSCRIPTEN__
+                handled = EM_ASM_INT({
+                    if(amy_external_render_js_hook) {
+                        return amy_external_render_js_hook($0, $1, $2);    
+                    }}, osc, per_osc_fb[core], AMY_BLOCK_SIZE);
+                #endif
             }
             // only mix the audio in if the external hook did not handle it
             if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
