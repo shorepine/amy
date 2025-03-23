@@ -1191,8 +1191,8 @@ void hold_and_modify(uint16_t osc) {
         ctrl_inputs[COEF_EXT1] = amy_external_coef_hook(1);
     } else {
         #ifdef __EMSCRIPTEN__
-        ctrl_inputs[COEF_EXT0] = EM_ASM_DOUBLE({ if(amy_coef_js_hook) { return amy_coef_js_hook(0);} else return 0; });
-        ctrl_inputs[COEF_EXT1] = EM_ASM_DOUBLE({ if(amy_coef_js_hook) { return amy_coef_js_hook(1);} else return 0; });
+        ctrl_inputs[COEF_EXT0] = EM_ASM_DOUBLE({ if(typeof amy_coef_js_hook === 'function') { return amy_coef_js_hook(0);} else return 0; });
+        ctrl_inputs[COEF_EXT1] = EM_ASM_DOUBLE({ if(typeof amy_coef_js_hook === 'function') { return amy_coef_js_hook(1);} else return 0; });
         #endif
         ctrl_inputs[COEF_EXT0] = 0;
         ctrl_inputs[COEF_EXT1] = 0;        
@@ -1387,7 +1387,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             } else {
                 #ifdef __EMSCRIPTEN__
                 handled = EM_ASM_INT({
-                    if(amy_external_render_js_hook) {
+                    if(typeof amy_external_render_js_hook === 'function') {
                         return amy_external_render_js_hook($0, $1, $2);    
                     }}, osc, per_osc_fb[core], AMY_BLOCK_SIZE);
                 #endif
