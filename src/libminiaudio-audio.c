@@ -37,11 +37,19 @@ pthread_t amy_live_thread;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+float amy_web_cv_1 = 0;
+float amy_web_cv_2 = 0;
 extern void sequencer_check_and_fill();
 void main_loop__em()
 {
     // We call repeatedly here to fill the sequencer, for webassembly (no threads)
     sequencer_check_and_fill();
+    amy_web_cv_1 = EM_ASM_DOUBLE({ 
+        if(typeof cv_1_voltage != 'undefined') { return cv_1_voltage; } else { return 0; }
+    });
+    amy_web_cv_2 = EM_ASM_DOUBLE({ 
+        if(typeof cv_2_voltage != 'undefined') { return cv_2_voltage; } else { return 0; }
+    });
 }
 #endif
 
