@@ -1487,7 +1487,7 @@ int16_t * amy_simple_fill_buffer() {
 
 #ifdef __EMSCRIPTEN__
 
-int16_t * amy_get_input_buffer(int16_t * samples) {
+void amy_get_input_buffer(int16_t * samples) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_in_block[i];
 }
 
