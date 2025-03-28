@@ -1485,14 +1485,16 @@ int16_t * amy_simple_fill_buffer() {
 }
 
 
-#if 0
-int web_audio_buffer(float *samples, int length) {
-     int16_t *s = amy_simple_fill_buffer();
-     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
-         samples[i] = (float)s[i]/32767.0f;
-     }
-     return AMY_BLOCK_SIZE;
- }
+#ifdef __EMSCRIPTEN__
+
+int16_t * amy_get_input_buffer() {
+    return amy_in_block;
+}
+
+void amy_set_input_buffer(int16_t * samples) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) amy_in_block[i] = samples[i];
+}
+
 #endif
 
 int16_t * amy_fill_buffer() {
