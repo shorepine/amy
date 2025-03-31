@@ -12,6 +12,7 @@ log = False
 
 show_warnings = True
 
+block_cb = None
 """
     A bunch of useful presets
     TODO : move this to patches.c
@@ -310,24 +311,39 @@ def unload_sample(patch=0):
     send(load_sample=s)
     print("Patch %d unloaded from RAM" % (patch))
 
+
+try:
+    import base64
+    def b64(b):
+        return base64.b64encode(b)
+except ImportError:
+    import ubinascii
+    def b64(b):
+        return ubinascii.b2a_base64(b)[:-1]
+
+def load_sample_bytes(b, stereo=False, patch=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
+    # takes in a python bytes obj instead of filename
+    from math import ceil
+    if(stereo):
+        # just choose first channel
+        b = bytes([b[j] for i in range(0,len(b),4) for j in (i,i+1)])
+    n_frames = len(b)/2
+    s = "%d,%d,%d,%d,%d,%d" % (patch, n_frames, sr, midinote, loopstart, loopend)
+    send(load_sample=s)
+    last_f = 0
+    for i in range(ceil(n_frames/94)):
+        frames_bytes = b[last_f:last_f+188]
+        message = b64(frames_bytes)
+        send_raw(message.decode('ascii'))
+        last_f = last_f + 188
+    print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, n_frames*2, n_frames, midinote))
+
 def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil
     import amy_wave # our version of a wave file reader that looks for sampler metadata
     # tulip has ubinascii, normal has base64
-    try:
-        import base64
-        def b64(b):
-            return base64.b64encode(b)
-    except ImportError:
-        import ubinascii
-        def b64(b):
-            return ubinascii.b2a_base64(b)[:-1]
-
     w = amy_wave.open(wavfilename, 'r')
     
-    if(w.getnchannels()>1):
-        # de-interleave and just choose the first channel
-        f = bytes([f[j] for i in range(0,len(f),4) for j in (i,i+1)])
     if(loopstart==0): 
         if(hasattr(w,'_loopstart')): 
             loopstart = w._loopstart
@@ -346,7 +362,11 @@ def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
     # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
     for i in range(ceil(w.getnframes()/94)):
-        message = b64(w.readframes(94))
+        frames_bytes = w.readframes(94)
+        if(w.getnchannels()==2):
+            # de-interleave and just choose the first channel
+            frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
+        message = b64(frames_bytes)
         send_raw(message.decode('ascii'))
     print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, w.getnframes()*2, w.getnframes(), midinote))
 
