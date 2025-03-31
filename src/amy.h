@@ -94,9 +94,10 @@ enum coefs{
 #define INTERP_PARTIALS 12
 #define AUDIO_IN0 13
 #define AUDIO_IN1 14
-#define CUSTOM 15
-#define WAVE_OFF 16
-///  !!!!!!! IF YOU CHANGE THE WAV VALUES, YOU HAVE TO KEEP amy.py:8 IN SYNC BY HAND !!!!!!!!
+#define AUDIO_EXT0 15
+#define AUDIO_EXT1 16
+#define CUSTOM 17
+#define WAVE_OFF 18
 
 // synth[].status values
 #define SYNTH_OFF 0
@@ -152,7 +153,7 @@ typedef int amy_err_t;
 
 extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
 extern float (*amy_external_coef_hook)(uint16_t);
-
+extern void (*amy_external_block_done_hook)(void);
 
 enum params{
     WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2

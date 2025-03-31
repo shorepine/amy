@@ -121,14 +121,18 @@ SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
-// Audio input block. Filled by the audio implementation before rendering.
+// Audio input blocks. Filled by the audio implementation before rendering.
 int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+int16_t amy_external_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 
-// Optional render hook that's called per oscillator during rendering
+// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
 
-// Optional external coef setter (meant for CV control of AMY)
+// Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
 float (*amy_external_coef_hook)(uint16_t) = NULL;
+
+// Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
+void (*amy_external_block_done_hook)(void) = NULL;
 
 
 #ifndef MALLOC_CAPS_DEFINED
@@ -761,9 +765,10 @@ int8_t oscs_init() {
         for (int c = 0; c < AMY_NCHANS; ++c)  echo_delay_lines[c] = NULL;
     }
 
-    // Set the optional input to 0
+    // Set the optional inputs to 0
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
         amy_in_block[i] = 0;
+        amy_external_in_block[i] = 0;
     }
 
     //init_stereo_reverb();
@@ -856,10 +861,23 @@ void audio_in_note_on(uint16_t osc, uint8_t channel) {
     // do i need to do anything here? probably not
 }
 
+void external_audio_in_note_on(uint16_t osc, uint8_t channel) {
+    // do i need to do anything here? probably not
+}
+
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
-    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+AMY_NCHANS) {
-        buf[c++] = SMULR6(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
+    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+        buf[c++] = SMULR7(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
+    }
+    // We have to return something for max_value or else the zero-amp reaper will come along. 
+    return F2S(1.0); //max_value;
+}
+
+SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel) {
+    uint16_t c = 0;
+    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+        buf[c++] = SMULR7(L2S(amy_external_in_block[i]), F2S(msynth[osc].amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
     return F2S(1.0); //max_value;
@@ -884,6 +902,8 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==NOISE) noise_note_on(osc);
     if(synth[osc].wave==AUDIO_IN0) audio_in_note_on(osc, 0);
     if(synth[osc].wave==AUDIO_IN1) audio_in_note_on(osc, 1);
+    if(synth[osc].wave==AUDIO_EXT0) external_audio_in_note_on(osc, 0);
+    if(synth[osc].wave==AUDIO_EXT1) external_audio_in_note_on(osc, 1);
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
@@ -1173,6 +1193,7 @@ float combine_controls_mult(float *controls, float *coefs) {
 
 // apply an mod & bp, if any, to the osc
 #ifdef __EMSCRIPTEN__
+#include "emscripten/webaudio.h"
 extern float amy_web_cv_1;
 extern float amy_web_cv_2;
 #endif
@@ -1317,6 +1338,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == SINE) max_val = render_sine(buf, osc);
             if(synth[osc].wave == AUDIO_IN0) max_val = render_audio_in(buf, osc, 0);
             if(synth[osc].wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
+            if(synth[osc].wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
+            if(synth[osc].wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
             if(synth[osc].wave == KS) {
                 #if AMY_KS_OSCS > 0
                 max_val = render_ks(buf, osc);
@@ -1387,16 +1410,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
             } else {
                 #ifdef __EMSCRIPTEN__
-                //handled = EM_ASM_INT({
-                    //if(typeof amy_external_render_js_hook === 'function') {
-                    //    return amy_external_render_js_hook($0, $1, $2);    
-                    //}}, osc, per_osc_fb[core], AMY_BLOCK_SIZE);
+                // TODO -- pass the buffer to a JS shim using the new bytes support, we could use this to visualize CV output
                 #endif
             }
             // only mix the audio in if the external hook did not handle it
             if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc].last_pan, msynth[osc].pan);
-            //printf("render5 %d %d %d %d\n", osc, start, end, core);
-
             if (max_val > max_max) max_max = max_val;
         }
     }
@@ -1485,18 +1503,42 @@ int16_t * amy_simple_fill_buffer() {
 }
 
 
-#if 0
-int web_audio_buffer(float *samples, int length) {
-     int16_t *s = amy_simple_fill_buffer();
-     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
-         samples[i] = (float)s[i]/32767.0f;
-     }
-     return AMY_BLOCK_SIZE;
- }
+// get AUDIO_IN0 and AUDIO_IN1
+void amy_get_input_buffer(int16_t * samples) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_in_block[i];
+}
+
+// set AUDIO_EXT0 and AUDIO_EXT1
+void amy_set_external_input_buffer(int16_t * samples) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) amy_external_in_block[i] = samples[i];
+}
+
+
+// called by the audio render loop to alert JS (and then python) that a block has been rendered
+void amy_block_processed(void) {
+
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        if(typeof amy_block_processed_js_hook === 'function') {
+            amy_block_processed_js_hook();
+        }
+    });
+#else
+    if(amy_external_block_done_hook != NULL) {
+        amy_external_block_done_hook();
+    }
 #endif
+}
+
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
+    #ifdef __EMSCRIPTEN__
+    // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
+    emscripten_audio_worklet_post_function_v(0, amy_block_processed);
+    #else
+    amy_block_processed();
+    #endif
     // mix results from both cores.
     SAMPLE max_val = core_max[0];
     if(AMY_CORES==2) {
@@ -1604,8 +1646,10 @@ int16_t * amy_fill_buffer() {
     }
     total_samples += AMY_BLOCK_SIZE;
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
+
     return block;
 }
+
 
 float atoff(const char *s) {
     // Returns float value corresponding to parseable prefix of s.
