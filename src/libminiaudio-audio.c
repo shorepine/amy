@@ -86,7 +86,7 @@ void amy_print_devices() {
 #define OUTPUT_RING_FRAMES (AMY_BLOCK_SIZE*8)
 #define OUTPUT_RING_LENGTH (OUTPUT_RING_FRAMES*AMY_NCHANS)
 #ifdef __EMSCRIPTEN__
-#define PY_CALLBACK_WAIT_TIME_US (0) 
+#define PY_CALLBACK_WAIT_TIME_US (3200) 
 #else
 #define PY_CALLBACK_WAIT_TIME_US (2600)
 #endif
