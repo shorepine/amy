@@ -11,7 +11,11 @@
 #define AMY_BLOCK_SIZE 256
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
 #endif
+#ifdef ARDUINO
+#define AMY_OSCS 120
+#else
 #define AMY_OSCS 180
+#endif
 
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
