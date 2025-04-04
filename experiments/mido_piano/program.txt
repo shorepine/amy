@@ -1,0 +1,35 @@
+000-IMSLP172781-WIMA.cb18-wtc01.mid
+Prelude and Fugue in C from the Well-tempered Clavier
+J. S. Bach
+BWV 846
+format: unknown
+https://imslp.org/wiki/Special:ImagefromIndex/172781/hfpn
+Accessed on January 18, 2025
+James L. Bailey
+Creative Commons Attribution Non-commercial Share Alike 3.0
+
+001-chopin_op66.mid
+Fantasie Impromptu
+Frédéric Chopin
+Op. 66
+with artificial quantization of note event time. *too* perfect.
+format: export from Ableton Live MIDI clip editor
+Matt Harvey
+Creative Commons CC0 (public domain)
+
+002-chopin_op_25_no_12.mid
+Ocean Etude
+Frédéric Chopin
+Op. 25 No. 12
+with terrible mistakes
+format: arecordmidi from Kawai CA-67 digital piano
+Matt Harvey
+Creative Commons CC0 (public domain)
+
+003-schumann_op_15_no_1.mid
+Of Foreign Lands and Peoples
+Robert Schumann
+Op. 15 No. 1
+format: arecordmidi from Kawai CA-67 digital piano
+Matt Harvey
+Creative Commons CC0 (public domain)
