@@ -18,6 +18,7 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
+extern void instrument_test(void);
 
 int main(int argc, char ** argv) {
     char *output_filename = NULL;
@@ -103,6 +104,8 @@ int main(int argc, char ** argv) {
     example_drums(10000,2);
     */
 
+
+  instrument_test();
 
   struct event a = amy_default_event();
   a.osc = 1;
