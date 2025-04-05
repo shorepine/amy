@@ -256,13 +256,13 @@ class AMYPatch:
         #print("osc 7 amp lfo wave %d freq %f amp %f" % (
         #    self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
         amy.send(osc=7, wave=self.lfo_waveform, freq=t(self.lfo_freq),
-                   amp=t(self.amp_lfo_amp))
+                   amp=t(self.amp_lfo_amp), phase=0.25)
 
         # and the pitch one
         #print("osc 8 pitch lfo wave %d freq %f amp %f" % (
         #    self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
         amy.send(osc=8, wave=self.lfo_waveform, freq=t(self.lfo_freq),
-                   amp=t(self.pitch_lfo_amp))
+                   amp=t(self.pitch_lfo_amp), phase=0.25)
 
         #print("not used: lfo delay %d " % self.lfo_delay)
 

@@ -97,8 +97,11 @@ SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, 
 }
 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
+    // Perform the vital parts of amy.c:1089 ff since these oscs aren't turned on elsewhere.
     synth[osc].note_on_clock = total_samples;
     synth[osc].status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
+    if (AMY_IS_SET(synth[osc].trigger_phase))
+        synth[osc].phase = synth[osc].trigger_phase;
     if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 
@@ -116,7 +119,8 @@ void algo_note_off(uint16_t osc) {
 }
 
 
-void algo_note_on(uint16_t osc) {    
+void algo_note_on(uint16_t osc, float freq) {
+    msynth[osc].logfreq = logfreq_of_freq(freq);
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(AMY_IS_SET(synth[osc].algo_source[i])) {
             note_on_mod(synth[osc].algo_source[i], osc);
