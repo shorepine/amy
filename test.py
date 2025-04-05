@@ -295,6 +295,17 @@ class TestAlgo2(AmyTest):
     amy.send(time=500, voices="0", vel=0)
 
 
+class TestFMRepeat(AmyTest):
+  # Douglas reports that the DX7 Marimba sometimes clicks at onset.
+
+  def run(self):
+    amy.send(time=0, voices="0", load_patch=128+21)
+    for i in range(5):
+      t = 100 + round(i * 51200 / 441)
+      amy.send(time=t, voices="0", note=32, vel=1)
+      amy.send(time=t + 20, voices="0", vel=0)
+
+
 class TestFilter(AmyTest):
 
   def run(self):

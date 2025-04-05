@@ -555,7 +555,7 @@ extern void custom_note_on(uint16_t osc, float freq);
 extern void custom_note_off(uint16_t osc);
 extern void partial_note_on(uint16_t osc);
 extern void partial_note_off(uint16_t osc);
-extern void algo_note_on(uint16_t osc);
+extern void algo_note_on(uint16_t osc, float freq);
 extern void algo_note_off(uint16_t osc);
 extern void ks_note_on(uint16_t osc); 
 extern void ks_note_off(uint16_t osc);
