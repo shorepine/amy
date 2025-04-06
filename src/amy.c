@@ -409,6 +409,7 @@ struct event amy_default_event() {
     e.bp0[0] = 0;
     e.bp1[0] = 0;
     e.voices[0] = 0;
+    AMY_UNSET(e.instrument);
     return e;
 }
 
@@ -485,17 +486,13 @@ void amy_parse_event_to_deltas(struct event e, uint16_t base_osc, void (*callbac
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
-    if(e.voices[0] != 0 && AMY_IS_SET(e.load_patch)) {
-        patches_load_patch(e);
+    if (e.voices[0] != 0 || AMY_IS_SET(e.instrument)) {
+        if (AMY_IS_SET(e.load_patch)) {
+            patches_load_patch(e);
+        }
         patches_event_has_voices(e, callback, user_data);
         goto end;
-    } else {
-        if(e.voices[0] != 0) {
-            patches_event_has_voices(e, callback, user_data);
-            goto end;
-        }
     }
-
 
     d.time = e.time;
     d.osc = e.osc;
@@ -725,6 +722,7 @@ int8_t oscs_init() {
     filters_init();
     algo_init();
     patches_init();
+    instruments_init();
 
     if(pcm_samples) {
         pcm_init();
@@ -1756,7 +1754,7 @@ void copy_param_list_substring(char *dest, const char *src) {
     dest[c] = '\0';
 }
 
-// helper to parse the list of source voices for an algorithm
+// helper to parse the list of source oscs for an algorithm
 void parse_algorithm_source(struct synthinfo * t, char *message) {
     int num_parsed = parse_list_int16_t(message, t->algo_source, MAX_ALGO_OPS,
                                             AMY_UNSET_VALUE(t->algo_source[0]));
@@ -1914,6 +1912,7 @@ struct event amy_parse_message(char * message) {
                         }
                         break;
                         /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
+                        case 'i': e.instrument = atoi(message + start); break;
                         case 'I': e.ratio = atoff(message + start); break;
                         case 'j': e.tempo = atof(message+start); break;
                         /* j, J available */
@@ -1944,16 +1943,17 @@ struct event amy_parse_message(char * message) {
                             config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
                         }
                         break;
-                        case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'n': e.midi_note=atof(message + start); break;
+                        case 'N': e.latency_ms = atoi(message + start);  break;
                         case 'o': e.algorithm=atoi(message+start); break;
                         case 'O': copy_param_list_substring(e.algo_source, message+start); break;
                         case 'p': e.patch=atoi(message + start); break;
                         case 'P': e.phase=F2P(atoff(message + start)); break;
                         /* q unused */
                         case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
-                        case 'R': e.resonance=atoff(message + start); break;
                         case 'r': copy_param_list_substring(e.voices, message+start); break; 
+                        case 'R': e.resonance=atoff(message + start); break;
+                        case 's': e.pitch_bend = atoff(message + start); break;
                         case 'S': 
                             e.reset_osc = atoi(message + start);
                             // if we're resetting timebase, do it NOW
@@ -1966,11 +1966,10 @@ struct event amy_parse_message(char * message) {
                                 AMY_UNSET(e.reset_osc);
                             }
                             break;
-                        case 's': e.pitch_bend = atoff(message + start); break;
                         /* t used for time */
                         case 'T': e.eg_type[0] = atoi(message + start); break;
-                        /* U used by Alles for sync */
                         case 'u': patches_store_patch(message + start); AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
+                        /* U used by Alles for sync */
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
                         case 'w': e.wave=atoi(message + start); break;

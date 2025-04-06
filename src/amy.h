@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -311,6 +312,7 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
+    uint8_t instrument;
     uint32_t reset_osc;
     uint8_t status;
 };
@@ -474,6 +476,7 @@ extern struct state amy_global;
 float atoff(const char *s);
 int8_t oscs_init();
 void patches_init();
+void instruments_init();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
@@ -529,6 +532,11 @@ extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(char * message);
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices);
+#define _INSTRUMENT_NO_VOICE (255)
+extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
+extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
+extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;

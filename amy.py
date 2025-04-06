@@ -156,7 +156,7 @@ def message(**kwargs):
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
               'eq': 'xL', 'filter_type': 'GI', 'algorithm': 'oI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
+              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF', 'synth': 'iI',
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
               }
     arg_handlers = {
@@ -169,6 +169,8 @@ def message(**kwargs):
         # Check for possible user confusions.
         if 'voices' in kwargs and 'patch' in kwargs and 'osc' not in kwargs:
             print('You specified \'voices\' and \'patch\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
+        if 'voices' in kwargs and 'synth' in kwargs and not 'load_patch' in kwargs:
+            print('You specified both \'synth\' and \'voices\' in a non-\'load_patch\' message, but \'synth\' defines the voices.')
         if 'store_patch' in kwargs and len(kwargs) > 1:
             print('\'store_patch\' should be the only arg in a message.')
             # And yet we plow ahead...

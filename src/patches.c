@@ -19,6 +19,8 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 
 */
 
+#define _PATCHES_FIRST_USER_PATCH 1024
+
 #define MAX_VOICES 32
 #define MEMORY_PATCHES 32
 char * memory_patch[MEMORY_PATCHES];
@@ -79,12 +81,16 @@ void patches_reset() {
     }
 }
 
-
 void patches_store_patch(char * message) {
     // patch#,amy patch string
     // put it in ram
-    uint16_t patch_number = atoi(message);
-    char * patch = message + 5; // always 4 digit patch + ,
+    int patch_number = atoi(message) - _PATCHES_FIRST_USER_PATCH;
+    if (patch_number < 0 || patch_number >= MEMORY_PATCHES) {
+        fprintf(stderr, "patch number in '%s' is out of range (%d .. %d)\n",
+                message, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + MEMORY_PATCHES);
+        return;
+    }
+    char * patch = message + strspn(message, ",0123456789"); // 5; // always 4 digit patch + ,
     // Now find out how many oscs this message uses
     uint16_t max_osc = 0;
     char sub_message[255];
@@ -99,24 +105,65 @@ void patches_store_patch(char * message) {
             start = i+1;
         }
     }
-    if(memory_patch_oscs[patch_number-1024] >0) { free(memory_patch[patch_number-1024]); }
-    memory_patch[patch_number-1024] = malloc(strlen(patch)+1);
-    memory_patch_oscs[patch_number-1024] = max_osc + 1;
-    strcpy(memory_patch[patch_number-1024], patch);
+    if(memory_patch_oscs[patch_number] >0) { free(memory_patch[patch_number]); }
+    memory_patch[patch_number] = malloc(strlen(patch)+1);
+    memory_patch_oscs[patch_number] = max_osc + 1;
+    strcpy(memory_patch[patch_number], patch);
     //fprintf(stderr, "store_patch: patch %d n_osc %d patch %s\n", patch_number, max_osc, patch);
 }
 
 extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, uint16_t skipped_val);
 
 
-// This is called when i get an event with voices in it, BUT NOT with a load_patch 
+// This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
-    // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
+    uint8_t num_voices;
+    if (!AMY_IS_SET(e.instrument)) {
+        // No instrument, just directly naming the voices.
+        num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
+    } else {
+        // We have an instrument specified - decide which of its voices are actually to be used.
+        
+        // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
+        // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
+        if (e.voices[0] != 0 && !AMY_IS_SET(e.load_patch)) {
+            fprintf(stderr, "You specified both synth %d and voices %s.  Synth implies voices, ignoring voices.\n",
+                    e.instrument, e.voices);
+        }
+        if (!AMY_IS_SET(e.velocity)) {
+            // Not a note-on/note-off message - treat the synth as a shorthand for *all* the voices.
+            num_voices = instrument_get_voices(e.instrument, voices);
+        } else {
+            // velocity is present, this is a note-on/note-off.
+            if (! (AMY_IS_SET(e.midi_note) && e.midi_note != 0) ) {
+                // velocity without a note number (or for midi_note=0).  This is valid for velocity==0 => all-notes-off.
+                if (e.velocity != 0) {
+                    // Attempted a note-on to all voices, suppress.
+                    fprintf(stderr, "note-on for synth %d without specifying note (or note 0) - ignored.\n", e.instrument);
+                    return;
+                }
+                // All notes off - find out which voices are actually currently active, so we can turn them off.
+                num_voices = instrument_all_notes_off(e.instrument, voices);
+            } else {
+                // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
+                uint8_t note = (uint8_t)roundf(e.midi_note);
+                bool is_note_off = (e.velocity == 0);
+                voices[0] = instrument_voice_for_note_event(e.instrument, note, is_note_off);
+                if (voices[0] == _INSTRUMENT_NO_VOICE) {
+                    // For now, I think this can only happen with a note-off that has no matching note-on.
+                    fprintf(stderr, "synth %d did not find a voice, dropping message.", e.instrument);
+                    return;
+                }
+                num_voices = 1;
+            }
+        }
+    }
+    // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     e.voices[0] = 0;
     AMY_UNSET(e.load_patch);
+    AMY_UNSET(e.instrument);
     // for each voice, send the event to the base osc (+ e.osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
@@ -136,10 +183,11 @@ void patches_load_patch(struct event e) {
     uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
-    if(e.load_patch > 1023) {
-        patch_osc = memory_patch_oscs[e.load_patch-1024];
+    if(e.load_patch >= _PATCHES_FIRST_USER_PATCH) {
+        int patch_number = e.load_patch - _PATCHES_FIRST_USER_PATCH;
+        patch_osc = memory_patch_oscs[patch_number];
         if(patch_osc > 0){
-            message = memory_patch[e.load_patch-1024];
+            message = memory_patch[patch_number];
         } else {
             num_voices = 0; // don't do anything
         }
@@ -214,6 +262,8 @@ void patches_load_patch(struct event e) {
             }
         }
     }
+    // Finally, store as an instrument if instrument number is specified.
+    if (AMY_IS_SET(e.instrument)) {
+        instrument_add_new(e.instrument, num_voices, voices);
+    }
 }
-
-
