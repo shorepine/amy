@@ -125,7 +125,7 @@ void patches_event_has_voices(struct event e, void (*callback)(struct delta d, v
         num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
     } else {
         // We have an instrument specified - decide which of its voices are actually to be used.
-        
+
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
         if (e.voices[0] != 0 && !AMY_IS_SET(e.load_patch)) {
