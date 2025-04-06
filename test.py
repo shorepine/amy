@@ -629,6 +629,24 @@ class TestEchoHPF(AmyTest):
     amy.send(time=100, osc=0, note=48, vel=1)
 
 
+class TestVoiceManagement(AmyTest):
+  """The 'synth' structure manages a set of voices."""
+
+  def run(self):
+    # Patch is bare sinewave oscillator but with a 100ms release.
+    amy.send(store_patch='1024,' + amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
+    amy.send(time=10, synth=0, voices='0,1,2', load_patch=1024)
+    amy.send(time=100, synth=0, note=60, vel=1)
+    amy.send(time=200, synth=0, note=72, vel=1)
+    amy.send(time=300, synth=0, note=84, vel=1)
+    # We ran out of voices, this should steal the first one
+    amy.send(time=400, synth=0, note=96, vel=1)
+    # Stop one
+    amy.send(time=500, synth=0, note=84, vel=0)
+    # Stop all the rest.
+    amy.send(time=600, synth=0, vel=0)
+
+
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.
