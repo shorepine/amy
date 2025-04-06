@@ -17,10 +17,20 @@ int16_t midi_queue_tail = 0;
 
 void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     fprintf(stderr, "note on channel %d note %d vel %d\n", channel, note, vel);
+    struct event e = amy_default_event();
+    e.instrument = channel;
+    e.midi_note = note;
+    e.velocity = ((float)vel/127.0);
+    amy_add_event(e);
 }
 
 void note_off(uint8_t channel, uint8_t note, uint8_t vel) {
     fprintf(stderr, "note off channel %d note %d vel %d\n", channel, note, vel);
+    struct event e = amy_default_event();
+    e.instrument = channel;
+    e.midi_note = note;
+    e.velocity = 0;
+    amy_add_event(e);
 }
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
