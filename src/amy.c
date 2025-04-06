@@ -4,7 +4,7 @@
 // brian@variogr.am
 
 #include "amy.h"
-
+#include "midi.h"
 // Flag set momentarily by debug message to report state on-demand.
 int debug_flag = 0;
 
@@ -2056,6 +2056,8 @@ void amy_stop() {
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
+        pthread_t midi_thread_id;
+        pthread_create(&midi_thread_id, NULL, run_midi, NULL);
     #endif
     amy_profiles_init();
     global_init();
