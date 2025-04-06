@@ -3,14 +3,15 @@
 TARGET = amy-example amy-message
 LIBS = -lpthread  -lm 
 
-
-# on macOS, need to link to AudioUnit, CoreAudio, and CoreFoundation
-ifeq ($(shell uname -s), Darwin)
-LIBS += -framework AudioUnit -framework CoreAudio -framework CoreFoundation
-
-# Needed for brew's python3.12+ on MacOS
-EXTRA_PIP_ENV = PIP_BREAK_SYSTEM_PACKAGES=1 
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	SOURCES = src/macos_midi.m
+	CFLAGS += -DMACOS
+	LIBS = -framework AudioUnit -framework CoreAudio -framework CoreFoundation -framework CoreMIDI -framework Cocoa -lstdc++ 
+	# Needed for brew's python3.12+ on MacOS
+	EXTRA_PIP_ENV = PIP_BREAK_SYSTEM_PACKAGES=1 
 endif
+
 
 # on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
 ifeq ($(shell uname -m), armv7l)
@@ -22,7 +23,7 @@ LIBS += -ldl  -latomic
 endif
 
 CC = gcc
-CFLAGS = -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations
+CFLAGS += -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations
 CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
@@ -42,10 +43,10 @@ PYTHON = python3
 default: $(TARGET)
 all: default
 
-SOURCES = src/algorithms.c src/amy.c src/envelope.c src/examples.c \
+SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c \
 	src/filters.c src/oscillators.c src/pcm.c src/partials.c src/interp_partials.c src/custom.c \
 	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c \
-	src/libminiaudio-audio.c src/instrument.c
+	src/libminiaudio-audio.c src/instrument.c src/midi.c
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
  
@@ -63,6 +64,9 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 
 %.o: %.mm $(HEADERS)
 	clang $(CFLAGS) -c $< -o $@
+
+%.o: %.m
+	clang  -I$(INC) $(CFLAGS) -c -o $@ $<
 
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
