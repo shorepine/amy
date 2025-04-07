@@ -14,15 +14,35 @@ uint8_t sysex_flag = 0;
 int16_t midi_queue_head = 0;
 int16_t midi_queue_tail = 0;
 
+// Send a MIDI note on OUT
+void midi_note_on(uint16_t osc) {
+    uint8_t bytes[3];
+    bytes[0] = 0x90;
+    bytes[1] = synth[osc].midi_note;
+    bytes[2] = (uint8_t) (synth[osc].velocity*127.0f);
+    midi_out(bytes, 3);
+}
 
+// Send a MIDI note off OUT
+void midi_note_off(uint16_t osc) {
+    uint8_t bytes[3];
+    bytes[0] = 0x80;
+    bytes[1] = synth[osc].midi_note;
+    bytes[2] = (uint8_t) (synth[osc].velocity*127.0f);
+    midi_out(bytes, 3);
+}
+
+
+// Given a MIDI note on IN, create a AMY message on that instrument and play it
 void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     struct event e = amy_default_event();
     e.instrument = channel;
     e.midi_note = note;
-    e.velocity = ((float)vel/127.0);
+    e.velocity = ((float)vel/127.0f);
     amy_add_event(e);
 }
 
+// Given a MIDI note off IN, create a AMY message on that instrument and play it
 void note_off(uint8_t channel, uint8_t note, uint8_t vel) {
     struct event e = amy_default_event();
     e.instrument = channel;

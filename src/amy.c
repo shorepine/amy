@@ -901,6 +901,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==AUDIO_IN1) audio_in_note_on(osc, 1);
     if(synth[osc].wave==AUDIO_EXT0) external_audio_in_note_on(osc, 0);
     if(synth[osc].wave==AUDIO_EXT1) external_audio_in_note_on(osc, 1);
+    if(synth[osc].wave==MIDI) midi_note_on(osc);
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
@@ -1145,6 +1146,8 @@ void play_event(struct delta d) {
                 #endif
             } else if(synth[d.osc].wave==PCM) {
                 pcm_note_off(d.osc);
+            } else if(synth[d.osc].wave==MIDI) {
+                midi_note_off(d.osc);
             } else if(synth[d.osc].wave==CUSTOM) {
                 #if AMY_HAS_CUSTOM == 1
                 custom_note_off(d.osc);
