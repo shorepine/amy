@@ -28,7 +28,6 @@ const char* profile_tag_name(enum itags tag) {
         case AMY_RENDER: return "AMY_RENDER";            
         case AMY_PREPARE_BUFFER: return "AMY_PREPARE_BUFFER";            
         case AMY_FILL_BUFFER: return "AMY_FILL_BUFFER";            
-        case AMY_PARSE_MESSAGE: return "AMY_PARSE_MESSAGE";            
         case RENDER_LUT_FM: return "RENDER_LUT_FM";            
         case RENDER_LUT_FB: return "RENDER_LUT_FB";            
         case RENDER_LUT: return "RENDER_LUT";            
@@ -1010,11 +1009,7 @@ void play_event(struct delta d) {
             AMY_UNSET(synth[d.osc].chained_osc);
     }
     if(d.param == RESET_OSC) { 
-        // Remember that RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
-        if(*(uint32_t *)&d.data & RESET_AMY) {
-            amy_stop();
-            amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo);
-        }
+        // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
         if(*(uint32_t *)&d.data & RESET_ALL_OSCS) { 
             amy_reset_oscs(); 
         }
@@ -1845,7 +1840,6 @@ void parse_coef_message(char *message, float *coefs) {
 
 // given a string return an event
 struct event amy_parse_message(char * message) {
-    AMY_PROFILE_START(AMY_PARSE_MESSAGE)
     uint8_t mode = 0;
     uint16_t start = 0;
     uint16_t c = 0;
@@ -1858,7 +1852,6 @@ struct event amy_parse_message(char * message) {
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_transfer_flag) {
         parse_transfer_message(message, length);
-        AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
         struct event e = amy_default_event();
         e.status = EVENT_TRANSFER_DATA;
         return e;
@@ -1956,6 +1949,11 @@ struct event amy_parse_message(char * message) {
                         case 's': e.pitch_bend = atoff(message + start); break;
                         case 'S': 
                             e.reset_osc = atoi(message + start);
+                            // if we're resetting all of AMY, do it now
+                            if(e.reset_osc & RESET_AMY) {
+                                amy_stop();
+                                amy_start(amy_global.cores, amy_global.has_chorus, amy_global.has_reverb, amy_global.has_echo, amy_global.default_synth);
+                            }
                             // if we're resetting timebase, do it NOW
                             if(e.reset_osc & RESET_TIMEBASE) {
                                 amy_reset_sysclock();
@@ -1968,7 +1966,7 @@ struct event amy_parse_message(char * message) {
                             break;
                         /* t used for time */
                         case 'T': e.eg_type[0] = atoi(message + start); break;
-                        case 'u': patches_store_patch(message + start); AMY_PROFILE_STOP(AMY_PARSE_MESSAGE) return amy_default_event(); 
+                        case 'u': patches_store_patch(message + start); return amy_default_event(); 
                         /* U used by Alles for sync */
                         case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e.volume = atoff(message + start); break;
@@ -2006,7 +2004,6 @@ struct event amy_parse_message(char * message) {
         }
         c++;
     }
-    AMY_PROFILE_STOP(AMY_PARSE_MESSAGE)
 
     if(length>0) { // only do this if we got some data 
         if(sequence_message) {
@@ -2045,6 +2042,15 @@ void amy_play_message(char *message) {
 }
 
 
+void amy_default_setup() {
+    // after start, send the params for the default setup, like midi.config used to do
+    struct event e = amy_default_event();
+    strcpy(e.voices, "0,1,2,3,4,5");
+    e.load_patch = 0;
+    e.instrument = 0;
+    amy_add_event(e);
+}
+
 // amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
 
 // fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
@@ -2053,7 +2059,7 @@ void amy_stop() {
     oscs_deinit();
 }
 
-void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo, uint8_t default_synth) {
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
         pthread_t midi_thread_id;
@@ -2066,6 +2072,8 @@ void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
     amy_global.has_chorus = chorus;
     amy_global.has_reverb = reverb;
     amy_global.has_echo = echo;
+    amy_global.default_synth = default_synth;
     oscs_init();
+    if(default_synth)amy_default_setup();
     //amy_reset_oscs();
 }

@@ -16,7 +16,6 @@ int16_t midi_queue_tail = 0;
 
 
 void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
-    fprintf(stderr, "note on channel %d note %d vel %d\n", channel, note, vel);
     struct event e = amy_default_event();
     e.instrument = channel;
     e.midi_note = note;
@@ -25,7 +24,6 @@ void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
 }
 
 void note_off(uint8_t channel, uint8_t note, uint8_t vel) {
-    fprintf(stderr, "note off channel %d note %d vel %d\n", channel, note, vel);
     struct event e = amy_default_event();
     e.instrument = channel;
     e.midi_note = note;

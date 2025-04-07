@@ -188,7 +188,7 @@ enum params{
 enum itags{
     RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, FILTER_PROCESS_STAGE0,
     FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_EVENT, PLAY_EVENT,  MIX_WITH_PAN, AMY_RENDER, 
-    AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, AMY_PARSE_MESSAGE,RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
+    AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
     RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
     PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, BLOCK_NORM, CALIBRATE, AMY_ESP_FILL_BUFFER, NO_TAG
 };
@@ -441,6 +441,7 @@ SAMPLE exp2_lut(SAMPLE x);
 // global synth state
 struct state {
     uint8_t cores;
+    uint8_t default_synth;
     uint8_t has_reverb;
     uint8_t has_chorus;
     uint8_t has_echo;
@@ -490,7 +491,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 void amy_play_message(char *message);
 struct event amy_parse_message(char * message);
 void amy_restart();
-void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo);
+void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo, uint8_t default_synth);
 void amy_stop();
 void amy_live_start(uint8_t audio_in);
 void amy_live_stop();

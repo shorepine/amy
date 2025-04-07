@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io.wavfile as wav
 
 import amy
+import time
 
 
 def wavread(filename):
@@ -32,12 +33,14 @@ class AmyTest:
   test_dir = './tests/tst'
 
   def __init__(self):
-    amy.restart()
+    pass
 
   def test(self):
-
+    import libamy
     name = self.__class__.__name__
-
+    libamy.stop()
+    libamy.start(1,1,1,1,0)
+    #amy.send(reset=amy.RESET_AMY)
     self.run()
     
     samples = amy.render(1.0)
