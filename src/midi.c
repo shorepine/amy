@@ -18,8 +18,8 @@ int16_t midi_queue_tail = 0;
 void midi_note_on(uint16_t osc) {
     uint8_t bytes[3];
     bytes[0] = 0x90;
-    bytes[1] = synth[osc].midi_note;
-    bytes[2] = (uint8_t) (synth[osc].velocity*127.0f);
+    bytes[1] = (uint8_t)roundf(synth[osc].midi_note);
+    bytes[2] = (uint8_t)roundf(synth[osc].velocity*127.0f);
     midi_out(bytes, 3);
 }
 
@@ -27,8 +27,8 @@ void midi_note_on(uint16_t osc) {
 void midi_note_off(uint16_t osc) {
     uint8_t bytes[3];
     bytes[0] = 0x80;
-    bytes[1] = synth[osc].midi_note;
-    bytes[2] = (uint8_t) (synth[osc].velocity*127.0f);
+    bytes[1] = (uint8_t)roundf(synth[osc].midi_note);
+    bytes[2] = (uint8_t)roundf(synth[osc].velocity*127.0f);
     midi_out(bytes, 3);
 }
 
