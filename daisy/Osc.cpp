@@ -77,7 +77,7 @@ int main(void)
     //Start the adc
     hardware.adc.Start();
 
-    amy_start(1,1,1);
+    amy_start(1,1,1, 0);
     polyphony(0, 0);
 
     //Start calling the audio callback

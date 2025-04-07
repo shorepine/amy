@@ -128,7 +128,7 @@ void bleep() {
 }
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0,  /* echo */ 1); // initializes amy 
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0,  /* echo */ 1, /* setup default synth */ 1); // initializes amy 
     amy_live_start(1); // render live audio
     bleep();
 }
@@ -140,7 +140,7 @@ Or in C, sending the wire protocol directly:
 #include "amy.h"
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 1);
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 1, /* setup default synth */ 1);
     amy_live_start(1);
     amy_play_message("v0n50l1K130r0Z");
 }
@@ -151,7 +151,7 @@ If you want to receive buffers of samples, or have more control over the renderi
 ```c
 #include "amy.h"
 ...
-amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo */ 1);
+amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo */ 1, /* setup default synth */ 1);
 ...
 ... {
     // For each sample block:

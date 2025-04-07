@@ -288,10 +288,6 @@ def render(seconds):
         frames.append( np.array(libamy.render())/32768.0 )
     return np.hstack(frames).reshape((-1, AMY_NCHANS))
 
-# Starts a live mode, with audio playing out default sounddevice
-def start():
-    live()
-
 def live(audio_playback_device=-1, audio_capture_device=-1):
     import libamy
     libamy.live(audio_playback_device, audio_capture_device)

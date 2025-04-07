@@ -23,11 +23,11 @@ int32_t AMY::sysclock() {
 }
 
 void AMY::begin() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo= */ 0);
+    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo= */ 0, /* setup default synth */ 1);
 }
 
-void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo) {
-    amy_start(cores, reverb, chorus, echo);
+void AMY::begin(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo, uint8_t default_synth) {
+    amy_start(cores, reverb, chorus, echo, default_synth);
 }
 
 

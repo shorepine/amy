@@ -15,7 +15,7 @@ amyModule().then(async function(am) {
     'amy_live_start', null, null, {async: true}    
   );
   amy_start = amy_module.cwrap(
-    'amy_start', null, ['number', 'number', 'number']
+    'amy_start', null, ['number', 'number', 'number', 'number']
   );
   amy_play_message = amy_module.cwrap(
     'amy_play_message', null, ['string'], {async: true} 

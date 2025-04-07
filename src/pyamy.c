@@ -35,9 +35,17 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
+static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
+    return Py_None;
+}
+
+
+static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
+    int arg1 = 1; int arg2 = 1; int arg3 = 1; int arg4=1; int arg5=1;
+    if(PyArg_ParseTuple(args, "iiiii", &arg1, &arg2, &arg3, &arg4, &arg5)) {
+        amy_start(arg1,arg2,arg3,arg4,arg5);
+    }
     return Py_None;
 }
 
@@ -72,7 +80,8 @@ static PyMethodDef libAMYMethods[] = {
     {"send", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
-    {"restart", restart_wrapper, METH_VARARGS, "Restart AMY"},
+    {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
+    {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     { NULL, NULL, 0, NULL }
 };
@@ -88,7 +97,7 @@ static struct PyModuleDef libamyDef =
 
 PyMODINIT_FUNC PyInit_libamy(void)
 {   
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
+    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1, /* default synth */ 1);
     return PyModule_Create(&libamyDef);
 
 }
