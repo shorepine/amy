@@ -97,8 +97,9 @@ enum coefs{
 #define AUDIO_IN1 14
 #define AUDIO_EXT0 15
 #define AUDIO_EXT1 16
-#define CUSTOM 17
-#define WAVE_OFF 18
+#define MIDI 17
+#define CUSTOM 18
+#define WAVE_OFF 19
 
 // synth[].status values
 #define SYNTH_OFF 0
