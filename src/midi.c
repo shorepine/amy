@@ -189,15 +189,16 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
 }
 
 // This is used for web emscripten hooks + external linkers of AMY
-void amy_process_single_midi_byte(uint8_t byte) {
+// set from_web_or_usb to 1 if this is a 4 packet type interface -- WebMIDI or USB MIDI gadget/host, 0 otherwise
+void amy_process_single_midi_byte(uint8_t byte, uint8_t from_web_or_usb) {
     uint8_t data[1];
     data[0] = byte;
-    convert_midi_bytes_to_messages(data, 1, 1);
+    convert_midi_bytes_to_messages(data, 1, from_web_or_usb); 
 }
 
 // for external programs to send MIDI data OUT using AMY
 void amy_external_midi_output(uint8_t * data, uint32_t len) {
-    convert_midi_bytes_to_messages(data, len, 0);
+    midi_out(data, len);
 }
 
 

@@ -8,7 +8,7 @@ extern QueueHandle_t uart_queue;
 #define MIDI_SLOTS 4
 
 void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb);
-void amy_process_single_midi_byte(uint8_t byte);
+void amy_process_single_midi_byte(uint8_t byte, uint8_t from_web_or_usb);
 void amy_external_midi_output(uint8_t * data, uint32_t len);
 
 
