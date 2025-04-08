@@ -648,7 +648,7 @@ void reset_osc(uint16_t i ) {
     synth[i].portamento_alpha = 0;
     synth[i].velocity = 0;
     synth[i].step = 0;
-    synth[i].source = 0;
+    synth[i].source = EVENT_NONE;
     synth[i].sample = F2S(0);
     synth[i].mod_value = F2S(0);
     synth[i].substep = 0;

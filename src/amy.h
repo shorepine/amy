@@ -115,6 +115,7 @@ enum coefs{
 #define EVENT_SEQUENCE 3
 
 // event.source values
+#define EVENT_NONE 0
 #define EVENT_USER 1
 #define EVENT_MIDI 2
 
