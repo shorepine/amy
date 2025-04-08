@@ -113,15 +113,18 @@ struct synthinfo * synth;
 // envelope-modified per-osc state
 struct mod_synthinfo * msynth;
 
-
-
 // Two mixing blocks, one per core of rendering
 SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
+
+
 // Audio input blocks. Filled by the audio implementation before rendering.
+
+// For live audio input from a codec, AUDIO_IN0 / 1
 int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+// For generated audio streams, AUDIO_EXT0 / 1
 int16_t amy_external_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
 
 // Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
@@ -132,6 +135,9 @@ float (*amy_external_coef_hook)(uint16_t) = NULL;
 
 // Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
 void (*amy_external_block_done_hook)(void) = NULL;
+
+// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
+void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t) = NULL;
 
 
 #ifndef MALLOC_CAPS_DEFINED
@@ -404,6 +410,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.eg_type[0]);
     AMY_UNSET(e.eg_type[1]);
     AMY_UNSET(e.reset_osc);
+    AMY_UNSET(e.source);
     e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
@@ -536,6 +543,7 @@ void amy_parse_event_to_deltas(struct event e, uint16_t base_osc, void (*callbac
     if(AMY_IS_SET(e.portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e.portamento_ms; callback(d, user_data); }
     if(AMY_IS_SET(e.chained_osc)) { e.chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e.chained_osc; callback(d, user_data); }
     if(AMY_IS_SET(e.reset_osc)) { e.reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e.reset_osc; callback(d, user_data); }
+    if(AMY_IS_SET(e.source)) { d.param=EVENT_SOURCE; d.data = *(uint32_t*)&e.source; callback(d,user_data); }
     if(AMY_IS_SET(e.mod_source)) { e.mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e.mod_source; callback(d, user_data); }
     if(AMY_IS_SET(e.filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e.filter_type; callback(d, user_data); }
     if(AMY_IS_SET(e.algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e.algorithm; callback(d, user_data); }
@@ -640,6 +648,7 @@ void reset_osc(uint16_t i ) {
     synth[i].portamento_alpha = 0;
     synth[i].velocity = 0;
     synth[i].step = 0;
+    synth[i].source = 0;
     synth[i].sample = F2S(0);
     synth[i].mod_value = F2S(0);
     synth[i].substep = 0;
@@ -901,7 +910,9 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==AUDIO_IN1) audio_in_note_on(osc, 1);
     if(synth[osc].wave==AUDIO_EXT0) external_audio_in_note_on(osc, 0);
     if(synth[osc].wave==AUDIO_EXT1) external_audio_in_note_on(osc, 1);
-    if(synth[osc].wave==MIDI) midi_note_on(osc);
+    if(synth[osc].wave==MIDI) {
+        midi_note_on(osc);
+    }
     if(AMY_HAS_PARTIALS == 1) {
         //if(synth[osc].wave==PARTIAL)  partial_note_on(osc);
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
@@ -1009,6 +1020,7 @@ void play_event(struct delta d) {
         else
             AMY_UNSET(synth[d.osc].chained_osc);
     }
+    if(d.param == EVENT_SOURCE) synth[d.osc].source = *(uint8_t *)&d.data;
     if(d.param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
         if(*(uint32_t *)&d.data & RESET_ALL_OSCS) { 
@@ -1336,6 +1348,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc].wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
             if(synth[osc].wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
             if(synth[osc].wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
+            if(synth[osc].wave == MIDI) max_val = 1; //
             if(synth[osc].wave == KS) {
                 #if AMY_KS_OSCS > 0
                 max_val = render_ks(buf, osc);
@@ -1863,6 +1876,8 @@ struct event amy_parse_message(char * message) {
     struct event e = amy_default_event();
     uint32_t sysclock = amy_sysclock();
 
+    e.source = EVENT_USER;
+
     //printf("parse_message: %s\n", message);
     
     // cut the osc cruft max etc add, they put a 0 and then more things after the 0
@@ -2050,7 +2065,7 @@ void amy_default_setup() {
     struct event e = amy_default_event();
     strcpy(e.voices, "0,1,2,3,4,5");
     e.load_patch = 0;
-    e.instrument = 0;
+    e.instrument = 1;
     amy_add_event(e);
 }
 

@@ -114,6 +114,10 @@ enum coefs{
 #define EVENT_TRANSFER_DATA 2
 #define EVENT_SEQUENCE 3
 
+// event.source values
+#define EVENT_USER 1
+#define EVENT_MIDI 2
+
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
 #define ENVELOPE_LINEAR 1
@@ -179,7 +183,8 @@ enum params{
     EG0_TYPE, EG1_TYPE,                  // 140, 141
     CLONE_OSC,                           // 142
     RESET_OSC,                           // 143
-    NO_PARAM                             // 144
+    EVENT_SOURCE,                        // 144
+    NO_PARAM                             // 145
 };
 
 #ifdef AMY_DEBUG
@@ -316,6 +321,7 @@ struct event {
     uint8_t instrument;
     uint32_t reset_osc;
     uint8_t status;
+    uint8_t source;
 };
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -375,6 +381,7 @@ struct synthinfo {
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
+    uint8_t source;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc

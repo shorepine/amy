@@ -33,7 +33,6 @@ void midi_out(uint8_t * bytes, uint16_t len) {
         p = MIDIPacketListAdd(&pl, 1024, p, 0, len, bytes);
         for (NSUInteger endpointRefIndex = 0; endpointRefIndex < MIDIGetNumberOfDestinations(); ++endpointRefIndex) {
             MIDIObjectRef destinationEndpoint = MIDIGetDestination(endpointRefIndex);
-            fprintf(stderr, "sending message\n");
             MIDISend(out_port, destinationEndpoint, &pl);
         }
     } else {
