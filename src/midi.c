@@ -1,18 +1,12 @@
 // midi.c
 // i deal with parsing and receiving midi on many platforms
-// i'll start with just macOS because that's where i'll test
+
 #include "amy.h"
 #include "midi.h"
-uint8_t last_midi[MIDI_QUEUE_DEPTH][MAX_MIDI_BYTES_PER_MESSAGE];
-uint8_t last_midi_len[MIDI_QUEUE_DEPTH];
 
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
-
-uint8_t midi_message_buffer[MAX_MIDI_BYTES_TO_PARSE];
 uint8_t sysex_flag = 0;
-int16_t midi_queue_head = 0;
-int16_t midi_queue_tail = 0;
 
 // Send a MIDI note on OUT
 void midi_note_on(uint16_t osc) {
@@ -38,7 +32,6 @@ void midi_note_off(uint16_t osc) {
     }
 }
 
-
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
 void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     struct event e = amy_default_event();
@@ -60,48 +53,36 @@ void note_off(uint8_t channel, uint8_t note, uint8_t vel) {
 }
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
-void amy_event_midi_message_received(uint8_t sysex) {
+void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex) {
     if(!sysex) {
-        if(midi_queue_head != midi_queue_tail) {
-            int16_t prev_head = midi_queue_head;
-            // Step on the head, hope no-one notices before we pop it.
-            midi_queue_head = (midi_queue_head + 1) % MIDI_QUEUE_DEPTH;
-            // message is in last_midi[prev_head] with len of last_midi_len[prev_head]
-            uint8_t  * message = last_midi[prev_head];
-            uint8_t status = message[0] & 0xF0;
-            uint8_t channel = message[0] & 0x0F;
-            if(status == 0x90) note_on(channel+1, message[1], message[2] );
-            if(status == 0x80) note_off(channel+1, message[1], message[2] );
-        }
-    } else { // sysex
-        // check for / play the amy message 
+        uint8_t status = data[0] & 0xF0;
+        uint8_t channel = data[0] & 0x0F;
+        // Do the AMY instrument things here
+        if(status == 0x90) note_on(channel+1, data[1], data[2] );
+        if(status == 0x80) note_off(channel+1, data[1], data[2] );
     }
+
+    // Also send the external hooks if set
+    if(amy_external_midi_input_hook != NULL) {
+        amy_external_midi_input_hook(data, len, sysex);
+    }
+
+    // Update web MIDI out hook if set
+    #ifdef __EMSCRIPTEN__
+    // TODO - send bytes like the audio callback hook does
+    EM_ASM({
+        if(typeof amy_external_midi_input_js_hook === 'function') {
+            amy_external_midi_input_js_hook();
+        }
+    });
+    #endif
 }
 
 
 void midi_clock_received() {
-    // do nothing
-    // but one day update our sequencer
+    // one day update the AMY sequencer
 }
 
-// This takes a fully formed (and with status byte) midi messages and puts it in a queue that Python reads from.
-// We have to do this as python may be slower than the bytes come in.
-void callback_midi_message_received(uint8_t *data, size_t len) {
-    //fprintf(stderr, "adding midi message of %d bytes to queue: ", len);
-    for(uint32_t i = 0; i < (uint32_t)len; i++) {
-        if(i < MAX_MIDI_BYTES_PER_MESSAGE) {
-            //fprintf(stderr, "%02x ", data[i]);
-            last_midi[midi_queue_tail][i] = data[i];
-        }
-    }
-    last_midi_len[midi_queue_tail] = (uint16_t)len;
-    midi_queue_tail = (midi_queue_tail + 1) % MIDI_QUEUE_DEPTH;
-    if (midi_queue_tail == midi_queue_head) {
-        // Queue wrap, drop oldest item.
-        midi_queue_head = (midi_queue_head + 1) % MIDI_QUEUE_DEPTH;
-    }
-    amy_event_midi_message_received(false);
-}
 
 /*
     3 0x8X - note off    |   note number    |  velocity 
@@ -141,9 +122,7 @@ void parse_sysex() {
             amy_play_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-            // alert python there's some sysex to read
-            amy_event_midi_message_received(true);
-            // will be handled when tulip.sysex_in is called
+            amy_event_midi_message_received(sysex_buffer, sysex_len, 1);
         }
     }
 }
@@ -173,7 +152,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 current_midi_message[0] = byte;
                 if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
                     byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-                    callback_midi_message_received(current_midi_message, 1); 
+                    amy_event_midi_message_received(current_midi_message, 1, 0); 
                     if(usb) i = len+1; // exit the loop if usb
                 }  else if(byte == 0xF0) { // sysex start 
                     // if that's there we then assume everything is an AMY message until 0xF7
@@ -195,12 +174,12 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                     } else {
                         current_midi_message[2] = byte;
                         midi_message_slot = 0;
-                        callback_midi_message_received(current_midi_message, 3);
+                        amy_event_midi_message_received(current_midi_message, 3, 0);
                     }
                 // a 1 byte data message
                 } else if (status == 0xC0 || status == 0xD0 || current_midi_message[0] == 0xF3 || current_midi_message[0] == 0xF1) {
                     current_midi_message[1] = byte;
-                    callback_midi_message_received(current_midi_message, 2);
+                    amy_event_midi_message_received(current_midi_message, 2, 0);
                     if(usb) i = len+1; // exit the loop if usb
                 }
             }
@@ -209,11 +188,16 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
     
 }
 
-// This is used for web emscripten hooks
-void process_single_midi_byte(uint8_t byte) {
+// This is used for web emscripten hooks + external linkers of AMY
+void amy_process_single_midi_byte(uint8_t byte) {
     uint8_t data[1];
     data[0] = byte;
     convert_midi_bytes_to_messages(data, 1, 1);
+}
+
+// for external programs to send MIDI data OUT using AMY
+void amy_external_midi_output(uint8_t * data, uint32_t len) {
+    convert_midi_bytes_to_messages(data, len, 0);
 }
 
 
