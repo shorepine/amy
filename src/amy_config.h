@@ -17,6 +17,8 @@
 #define AMY_OSCS 180
 #endif
 
+#define AMY_BLOCKS_IN_CALLBACK 8
+
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
 #elif defined __EMSCRIPTEN__

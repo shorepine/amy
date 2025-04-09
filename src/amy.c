@@ -122,8 +122,8 @@ SAMPLE ** per_osc_fb;
 SAMPLE core_max[AMY_MAX_CORES];
 
 // Audio input blocks. Filled by the audio implementation before rendering.
-int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
-int16_t amy_external_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK];
+int16_t amy_external_in_block[AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK];
 
 // Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
@@ -154,6 +154,7 @@ output_sample_type * block;
 uint32_t total_samples;
 uint32_t event_counter ;
 uint32_t message_counter ;
+uint32_t amy_blocks_processed ;
 
 char *message_start_pointer;
 int16_t message_length;
@@ -766,7 +767,7 @@ int8_t oscs_init() {
     }
 
     // Set the optional inputs to 0
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) {
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK;i++) {
         amy_in_block[i] = 0;
         amy_external_in_block[i] = 0;
     }
@@ -774,6 +775,7 @@ int8_t oscs_init() {
     //init_stereo_reverb();
 
     total_samples = 0;
+    amy_blocks_processed = 0;
     event_counter = 0;
     message_counter = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
@@ -867,7 +869,8 @@ void external_audio_in_note_on(uint16_t osc, uint8_t channel) {
 
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
-    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+    uint16_t offset = (amy_blocks_processed % AMY_BLOCKS_IN_CALLBACK) * (AMY_BLOCK_SIZE*AMY_NCHANS);
+    for(uint16_t i=offset+channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
         buf[c++] = SMULR7(L2S(amy_in_block[i]), F2S(msynth[osc].amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
@@ -876,7 +879,8 @@ SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
 
 SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel) {
     uint16_t c = 0;
-    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+    uint16_t offset = (amy_blocks_processed % AMY_BLOCKS_IN_CALLBACK) * (AMY_BLOCK_SIZE*AMY_NCHANS);
+    for(uint16_t i=offset+channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
         buf[c++] = SMULR7(L2S(amy_external_in_block[i]), F2S(msynth[osc].amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
@@ -1505,12 +1509,12 @@ int16_t * amy_simple_fill_buffer() {
 
 // get AUDIO_IN0 and AUDIO_IN1
 void amy_get_input_buffer(int16_t * samples) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_in_block[i];
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK;i++) samples[i] = amy_in_block[i];
 }
 
 // set AUDIO_EXT0 and AUDIO_EXT1
 void amy_set_external_input_buffer(int16_t * samples) {
-    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) amy_external_in_block[i] = samples[i];
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK;i++) amy_external_in_block[i] = samples[i];
 }
 
 
@@ -1533,12 +1537,14 @@ void amy_block_processed(void) {
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
-    #ifdef __EMSCRIPTEN__
-    // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
-    emscripten_audio_worklet_post_function_v(0, amy_block_processed);
-    #else
-    amy_block_processed();
-    #endif
+    if(amy_blocks_processed++ % AMY_BLOCKS_IN_CALLBACK == 0) {
+        #ifdef __EMSCRIPTEN__
+        // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
+        emscripten_audio_worklet_post_function_v(0, amy_block_processed);
+        #else
+        amy_block_processed();
+        #endif
+    }
     // mix results from both cores.
     SAMPLE max_val = core_max[0];
     if(AMY_CORES==2) {

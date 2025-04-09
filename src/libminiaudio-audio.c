@@ -85,17 +85,12 @@ void amy_print_devices() {
 // I've seen frame counts as big as 1440, I think *8 is enough room (2048)
 #define OUTPUT_RING_FRAMES (AMY_BLOCK_SIZE*8)
 #define OUTPUT_RING_LENGTH (OUTPUT_RING_FRAMES*AMY_NCHANS)
-#ifdef __EMSCRIPTEN__
-#define PY_CALLBACK_WAIT_TIME_US (3200) 
-#else
-#define PY_CALLBACK_WAIT_TIME_US (2600)
-#endif
 int16_t output_ring[OUTPUT_RING_LENGTH];
 
 uint16_t ring_write_ptr = AMY_BLOCK_SIZE*AMY_NCHANS; // start after one AMY frame
 uint16_t ring_read_ptr = 0 ;
-uint16_t in_ptr = 0;
-extern int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+uint32_t in_ptr = 0;
+extern int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK];
 
 static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
     short int *poke = (short *)pOutput;
@@ -103,20 +98,11 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     // We lag a AMY block behind input here because our frame size is never a multiple of AMY block size
     for(uint16_t frame=0;frame<frame_count;frame++) {
         for(uint8_t c=0;c<AMY_NCHANS;c++) {
-            amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
+            amy_in_block[in_ptr++ % (AMY_BLOCK_SIZE*AMY_NCHANS*AMY_BLOCKS_IN_CALLBACK)] = peek[AMY_NCHANS * frame + c];
         }
-        if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
+        if(in_ptr % (AMY_BLOCK_SIZE*AMY_NCHANS) == 0) { // we have a block of input ready
             // render and copy into output ring buffer
             int16_t * buf = amy_simple_fill_buffer();
-            // now sleep in this thread, as we need time for any python audio callbacks to run after a block. 
-            // the callback to miniaudio is often >> block size, so in normal use we just call fill_buffer N times to make up a bigger buffer
-            // so sleeping gives space for any callback to run, and shouldn't have any bad consequences on TD
-            // on esp this is a no-op 
-            // max 5805us (1/(44100/256))
-            // i presume a better way to do this is to block with a mutex, but unclear how we know if/when a py callback finishes 
-            usleep(PY_CALLBACK_WAIT_TIME_US);
-            // reset the input pointer for future input data
-            in_ptr = 0;
             // copy this output to a ring buffer
             for(uint16_t amy_frame=0;amy_frame<AMY_BLOCK_SIZE;amy_frame++) {
                 for(uint8_t c=0;c<AMY_NCHANS;c++) {
