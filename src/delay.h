@@ -5,14 +5,7 @@
 // The number of bits used to hold the delay line index.
 #define DELAY_INDEX_BITS (31 - DELAY_INDEX_FRAC_BITS)
 
-typedef struct delay_line {
-    SAMPLE *samples;
-    int len;
-    int log_2_len;
-    int fixed_delay;
-    int next_in;
-} delay_line_t;
-
+#include "amy.h"
 
 delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type /* e.g. MALLOC_CAP_INTERNAL */);
 void free_delay_line(delay_line_t *d);

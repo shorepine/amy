@@ -350,6 +350,10 @@ static inline int isnan_c11(float test)
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
 
+// Helpers to identify if param is in a range.
+#define PARAM_IS_COMBO_COEF(param, base)   ((param) >= (base) && (param) < (base) + NUM_COMBO_COEFS)
+#define PARAM_IS_BP_COEF(param)    ((param) >= BP_START && (param) < BP_END)
+
 
 ///////////////////////////////////////
 // Events & deltas
@@ -495,6 +499,16 @@ typedef struct sequence_entry_ll_t {
 } sequence_entry_ll_t;
 
 
+typedef struct delay_line {
+    SAMPLE *samples;
+    int len;
+    int log_2_len;
+    int fixed_delay;
+    int next_in;
+} delay_line_t;
+
+
+#include "delay.h"
 #include "sequencer.h"
 #include "midi.h"
 #include "transfer.h"

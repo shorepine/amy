@@ -78,13 +78,13 @@ void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i)
 #endif
 
 #include "clipping_lookup_table.h"
-#include "delay.h"
+
 // Final output delay lines.
 delay_line_t **chorus_delay_lines; 
 delay_line_t **echo_delay_lines; 
+SAMPLE *echo_delays[AMY_MAX_CHANNELS];
+SAMPLE *delay_mod = NULL;
 
-#include "transfer.h"
-#include "sequencer.h"
 
 #ifdef _POSIX_THREADS
 #include <pthread.h>
@@ -112,17 +112,16 @@ SAMPLE ** fbl;
 SAMPLE ** per_osc_fb; 
 SAMPLE core_max[AMY_MAX_CORES];
 
-
-
 // Audio input blocks. Filled by the audio implementation before rendering.
-
 // For live audio input from a codec, AUDIO_IN0 / 1
 output_sample_type * amy_in_block;
 // For generated audio streams, AUDIO_EXT0 / 1
 output_sample_type * amy_external_in_block;
-
 // block -- what gets sent to the dac -- -32768...32767 (int16 le)
 output_sample_type * block;
+
+//////////////////////
+// Hooks
 
 // Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
 uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
@@ -135,6 +134,9 @@ void (*amy_external_block_done_hook)(void) = NULL;
 
 // Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
 void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t) = NULL;
+
+
+
 
 
 #ifndef MALLOC_CAPS_DEFINED
@@ -155,8 +157,6 @@ uint32_t enclosing_power_of_2(uint32_t n) {
     while (result < n)  result <<= 1;
     return result;
 }
-
-SAMPLE *echo_delays[AMY_MAX_CHANNELS];
 
 void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
     uint32_t delay_samples = (uint32_t)(delay_ms / 1000.f * AMY_SAMPLE_RATE);
@@ -191,10 +191,6 @@ void dealloc_echo_delay_lines(void) {
     for (uint16_t c = 0; c < AMY_NCHANS; ++c)
         if (echo_delay_lines[c]) free(echo_delay_lines[c]);
 }
-
-SAMPLE *delay_mod = NULL;
-
-
 
 
 void alloc_chorus_delay_lines(void) {
@@ -245,10 +241,6 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
     amy_global.chorus.depth = depth;
 }
 
-
-
-
-
 void config_reverb(float level, float liveness, float damping, float xover_hz) {
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
@@ -275,8 +267,6 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     //fprintf(stderr,"[ok]\n");
     return 0;
 }
-
-
 
 int8_t global_init(amy_config_t c) {
     amy_global.config = c;
@@ -320,11 +310,8 @@ int8_t global_init(amy_config_t c) {
     return 0;
 }
 
-
 // Convert to and from the log-frequency scale.
 // A log-frequency scale is good for summing control inputs.
-
-
 float logfreq_of_freq(float freq) {
     // logfreq is defined as log_2(freq / 8.18 Hz)
     //if (freq==0) return ZERO_HZ_LOG_VAL;
@@ -629,8 +616,6 @@ end:
 }
 
 
-
-
 void reset_osc(uint16_t i ) {
     // set all the synth state to defaults
     synth[i].osc = i; // self-reference to make updating oscs easier
@@ -866,8 +851,6 @@ void show_debug(uint8_t type) {
     }
 }
 
-
-
 void oscs_deinit() {
     free(block);
     free(fbl[0]);
@@ -958,15 +941,9 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     return false;
 }
 
-// Helpers to identify if param is in a range.
-#define PARAM_IS_COMBO_COEF(param, base)   ((param) >= (base) && (param) < (base) + NUM_COMBO_COEFS)
-#define PARAM_IS_BP_COEF(param)    ((param) >= BP_START && (param) < BP_END)
-
 float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
-
-
 
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
@@ -1708,8 +1685,10 @@ void amy_start(amy_config_t c) {
     global_init(c);
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
-        pthread_t midi_thread_id;
-        pthread_create(&midi_thread_id, NULL, run_midi, NULL);
+        if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget) {
+            pthread_t midi_thread_id;
+            pthread_create(&midi_thread_id, NULL, run_midi, NULL);
+        }
     #endif
     amy_profiles_init();
     sequencer_init();
