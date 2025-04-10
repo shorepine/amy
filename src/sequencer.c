@@ -1,30 +1,10 @@
 #include "sequencer.h"
+#include "amy.h"
 
-typedef struct sequence_entry_ll_t {
-    struct delta d;
-    uint32_t tag;
-    uint32_t tick; // 0 means not used 
-    uint32_t period; // 0 means not used 
-    struct sequence_entry_ll_t *next;
-} sequence_entry_ll_t;
 
-// A pointer to a sequence entry and the sequence metadata, for passing to the callback
-typedef struct sequence_callback_info_t {
-    struct sequence_entry_ll_t ** pointer;
-    uint32_t tag;
-    uint32_t tick; // 0 means not used 
-    uint32_t period; // 0 means not used 
-} sequence_callback_info_t;    
-
-sequence_entry_ll_t * sequence_entry_ll_start;
 
 // Optional sequencer hook that's called every tick
 void (*amy_external_sequencer_hook)(uint32_t) = NULL;
-
-// Our internal accounting
-uint32_t sequencer_tick_count = 0;
-uint64_t next_amy_tick_us = 0;
-uint32_t us_per_tick = 0;
 
 #ifdef ESP_PLATFORM
 #include "esp_timer.h"
@@ -38,22 +18,22 @@ esp_timer_handle_t periodic_timer;
 #include <emscripten.h>
 #endif
 
-uint32_t sequencer_ticks() { return sequencer_tick_count; }
+uint32_t sequencer_ticks() { return amy_global.sequencer_tick_count; }
 
 void sequencer_reset() {
     // Remove all events
-    sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+    sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
         sequence_entry_ll_t *doomed = *entry_ll_ptr;
         *entry_ll_ptr = doomed->next; // close up list.
         free(doomed);
     }
-    sequence_entry_ll_start = NULL;
+    amy_global.sequence_entry_ll_start = NULL;
 }
 
 void sequencer_recompute() {
-    us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
-    next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
+    amy_global.us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
+    amy_global.next_amy_tick_us = amy_sysclock()*1000 + amy_global.us_per_tick;
 }
 
 void add_delta_to_sequencer(struct delta d, void*user_data) {
@@ -76,7 +56,7 @@ void add_delta_to_sequencer(struct delta d, void*user_data) {
 uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
-    sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+    sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
         // This can delete all the deltas from a source event if it matches tag
@@ -91,7 +71,7 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
     }
 
     if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
-    if(tick != 0 && period == 0 && tick <= sequencer_tick_count) return 0; // don't schedule things in the past.
+    if(tick != 0 && period == 0 && tick <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
 
     // Get all the deltas for this event
     // For each delta, add a new entry at the end
@@ -107,20 +87,20 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 
 void sequencer_check_and_fill() {
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
-    while(amy_sysclock()  >= (next_amy_tick_us/1000)) {
-        sequencer_tick_count++;
+    while(amy_sysclock()  >= (amy_global.next_amy_tick_us/1000)) {
+        amy_global.sequencer_tick_count++;
         // Scan through LL looking for matches
-        sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
+        sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
         while ((*entry_ll_ptr) != NULL) {
             uint8_t deleted = 0;
             uint8_t hit = 0;
             uint8_t delete = 0;
             if((*entry_ll_ptr)->period != 0) { // period set 
-                uint32_t offset = sequencer_tick_count % (*entry_ll_ptr)->period;
+                uint32_t offset = amy_global.sequencer_tick_count % (*entry_ll_ptr)->period;
                 if(offset == (*entry_ll_ptr)->tick) hit = 1;
             } else {
                 // Test for absolute tick (no period set)
-                if ((*entry_ll_ptr)->tick == sequencer_tick_count) { hit = 1; delete = 1; }
+                if ((*entry_ll_ptr)->tick == amy_global.sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {
                 add_delta_to_queue((*entry_ll_ptr)->d, NULL);
@@ -140,12 +120,12 @@ void sequencer_check_and_fill() {
 #ifdef __EMSCRIPTEN__
         EM_ASM({
             amy_sequencer_js_hook($0);
-        }, sequencer_tick_count);
+        }, amy_global.sequencer_tick_count);
 #endif
         if(amy_external_sequencer_hook!=NULL) {
-            amy_external_sequencer_hook(sequencer_tick_count);
+            amy_external_sequencer_hook(amy_global.sequencer_tick_count);
         }
-        next_amy_tick_us = next_amy_tick_us + us_per_tick;
+        amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + amy_global.us_per_tick;
     }
 }
 
@@ -178,7 +158,7 @@ void * run_sequencer(void *vargs) {
 
 
 void sequencer_init() {
-    sequence_entry_ll_start = NULL;
+    amy_global.sequence_entry_ll_start = NULL;
     sequencer_recompute();        
 
     #ifdef ESP_PLATFORM

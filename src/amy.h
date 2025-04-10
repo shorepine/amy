@@ -353,73 +353,6 @@ static inline int isnan_c11(float test)
 
 
 ///////////////////////////////////////
-// config
-
-typedef struct  {
-    // feature flags
-    uint8_t has_reverb;
-    uint8_t has_echo;
-    uint8_t has_chorus;
-    uint8_t has_audio_in;
-    uint8_t has_midi_uart;
-    uint8_t has_midi_gadget;
-    uint8_t use_spiram;
-    uint8_t has_partials;
-    uint8_t has_custom; 
-
-    // variables
-    uint8_t set_default_synth;
-    uint16_t max_oscs;
-    uint8_t cores;
-    uint8_t ks_oscs;
-    uint32_t event_fifo_len;
-
-    // pins for MCU platforms
-    int8_t i2s_lrc;
-    int8_t i2s_dout;
-    int8_t i2s_din;
-    int8_t i2s_bclk;
-    int8_t midi_out;
-    int8_t midi_in;
-
-    // memory caps for MCUs
-    uint8_t ram_caps_events;
-    uint8_t ram_caps_synth;
-    uint8_t ram_caps_block;
-    uint8_t ram_caps_fbl;
-    uint8_t ram_caps_delay;
-    uint8_t ram_caps_sample;
-
-    // device ids for miniaudio platforms
-    int8_t capture_device_id;
-    int8_t playback_device_id;
-
-} amy_config_t;
-
-
-// global synth state
-struct state {
-    amy_config_t config;
-    uint8_t running;
-    float volume;
-    float pitch_bend;
-    // State of fixed dc-blocking HPF
-    SAMPLE hpf_state;
-    SAMPLE eq[3];
-    uint16_t event_qsize;
-    int16_t next_event_write;
-    struct delta * event_start; // start of the sorted list
-    int16_t latency_ms;
-    float tempo;
-    uint8_t transfer_flag;
-    uint8_t * transfer_storage;
-    uint32_t transfer_length;
-    uint32_t transfer_stored;
-    uint32_t total_samples;
-    uint8_t debug_flag;
-};
-
-///////////////////////////////////////
 // Events & deltas
 
 
@@ -553,6 +486,94 @@ struct mod_synthinfo {
     float feedback;
 };
 
+
+typedef struct sequence_entry_ll_t {
+    struct delta d;
+    uint32_t tag;
+    uint32_t tick; // 0 means not used 
+    uint32_t period; // 0 means not used 
+    struct sequence_entry_ll_t *next;
+} sequence_entry_ll_t;
+
+
+#include "sequencer.h"
+
+
+///////////////////////////////////////
+// config
+
+typedef struct  {
+    // feature flags
+    uint8_t has_reverb;
+    uint8_t has_echo;
+    uint8_t has_chorus;
+    uint8_t has_audio_in;
+    uint8_t has_midi_uart;
+    uint8_t has_midi_gadget;
+    uint8_t use_spiram;
+    uint8_t has_partials;
+    uint8_t has_custom; 
+
+    // variables
+    uint8_t set_default_synth;
+    uint16_t max_oscs;
+    uint8_t cores;
+    uint8_t ks_oscs;
+    uint32_t event_fifo_len;
+
+    // pins for MCU platforms
+    int8_t i2s_lrc;
+    int8_t i2s_dout;
+    int8_t i2s_din;
+    int8_t i2s_bclk;
+    int8_t midi_out;
+    int8_t midi_in;
+
+    // memory caps for MCUs
+    uint8_t ram_caps_events;
+    uint8_t ram_caps_synth;
+    uint8_t ram_caps_block;
+    uint8_t ram_caps_fbl;
+    uint8_t ram_caps_delay;
+    uint8_t ram_caps_sample;
+
+    // device ids for miniaudio platforms
+    int8_t capture_device_id;
+    int8_t playback_device_id;
+
+} amy_config_t;
+
+
+// global synth state
+struct state {
+    amy_config_t config;
+    uint8_t running;
+    float volume;
+    float pitch_bend;
+    // State of fixed dc-blocking HPF
+    SAMPLE hpf_state;
+    SAMPLE eq[3];
+    uint16_t event_qsize;
+    int16_t next_event_write;
+    struct delta * event_start; // start of the sorted list
+    int16_t latency_ms;
+    float tempo;
+    uint32_t total_samples;
+    uint8_t debug_flag;
+
+    // Transfer
+    uint8_t transfer_flag;
+    uint8_t * transfer_storage;
+    uint32_t transfer_length;
+    uint32_t transfer_stored;
+
+    // Sequencer
+    uint32_t sequencer_tick_count;
+    uint64_t next_amy_tick_us;
+    uint32_t us_per_tick;
+    sequence_entry_ll_t * sequence_entry_ll_start;
+
+};
 
 // Shared structures
 extern struct synthinfo* synth;

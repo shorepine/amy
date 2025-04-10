@@ -4,10 +4,13 @@
 
 #include "amy.h"
 
-// Our internal accounting
-extern uint32_t sequencer_tick_count ;
-extern uint64_t next_amy_tick_us ;
-extern uint32_t us_per_tick ;
+// A pointer to a sequence entry and the sequence metadata, for passing to the callback
+typedef struct sequence_callback_info_t {
+    struct sequence_entry_ll_t ** pointer;
+    uint32_t tag;
+    uint32_t tick; // 0 means not used 
+    uint32_t period; // 0 means not used 
+} sequence_callback_info_t;    
 
 uint32_t sequencer_ticks();
 void sequencer_init();

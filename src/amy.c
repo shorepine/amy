@@ -323,6 +323,11 @@ int8_t global_init(amy_config_t c) {
     amy_global.transfer_length = 0;
     amy_global.transfer_stored = 0;
     amy_global.debug_flag = 0;
+    amy_global.sequencer_tick_count = 0;
+    amy_global.next_amy_tick_us = 0;
+    amy_global.us_per_tick = 0;
+    amy_global.sequence_entry_ll_start = NULL;
+
     return 0;
 }
 
@@ -2063,7 +2068,7 @@ struct event amy_parse_message(char * message) {
 
 void amy_reset_sysclock() {
     amy_global.total_samples = 0;
-    sequencer_tick_count = 0;
+    amy_global.sequencer_tick_count = 0;
     sequencer_recompute();
 }
 
