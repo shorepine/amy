@@ -3,16 +3,13 @@
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
 #include "amy.h"
 
-//#define MA_NO_DECODING
-//#define MA_NO_ENCODING
-//#define MA_NO_WAV
 #define MA_NO_FLAC
 #define MA_NO_MP3
 #define MA_NO_RESOURCE_MANAGER
 #define MA_NO_NODE_GRAPH
 #define MA_NO_ENGINE
 #define MA_NO_GENERATION
-//#define MA_DEBUG_OUTPUT
+
 extern SAMPLE ** fbl;
 
 #ifdef __APPLE__
@@ -184,6 +181,8 @@ amy_err_t miniaudio_init() {
     deviceConfig.sampleRate        = AMY_SAMPLE_RATE;
     deviceConfig.dataCallback      = data_callback;
     deviceConfig.pUserData         = _custom;
+
+    // Force miniaudio's callback to be the same size as AMY. This helps us not loop too many fill_buffer calls
     deviceConfig.periodSizeInFrames=AMY_BLOCK_SIZE;
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {

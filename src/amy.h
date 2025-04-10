@@ -215,7 +215,6 @@ enum coefs{
 #define AMY_OK 0
 typedef int amy_err_t;
 
-
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
@@ -223,7 +222,6 @@ typedef int amy_err_t;
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
-
 
 
 #include "amy_fixedpoint.h"
@@ -524,7 +522,6 @@ typedef struct  {
     uint8_t has_audio_in;
     uint8_t has_midi_uart;
     uint8_t has_midi_gadget;
-    uint8_t use_spiram;
     uint8_t has_partials;
     uint8_t has_custom; 
 
@@ -615,6 +612,19 @@ struct state {
 
 };
 
+
+// custom oscillator
+struct custom_oscillator {
+    void (*init)(void);
+    void (*note_on)(uint16_t osc, float freq);
+    void (*note_off)(uint16_t osc);
+    void (*mod_trigger)(uint16_t osc);
+    SAMPLE (*render)(SAMPLE* buf, uint16_t osc);
+    SAMPLE (*compute_mod)(uint16_t osc);
+};
+
+
+
 // Shared structures
 extern struct synthinfo* synth;
 extern struct mod_synthinfo* msynth;
@@ -651,17 +661,6 @@ void chorus_note_on(float initial_freq);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
-
-
-// custom oscillator
-struct custom_oscillator {
-    void (*init)(void);
-    void (*note_on)(uint16_t osc, float freq);
-    void (*note_off)(uint16_t osc);
-    void (*mod_trigger)(uint16_t osc);
-    SAMPLE (*render)(SAMPLE* buf, uint16_t osc);
-    SAMPLE (*compute_mod)(uint16_t osc);
-};
 
 
 float atoff(const char *s);
