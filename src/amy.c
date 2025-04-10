@@ -150,25 +150,11 @@ void * malloc_caps(uint32_t size, uint32_t flags) {
 #endif
 
 
-typedef struct echo_config {
-    SAMPLE level;  // Mix of echo into output.  0 = Echo off.
-    uint32_t delay_samples;  // Current delay, quantized to samples.
-    uint32_t max_delay_samples;  // Maximum delay, i.e. size of allocated delay line.
-    SAMPLE feedback;  // Gain applied when feeding back output to input.
-    SAMPLE filter_coef;  // Echo is filtered by a two-point normalize IIR.  This is the real pole location.
-} echo_config_t;
-
 uint32_t enclosing_power_of_2(uint32_t n) {
     uint32_t result = 1;
     while (result < n)  result <<= 1;
     return result;
 }
-
-echo_config_t echo = {F2S(ECHO_DEFAULT_LEVEL),
-                      (uint32_t)(ECHO_DEFAULT_DELAY_MS * 1000.f / AMY_SAMPLE_RATE),
-                      65536, // enclosing_power_of_2((uint32_t)(ECHO_DEFAULT_MAX_DELAY_MS * 1000.f / AMY_SAMPLE_RATE)),
-                      F2S(ECHO_DEFAULT_FEEDBACK),
-                      F2S(ECHO_DEFAULT_FILTER_COEF)};
 
 SAMPLE *echo_delays[AMY_MAX_CHANNELS];
 
@@ -181,23 +167,23 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
             uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
             for (int c = 0; c < AMY_NCHANS; ++c)
                 echo_delay_lines[c] = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
-            echo.max_delay_samples = max_delay_samples;
+            amy_global.echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
         // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.
-        if (delay_samples > echo.max_delay_samples - 1) delay_samples = echo.max_delay_samples - 1;
+        if (delay_samples > amy_global.echo.max_delay_samples - 1) delay_samples = amy_global.echo.max_delay_samples - 1;
         for (int c = 0; c < AMY_NCHANS; ++c) {
             echo_delay_lines[c]->fixed_delay = delay_samples;
         }
     }
-    echo.level = F2S(level);
-    echo.delay_samples = delay_samples;
+    amy_global.echo.level = F2S(level);
+    amy_global.echo.delay_samples = delay_samples;
     // Filter is IIR [1, filter_coef] normalized for filter_coef > 0 (LPF), or FIR [1, filter_coef] normalized for filter_coef < 0 (HPF).
     if (filter_coef > 0.99)  filter_coef = 0.99;  // Avoid unstable filters.
-    echo.filter_coef = F2S(filter_coef);
+    amy_global.echo.filter_coef = F2S(filter_coef);
     // FIR filter potentially has gain > 1 for high frequencies, so discount the loop feedback to stop things exploding.
     if (filter_coef < 0)  feedback /= 1.f - filter_coef;
-    echo.feedback = F2S(feedback);
+    amy_global.echo.feedback = F2S(feedback);
     //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
 }
 
@@ -208,15 +194,8 @@ void dealloc_echo_delay_lines(void) {
 
 SAMPLE *delay_mod = NULL;
 
-typedef struct chorus_config {
-    SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
-    int max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
-    float lfo_freq;
-    float depth;
-} chorus_config_t;
 
 
-chorus_config_t chorus = {CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH};
 
 void alloc_chorus_delay_lines(void) {
     for(uint16_t c=0;c<AMY_NCHANS;++c) {
@@ -260,35 +239,29 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
             chorus_delay_lines[chan]->fixed_delay = (int)max_delay / 2;
         }
     }
-    chorus.max_delay = max_delay;
-    chorus.level = F2S(level);
-    chorus.lfo_freq = lfo_freq;
-    chorus.depth = depth;
+    amy_global.chorus.max_delay = max_delay;
+    amy_global.chorus.level = F2S(level);
+    amy_global.chorus.lfo_freq = lfo_freq;
+    amy_global.chorus.depth = depth;
 }
 
 
-typedef struct reverb_state {
-    SAMPLE level;
-    float liveness;
-    float damping;
-    float xover_hz;
-} reverb_state_t;
 
-reverb_state_t reverb = {F2S(REVERB_DEFAULT_LEVEL), REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ};
+
 
 void config_reverb(float level, float liveness, float damping, float xover_hz) {
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
-        if (reverb.level == 0) { 
+        if (amy_global.reverb.level == 0) { 
             init_stereo_reverb();  // In case it's the first time
         }
         config_stereo_reverb(liveness, xover_hz, damping);
     }
-    reverb.level = F2S(level);
-    reverb.liveness = liveness;
-    reverb.damping = damping;
-    reverb.xover_hz = xover_hz;
+    amy_global.reverb.level = F2S(level);
+    amy_global.reverb.liveness = liveness;
+    amy_global.reverb.damping = damping;
+    amy_global.reverb.xover_hz = xover_hz;
 }
 
 
@@ -327,6 +300,22 @@ int8_t global_init(amy_config_t c) {
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
     amy_global.sequence_entry_ll_start = NULL;
+    
+    amy_global.reverb.level = F2S(REVERB_DEFAULT_LEVEL);
+    amy_global.reverb.liveness= REVERB_DEFAULT_LIVENESS;
+    amy_global.reverb.damping = REVERB_DEFAULT_DAMPING;
+    amy_global.reverb.xover_hz = REVERB_DEFAULT_XOVER_HZ;
+
+    amy_global.chorus.level = CHORUS_DEFAULT_LEVEL;
+    amy_global.chorus.max_delay =  CHORUS_DEFAULT_MAX_DELAY;
+    amy_global.chorus.lfo_freq = CHORUS_DEFAULT_LFO_FREQ;
+    amy_global.chorus.depth = CHORUS_DEFAULT_MOD_DEPTH;
+
+    amy_global.echo.level = F2S(ECHO_DEFAULT_LEVEL);
+    amy_global.echo.delay_samples = (uint32_t)(ECHO_DEFAULT_DELAY_MS * 1000.f / AMY_SAMPLE_RATE);
+    amy_global.echo.max_delay_samples = 65536;
+    amy_global.echo.feedback = F2S(ECHO_DEFAULT_FEEDBACK);
+    amy_global.echo.filter_coef = ECHO_DEFAULT_FILTER_COEF;
 
     return 0;
 }
@@ -400,6 +389,10 @@ amy_config_t amy_default_config() {
     c.ram_caps_delay = MALLOC_CAP_DEFAULT;
     c.ram_caps_sample = MALLOC_CAP_DEFAULT;
     #endif    
+
+    c.capture_device_id = -1;
+    c.playback_device_id = -1;
+
     c.i2s_lrc = -1;
     c.i2s_dout = -1;
     c.i2s_din = -1;
@@ -814,8 +807,6 @@ int8_t oscs_init() {
         amy_in_block[i] = 0;
         amy_external_in_block[i] = 0;
     }
-
-    //init_stereo_reverb();
 
     amy_global.total_samples = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
@@ -1516,7 +1507,7 @@ void amy_prepare_buffer() {
     
     if(AMY_HAS_CHORUS==1) {
         hold_and_modify(CHORUS_MOD_SOURCE);
-        if(chorus.level!=0)  {
+        if(amy_global.chorus.level!=0)  {
             bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
             render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
         }
@@ -1585,13 +1576,13 @@ int16_t * amy_fill_buffer() {
 
         if(AMY_HAS_CHORUS==1) {
             // apply chorus.
-            if(chorus.level > 0 && chorus_delay_lines[0] != NULL) {
+            if(amy_global.chorus.level > 0 && chorus_delay_lines[0] != NULL) {
                 // apply time-varying delays to both chans.
                 // delay_mod_val, the modulated delay amount, is set up before calling render_*.
                 SAMPLE scale = F2S(1.0f);
                 for (int16_t c=0; c < AMY_NCHANS; ++c) {
                     apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, chorus_delay_lines[c],
-                                         delay_mod, scale, chorus.level, 0);
+                                         delay_mod, scale, amy_global.chorus.level, 0);
                     // flip delay direction for alternating channels.
                     scale = -scale;
                 }
@@ -1600,19 +1591,19 @@ int16_t * amy_fill_buffer() {
     }
     if (AMY_HAS_ECHO == 1) {
         // Apply echo.
-        if (echo.level > 0 && echo_delay_lines[0] != NULL ) {
+        if (amy_global.echo.level > 0 && echo_delay_lines[0] != NULL ) {
             for (int16_t c=0; c < AMY_NCHANS; ++c) {
-                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, echo_delay_lines[c], echo.delay_samples, echo.level, echo.feedback, echo.filter_coef);
+                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, echo_delay_lines[c], amy_global.echo.delay_samples, amy_global.echo.level, amy_global.echo.feedback, amy_global.echo.filter_coef);
             }
         }
     }
     if(AMY_HAS_REVERB) {
         // apply reverb.
-        if(reverb.level > 0) {
+        if(amy_global.reverb.level > 0) {
             if(AMY_NCHANS == 1) {
-                stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, reverb.level);
+                stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, amy_global.reverb.level);
             } else {
-                stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, reverb.level);
+                stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, amy_global.reverb.level);
             }
         }
     }
@@ -1679,391 +1670,6 @@ int16_t * amy_fill_buffer() {
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
     return block;
-}
-
-
-float atoff(const char *s) {
-    // Returns float value corresponding to parseable prefix of s.
-    // Unlike atof(), it does not recognize scientific format ('e' or 'E')
-    // and will stop parsing there.  Needed for message strings that contain
-    // 'e' as a command prefix.
-    float frac = 0;
-    // Skip leading spaces.
-    while (*s == ' ') ++s;
-    float whole = (float)atoi(s);
-    int is_negative = (s[0] == '-');  // Can't use (whole < 0) because of "-0.xx".
-    //const char *s_in = s;  // for debug message.
-    s += strspn(s, "-0123456789");
-    if (*s == '.') {
-        // Float with a decimal part.
-        // Step over dp
-        ++s;
-        // Extract fractional part.
-        int fraclen = strspn(s, "0123456789");
-        char fracpart[8];
-        // atoi() will overflow for values larger than 2^31, so only decode a prefix.
-        if (fraclen > 6) {
-            for(int i = 0; i < 7; ++i) {
-                fracpart[i] = s[i];
-            }
-            fracpart[7] = '\0';
-            s = fracpart;
-            fraclen = 7;
-        }
-        frac = (float)atoi(s);
-        frac /= powf(10.f, (float)fraclen);
-        if (is_negative) frac = -frac;
-    }
-    //fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
-    return whole + frac;
-}
-
-
-#define PARSE_LIST_STRSPN1(var) _Generic((var), \
-    float:    " -0123456789,.", \
-    uint32_t: " 0123456789,", \
-    uint16_t: " 0123456789,", \
-    int16_t:  " -0123456789,", \
-    int32_t:  " -0123456789," \
-)
-
-#define PARSE_LIST_STRSPN2(var) _Generic((var), \
-    float:    "-0123456789.", \
-    uint32_t: "0123456789", \
-    uint16_t: "0123456789", \
-    int16_t:  "-0123456789", \
-    int32_t:  "-0123456789" \
-)
-
-#define PARSE_LIST_ATO(var) _Generic((var), \
-    float:    atoff, \
-    uint32_t: atoi, \
-    uint16_t: atoi, \
-    int32_t:  atoi, \
-    int16_t:  atoi \
-)
-
-#define PARSE_LIST(type) \
-    int parse_list_##type(char *message, type *vals, int max_num_vals, type skipped_val) { \
-        uint16_t c = 0, last_c; \
-        uint16_t stop = strspn(message, PARSE_LIST_STRSPN1(skipped_val)); \
-        int num_vals_received = 0; \
-        while(c < stop && num_vals_received < max_num_vals) { \
-            *vals = PARSE_LIST_ATO(skipped_val)(message + c); \
-            while (message[c] == ' ') ++c; \
-            last_c = c; \
-            c += strspn(message + c, PARSE_LIST_STRSPN2(skipped_val));  \
-            if (last_c == c)  \
-                *vals = skipped_val;  \
-            while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++; \
-            ++c; \
-            ++vals; \
-            ++num_vals_received; \
-        } \
-        if (c < stop) { \
-            fprintf(stderr, "WARNING: parse__list_##type: More than %d values in \"%s\"\n", \
-                max_num_vals, message); \
-        } \
-        return num_vals_received; \
-    }
-
-
-PARSE_LIST(float)
-PARSE_LIST(uint32_t)
-PARSE_LIST(uint16_t)
-PARSE_LIST(int32_t)
-PARSE_LIST(int16_t)
-
-
-
-void copy_param_list_substring(char *dest, const char *src) {
-    // Copy wire command string up to next parameter char.
-    uint16_t c = 0;
-    uint16_t stop = strspn(src, " 0123456789-,.");  // Note space & period.
-    while (c < stop && src[c]) {
-        dest[c] = src[c];
-        c++;
-    }
-    dest[c] = '\0';
-}
-
-// helper to parse the list of source oscs for an algorithm
-void parse_algorithm_source(struct synthinfo * t, char *message) {
-    int num_parsed = parse_list_int16_t(message, t->algo_source, MAX_ALGO_OPS,
-                                            AMY_UNSET_VALUE(t->algo_source[0]));
-    // Clear unspecified values.
-    for (int i = num_parsed; i < MAX_ALGO_OPS; ++i) {
-        AMY_UNSET(t->algo_source[i]);
-    }
-}
-
-uint32_t ms_to_samples(uint32_t ms) {
-    uint32_t samps = 0;
-    if (AMY_IS_UNSET(ms)) return AMY_UNSET_VALUE(samps);
-    samps = (uint32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
-    return samps;
-}
-
-float int_db_to_float_lin(uint32_t db) {
-    float lin = 0;
-    if (AMY_IS_UNSET(db)) return AMY_UNSET_VALUE(lin);
-    lin = powf(10.0f, ((((float)db) - 100.0f) / 20.0f)) - 0.001f;
-    if (lin < 0) return 0;
-    return lin;
-}
-
-// helper to parse the special bp string
-int parse_breakpoint_core_float_lin(struct synthinfo * e, char* message, uint8_t which_bpset) {
-    // This is the classic version, int_time_delta_ms,float_lin_val,...
-    float vals[2 * MAX_BREAKPOINTS];
-    // Read all the values as floats.
-    int num_vals = parse_list_float(message, vals, 2 * MAX_BREAKPOINTS,
-                                    AMY_UNSET_VALUE(vals[0]));
-    // Distribute out to times and vals, casting times to ints.
-    for (int i = 0; i < num_vals; ++i) {
-        if ((i % 2) == 0)
-            if (AMY_IS_SET(vals[i]))
-                e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples((int)vals[i]);
-            else  // Have to translate the "unset" value for the non-float type.
-                e->breakpoint_times[which_bpset][i >> 1] = AMY_UNSET_VALUE(e->breakpoint_times[which_bpset][i >> 1]);
-        else
-            e->breakpoint_values[which_bpset][i >> 1] = vals[i];
-    }
-    return num_vals;
-}
-
-int parse_breakpoint_core_int_db(struct synthinfo * e, char* message, uint8_t which_bpset) {
-    // This is for the special faster additive-synth version, int_time_delta_ms,uint_db_val,...
-    uint32_t vals[2 * MAX_BREAKPOINTS];
-    // Read all the values as floats.
-    int num_vals = parse_list_uint32_t(message, vals, 2 * MAX_BREAKPOINTS,
-                                       AMY_UNSET_VALUE(vals[0]));
-    // Distribute out to times and vals, casting int db values to linear floats.
-    // Both ms_to_samples and int_db_to_float_lin pass through AMY_UNSET suitably translated.
-    for (int i = 0; i < num_vals; ++i) {
-        if ((i % 2) == 0)
-            e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples(vals[i]);
-        else
-            e->breakpoint_values[which_bpset][i >> 1] = int_db_to_float_lin(vals[i]);
-    }
-    return num_vals;
-}
-
-int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
-    int num_vals;
-    // Test for special case BP string that begins ".." meaning it's unsigned integer dB values.
-    if (message[0] == '.' && message[1] == '.') {
-        num_vals = parse_breakpoint_core_int_db(e, message + 2, which_bpset);
-    } else {
-        num_vals = parse_breakpoint_core_float_lin(e, message, which_bpset);
-    }
-    // Values that are not specified at the end of the list indicate the total length of the BP set.
-    for (int i = num_vals; i < 2 * MAX_BREAKPOINTS; ++i) {
-        if ((i % 2) == 0)
-            AMY_UNSET(e->breakpoint_times[which_bpset][i >> 1]);
-        else
-            AMY_UNSET(e->breakpoint_values[which_bpset][i >> 1]);
-    }
-    // Return the number of breakpoints that were present.
-    return (num_vals + 1) >> 1;
-}
-
-void parse_coef_message(char *message, float *coefs) {
-    int num_coefs = parse_list_float(message, coefs, NUM_COMBO_COEFS,
-                                             AMY_UNSET_VALUE(coefs[0]));
-    // Clear the unspecified coefs to unset.
-    for (int i = num_coefs; i < NUM_COMBO_COEFS; ++i)
-        coefs[i] = AMY_UNSET_VALUE(coefs[0]);
-}
-
-// given a string return an event
-struct event amy_parse_message(char * message) {
-    uint8_t mode = 0;
-    uint16_t start = 0;
-    uint16_t c = 0;
-    int16_t length = strlen(message);
-
-    // default values for sequence message
-    uint32_t seq_message[3] = {0,0,0};
-    uint8_t sequence_message = 0;
-
-    // Check if we're in a transfer block, if so, parse it and leave this loop 
-    if(amy_global.transfer_flag) {
-        parse_transfer_message(message, length);
-        struct event e = amy_default_event();
-        e.status = EVENT_TRANSFER_DATA;
-        return e;
-    }
-
-    struct event e = amy_default_event();
-    uint32_t sysclock = amy_sysclock();
-
-    e.source = EVENT_USER;
-
-    //printf("parse_message: %s\n", message);
-    
-    // cut the osc cruft max etc add, they put a 0 and then more things after the 0
-    int new_length = length;
-    for(int d=0;d<length;d++) {
-        if(message[d] == 0) { new_length = d; d = length + 1;  }
-    }
-    length = new_length;
-    //fprintf(stderr, "%s\n", message);
-
-    while(c < length+1) {
-        uint8_t b = message[c];
-        //if(b == '_' && c==0) sync_response = 1;
-        if( ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) || b == 0) {  // new mode or end
-            if(mode=='t') {
-                e.time=atol(message + start);
-            } else {
-                if(mode >= 'A' && mode <= 'z') {
-                    switch(mode) {
-                        case 'a': parse_coef_message(message + start, e.amp_coefs);break;
-                        case 'A': copy_param_list_substring(e.bp0, message + start); e.bp_is_set[0] = 1; break;
-                        case 'B': copy_param_list_substring(e.bp1, message + start); e.bp_is_set[1] = 1; break;
-                        case 'b': e.feedback = atoff(message+start); break;
-                        case 'c': e.chained_osc = atoi(message + start); break;
-                        /* C available */
-                        case 'd': parse_coef_message(message + start, e.duty_coefs);break;
-                        case 'D': show_debug(atoi(message + start)); break;
-                        case 'f': parse_coef_message(message + start, e.freq_coefs);break;
-                        case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
-                        case 'G': e.filter_type = atoi(message + start); break;
-                        /* g used for Alles for client # */
-                        case 'H': parse_list_uint32_t(message+start, seq_message, 3, 0); sequence_message = 1; break;
-                        case 'h': if (AMY_HAS_REVERB) {
-                            float reverb_params[4] = {AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness),
-                                                      AMY_UNSET_VALUE(reverb.liveness), AMY_UNSET_VALUE(reverb.liveness)};
-                            parse_list_float(message + start, reverb_params, 4, AMY_UNSET_VALUE(reverb.liveness));
-                            // config_reverb doesn't understand UNSET, so copy in the current values.
-                            if (AMY_IS_UNSET(reverb_params[0])) reverb_params[0] = S2F(reverb.level);
-                            if (AMY_IS_UNSET(reverb_params[1])) reverb_params[1] = reverb.liveness;
-                            if (AMY_IS_UNSET(reverb_params[2])) reverb_params[2] = reverb.damping;
-                            if (AMY_IS_UNSET(reverb_params[3])) reverb_params[3] = reverb.xover_hz;
-                            config_reverb(reverb_params[0], reverb_params[1], reverb_params[2], reverb_params[3]);
-                        }
-                        break;
-                        /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
-                        case 'i': e.instrument = atoi(message + start); break;
-                        case 'I': e.ratio = atoff(message + start); break;
-                        case 'j': e.tempo = atof(message+start); break;
-                        /* j, J available */
-                        // chorus.level 
-                        case 'k': if(AMY_HAS_CHORUS) {
-                            float chorus_params[4] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_list_float(message + start, chorus_params, 4, AMY_UNSET_FLOAT);
-                            // config_chorus doesn't understand UNSET, copy existing values.
-                            if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(chorus.level);
-                            if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)chorus.max_delay;
-                            if (AMY_IS_UNSET(chorus_params[2])) chorus_params[2] = chorus.lfo_freq;
-                            if (AMY_IS_UNSET(chorus_params[3])) chorus_params[3] = chorus.depth;
-                            config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
-                        }
-                        break;
-                        case 'K': e.load_patch = atoi(message+start); break;
-                        case 'l': e.velocity=atoff(message + start); break;
-                        case 'L': e.mod_source=atoi(message + start); break;
-                        case 'm': e.portamento_ms=atoi(message + start); break;
-                        case 'M': if (AMY_HAS_ECHO) {
-                            float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_list_float(message + start, echo_params, 5, AMY_UNSET_FLOAT);
-                            if (AMY_IS_UNSET(echo_params[0])) echo_params[0] = S2F(echo.level);
-                            if (AMY_IS_UNSET(echo_params[1])) echo_params[1] = (float)echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-                            if (AMY_IS_UNSET(echo_params[2])) echo_params[2] = (float)echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
-                            if (AMY_IS_UNSET(echo_params[3])) echo_params[3] = S2F(echo.feedback);
-                            if (AMY_IS_UNSET(echo_params[4])) echo_params[4] = S2F(echo.filter_coef);
-                            config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
-                        }
-                        break;
-                        case 'n': e.midi_note=atof(message + start); break;
-                        case 'N': e.latency_ms = atoi(message + start);  break;
-                        case 'o': e.algorithm=atoi(message+start); break;
-                        case 'O': copy_param_list_substring(e.algo_source, message+start); break;
-                        case 'p': e.patch=atoi(message + start); break;
-                        case 'P': e.phase=F2P(atoff(message + start)); break;
-                        /* q unused */
-                        case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
-                        case 'r': copy_param_list_substring(e.voices, message+start); break; 
-                        case 'R': e.resonance=atoff(message + start); break;
-                        case 's': e.pitch_bend = atoff(message + start); break;
-                        case 'S': 
-                            e.reset_osc = atoi(message + start);
-                            // if we're resetting all of AMY, do it now
-                            if(e.reset_osc & RESET_AMY) {
-                                amy_stop();
-                                amy_start(amy_global.config);
-                            }
-                            // if we're resetting timebase, do it NOW
-                            if(e.reset_osc & RESET_TIMEBASE) {
-                                amy_reset_sysclock();
-                                AMY_UNSET(e.reset_osc);
-                            }
-                            if(e.reset_osc & RESET_EVENTS) {
-                                amy_events_reset();
-                                AMY_UNSET(e.reset_osc);
-                            }
-                            break;
-                        /* t used for time */
-                        case 'T': e.eg_type[0] = atoi(message + start); break;
-                        case 'u': patches_store_patch(message + start); return amy_default_event(); 
-                        /* U used by Alles for sync */
-                        case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
-                        case 'V': e.volume = atoff(message + start); break;
-                        case 'w': e.wave=atoi(message + start); break;
-                        /* W used by Tulip for CV, external_channel */
-                        case 'X': e.eg_type[1] = atoi(message + start); break;
-                        case 'x': {
-                              float eq[3] = {AMY_UNSET_VALUE(e.eq_l), AMY_UNSET_VALUE(e.eq_m), AMY_UNSET_VALUE(e.eq_h)};
-                              parse_list_float(message + start, eq, 3, AMY_UNSET_VALUE(e.eq_l));
-                              e.eq_l = eq[0];
-                              e.eq_m = eq[1];
-                              e.eq_h = eq[2];
-                            }
-                            break;
-                        case 'z': {
-                            uint32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
-                            parse_list_uint32_t(message+start, sm, 6, 0);
-                            if(sm[1]==0) { // remove patch
-                                pcm_unload_patch(sm[0]);
-                            } else {
-                                int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
-                                start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
-                            }
-                            break;
-                        }
-                        /* Y,y available */
-                        /* Z used for end of message */
-                        default:
-                            break;
-                    }
-                }
-            }
-            mode=b;
-            start=c+1;
-        }
-        c++;
-    }
-
-    if(length>0) { // only do this if we got some data 
-        if(sequence_message) {
-            uint8_t added = sequencer_add_event(e, seq_message[0], seq_message[1], seq_message[2]);
-            (void)added; // we don't need to do anything with this info at this time
-        } else {
-            // if time is set, play then
-            // if time and latency is set, play in time + latency
-            // if time is not set, play now
-            // if time is not set + latency is set, play in latency
-            uint32_t playback_time = sysclock;
-            if(AMY_IS_SET(e.time)) playback_time = e.time;
-            playback_time += amy_global.latency_ms;
-            e.time = playback_time;
-            e.status = EVENT_SCHEDULED;
-            return e;
-            
-        }
-    }
-    return amy_default_event();
 }
 
 void amy_reset_sysclock() {

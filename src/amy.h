@@ -227,7 +227,6 @@ typedef int amy_err_t;
 
 
 #include "amy_fixedpoint.h"
-#include "midi.h"
 
 #if defined ARDUINO && !defined TLONG && !defined ESP_PLATFORM
 #include "avr/pgmspace.h" // for PROGMEM, DMAMEM, FASTRUN
@@ -497,7 +496,8 @@ typedef struct sequence_entry_ll_t {
 
 
 #include "sequencer.h"
-
+#include "midi.h"
+#include "transfer.h"
 
 ///////////////////////////////////////
 // config
@@ -543,6 +543,28 @@ typedef struct  {
 
 } amy_config_t;
 
+typedef struct reverb_state {
+    SAMPLE level;
+    float liveness;
+    float damping;
+    float xover_hz;
+} reverb_state_t;
+
+typedef struct chorus_config {
+    SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
+    int max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
+    float lfo_freq;
+    float depth;
+} chorus_config_t;
+
+typedef struct echo_config {
+    SAMPLE level;  // Mix of echo into output.  0 = Echo off.
+    uint32_t delay_samples;  // Current delay, quantized to samples.
+    uint32_t max_delay_samples;  // Maximum delay, i.e. size of allocated delay line.
+    SAMPLE feedback;  // Gain applied when feeding back output to input.
+    SAMPLE filter_coef;  // Echo is filtered by a two-point normalize IIR.  This is the real pole location.
+} echo_config_t;
+
 
 // global synth state
 struct state {
@@ -560,6 +582,10 @@ struct state {
     float tempo;
     uint32_t total_samples;
     uint8_t debug_flag;
+    
+    reverb_state_t reverb;
+    chorus_config_t chorus;
+    echo_config_t echo;
 
     // Transfer
     uint8_t transfer_flag;
@@ -605,6 +631,7 @@ void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay, float lfo_freq, float depth);
+void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
 void osc_note_on(uint16_t osc, float initial_freq);
 void chorus_note_on(float initial_freq);
 
