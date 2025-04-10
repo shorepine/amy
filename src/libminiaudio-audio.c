@@ -13,13 +13,12 @@
 #define MA_NO_ENGINE
 #define MA_NO_GENERATION
 //#define MA_DEBUG_OUTPUT
+extern SAMPLE ** fbl;
 
 #ifdef __APPLE__
     #define MA_NO_RUNTIME_LINKING
 #endif
 #define MINIAUDIO_IMPLEMENTATION
-//#define MA_NO_PULSEAUDIO
-//#define MA_NO_JACK
 
 #include "miniaudio.h"
 
@@ -30,9 +29,6 @@
 
 int16_t * leftover_buf;
 uint16_t leftover_samples = 0;
-int16_t amy_playback_device_id = -1;
-int16_t amy_capture_device_id = -1;
-uint8_t amy_running = 0;
 pthread_t amy_live_thread;
 
 #ifdef __EMSCRIPTEN__
@@ -92,7 +88,7 @@ int16_t output_ring[OUTPUT_RING_LENGTH];
 uint16_t ring_write_ptr = AMY_BLOCK_SIZE*AMY_NCHANS; // start after one AMY frame
 uint16_t ring_read_ptr = 0 ;
 uint16_t in_ptr = 0;
-extern int16_t amy_in_block[AMY_BLOCK_SIZE*AMY_NCHANS];
+extern output_sample_type *amy_in_block;
 
 static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frame_count) {
     short int *poke = (short *)pOutput;
@@ -137,8 +133,8 @@ ma_uint32 captureCount;
 
 // start 
 
-amy_err_t miniaudio_init(uint8_t audio_in) {
-    leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, FBL_RAM_CAPS);
+amy_err_t miniaudio_init() {
+    leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_fbl);
 
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
         printf("Failed to setup context for device list.\n");
@@ -149,35 +145,35 @@ amy_err_t miniaudio_init(uint8_t audio_in) {
         exit(1);
     }
     
-    if(audio_in) {
-        if (amy_playback_device_id >= (int32_t)playbackCount || amy_capture_device_id >= (int32_t)captureCount) {
+    if(amy_global.config.has_audio_in) {
+        if (amy_global.config.playback_device_id >= (int32_t)playbackCount || amy_global.config.capture_device_id >= (int32_t)captureCount) {
             printf("invalid device\n");
             exit(1);
         }
     } else {
-        if (amy_playback_device_id >= (int32_t)playbackCount) {
+        if (amy_global.config.playback_device_id >= (int32_t)playbackCount) {
             printf("invalid device\n");
             exit(1);
         }
     }
 
-    if(audio_in) {
+    if(amy_global.config.has_audio_in) {
         deviceConfig = ma_device_config_init(ma_device_type_duplex);
     } else {
         deviceConfig = ma_device_config_init(ma_device_type_playback);
     }
 
-    if(amy_playback_device_id >= 0) {
-        deviceConfig.playback.pDeviceID = &pPlaybackInfos[amy_playback_device_id].id;
+    if(amy_global.config.playback_device_id >= 0) {
+        deviceConfig.playback.pDeviceID = &pPlaybackInfos[amy_global.config.playback_device_id].id;
     } else {
         deviceConfig.playback.pDeviceID = NULL; // system default
     }
     deviceConfig.playback.format   = DEVICE_FORMAT;
     deviceConfig.playback.channels = AMY_NCHANS;
 
-    if(audio_in) {
-        if(amy_capture_device_id >= 0) {
-            deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_capture_device_id].id;
+    if(amy_global.config.has_audio_in) {
+        if(amy_global.config.capture_device_id >= 0) {
+            deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_global.config.capture_device_id].id;
         } else {
             deviceConfig.capture.pDeviceID = NULL; // system default
         }
@@ -206,21 +202,20 @@ amy_err_t miniaudio_init(uint8_t audio_in) {
 }
 
 void *miniaudio_run(void *vargp) {
-    // Always audio in on non-web posix platforms
-    miniaudio_init(1);
+    miniaudio_init();
     
-    while(amy_running) {
+    while(amy_global.running) {
         sleep(1);
     }
     return NULL;
 }
 
-void amy_live_start(uint8_t audio_in) {
+void amy_live_start() {
     // kick off a thread running miniaudio_run
-    amy_running = 1;
+    amy_global.running = 1;
     #ifdef __EMSCRIPTEN__
     emscripten_cancel_main_loop();
-    miniaudio_init(audio_in);
+    miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
     #else
     pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
@@ -229,7 +224,7 @@ void amy_live_start(uint8_t audio_in) {
 
 
 void amy_live_stop() {
-    amy_running = 0;
+    amy_global.running = 0;
     ma_device_uninit(&device);
     free(leftover_buf);
 }

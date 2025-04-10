@@ -20,13 +20,13 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     int arg1 = -1; int arg2 = -1;
     if(! PyArg_ParseTuple(args, "ii", &arg1, &arg2)) {
-        amy_playback_device_id = -1;
-        amy_capture_device_id = -1;
+        amy_global.config.playback_device_id = arg1;
+        amy_global.config.capture_device_id = arg2;
     } else {
-        amy_playback_device_id = arg1;
-        amy_capture_device_id = arg2;
+        amy_global.config.playback_device_id = arg1;
+        amy_global.config.capture_device_id = arg2;
     }
-    amy_live_start(1);
+    amy_live_start();
     return Py_None;
 }
 
@@ -41,11 +41,10 @@ static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
 }
 
 
-static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
-    int arg1 = 1; int arg2 = 1; int arg3 = 1; int arg4=1; int arg5=1;
-    if(PyArg_ParseTuple(args, "iiiii", &arg1, &arg2, &arg3, &arg4, &arg5)) {
-        amy_start(arg1,arg2,arg3,arg4,arg5);
-    }
+static PyObject * amystart_no_default_wrapper(PyObject *self, PyObject *args) {
+    amy_config_t amy_config = amy_default_config();
+    amy_config.set_default_synth=0;
+    amy_start(amy_config); // initializes amy 
     return Py_None;
 }
 
@@ -80,7 +79,7 @@ static PyMethodDef libAMYMethods[] = {
     {"send", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
-    {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
+    {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     { NULL, NULL, 0, NULL }
@@ -97,7 +96,8 @@ static struct PyModuleDef libamyDef =
 
 PyMODINIT_FUNC PyInit_libamy(void)
 {   
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1, /* default synth */ 1);
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config);
     return PyModule_Create(&libamyDef);
 
 }

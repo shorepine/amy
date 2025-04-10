@@ -128,7 +128,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
         const LUTSAMPLE* table = patch.sample_ram;
         uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
-        //fprintf(stderr, "render_pcm: time=%.3f patch=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", total_samples / (float)AMY_SAMPLE_RATE, synth[osc].patch, base_index, patch->length, patch->loopstart, patch->loopend, msynth[osc].feedback, AMY_IS_UNSET(synth[osc].note_off_clock));
+        //fprintf(stderr, "render_pcm: time=%.3f patch=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", amy_global.total_samples / (float)AMY_SAMPLE_RATE, synth[osc].patch, base_index, patch->length, patch->loopstart, patch->loopend, msynth[osc].feedback, AMY_IS_UNSET(synth[osc].note_off_clock));
         for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
             SAMPLE frac = S_FRAC_OF_P(synth[osc].phase, PCM_INDEX_BITS);
             LUTSAMPLE b = table[base_index];
@@ -208,13 +208,13 @@ int16_t * pcm_load(uint16_t patch_number, uint32_t length, uint32_t samplerate, 
     new_patch_pointer->next = NULL;
     new_patch_pointer->patch_number = patch_number;
     // Now alloc a patch
-    memorypcm_patch_t *memory_patch = malloc_caps(sizeof(memorypcm_patch_t), SAMPLE_RAM_CAPS);
+    memorypcm_patch_t *memory_patch = malloc_caps(sizeof(memorypcm_patch_t), amy_global.config.ram_caps_sample);
     memory_patch->samplerate = samplerate;
     memory_patch->log2sr = log2f((float)samplerate / ZERO_LOGFREQ_IN_HZ);
     memory_patch->midinote = midinote;
     memory_patch->loopstart = loopstart;
     memory_patch->length = length;
-    memory_patch->sample_ram = malloc_caps(length*2, SAMPLE_RAM_CAPS);
+    memory_patch->sample_ram = malloc_caps(length*2, amy_global.config.ram_caps_sample);
     if(memory_patch->sample_ram  == NULL) {
         fprintf(stderr, "No RAM left for sample load\n");
         free(memory_patch);

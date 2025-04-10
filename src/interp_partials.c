@@ -89,7 +89,7 @@ void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partial
     synth[o].amp_coefs[COEF_VEL] = 0;
     // Other osc params.
     synth[o].status = SYNTH_IS_ALGO_SOURCE;
-    synth[o].note_on_clock = total_samples;
+    synth[o].note_on_clock = amy_global.total_samples;
     AMY_UNSET(synth[o].note_off_clock);
     partial_note_on(o);
 }
@@ -136,7 +136,7 @@ void interp_partials_note_on(uint16_t osc) {
         _harmonic_base_index_for_pitch_vel(pitch_index + 1, vel_index + 1, partials_voice);
     float alpha_ph_vh = (pitch_alpha) * (vel_alpha);
     //fprintf(stderr, "interp_partials@%u: osc %d note %.1f vel %.1f pitch_x %d vel_x %d numh %d harm_bi_ll %d pitch_a %.3f vel_a %.3f alphas %.2f %.2f %.2f %.2f\n",
-    //        total_samples, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics,
+    //        amy_global.total_samples, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics,
     //        harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
     for (int h = 0; h < num_harmonics; ++h) {
@@ -166,6 +166,6 @@ void interp_partials_note_off(uint16_t osc) {
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         AMY_UNSET(synth[o].note_on_clock);
-        synth[o].note_off_clock = total_samples;
+        synth[o].note_off_clock = amy_global.total_samples;
     }
 }

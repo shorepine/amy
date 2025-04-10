@@ -28,7 +28,7 @@ struct voice_fifo *voice_fifo_init(int size, char *name) {
         fprintf(stderr, "init_voice_fifo: size %d value error (max size is %d)\n", size, MAX_VOICES_PER_INSTRUMENT);
         return NULL;
     }
-    struct voice_fifo *result = (struct voice_fifo *)malloc_caps(sizeof(struct voice_fifo), INSTRUMENT_RAM_CAPS);
+    struct voice_fifo *result = (struct voice_fifo *)malloc_caps(sizeof(struct voice_fifo), amy_global.config.ram_caps_synth);
     result->head = 0;
     result->tail = 0;
     result->length = MAX_VOICES_PER_INSTRUMENT + 1;  // One more than max size.  fixed in this implementation.
@@ -104,7 +104,7 @@ struct instrument_info {
 //#define _INSTRUMENT_NO_VOICE 255
 
 struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices) {
-    struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), INSTRUMENT_RAM_CAPS);
+    struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     instrument->num_voices = num_voices;
     instrument->released_voices = voice_fifo_init(num_voices, "released");
     instrument->active_voices = voice_fifo_init(num_voices, "active");

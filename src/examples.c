@@ -340,8 +340,6 @@ void example_fm(uint32_t start) {
 
 // Minimal custom oscillator
 
-#if AMY_HAS_CUSTOM == 1
-
 void beeper_init(void) {
     //printf("Beeper init\n");
 }
@@ -351,7 +349,7 @@ void beeper_note_on(uint16_t osc, float freq) {
 }
 
 void beeper_note_off(uint16_t osc) {
-    synth[osc].note_off_clock = total_samples;
+    synth[osc].note_off_clock = amy_global.total_samples;
 }
 
 void beeper_mod_trigger(uint16_t osc) {
@@ -393,4 +391,3 @@ void example_custom_beep() {
     amy_add_event(e);
 }
 
-#endif

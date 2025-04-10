@@ -25,7 +25,7 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 #define MEMORY_PATCHES 32
 char * memory_patch[MEMORY_PATCHES];
 uint16_t memory_patch_oscs[MEMORY_PATCHES];
-uint8_t osc_to_voice[AMY_OSCS];
+uint8_t * osc_to_voice;
 uint16_t voice_to_base_osc[MAX_VOICES];
 
 void patches_debug() {
@@ -61,6 +61,7 @@ void all_notes_off() {
 }
 
 void patches_init() {
+
     for(uint8_t i=0;i<MEMORY_PATCHES;i++) {
         memory_patch_oscs[i]  = 0;
         memory_patch[i] = NULL;
@@ -68,6 +69,9 @@ void patches_init() {
 }
 
 void patches_reset() {
+    if(osc_to_voice != NULL) free(osc_to_voice);
+    osc_to_voice = (uint8_t*)malloc(AMY_OSCS);
+
     for(uint8_t v=0;v<MAX_VOICES;v++) {
         AMY_UNSET(voice_to_base_osc[v]);
     }

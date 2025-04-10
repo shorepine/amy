@@ -50,13 +50,13 @@ SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c \
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
  
-HEADERS = $(wildcard src/*.h) src/amy_config.h
+HEADERS = $(wildcard src/*.h)
 HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 
 PYTHONS = $(wildcard *.py)
 
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
-	cat src/amy{,_config}.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f$$/\1/' | awk '{print $$2 "=" $$3}' > amy_constants.py
+	cat src/amy.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f$$/\1/' | awk '{print $$2 "=" $$3}' > amy_constants.py
 	${PYTHON} amy_headers.py
 
 %.o: %.c $(HEADERS) src/patches.h

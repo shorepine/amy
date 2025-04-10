@@ -39,8 +39,7 @@ class AmyTest:
     import libamy
     name = self.__class__.__name__
     libamy.stop()
-    libamy.start(1,1,1,1,0)
-    #amy.send(reset=amy.RESET_AMY)
+    libamy.start_no_default()
     self.run()
     
     samples = amy.render(1.0)
