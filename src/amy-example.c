@@ -18,9 +18,6 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
-extern void instrument_test(void);
-extern SAMPLE ** fbl;
-
 int main(int argc, char ** argv) {
     int8_t playback_device_id = -1;
     int8_t capture_device_id = -1;

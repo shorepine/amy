@@ -40,6 +40,11 @@ static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config); // initializes amy 
+    return Py_None;
+}
 
 static PyObject * amystart_no_default_wrapper(PyObject *self, PyObject *args) {
     amy_config_t amy_config = amy_default_config();
@@ -80,6 +85,7 @@ static PyMethodDef libAMYMethods[] = {
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
     {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
+    {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     { NULL, NULL, 0, NULL }

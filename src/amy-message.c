@@ -49,7 +49,6 @@ int main(int argc, char ** argv) {
     amy_config.capture_device_id = capture_device_id;
     amy_start(amy_config);
     amy_live_start();
-    amy_reset_oscs();
 
     while (1) {
         char input[1024];

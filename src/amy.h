@@ -590,6 +590,7 @@ void chorus_note_on(float initial_freq);
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
 
+
 // custom oscillator
 struct custom_oscillator {
     void (*init)(void);

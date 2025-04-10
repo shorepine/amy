@@ -4,8 +4,6 @@
 // brian@variogr.am
 
 #include "amy.h"
-// Flag set momentarily by debug message to report state on-demand.
-
 
 #ifdef AMY_DEBUG
 
