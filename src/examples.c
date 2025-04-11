@@ -349,7 +349,7 @@ void beeper_note_on(uint16_t osc, float freq) {
 }
 
 void beeper_note_off(uint16_t osc) {
-    synth[osc].note_off_clock = amy_global.total_samples;
+    synth[osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
 }
 
 void beeper_mod_trigger(uint16_t osc) {

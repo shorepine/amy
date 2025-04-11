@@ -1,12 +1,3 @@
-/* -*- Mode: ObjC; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2; fill-column: 150 -*- */
-
-// compile with clang virtualmidi.mm  -framework CoreMIDI -framework Cocoa -lstdc++ -o vm 
-
-
-//#import <array>
-//#import <cassert>
-//#import <cstdio>
-
 #define unichar OSX_UNICHAR
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
@@ -40,7 +31,6 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     }
 
 }
-
 
 
 void* run_midi(void*argp){

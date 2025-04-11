@@ -98,7 +98,7 @@ SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, 
 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     // Perform the vital parts of amy.c:1089 ff since these oscs aren't turned on elsewhere.
-    synth[osc].note_on_clock = amy_global.total_samples;
+    synth[osc].note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
     synth[osc].status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
     if (AMY_IS_SET(synth[osc].trigger_phase))
         synth[osc].phase = synth[osc].trigger_phase;
@@ -110,12 +110,12 @@ void algo_note_off(uint16_t osc) {
         if(AMY_IS_SET(synth[osc].algo_source[i])) {
             uint16_t o = synth[osc].algo_source[i];
             AMY_UNSET(synth[o].note_on_clock);
-            synth[o].note_off_clock = amy_global.total_samples;
+            synth[o].note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
         }
     }
     // osc note off, start release
     AMY_UNSET(synth[osc].note_on_clock);
-    synth[osc].note_off_clock = amy_global.total_samples;          
+    synth[osc].note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;          
 }
 
 

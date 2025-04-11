@@ -9,7 +9,7 @@ uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
 
 // Send a MIDI note on OUT
-void midi_note_on(uint16_t osc) {
+void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
     if(synth[osc].source != EVENT_MIDI) {
         uint8_t bytes[3];
@@ -21,7 +21,7 @@ void midi_note_on(uint16_t osc) {
 }
 
 // Send a MIDI note off OUT
-void midi_note_off(uint16_t osc) {
+void amy_send_midi_note_off(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
     if(synth[osc].source != EVENT_MIDI) {
         uint8_t bytes[3];
@@ -33,7 +33,7 @@ void midi_note_off(uint16_t osc) {
 }
 
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
-void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
+void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     struct event e = amy_default_event();
     e.instrument = channel;
     e.source = EVENT_MIDI;
@@ -43,7 +43,7 @@ void note_on(uint8_t channel, uint8_t note, uint8_t vel) {
 }
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
-void note_off(uint8_t channel, uint8_t note, uint8_t vel) {
+void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel) {
     struct event e = amy_default_event();
     e.instrument = channel;
     e.source = EVENT_MIDI;
@@ -58,8 +58,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         uint8_t status = data[0] & 0xF0;
         uint8_t channel = data[0] & 0x0F;
         // Do the AMY instrument things here
-        if(status == 0x90) note_on(channel+1, data[1], data[2] );
-        if(status == 0x80) note_off(channel+1, data[1], data[2] );
+        if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2] );
+        if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2] );
     }
 
     // Also send the external hooks if set

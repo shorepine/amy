@@ -60,7 +60,7 @@ int main(int argc, char ** argv) {
                     fprintf(stdout, "%" PRIu32 "\n", amy_sysclock());
                     break;
                 case 's':
-                    fprintf(stdout, "%" PRIu32 "\n", amy_global.total_samples);
+                    fprintf(stdout, "%" PRIu32 "\n", amy_global.total_blocks);
                     break;
                 default:
                     fprintf(stdout, "?\n");
