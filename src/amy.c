@@ -444,7 +444,7 @@ void add_delta_to_queue(struct delta d, void*user_data) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #elif defined _POSIX_THREADS
-    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_samples, d.osc, d.param, d.data, amy_global.event_qsize);
+    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d.osc, d.param, d.data, amy_global.event_qsize);
     pthread_mutex_lock(&amy_queue_lock); 
 #endif
 
@@ -793,7 +793,7 @@ int8_t oscs_init() {
         amy_external_in_block[i] = 0;
     }
 
-    amy_global.total_samples = 0;
+    amy_global.total_blocks = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
     //    AMY_OSCS, AMY_BLOCK_SIZE, AMY_CORES, AMY_NCHANS, pcm_samples);
     return 0;
@@ -916,7 +916,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc].wave==AUDIO_EXT0) external_audio_in_note_on(osc, 0);
     if(synth[osc].wave==AUDIO_EXT1) external_audio_in_note_on(osc, 1);
     if(synth[osc].wave==MIDI) {
-        midi_note_on(osc);
+        amy_send_midi_note_on(osc);
     }
     if(amy_global.config.has_partials) {
         if(synth[osc].wave==PARTIALS || synth[osc].wave==BYO_PARTIALS) partials_note_on(osc);
@@ -948,7 +948,7 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
 // play an event, now -- tell the audio loop to start making noise
 void play_event(struct delta d) {
     AMY_PROFILE_START(PLAY_EVENT)
-    //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_samples, d.osc, d.param, d.data, global.event_qsize);
+    //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d.osc, d.param, d.data, global.event_qsize);
     //uint8_t trig=0;
     // todo: event-only side effect, remove
     if(d.param == MIDI_NOTE) {
@@ -1092,7 +1092,7 @@ void play_event(struct delta d) {
             synth[d.osc].status = SYNTH_AUDIBLE;
             // an osc came in with a note on.
             // start the bp clock
-            synth[d.osc].note_on_clock = amy_global.total_samples; //esp_timer_get_time() / 1000;
+            synth[d.osc].note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; //esp_timer_get_time() / 1000;
 
             // if there was a filter active for this voice, reset it
             if(synth[d.osc].filter_type != FILTER_NONE) reset_filter(d.osc);
@@ -1122,7 +1122,7 @@ void play_event(struct delta d) {
                 if (AMY_IS_SET(synth[synth[d.osc].mod_source].trigger_phase))
                     synth[synth[d.osc].mod_source].phase = synth[synth[d.osc].mod_source].trigger_phase;
 
-                synth[synth[d.osc].mod_source].note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.
+                synth[synth[d.osc].mod_source].note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.
                 if(synth[synth[d.osc].mod_source].wave==SINE) sine_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_DOWN) saw_up_mod_trigger(synth[d.osc].mod_source);
                 if(synth[synth[d.osc].mod_source].wave==SAW_UP) saw_down_mod_trigger(synth[d.osc].mod_source);
@@ -1143,14 +1143,14 @@ void play_event(struct delta d) {
             } else if(synth[d.osc].wave==PARTIALS || synth[d.osc].wave==BYO_PARTIALS || synth[d.osc].wave==INTERP_PARTIALS) {
                 if(amy_global.config.has_partials) {
                     AMY_UNSET(synth[d.osc].note_on_clock);
-                    synth[d.osc].note_off_clock = amy_global.total_samples;
+                    synth[d.osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
                     if(synth[d.osc].wave==INTERP_PARTIALS) interp_partials_note_off(d.osc);
                     else partials_note_off(d.osc);
                 }
             } else if(synth[d.osc].wave==PCM) {
                 pcm_note_off(d.osc);
             } else if(synth[d.osc].wave==MIDI) {
-                midi_note_off(d.osc);
+                amy_send_midi_note_off(d.osc);
             } else if(synth[d.osc].wave==CUSTOM) {
                 if(amy_global.config.has_custom) {
                     custom_note_off(d.osc);
@@ -1161,7 +1161,7 @@ void play_event(struct delta d) {
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
                 AMY_UNSET(synth[d.osc].note_on_clock);
-                synth[d.osc].note_off_clock = amy_global.total_samples;
+                synth[d.osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
             }
         }
         // Now maybe propagate the velocity event to the chained osc.
@@ -1270,7 +1270,7 @@ void hold_and_modify(uint16_t osc) {
 
     if (osc == 999) {
         fprintf(stderr, "h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
-               amy_global.total_samples / (float)AMY_SAMPLE_RATE, osc,
+               amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc,
                ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
                synth[osc].amp_coefs[0], synth[osc].amp_coefs[1], synth[osc].amp_coefs[2], synth[osc].amp_coefs[3], synth[osc].amp_coefs[4], synth[osc].amp_coefs[5],
                synth[osc].logfreq_coefs[0], synth[osc].logfreq_coefs[1], synth[osc].logfreq_coefs[2], synth[osc].logfreq_coefs[3], synth[osc].logfreq_coefs[4], synth[osc].logfreq_coefs[5],
@@ -1320,12 +1320,12 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)
     // Returns abs max of what it wrote.
     //fprintf(stderr, "+render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
-    //        amy_global.total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+    //        amy_global.total_blocks, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
     //        osc, synth[osc].render_clock);
     SAMPLE max_val = 0;
     // Only render if osc has not already been rendered this time step e.g. by chained_osc.
-    if (synth[osc].render_clock != amy_global.total_samples) {
-        synth[osc].render_clock = amy_global.total_samples;
+    if (synth[osc].render_clock != amy_global.total_blocks*AMY_BLOCK_SIZE) {
+        synth[osc].render_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         // fill buf with next block_size of samples for specified osc.
         hold_and_modify(osc); // apply bp / mod
         if(!(msynth[osc].amp == 0 && msynth[osc].last_amp == 0)) {
@@ -1373,8 +1373,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if (max_val > 0) {
                 AMY_UNSET(synth[osc].zero_amp_clock);
             } else {
-                if ( (amy_global.total_samples - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
-                    //printf("h&m: time %f osc %d OFF\n", amy_global.total_samples/(float)AMY_SAMPLE_RATE, osc);
+                if ( (amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc].zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                    //printf("h&m: time %f osc %d OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, osc);
                     // Oscillator has fallen silent, stop executing it.
                     synth[osc].status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
                     // .. but force it to start at zero phase next time.
@@ -1382,12 +1382,12 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 }
             }
         } else if (max_val == 0) {
-            synth[osc].zero_amp_clock = amy_global.total_samples;
+            synth[osc].zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         }
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
     //fprintf(stderr, "-render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
-    //    amy_global.total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+    //    amy_global.total_blocks*AMY_BLOCK_SIZE, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
     //    osc, synth[osc].render_clock);
     return max_val;
 }
@@ -1422,7 +1422,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if (amy_global.debug_flag) {
         amy_global.debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core], AMY_BLOCK_SIZE);
-        fprintf(stderr, "time %" PRIu32 " core %d max_max=%.3f post-eq max=%.3f\n", amy_global.total_samples, core, S2F(max_max), S2F(smax));
+        fprintf(stderr, "time %" PRIu32 " core %d max_max=%.3f post-eq max=%.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, core, S2F(max_max), S2F(smax));
     }
 
     AMY_PROFILE_STOP(AMY_RENDER)
@@ -1431,7 +1431,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
 uint32_t amy_sysclock() {
-    return (uint32_t)((amy_global.total_samples / (float)AMY_SAMPLE_RATE) * 1000);
+    return (uint32_t)((amy_global.total_blocks * AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE) * 1000);
 }
 
 
@@ -1643,14 +1643,14 @@ int16_t * amy_fill_buffer() {
             }
         }
     }
-    amy_global.total_samples += AMY_BLOCK_SIZE;
+    amy_global.total_blocks++;
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
     return block;
 }
 
 void amy_reset_sysclock() {
-    amy_global.total_samples = 0;
+    amy_global.total_blocks = 0;
     amy_global.sequencer_tick_count = 0;
     sequencer_recompute();
 }
@@ -1685,7 +1685,7 @@ void amy_start(amy_config_t c) {
     global_init(c);
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
-        if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget) {
+        if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
             pthread_t midi_thread_id;
             pthread_create(&midi_thread_id, NULL, run_midi, NULL);
         }

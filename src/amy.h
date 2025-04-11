@@ -520,8 +520,11 @@ typedef struct  {
     uint8_t has_echo;
     uint8_t has_chorus;
     uint8_t has_audio_in;
+    
     uint8_t has_midi_uart;
     uint8_t has_midi_gadget;
+    uint8_t has_midi_mac;
+
     uint8_t has_partials;
     uint8_t has_custom; 
 
@@ -591,7 +594,7 @@ struct state {
     struct delta * event_start; // start of the sorted list
     int16_t latency_ms;
     float tempo;
-    uint32_t total_samples;
+    uint32_t total_blocks;
     uint8_t debug_flag;
     
     reverb_state_t reverb;

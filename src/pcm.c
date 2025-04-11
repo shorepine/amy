@@ -128,7 +128,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
         const LUTSAMPLE* table = patch.sample_ram;
         uint32_t base_index = INT_OF_P(synth[osc].phase, PCM_INDEX_BITS);
-        //fprintf(stderr, "render_pcm: time=%.3f patch=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", amy_global.total_samples / (float)AMY_SAMPLE_RATE, synth[osc].patch, base_index, patch->length, patch->loopstart, patch->loopend, msynth[osc].feedback, AMY_IS_UNSET(synth[osc].note_off_clock));
+        //fprintf(stderr, "render_pcm: time=%.3f patch=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, synth[osc].patch, base_index, patch->length, patch->loopstart, patch->loopend, msynth[osc].feedback, AMY_IS_UNSET(synth[osc].note_off_clock));
         for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
             SAMPLE frac = S_FRAC_OF_P(synth[osc].phase, PCM_INDEX_BITS);
             LUTSAMPLE b = table[base_index];

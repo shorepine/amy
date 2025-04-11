@@ -13,9 +13,9 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     // modulates).
     // Has this mod value already been calculated this frame?  Can't
     // recalculate, because compute_mod advance phase internally.
-    if (synth[mod_osc].mod_value_clock == amy_global.total_samples)
+    if (synth[mod_osc].mod_value_clock == amy_global.total_blocks*AMY_BLOCK_SIZE)
         return synth[mod_osc].mod_value;
-    synth[mod_osc].mod_value_clock = amy_global.total_samples;
+    synth[mod_osc].mod_value_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     SAMPLE value = 0;
     if(synth[mod_osc].wave == NOISE) value = compute_mod_noise(mod_osc);
     if(synth[mod_osc].wave == SAW_DOWN) value = compute_mod_saw_down(mod_osc);
@@ -87,7 +87,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
 
     // Find out which BP we're in
     if(AMY_IS_SET(synth[osc].note_on_clock)) {
-        elapsed = (amy_global.total_samples - synth[osc].note_on_clock + sample_offset) + 1;
+        elapsed = (amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc].note_on_clock + sample_offset) + 1;
         for(uint8_t i = 0; i < bp_r; i++) {
             if(elapsed < bp_end_times[i]) {
                 // We found a segment.
@@ -100,13 +100,13 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             found = bp_r - 1; // segment before release defines sustain
             scale = F2S(synth[osc].breakpoint_values[bp_set][found]);
             synth[osc].last_scale[bp_set] = scale;
-            //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", amy_global.total_samples, bp_set, found, S2F(scale));
+            //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, S2F(scale));
             //return scale;
             goto return_label;
         }
     } else if(AMY_IS_SET(synth[osc].note_off_clock)) {
         release = 1;
-        elapsed = (amy_global.total_samples - synth[osc].note_off_clock + sample_offset);
+        elapsed = (amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc].note_off_clock + sample_offset);
         // Get the last t/v pair , for release
         found = bp_r;
         t0 = 0; // start the elapsed clock again
@@ -124,7 +124,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                 //return scale;
                 goto return_label;
             }
-            //printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_samples / (float)AMY_SAMPLE_RATE, osc, msynth[osc].amp);
+            //printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, msynth[osc].amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
             //synth[osc].status=SYNTH_OFF;
             //AMY_UNSET(synth[osc].note_off_clock);
@@ -203,7 +203,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                                          F2S(1.0f)
                                          - exp2_lut(MUL4_SS(exponential_rate,
                                                             F2S(time_ratio)))));
-            //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_samples, bp_set, found, time_ratio, S2F(scale));
+            //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, time_ratio, S2F(scale));
         }
     }
     // If sign is negative, flip it back again.
@@ -214,7 +214,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
  return_label:
     if (!release) synth[osc].last_scale[bp_set] = scale;
     //if (osc < AMY_OSCS && found != -1)
-    //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_samples / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)
     return scale;
 }

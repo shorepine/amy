@@ -51,7 +51,7 @@ void partials_note_on(uint16_t osc) {
                 // //synth[o].logfreq_coefs[COEF_EG1] = 1.0;  // Let the user turn this on if they want.
                 synth[o].logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
                 synth[o].status = SYNTH_IS_ALGO_SOURCE;
-                synth[o].note_on_clock = amy_global.total_samples;
+                synth[o].note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
                 AMY_UNSET(synth[o].note_off_clock);
                 msynth[o].logfreq = synth[o].logfreq_coefs[COEF_CONST] + msynth[osc].logfreq;
                 partial_note_on(o);
@@ -78,7 +78,7 @@ void partials_note_off(uint16_t osc) {
         for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
             uint16_t o = i % AMY_OSCS;
             AMY_UNSET(synth[o].note_on_clock);
-            synth[o].note_off_clock = amy_global.total_samples;
+            synth[o].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         }
     } else {
         // todo; finish the sustain
@@ -106,7 +106,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
         // If ratio is set (not 0 or -1), use it for a time stretch
         float time_ratio = 1;
         if(AMY_IS_SET(synth[osc].logratio)) time_ratio = exp2f(synth[osc].logratio);
-        uint32_t ms_since_started = (uint32_t) ((((amy_global.total_samples - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
+        uint32_t ms_since_started = (uint32_t) ((((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc].note_on_clock) / (float)AMY_SAMPLE_RATE)*1000.0)*time_ratio);
         num_oscs = patch.oscs_alloc;
         if(synth[osc].step >= 0) {
             // do we either have no sustain, or are we past sustain?
@@ -118,7 +118,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     // It's time for the next breakpoint!
                     uint16_t o = (pb.osc + 1 + osc) % AMY_OSCS; // just in case
     
-                    //printf("time %.3f rel %f: freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", amy_global.total_samples / (float)AMY_SAMPLE_RATE, ms_since_started / (float)AMY_SAMPLE_RATE, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
+                    //printf("time %.3f rel %f: freqlogratio %f new pb: osc %d t_ms %d amp %f freq %f phase %f logfreq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, ms_since_started / (float)AMY_SAMPLE_RATE, freq_logratio, pb.osc, pb.ms_offset, pb.amp, pb.freq, pb.phase, logfreq_of_freq(pb.freq));
 
                     // All the types share these params or are overwritten
                     synth[o].wave = PARTIAL;
@@ -127,7 +127,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     synth[o].patch = synth[osc].patch;
                     //synth[o].velocity = synth[osc].velocity;
                     // velocity is set directly before rendering each partial according to the parent osc's amplitude envelope.
-                    synth[o].note_on_clock = amy_global.total_samples; // start breakpoints
+                    synth[o].note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; // start breakpoints
                     synth[o].amp_coefs[COEF_CONST] = pb.amp;
                     // logfreq coef_const combines both the freq of this partial and the expected note.  Actual note will be added via 'note' field.
                     synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq(pb.freq) - logfreq_for_midi_note(patch.midi_note);
@@ -167,12 +167,12 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                     }
                     if(partial_code==1) { // continuation
                         //synth[o].logfreq_coefs[COEF_CONST] = logfreq_of_freq(pb.freq) + freq_logratio;
-                        //printf("[%d %d] o %d continue partial\n", amy_global.total_samples, ms_since_started, o);
+                        //printf("[%d %d] o %d continue partial\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o);
                     } else if(partial_code==2) { // partial is done, give it one buffer to ramp to zero.
                         synth[o].amp_coefs[COEF_CONST] = 0.0001;
                         //partial_note_off(o);
                     } else { // start of a partial,
-                        //printf("[%d %d] o %d start partial\n", amy_global.total_samples,ms_since_started, o);
+                        //printf("[%d %d] o %d start partial\n", amy_global.total_blocks*AMY_BLOCK_SIZE,ms_since_started, o);
                         // Simulate the work of hold_and_modify to ensure msynth logfreq is set, to guide choice of LUT length.
                         msynth[o].logfreq = synth[o].logfreq_coefs[COEF_CONST] + msynth[osc].logfreq;
                         partial_note_on(o);
@@ -192,19 +192,19 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
                 uint16_t o = i % AMY_OSCS;
                 if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
                     AMY_UNSET(synth[o].note_on_clock);
-                    synth[o].note_off_clock = amy_global.total_samples;
+                    synth[o].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
                     synth[o].status = SYNTH_OFF;
                 }
             }
             // osc note off, start release
             AMY_UNSET(synth[osc].note_on_clock);
-            synth[osc].note_off_clock = amy_global.total_samples;
+            synth[osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
             synth[osc].status = SYNTH_OFF;
         }
     }  // End of block for handling preset patches.
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc].logfreq);
-    //fprintf(stderr, "t=%u partials o=%d msynth[osc].logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_samples, osc, msynth[osc].logfreq, midi_note, msynth[osc].amp);
+    //fprintf(stderr, "t=%u partials o=%d msynth[osc].logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc].logfreq, midi_note, msynth[osc].amp);
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
         if(synth[o].status ==SYNTH_IS_ALGO_SOURCE) {
@@ -216,7 +216,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             // envelope value are delayed by 1 frame compared to other oscs
             // so that partials fade in over one frame from zero amp.
             hold_and_modify(o);
-            //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_samples, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
+            //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o].amp, msynth[o].amp, synth[o].freq, msynth[o].freq, synth[o].note_on_clock, synth[o].note_off_clock, synth[o].breakpoint_times[0][0], 
             //    synth[o].breakpoint_values[0][0], synth[o].breakpoint_times[1][0], synth[o].breakpoint_values[1][0], synth[o].wave);
             SAMPLE value = render_partial(buf, o);
             if (value > max_value) max_value = value;
