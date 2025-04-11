@@ -23,7 +23,7 @@ void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 
 // Our internal accounting
 uint32_t sequencer_tick_count = 0;
-uint64_t next_amy_tick_us = 0;
+uint32_t next_amy_tick_ms = 0;
 uint32_t us_per_tick = 0;
 
 #ifdef ESP_PLATFORM
@@ -53,7 +53,7 @@ void sequencer_reset() {
 
 void sequencer_recompute() {
     us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
-    next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
+    next_amy_tick_ms = amy_sysclock() + (us_per_tick/1000);
 }
 
 void add_delta_to_sequencer(struct delta d, void*user_data) {
@@ -107,7 +107,7 @@ uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint
 
 void sequencer_check_and_fill() {
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
-    while(amy_sysclock()  >= (next_amy_tick_us/1000)) {
+    while(amy_sysclock()  >= next_amy_tick_ms) {
         sequencer_tick_count++;
         // Scan through LL looking for matches
         sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
@@ -145,7 +145,7 @@ void sequencer_check_and_fill() {
         if(amy_external_sequencer_hook!=NULL) {
             amy_external_sequencer_hook(sequencer_tick_count);
         }
-        next_amy_tick_us = next_amy_tick_us + us_per_tick;
+        next_amy_tick_ms = next_amy_tick_ms + (us_per_tick/1000);
     }
 }
 
