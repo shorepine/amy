@@ -1,7 +1,8 @@
 // midi.h
 #ifdef ESP_PLATFORM 
+#include "driver/uart.h"
 #include "soc/uart_reg.h"
-extern QueueHandle_t uart_queue;
+#include "esp_task.h"
 #else
 // virtualmidi Cocoa stubs
 #endif
@@ -30,6 +31,10 @@ void amy_send_midi_note_off(uint16_t osc);
 void amy_send_midi_note_on(uint16_t osc);
 
 #ifdef ESP_PLATFORM
+#define MIDI_TASK_COREID (0)
+#define MIDI_TASK_STACK_SIZE (16 * 1024)
+#define MIDI_TASK_NAME      "amy_midi_task"
+#define MIDI_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 2)
 void run_midi();
 #else
 void *run_midi(void*vargp);

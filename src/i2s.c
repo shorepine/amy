@@ -7,7 +7,7 @@
 
 // Only run this code on MCUs
 #if defined(ESP_PLATFORM) || !defined(PICO_ON_DEVICE) || !defined(ARDUINO)
-
+#include <esp_task.h>
 #include "amy.h"
 
 
@@ -25,8 +25,9 @@
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
 #define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 
-extern TaskHandle_t amy_render_handle;
-extern TaskHandle_t amy_fill_buffer_handle;
+
+TaskHandle_t amy_render_handle;
+TaskHandle_t amy_fill_buffer_handle;
 
 #include "driver/i2s_std.h"
 i2s_chan_handle_t tx_handle;
@@ -48,10 +49,10 @@ amy_err_t setup_i2s(void) {
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
             .mclk = I2S_GPIO_UNUSED,
-            .bclk = amy_global.config.bclk,
-            .ws = amy_global.config.lrc,
-            .dout = amy_global.config.dout,
-            .din = amy_global.config.din,
+            .bclk = amy_global.config.i2s_bclk,
+            .ws = amy_global.config.i2s_lrc,
+            .dout = amy_global.config.i2s_dout,
+            .din = amy_global.config.i2s_din,
             .invert_flags = {
                 .mclk_inv = false,
                 .bclk_inv = false,
@@ -162,9 +163,6 @@ amy_err_t i2s_amy_init() {
 
     // Create the second core rendering task
     xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
-
-    // Wait for the render tasks to get going before starting the i2s task
-    delay_ms(100);
 
     // And the fill audio buffer thread, combines, does volume & filters
     xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
