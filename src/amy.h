@@ -406,9 +406,9 @@ struct event {
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
     uint8_t instrument;
-    uint32_t reset_osc;
     uint8_t status;
     uint8_t source;
+    uint32_t reset_osc;
 };
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -544,12 +544,12 @@ typedef struct  {
     int8_t midi_in;
 
     // memory caps for MCUs
-    uint8_t ram_caps_events;
-    uint8_t ram_caps_synth;
-    uint8_t ram_caps_block;
-    uint8_t ram_caps_fbl;
-    uint8_t ram_caps_delay;
-    uint8_t ram_caps_sample;
+    uint32_t ram_caps_events;
+    uint32_t ram_caps_synth;
+    uint32_t ram_caps_block;
+    uint32_t ram_caps_fbl;
+    uint32_t ram_caps_delay;
+    uint32_t ram_caps_sample;
 
     // device ids for miniaudio platforms
     int8_t capture_device_id;

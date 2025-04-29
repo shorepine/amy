@@ -202,9 +202,6 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 }
 
 
-#ifdef ESP_PLATFORM
-QueueHandle_t uart_queue;
-#endif
 
 #ifdef PI_PICO
 //todo
@@ -255,8 +252,7 @@ void run_midi() {
 
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-    // TX, RX, CTS/RTS -- Only care about RX here, pin 47 for now
-    ESP_ERROR_CHECK(uart_set_pin(uart_num, MIDI_OUT_PIN, MIDI_IN_PIN, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
+    ESP_ERROR_CHECK(uart_set_pin(uart_num, amy_global.config.midi_out, amy_global.config.midi_in, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
 
     const int uart_buffer_size = (MAX_MIDI_BYTES_TO_PARSE);
     // Install UART driver using an event queue here

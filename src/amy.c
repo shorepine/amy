@@ -95,7 +95,8 @@ pthread_mutex_t amy_queue_lock;
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-extern SemaphoreHandle_t xQueueSemaphore;
+SemaphoreHandle_t xQueueSemaphore;
+TaskHandle_t midi_handle;
 #endif
 
 // Global state 
@@ -1666,12 +1667,26 @@ void amy_play_message(char *message) {
 
 
 void amy_default_setup() {
-    // after start, send the params for the default setup, like midi.config used to do
+    // Juno 6 poly on channel 1
     struct event e = amy_default_event();
     strcpy(e.voices, "0,1,2,3,4,5");
     e.load_patch = 0;
     e.instrument = 1;
     amy_add_event(e);
+
+    // sine wave "bleeper" on ch 16
+    // store memory patch 1024 wine wave
+    patches_store_patch("1024w0"); 
+
+    e = amy_default_event();
+    strcpy(e.voices,"6");
+    e.load_patch=1024;
+    e.instrument=16;
+    amy_add_event(e);
+
+    // GM drum synth on channel 10
+    
+
 }
 
 // amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
@@ -1683,12 +1698,17 @@ void amy_stop() {
 
 void amy_start(amy_config_t c) {
     global_init(c);
+    #ifndef ESP_PLATFORM
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
         if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
             pthread_t midi_thread_id;
             pthread_create(&midi_thread_id, NULL, run_midi, NULL);
         }
+    #endif
+    #else
+    xQueueSemaphore = xSemaphoreCreateMutex();
+    xTaskCreatePinnedToCore(run_midi, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
     #endif
     amy_profiles_init();
     sequencer_init();
