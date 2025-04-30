@@ -93,7 +93,8 @@ void patches_store_patch(char * message) {
         if(patch[i] == 'Z') {
             strncpy(sub_message, patch + start, i - start + 1);
             sub_message[i-start+1]= 0;
-            struct event patch_event = amy_parse_message(sub_message);
+            struct event patch_event;
+            amy_parse_message(sub_message, &patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;
@@ -111,13 +112,13 @@ extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, 
 
 // This is called when i get an event with voices in it, BUT NOT with a load_patch 
 // So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data ) {
+void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
-    e.voices[0] = 0;
-    AMY_UNSET(e.load_patch);
-    // for each voice, send the event to the base osc (+ e.osc if given, added by amy_add_event)
+    e->voices[0] = 0;
+    AMY_UNSET(e->load_patch);
+    // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
@@ -129,26 +130,26 @@ void patches_event_has_voices(struct event e, void (*callback)(struct delta d, v
 // Given an event with a load_patch object AND a voices object in it
 // This means to set/reset the voices and load the messages from ROM and set them
 
-void patches_load_patch(struct event e) {
+void patches_load_patch(struct event *e) {
     char sub_message[255];
     
     uint16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
-    if(e.load_patch > 1023) {
-        patch_osc = memory_patch_oscs[e.load_patch-1024];
+    if(e->load_patch > 1023) {
+        patch_osc = memory_patch_oscs[e->load_patch-1024];
         if(patch_osc > 0){
-            message = memory_patch[e.load_patch-1024];
+            message = memory_patch[e->load_patch-1024];
         } else {
             num_voices = 0; // don't do anything
         }
     } else {
-        message = (char*)patch_commands[e.load_patch];    
-        patch_osc = patch_oscs[e.load_patch];
+        message = (char*)patch_commands[e->load_patch];    
+        patch_osc = patch_oscs[e->load_patch];
     }
     for(uint8_t v=0;v<num_voices;v++) {
-        // Find the first osc with patch_oscs[e.load_patch] free oscs
+        // Find the first osc with patch_oscs[e->load_patch] free oscs
         // First, is this an old voice we're re-doing? 
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
             //fprintf(stderr, "Already set voice %d, removing it\n", voices[v]);
@@ -183,7 +184,7 @@ void patches_load_patch(struct event e) {
                     good = good & (AMY_IS_UNSET(osc_to_voice[osc+j]));
                 }
                 if(good) {
-                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], osc, voices[v]);
+                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e->load_patch], osc, voices[v]);
                     //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
                     voice_to_base_osc[voices[v]] = osc; 
                     for(uint16_t j=0;j<patch_osc;j++) {
@@ -204,10 +205,11 @@ void patches_load_patch(struct event e) {
                 if(message[i] == 'Z') {
                     strncpy(sub_message, message + start, i - start + 1);
                     sub_message[i-start+1]= 0;
-                    struct event patch_event = amy_parse_message(sub_message);
-                    patch_event.time = e.time;
+                    struct event patch_event;
+                    amy_parse_message(sub_message, &patch_event);
+                    patch_event.time = e->time;
                     if(patch_event.status == EVENT_SCHEDULED) {
-                        amy_add_event_internal(patch_event, voice_to_base_osc[voices[v]]);
+                        amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;
                 }

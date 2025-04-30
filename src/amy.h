@@ -407,12 +407,12 @@ extern uint8_t amy_transfer_flag ;
 
 
 
-struct event amy_default_event();
+void amy_default_event(struct event *e);
 void amy_events_reset();
-void amy_add_event(struct event e);
-void add_delta_to_queue(struct delta d, void*user_data);
-void amy_add_event_internal(struct event e, uint16_t base_osc);
-void amy_parse_event_to_deltas(struct event e, uint16_t base_osc, void (*callback)(struct delta d, void*user_data), void*user_data );
+void amy_add_event(struct event *e);
+void add_delta_to_queue(struct delta *d, void *user_data);
+void amy_add_event_internal(struct event *e, uint16_t base_osc);
+void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void *user_data), void*user_data );
 int16_t * amy_simple_fill_buffer() ;
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
@@ -474,8 +474,8 @@ extern struct state amy_global;
 float atoff(const char *s);
 int8_t oscs_init();
 void patches_init();
-int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
-void parse_algorithm_source(struct synthinfo * e, char* message) ;
+int parse_breakpoint(struct synthinfo *e, char* message, uint8_t bp_set) ;
+void parse_algorithm_source(struct synthinfo *e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
 void amy_prepare_buffer();
 int16_t * amy_fill_buffer();
@@ -485,7 +485,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // external functions
 void amy_play_message(char *message);
-struct event amy_parse_message(char * message);
+void amy_parse_message(char * message, struct event *e);
 void amy_restart();
 void amy_start(uint8_t cores, uint8_t reverb, uint8_t chorus, uint8_t echo);
 void amy_stop();
@@ -523,8 +523,8 @@ extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
 extern void interp_partials_note_on(uint16_t osc);
 extern void interp_partials_note_off(uint16_t osc);
-extern void patches_load_patch(struct event e); 
-extern void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data );
+extern void patches_load_patch(struct event *e); 
+extern void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void *user_data), void *user_data );
 extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();

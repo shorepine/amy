@@ -104,16 +104,18 @@ int main(int argc, char ** argv) {
     */
 
 
-  struct event a = amy_default_event();
+  struct event a;
+  amy_default_event(&a);
   a.osc = 1;
   a.wave = SINE;
   a.freq_coefs[0] = 0.25;
 
   a.amp_coefs[0] = 1;
 
-  amy_add_event(a);
+  amy_add_event(&a);
 
-  struct event e = amy_default_event();
+  struct event e;
+  amy_default_event(&e);
   e.osc = 0;
   e.wave = PULSE;
   e.freq_coefs[0] = 440;
@@ -122,7 +124,7 @@ int main(int argc, char ** argv) {
 
   e.duty_coefs[5] = 1;
   e.velocity = 1;
-  amy_add_event(e);
+  amy_add_event(&e);
 
     // Now just spin for 15s
     uint32_t start = amy_sysclock();

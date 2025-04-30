@@ -56,24 +56,24 @@ void sequencer_recompute() {
     next_amy_tick_us = amy_sysclock()*1000 + us_per_tick;
 }
 
-void add_delta_to_sequencer(struct delta d, void*user_data) {
+void add_delta_to_sequencer(struct delta *d, void*user_data) {
     sequence_callback_info_t * cbinfo = (sequence_callback_info_t *)user_data;
     sequence_entry_ll_t ***entry_ll_ptr = &(cbinfo->pointer); 
     (**entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
     //fprintf(stderr, "ll %p adding tag %d period %d tick %d data %d param %d osc %d\n",
-    //    (**entry_ll_ptr), cbinfo->tag, cbinfo->period, cbinfo->tick, d.data, d.param, d.osc);
+    //    (**entry_ll_ptr), cbinfo->tag, cbinfo->period, cbinfo->tick, d->data, d->param, d->osc);
     (**entry_ll_ptr)->tick = cbinfo->tick;
     (**entry_ll_ptr)->period = cbinfo->period;
     (**entry_ll_ptr)->tag = cbinfo->tag;
     (**entry_ll_ptr)->d.time = 0;
-    (**entry_ll_ptr)->d.data = d.data;
-    (**entry_ll_ptr)->d.param = d.param;
-    (**entry_ll_ptr)->d.osc = d.osc;
+    (**entry_ll_ptr)->d.data = d->data;
+    (**entry_ll_ptr)->d.param = d->param;
+    (**entry_ll_ptr)->d.osc = d->osc;
     (**entry_ll_ptr)->next = NULL;
     (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
 }
 
-uint8_t sequencer_add_event(struct event e, uint32_t tick, uint32_t period, uint32_t tag) {
+uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     sequence_entry_ll_t **entry_ll_ptr = &sequence_entry_ll_start; // Start pointing to the root node.
@@ -123,7 +123,7 @@ void sequencer_check_and_fill() {
                 if ((*entry_ll_ptr)->tick == sequencer_tick_count) { hit = 1; delete = 1; }
             }
             if(hit) {
-                add_delta_to_queue((*entry_ll_ptr)->d, NULL);
+                add_delta_to_queue(&(*entry_ll_ptr)->d, NULL);
                 // Delete absolute tick addressed sequence entry if sent
                 if(delete) {
                     sequence_entry_ll_t *doomed = *entry_ll_ptr;

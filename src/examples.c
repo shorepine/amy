@@ -7,108 +7,112 @@
 extern void delay_ms(uint32_t ms);
 
 void example_reset(uint32_t start) {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.osc = 0;
     e.reset_osc = RESET_ALL_OSCS;
     e.time = start;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.load_patch = 1;
     strcpy(e.voices, "0,1");
-    amy_add_event(e);
+    amy_add_event(&e);
     delay_ms(250);
 
-    e = amy_default_event();
+    amy_default_event(&e);
     e.load_patch = 131;
     strcpy(e.voices, "0");
-    amy_add_event(e);
+    amy_add_event(&e);
     delay_ms(250);
 
     // play the same note on both
-    e = amy_default_event();
+    amy_default_event(&e);
     e.velocity = 1;
     e.midi_note = 60;
     strcpy(e.voices,"0");
-    amy_add_event(e);
+    amy_add_event(&e);
     delay_ms(2000);
 
-    e = amy_default_event();
+    amy_default_event(&e);
     e.velocity = 1;
     e.midi_note = 60;
     strcpy(e.voices,"1");
-    amy_add_event(e);
+    amy_add_event(&e);
     delay_ms(2000);
 
 
     // now try to alloc voice 0 with a juno, should use oscs 0-4 again
-    e = amy_default_event();
+    amy_default_event(&e);
     e.load_patch = 2;
     strcpy(e.voices, "0");
-    amy_add_event(e);
+    amy_add_event(&e);
     delay_ms(250);
 }
 
 
 void example_voice_chord(uint32_t start, uint16_t patch) {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.time = start;
     e.load_patch = patch;
     strcpy(e.voices, "0,1,2");
-    amy_add_event(e);
+    amy_add_event(&e);
     start += 250;
 
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start;
     e.velocity=0.5;
 
     strcpy(e.voices, "0");
     e.midi_note = 50;
-    amy_add_event(e);
+    amy_add_event(&e);
     start += 1000;
 
     strcpy(e.voices, "1");
     e.midi_note = 54;
     e.time = start;
-    amy_add_event(e);
+    amy_add_event(&e);
     start += 1000;
 
     strcpy(e.voices, "2");
     e.midi_note = 56;
     e.time = start;
-    amy_add_event(e);
+    amy_add_event(&e);
     start += 2000;
     
     strcpy(e.voices, "0,1,2");
     e.velocity = 0;
     e.time = start;
-    amy_add_event(e);
+    amy_add_event(&e);
 }   
 
 
 void example_patches() {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     for(uint16_t i=0;i<256;i++) {
         e.load_patch = i;
         strcpy(e.voices, "0");
         fprintf(stderr, "sending patch %d\n", i);
-        amy_add_event(e);
+        amy_add_event(&e);
         delay_ms(250);
 
-        e = amy_default_event();
+        amy_default_event(&e);
         strcpy(e.voices, "0");
         e.osc = 0;
         e.midi_note = 50;
         e.velocity = 0.5;
-        amy_add_event(e);
+        amy_add_event(&e);
 
         delay_ms(1000);
         strcpy(e.voices, "0");
         e.velocity = 0;
-        amy_add_event(e);
+        amy_add_event(&e);
 
         delay_ms(250);
 
@@ -129,7 +133,8 @@ void example_chorus() {
 
 // Play a KS tone
 void example_ks(uint32_t start) {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.time = start;
 
     e.velocity = 1;
@@ -138,42 +143,45 @@ void example_ks(uint32_t start) {
     e.patch = 15;
     e.osc = 0;
     e.midi_note = 60;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 // make a 440hz sine
 void example_sine(uint32_t start) {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.time = start;
     e.freq_coefs[0] = 440;
     e.wave = SINE;
     e.velocity = 1;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 // Schedule a bleep now
 void bleep(uint32_t start) {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.osc = 0;
     e.time = start;
     e.wave = SINE;
     e.freq_coefs[COEF_CONST] = 220;
     e.pan_coefs[COEF_CONST] = 0.9;
     e.velocity = 1;
-    amy_add_event(e);
+    amy_add_event(&e);
     e.time = start + 150;
     e.freq_coefs[COEF_CONST] = 440;
     e.pan_coefs[COEF_CONST] = 0.1;
-    amy_add_event(e);
+    amy_add_event(&e);
     e.time = start + 300;
     e.velocity = 0;
     e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 
 void example_multimbral_fm() {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     char *voices[] = {"0","1","2","3","4","5"};
     int notes[] = {60, 70, 64, 68, 72, 82};
     e.velocity = 0.5;
@@ -183,7 +191,7 @@ void example_multimbral_fm() {
         e.pan_coefs[0] = (i%2);
         e.load_patch++;
         strcpy(e.voices, voices[i]);
-        amy_add_event(e);
+        amy_add_event(&e);
         delay_ms(1000);
     }
 }
@@ -198,14 +206,16 @@ void example_drums(uint32_t start, int loops) {
 
     // Reset all used oscs first, just in case
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
-        struct event e_reset = amy_default_event();
+        struct event e_reset;
+        amy_default_event(&e_reset);
         e_reset.time = start;
         e_reset.osc = oscs[i];    
         e_reset.reset_osc = oscs[i];
-        amy_add_event(e_reset);
+        amy_add_event(&e_reset);
     }
 
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.time = start + 1;
     float volume = 0.5;
     e.wave = PCM;
@@ -214,17 +224,17 @@ void example_drums(uint32_t start, int loops) {
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         e.osc = oscs[i];
         e.patch = patches[i];
-        amy_add_event(e);
+        amy_add_event(&e);
     }
     // Update high cowbell.
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start+1;
     e.osc = 4;
     e.midi_note = 70;
-    amy_add_event(e);
+    amy_add_event(&e);
 
     // osc 5 : bass
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start+1;
     e.osc = 5;
     e.wave = SAW_DOWN;
@@ -233,7 +243,7 @@ void example_drums(uint32_t start, int loops) {
     e.resonance = 5.0;
     e.filter_type = FILTER_LPF;
     strcpy(e.bp0, "0,1,500,0.2,25,0");
-    amy_add_event(e);
+    amy_add_event(&e);
 
 
     const int bd = 1 << 0;
@@ -245,7 +255,7 @@ void example_drums(uint32_t start, int loops) {
     int pattern[] = {bd+hat, hat+hicow, bd+hat+snare, hat+cow, hat, bd+hat, snare+hat, hat};
     int bassline[] = {50, 0, 0, 0, 50, 52, 51, 0};
 
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start+1;
     while (loops--) {
         for (unsigned int i = 0; i < sizeof(pattern) / sizeof(int); ++i) {
@@ -257,27 +267,27 @@ void example_drums(uint32_t start, int loops) {
             if(x & bd) {
                 e.osc = 0;
                 e.velocity = 4.0 * volume;
-                amy_add_event(e);
+                amy_add_event(&e);
             }
             if(x & snare) {
                 e.osc = 1;
                 e.velocity = 1.5 * volume;
-                amy_add_event(e);
+                amy_add_event(&e);
             }
             if(x & hat) {
                 e.osc = 2;
                 e.velocity = 1 * volume;
-                amy_add_event(e);
+                amy_add_event(&e);
             }
             if(x & cow) {
                 e.osc = 3;
                 e.velocity = 1 * volume;
-                amy_add_event(e);
+                amy_add_event(&e);
             }
             if(x & hicow) {
                 e.osc = 4;
                 e.velocity = 1 * volume;
-                amy_add_event(e);
+                amy_add_event(&e);
             }
 
             e.osc = 5;
@@ -287,7 +297,7 @@ void example_drums(uint32_t start, int loops) {
             } else {
                 e.velocity = 0;
             }
-            amy_add_event(e);
+            amy_add_event(&e);
         }
     }
 }
@@ -297,7 +307,7 @@ void example_fm(uint32_t start) {
     struct event e;
 
     // Modulating oscillator (op 2)
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start;
     e.osc = 9;
     e.wave = SINE;
@@ -305,10 +315,10 @@ void example_fm(uint32_t start) {
     e.amp_coefs[COEF_CONST] = 1.0f;
     e.amp_coefs[COEF_VEL] = 0;
     e.amp_coefs[COEF_EG0] = 0;
-    amy_add_event(e);
+    amy_add_event(&e);
 
     // Output oscillator (op 1)
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start;
     e.osc = 8;
     e.wave = SINE;
@@ -317,24 +327,24 @@ void example_fm(uint32_t start) {
     e.amp_coefs[COEF_VEL] = 0;
     e.amp_coefs[COEF_EG0] = 1.0f;
     strcpy(e.bp0, "0,1,1000,0,0,0");
-    amy_add_event(e);
+    amy_add_event(&e);
 
     // ALGO control oscillator
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start;
     e.osc = 7;
     e.wave = ALGO;
     e.algorithm = 1;  // algo 1 has op 2 driving op 1 driving output (plus a second chain for ops 6,5,4,3).
     strcpy(e.algo_source, ",,,,9,8");
-    amy_add_event(e);
+    amy_add_event(&e);
 
     // Add a note on event.
-    e = amy_default_event();
+    amy_default_event(&e);
     e.time = start + 100;
     e.osc = 7;
     e.midi_note = 60;
     e.velocity = 1.0f;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 
@@ -380,17 +390,18 @@ void example_init_custom() {
 }
 
 void example_custom_beep() {
-    struct event e = amy_default_event();
+    struct event e;
+    amy_default_event(&e);
     e.osc = 50;
     e.time = amy_sysclock();
     e.freq_coefs[0] = 880;
     e.wave = CUSTOM;
     e.velocity = 1;
-    amy_add_event(e);
+    amy_add_event(&e);
 
     e.velocity = 0;
     e.time += 500;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 #endif
