@@ -115,6 +115,9 @@ extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, 
 void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
+
+    fprintf(stderr, "stack_depth=%u\n", get_stack_depth());
+
     // clear out the voices and patch now from the event. If we didn't, we'd keep calling this over and over
     e->voices[0] = 0;
     AMY_UNSET(e->load_patch);

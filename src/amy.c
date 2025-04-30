@@ -9,8 +9,6 @@
 int debug_flag = 0;
 
 
-
-
 #ifdef AMY_DEBUG
 
 const char* profile_tag_name(enum itags tag) {
@@ -312,10 +310,22 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     return 0;
 }
 
+uint64_t get_stack_pointer() {
+    char dummy[64];
+    uint64_t val = (uint64_t)dummy;
+    return val;
+}
 
+static uint64_t initial_sp = 0;
+
+uint64_t get_stack_depth() {
+    // Stack pointer moves down, i.e. it's smaller now than it was at the beginning.
+    return initial_sp - get_stack_pointer();
+}
 
 int8_t global_init() {
     // function pointers
+    initial_sp = get_stack_pointer();
     amy_global.next_event_write = 0;
     amy_global.event_start = NULL;
     amy_global.event_qsize = 0;
@@ -476,11 +486,18 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     struct delta *d = &dd;
 
     // Synth defaults if not set, these are required for the delta struct
-    if(AMY_IS_UNSET(e->osc)) { e->osc = 0; } 
-    if(AMY_IS_UNSET(e->time)) { e->time = 0; } 
+    if(AMY_IS_SET(e->osc))
+        d->osc = e->osc;
+    else
+        d->osc = 0;
+
+    if(AMY_IS_SET(e->time))
+        d->time = e->time;
+    else
+        d->time = 0;
 
     // First, adapt the osc in this event with base_osc offsets for voices
-    e->osc += base_osc;
+    d->osc += base_osc;
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
@@ -496,8 +513,6 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     }
 
 
-    d->time = e->time;
-    d->osc = e->osc;
     // Everything else only added to queue if set
     if(AMY_IS_SET(e->wave)) { d->param=WAVE; d->data = *(uint32_t *)&e->wave; callback(d, user_data); }
     if(AMY_IS_SET(e->patch)) { d->param=PATCH; d->data = *(uint32_t *)&e->patch; callback(d, user_data); }

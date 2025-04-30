@@ -433,6 +433,8 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth);
 void osc_note_on(uint16_t osc, float initial_freq);
 void chorus_note_on(float initial_freq);
 
+uint64_t get_stack_depth();
+
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
 
