@@ -79,10 +79,6 @@ int main(void)
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
 
-<<<<<<< HEAD
-=======
-    amy_start(1,1,1, 0);
->>>>>>> e209add652820d686e9a5b9d3e4e36420521671c
     polyphony(0, 0);
 
     //Start calling the audio callback
