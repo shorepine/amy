@@ -198,7 +198,7 @@ void parse_coef_message(char *message, float *coefs) {
 }
 
 // given a string return an event
-struct event amy_parse_message(char * message) {
+void amy_parse_message(char * message, struct event *e) {
     uint8_t mode = 0;
     uint16_t start = 0;
     uint16_t c = 0;
@@ -211,15 +211,13 @@ struct event amy_parse_message(char * message) {
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_global.transfer_flag) {
         parse_transfer_message(message, length);
-        struct event e = amy_default_event();
-        e.status = EVENT_TRANSFER_DATA;
-        return e;
+        e->status = EVENT_TRANSFER_DATA;
+        return;
     }
 
-    struct event e = amy_default_event();
     uint32_t sysclock = amy_sysclock();
 
-    e.source = EVENT_USER;
+    e->source = EVENT_USER;
 
     //printf("parse_message: %s\n", message);
     
@@ -236,21 +234,21 @@ struct event amy_parse_message(char * message) {
         //if(b == '_' && c==0) sync_response = 1;
         if( ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) || b == 0) {  // new mode or end
             if(mode=='t') {
-                e.time=atol(message + start);
+                e->time=atol(message + start);
             } else {
                 if(mode >= 'A' && mode <= 'z') {
                     switch(mode) {
-                        case 'a': parse_coef_message(message + start, e.amp_coefs);break;
-                        case 'A': copy_param_list_substring(e.bp0, message + start); e.bp_is_set[0] = 1; break;
-                        case 'B': copy_param_list_substring(e.bp1, message + start); e.bp_is_set[1] = 1; break;
-                        case 'b': e.feedback = atoff(message+start); break;
-                        case 'c': e.chained_osc = atoi(message + start); break;
+                        case 'a': parse_coef_message(message + start, e->amp_coefs);break;
+                        case 'A': copy_param_list_substring(e->bp0, message + start); e->bp_is_set[0] = 1; break;
+                        case 'B': copy_param_list_substring(e->bp1, message + start); e->bp_is_set[1] = 1; break;
+                        case 'b': e->feedback = atoff(message+start); break;
+                        case 'c': e->chained_osc = atoi(message + start); break;
                         /* C available */
-                        case 'd': parse_coef_message(message + start, e.duty_coefs);break;
+                        case 'd': parse_coef_message(message + start, e->duty_coefs);break;
                         case 'D': show_debug(atoi(message + start)); break;
-                        case 'f': parse_coef_message(message + start, e.freq_coefs);break;
-                        case 'F': parse_coef_message(message + start, e.filter_freq_coefs); break;
-                        case 'G': e.filter_type = atoi(message + start); break;
+                        case 'f': parse_coef_message(message + start, e->freq_coefs);break;
+                        case 'F': parse_coef_message(message + start, e->filter_freq_coefs); break;
+                        case 'G': e->filter_type = atoi(message + start); break;
                         /* g used for Alles for client # */
                         case 'H': parse_list_uint32_t(message+start, seq_message, 3, 0); sequence_message = 1; break;
                         case 'h': if (AMY_HAS_REVERB) {
@@ -266,9 +264,9 @@ struct event amy_parse_message(char * message) {
                         }
                         break;
                         /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
-                        case 'i': e.instrument = atoi(message + start); break;
-                        case 'I': e.ratio = atoff(message + start); break;
-                        case 'j': e.tempo = atof(message+start); break;
+                        case 'i': e->instrument = atoi(message + start); break;
+                        case 'I': e->ratio = atoff(message + start); break;
+                        case 'j': e->tempo = atof(message+start); break;
                         /* j, J available */
                         // chorus.level 
                         case 'k': if(AMY_HAS_CHORUS) {
@@ -282,10 +280,10 @@ struct event amy_parse_message(char * message) {
                             config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
                         }
                         break;
-                        case 'K': e.load_patch = atoi(message+start); break;
-                        case 'l': e.velocity=atoff(message + start); break;
-                        case 'L': e.mod_source=atoi(message + start); break;
-                        case 'm': e.portamento_ms=atoi(message + start); break;
+                        case 'K': e->load_patch = atoi(message+start); break;
+                        case 'l': e->velocity=atoff(message + start); break;
+                        case 'L': e->mod_source=atoi(message + start); break;
+                        case 'm': e->portamento_ms=atoi(message + start); break;
                         case 'M': if (AMY_HAS_ECHO) {
                             float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
                             parse_list_float(message + start, echo_params, 5, AMY_UNSET_FLOAT);
@@ -297,49 +295,49 @@ struct event amy_parse_message(char * message) {
                             config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
                         }
                         break;
-                        case 'n': e.midi_note=atof(message + start); break;
-                        case 'N': e.latency_ms = atoi(message + start);  break;
-                        case 'o': e.algorithm=atoi(message+start); break;
-                        case 'O': copy_param_list_substring(e.algo_source, message+start); break;
-                        case 'p': e.patch=atoi(message + start); break;
-                        case 'P': e.phase=F2P(atoff(message + start)); break;
+                        case 'n': e->midi_note=atof(message + start); break;
+                        case 'N': e->latency_ms = atoi(message + start);  break;
+                        case 'o': e->algorithm=atoi(message+start); break;
+                        case 'O': copy_param_list_substring(e->algo_source, message+start); break;
+                        case 'p': e->patch=atoi(message + start); break;
+                        case 'P': e->phase=F2P(atoff(message + start)); break;
                         /* q unused */
-                        case 'Q': parse_coef_message(message + start, e.pan_coefs); break;
-                        case 'r': copy_param_list_substring(e.voices, message+start); break; 
-                        case 'R': e.resonance=atoff(message + start); break;
-                        case 's': e.pitch_bend = atoff(message + start); break;
+                        case 'Q': parse_coef_message(message + start, e->pan_coefs); break;
+                        case 'r': copy_param_list_substring(e->voices, message+start); break; 
+                        case 'R': e->resonance=atoff(message + start); break;
+                        case 's': e->pitch_bend = atoff(message + start); break;
                         case 'S': 
-                            e.reset_osc = atoi(message + start);
+                            e->reset_osc = atoi(message + start);
                             // if we're resetting all of AMY, do it now
-                            if(e.reset_osc & RESET_AMY) {
+                            if(e->reset_osc & RESET_AMY) {
                                 amy_stop();
                                 amy_start(amy_global.config);
                             }
                             // if we're resetting timebase, do it NOW
-                            if(e.reset_osc & RESET_TIMEBASE) {
+                            if(e->reset_osc & RESET_TIMEBASE) {
                                 amy_reset_sysclock();
-                                AMY_UNSET(e.reset_osc);
+                                AMY_UNSET(e->reset_osc);
                             }
-                            if(e.reset_osc & RESET_EVENTS) {
+                            if(e->reset_osc & RESET_EVENTS) {
                                 amy_events_reset();
-                                AMY_UNSET(e.reset_osc);
+                                AMY_UNSET(e->reset_osc);
                             }
                             break;
                         /* t used for time */
-                        case 'T': e.eg_type[0] = atoi(message + start); break;
-                        case 'u': patches_store_patch(message + start); return amy_default_event(); 
+                        case 'T': e->eg_type[0] = atoi(message + start); break;
+                        case 'u': patches_store_patch(message + start); return; 
                         /* U used by Alles for sync */
-                        case 'v': e.osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
-                        case 'V': e.volume = atoff(message + start); break;
-                        case 'w': e.wave=atoi(message + start); break;
+                        case 'v': e->osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
+                        case 'V': e->volume = atoff(message + start); break;
+                        case 'w': e->wave=atoi(message + start); break;
                         /* W used by Tulip for CV, external_channel */
-                        case 'X': e.eg_type[1] = atoi(message + start); break;
+                        case 'X': e->eg_type[1] = atoi(message + start); break;
                         case 'x': {
-                              float eq[3] = {AMY_UNSET_VALUE(e.eq_l), AMY_UNSET_VALUE(e.eq_m), AMY_UNSET_VALUE(e.eq_h)};
-                              parse_list_float(message + start, eq, 3, AMY_UNSET_VALUE(e.eq_l));
-                              e.eq_l = eq[0];
-                              e.eq_m = eq[1];
-                              e.eq_h = eq[2];
+                              float eq[3] = {AMY_UNSET_VALUE(e->eq_l), AMY_UNSET_VALUE(e->eq_m), AMY_UNSET_VALUE(e->eq_h)};
+                              parse_list_float(message + start, eq, 3, AMY_UNSET_VALUE(e->eq_l));
+                              e->eq_l = eq[0];
+                              e->eq_m = eq[1];
+                              e->eq_h = eq[2];
                             }
                             break;
                         case 'z': {
@@ -376,13 +374,10 @@ struct event amy_parse_message(char * message) {
             // if time is not set, play now
             // if time is not set + latency is set, play in latency
             uint32_t playback_time = sysclock;
-            if(AMY_IS_SET(e.time)) playback_time = e.time;
+            if(AMY_IS_SET(e->time)) playback_time = e->time;
             playback_time += amy_global.latency_ms;
-            e.time = playback_time;
-            e.status = EVENT_SCHEDULED;
-            return e;
-            
+            e->time = playback_time;
+            e->status = EVENT_SCHEDULED;
         }
     }
-    return amy_default_event();
 }

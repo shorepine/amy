@@ -103,7 +103,8 @@ void patches_store_patch(char * message) {
         if(patch[i] == 'Z') {
             strncpy(sub_message, patch + start, i - start + 1);
             sub_message[i-start+1]= 0;
-            struct event patch_event = amy_parse_message(sub_message);
+            struct event patch_event = amy_default_event();
+	    amy_parse_message(sub_message, &patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;
@@ -121,43 +122,43 @@ extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, 
 
 // This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(struct event e, void (*callback)(struct delta d, void*user_data), void*user_data ) {
+void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices;
-    if (!AMY_IS_SET(e.instrument)) {
+    if (!AMY_IS_SET(e->instrument)) {
         // No instrument, just directly naming the voices.
-        num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
+        num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
     } else {
         // We have an instrument specified - decide which of its voices are actually to be used.
 
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
-        if (e.voices[0] != 0 && !AMY_IS_SET(e.load_patch)) {
+        if (e->voices[0] != 0 && !AMY_IS_SET(e->load_patch)) {
             fprintf(stderr, "You specified both synth %d and voices %s.  Synth implies voices, ignoring voices.\n",
-                    e.instrument, e.voices);
+                    e->instrument, e->voices);
         }
-        if (!AMY_IS_SET(e.velocity)) {
+        if (!AMY_IS_SET(e->velocity)) {
             // Not a note-on/note-off message - treat the synth as a shorthand for *all* the voices.
-            num_voices = instrument_get_voices(e.instrument, voices);
+            num_voices = instrument_get_voices(e->instrument, voices);
         } else {
             // velocity is present, this is a note-on/note-off.
-            if (! (AMY_IS_SET(e.midi_note) && e.midi_note != 0) ) {
+            if (! (AMY_IS_SET(e->midi_note) && e->midi_note != 0) ) {
                 // velocity without a note number (or for midi_note=0).  This is valid for velocity==0 => all-notes-off.
-                if (e.velocity != 0) {
+                if (e->velocity != 0) {
                     // Attempted a note-on to all voices, suppress.
-                    fprintf(stderr, "note-on for synth %d without specifying note (or note 0) - ignored.\n", e.instrument);
+                    fprintf(stderr, "note-on for synth %d without specifying note (or note 0) - ignored.\n", e->instrument);
                     return;
                 }
                 // All notes off - find out which voices are actually currently active, so we can turn them off.
-                num_voices = instrument_all_notes_off(e.instrument, voices);
+                num_voices = instrument_all_notes_off(e->instrument, voices);
             } else {
                 // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
-                uint8_t note = (uint8_t)roundf(e.midi_note);
-                bool is_note_off = (e.velocity == 0);
-                voices[0] = instrument_voice_for_note_event(e.instrument, note, is_note_off);
+                uint8_t note = (uint8_t)roundf(e->midi_note);
+                bool is_note_off = (e->velocity == 0);
+                voices[0] = instrument_voice_for_note_event(e->instrument, note, is_note_off);
                 if (voices[0] == _INSTRUMENT_NO_VOICE) {
                     // For now, I think this can only happen with a note-off that has no matching note-on.
-                    fprintf(stderr, "synth %d did not find a voice, dropping message.", e.instrument);
+                    fprintf(stderr, "synth %d did not find a voice, dropping message.", e->instrument);
                     return;
                 }
                 num_voices = 1;
@@ -165,10 +166,10 @@ void patches_event_has_voices(struct event e, void (*callback)(struct delta d, v
         }
     }
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
-    e.voices[0] = 0;
-    AMY_UNSET(e.load_patch);
-    AMY_UNSET(e.instrument);
-    // for each voice, send the event to the base osc (+ e.osc if given, added by amy_add_event)
+    e->voices[0] = 0;
+    AMY_UNSET(e->load_patch);
+    AMY_UNSET(e->instrument);
+    // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
@@ -180,15 +181,15 @@ void patches_event_has_voices(struct event e, void (*callback)(struct delta d, v
 // Given an event with a load_patch object AND a voices object in it
 // This means to set/reset the voices and load the messages from ROM and set them
 
-void patches_load_patch(struct event e) {
+void patches_load_patch(struct event *e) {
     char sub_message[255];
     
     uint16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_list_uint16_t(e.voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
     char *message;
     uint16_t patch_osc = 0;
-    if(e.load_patch >= _PATCHES_FIRST_USER_PATCH) {
-        int patch_number = e.load_patch - _PATCHES_FIRST_USER_PATCH;
+    if(e->load_patch >= _PATCHES_FIRST_USER_PATCH) {
+        int patch_number = e->load_patch - _PATCHES_FIRST_USER_PATCH;
         patch_osc = memory_patch_oscs[patch_number];
         if(patch_osc > 0){
             message = memory_patch[patch_number];
@@ -196,11 +197,11 @@ void patches_load_patch(struct event e) {
             num_voices = 0; // don't do anything
         }
     } else {
-        message = (char*)patch_commands[e.load_patch];    
-        patch_osc = patch_oscs[e.load_patch];
+        message = (char*)patch_commands[e->load_patch];    
+        patch_osc = patch_oscs[e->load_patch];
     }
     for(uint8_t v=0;v<num_voices;v++) {
-        // Find the first osc with patch_oscs[e.load_patch] free oscs
+        // Find the first osc with patch_oscs[e->load_patch] free oscs
         // First, is this an old voice we're re-doing? 
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
             //fprintf(stderr, "Already set voice %d, removing it\n", voices[v]);
@@ -235,7 +236,7 @@ void patches_load_patch(struct event e) {
                     good = good & (AMY_IS_UNSET(osc_to_voice[osc+j]));
                 }
                 if(good) {
-                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e.load_patch], osc, voices[v]);
+                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[e->load_patch], osc, voices[v]);
                     //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
                     voice_to_base_osc[voices[v]] = osc; 
                     for(uint16_t j=0;j<patch_osc;j++) {
@@ -256,10 +257,11 @@ void patches_load_patch(struct event e) {
                 if(message[i] == 'Z') {
                     strncpy(sub_message, message + start, i - start + 1);
                     sub_message[i-start+1]= 0;
-                    struct event patch_event = amy_parse_message(sub_message);
-                    patch_event.time = e.time;
+                    struct event patch_event = amy_default_event();
+		    amy_parse_message(sub_message, &patch_event);
+                    patch_event.time = e->time;
                     if(patch_event.status == EVENT_SCHEDULED) {
-                        amy_add_event_internal(patch_event, voice_to_base_osc[voices[v]]);
+                        amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;
                 }
@@ -267,7 +269,7 @@ void patches_load_patch(struct event e) {
         }
     }
     // Finally, store as an instrument if instrument number is specified.
-    if (AMY_IS_SET(e.instrument)) {
-        instrument_add_new(e.instrument, num_voices, voices);
+    if (AMY_IS_SET(e->instrument)) {
+        instrument_add_new(e->instrument, num_voices, voices);
     }
 }

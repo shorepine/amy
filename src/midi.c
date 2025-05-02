@@ -39,7 +39,7 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     e.source = EVENT_MIDI;
     e.midi_note = note;
     e.velocity = ((float)vel/127.0f);
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
@@ -49,7 +49,7 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel) {
     e.source = EVENT_MIDI;
     e.midi_note = note;
     e.velocity = 0;
-    amy_add_event(e);
+    amy_add_event(&e);
 }
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
@@ -207,6 +207,8 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 //todo
 #endif
 
+#define ESP_USB_HOST
+
 #ifdef ESP_USB_HOST
 extern void send_usb_midi_out(uint8_t * data, uint16_t len);
 extern bool midi_has_out;
@@ -235,8 +237,22 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     #endif
 }
 
+#if (defined TULIP) || (defined AMYBOARD)
+  #define MALLOC_CAP_SYSEX MALLOC_CAP_SPIRAM
+#else
+  #define MALLOC_CAP_SYSEX MALLOC_CAP_DEFAULT
+
+void send_usb_midi_out(uint8_t *bytes, uint16_t len) {
+}
+
+#endif
+
+#ifdef ESP_PLATFORM
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SPIRAM);
+#else
+  void *run_midi(void*vargp) {
+#endif
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
 
     #ifdef ESP_PLATFORM
     // Setup UART2 to listen for MIDI messages 
@@ -293,6 +309,9 @@ void run_midi() {
     }
     #endif
 
+#ifndef ESP_PLATFORM
+    return NULL;
+#endif
 }
 
 #endif // MACOS
