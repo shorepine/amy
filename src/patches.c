@@ -180,7 +180,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
             amy_parse_event_to_deltas(e, target_osc, callback, user_data);
-	    fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
+	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
 }
@@ -260,7 +260,7 @@ void patches_load_patch(struct event *e) {
             fprintf(stderr, "we are out of oscs for voice %d. not setting this voice\n", voices[v]);
         } else {
             uint16_t start = 0;
-	    fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->instrument, voices[v], message);
+	    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->instrument, voices[v], message);
             for(uint16_t i=0;i<strlen(message) + 1;i++) {
 	      if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
                     strncpy(sub_message, message + start, i - start + 1);
@@ -272,7 +272,7 @@ void patches_load_patch(struct event *e) {
                         amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;
-		    fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
+		    //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
                 }
             }
         }

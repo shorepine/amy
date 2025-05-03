@@ -34,7 +34,7 @@ void midi_local(uint8_t * bytes, uint16_t len);
 void amy_send_midi_note_off(uint16_t osc);
 void amy_send_midi_note_on(uint16_t osc);
 // For pyamy inject_midi
-void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex);
+void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time);
 
 #ifdef ESP_PLATFORM
 #define MIDI_TASK_COREID (0)

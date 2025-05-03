@@ -108,25 +108,31 @@ struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWE
     //    {24, 72},  // "Steel", None),
 };
 
+
+bool setup_drum_event(struct event *e, uint8_t note) {
+  // Special-case processing to convert MIDI drum notes into PCM patch events.
+  bool forward_note = false;
+  if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
+      struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
+      e->patch = s.pcm_patch_number;
+      // This will play havoc with the note-based voice stealing algo.
+      e->midi_note = s.base_midi_note;
+      forward_note = true;
+  }
+  return forward_note;
+}
+
+
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
-void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
-    bool forward_note = false;
+void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    bool forward_note = true;
     struct event e = amy_default_event();
+    e.time = time;
     e.instrument = channel;
     e.source = EVENT_MIDI;
+    e.midi_note = note;
     if (channel == AMY_MIDI_CHANNEL_DRUMS) {
-        // Special case for drums - set up for PCM playback from fixed table
-        if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
-	    struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
-            e.patch = s.pcm_patch_number;
-	    // This will play havoc with the note-based voice stealing algo.
-            e.midi_note = s.base_midi_note;
-            forward_note = true;
-            fprintf(stderr, "amy_received drum: chan %d note %d vel %d", channel, note, vel);
-        }
-    } else {
-        e.midi_note = note;
-        forward_note = true;
+        forward_note = setup_drum_event(&e, note);
     }
     if (forward_note) {
         e.velocity = ((float)vel/127.0f);
@@ -135,23 +141,30 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
 }
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
-void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel) {
+void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    bool forward_note = true;
     struct event e = amy_default_event();
+    e.time = time;
     e.instrument = channel;
     e.source = EVENT_MIDI;
     e.midi_note = note;
-    e.velocity = 0;
-    amy_add_event(&e);
+    if (channel == AMY_MIDI_CHANNEL_DRUMS) {
+        forward_note = setup_drum_event(&e, note);
+    }
+    if (forward_note) {
+        e.velocity = 0;
+        amy_add_event(&e);
+    }
 }
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
-void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex) {
+void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
     if(!sysex) {
         uint8_t status = data[0] & 0xF0;
         uint8_t channel = data[0] & 0x0F;
         // Do the AMY instrument things here
-        if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2] );
-        if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2] );
+        if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
+        if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2], time);
     }
 
     // Also send the external hooks if set
@@ -207,6 +220,7 @@ uint16_t sysex_len = 0;
 
 uint8_t * sysex_buffer;
 void parse_sysex() {
+    uint32_t time = AMY_UNSET_VALUE(time);
     if(sysex_len>3) {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
@@ -214,7 +228,7 @@ void parse_sysex() {
             amy_play_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-            amy_event_midi_message_received(sysex_buffer, sysex_len, 1);
+	  amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
     }
 }
@@ -225,6 +239,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
     // running status is handled by keeping the status byte around after getting a message.
     // remember that USB midi always comes in groups of 3 here, even if it's just a one byte message
     // so we have USB (and mac IAC) set a usb flag so we know to end the loop once a message is parsed
+    uint32_t time = AMY_UNSET_VALUE(time);
     for(size_t i=0;i<len;i++) {
 
         uint8_t byte = data[i];
@@ -244,7 +259,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 current_midi_message[0] = byte;
                 if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
                     byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-                    amy_event_midi_message_received(current_midi_message, 1, 0); 
+		    amy_event_midi_message_received(current_midi_message, 1, 0, time);
                     if(usb) i = len+1; // exit the loop if usb
                 }  else if(byte == 0xF0) { // sysex start 
                     // if that's there we then assume everything is an AMY message until 0xF7
@@ -266,12 +281,12 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                     } else {
                         current_midi_message[2] = byte;
                         midi_message_slot = 0;
-                        amy_event_midi_message_received(current_midi_message, 3, 0);
+                        amy_event_midi_message_received(current_midi_message, 3, 0, time);
                     }
                 // a 1 byte data message
                 } else if (status == 0xC0 || status == 0xD0 || current_midi_message[0] == 0xF3 || current_midi_message[0] == 0xF1) {
                     current_midi_message[1] = byte;
-                    amy_event_midi_message_received(current_midi_message, 2, 0);
+                    amy_event_midi_message_received(current_midi_message, 2, 0, time);
                     if(usb) i = len+1; // exit the loop if usb
                 }
             }

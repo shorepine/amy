@@ -660,7 +660,12 @@ class TestMidiDrums(AmyTest):
     self.config_default = True
   
   def run(self):
-    amy.inject_midi(0x99, 37, 100)  # snare
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(100, 0x99, 35, 100)  # bass
+    amy.inject_midi(400, 0x99, 35, 100)  # bass
+    amy.inject_midi(400, 0x99, 37, 100)  # snare
+    amy.inject_midi(700, 0x99, 37, 100)  # snare
+    amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
 def main(argv):

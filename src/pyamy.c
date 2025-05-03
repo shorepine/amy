@@ -82,13 +82,16 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
 static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
     char *arg1;
 #define MAX_MIDI_ARGS 16
-    uint8_t data[MAX_MIDI_ARGS];
-    // But for now we accept only exactly 3 values.
-    if (! PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2])) {
+    int data[MAX_MIDI_ARGS];
+    uint8_t byte_data[MAX_MIDI_ARGS];
+    uint32_t time = AMY_UNSET_VALUE(time);
+    // But for now we accept only exactly 3 or 4 values: [time,] midi_bytes0..2
+    if (! PyArg_ParseTuple(args, "iiii", &time, &data[0], &data[1], &data[2]))
+      if (! PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2]))
         return NULL;
-    }
     uint8_t sysex = 0;
-    amy_event_midi_message_received(data, 3, sysex);
+    for (int i = 0; i < 3; ++i)  byte_data[i] = (uint8_t)data[i];
+    amy_event_midi_message_received(byte_data, 3, sysex, time);
     return Py_None;
 }
 

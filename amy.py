@@ -304,9 +304,12 @@ def restart():
     import libamy
     libamy.restart()
 
-def inject_midi(a, b, c):
+def inject_midi(a, b, c, d=None):
     import libamy
-    libamy.inject_midi(a, b, c)
+    if d is None:
+        libamy.inject_midi(a, b, c)
+    else:
+        libamy.inject_midi(a, b, c, d)
     
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)

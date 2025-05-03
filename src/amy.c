@@ -1673,7 +1673,6 @@ void amy_default_setup() {
     strcpy(e.voices, "0,1,2,3,4,5");
     e.load_patch = 0;
     e.instrument = 1;
-    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
     // sine wave "bleeper" on ch 16
@@ -1684,7 +1683,6 @@ void amy_default_setup() {
     strcpy(e.voices, "6");
     e.load_patch = 1024;
     e.instrument = 16;
-    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
     // GM drum synth on channel 10
@@ -1699,7 +1697,6 @@ void amy_default_setup() {
     strcpy(e.voices, "7,8,9,10,11,12");
     e.load_patch = 1025;
     e.instrument = 10;
-    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
 }
