@@ -117,8 +117,9 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
     if (channel == AMY_MIDI_CHANNEL_DRUMS) {
         // Special case for drums - set up for PCM playback from fixed table
         if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
-            struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
+	    struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
             e.patch = s.pcm_patch_number;
+	    // This will play havoc with the note-based voice stealing algo.
             e.midi_note = s.base_midi_note;
             forward_note = true;
             fprintf(stderr, "amy_received drum: chan %d note %d vel %d", channel, note, vel);

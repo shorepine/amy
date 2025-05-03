@@ -558,10 +558,10 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     if(AMY_IS_SET(e->ratio)) { float logratio = log2f(e->ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; callback(&d, user_data); }
     if(AMY_IS_SET(e->resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e->resonance; callback(&d, user_data); }
     if(AMY_IS_SET(e->portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e->portamento_ms; callback(&d, user_data); }
-    if(AMY_IS_SET(e->chained_osc)) { e->chained_osc += base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&e->chained_osc; callback(&d, user_data); }
-    if(AMY_IS_SET(e->reset_osc)) { e->reset_osc += base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&e->reset_osc; callback(&d, user_data); }
+    if(AMY_IS_SET(e->chained_osc)) { int v = e->chained_osc + base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&v; callback(&d, user_data); }
+    if(AMY_IS_SET(e->reset_osc)) { int v = e->reset_osc + base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&v; callback(&d, user_data); }
     if(AMY_IS_SET(e->source)) { d.param=EVENT_SOURCE; d.data = *(uint32_t*)&e->source; callback(&d,user_data); }
-    if(AMY_IS_SET(e->mod_source)) { e->mod_source += base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&e->mod_source; callback(&d, user_data); }
+    if(AMY_IS_SET(e->mod_source)) { int v = e->mod_source + base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&v; callback(&d, user_data); }
     if(AMY_IS_SET(e->filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e->filter_type; callback(&d, user_data); }
     if(AMY_IS_SET(e->algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e->algorithm; callback(&d, user_data); }
     if(AMY_IS_SET(e->eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e->eq_l; callback(&d, user_data); }
@@ -1673,6 +1673,7 @@ void amy_default_setup() {
     strcpy(e.voices, "0,1,2,3,4,5");
     e.load_patch = 0;
     e.instrument = 1;
+    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
     // sine wave "bleeper" on ch 16
@@ -1683,16 +1684,22 @@ void amy_default_setup() {
     strcpy(e.voices, "6");
     e.load_patch = 1024;
     e.instrument = 16;
+    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
     // GM drum synth on channel 10
+    // Somehow, we need to select simple round-robin voice allocation, because the note numbers don't indicate the voice, so using the same
+    // voice for successive events with the same note number can end up truncating samples.
+    // We could make the voice management use the outer product of preset number and note when calculating "same note"
+    
     // {'wave': amy.PCM, 'freq': 0}
-    patches_store_patch("1024w7f0"); 
+    patches_store_patch("1025w7f0"); 
 
     e = amy_default_event();
-    strcpy(e.voices, "7");
-    e.load_patch = 1024;
+    strcpy(e.voices, "7,8,9,10,11,12");
+    e.load_patch = 1025;
     e.instrument = 10;
+    fprintf(stderr, "default setup for instr %d patch %d\n", e.instrument, e.load_patch);
     amy_add_event(&e);
 
 }

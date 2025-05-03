@@ -153,7 +153,12 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                 num_voices = instrument_all_notes_off(e->instrument, voices);
             } else {
                 // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
-                uint8_t note = (uint8_t)roundf(e->midi_note);
+                uint16_t note = (uint8_t)roundf(e->midi_note);
+		if (AMY_IS_SET(e->patch)) {
+		    // This event includes a note *and* a patch, so it's like a drum sample note on.
+		    // Wrap the patch number into the note, so we don't allocate the same pitch for different drums to the same voice.
+		    note += 128 * e->patch;
+		}
                 bool is_note_off = (e->velocity == 0);
                 voices[0] = instrument_voice_for_note_event(e->instrument, note, is_note_off);
                 if (voices[0] == _INSTRUMENT_NO_VOICE) {
@@ -168,12 +173,14 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     e->voices[0] = 0;
     AMY_UNSET(e->load_patch);
+    int instrument = e->instrument;
     AMY_UNSET(e->instrument);
     // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
             amy_parse_event_to_deltas(e, target_osc, callback, user_data);
+	    fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
 }
@@ -253,8 +260,9 @@ void patches_load_patch(struct event *e) {
             fprintf(stderr, "we are out of oscs for voice %d. not setting this voice\n", voices[v]);
         } else {
             uint16_t start = 0;
-            for(uint16_t i=0;i<strlen(message);i++) {
-                if(message[i] == 'Z') {
+	    fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->instrument, voices[v], message);
+            for(uint16_t i=0;i<strlen(message) + 1;i++) {
+	      if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
                     strncpy(sub_message, message + start, i - start + 1);
                     sub_message[i-start+1]= 0;
                     struct event patch_event = amy_default_event();
@@ -264,6 +272,7 @@ void patches_load_patch(struct event *e) {
                         amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
                     }
                     start = i+1;
+		    fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
                 }
             }
         }

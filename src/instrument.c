@@ -91,9 +91,9 @@ struct instrument_info {
     struct voice_fifo *active_voices;
     uint8_t num_voices;
     // AMY "voice" index for each of the num_voices allocated voices.
-    uint8_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
-    // Track which note each voice is sounding.
-    uint8_t note_per_voice[MAX_VOICES_PER_INSTRUMENT];
+    uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
+    // Track which note each voice is sounding.  We use int16 so we can store PCM_PRESET *127 + midi_note
+    uint16_t note_per_voice[MAX_VOICES_PER_INSTRUMENT];
 };
 
 
@@ -122,30 +122,30 @@ void instrument_free(struct instrument_info *instrument) {
     free(instrument);
 }
 
-uint8_t _instrument_get_voice(struct instrument_info *instrument) {
+uint16_t _instrument_get_voice(struct instrument_info *instrument) {
     if (!voice_fifo_empty(instrument->released_voices))
         return voice_fifo_get(instrument->released_voices);
     // No released voices, have to steal.
     return voice_fifo_get(instrument->active_voices);
 }
 
-uint8_t _instrument_voice_for_note(struct instrument_info *instrument, uint8_t note) {
+uint16_t _instrument_voice_for_note(struct instrument_info *instrument, uint16_t note) {
     // Linear search through note_per_voice to see if this note is present.
-    for (uint8_t voice = 0; voice < instrument->num_voices; ++voice)
+    for (uint16_t voice = 0; voice < instrument->num_voices; ++voice)
         if (instrument->note_per_voice[voice] == note)
             return voice;
     return _INSTRUMENT_NO_VOICE;
 }
 
-uint16_t _instrument_voice_off(struct instrument_info *instrument, uint8_t voice) {
+uint16_t _instrument_voice_off(struct instrument_info *instrument, uint16_t voice) {
     instrument->note_per_voice[voice] = _INSTRUMENT_NO_NOTE;
     voice_fifo_remove(instrument->active_voices, voice);
     voice_fifo_put(instrument->released_voices, voice);
     return instrument->amy_voices[voice];
 }
 
-uint16_t instrument_note_off(struct instrument_info *instrument, uint8_t note) {
-    uint8_t voice = _instrument_voice_for_note(instrument, note);
+uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) {
+    uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         fprintf(stderr, "note off for %d does not match note on\n", note);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
@@ -157,7 +157,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint8_t note) {
 int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_voices) {
     // Register any active voices as inactive; return those voices.
     int num_voices_turned_off = 0;
-    for (uint8_t voice = 0; voice < instrument->num_voices; ++voice)
+    for (uint16_t voice = 0; voice < instrument->num_voices; ++voice)
         if (instrument->note_per_voice[voice] != _INSTRUMENT_NO_NOTE) {
             //fprintf(stderr, "voice %d note %d all-off\n", instrument->amy_voices[voice], instrument->note_per_voice[voice]);
             _instrument_voice_off(instrument, voice);
@@ -167,13 +167,13 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
     return num_voices_turned_off;
 }
 
-uint16_t instrument_note_on(struct instrument_info *instrument, uint8_t note) {
+uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
     if (note == 0) {
         // note == 0 is for all-notes-off, it's not allowed for note-on (sorry, C-1).
-        fprintf(stderr, "note-on for note 0: ignored.");
+        fprintf(stderr, "note-on for note 0: ignored.\n");
         return _INSTRUMENT_NO_VOICE;
     }
-    uint8_t voice = _instrument_voice_for_note(instrument, note);
+    uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         // Not a re-onset, need to allocate a new voice.
         voice = _instrument_get_voice(instrument);
@@ -218,7 +218,7 @@ void instrument_test(void) {
 struct instrument_info *instruments[MAX_INSTRUMENTS];
 
 void instruments_init() {
-    for(uint8_t i=0;i<MAX_INSTRUMENTS;i++) {
+    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++) {
         instruments[i]  = NULL;
     }
 }
@@ -238,7 +238,7 @@ int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        fprintf(stderr, "get_voices: instrument_number %d is not defined.", instrument_number);
+        fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
     } else {
         num_voices = instrument->num_voices;
         for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];
@@ -250,7 +250,7 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
     // Called from patches_event_has_voices for events including an instrument, velocity, and note (note-on/note-off).
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        fprintf(stderr, "note_event: instrument_number %d is not defined.", instrument_number);
+        fprintf(stderr, "note_event: instrument_number %d is not defined.\n", instrument_number);
         return _INSTRUMENT_NO_VOICE;
     }
     if (is_note_off) {
@@ -270,7 +270,7 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
 int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        fprintf(stderr, "all_notes_off: instrument_number %d is not defined.", instrument_number);
+        fprintf(stderr, "all_notes_off: instrument_number %d is not defined.\n", instrument_number);
         return 0;
     }
     return _instrument_all_notes_off(instrument, amy_voices);
