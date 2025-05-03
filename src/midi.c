@@ -150,7 +150,9 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t 
     e.source = EVENT_MIDI;
     e.midi_note = note;
     if (channel == AMY_MIDI_CHANNEL_DRUMS) {
-        forward_note = setup_drum_event(&e, note);
+        //forward_note = setup_drum_event(&e, note);
+        // It's better to ignore note-offs for drums, to avoid truncating longer drum sounds.
+        forward_note = false;
     }
     if (forward_note) {
         e.velocity = 0;
