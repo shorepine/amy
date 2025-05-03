@@ -163,7 +163,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                 voices[0] = instrument_voice_for_note_event(e->instrument, note, is_note_off);
                 if (voices[0] == _INSTRUMENT_NO_VOICE) {
                     // For now, I think this can only happen with a note-off that has no matching note-on.
-                    fprintf(stderr, "synth %d did not find a voice, dropping message.", e->instrument);
+                    fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->instrument);
                     return;
                 }
                 num_voices = 1;
@@ -293,6 +293,6 @@ void patches_load_patch(struct event *e) {
     }
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->instrument)) {
-        instrument_add_new(e->instrument, num_voices, voices);
+        instrument_add_new(e->instrument, num_voices, voices, e->load_patch);
     }
 }
