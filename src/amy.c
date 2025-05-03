@@ -1162,7 +1162,10 @@ void play_event(struct delta *d) {
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
                 AMY_UNSET(synth[d->osc].note_on_clock);
-                synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                if (AMY_IS_UNSET(synth[d->osc].note_off_clock)) {
+                    // Only set the note_off_clock (start of release) if we don't already have one.
+                    synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                }
             }
         }
         // Now maybe propagate the velocity event to the chained osc.

@@ -173,7 +173,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     e->voices[0] = 0;
     AMY_UNSET(e->load_patch);
-    int instrument = e->instrument;
+    //int instrument = e->instrument;
     AMY_UNSET(e->instrument);
     // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
     for(uint8_t i=0;i<num_voices;i++) {
@@ -192,7 +192,21 @@ void patches_load_patch(struct event *e) {
     char sub_message[255];
     
     uint16_t voices[MAX_VOICES];
-    uint8_t num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
+    uint8_t num_voices = 0;
+    if (e->voices[0] == 0) {
+        // No voices specified, see if there's an existing instrument allocation
+        if (AMY_IS_UNSET(e->instrument)) {
+            fprintf(stderr, "load_patch %d without voices or synth.\n", e->load_patch);
+            return;
+        }
+        num_voices = instrument_get_voices(e->instrument, voices);
+        if (num_voices == 0) {
+            fprintf(stderr, "load_patch %d for empty instrument %d.\n", e->load_patch, e->instrument);
+            return;
+        }
+    } else {
+        num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
+    }
     char *message;
     uint16_t patch_osc = 0;
     if(e->load_patch >= _PATCHES_FIRST_USER_PATCH) {
