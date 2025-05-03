@@ -90,6 +90,7 @@ struct instrument_info {
     struct voice_fifo *released_voices;
     struct voice_fifo *active_voices;
     uint8_t num_voices;
+    uint16_t patch_number;  // What patch this instrument is currently set to.
     // AMY "voice" index for each of the num_voices allocated voices.
     uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
     // Track which note each voice is sounding.  We use int16 so we can store PCM_PRESET *127 + midi_note
@@ -103,9 +104,10 @@ struct instrument_info {
 // Defined in amy.h because patches.c needs to know it.
 //#define _INSTRUMENT_NO_VOICE 255
 
-struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices) {
+struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, uint16_t patch_number) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     instrument->num_voices = num_voices;
+    instrument->patch_number = patch_number;
     instrument->released_voices = voice_fifo_init(num_voices, "released");
     instrument->active_voices = voice_fifo_init(num_voices, "active");
     for (uint8_t voice = 0; voice < num_voices; ++voice) {
@@ -188,7 +190,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
 
 void instrument_test(void) {
     uint16_t amy_voices[4] = {101, 102, 103, 104};
-    struct instrument_info *instrument = instrument_init(4, amy_voices);
+    struct instrument_info *instrument = instrument_init(4, amy_voices, 0);
 
     // 5 non-overlapping notes
     for (int i = 0; i < 5; ++i) {
@@ -223,7 +225,7 @@ void instruments_init() {
     }
 }
 
-void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices) {
+void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number) {
     if (instrument_number < 0 || instrument_number >= MAX_INSTRUMENTS) {
         fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, MAX_INSTRUMENTS);
         return;
@@ -231,7 +233,7 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
     if(instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
     }
-    instruments[instrument_number] = instrument_init(num_voices, amy_voices);
+    instruments[instrument_number] = instrument_init(num_voices, amy_voices, patch_number);
 }
 
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
@@ -274,4 +276,13 @@ int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
         return 0;
     }
     return _instrument_all_notes_off(instrument, amy_voices);
+}
+
+int instrument_get_patch_number(int instrument_number) {
+    struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument == NULL) {
+        fprintf(stderr, "get_patch_number: instrument_number %d is not defined.\n", instrument_number);
+        return -1;
+    }
+    return instrument->patch_number;
 }

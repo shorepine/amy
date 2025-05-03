@@ -730,11 +730,12 @@ extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(char * message);
-extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices);
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
 extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
+extern int instrument_get_patch_number(int instrument_number);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;
