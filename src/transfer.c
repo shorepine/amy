@@ -7,20 +7,16 @@
 #include <stdio.h>
 #include <stdint.h>
 
-uint8_t amy_transfer_flag = 0;
-uint8_t * amy_transfer_storage = NULL; 
-uint32_t amy_transfer_length = 0;
-uint32_t amy_transfer_stored =0;
 
 // We keep one decbuf around and reuse it during transfer
 b64_buffer_t decbuf;
 
 // signals to AMY that i'm now receiving a transfer of length (bytes!) into allocated storage
 void start_receiving_transfer(uint32_t length, uint8_t * storage) {
-    amy_transfer_flag = 1;
-    amy_transfer_storage = storage;
-    amy_transfer_length = length;
-    amy_transfer_stored = 0;
+    amy_global.transfer_flag = 1;
+    amy_global.transfer_storage = storage;
+    amy_global.transfer_length = length;
+    amy_global.transfer_stored = 0;
     b64_buf_malloc(&decbuf);
 }
 
@@ -29,10 +25,10 @@ void parse_transfer_message(char * message, uint16_t len) {
     size_t decoded = 0;
     uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
     for(uint16_t i=0;i<decoded;i++) {
-        amy_transfer_storage[amy_transfer_stored++] = block[i];
+        amy_global.transfer_storage[amy_global.transfer_stored++] = block[i];
     }
-    if(amy_transfer_stored>=amy_transfer_length) { // we're done
-        amy_transfer_flag = 0;
+    if(amy_global.transfer_stored>=amy_global.transfer_length) { // we're done
+        amy_global.transfer_flag = 0;
         free(decbuf.ptr);
     }
 }

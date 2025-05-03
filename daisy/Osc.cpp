@@ -76,8 +76,9 @@ int main(void)
 
     //Start the adc
     hardware.adc.Start();
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config); // initializes amy 
 
-    amy_start(1,1,1);
     polyphony(0, 0);
 
     //Start calling the audio callback

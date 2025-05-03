@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io.wavfile as wav
 
 import amy
+import time
 
 
 def wavread(filename):
@@ -32,12 +33,16 @@ class AmyTest:
   test_dir = './tests/tst'
 
   def __init__(self):
-    amy.restart()
+    self.config_default = False
 
   def test(self):
-
+    import libamy
     name = self.__class__.__name__
-
+    libamy.stop()
+    if self.config_default:
+      libamy.start()
+    else:
+      libamy.start_no_default()
     self.run()
     
     samples = amy.render(1.0)
@@ -627,6 +632,40 @@ class TestEchoHPF(AmyTest):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
 
     amy.send(time=100, osc=0, note=48, vel=1)
+
+
+class TestVoiceManagement(AmyTest):
+  """The 'synth' structure manages a set of voices."""
+
+  def run(self):
+    # Patch is bare sinewave oscillator but with a 100ms release.
+    amy.send(store_patch='1024,' + amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
+    amy.send(time=10, synth=0, voices='0,1,2', load_patch=1024)
+    amy.send(time=100, synth=0, note=60, vel=1)
+    amy.send(time=200, synth=0, note=72, vel=1)
+    amy.send(time=300, synth=0, note=84, vel=1)
+    # We ran out of voices, this should steal the first one
+    amy.send(time=400, synth=0, note=96, vel=1)
+    # Stop one
+    amy.send(time=500, synth=0, note=84, vel=0)
+    # Stop all the rest.
+    amy.send(time=600, synth=0, vel=0)
+
+
+class TestMidiDrums(AmyTest):
+  """Test MIDI drums on channel 10 via injection."""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+  
+  def run(self):
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(100, 0x99, 35, 100)  # bass
+    amy.inject_midi(400, 0x99, 35, 100)  # bass
+    amy.inject_midi(400, 0x99, 37, 100)  # snare
+    amy.inject_midi(700, 0x99, 37, 100)  # snare
+    amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
 def main(argv):

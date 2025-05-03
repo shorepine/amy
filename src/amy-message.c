@@ -10,24 +10,25 @@ void delay_ms(uint32_t ms) {
     while(amy_sysclock() - start < ms) usleep(THREAD_USLEEP);
 }
 int main(int argc, char ** argv) {
-
+    int8_t playback_device_id = -1;
+    int8_t capture_device_id = -1;
     int opt;
     while((opt = getopt(argc, argv, ":d:lh")) != -1) 
     { 
         switch(opt) 
         { 
             case 'd': 
-                amy_playback_device_id = atoi(optarg);
+                playback_device_id = atoi(optarg);
                 break;
             case 'c': 
-                amy_capture_device_id = atoi(optarg);
+                capture_device_id = atoi(optarg);
                 break;
             case 'l':
                 amy_print_devices();
                 return 0;
                 break;
             case 'h':
-                printf("usage: amy-example\n");
+                printf("usage: amy-message\n");
                 printf("\t[-d sound device id, use -l to list, default, autodetect]\n");
                 printf("\t[-l list all sound devices and exit]\n");
                 printf("\t[-h show this help and exit]\n");
@@ -43,10 +44,11 @@ int main(int argc, char ** argv) {
     }
 
 
-
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */1);
-    amy_live_start(1);
-    amy_reset_oscs();
+    amy_config_t amy_config = amy_default_config();
+    amy_config.playback_device_id = playback_device_id;
+    amy_config.capture_device_id = capture_device_id;
+    amy_start(amy_config);
+    amy_live_start();
 
     while (1) {
         char input[1024];
@@ -58,7 +60,7 @@ int main(int argc, char ** argv) {
                     fprintf(stdout, "%" PRIu32 "\n", amy_sysclock());
                     break;
                 case 's':
-                    fprintf(stdout, "%" PRIu32 "\n", total_samples);
+                    fprintf(stdout, "%" PRIu32 "\n", amy_global.total_blocks);
                     break;
                 default:
                     fprintf(stdout, "?\n");

@@ -69,7 +69,7 @@ We provide an `emscripten` port of AMY that runs in javascript. [See the AMY web
 
 ## Using AMY in any other software
 
-To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them. No other libraries should be required to synthesize audio in AMY. You'll want to make sure the configuration in `amy_config.h` is set up for your application / hardware. 
+To use AMY in your own software, simply copy the .c and .h files in `src` to your program and compile them. No other libraries should be required to synthesize audio in AMY. 
 
 To run a simple C example on many platforms:
 
@@ -128,7 +128,8 @@ void bleep() {
 }
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0,  /* echo */ 1); // initializes amy 
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config); // initializes amy 
     amy_live_start(1); // render live audio
     bleep();
 }
@@ -140,7 +141,8 @@ Or in C, sending the wire protocol directly:
 #include "amy.h"
 
 void main() {
-    amy_start(/* cores= */ 1, /* reverb= */ 0, /* chorus= */ 0, /* echo */ 1);
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config); // initializes amy 
     amy_live_start(1);
     amy_play_message("v0n50l1K130r0Z");
 }
@@ -151,7 +153,8 @@ If you want to receive buffers of samples, or have more control over the renderi
 ```c
 #include "amy.h"
 ...
-amy_start(/* cores= */ 2, /* reverb= */ 1, /* chorus= */ 1, /* echo */ 1);
+amy_config_t amy_config = amy_default_config();
+amy_start(amy_config); // initializes amy 
 ...
 ... {
     // For each sample block:
@@ -201,6 +204,7 @@ Here's the full list:
 | `G`    | `filter_type` | 0-4 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
 | `H`    | `sequence` | int,int,int | Tick offset, period, tag for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
+| `i`    | `synth`  | 0-31  | Define a set of voices for voice management. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
@@ -663,9 +667,9 @@ amy.unload_sample(3) # unloads the RAM for patch 3
 
 Under the hood, if AMY receives a `load_sample` message (with patch number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
 
-## <a name="voices_and_patches"></a>Voices and patches (DX7, Piano, Juno-6, custom) support
+## <a name="voices_and_patches"></a>Voices, patches, and synths (DX7, Piano, Juno-6, custom) support
 
-Up until now, we have been directly controlling the AMY oscillators, which are the fundamental building blocks for sound production.  However, as we've seen, most interesting tones involve multiple oscillators.  AMY provides a second layer of organization, **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.
+Up until now, we have been directly controlling the AMY oscillators, which are the fundamental building blocks for sound production.  However, as we've seen, most interesting tones involve multiple oscillators.  AMY provides a second layer of organization, **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.  You can also manage a set of voices using a **synth**, which takes care of allocating available voices to successive notes.
 
 A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
 
@@ -704,4 +708,20 @@ You can "record" patches in a sequence of commands like this:
 
 **Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and manage your own oscillator mapping in your code.
 
+A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices, e.g.
 
+```python
+amy.send(synth=0, voices='0,1,2', load_patch=1)     # 4-voice Juno path #1 on synth 0
+# Play three notes simultaneously
+amy.send(synth=0, note=60, vel=1)
+amy.send(synth=0, note=64, vel=1)
+amy.send(synth=0, note=67, vel=1)
+# To play a 4th note, the synth 'steals' the oldest voice, i.e. the one that was playing note 60
+amy.send(synth=0, note=70, vel=1)
+# We can send note-offs to individual notes
+amy.send(synth=0, note=70, vel=0)
+# .. or we can send note-offs to all the currently-active synth voices by not specifying a note
+amy.send(synth=0, vel=0)
+```
+
+(Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.)

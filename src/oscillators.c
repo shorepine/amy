@@ -227,7 +227,7 @@ PHASOR render_lut_cub(SAMPLE* buf,
 
 /* Pulse wave */
 void pulse_note_on(uint16_t osc, float freq) {
-    //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", total_samples, osc, synth[osc].logfreq, msynth[osc].amp, msynth[osc].last_amp);
+    //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, synth[osc].logfreq, msynth[osc].amp, msynth[osc].last_amp);
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, saw_fxpt_lutset);
 }
@@ -288,7 +288,7 @@ SAMPLE compute_mod_pulse(uint16_t osc) {
 
 /* Saw waves */
 void saw_note_on(uint16_t osc, int8_t direction_notused, float freq) {
-    //printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", total_samples, osc, freq, synth[osc].logfreq, msynth[osc].amp, msynth[osc].last_amp, P2F(synth[osc].phase));
+    //printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, synth[osc].logfreq, msynth[osc].amp, msynth[osc].last_amp, P2F(synth[osc].phase));
     float period_samples = ((float)AMY_SAMPLE_RATE / freq);
     synth[osc].lut = choose_from_lutset(period_samples, saw_fxpt_lutset);
     synth[osc].dc_offset = 0;
@@ -304,7 +304,7 @@ void saw_up_note_on(uint16_t osc, float freq) {
 SAMPLE render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
     return render_lpf_lut(buf, osc, false, direction, synth[osc].dc_offset);
     //printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
-    //       total_samples, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
+    //       amy_global.total_blocks*AMY_BLOCK_SIZE, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
 }
 
 SAMPLE render_saw_down(SAMPLE* buf, uint16_t osc) {
@@ -385,7 +385,6 @@ SAMPLE compute_mod_triangle(uint16_t osc) {
     return MUL4_SS(synth[osc].sample, F2S(msynth[osc].amp));
 }
 
-extern uint32_t total_samples;
 
 /* FM */
 // NB this uses new lingo for step, skip, phase etc
@@ -434,7 +433,7 @@ SAMPLE render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_le
 
 /* sine */
 void sine_note_on(uint16_t osc, float freq) {
-    //fprintf(stderr, "sine_note_on: time %f osc %d freq %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc].logfreq_coefs[0]));
+    //fprintf(stderr, "sine_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc].logfreq_coefs[0]));
     // There's really only one sine table, but for symmetry with the other ones...
     float period_samples = (float)AMY_SAMPLE_RATE / freq;
     synth[osc].lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
@@ -445,7 +444,7 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     SAMPLE last_amp = F2S(msynth[osc].last_amp);
-    //fprintf(stderr, "render_sine: time %f osc %d freq %f last_amp %f amp %f\n", total_samples / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
+    //fprintf(stderr, "render_sine: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
     SAMPLE max_value;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, last_amp, amp, synth[osc].lut, &max_value);
     msynth[osc].last_amp = msynth[osc].amp;
@@ -522,7 +521,7 @@ SAMPLE compute_mod_noise(uint16_t osc) {
         // phase wrapped, take new sample.
         synth[osc].last_two[0] = MUL4_SS(amy_get_random(), amp);
     }
-    //printf("mod_noise: time %lld fstep %f samp %f\n", total_samples, fstep, S2F(synth[osc].last_two[0]));
+    //printf("mod_noise: time %lld fstep %f samp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, fstep, S2F(synth[osc].last_two[0]));
     return synth[osc].last_two[0];
 }
 
@@ -535,7 +534,7 @@ SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc].amp);
     SAMPLE last_amp = F2S(msynth[osc].last_amp);
-    //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)total_samples/(float)AMY_SAMPLE_RATE, msynth[osc].logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc].lut->table_size); 
+    //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc].logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc].lut->table_size); 
     SAMPLE max_value;
     synth[osc].phase = render_lut(buf, synth[osc].phase, step, last_amp, amp, synth[osc].lut, &max_value);
     msynth[osc].last_amp = msynth[osc].amp;
@@ -551,7 +550,7 @@ void partial_note_on(uint16_t osc) {
 void partial_note_off(uint16_t osc) {
     synth[osc].substep = 2;
     AMY_UNSET(synth[osc].note_on_clock);
-    synth[osc].note_off_clock = total_samples;   
+    synth[osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;   
     msynth[osc].last_amp = 0;
     synth[osc].status = SYNTH_OFF;
 }
@@ -589,7 +588,7 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
             }
         }
     }
-    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", total_samples, osc, freq, S2F(amp), S2F(max_value));
+    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, S2F(amp), S2F(max_value));
     return max_value;
 }
 

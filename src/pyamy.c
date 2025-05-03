@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <math.h>
 #include "amy.h"
+#include "midi.h"
 #include "libminiaudio-audio.h"
 
 // Python module wrapper for AMY commands
@@ -20,13 +21,13 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     int arg1 = -1; int arg2 = -1;
     if(! PyArg_ParseTuple(args, "ii", &arg1, &arg2)) {
-        amy_playback_device_id = -1;
-        amy_capture_device_id = -1;
+        amy_global.config.playback_device_id = arg1;
+        amy_global.config.capture_device_id = arg2;
     } else {
-        amy_playback_device_id = arg1;
-        amy_capture_device_id = arg2;
+        amy_global.config.playback_device_id = arg1;
+        amy_global.config.capture_device_id = arg2;
     }
-    amy_live_start(1);
+    amy_live_start();
     return Py_None;
 }
 
@@ -35,9 +36,21 @@ static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-static PyObject * restart_wrapper(PyObject *self, PyObject *args) {
+static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
+    return Py_None;
+}
+
+static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config); // initializes amy 
+    return Py_None;
+}
+
+static PyObject * amystart_no_default_wrapper(PyObject *self, PyObject *args) {
+    amy_config_t amy_config = amy_default_config();
+    amy_config.set_default_synth=0;
+    amy_start(amy_config); // initializes amy 
     return Py_None;
 }
 
@@ -66,14 +79,33 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     return ret;
 }
 
+static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
+    char *arg1;
+#define MAX_MIDI_ARGS 16
+    int data[MAX_MIDI_ARGS];
+    uint8_t byte_data[MAX_MIDI_ARGS];
+    uint32_t time = AMY_UNSET_VALUE(time);
+    // But for now we accept only exactly 3 or 4 values: [time,] midi_bytes0..2
+    if (! PyArg_ParseTuple(args, "iiii", &time, &data[0], &data[1], &data[2]))
+      if (! PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2]))
+        return NULL;
+    uint8_t sysex = 0;
+    for (int i = 0; i < 3; ++i)  byte_data[i] = (uint8_t)data[i];
+    amy_event_midi_message_received(byte_data, 3, sysex, time);
+    return Py_None;
+}
+
 
 static PyMethodDef libAMYMethods[] = {
     {"render", render_wrapper, METH_VARARGS, "Render audio"},
     {"send", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
-    {"restart", restart_wrapper, METH_VARARGS, "Restart AMY"},
+    {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
+    {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
+    {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
+    {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     { NULL, NULL, 0, NULL }
 };
 
@@ -88,7 +120,8 @@ static struct PyModuleDef libamyDef =
 
 PyMODINIT_FUNC PyInit_libamy(void)
 {   
-    amy_start(/* cores= */ 1, /* reverb= */ 1, /* chorus= */ 1, /* echo= */ 1);
+    amy_config_t amy_config = amy_default_config();
+    amy_start(amy_config);
     return PyModule_Create(&libamyDef);
 
 }

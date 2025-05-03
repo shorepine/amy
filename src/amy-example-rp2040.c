@@ -146,7 +146,7 @@ int main() {
     sleep_ms(500);
     printf("Clock is set to %d\n", clock_get_hz(clk_sys));
 
-    amy_start(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 1, /* echo= */ 1);
+    amy_start(/* cores= */ 2, /* reverb= */ 0, /* chorus= */ 1, /* echo= */ 1, /* setup default synth */ 0);
 
     gpio_init(CPU0_METER);
     gpio_set_dir(CPU0_METER, GPIO_OUT);

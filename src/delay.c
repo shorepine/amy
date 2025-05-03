@@ -200,17 +200,17 @@ void config_stereo_reverb(float a_liveness, float crossover_hz, float damping) {
 
 void init_stereo_reverb(void) {
     if (delay_1 == NULL) {
-        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, DELAY_RAM_CAPS);
-        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, DELAY_RAM_CAPS);
-        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, DELAY_RAM_CAPS);
-        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, DELAY_RAM_CAPS);
+        delay_1 = new_delay_line(DELAY_POW2, DELAY1SAMPS, amy_global.config.ram_caps_delay);
+        delay_2 = new_delay_line(DELAY_POW2, DELAY2SAMPS, amy_global.config.ram_caps_delay);
+        delay_3 = new_delay_line(DELAY_POW2, DELAY3SAMPS, amy_global.config.ram_caps_delay);
+        delay_4 = new_delay_line(DELAY_POW2, DELAY4SAMPS, amy_global.config.ram_caps_delay);
 
-        ref_1 = new_delay_line(4096, REF1SAMPS, DELAY_RAM_CAPS);
-        ref_2 = new_delay_line(2048, REF2SAMPS, DELAY_RAM_CAPS);
-        ref_3 = new_delay_line(2048, REF3SAMPS, DELAY_RAM_CAPS);
-        ref_4 = new_delay_line(1024, REF4SAMPS, DELAY_RAM_CAPS);
-        ref_5 = new_delay_line(1024, REF5SAMPS, DELAY_RAM_CAPS);
-        ref_6 = new_delay_line(1024, REF6SAMPS, DELAY_RAM_CAPS);
+        ref_1 = new_delay_line(4096, REF1SAMPS, amy_global.config.ram_caps_delay);
+        ref_2 = new_delay_line(2048, REF2SAMPS, amy_global.config.ram_caps_delay);
+        ref_3 = new_delay_line(2048, REF3SAMPS, amy_global.config.ram_caps_delay);
+        ref_4 = new_delay_line(1024, REF4SAMPS, amy_global.config.ram_caps_delay);
+        ref_5 = new_delay_line(1024, REF5SAMPS, amy_global.config.ram_caps_delay);
+        ref_6 = new_delay_line(1024, REF6SAMPS, amy_global.config.ram_caps_delay);
         
         config_stereo_reverb(INITIAL_LIVENESS, INITIAL_XOVER_HZ, INITIAL_DAMPING);
     }

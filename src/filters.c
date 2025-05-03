@@ -75,9 +75,9 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
-    //printf("Flpf t=%f f=%f q=%f alpha %f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor, alpha, 
+    //printf("Flpf t=%f f=%f q=%f alpha %f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor, alpha, 
     //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0, r, w0);
-    //printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", total_samples / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
+    //printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
     //       S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]));
 
     return 0;
@@ -477,19 +477,19 @@ void filters_deinit() {
 
 
 void filters_init() {
-    coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, FBL_RAM_CAPS);
-    eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, FBL_RAM_CAPS);
-    eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, FBL_RAM_CAPS);
+    coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, amy_global.config.ram_caps_fbl);
+    eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
+    eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, amy_global.config.ram_caps_fbl);
     for(uint16_t i=0;i<AMY_OSCS;i++) {
-        coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, FBL_RAM_CAPS);
+        coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, amy_global.config.ram_caps_fbl);
     }
     for(uint16_t i=0;i<3;i++) {
-        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, FBL_RAM_CAPS);
+        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, amy_global.config.ram_caps_fbl);
     }
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
-        eq_delay[i] = malloc_caps(sizeof(SAMPLE*) * 3, FBL_RAM_CAPS);
+        eq_delay[i] = malloc_caps(sizeof(SAMPLE*) * 3, amy_global.config.ram_caps_fbl);
         for(uint16_t j=0;j<3;j++) {
-            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, FBL_RAM_CAPS);
+            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, amy_global.config.ram_caps_fbl);
 
         }
     }
@@ -695,7 +695,7 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
     }
     if (maxdiff > F2S(0.2f))
         fprintf(stderr, "Overflow at timeframe %.3f max=%.3f maxdiff=%.3f osc=%d msg=%s\n",
-                (float)(total_samples) / AMY_SAMPLE_RATE,
+                (float)(amy_global.total_blocks*AMY_BLOCK_SIZE) / AMY_SAMPLE_RATE,
                 S2F(max), S2F(maxdiff), osc, msg);
 
 #endif // AMY_DEBUG
@@ -778,7 +778,7 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
 #else  // No block floating point
     const int normbits = 0;  // defeat BFP
 #endif
-    //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", total_samples / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
+    //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc].last_filt_norm_bits, filtnormbits, normbits);
     //block_norm(&synth[osc].hpf_state[0], 2, normbits - synth[osc].last_filt_norm_bits);
     if(synth[osc].filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
