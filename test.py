@@ -668,6 +668,16 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestDoubleNoteOff(AmyTest):
+  """Test for bug where release restarts if a second note-off is received (#319)."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SINE, bp0='0,1,100,1,1000,0')
+    amy.send(time=100, osc=0, note=60, vel=1)
+    amy.send(time=200, osc=0, vel=0)
+    amy.send(time=600, osc=0, vel=0)
+
+
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.
