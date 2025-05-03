@@ -48,39 +48,39 @@ struct pcm_sample_info {
 struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
     {28, 60},  // "Std Kick", 35)
     {25, 60},  // "Pwr Kick", 36),
-    {3, 52},   // "Snare2", 37),
+    {2, 45},   // "Snare", 37),
     {5, 41},   // "Snare4", 38),
     {9, 94},   // "Clap", 39),
     {20, 60},  // "Pwr Snare", 40),
-    {8, 61},   // "Low Tom", 41),
+    {8, 61},   // "Low floor Tom", 41),
     {6, 53},   // "Closed Hat", 42),
-    {21, 60},  // "Hi Tom", 43),
-    {-1, -1},  // "Pedal hi-hat", 44
-    {-1, -1},  // "low tom", 45
+    {8, 68},  // "Hi floor Tom", 43),
+    {7, 61},  // "Pedal hi-hat", 44
+    {21, 56},  // "low tom", 45
     {7, 56},   // "Open Hat", 46),
-    {-1, -1},  // "low-mid tom", 47
-    {-1, -1},  // "hi-mid tom", 48
+    {21, 63},  // "low-mid tom", 47
+    {21, 70},  // "hi-mid tom", 48
     {16, 60},  // "Crash", 49),
-    {-1, -1},  // "hi-tom", 50,
-    {-1, -1},  // "ride cymbal", 51,
-    {-1, -1},  // "chinese cymbal", 52,
-    {-1, -1},  // "ride bell", 53,
-    {-1, -1},  // "tambourine", 54,
-    {-1, -1},  // "splash cymbal", 55,
+    {21, 77},  // "hi-tom", 50,
+    {7, 51},  // "ride cymbal", 51,
+    {16, 50},  // "chinese cymbal", 52,
+    {6,  47},  // "ride bell", 53,
+    {9, 84},  // "tambourine", 54,
+    {7, 46},  // "splash cymbal", 55,
     {10, 69},  // "Cowbell", 56),
-    {-1, -1},  // "crash cymbal 2", 57,
+    {7, 57},  // "crash cymbal 2", 57,
     {-1, -1},  // "vibraslap", 58,
-    {-1, -1},  // "ride cymbal", 59,
-    {-1, -1},  // "hi bongo", 60,
-    {-1, -1},  // "low bongo", 61,
-    {-1, -1},  // "mute hi conga", 62,
-    {-1, -1},  // "open hi conga", 63,
-    {11, 74},  // "Congo Low", 64),
-    {-1, -1},  // "high timbale", 65,
-    {-1, -1},  // "low timbale", 66,
-    {-1, -1},  // "high agogo", 67,
-    {-1, -1},  // "low agogo", 68,
-    {-1, -1},  // "cabasa", 69,
+    {7, 48},  // "ride cymbal", 59,
+    {11, 74},  // "hi bongo", 60,
+    {11, 67},  // "low bongo", 61,
+    {11, 77},  // "mute hi conga", 62,
+    {8, 77},  // "open hi conga", 63,
+    {11, 64},  // "Congo Low", 64),
+    {21, 79},  // "high timbale", 65,
+    {21, 73},  // "low timbale", 66,
+    {13, 55},  // "high agogo", 67,
+    {13, 50},  // "low agogo", 68,
+    {0, 79},   // "cabasa", 69,
     {0, 89},   // "Maraca", 70),
     {-1, -1},  // "short whistle", 71,
     {-1, -1},  // "long whistle", 72,
@@ -88,13 +88,13 @@ struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWE
     {-1, -1},  // "long guiro", 74,
     {12, 82},  // "Clave", 75),
     {13, 60},  // "hi Block", 76),
-    {-1, -1},  // "low block", 77
+    {13, 52},  // "low block", 77
     {-1, -1},  // "mute cuica", 78
     {-1, -1},  // "open cuica", 79
     {-1, -1},  // "mute triangle", 80
     {-1, -1},  // "open trianlge", 81
     //    {1, 39},  // "Kick", None),
-    //    {2, 45},  // "Snare", None),
+    //    {3, 52},  // "Snare2", None),
     //    {4, 51},  // "Snare3", None),
     //    {14, 60},  // "Roll", None),
     //    {15, 60},  // "Hit", None),
