@@ -114,10 +114,11 @@ bool setup_drum_event(struct event *e, uint8_t note) {
   bool forward_note = false;
   if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
       struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
-      e->patch = s.pcm_patch_number;
-      // This will play havoc with the note-based voice stealing algo.
-      e->midi_note = s.base_midi_note;
-      forward_note = true;
+      if (s.pcm_patch_number != -1) {
+          e->patch = s.pcm_patch_number;
+          e->midi_note = s.base_midi_note;
+          forward_note = true;
+      }
   }
   return forward_note;
 }
