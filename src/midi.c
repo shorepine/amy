@@ -32,14 +32,105 @@ void amy_send_midi_note_off(uint16_t osc) {
     }
 }
 
+// Drum kit - copied from tulip/shared/py/patches.py
+// Drumkit is [base_midi_note, name, general_midi_note]
+
+struct pcm_sample_info {
+    int8_t pcm_patch_number;
+    int8_t base_midi_note;
+};
+
+#define AMY_MIDI_DRUMS_LOWEST_NOTE 35
+#define AMY_MIDI_DRUMS_HIGHEST_NOTE 81
+
+// drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
+
+struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
+    {28, 60},  // "Std Kick", 35)
+    {25, 60},  // "Pwr Kick", 36),
+    {3, 52},   // "Snare2", 37),
+    {5, 41},   // "Snare4", 38),
+    {9, 94},   // "Clap", 39),
+    {20, 60},  // "Pwr Snare", 40),
+    {8, 61},   // "Low Tom", 41),
+    {6, 53},   // "Closed Hat", 42),
+    {21, 60},  // "Hi Tom", 43),
+    {-1, -1},  // "Pedal hi-hat", 44
+    {-1, -1},  // "low tom", 45
+    {7, 56},   // "Open Hat", 46),
+    {-1, -1},  // "low-mid tom", 47
+    {-1, -1},  // "hi-mid tom", 48
+    {16, 60},  // "Crash", 49),
+    {-1, -1},  // "hi-tom", 50,
+    {-1, -1},  // "ride cymbal", 51,
+    {-1, -1},  // "chinese cymbal", 52,
+    {-1, -1},  // "ride bell", 53,
+    {-1, -1},  // "tambourine", 54,
+    {-1, -1},  // "splash cymbal", 55,
+    {10, 69},  // "Cowbell", 56),
+    {-1, -1},  // "crash cymbal 2", 57,
+    {-1, -1},  // "vibraslap", 58,
+    {-1, -1},  // "ride cymbal", 59,
+    {-1, -1},  // "hi bongo", 60,
+    {-1, -1},  // "low bongo", 61,
+    {-1, -1},  // "mute hi conga", 62,
+    {-1, -1},  // "open hi conga", 63,
+    {11, 74},  // "Congo Low", 64),
+    {-1, -1},  // "high timbale", 65,
+    {-1, -1},  // "low timbale", 66,
+    {-1, -1},  // "high agogo", 67,
+    {-1, -1},  // "low agogo", 68,
+    {-1, -1},  // "cabasa", 69,
+    {0, 89},   // "Maraca", 70),
+    {-1, -1},  // "short whistle", 71,
+    {-1, -1},  // "long whistle", 72,
+    {-1, -1},  // "short guiro", 73,
+    {-1, -1},  // "long guiro", 74,
+    {12, 82},  // "Clave", 75),
+    {13, 60},  // "hi Block", 76),
+    {-1, -1},  // "low block", 77
+    {-1, -1},  // "mute cuica", 78
+    {-1, -1},  // "open cuica", 79
+    {-1, -1},  // "mute triangle", 80
+    {-1, -1},  // "open trianlge", 81
+    //    {1, 39},  // "Kick", None),
+    //    {2, 45},  // "Snare", None),
+    //    {4, 51},  // "Snare3", None),
+    //    {14, 60},  // "Roll", None),
+    //    {15, 60},  // "Hit", None),
+    //    {26, 66},  // "Marimba", None),
+    //    {27, 60},  // "Frets", None),
+    //    {17, 60},  // "Shell", None),
+    //    {18, 60},  // "Chimes", None),
+    //    {19, 60},  // "Seashore", None),
+    //    {22, 66},  // "Shamisen", None),
+    //    {23, 66},  // "Koto", None),
+    //    {24, 72},  // "Steel", None),
+};
+
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
 void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel) {
+    bool forward_note = false;
     struct event e = amy_default_event();
     e.instrument = channel;
     e.source = EVENT_MIDI;
-    e.midi_note = note;
-    e.velocity = ((float)vel/127.0f);
-    amy_add_event(&e);
+    if (channel == AMY_MIDI_CHANNEL_DRUMS) {
+        // Special case for drums - set up for PCM playback from fixed table
+        if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
+            struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
+            e.patch = s.pcm_patch_number;
+            e.midi_note = s.base_midi_note;
+            forward_note = true;
+            fprintf(stderr, "amy_received drum: chan %d note %d vel %d", channel, note, vel);
+        }
+    } else {
+        e.midi_note = note;
+        forward_note = true;
+    }
+    if (forward_note) {
+        e.velocity = ((float)vel/127.0f);
+        amy_add_event(&e);
+    }
 }
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it

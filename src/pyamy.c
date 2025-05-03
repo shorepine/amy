@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <math.h>
 #include "amy.h"
+#include "midi.h"
 #include "libminiaudio-audio.h"
 
 // Python module wrapper for AMY commands
@@ -78,6 +79,19 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     return ret;
 }
 
+static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
+    char *arg1;
+#define MAX_MIDI_ARGS 16
+    uint8_t data[MAX_MIDI_ARGS];
+    // But for now we accept only exactly 3 values.
+    if (! PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2])) {
+        return NULL;
+    }
+    uint8_t sysex = 0;
+    amy_event_midi_message_received(data, 3, sysex);
+    return Py_None;
+}
+
 
 static PyMethodDef libAMYMethods[] = {
     {"render", render_wrapper, METH_VARARGS, "Render audio"},
@@ -88,6 +102,7 @@ static PyMethodDef libAMYMethods[] = {
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
+    {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     { NULL, NULL, 0, NULL }
 };
 

@@ -1680,13 +1680,20 @@ void amy_default_setup() {
     patches_store_patch("1024w0"); 
 
     e = amy_default_event();
-    strcpy(e.voices,"6");
-    e.load_patch=1024;
-    e.instrument=16;
+    strcpy(e.voices, "6");
+    e.load_patch = 1024;
+    e.instrument = 16;
     amy_add_event(&e);
 
     // GM drum synth on channel 10
-    
+    // {'wave': amy.PCM, 'freq': 0}
+    patches_store_patch("1024w7f0"); 
+
+    e = amy_default_event();
+    strcpy(e.voices, "7");
+    e.load_patch = 1024;
+    e.instrument = 10;
+    amy_add_event(&e);
 
 }
 

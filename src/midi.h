@@ -1,4 +1,8 @@
 // midi.h
+
+#ifndef __MIDI_H
+#define __MIDI_H
+
 #ifdef ESP_PLATFORM 
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
@@ -29,6 +33,8 @@ void midi_out(uint8_t * bytes, uint16_t len);
 void midi_local(uint8_t * bytes, uint16_t len);
 void amy_send_midi_note_off(uint16_t osc);
 void amy_send_midi_note_on(uint16_t osc);
+// For pyamy inject_midi
+void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex);
 
 #ifdef ESP_PLATFORM
 #define MIDI_TASK_COREID (0)
@@ -39,3 +45,5 @@ void run_midi();
 #else
 void *run_midi(void*vargp);
 #endif
+
+#endif // __MIDI_H

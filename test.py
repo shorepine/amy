@@ -33,13 +33,16 @@ class AmyTest:
   test_dir = './tests/tst'
 
   def __init__(self):
-    pass
+    self.config_default = False
 
   def test(self):
     import libamy
     name = self.__class__.__name__
     libamy.stop()
-    libamy.start_no_default()
+    if self.config_default:
+      libamy.start()
+    else:
+      libamy.start_no_default()
     self.run()
     
     samples = amy.render(1.0)
@@ -647,6 +650,17 @@ class TestVoiceManagement(AmyTest):
     amy.send(time=500, synth=0, note=84, vel=0)
     # Stop all the rest.
     amy.send(time=600, synth=0, vel=0)
+
+
+class TestMidiDrums(AmyTest):
+  """Test MIDI drums on channel 10 via injection."""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+  
+  def run(self):
+    amy.inject_midi(0x99, 37, 100)  # snare
 
 
 def main(argv):

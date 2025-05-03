@@ -68,6 +68,10 @@ extern const uint16_t pcm_samples;
 #define AMY_EVENT_FIFO_LEN amy_global.config.event_fifo_len
 #define AMY_OSCS amy_global.config.max_oscs
 
+// On which MIDI channel to install the default MIDI drums handler.
+#define AMY_MIDI_CHANNEL_DRUMS 10
+
+
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
 #endif
