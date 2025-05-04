@@ -1127,27 +1127,16 @@ void play_delta(struct delta *d) {
         } else if(synth[d->osc].velocity > 0 && d->data.f == 0) { // new note off
             // DON'T clear velocity, we still need to reference it in decay.
             //synth[d->osc].velocity = 0;
-            if(synth[d->osc].wave==KS) {
-                if(amy_global.config.ks_oscs) {
-                    ks_note_off(d->osc);
-                }
-            } else if(synth[d->osc].wave==ALGO) {
-                algo_note_off(d->osc);
-            } else if(synth[d->osc].wave==PARTIALS || synth[d->osc].wave==BYO_PARTIALS || synth[d->osc].wave==INTERP_PARTIALS) {
-                if(amy_global.config.has_partials) {
-                    AMY_UNSET(synth[d->osc].note_on_clock);
-                    synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-                    if(synth[d->osc].wave==INTERP_PARTIALS) interp_partials_note_off(d->osc);
-                    else partials_note_off(d->osc);
-                }
-            } else if(synth[d->osc].wave==PCM) {
-                pcm_note_off(d->osc);
-            } else if(synth[d->osc].wave==MIDI) {
-                amy_send_midi_note_off(d->osc);
-            } else if(synth[d->osc].wave==CUSTOM) {
-                if(amy_global.config.has_custom) {
-                    custom_note_off(d->osc);
-                }
+            if(synth[d->osc].wave==KS) ks_note_off(d->osc);
+            else if(synth[d->osc].wave==ALGO)  algo_note_off(d->osc);
+            else if(synth[d->osc].wave==PCM) pcm_note_off(d->osc);
+            else if(synth[d->osc].wave==MIDI) amy_send_midi_note_off(d->osc);
+            else if(synth[d->osc].wave==CUSTOM) custom_note_off(d->osc);
+            else if(synth[d->osc].wave==PARTIALS || synth[d->osc].wave==BYO_PARTIALS || synth[d->osc].wave==INTERP_PARTIALS) {
+                AMY_UNSET(synth[d->osc].note_on_clock);
+                synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                if(synth[d->osc].wave==INTERP_PARTIALS) interp_partials_note_off(d->osc);
+                else partials_note_off(d->osc);
             } else {
                 // osc note off, start release
                 // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
