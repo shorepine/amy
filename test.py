@@ -669,6 +669,22 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestSynthDrums(AmyTest):
+  """Test MIDI drums using synth-level note translation."""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+  
+  def run(self):
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=10, note=37, vel=100/127)  # snare
+    amy.send(time=700, synth=10, note=37, vel=100/127)  # snare
+    amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
+
+
 class TestDoubleNoteOff(AmyTest):
   """Test for bug where release restarts if a second note-off is received (#319)."""
 
