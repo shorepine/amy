@@ -274,23 +274,25 @@ void patches_load_patch(struct event *e) {
         }
         if(!good) {
             fprintf(stderr, "we are out of oscs for voice %d. not setting this voice\n", voices[v]);
-        } else {
-            uint16_t start = 0;
-	    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->instrument, voices[v], message);
-            for(uint16_t i=0;i<strlen(message) + 1;i++) {
-	      if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
-                    strncpy(sub_message, message + start, i - start + 1);
-                    sub_message[i-start+1]= 0;
-                    struct event patch_event = amy_default_event();
-		    amy_parse_message(sub_message, &patch_event);
-                    patch_event.time = e->time;
-                    if(patch_event.status == EVENT_SCHEDULED) {
+        }
+    }  // end of loop setting up voice_to_base_osc for all voices[v]
+    // Now actually initialize the newly-allocated osc blocks with the patch
+    uint16_t start = 0;
+    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->instrument, voices[v], message);
+    for(uint16_t i=0;i<strlen(message) + 1;i++) {
+        if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
+            strncpy(sub_message, message + start, i - start + 1);
+            sub_message[i-start+1]= 0;
+            struct event patch_event = amy_default_event();
+            amy_parse_message(sub_message, &patch_event);
+            patch_event.time = e->time;
+            if(patch_event.status == EVENT_SCHEDULED) {
+                for(uint8_t v=0;v<num_voices;v++)
+                    if(AMY_IS_SET(voice_to_base_osc[voices[v]]))
                         amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
-                    }
-                    start = i+1;
-		    //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
-                }
             }
+            start = i+1;
+            //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
         }
     }
     // Finally, store as an instrument if instrument number is specified.
