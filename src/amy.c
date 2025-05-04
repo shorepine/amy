@@ -950,6 +950,12 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
 
+#define DELTA_TO_SYNTH_I(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc].FIELD = d->data.i;
+#define DELTA_TO_SYNTH_F(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc].FIELD = d->data.f;
+#define DELTA_TO_COEFS(FLAG, FIELD) \
+    if (PARAM_IS_COMBO_COEF(d->param, FLAG)) \
+        synth[d->osc].FIELD[d->param - FLAG] = d->data.f;
+
 // play an delta, now -- tell the audio loop to start making noise
 void play_delta(struct delta *d) {
     AMY_PROFILE_START(PLAY_DELTA)
@@ -974,24 +980,25 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc].logfreq_coefs[COEF_CONST]));
         }
     }
-    if(d->param == PHASE) synth[d->osc].trigger_phase = (PHASOR)d->data.i;  // PHASOR.  Only trigger_phase is set, current phase untouched->
+    DELTA_TO_SYNTH_I(PHASE, trigger_phase)
     // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
     if(d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
-    if(d->param == FEEDBACK) synth[d->osc].feedback = d->data.f;
 
-    if(PARAM_IS_COMBO_COEF(d->param, AMP)) {
-        synth[d->osc].amp_coefs[d->param - AMP] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, FREQ)) {
-        synth[d->osc].logfreq_coefs[d->param - FREQ] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, FILTER_FREQ)) {
-        synth[d->osc].filter_logfreq_coefs[d->param - FILTER_FREQ] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, DUTY))
-        synth[d->osc].duty_coefs[d->param - DUTY] = d->data.f;
-    if(PARAM_IS_COMBO_COEF(d->param, PAN))
-        synth[d->osc].pan_coefs[d->param - PAN] = d->data.f;
+    DELTA_TO_SYNTH_F(FEEDBACK, feedback)
+    DELTA_TO_SYNTH_F(RATIO, logratio)
+    DELTA_TO_SYNTH_F(RESONANCE, resonance)
+    DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
+    DELTA_TO_SYNTH_I(EVENT_SOURCE, source)
+    DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
+    DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
+
+    if (d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
+
+    DELTA_TO_COEFS(AMP, amp_coefs)
+    DELTA_TO_COEFS(FREQ, logfreq_coefs)
+    DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)
+    DELTA_TO_COEFS(DUTY, duty_coefs)
+    DELTA_TO_COEFS(PAN, pan_coefs)
 
     // todo, i really should clean this up
     if (PARAM_IS_BP_COEF(d->param)) {
@@ -1022,7 +1029,6 @@ void play_delta(struct delta *d) {
         else
             AMY_UNSET(synth[d->osc].chained_osc);
     }
-    if(d->param == EVENT_SOURCE) synth[d->osc].source = d->data.i;
     if(d->param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
         if(d->data.i & RESET_ALL_OSCS) { 
@@ -1049,14 +1055,6 @@ void play_delta(struct delta *d) {
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc].amp_coefs[COEF_VEL] = 0;
     }
-
-    if(d->param == RATIO) synth[d->osc].logratio = d->data.f;
-
-    if(d->param == FILTER_TYPE) synth[d->osc].filter_type = d->data.i;
-    if(d->param == RESONANCE) synth[d->osc].resonance = d->data.f;
-
-    if(d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
-
     if(d->param == ALGORITHM) {
         synth[d->osc].algorithm = d->data.i;
         // This is a DX7-style control osc; ensure eg_types are set
@@ -1064,7 +1062,6 @@ void play_delta(struct delta *d) {
         synth[d->osc].eg_type[0] = ENVELOPE_DX7;
         synth[d->osc].eg_type[1] = ENVELOPE_TRUE_EXPONENTIAL;
     }
-
     if(d->param >= ALGO_SOURCE_START && d->param < ALGO_SOURCE_END) {
         uint16_t which_source = d->param - ALGO_SOURCE_START;
         synth[d->osc].algo_source[which_source] = d->data.i;
@@ -1075,14 +1072,10 @@ void play_delta(struct delta *d) {
             synth[osc].eg_type[0] = ENVELOPE_DX7;
         }
     }
-
-    if (d->param == EG0_TYPE) synth[d->osc].eg_type[0] = d->data.i;
-    if (d->param == EG1_TYPE) synth[d->osc].eg_type[1] = d->data.i;
-
     // for global changes, just make the change, no need to update the per-osc synth
     if(d->param == VOLUME) amy_global.volume = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
-    if(d->param == LATENCY) { amy_global.latency_ms = d->data.i; }
+    if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
     if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
     if(d->param == EQ_L) amy_global.eq[0] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_M) amy_global.eq[1] = F2S(powf(10, d->data.f / 20.0));
