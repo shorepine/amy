@@ -1435,6 +1435,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
 uint32_t amy_sysclock() {
+    // Time is returned in integer microseconds.  uint32_t rollover is 49.7 days.
     return (uint32_t)((amy_global.total_blocks * AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE) * 1000);
 }
 

@@ -33,7 +33,7 @@ void sequencer_reset() {
 
 void sequencer_recompute() {
     amy_global.us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
-    amy_global.next_amy_tick_us = amy_sysclock()*1000 + amy_global.us_per_tick;
+    amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
 }
 
 void add_delta_to_sequencer(struct delta *d, void*user_data) {
@@ -87,7 +87,7 @@ uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uin
 
 void sequencer_check_and_fill() {
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
-    while(amy_sysclock()  >= (amy_global.next_amy_tick_us/1000)) {
+    while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
         amy_global.sequencer_tick_count++;
         // Scan through LL looking for matches
         sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
@@ -125,7 +125,7 @@ void sequencer_check_and_fill() {
         if(amy_external_sequencer_hook!=NULL) {
             amy_external_sequencer_hook(amy_global.sequencer_tick_count);
         }
-        amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + amy_global.us_per_tick;
+        amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + (uint64_t)amy_global.us_per_tick;
     }
 }
 
@@ -142,7 +142,7 @@ void run_sequencer() {
             .name = "sequencer"
     };
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-    // 500uS = 0.5mS
+    // 500us = 0.5ms
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
 #elif defined _POSIX_THREADS
@@ -150,7 +150,7 @@ void * run_sequencer(void *vargs) {
     // Loop forever, checking for time and sleeping
     while(1) {
         sequencer_check_and_fill();            
-        // 500000nS = 500uS = 0.5mS
+        // 500000ns = 500us = 0.5ms
         nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
     }
 }

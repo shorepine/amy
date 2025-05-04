@@ -142,7 +142,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
             num_voices = instrument_get_voices(e->instrument, voices);
         } else {
             // velocity is present, this is a note-on/note-off.
-            if (! (AMY_IS_SET(e->midi_note) && e->midi_note != 0) ) {
+            if (! (AMY_IS_SET(e->midi_note) && e->midi_note != 0) && AMY_IS_UNSET(e->patch)) {
                 // velocity without a note number (or for midi_note=0).  This is valid for velocity==0 => all-notes-off.
                 if (e->velocity != 0) {
                     // Attempted a note-on to all voices, suppress.
@@ -153,7 +153,9 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                 num_voices = instrument_all_notes_off(e->instrument, voices);
             } else {
                 // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
-                uint16_t note = (uint8_t)roundf(e->midi_note);
+                uint16_t note = 0;
+                if (AMY_IS_SET(e->midi_note))  // midi note can be unset if patch is set.
+                    note = (uint8_t)roundf(e->midi_note);
 		if (AMY_IS_SET(e->patch)) {
 		    // This event includes a note *and* a patch, so it's like a drum sample note on.
 		    // Wrap the patch number into the note, so we don't allocate the same pitch for different drums to the same voice.
