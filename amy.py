@@ -305,7 +305,6 @@ def restart():
     libamy.restart()
 
 def inject_midi(a, b, c, d=None):
-    import libamy
     if d is None:
         libamy.inject_midi(a, b, c)
     else:
