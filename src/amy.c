@@ -436,6 +436,7 @@ struct event amy_default_event() {
     e.bp1[0] = 0;
     e.voices[0] = 0;
     AMY_UNSET(e.instrument);
+    AMY_UNSET(e.instrument_flags);
     return e;
 }
 
@@ -1682,6 +1683,7 @@ void amy_default_setup() {
     strcpy(e.voices, "7,8,9,10,11,12");
     e.load_patch = 1025;
     e.instrument = 10;
+    e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
     amy_add_event(&e);
 
 }

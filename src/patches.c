@@ -120,11 +120,105 @@ void patches_store_patch(char * message) {
 extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, uint16_t skipped_val);
 
 
+// This code was originally in midi.c, but putting it here allows endogenous use of MIDI drums.
+// Drum kit - copied from tulip/shared/py/patches.py
+// Drumkit is [base_midi_note, name, general_midi_note]
+
+struct pcm_sample_info {
+    int8_t pcm_patch_number;
+    int8_t base_midi_note;
+};
+
+#define AMY_MIDI_DRUMS_LOWEST_NOTE 35
+#define AMY_MIDI_DRUMS_HIGHEST_NOTE 81
+
+// drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
+
+struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
+    {28, 60},  // "Std Kick", 35)
+    {25, 60},  // "Pwr Kick", 36),
+    {2, 45},   // "Snare", 37),
+    {5, 41},   // "Snare4", 38),
+    {9, 94},   // "Clap", 39),
+    {20, 60},  // "Pwr Snare", 40),
+    {8, 61},   // "Low floor Tom", 41),
+    {6, 53},   // "Closed Hat", 42),
+    {8, 68},  // "Hi floor Tom", 43),
+    {7, 61},  // "Pedal hi-hat", 44
+    {21, 56},  // "low tom", 45
+    {7, 56},   // "Open Hat", 46),
+    {21, 63},  // "low-mid tom", 47
+    {21, 70},  // "hi-mid tom", 48
+    {16, 60},  // "Crash", 49),
+    {21, 77},  // "hi-tom", 50,
+    {7, 51},  // "ride cymbal", 51,
+    {16, 50},  // "chinese cymbal", 52,
+    {6,  47},  // "ride bell", 53,
+    {9, 84},  // "tambourine", 54,
+    {7, 46},  // "splash cymbal", 55,
+    {10, 69},  // "Cowbell", 56),
+    {7, 57},  // "crash cymbal 2", 57,
+    {-1, -1},  // "vibraslap", 58,
+    {7, 48},  // "ride cymbal", 59,
+    {11, 74},  // "hi bongo", 60,
+    {11, 67},  // "low bongo", 61,
+    {11, 77},  // "mute hi conga", 62,
+    {8, 77},  // "open hi conga", 63,
+    {11, 64},  // "Congo Low", 64),
+    {21, 79},  // "high timbale", 65,
+    {21, 73},  // "low timbale", 66,
+    {13, 55},  // "high agogo", 67,
+    {13, 50},  // "low agogo", 68,
+    {0, 79},   // "cabasa", 69,
+    {0, 89},   // "Maraca", 70),
+    {-1, -1},  // "short whistle", 71,
+    {-1, -1},  // "long whistle", 72,
+    {-1, -1},  // "short guiro", 73,
+    {-1, -1},  // "long guiro", 74,
+    {12, 82},  // "Clave", 75),
+    {13, 60},  // "hi Block", 76),
+    {13, 52},  // "low block", 77
+    {-1, -1},  // "mute cuica", 78
+    {-1, -1},  // "open cuica", 79
+    {-1, -1},  // "mute triangle", 80
+    {-1, -1},  // "open trianlge", 81
+    //    {1, 39},  // "Kick", None),
+    //    {3, 52},  // "Snare2", None),
+    //    {4, 51},  // "Snare3", None),
+    //    {14, 60},  // "Roll", None),
+    //    {15, 60},  // "Hit", None),
+    //    {26, 66},  // "Marimba", None),
+    //    {27, 60},  // "Frets", None),
+    //    {17, 60},  // "Shell", None),
+    //    {18, 60},  // "Chimes", None),
+    //    {19, 60},  // "Seashore", None),
+    //    {22, 66},  // "Shamisen", None),
+    //    {23, 66},  // "Koto", None),
+    //    {24, 72},  // "Steel", None),
+};
+
+
+bool setup_drum_event(struct event *e, uint8_t note) {
+  // Special-case processing to convert MIDI drum notes into PCM patch events.
+  bool forward_note = false;
+  if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
+      struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
+      if (s.pcm_patch_number != -1) {
+          e->patch = s.pcm_patch_number;
+          e->midi_note = s.base_midi_note;
+          forward_note = true;
+      }
+  }
+  return forward_note;
+}
+
+
 // This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices;
+    uint32_t flags = 0;
     if (!AMY_IS_SET(e->instrument)) {
         // No instrument, just directly naming the voices.
         num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES, 0);
@@ -137,6 +231,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
             fprintf(stderr, "You specified both synth %d and voices %s.  Synth implies voices, ignoring voices.\n",
                     e->instrument, e->voices);
         }
+        flags = instrument_get_flags(e->instrument);
         if (!AMY_IS_SET(e->velocity)) {
             // Not a note-on/note-off message - treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_voices(e->instrument, voices);
@@ -156,12 +251,18 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                 uint16_t note = 0;
                 if (AMY_IS_SET(e->midi_note))  // midi note can be unset if patch is set.
                     note = (uint8_t)roundf(e->midi_note);
+                if (flags & _INSTRUMENT_FLAGS_MIDI_DRUMS) {
+                    if (!setup_drum_event(e, note))
+                        return;   // It's not a MIDI drum event we can emulate, just drop the event.
+                }
 		if (AMY_IS_SET(e->patch)) {
 		    // This event includes a note *and* a patch, so it's like a drum sample note on.
 		    // Wrap the patch number into the note, so we don't allocate the same pitch for different drums to the same voice.
 		    note += 128 * e->patch;
 		}
                 bool is_note_off = (e->velocity == 0);
+                if (is_note_off && (flags & _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS))
+                    return;  // Ignore the note off, as requested.
                 voices[0] = instrument_voice_for_note_event(e->instrument, note, is_note_off);
                 if (voices[0] == _INSTRUMENT_NO_VOICE) {
                     // For now, I think this can only happen with a note-off that has no matching note-on.
@@ -297,6 +398,8 @@ void patches_load_patch(struct event *e) {
     }
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->instrument)) {
-        instrument_add_new(e->instrument, num_voices, voices, e->load_patch);
+        uint32_t flags = 0;
+        if (AMY_IS_SET(e->instrument_flags)) flags = e->instrument_flags;
+        instrument_add_new(e->instrument, num_voices, voices, e->load_patch, flags);
     }
 }
