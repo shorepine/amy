@@ -495,15 +495,15 @@ void amy_add_event_internal(struct event *e, uint16_t base_osc) {
     amy_parse_event_to_deltas(e, base_osc, add_delta_to_queue, NULL);
 }
 
-#define COPY_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
-#define COPY_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define COPY_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; callback(&d, user_data);}
-#define COPY_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
-#define COPY_TO_DELTA_COEFS(FIELD, FLAG)  \
+#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
+#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; callback(&d, user_data);}
+#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
+#define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
-        COPY_TO_DELTA_F(FIELD[i], FLAG + i)
+        EVENT_TO_DELTA_F(FIELD[i], FLAG + i)
 // Const freq coef is in Hz, rest are linear.
-#define COPY_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
+#define EVENT_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
         if (AMY_IS_SET(e->FIELD[i]))  {              \
             d.param = FLAG + i;  \
@@ -540,34 +540,34 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     }
 
     // Everything else only added to queue if set
-    COPY_TO_DELTA_I(wave, WAVE)
-    COPY_TO_DELTA_I(patch, PATCH)
-    COPY_TO_DELTA_F(midi_note, MIDI_NOTE)
-    COPY_TO_DELTA_COEFS(amp_coefs, AMP)
-    COPY_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
-    COPY_TO_DELTA_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
-    COPY_TO_DELTA_COEFS(duty_coefs, DUTY)
-    COPY_TO_DELTA_COEFS(pan_coefs, PAN)
-    COPY_TO_DELTA_F(feedback, FEEDBACK)
-    COPY_TO_DELTA_F(phase, PHASE)
-    COPY_TO_DELTA_F(volume, VOLUME)
-    COPY_TO_DELTA_F(pitch_bend, PITCH_BEND)
-    COPY_TO_DELTA_I(latency_ms, LATENCY)
-    COPY_TO_DELTA_F(tempo, TEMPO)
-    COPY_TO_DELTA_LOG(ratio, RATIO)
-    COPY_TO_DELTA_F(resonance, RESONANCE)
-    COPY_TO_DELTA_I(portamento_ms, PORTAMENTO)
-    COPY_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
-    COPY_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
-    COPY_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
-    COPY_TO_DELTA_I(source, EVENT_SOURCE)
-    COPY_TO_DELTA_I(filter_type, FILTER_TYPE)
-    COPY_TO_DELTA_I(algorithm, ALGORITHM)
-    COPY_TO_DELTA_F(eq_l, EQ_L)
-    COPY_TO_DELTA_F(eq_m, EQ_M)
-    COPY_TO_DELTA_F(eq_h, EQ_H)
-    COPY_TO_DELTA_I(eg_type[0], EG0_TYPE)
-    COPY_TO_DELTA_I(eg_type[1], EG1_TYPE)
+    EVENT_TO_DELTA_I(wave, WAVE)
+    EVENT_TO_DELTA_I(patch, PATCH)
+    EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
+    EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
+    EVENT_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
+    EVENT_TO_DELTA_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
+    EVENT_TO_DELTA_COEFS(duty_coefs, DUTY)
+    EVENT_TO_DELTA_COEFS(pan_coefs, PAN)
+    EVENT_TO_DELTA_F(feedback, FEEDBACK)
+    EVENT_TO_DELTA_F(phase, PHASE)
+    EVENT_TO_DELTA_F(volume, VOLUME)
+    EVENT_TO_DELTA_F(pitch_bend, PITCH_BEND)
+    EVENT_TO_DELTA_I(latency_ms, LATENCY)
+    EVENT_TO_DELTA_F(tempo, TEMPO)
+    EVENT_TO_DELTA_LOG(ratio, RATIO)
+    EVENT_TO_DELTA_F(resonance, RESONANCE)
+    EVENT_TO_DELTA_I(portamento_ms, PORTAMENTO)
+    EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
+    EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
+    EVENT_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
+    EVENT_TO_DELTA_I(source, EVENT_SOURCE)
+    EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
+    EVENT_TO_DELTA_I(algorithm, ALGORITHM)
+    EVENT_TO_DELTA_F(eq_l, EQ_L)
+    EVENT_TO_DELTA_F(eq_m, EQ_M)
+    EVENT_TO_DELTA_F(eq_h, EQ_H)
+    EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
+    EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
     if(e->algo_source[0] != 0) {
         struct synthinfo t;
@@ -614,7 +614,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
 
-    COPY_TO_DELTA_F(velocity, VELOCITY)
+    EVENT_TO_DELTA_F(velocity, VELOCITY)
 end:
     AMY_PROFILE_STOP(AMY_ADD_DELTA)
 
@@ -971,7 +971,6 @@ void play_delta(struct delta *d) {
             play_delta(d);
         }
     }
-
     if(d->param == WAVE) {
         synth[d->osc].wave = d->data.i;
         // todo: delta-only side effect, remove
@@ -980,10 +979,6 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc].logfreq_coefs[COEF_CONST]));
         }
     }
-    DELTA_TO_SYNTH_I(PHASE, trigger_phase)
-    // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
-    if(d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
-
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
@@ -991,7 +986,9 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(EVENT_SOURCE, source)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-
+    DELTA_TO_SYNTH_I(PHASE, trigger_phase)
+    // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
+    if (d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
     if (d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
 
     DELTA_TO_COEFS(AMP, amp_coefs)
@@ -1012,15 +1009,13 @@ void play_delta(struct delta *d) {
         }
         //trig=1;
     }
-
-    if ( PARAM_IS_COMBO_COEF(d->param, AMP) ||
-         PARAM_IS_BP_COEF(d->param)) {
+    if (PARAM_IS_COMBO_COEF(d->param, AMP) ||
+        PARAM_IS_BP_COEF(d->param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
         // Revive the note if it hasn't seen a note_off since the last note_on.
         if (synth[d->osc].status == SYNTH_AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d->osc].note_off_clock))
             synth[d->osc].status = SYNTH_AUDIBLE;
     }
-
     if(d->param == CHAINED_OSC) {
         int chained_osc = d->data.i;
         if (chained_osc >=0 && chained_osc < AMY_OSCS &&
