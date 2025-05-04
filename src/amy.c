@@ -495,6 +495,23 @@ void amy_add_event_internal(struct event *e, uint16_t base_osc) {
     amy_parse_event_to_deltas(e, base_osc, add_delta_to_queue, NULL);
 }
 
+#define COPY_TO_DELTA(FIELD, FLAG)                 if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data = *(uint32_t *)&e->FIELD; callback(&d, user_data); }
+#define COPY_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { int v = e->FIELD + base_osc; d.param=FLAG; d.data = *(uint32_t *)&v; callback(&d, user_data);}
+#define COPY_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { float logv = log2f(e->FIELD); d.param=FLAG; d.data = *(uint32_t *)&logv; callback(&d, user_data);}
+#define COPY_TO_DELTA_COEFS(FIELD, FLAG)  \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
+        COPY_TO_DELTA(FIELD[i], FLAG + i)
+// Const freq coef is in Hz, rest are linear.
+#define COPY_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
+        if (AMY_IS_SET(e->FIELD[i]))  {              \
+            float coef = e->FIELD[i];               \
+            if (i == COEF_CONST)  \
+                coef = logfreq_of_freq(coef);                                 \
+            d.param = FLAG + i; d.data = *(uint32_t *)&coef; callback(&d, user_data); \
+        }    \
+    }
+
 // Add a API facing event, convert into delta directly
 void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     AMY_PROFILE_START(AMY_ADD_EVENT)
@@ -520,56 +537,34 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     }
 
     // Everything else only added to queue if set
-    if(AMY_IS_SET(e->wave)) { d.param=WAVE; d.data = *(uint32_t *)&e->wave; callback(&d, user_data); }
-    if(AMY_IS_SET(e->patch)) { d.param=PATCH; d.data = *(uint32_t *)&e->patch; callback(&d, user_data); }
-    if(AMY_IS_SET(e->midi_note)) { d.param=MIDI_NOTE; d.data = *(uint32_t *)&e->midi_note; callback(&d, user_data); }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e->amp_coefs[i])) {  d.param=AMP + i; d.data = *(uint32_t *)&e->amp_coefs[i]; callback(&d, user_data); }
-
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
-        if(AMY_IS_SET(e->freq_coefs[i])) {
-            float freq_coef = e->freq_coefs[i];
-            // Const freq coef is in Hz, rest are linear.
-            if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
-            d.param=FREQ + i; d.data = *(uint32_t *)&freq_coef; callback(&d, user_data);
-        }
-    }
-
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
-        if(AMY_IS_SET(e->filter_freq_coefs[i])) {
-            float freq_coef = e->filter_freq_coefs[i];
-            // Const freq coef is in Hz, rest are linear.
-            if (i == COEF_CONST) freq_coef = logfreq_of_freq(freq_coef);
-            d.param=FILTER_FREQ + i; d.data = *(uint32_t *)&freq_coef; callback(&d, user_data);
-        }
-    }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e->duty_coefs[i])) {  d.param=DUTY + i; d.data = *(uint32_t *)&e->duty_coefs[i]; callback(&d, user_data); }
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
-        if(AMY_IS_SET(e->pan_coefs[i])) { d.param=PAN + i; d.data = *(uint32_t *)&e->pan_coefs[i]; callback(&d, user_data); }
-
-
-    if(AMY_IS_SET(e->feedback)) { d.param=FEEDBACK; d.data = *(uint32_t *)&e->feedback; callback(&d, user_data); }
-    if(AMY_IS_SET(e->phase)) { d.param=PHASE; d.data = *(uint32_t *)&e->phase; callback(&d, user_data); }
-    if(AMY_IS_SET(e->volume)) { d.param=VOLUME; d.data = *(uint32_t *)&e->volume; callback(&d, user_data); }
-    if(AMY_IS_SET(e->pitch_bend)) { d.param=PITCH_BEND; d.data = *(uint32_t *)&e->pitch_bend; callback(&d, user_data); }
-    if(AMY_IS_SET(e->latency_ms)) { d.param=LATENCY; d.data = *(uint32_t *)&e->latency_ms; callback(&d, user_data); }
-    if(AMY_IS_SET(e->tempo)) { d.param=TEMPO; d.data = *(uint32_t *)&e->tempo; callback(&d, user_data); }
-    if(AMY_IS_SET(e->ratio)) { float logratio = log2f(e->ratio); d.param=RATIO; d.data = *(uint32_t *)&logratio; callback(&d, user_data); }
-    if(AMY_IS_SET(e->resonance)) { d.param=RESONANCE; d.data = *(uint32_t *)&e->resonance; callback(&d, user_data); }
-    if(AMY_IS_SET(e->portamento_ms)) { d.param=PORTAMENTO; d.data = *(uint32_t *)&e->portamento_ms; callback(&d, user_data); }
-    if(AMY_IS_SET(e->chained_osc)) { int v = e->chained_osc + base_osc; d.param=CHAINED_OSC; d.data = *(uint32_t *)&v; callback(&d, user_data); }
-    if(AMY_IS_SET(e->reset_osc)) { int v = e->reset_osc + base_osc; d.param=RESET_OSC; d.data = *(uint32_t *)&v; callback(&d, user_data); }
-    if(AMY_IS_SET(e->source)) { d.param=EVENT_SOURCE; d.data = *(uint32_t*)&e->source; callback(&d,user_data); }
-    if(AMY_IS_SET(e->mod_source)) { int v = e->mod_source + base_osc; d.param=MOD_SOURCE; d.data = *(uint32_t *)&v; callback(&d, user_data); }
-    if(AMY_IS_SET(e->filter_type)) { d.param=FILTER_TYPE; d.data = *(uint32_t *)&e->filter_type; callback(&d, user_data); }
-    if(AMY_IS_SET(e->algorithm)) { d.param=ALGORITHM; d.data = *(uint32_t *)&e->algorithm; callback(&d, user_data); }
-    if(AMY_IS_SET(e->eq_l)) { d.param=EQ_L; d.data = *(uint32_t *)&e->eq_l; callback(&d, user_data); }
-    if(AMY_IS_SET(e->eq_m)) { d.param=EQ_M; d.data = *(uint32_t *)&e->eq_m; callback(&d, user_data); }
-    if(AMY_IS_SET(e->eq_h)) { d.param=EQ_H; d.data = *(uint32_t *)&e->eq_h; callback(&d, user_data); }
-
-    if(AMY_IS_SET(e->eg_type[0]))  { d.param=EG0_TYPE; d.data = e->eg_type[0]; callback(&d, user_data); }
-    if(AMY_IS_SET(e->eg_type[1]))  { d.param=EG1_TYPE; d.data = e->eg_type[1]; callback(&d, user_data); }
+    COPY_TO_DELTA(wave, WAVE)
+    COPY_TO_DELTA(patch, PATCH)
+    COPY_TO_DELTA(midi_note, MIDI_NOTE)
+    COPY_TO_DELTA_COEFS(amp_coefs, AMP)
+    COPY_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
+    COPY_TO_DELTA_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
+    COPY_TO_DELTA_COEFS(duty_coefs, DUTY)
+    COPY_TO_DELTA_COEFS(pan_coefs, PAN)
+    COPY_TO_DELTA(feedback, FEEDBACK)
+    COPY_TO_DELTA(phase, PHASE)
+    COPY_TO_DELTA(volume, VOLUME)
+    COPY_TO_DELTA(pitch_bend, PITCH_BEND)
+    COPY_TO_DELTA(latency_ms, LATENCY)
+    COPY_TO_DELTA(tempo, TEMPO)
+    COPY_TO_DELTA_LOG(ratio, RATIO)
+    COPY_TO_DELTA(resonance, RESONANCE)
+    COPY_TO_DELTA(portamento_ms, PORTAMENTO)
+    COPY_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
+    COPY_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
+    COPY_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
+    COPY_TO_DELTA(source, EVENT_SOURCE)
+    COPY_TO_DELTA(filter_type, FILTER_TYPE)
+    COPY_TO_DELTA(algorithm, ALGORITHM)
+    COPY_TO_DELTA(eq_l, EQ_L)
+    COPY_TO_DELTA(eq_m, EQ_M)
+    COPY_TO_DELTA(eq_h, EQ_H)
+    COPY_TO_DELTA(eg_type[0], EG0_TYPE)
+    COPY_TO_DELTA(eg_type[1], EG1_TYPE)
 
     if(e->algo_source[0] != 0) {
         struct synthinfo t;
@@ -610,7 +605,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
-    if(AMY_IS_SET(e->velocity)) {  d.param=VELOCITY; d.data = *(uint32_t *)&e->velocity; callback(&d, user_data); }
+    COPY_TO_DELTA(velocity, VELOCITY)
 end:
     AMY_PROFILE_STOP(AMY_ADD_EVENT)
 
