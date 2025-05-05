@@ -175,6 +175,9 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
 #define MIN_LEVEL_S 4.25
 #define ATTACK_RANGE_S 9.375
 #define MAP_ATTACK_LEVEL_S(level) (1 - MAX(level - MIN_LEVEL_S, 0) / ATTACK_RANGE_S)
+            // DX7 is only defined for amps up to 1.0, clip to avoid negative values (which caused a math panic when using float math).
+            v0 = MIN(F2S(1.0f), v0);
+            v1 = MIN(F2S(1.0f), v1);
             SAMPLE mapped_current_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v0)));
             SAMPLE mapped_target_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v1)));
             float t_const = (t1 - t0) / S2F(log2_lut(mapped_current_level) - log2_lut(mapped_target_level));
