@@ -216,6 +216,7 @@ Here's the full list:
 | `n`    | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
+| `o`    | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->patch translation; 2 = Drop note-off events.  (Note alias with `algorithm` code). |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
@@ -724,6 +725,10 @@ amy.send(synth=0, note=70, vel=0)
 amy.send(synth=0, vel=0)
 # Once a synth has been initialized and associated with a set of voices, you can use it alone with load_patch
 amy.send(synth=0, load_patch=13)  # Load a different Juno patch, will remain 4-voice.
+# As a special case, you can set up a MIDI drum synth that will translate note events into PCM presets.
+amy.send(store_patch='1024,w7f0')
+amy.send(synth=10, voices='3,4,5', load_patch=1024, synth_flags=3)
+amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
 
 (Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `patch` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.)
