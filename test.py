@@ -459,15 +459,16 @@ class TestJunoPatch(AmyTest):
   """Known Juno patch."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", load_patch=20)
-    amy.send(time=50, voices="0", note=48, vel=1)
-    amy.send(time=50, voices="1", note=60, vel=1)
-    amy.send(time=50, voices="2", note=63, vel=1)
-    amy.send(time=50, voices="3", note=67, vel=1)
-    amy.send(time=600, voices="0", vel=0)
-    amy.send(time=600, voices="1", vel=0)
-    amy.send(time=600, voices="2", vel=0)
-    amy.send(time=600, voices="3", vel=0)
+    # Also test the synth mechanism.
+    amy.send(time=0, synth=1, voices="0,1,2,3", load_patch=20)
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    amy.send(time=350, synth=1, note=67, vel=1)
+    amy.send(time=600, synth=1, note=48, vel=0)
+    amy.send(time=700, synth=1, note=60, vel=0)
+    amy.send(time=800, synth=1, note=63, vel=0)
+    amy.send(time=900, synth=1, note=67, vel=0)
 
 class TestJunoClip(AmyTest):
   """Juno patch that clips."""

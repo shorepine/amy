@@ -349,6 +349,8 @@ static inline int isnan_c11(float test)
     float: isnan_c11(var), \
     default: var==AMY_UNSET_VALUE(var) \
 )
+//    char*: *(uint8_t *)var == 0,
+
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
 
@@ -364,7 +366,10 @@ static inline int isnan_c11(float test)
 // Delta holds the individual changes from an event, it's sorted in order of playback time 
 // this is more efficient in memory than storing entire events per message 
 struct delta {
-    uint32_t data; // casted to the right thing later
+    union d {
+        uint32_t i;
+        float f;
+    } data;
     enum params param; // which parameter is being changed
     uint32_t time; // what time to play / change this parameter
     uint16_t osc; // which oscillator it impacts
