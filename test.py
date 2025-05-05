@@ -677,12 +677,26 @@ class TestSynthDrums(AmyTest):
     self.config_default = True
   
   def run(self):
-    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=10, note=37, vel=100/127)  # snare
     amy.send(time=700, synth=10, note=37, vel=100/127)  # snare
     amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
+
+
+class TestSynthFlags(AmyTest):
+  """Test setting up MIDI drums using synth_flags (alias).  Slightly different waveform than TestSynthDrums because chorus is off."""
+
+  def run(self):
+    # The default config is NOT set, set up MIDI drums on instrument 1 here.
+    amy.send(store_patch='1024,w7f0');
+    # synth_flags=3 means do MIDI drums note translation and ignore note-offs.
+    amy.send(synth=1, synth_flags=3, voices='0,1,2,3', load_patch=1024)
+    amy.send(time=100, synth=1, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=1, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=1, note=37, vel=100/127)  # snare
+    amy.send(time=700, synth=1, note=37, vel=100/127)  # snare
+    amy.send(time=900, synth=1, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
 class TestDoubleNoteOff(AmyTest):

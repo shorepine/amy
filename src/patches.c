@@ -399,6 +399,11 @@ void patches_load_patch(struct event *e) {
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->instrument)) {
         uint32_t flags = 0;
+        if (AMY_IS_SET(e->algorithm) && !AMY_IS_SET(e->instrument_flags)) {
+            // algorithm is used as an alias for synth_flags when defining instruments.
+            e->instrument_flags = e->algorithm;
+            AMY_UNSET(e->algorithm);
+        }
         if (AMY_IS_SET(e->instrument_flags)) flags = e->instrument_flags;
         instrument_add_new(e->instrument, num_voices, voices, e->load_patch, flags);
     }
