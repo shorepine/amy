@@ -300,7 +300,7 @@ void amy_parse_message(char * message, struct event *e) {
                         case 'o': e->algorithm=atoi(message+start); break;
                         case 'O': copy_param_list_substring(e->algo_source, message+start); break;
                         case 'p': e->patch=atoi(message + start); break;
-                        case 'P': e->phase=F2P(atoff(message + start)); break;
+                        case 'P': e->phase=atoff(message + start); break;
                         /* q unused */
                         case 'Q': parse_coef_message(message + start, e->pan_coefs); break;
                         case 'r': copy_param_list_substring(e->voices, message+start); break; 
