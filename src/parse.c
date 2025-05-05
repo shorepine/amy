@@ -319,7 +319,7 @@ void amy_parse_message(char * message, struct event *e) {
                                 AMY_UNSET(e->reset_osc);
                             }
                             if(e->reset_osc & RESET_EVENTS) {
-                                amy_events_reset();
+                                amy_deltas_reset();
                                 AMY_UNSET(e->reset_osc);
                             }
                             break;

@@ -65,7 +65,7 @@ extern const uint16_t pcm_samples;
 #define AMY_KS_OSCS amy_global.config.ks_oscs
 #define AMY_HAS_PARTIALS amy_global.config.has_partials
 #define AMY_HAS_CUSTOM amy_global.config.has_custom
-#define AMY_EVENT_FIFO_LEN amy_global.config.event_fifo_len
+#define AMY_DELTA_FIFO_LEN amy_global.config.delta_fifo_len
 #define AMY_OSCS amy_global.config.max_oscs
 
 // On which MIDI channel to install the default MIDI drums handler.
@@ -274,7 +274,7 @@ enum params{
       
 enum itags{
     RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, FILTER_PROCESS_STAGE0,
-    FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_EVENT, PLAY_EVENT,  MIX_WITH_PAN, AMY_RENDER, 
+    FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_DELTA, PLAY_DELTA,  MIX_WITH_PAN, AMY_RENDER, 
     AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
     RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
     PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, BLOCK_NORM, CALIBRATE, AMY_ESP_FILL_BUFFER, NO_TAG
@@ -373,7 +373,7 @@ struct delta {
     enum params param; // which parameter is being changed
     uint32_t time; // what time to play / change this parameter
     uint16_t osc; // which oscillator it impacts
-    struct delta * next; // the next event, in time 
+    struct delta * next; // the next delta, in time 
 };
 
 
@@ -415,6 +415,7 @@ struct event {
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
     uint8_t instrument;
+    uint32_t instrument_flags;  // Special flags to set when defining instruments.
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
@@ -542,7 +543,7 @@ typedef struct  {
     uint16_t max_oscs;
     uint8_t cores;
     uint8_t ks_oscs;
-    uint32_t event_fifo_len;
+    uint32_t delta_fifo_len;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -598,9 +599,9 @@ struct state {
     // State of fixed dc-blocking HPF
     SAMPLE hpf_state;
     SAMPLE eq[3];
-    uint16_t event_qsize;
-    int16_t next_event_write;
-    struct delta * event_start; // start of the sorted list
+    uint16_t delta_qsize;
+    int16_t next_delta_write;
+    struct delta * delta_start; // start of the sorted list
     int16_t latency_ms;
     float tempo;
     uint32_t total_blocks;
@@ -645,7 +646,7 @@ extern struct state amy_global;
 
 
 struct event amy_default_event();
-void amy_events_reset();
+void amy_deltas_reset();
 void amy_add_event(struct event *e);
 void add_delta_to_queue(struct delta *d, void*user_data);
 void amy_add_event_internal(struct event *e, uint16_t base_osc);
@@ -735,12 +736,15 @@ extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(char * message);
-extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number);
+#define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
+#define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
 extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
+extern uint32_t instrument_get_flags(int instrument_number);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;

@@ -16,8 +16,8 @@ const char* profile_tag_name(enum itags tag) {
         case FILTER_PROCESS_STAGE0: return "FILTER_PROCESS_STAGE0";
         case FILTER_PROCESS_STAGE1: return "FILTER_PROCESS_STAGE1";
         case ADD_DELTA_TO_QUEUE: return "ADD_DELTA_TO_QUEUE";
-        case AMY_ADD_EVENT: return "AMY_ADD_EVENT";
-        case PLAY_EVENT: return "PLAY_EVENT";
+        case AMY_ADD_DELTA: return "AMY_ADD_DELTA";
+        case PLAY_DELTA: return "PLAY_DELTA";
         case MIX_WITH_PAN: return "MIX_WITH_PAN";
         case AMY_RENDER: return "AMY_RENDER";            
         case AMY_PREPARE_BUFFER: return "AMY_PREPARE_BUFFER";            
@@ -102,7 +102,7 @@ TaskHandle_t midi_handle;
 // Global state 
 struct state amy_global;
 // set of deltas for the fifo to be played
-struct delta * events;
+struct delta * deltas;
 // state per osc as multi-channel synthesizer that the scheduler renders into
 struct synthinfo * synth;
 // envelope-modified per-osc state
@@ -271,9 +271,9 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 
 int8_t global_init(amy_config_t c) {
     amy_global.config = c;
-    amy_global.next_event_write = 0;
-    amy_global.event_start = NULL;
-    amy_global.event_qsize = 0;
+    amy_global.next_delta_write = 0;
+    amy_global.delta_start = NULL;
+    amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
@@ -348,7 +348,7 @@ amy_config_t amy_default_config() {
     c.has_partials = 1;
     c.has_custom = 1;
     c.ks_oscs = 1;
-    c.event_fifo_len = 2400;
+    c.delta_fifo_len = 2400;
     c.has_audio_in = 1;
     c.has_midi_uart = 0;
     c.has_midi_gadget = 0;
@@ -436,6 +436,7 @@ struct event amy_default_event() {
     e.bp1[0] = 0;
     e.voices[0] = 0;
     AMY_UNSET(e.instrument);
+    AMY_UNSET(e.instrument_flags);
     return e;
 }
 
@@ -445,33 +446,33 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
     //  take the queue mutex before starting
     xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
 #elif defined _POSIX_THREADS
-    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data, amy_global.event_qsize);
+    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data, amy_global.delta_qsize);
     pthread_mutex_lock(&amy_queue_lock); 
 #endif
 
-    if(amy_global.event_qsize < AMY_EVENT_FIFO_LEN) {
+    if(amy_global.delta_qsize < AMY_DELTA_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
-        uint16_t write_location = amy_global.next_event_write;
+        uint16_t write_location = amy_global.next_delta_write;
         int16_t found = -1;
         // guaranteed to find eventually if qsize stays accurate
         while(found<0) {
-            if(events[write_location].time == UINT32_MAX) found = write_location;
-            write_location = (write_location + 1) % AMY_EVENT_FIFO_LEN;
+            if(deltas[write_location].time == UINT32_MAX) found = write_location;
+            write_location = (write_location + 1) % AMY_DELTA_FIFO_LEN;
         }
         // found a mem location. copy the data in and update the write pointers.
-        events[found].time = d->time;
-        events[found].osc = d->osc;
-        events[found].param = d->param;
-        events[found].data.i = d->data.i;  // Copying uint32_t of union will copy float value if that's where it is.
-        amy_global.next_event_write = write_location;
-        amy_global.event_qsize++;
+        deltas[found].time = d->time;
+        deltas[found].osc = d->osc;
+        deltas[found].param = d->param;
+        deltas[found].data.i = d->data.i;  // Copying uint32_t of union will copy float value if that's where it is.
+        amy_global.next_delta_write = write_location;
+        amy_global.delta_qsize++;
 
         // now insert it into the sorted list for fast playback
-        struct delta **pptr = &amy_global.event_start;
+        struct delta **pptr = &amy_global.delta_start;
         while(d->time >= (*pptr)->time)
             pptr = &(*pptr)->next;
-        events[found].next = *pptr;
-        *pptr = &events[found];
+        deltas[found].next = *pptr;
+        *pptr = &deltas[found];
     } else {
         // if there's no room in the queue, just skip the message
         // todo -- report this somehow?
@@ -495,27 +496,29 @@ void amy_add_event_internal(struct event *e, uint16_t base_osc) {
     amy_parse_event_to_deltas(e, base_osc, add_delta_to_queue, NULL);
 }
 
-#define COPY_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
-#define COPY_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define COPY_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { int v = e->FIELD + base_osc; d.param=FLAG; d.data.i = v; callback(&d, user_data);}
-#define COPY_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { float logv = log2f(e->FIELD); d.param=FLAG; d.data.f = logv; callback(&d, user_data);}
-#define COPY_TO_DELTA_COEFS(FIELD, FLAG)  \
+#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
+#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; callback(&d, user_data);}
+#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
+#define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
-        COPY_TO_DELTA_F(FIELD[i], FLAG + i)
+        EVENT_TO_DELTA_F(FIELD[i], FLAG + i)
 // Const freq coef is in Hz, rest are linear.
-#define COPY_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
+#define EVENT_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
         if (AMY_IS_SET(e->FIELD[i]))  {              \
-            float coef = e->FIELD[i];               \
+            d.param = FLAG + i;  \
             if (i == COEF_CONST)  \
-                coef = logfreq_of_freq(coef);                                 \
-            d.param = FLAG + i; d.data.f = coef; callback(&d, user_data); \
+                d.data.f = logfreq_of_freq(e->FIELD[i]);  \
+            else \
+                d.data.f = e->FIELD[i]; \
+            callback(&d, user_data); \
         }    \
     }
 
 // Add a API facing event, convert into delta directly
 void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
-    AMY_PROFILE_START(AMY_ADD_EVENT)
+    AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
     // Synth defaults if not set, these are required for the delta struct
@@ -538,34 +541,34 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     }
 
     // Everything else only added to queue if set
-    COPY_TO_DELTA_I(wave, WAVE)
-    COPY_TO_DELTA_I(patch, PATCH)
-    COPY_TO_DELTA_F(midi_note, MIDI_NOTE)
-    COPY_TO_DELTA_COEFS(amp_coefs, AMP)
-    COPY_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
-    COPY_TO_DELTA_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
-    COPY_TO_DELTA_COEFS(duty_coefs, DUTY)
-    COPY_TO_DELTA_COEFS(pan_coefs, PAN)
-    COPY_TO_DELTA_F(feedback, FEEDBACK)
-    COPY_TO_DELTA_F(phase, PHASE)
-    COPY_TO_DELTA_F(volume, VOLUME)
-    COPY_TO_DELTA_F(pitch_bend, PITCH_BEND)
-    COPY_TO_DELTA_I(latency_ms, LATENCY)
-    COPY_TO_DELTA_F(tempo, TEMPO)
-    COPY_TO_DELTA_LOG(ratio, RATIO)
-    COPY_TO_DELTA_F(resonance, RESONANCE)
-    COPY_TO_DELTA_I(portamento_ms, PORTAMENTO)
-    COPY_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
-    COPY_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
-    COPY_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
-    COPY_TO_DELTA_I(source, EVENT_SOURCE)
-    COPY_TO_DELTA_I(filter_type, FILTER_TYPE)
-    COPY_TO_DELTA_I(algorithm, ALGORITHM)
-    COPY_TO_DELTA_F(eq_l, EQ_L)
-    COPY_TO_DELTA_F(eq_m, EQ_M)
-    COPY_TO_DELTA_F(eq_h, EQ_H)
-    COPY_TO_DELTA_I(eg_type[0], EG0_TYPE)
-    COPY_TO_DELTA_I(eg_type[1], EG1_TYPE)
+    EVENT_TO_DELTA_I(wave, WAVE)
+    EVENT_TO_DELTA_I(patch, PATCH)
+    EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
+    EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
+    EVENT_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
+    EVENT_TO_DELTA_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
+    EVENT_TO_DELTA_COEFS(duty_coefs, DUTY)
+    EVENT_TO_DELTA_COEFS(pan_coefs, PAN)
+    EVENT_TO_DELTA_F(feedback, FEEDBACK)
+    EVENT_TO_DELTA_F(phase, PHASE)
+    EVENT_TO_DELTA_F(volume, VOLUME)
+    EVENT_TO_DELTA_F(pitch_bend, PITCH_BEND)
+    EVENT_TO_DELTA_I(latency_ms, LATENCY)
+    EVENT_TO_DELTA_F(tempo, TEMPO)
+    EVENT_TO_DELTA_LOG(ratio, RATIO)
+    EVENT_TO_DELTA_F(resonance, RESONANCE)
+    EVENT_TO_DELTA_I(portamento_ms, PORTAMENTO)
+    EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
+    EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
+    EVENT_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
+    EVENT_TO_DELTA_I(source, EVENT_SOURCE)
+    EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
+    EVENT_TO_DELTA_I(algorithm, ALGORITHM)
+    EVENT_TO_DELTA_F(eq_l, EQ_L)
+    EVENT_TO_DELTA_F(eq_m, EQ_M)
+    EVENT_TO_DELTA_F(eq_h, EQ_H)
+    EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
+    EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
     if(e->algo_source[0] != 0) {
         struct synthinfo t;
@@ -591,24 +594,30 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
             int num_bps = parse_breakpoint(&t, bps[i], i);
             for(uint8_t j = 0; j < num_bps; j++) {
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
-                    d.param = BP_START+(j*2)+(i*MAX_BREAKPOINTS*2); d.data.i = t.breakpoint_times[i][j]; callback(&d, user_data);
+                    d.param = BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2);
+                    d.data.i = t.breakpoint_times[i][j];
+                    callback(&d, user_data);
                 }
                 if(AMY_IS_SET(t.breakpoint_values[i][j])) {
-                    d.param = BP_START+(j*2 + 1)+(i*MAX_BREAKPOINTS*2); d.data.f = t.breakpoint_values[i][j]; callback(&d, user_data);
+                    d.param = BP_START + (j * 2 + 1) + (i * MAX_BREAKPOINTS * 2);
+                    d.data.f = t.breakpoint_values[i][j];
+                    callback(&d, user_data);
                 }
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
-                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2); d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]); callback(&d, user_data);
+                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
+                d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
+                callback(&d, user_data);
             }
         }
     }
 
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
 
-    COPY_TO_DELTA_F(velocity, VELOCITY)
+    EVENT_TO_DELTA_F(velocity, VELOCITY)
 end:
-    AMY_PROFILE_STOP(AMY_ADD_EVENT)
+    AMY_PROFILE_STOP(AMY_ADD_DELTA)
 
 }
 
@@ -712,28 +721,28 @@ void amy_reset_oscs() {
 }
 
 
-void amy_events_reset() {
-    // make a fencepost last event with no next, time of end-1, and call it start for now, all other events get inserted before it
-    events[0].next = NULL;
-    events[0].time = UINT32_MAX - 1;
-    events[0].osc = 0;
-    events[0].data.i = 0;
-    events[0].param = NO_PARAM;
-    amy_global.next_event_write = 1;
-    amy_global.event_start = &events[0];
-    amy_global.event_qsize = 1;
+void amy_deltas_reset() {
+    // make a fencepost last delta with no next, time of end-1, and call it start for now, all other deltas get inserted before it
+    deltas[0].next = NULL;
+    deltas[0].time = UINT32_MAX - 1;
+    deltas[0].osc = 0;
+    deltas[0].data.i = 0;
+    deltas[0].param = NO_PARAM;
+    amy_global.next_delta_write = 1;
+    amy_global.delta_start = &deltas[0];
+    amy_global.delta_qsize = 1;
 
-    // set all the other events to empty
-    for(uint16_t i=1;i<AMY_EVENT_FIFO_LEN;i++) {
-        events[i].time = UINT32_MAX;
-        events[i].next = NULL;
-        events[i].osc = 0;
-        events[i].data.i = 0;
-        events[i].param = NO_PARAM;
+    // set all the other deltas to empty
+    for(uint16_t i=1;i<AMY_DELTA_FIFO_LEN;i++) {
+        deltas[i].time = UINT32_MAX;
+        deltas[i].next = NULL;
+        deltas[i].osc = 0;
+        deltas[i].data.i = 0;
+        deltas[i].param = NO_PARAM;
     }
 }
 
-// the synth object keeps held state, whereas events are only deltas/changes
+// the synth object keeps held state, whereas deltas are only deltas/changes
 int8_t oscs_init() {
     if(amy_global.config.ks_oscs>0)
         ks_init();
@@ -748,7 +757,7 @@ int8_t oscs_init() {
     if(amy_global.config.has_custom) {
         custom_init();
     }
-    events = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_EVENT_FIFO_LEN, amy_global.config.ram_caps_events);
+    deltas = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_DELTA_FIFO_LEN, amy_global.config.ram_caps_events);
     synth = (struct synthinfo*) malloc_caps(sizeof(struct synthinfo) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     msynth = (struct mod_synthinfo*) malloc_caps(sizeof(struct mod_synthinfo) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
@@ -756,8 +765,8 @@ int8_t oscs_init() {
     amy_external_in_block = (output_sample_type*)malloc_caps(sizeof(output_sample_type)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_block);
     // set all oscillators to their default values
     amy_reset_oscs();
-    // reset the events queue
-    amy_events_reset();
+    // reset the deltas queue
+    amy_deltas_reset();
 
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
     per_osc_fb = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
@@ -807,8 +816,8 @@ void show_debug(uint8_t type) {
     esp_show_debug();
     #endif
     if(type>0) {
-        struct delta * ptr = amy_global.event_start;
-        uint16_t q = amy_global.event_qsize;
+        struct delta * ptr = amy_global.delta_start;
+        uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
             fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %d\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
@@ -859,7 +868,7 @@ void oscs_deinit() {
     free(fbl);
     free(synth);
     free(msynth);
-    free(events);
+    free(deltas);
     if(amy_global.config.ks_oscs > 0)
         ks_deinit();
     filters_deinit();
@@ -942,48 +951,52 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
 
-// play an event, now -- tell the audio loop to start making noise
-void play_event(struct delta *d) {
-    AMY_PROFILE_START(PLAY_EVENT)
-    //fprintf(stderr,"play_event: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data.i, global.event_qsize);
+#define DELTA_TO_SYNTH_I(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc].FIELD = d->data.i;
+#define DELTA_TO_SYNTH_F(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc].FIELD = d->data.f;
+#define DELTA_TO_COEFS(FLAG, FIELD) \
+    if (PARAM_IS_COMBO_COEF(d->param, FLAG)) \
+        synth[d->osc].FIELD[d->param - FLAG] = d->data.f;
+
+// play an delta, now -- tell the audio loop to start making noise
+void play_delta(struct delta *d) {
+    AMY_PROFILE_START(PLAY_DELTA)
+    //fprintf(stderr,"play_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data.i, global.delta_qsize);
     //uint8_t trig=0;
-    // todo: event-only side effect, remove
+    // todo: delta-only side effect, remove
     if(d->param == MIDI_NOTE) {
         synth[d->osc].midi_note = d->data.f;
         // Midi note and Velocity are propagated to chained_osc.
         if (AMY_IS_SET(synth[d->osc].chained_osc)) {
             d->osc = synth[d->osc].chained_osc;
             // Recurse with the new osc.  We have to recurse rather than directly setting so that a complete chain of recursion will work.
-            play_event(d);
+            play_delta(d);
         }
     }
-
     if(d->param == WAVE) {
         synth[d->osc].wave = d->data.i;
-        // todo: event-only side effect, remove
+        // todo: delta-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner
         if(synth[d->osc].wave == SINE) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc].logfreq_coefs[COEF_CONST]));
         }
     }
-    if(d->param == PHASE) synth[d->osc].trigger_phase = (PHASOR)d->data.i;  // PHASOR.  Only trigger_phase is set, current phase untouched->
+    DELTA_TO_SYNTH_F(FEEDBACK, feedback)
+    DELTA_TO_SYNTH_F(RATIO, logratio)
+    DELTA_TO_SYNTH_F(RESONANCE, resonance)
+    DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
+    DELTA_TO_SYNTH_I(EVENT_SOURCE, source)
+    DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
+    DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
+    DELTA_TO_SYNTH_I(PHASE, trigger_phase)
     // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
-    if(d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
-    if(d->param == FEEDBACK) synth[d->osc].feedback = d->data.f;
+    if (d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
+    if (d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
 
-    if(PARAM_IS_COMBO_COEF(d->param, AMP)) {
-        synth[d->osc].amp_coefs[d->param - AMP] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, FREQ)) {
-        synth[d->osc].logfreq_coefs[d->param - FREQ] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, FILTER_FREQ)) {
-        synth[d->osc].filter_logfreq_coefs[d->param - FILTER_FREQ] = d->data.f;
-    }
-    if(PARAM_IS_COMBO_COEF(d->param, DUTY))
-        synth[d->osc].duty_coefs[d->param - DUTY] = d->data.f;
-    if(PARAM_IS_COMBO_COEF(d->param, PAN))
-        synth[d->osc].pan_coefs[d->param - PAN] = d->data.f;
+    DELTA_TO_COEFS(AMP, amp_coefs)
+    DELTA_TO_COEFS(FREQ, logfreq_coefs)
+    DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)
+    DELTA_TO_COEFS(DUTY, duty_coefs)
+    DELTA_TO_COEFS(PAN, pan_coefs)
 
     // todo, i really should clean this up
     if (PARAM_IS_BP_COEF(d->param)) {
@@ -997,15 +1010,13 @@ void play_event(struct delta *d) {
         }
         //trig=1;
     }
-
-    if ( PARAM_IS_COMBO_COEF(d->param, AMP) ||
-         PARAM_IS_BP_COEF(d->param)) {
+    if (PARAM_IS_COMBO_COEF(d->param, AMP) ||
+        PARAM_IS_BP_COEF(d->param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
         // Revive the note if it hasn't seen a note_off since the last note_on.
         if (synth[d->osc].status == SYNTH_AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d->osc].note_off_clock))
             synth[d->osc].status = SYNTH_AUDIBLE;
     }
-
     if(d->param == CHAINED_OSC) {
         int chained_osc = d->data.i;
         if (chained_osc >=0 && chained_osc < AMY_OSCS &&
@@ -1014,7 +1025,6 @@ void play_event(struct delta *d) {
         else
             AMY_UNSET(synth[d->osc].chained_osc);
     }
-    if(d->param == EVENT_SOURCE) synth[d->osc].source = d->data.i;
     if(d->param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
         if(d->data.i & RESET_ALL_OSCS) { 
@@ -1033,7 +1043,7 @@ void play_event(struct delta *d) {
     if(d->param == MOD_SOURCE) {
         uint16_t mod_osc = d->data.i;
         synth[d->osc].mod_source = mod_osc;
-        // NOTE: These are event-only side effects.  A purist would strive to remove them.
+        // NOTE: These are delta-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
         synth[mod_osc].status = SYNTH_IS_MOD_SOURCE;
         // No longer record this osc in note_off state.
@@ -1041,14 +1051,6 @@ void play_event(struct delta *d) {
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc].amp_coefs[COEF_VEL] = 0;
     }
-
-    if(d->param == RATIO) synth[d->osc].logratio = d->data.f;
-
-    if(d->param == FILTER_TYPE) synth[d->osc].filter_type = d->data.i;
-    if(d->param == RESONANCE) synth[d->osc].resonance = d->data.f;
-
-    if(d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
-
     if(d->param == ALGORITHM) {
         synth[d->osc].algorithm = d->data.i;
         // This is a DX7-style control osc; ensure eg_types are set
@@ -1056,7 +1058,6 @@ void play_event(struct delta *d) {
         synth[d->osc].eg_type[0] = ENVELOPE_DX7;
         synth[d->osc].eg_type[1] = ENVELOPE_TRUE_EXPONENTIAL;
     }
-
     if(d->param >= ALGO_SOURCE_START && d->param < ALGO_SOURCE_END) {
         uint16_t which_source = d->param - ALGO_SOURCE_START;
         synth[d->osc].algo_source[which_source] = d->data.i;
@@ -1067,14 +1068,10 @@ void play_event(struct delta *d) {
             synth[osc].eg_type[0] = ENVELOPE_DX7;
         }
     }
-
-    if (d->param == EG0_TYPE) synth[d->osc].eg_type[0] = d->data.i;
-    if (d->param == EG1_TYPE) synth[d->osc].eg_type[1] = d->data.i;
-
     // for global changes, just make the change, no need to update the per-osc synth
     if(d->param == VOLUME) amy_global.volume = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
-    if(d->param == LATENCY) { amy_global.latency_ms = d->data.i; }
+    if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
     if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
     if(d->param == EQ_L) amy_global.eq[0] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_M) amy_global.eq[1] = F2S(powf(10, d->data.f / 20.0));
@@ -1082,7 +1079,7 @@ void play_event(struct delta *d) {
 
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.
-    // Ignore velocity events if we've already received one this frame.  This may be due to a loop in chained_oscs.
+    // Ignore velocity deltas if we've already received one this frame.  This may be due to a loop in chained_oscs.
     if(d->param == VELOCITY) {
         if (d->data.f > 0) { // new note on (even if something is already playing on this osc)
             synth[d->osc].velocity = d->data.f;
@@ -1131,27 +1128,16 @@ void play_event(struct delta *d) {
         } else if(synth[d->osc].velocity > 0 && d->data.f == 0) { // new note off
             // DON'T clear velocity, we still need to reference it in decay.
             //synth[d->osc].velocity = 0;
-            if(synth[d->osc].wave==KS) {
-                if(amy_global.config.ks_oscs) {
-                    ks_note_off(d->osc);
-                }
-            } else if(synth[d->osc].wave==ALGO) {
-                algo_note_off(d->osc);
-            } else if(synth[d->osc].wave==PARTIALS || synth[d->osc].wave==BYO_PARTIALS || synth[d->osc].wave==INTERP_PARTIALS) {
-                if(amy_global.config.has_partials) {
-                    AMY_UNSET(synth[d->osc].note_on_clock);
-                    synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-                    if(synth[d->osc].wave==INTERP_PARTIALS) interp_partials_note_off(d->osc);
-                    else partials_note_off(d->osc);
-                }
-            } else if(synth[d->osc].wave==PCM) {
-                pcm_note_off(d->osc);
-            } else if(synth[d->osc].wave==MIDI) {
-                amy_send_midi_note_off(d->osc);
-            } else if(synth[d->osc].wave==CUSTOM) {
-                if(amy_global.config.has_custom) {
-                    custom_note_off(d->osc);
-                }
+            if(synth[d->osc].wave==KS) ks_note_off(d->osc);
+            else if(synth[d->osc].wave==ALGO)  algo_note_off(d->osc);
+            else if(synth[d->osc].wave==PCM) pcm_note_off(d->osc);
+            else if(synth[d->osc].wave==MIDI) amy_send_midi_note_off(d->osc);
+            else if(synth[d->osc].wave==CUSTOM) custom_note_off(d->osc);
+            else if(synth[d->osc].wave==PARTIALS || synth[d->osc].wave==BYO_PARTIALS || synth[d->osc].wave==INTERP_PARTIALS) {
+                AMY_UNSET(synth[d->osc].note_on_clock);
+                synth[d->osc].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                if(synth[d->osc].wave==INTERP_PARTIALS) interp_partials_note_off(d->osc);
+                else partials_note_off(d->osc);
             } else {
                 // osc note off, start release
                 // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
@@ -1164,14 +1150,14 @@ void play_event(struct delta *d) {
                 }
             }
         }
-        // Now maybe propagate the velocity event to the chained osc.
+        // Now maybe propagate the velocity delta to the chained osc.
         if (AMY_IS_SET(synth[d->osc].chained_osc)) {
             d->osc = synth[d->osc].chained_osc;
             // Recurse with the new osc.
-            play_event(d);
+            play_delta(d);
         }
     }
-    AMY_PROFILE_STOP(PLAY_EVENT)
+    AMY_PROFILE_STOP(PLAY_DELTA)
 }
 
 float combine_controls(float *controls, float *coefs) {
@@ -1450,7 +1436,7 @@ void amy_set_pitch_bend(float value) {
     amy_global.pitch_bend = value;
 }
 
-// this takes scheduled events and plays them at the right time
+// this takes scheduled deltas and plays them at the right time
 void amy_prepare_buffer() {
     AMY_PROFILE_START(AMY_PREPARE_BUFFER)
     // check to see which sounds to play
@@ -1463,18 +1449,18 @@ void amy_prepare_buffer() {
     pthread_mutex_lock(&amy_queue_lock);
 #endif
 
-    // find any events that need to be played from the (in-order) queue
-    struct delta *event_start = amy_global.event_start;
-    if (amy_global.event_qsize > 1 && event_start->time == UINT32_MAX) {
-        fprintf(stderr, "WARN: time=UINT32_MAX found at qsize=%d\n", amy_global.event_qsize);
+    // find any deltas that need to be played from the (in-order) queue
+    struct delta *delta_start = amy_global.delta_start;
+    if (amy_global.delta_qsize > 1 && delta_start->time == UINT32_MAX) {
+        fprintf(stderr, "WARN: time=UINT32_MAX found at qsize=%d\n", amy_global.delta_qsize);
     }
-    while(sysclock >= event_start->time) {
-        play_event(event_start);
-        event_start->time = UINT32_MAX;
-        amy_global.event_qsize--;
-        event_start = event_start->next;
+    while(sysclock >= delta_start->time) {
+        play_delta(delta_start);
+        delta_start->time = UINT32_MAX;
+        amy_global.delta_qsize--;
+        delta_start = delta_start->next;
     }
-    amy_global.event_start = event_start;
+    amy_global.delta_start = delta_start;
 
 #if defined ESP_PLATFORM && !defined ARDUINO
     // give the mutex back
@@ -1697,12 +1683,13 @@ void amy_default_setup() {
     strcpy(e.voices, "7,8,9,10,11,12");
     e.load_patch = 1025;
     e.instrument = 10;
+    e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
     amy_add_event(&e);
 
 }
 
-// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_events queue -> global event queue
-// fill_audio_buffer_task -> read delta global event queue -> play_event -> apply delta to synth[d.osc]
+// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue
+// fill_audio_buffer_task -> read delta global delta queue -> play_delta -> apply delta to synth[d.osc]
 
 void amy_stop() {
     oscs_deinit();
