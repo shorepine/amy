@@ -301,7 +301,7 @@ void amy_parse_message(char * message, struct event *e) {
                         case 'O': copy_param_list_substring(e->algo_source, message+start); break;
                         case 'p': e->patch=atoi(message + start); break;
                         case 'P': e->phase=atoff(message + start); break;
-                        /* q unused */
+                        case 'q': e->pedal = atoi(message + start); break;
                         case 'Q': parse_coef_message(message + start, e->pan_coefs); break;
                         case 'r': copy_param_list_substring(e->voices, message+start); break; 
                         case 'R': e->resonance=atoff(message + start); break;

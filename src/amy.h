@@ -416,7 +416,7 @@ struct event {
     char voices[MAX_PARAM_LEN];
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
-    uint8_t pedal;  // MIDI pedal value
+    uint8_t pedal;  // MIDI pedal value.
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
@@ -739,11 +739,13 @@ extern void patches_debug();
 extern void patches_store_patch(char * message);
 #define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
+#define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
 extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
+extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 

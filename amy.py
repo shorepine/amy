@@ -156,7 +156,7 @@ def message(**kwargs):
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
               'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF', 'synth': 'iI',
+              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF', 'synth': 'iI', 'pedal': 'qI',
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
               'algorithm': 'oI', 'synth_flags': 'oI', # Note aliasing.
               }

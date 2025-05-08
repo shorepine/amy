@@ -709,6 +709,23 @@ class TestDoubleNoteOff(AmyTest):
     amy.send(time=600, osc=0, vel=0)
 
 
+class TestSustainPedal(AmyTest):
+  """Test sustain pedal."""
+
+  def run(self):
+    amy.send(time=0, synth=1, voices='0,1,2,3', load_patch=256)
+    amy.send(time=50, synth=1, note=60, vel=1)
+    amy.send(time=100, synth=1, note=60, vel=0)
+    amy.send(time=150, synth=1, pedal=127)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    amy.send(time=300, synth=1, note=63, vel=0)
+    amy.send(time=450, synth=1, note=67, vel=1)
+    amy.send(time=500, synth=1, note=67, vel=0)
+    amy.send(time=650, synth=1, note=72, vel=1)   # This note is held across the pedal release
+    amy.send(time=750, synth=1, pedal=0)
+    amy.send(time=900, synth=1, note=72, vel=0)
+
+
 def main(argv):
   if len(argv) > 1:
     # Override location of reference files.

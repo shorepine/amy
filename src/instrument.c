@@ -96,6 +96,9 @@ struct instrument_info {
     uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
     // Track which note each voice is sounding.  We use int16 so we can store PCM_PRESET *127 + midi_note
     uint16_t note_per_voice[MAX_VOICES_PER_INSTRUMENT];
+    // Sustain tracking
+    bool in_sustain;  // Pedal is down.
+    bool pending_release[MAX_VOICES_PER_INSTRUMENT];
 };
 
 
@@ -110,12 +113,14 @@ struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, ui
     instrument->num_voices = num_voices;
     instrument->patch_number = patch_number;
     instrument->flags = flags;
+    instrument->in_sustain = false;
     instrument->released_voices = voice_fifo_init(num_voices, "released");
     instrument->active_voices = voice_fifo_init(num_voices, "active");
     for (uint8_t voice = 0; voice < num_voices; ++voice) {
         instrument->amy_voices[voice] = amy_voices[voice];
         voice_fifo_put(instrument->released_voices, voice);
         instrument->note_per_voice[voice] = _INSTRUMENT_NO_NOTE;
+        instrument->pending_release[voice] = false;
     }
     return instrument;
 }
@@ -143,6 +148,7 @@ uint16_t _instrument_voice_for_note(struct instrument_info *instrument, uint16_t
 
 uint16_t _instrument_voice_off(struct instrument_info *instrument, uint16_t voice) {
     instrument->note_per_voice[voice] = _INSTRUMENT_NO_NOTE;
+    instrument->pending_release[voice] = false;
     voice_fifo_remove(instrument->active_voices, voice);
     voice_fifo_put(instrument->released_voices, voice);
     return instrument->amy_voices[voice];
@@ -153,6 +159,10 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
     if (voice == _INSTRUMENT_NO_VOICE) {
         fprintf(stderr, "note off for %d does not match note on\n", note);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
+    }
+    if (instrument->in_sustain) {
+        instrument->pending_release[voice] = true;
+        return _INSTRUMENT_NO_VOICE;
     }
     //fprintf(stderr, "voice %d note %d off\n", instrument->amy_voices[voice], note);
     return _instrument_voice_off(instrument, voice);
@@ -184,6 +194,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
         voice_fifo_put(instrument->active_voices, voice);
     }
     instrument->note_per_voice[voice] = note;
+    instrument->pending_release[voice] = false;
     //fprintf(stderr, "voice %d note %d on\n", instrument->amy_voices[voice], note);
     return instrument->amy_voices[voice];
 }
@@ -250,6 +261,30 @@ int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
         return 0;
     }
     return _instrument_all_notes_off(instrument, amy_voices);
+}
+
+int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices) {
+    // Will return nonzero voices if the result is to release multiple notes.
+    struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument == NULL) {
+        fprintf(stderr, "sustain: instrument_number %d is not defined.\n", instrument_number);
+        return 0;
+    }
+    if (sustain) {
+        instrument->in_sustain = true;
+        return 0;
+    }
+    // Sustain pedal released - return multiple note-offs.  Like all notes off, but a different criterion.
+    instrument->in_sustain = false;
+    int num_voices_turned_off = 0;
+    for (uint16_t voice = 0; voice < instrument->num_voices; ++voice)
+        if (instrument->pending_release[voice]) {
+            //fprintf(stderr, "voice %d note %d pedal-released\n", instrument->amy_voices[voice], instrument->note_per_voice[voice]);
+            _instrument_voice_off(instrument, voice);
+            *amy_voices++ = instrument->amy_voices[voice];
+            ++num_voices_turned_off;
+        }
+    return num_voices_turned_off;
 }
 
 int instrument_get_patch_number(int instrument_number) {
