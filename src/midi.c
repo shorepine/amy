@@ -66,15 +66,38 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
     }
 }
 
+void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
+    struct event e = amy_default_event();
+    e.time = time;
+    e.instrument = channel;
+    e.source = EVENT_MIDI;
+    e.pedal = value;
+    amy_add_event(&e);
+}
+
+void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byte, uint32_t time) {
+    struct event e = amy_default_event();
+    e.time = time;
+    // Currently, pitch bend is global and not applied per-channel, but preserve the info.
+    e.instrument = channel;
+    e.source = EVENT_MIDI;
+    // The integer range is -8192 to 8191, the float range is -1/6th to +1/6th,
+    // units are octaves, so +/- 2 semitones.
+    e.pitch_bend = ((float)(((int)((high_byte << 7) | low_byte)) - 8192)) / (6.0f * 8192.0f);
+    amy_add_event(&e);
+}
+
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
 void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
     if(!sysex) {
         uint8_t status = data[0] & 0xF0;
         uint8_t channel = data[0] & 0x0F;
         // Do the AMY instrument things here
-        if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
         if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2], time);
-        if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
+        else if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
+        else if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
+        else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
+        else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
     }
 
     // Also send the external hooks if set

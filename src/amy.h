@@ -416,6 +416,7 @@ struct event {
     char voices[MAX_PARAM_LEN];
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
+    uint8_t pedal;  // MIDI pedal value
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
