@@ -220,6 +220,7 @@ Here's the full list:
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
+| `q`    | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |

@@ -232,8 +232,20 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                     e->instrument, e->voices);
         }
         flags = instrument_get_flags(e->instrument);
-        if (!AMY_IS_SET(e->velocity)) {
-            // Not a note-on/note-off message - treat the synth as a shorthand for *all* the voices.
+        // Pedal events are a special case
+        if (AMY_IS_SET(e->pedal)) {
+            bool sustain = (e->pedal != 0);
+            if (flags & _INSTRUMENT_FLAGS_NEGATE_PEDAL) {
+                sustain = !sustain;  // Some MIDI pedals report backwards.
+            }
+            // A sustain release can result in note-off events for multiple voices.
+            num_voices = instrument_sustain(e->instrument, sustain, voices);
+            if (num_voices) {
+                e->velocity = 0;
+            }
+            //fprintf(stderr, "instrument %d pedal %d num_voices %d\n", e->instrument, e->pedal, num_voices);
+        } else if (!AMY_IS_SET(e->velocity)) {
+            // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_voices(e->instrument, voices);
         } else {
             // velocity is present, this is a note-on/note-off.
@@ -261,17 +273,18 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
 		    note += 128 * e->patch;
 		}
                 bool is_note_off = (e->velocity == 0);
-                if (is_note_off && (flags & _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS))
-                    return;  // Ignore the note off, as requested.
                 voices[0] = instrument_voice_for_note_event(e->instrument, note, is_note_off);
                 if (voices[0] == _INSTRUMENT_NO_VOICE) {
                     // For now, I think this can only happen with a note-off that has no matching note-on.
-                    fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->instrument);
+                    //fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->instrument);
+                    // No, it also happens with note-offs when pedal is down.
                     return;
                 }
                 num_voices = 1;
             }
         }
+        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (flags & _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS))
+            return;  // Ignore the note off, as requested.
     }
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     e->voices[0] = 0;
