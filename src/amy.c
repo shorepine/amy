@@ -821,7 +821,7 @@ void show_debug(uint8_t type) {
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
-            fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %d\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
+            fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
     }
