@@ -438,6 +438,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.instrument);
     AMY_UNSET(e.instrument_flags);
     AMY_UNSET(e.pedal);
+    AMY_UNSET(e.num_voices);
     return e;
 }
 

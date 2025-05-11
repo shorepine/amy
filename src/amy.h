@@ -414,9 +414,12 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
+    // Instrument-layer values.
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
     uint8_t pedal;  // MIDI pedal value.
+    uint16_t num_voices;
+    //
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
