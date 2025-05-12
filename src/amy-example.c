@@ -62,7 +62,8 @@ int main(int argc, char ** argv) {
     amy_start(amy_config);
     
     amy_live_start();
-    example_voice_chord(0,0);
+    //example_voice_chord(0,0);
+    example_synth_chord(0,0);
 
     // Now just spin for 15s
     uint32_t start = amy_sysclock();

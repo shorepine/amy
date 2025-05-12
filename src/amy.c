@@ -438,6 +438,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.instrument);
     AMY_UNSET(e.instrument_flags);
     AMY_UNSET(e.pedal);
+    AMY_UNSET(e.num_voices);
     return e;
 }
 
@@ -1657,7 +1658,7 @@ void amy_play_message(char *message) {
 void amy_default_setup() {
     // Juno 6 poly on channel 1
     struct event e = amy_default_event();
-    strcpy(e.voices, "0,1,2,3,4,5");
+    e.num_voices = 6;
     e.load_patch = 0;
     e.instrument = 1;
     amy_add_event(&e);
@@ -1667,7 +1668,7 @@ void amy_default_setup() {
     patches_store_patch("1024w0"); 
 
     e = amy_default_event();
-    strcpy(e.voices, "6");
+    e.num_voices = 1;
     e.load_patch = 1024;
     e.instrument = 16;
     amy_add_event(&e);
@@ -1681,7 +1682,7 @@ void amy_default_setup() {
     patches_store_patch("1025w7f0"); 
 
     e = amy_default_event();
-    strcpy(e.voices, "7,8,9,10,11,12");
+    e.num_voices = 6;
     e.load_patch = 1025;
     e.instrument = 10;
     e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.

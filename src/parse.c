@@ -2,6 +2,7 @@
 // handle parsing wire strings
 
 #include "amy.h"
+#include <ctype.h>  // for isalpha().
 
 float atoff(const char *s) {
     // Returns float value corresponding to parseable prefix of s.
@@ -197,11 +198,36 @@ void parse_coef_message(char *message, float *coefs) {
         coefs[i] = AMY_UNSET_VALUE(coefs[0]);
 }
 
+// Parser for synth-layer ('i') prefix.
+void amy_parse_synth_layer_message(char *message, struct event *e) {
+    if (message[0] >= '0' && message[0] <= '9') {
+        // It's just the instrument number.
+        e->instrument = atoi(message);
+        return;
+    }
+    char cmd = message[0];
+    message++;
+    if (cmd == 'p')  e->pedal = atoi(message);
+    else if (cmd == 'f')  e->instrument_flags = atoi(message);
+    else if (cmd == 'v')  e->num_voices = atoi(message);
+    else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
+}
+
+int _next_alpha(char *s) {
+    // Return how many chars to skip to get to the next alphanumeric (or EOS).
+    int p = 0;
+    while (*(s + p)) {
+        char c = *(s + p);
+        if (isalpha(c))  break;
+        ++p;
+    }
+    return p;
+}
+
 // given a string return an event
 void amy_parse_message(char * message, struct event *e) {
-    uint8_t mode = 0;
-    uint16_t start = 0;
-    uint16_t c = 0;
+    char cmd = '\0';
+    uint16_t pos = 0;
     int16_t length = strlen(message);
 
     // default values for sequence message
@@ -221,40 +247,41 @@ void amy_parse_message(char * message, struct event *e) {
 
     //printf("parse_message: %s\n", message);
     
-    // cut the osc cruft max etc add, they put a 0 and then more things after the 0
+    // cut the osc cruft max etc add, they put a 0 and then more things after the 0  // Anyone want to explain what this means?
     int new_length = length;
-    for(int d=0;d<length;d++) {
+    for(int d = 0; d < length; d++) {
         if(message[d] == 0) { new_length = d; d = length + 1;  }
     }
     length = new_length;
     //fprintf(stderr, "%s\n", message);
 
-    while(c < length+1) {
-        uint8_t b = message[c];
-        //if(b == '_' && c==0) sync_response = 1;
-        if( ((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')) || b == 0) {  // new mode or end
-            if(mode=='t') {
-                e->time=atol(message + start);
+    while(pos < length + 1) {
+        cmd = message[pos];
+        char *arg = message + pos + 1;
+        //if(cmd == '_' && pos==0) sync_response = 1;
+        if( ((cmd >= 'a' && cmd <= 'z') || (cmd >= 'A' && cmd <= 'Z')) || cmd == 0) {  // new mode or end
+            if(cmd == 't') {
+                e->time=atol(arg);
             } else {
-                if(mode >= 'A' && mode <= 'z') {
-                    switch(mode) {
-                        case 'a': parse_coef_message(message + start, e->amp_coefs);break;
-                        case 'A': copy_param_list_substring(e->bp0, message + start); e->bp_is_set[0] = 1; break;
-                        case 'B': copy_param_list_substring(e->bp1, message + start); e->bp_is_set[1] = 1; break;
-                        case 'b': e->feedback = atoff(message+start); break;
-                        case 'c': e->chained_osc = atoi(message + start); break;
+                if(cmd >= 'A' && cmd <= 'z') {
+                    switch(cmd) {
+                        case 'a': parse_coef_message(arg, e->amp_coefs);break;
+                        case 'A': copy_param_list_substring(e->bp0, arg); e->bp_is_set[0] = 1; break;
+                        case 'B': copy_param_list_substring(e->bp1, arg); e->bp_is_set[1] = 1; break;
+                        case 'b': e->feedback = atoff(arg); break;
+                        case 'c': e->chained_osc = atoi(arg); break;
                         /* C available */
-                        case 'd': parse_coef_message(message + start, e->duty_coefs);break;
-                        case 'D': show_debug(atoi(message + start)); break;
-                        case 'f': parse_coef_message(message + start, e->freq_coefs);break;
-                        case 'F': parse_coef_message(message + start, e->filter_freq_coefs); break;
-                        case 'G': e->filter_type = atoi(message + start); break;
+                        case 'd': parse_coef_message(arg, e->duty_coefs);break;
+                        case 'D': show_debug(atoi(arg)); break;
+                        case 'f': parse_coef_message(arg, e->freq_coefs);break;
+                        case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
+                        case 'G': e->filter_type = atoi(arg); break;
                         /* g used for Alles for client # */
-                        case 'H': parse_list_uint32_t(message+start, seq_message, 3, 0); sequence_message = 1; break;
+                        case 'H': parse_list_uint32_t(arg, seq_message, 3, 0); sequence_message = 1; break;
                         case 'h': if (AMY_HAS_REVERB) {
                             float reverb_params[4] = {AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness),
                                                       AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness)};
-                            parse_list_float(message + start, reverb_params, 4, AMY_UNSET_VALUE(amy_global.reverb.liveness));
+                            parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(amy_global.reverb.liveness));
                             // config_reverb doesn't understand UNSET, so copy in the current values.
                             if (AMY_IS_UNSET(reverb_params[0])) reverb_params[0] = S2F(amy_global.reverb.level);
                             if (AMY_IS_UNSET(reverb_params[1])) reverb_params[1] = amy_global.reverb.liveness;
@@ -264,14 +291,14 @@ void amy_parse_message(char * message, struct event *e) {
                         }
                         break;
                         /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
-                        case 'i': e->instrument = atoi(message + start); break;
-                        case 'I': e->ratio = atoff(message + start); break;
-                        case 'j': e->tempo = atof(message+start); break;
+                        case 'i': amy_parse_synth_layer_message(arg, e); ++pos; break;  // Skip over second cmd letter, if any.
+                        case 'I': e->ratio = atoff(arg); break;
+                        case 'j': e->tempo = atof(arg); break;
                         /* j, J available */
                         // chorus.level 
                         case 'k': if(AMY_HAS_CHORUS) {
                             float chorus_params[4] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_list_float(message + start, chorus_params, 4, AMY_UNSET_FLOAT);
+                            parse_list_float(arg, chorus_params, 4, AMY_UNSET_FLOAT);
                             // config_chorus doesn't understand UNSET, copy existing values.
                             if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(amy_global.chorus.level);
                             if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)amy_global.chorus.max_delay;
@@ -280,13 +307,13 @@ void amy_parse_message(char * message, struct event *e) {
                             config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
                         }
                         break;
-                        case 'K': e->load_patch = atoi(message+start); break;
-                        case 'l': e->velocity=atoff(message + start); break;
-                        case 'L': e->mod_source=atoi(message + start); break;
-                        case 'm': e->portamento_ms=atoi(message + start); break;
+                        case 'K': e->load_patch = atoi(arg); break;
+                        case 'l': e->velocity=atoff(arg); break;
+                        case 'L': e->mod_source=atoi(arg); break;
+                        case 'm': e->portamento_ms=atoi(arg); break;
                         case 'M': if (AMY_HAS_ECHO) {
                             float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
-                            parse_list_float(message + start, echo_params, 5, AMY_UNSET_FLOAT);
+                            parse_list_float(arg, echo_params, 5, AMY_UNSET_FLOAT);
                             if (AMY_IS_UNSET(echo_params[0])) echo_params[0] = S2F(amy_global.echo.level);
                             if (AMY_IS_UNSET(echo_params[1])) echo_params[1] = (float)amy_global.echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
                             if (AMY_IS_UNSET(echo_params[2])) echo_params[2] = (float)amy_global.echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
@@ -295,19 +322,19 @@ void amy_parse_message(char * message, struct event *e) {
                             config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
                         }
                         break;
-                        case 'n': e->midi_note=atof(message + start); break;
-                        case 'N': e->latency_ms = atoi(message + start);  break;
-                        case 'o': e->algorithm=atoi(message+start); break;
-                        case 'O': copy_param_list_substring(e->algo_source, message+start); break;
-                        case 'p': e->patch=atoi(message + start); break;
-                        case 'P': e->phase=atoff(message + start); break;
-                        case 'q': e->pedal = atoi(message + start); break;
-                        case 'Q': parse_coef_message(message + start, e->pan_coefs); break;
-                        case 'r': copy_param_list_substring(e->voices, message+start); break; 
-                        case 'R': e->resonance=atoff(message + start); break;
-                        case 's': e->pitch_bend = atoff(message + start); break;
+                        case 'n': e->midi_note=atof(arg); break;
+                        case 'N': e->latency_ms = atoi(arg);  break;
+                        case 'o': e->algorithm=atoi(arg); break;
+                        case 'O': copy_param_list_substring(e->algo_source, arg); break;
+                        case 'p': e->patch=atoi(arg); break;
+                        case 'P': e->phase=atoff(arg); break;
+                        /* q unused */
+                        case 'Q': parse_coef_message(arg, e->pan_coefs); break;
+                        case 'r': copy_param_list_substring(e->voices, arg); break; 
+                        case 'R': e->resonance=atoff(arg); break;
+                        case 's': e->pitch_bend = atoff(arg); break;
                         case 'S': 
-                            e->reset_osc = atoi(message + start);
+                            e->reset_osc = atoi(arg);
                             // if we're resetting all of AMY, do it now
                             if(e->reset_osc & RESET_AMY) {
                                 amy_stop();
@@ -324,25 +351,25 @@ void amy_parse_message(char * message, struct event *e) {
                             }
                             break;
                         /* t used for time */
-                        case 'T': e->eg_type[0] = atoi(message + start); break;
-                        case 'u': patches_store_patch(message + start); return; 
+                        case 'T': e->eg_type[0] = atoi(arg); break;
+                        case 'u': patches_store_patch(arg); return; 
                         /* U used by Alles for sync */
-                        case 'v': e->osc=((atoi(message + start)) % (AMY_OSCS+1));  break; // allow osc wraparound
-                        case 'V': e->volume = atoff(message + start); break;
-                        case 'w': e->wave=atoi(message + start); break;
+                        case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
+                        case 'V': e->volume = atoff(arg); break;
+                        case 'w': e->wave=atoi(arg); break;
                         /* W used by Tulip for CV, external_channel */
-                        case 'X': e->eg_type[1] = atoi(message + start); break;
+                        case 'X': e->eg_type[1] = atoi(arg); break;
                         case 'x': {
                               float eq[3] = {AMY_UNSET_VALUE(e->eq_l), AMY_UNSET_VALUE(e->eq_m), AMY_UNSET_VALUE(e->eq_h)};
-                              parse_list_float(message + start, eq, 3, AMY_UNSET_VALUE(e->eq_l));
+                              parse_list_float(arg, eq, 3, AMY_UNSET_VALUE(e->eq_l));
                               e->eq_l = eq[0];
                               e->eq_m = eq[1];
                               e->eq_h = eq[2];
                             }
                             break;
                         case 'z': {
-                            uint32_t sm[6]; // patch, length, SR, midinote, loopstart, loopend
-                            parse_list_uint32_t(message+start, sm, 6, 0);
+                            uint32_t sm[6]; // patch, length, SR, midinote, loop_start, loopend
+                            parse_list_uint32_t(arg, sm, 6, 0);
                             if(sm[1]==0) { // remove patch
                                 pcm_unload_patch(sm[0]);
                             } else {
@@ -358,10 +385,9 @@ void amy_parse_message(char * message, struct event *e) {
                     }
                 }
             }
-            mode=b;
-            start=c+1;
         }
-        c++;
+        // Skip over arg, line up for the next cmd.
+        pos += 1 + _next_alpha(message + 1 + pos);
     }
 
     if(length>0) { // only do this if we got some data 
