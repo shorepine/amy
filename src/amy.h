@@ -417,6 +417,7 @@ struct event {
     // Instrument-layer values.
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
+    uint8_t to_instrument;  // For moving setup between synth numbers.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
     //
@@ -744,6 +745,7 @@ extern void patches_store_patch(char * message);
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
 extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);

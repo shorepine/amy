@@ -210,6 +210,7 @@ void amy_parse_synth_layer_message(char *message, struct event *e) {
     if (cmd == 'p')  e->pedal = atoi(message);
     else if (cmd == 'f')  e->instrument_flags = atoi(message);
     else if (cmd == 'v')  e->num_voices = atoi(message);
+    else if (cmd == 't')  e->to_instrument = atoi(message);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 
@@ -259,11 +260,11 @@ void amy_parse_message(char * message, struct event *e) {
         cmd = message[pos];
         char *arg = message + pos + 1;
         //if(cmd == '_' && pos==0) sync_response = 1;
-        if( ((cmd >= 'a' && cmd <= 'z') || (cmd >= 'A' && cmd <= 'Z')) || cmd == 0) {  // new mode or end
+        if( isalpha(cmd) || cmd == 0) {  // new cmd or end
             if(cmd == 't') {
                 e->time=atol(arg);
             } else {
-                if(cmd >= 'A' && cmd <= 'z') {
+                if(isalpha(cmd)) {
                     switch(cmd) {
                         case 'a': parse_coef_message(arg, e->amp_coefs);break;
                         case 'A': copy_param_list_substring(e->bp0, arg); e->bp_is_set[0] = 1; break;
