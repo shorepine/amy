@@ -234,7 +234,8 @@ int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
+        //fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
+        // instrument_get_voices is used to test if an instrument is set or not, so no error message if it isn't.
     } else {
         num_voices = instrument->num_voices;
         for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];

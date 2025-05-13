@@ -659,6 +659,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
 int16_t * amy_simple_fill_buffer() ;
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
+void print_osc_debug(int i /* osc */, bool show_eg);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();

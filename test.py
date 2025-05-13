@@ -687,6 +687,26 @@ class TestDefaultChan1Synth(AmyTest):
     amy.send(time=950, synth=1, note=74, vel=0)
 
 
+class TestSynthProgChange(AmyTest):
+  """Test switchting default synth to DX7, do oscs allocate OK?"""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+
+  def run(self):
+    # DX7 first patch, uses 9 oscs/voice, num_voices is inherited from previous init.
+    amy.send(time=0, synth=1, load_patch=128)
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=300, synth=1, note=63, vel=1)
+    amy.send(time=500, synth=1, note=67, vel=1)
+    amy.send(time=700, synth=1, note=74, vel=1)
+    amy.send(time=800, synth=1, note=60, vel=0)
+    amy.send(time=850, synth=1, note=63, vel=0)
+    amy.send(time=900, synth=1, note=67, vel=0)
+    amy.send(time=950, synth=1, note=74, vel=0)
+
+
 class TestSynthDrums(AmyTest):
   """Test MIDI drums using synth-level note translation."""
 
