@@ -157,7 +157,7 @@ def message(**kwargs):
               'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
               'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
-              'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', # 'i' is prefix for some two-letter synth-level codes.
+              'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', 'to_synth': 'itI', # 'i' is prefix for some two-letter synth-level codes.
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
               'algorithm': 'oI',
               }

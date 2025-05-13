@@ -232,8 +232,15 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
                     e->instrument, e->voices);
         }
         flags = instrument_get_flags(e->instrument);
-        // Pedal events are a special case
+        if (AMY_IS_SET(e->to_instrument)) {
+            // This involves moving the instrument number.
+            instrument_change_number(e->instrument, e->to_instrument);
+            e->instrument = e->to_instrument;
+            AMY_UNSET(e->to_instrument);
+            // Then continue handling any other args.
+        }
         if (AMY_IS_SET(e->pedal)) {
+            // Pedal events are a special case
             bool sustain = (e->pedal != 0);
             if (flags & _INSTRUMENT_FLAGS_NEGATE_PEDAL) {
                 sustain = !sustain;  // Some MIDI pedals report backwards.

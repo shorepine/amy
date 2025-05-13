@@ -207,6 +207,7 @@ Here's the full list:
 | `i`    | `synth`  | 0-31  | Define a set of voices for voice management. |
 | `if`   | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->patch translation; 2 = Drop note-off events. |
 | `ip`   | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
+| `it`   | `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
 | `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `instrument=X, load_patch=Y`. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |

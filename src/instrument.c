@@ -221,6 +221,15 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
     instruments[instrument_number] = instrument_init(num_voices, amy_voices, patch_number, flags);
 }
 
+void instrument_change_number(int old_instrument_number, int new_instrument_number) {
+    if (instruments[new_instrument_number]) {
+        instrument_free(instruments[new_instrument_number]);
+    }
+    instruments[new_instrument_number] = instruments[old_instrument_number];
+    instruments[old_instrument_number] = NULL;
+}
+
+
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
