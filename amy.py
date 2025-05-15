@@ -1,3 +1,4 @@
+import collections
 import time
 from amy_constants import *
 
@@ -151,16 +152,17 @@ def parse_ctrl_coefs(coefs):
 def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
-    kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
-              'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'gI', 'volume': 'VF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
-              'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
-              'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
-              'algorithm': 'oI', 'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'patch_number': 'KI', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
-              'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', 'to_synth': 'itI', # 'i' is prefix for some two-letter synth-level codes.
-              'preset': 'pI', 'num_partials': 'pI', # Note alaising.
-              'patch': 'uS',  # Patch MUST be last because we can't identify when it ends except by end-of-message.
-              }
+    kw_map = collections.OrderedDict([   # Order matters because patch string must come last.
+        ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
+        ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
+        ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
+        ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
+        ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
+        ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
+        ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), # 'i' is prefix for some two-letter synth-level codes.
+        ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
+        ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
+    ])
     arg_handlers = {
         'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
     }
@@ -186,13 +188,18 @@ def message(**kwargs):
         kwargs['time'] = insert_time()
 
     m = ""
+    # Validity check all the passed args.
     for key, arg in kwargs.items():
+        if key not in kw_map:
+            raise ValueError('Unknown keyword ' + key)
         if arg is None:
             # Just ignore time or sequence=None
             if key != 'time' and key != 'sequence':
                 raise ValueError('No arg for key ' + key)
-        else:
-            map_code = kw_map[key]
+    # We process the passed args by testing each entry in the known keys in order, to make sure 'patch' is added last.
+    for key, map_code in kw_map.items():
+        if key in kwargs:
+            arg = kwargs[key]
             type_code = map_code[-1]
             wire_code = map_code[:-1]
             m += wire_code + arg_handlers[type_code](arg)

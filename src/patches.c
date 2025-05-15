@@ -99,6 +99,7 @@ void patches_reset() {
 void patches_store_patch(struct event *e, char * patch_string) {
     // amy patch string. Either pull patch_number from e, or allocate a new one and write it to e.
     // Patch is stored in ram.
+    //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->instrument, e->patch_number, patch_string);
     if (!AMY_IS_SET(e->patch_number)) {
         // Allocate a new patch number.
         e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
@@ -130,7 +131,7 @@ void patches_store_patch(struct event *e, char * patch_string) {
     memory_patch[patch_index] = malloc(strlen(patch_string)+1);
     memory_patch_oscs[patch_index] = max_osc + 1;
     strcpy(memory_patch[patch_index], patch_string);
-    //fprintf(stderr, "store_patch: patch %d n_osc %d patch %s\n", patch_index, max_osc, patch_string);
+    //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s (e->num_vx=%d)\n", patch_index, max_osc, patch_string, e->num_voices);
 }
 
 extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, uint16_t skipped_val);
@@ -346,6 +347,7 @@ void patches_load_patch(struct event *e) {
     // This means to set/reset the voices and load the messages from ROM and set them.
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices = 0;
+    //fprintf(stderr, "load_patch synth %d patch_number %d\n", e->instrument, e->patch_number);
     if (AMY_IS_SET(e->instrument)) {
         // patch_number with instrument.
         // If the instrument is defined, copy the voice numbers.
