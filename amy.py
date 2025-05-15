@@ -155,11 +155,11 @@ def message(**kwargs):
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'gI', 'volume': 'VF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
               'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
-              'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
+              'algorithm': 'oI', 'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'patch_number': 'KI', 'voices': 'rL',
               'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
               'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', 'to_synth': 'itI', # 'i' is prefix for some two-letter synth-level codes.
-              'patch': 'pI', 'num_partials': 'pI', # Note alaising.
-              'algorithm': 'oI',
+              'preset': 'pI', 'num_partials': 'pI', # Note alaising.
+              'patch': 'uS',  # Patch MUST be last because we can't identify when it ends except by end-of-message.
               }
     arg_handlers = {
         'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
@@ -169,12 +169,12 @@ def message(**kwargs):
         raise ValueError('Unrecognized keyword(s): %s' % unrecognized_keywords)
     if show_warnings:
         # Check for possible user confusions.
-        if 'voices' in kwargs and 'patch' in kwargs and 'osc' not in kwargs:
-            print('You specified \'voices\' and \'patch\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
-        if 'voices' in kwargs and 'synth' in kwargs and not 'load_patch' in kwargs:
-            print('You specified both \'synth\' and \'voices\' in a non-\'load_patch\' message, but \'synth\' defines the voices.')
-        if 'store_patch' in kwargs and len(kwargs) > 1:
-            print('\'store_patch\' should be the only arg in a message.')
+        if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
+            print('You specified \'voices\' and \'preset\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
+        if 'voices' in kwargs and 'synth' in kwargs and not ('patch_number' in kwargs or 'patch' in kwargs):
+            print('You specified both \'synth\' and \'voices\' in a non-\'patch\'/\'patch_number\' message, but \'synth\' defines the voices.')
+        if 'patch' in kwargs and not ('patch_number' in kwargs or 'synth' in kwargs or 'voices' in kwargs):
+            print('\'patch\' is only valid with a \'patch_number\' or to define a new \'synth\' or \'voices\'.')
             # And yet we plow ahead...
         if 'num_partials' in kwargs:
             if 'patch' in kwargs:
@@ -414,7 +414,7 @@ def play_patches(wait=1, patch_total = 256, **kwargs):
     while True:
         patch = random.randint(0,256) #patch_count % patch_total
         print("Sending patch %d" %(patch))
-        send(osc=0, load_patch=patch)
+        send(osc=0, patch_number=patch)
         time.sleep(wait/4.0)            
         patch_count = patch_count + 1
         send(osc=0, note=50, vel=1, **kwargs)

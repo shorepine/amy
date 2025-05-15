@@ -397,9 +397,9 @@ struct event amy_default_event() {
     e.status = EVENT_EMPTY;
     AMY_UNSET(e.time);
     AMY_UNSET(e.osc);
-    AMY_UNSET(e.patch);
+    AMY_UNSET(e.preset);
     AMY_UNSET(e.wave);
-    AMY_UNSET(e.load_patch);
+    AMY_UNSET(e.patch_number);
     AMY_UNSET(e.phase);
     AMY_UNSET(e.feedback);
     AMY_UNSET(e.velocity);
@@ -536,7 +536,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
     if (e->voices[0] != 0 || AMY_IS_SET(e->instrument)) {
-        if (AMY_IS_SET(e->load_patch)) {
+        if (AMY_IS_SET(e->patch_number)) {
             patches_load_patch(e);
         }
         patches_event_has_voices(e, callback, user_data);
@@ -545,7 +545,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
 
     // Everything else only added to queue if set
     EVENT_TO_DELTA_I(wave, WAVE)
-    EVENT_TO_DELTA_I(patch, PATCH)
+    EVENT_TO_DELTA_I(preset, PRESET)
     EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
     EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
     EVENT_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
@@ -630,7 +630,7 @@ void reset_osc(uint16_t i ) {
     synth[i].osc = i; // self-reference to make updating oscs easier
     synth[i].wave = SINE;
     msynth[i].last_duty = 0.5f;
-    AMY_UNSET(synth[i].patch);
+    AMY_UNSET(synth[i].preset);
     AMY_UNSET(synth[i].midi_note);
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
         synth[i].amp_coefs[j] = 0;
@@ -720,7 +720,7 @@ void amy_reset_oscs() {
     // Reset patches
     patches_reset();
     // Reset memorypcm
-    pcm_unload_all_patches();
+    pcm_unload_all_presets();
 }
 
 
@@ -994,7 +994,7 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
     // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
-    if (d->param == PATCH) synth[d->osc].patch = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
+    if (d->param == PRESET) synth[d->osc].preset = ((synth[d->osc].wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
     if (d->param == PORTAMENTO) synth[d->osc].portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) synth[d->osc].trigger_phase = F2P(d->data.f);
 
@@ -1663,17 +1663,16 @@ void amy_default_setup() {
     // Juno 6 poly on channel 1
     struct event e = amy_default_event();
     e.num_voices = 6;
-    e.load_patch = 0;
+    e.patch_number = 0;
     e.instrument = 1;
     amy_add_event(&e);
 
     // sine wave "bleeper" on ch 16
-    // store memory patch 1024 wine wave
-    patches_store_patch("1024w0"); 
-
+    // store memory patch 1024 sine wave
     e = amy_default_event();
+    e.patch_number = 1024;
+    patches_store_patch(&e, "w0");
     e.num_voices = 1;
-    e.load_patch = 1024;
     e.instrument = 16;
     amy_add_event(&e);
 
@@ -1683,11 +1682,10 @@ void amy_default_setup() {
     // We could make the voice management use the outer product of preset number and note when calculating "same note"
     
     // {'wave': amy.PCM, 'freq': 0}
-    patches_store_patch("1025w7f0"); 
-
     e = amy_default_event();
+    e.patch_number = 1025;
+    patches_store_patch(&e, "w7f0");
     e.num_voices = 6;
-    e.load_patch = 1025;
     e.instrument = 10;
     e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
     amy_add_event(&e);

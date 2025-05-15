@@ -242,7 +242,7 @@ extern void (*amy_external_block_done_hook)(void);
 extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2
+    WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
     AMP,                                 // 3..9
     DUTY=AMP + NUM_COMBO_COEFS,          // 10..16
     FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 17
@@ -382,9 +382,9 @@ struct event {
     uint32_t time;
     uint16_t osc;
     uint16_t wave;
-    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
+    int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
-    uint16_t load_patch;
+    uint16_t patch_number;
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];
     float filter_freq_coefs[NUM_COMBO_COEFS];
@@ -430,7 +430,7 @@ struct event {
 struct synthinfo {
     uint16_t osc; // self-reference
     uint16_t wave;
-    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
+    int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
@@ -741,7 +741,7 @@ extern void patches_event_has_voices(struct event *e, void (*callback)(struct de
 extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
-extern void patches_store_patch(char * message);
+extern void patches_store_patch(struct event *e, char * message);
 #define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
@@ -793,8 +793,8 @@ extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
-extern void pcm_unload_patch(uint16_t patch_number);
-extern void pcm_unload_all_patches();
+extern void pcm_unload_preset(uint16_t patch_number);
+extern void pcm_unload_all_presets();
 
 // filters
 extern void filters_init();

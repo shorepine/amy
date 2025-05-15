@@ -60,7 +60,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
     e.instrument = channel;
     e.source = EVENT_MIDI;
     // The MIDI patch number is within the block-of-256 of existing patch numbers, so DX7 patches will remain DX7.
-    e.load_patch = program + (instrument_get_patch_number(e.instrument) & 0xFF80);
+    e.patch_number = program + (instrument_get_patch_number(e.instrument) & 0xFF80);
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
     }

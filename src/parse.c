@@ -308,7 +308,7 @@ void amy_parse_message(char * message, struct event *e) {
                             config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
                         }
                         break;
-                        case 'K': e->load_patch = atoi(arg); break;
+                        case 'K': e->patch_number = atoi(arg); break;
                         case 'l': e->velocity=atoff(arg); break;
                         case 'L': e->mod_source=atoi(arg); break;
                         case 'm': e->portamento_ms=atoi(arg); break;
@@ -327,7 +327,7 @@ void amy_parse_message(char * message, struct event *e) {
                         case 'N': e->latency_ms = atoi(arg);  break;
                         case 'o': e->algorithm=atoi(arg); break;
                         case 'O': copy_param_list_substring(e->algo_source, arg); break;
-                        case 'p': e->patch=atoi(arg); break;
+                        case 'p': e->preset=atoi(arg); break;
                         case 'P': e->phase=atoff(arg); break;
                         /* q unused */
                         case 'Q': parse_coef_message(arg, e->pan_coefs); break;
@@ -353,7 +353,7 @@ void amy_parse_message(char * message, struct event *e) {
                             break;
                         /* t used for time */
                         case 'T': e->eg_type[0] = atoi(arg); break;
-                        case 'u': patches_store_patch(arg); return; 
+                        case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch_number.
                         /* U used by Alles for sync */
                         case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
                         case 'V': e->volume = atoff(arg); break;
@@ -369,10 +369,10 @@ void amy_parse_message(char * message, struct event *e) {
                             }
                             break;
                         case 'z': {
-                            uint32_t sm[6]; // patch, length, SR, midinote, loop_start, loopend
+                            uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
                             parse_list_uint32_t(arg, sm, 6, 0);
-                            if(sm[1]==0) { // remove patch
-                                pcm_unload_patch(sm[0]);
+                            if(sm[1]==0) { // remove preset
+                                pcm_unload_preset(sm[0]);
                             } else {
                                 int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
                                 start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
