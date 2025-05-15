@@ -275,8 +275,12 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 void midi_out(uint8_t * bytes, uint16_t len) {
     #if defined TUD_USB_GADGET
     tud_midi_stream_write(0, bytes, len);
-    #else
+    #elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
+    #elif defined PI_PICO
+    // TBD
+    #else
+    // linux? 
     #endif
 }
 
