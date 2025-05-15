@@ -809,6 +809,14 @@ extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len,
 extern SAMPLE scan_max(SAMPLE* block, int len);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
+#define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
+#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
+#define AMY_RENDER_TASK_COREID (0)
+#define AMY_FILL_BUFFER_TASK_COREID (1)
+#define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
+#define AMY_FILL_BUFFER_TASK_STACK_SIZE (8 * 1024)
+#define AMY_RENDER_TASK_NAME      "amy_r_task"
+#define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"
 esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
 #endif

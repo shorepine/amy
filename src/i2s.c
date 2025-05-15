@@ -16,14 +16,7 @@
 ///////////////////////////////////////////////////////////////
 // ESP32, S3, P4 (maybe others)
 
-#define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
-#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
-#define AMY_RENDER_TASK_COREID (0)
-#define AMY_FILL_BUFFER_TASK_COREID (1)
-#define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
-#define AMY_FILL_BUFFER_TASK_STACK_SIZE (8 * 1024)
-#define AMY_RENDER_TASK_NAME      "amy_r_task"
-#define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
+
 
 
 TaskHandle_t amy_render_handle;
