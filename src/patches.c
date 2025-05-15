@@ -101,9 +101,20 @@ void patches_store_patch(struct event *e, char * patch_string) {
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->instrument, e->patch_number, patch_string);
     if (!AMY_IS_SET(e->patch_number)) {
-        // Allocate a new patch number.
+        // Check for a repeated string
+        for (int i = 0; i < MEMORY_PATCHES; ++i) {
+            if (memory_patch_oscs[i] > 0)
+                if (strcmp(memory_patch[i], patch_string) == 0) {
+                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
+                    // Actually, we don't need to store it, we already have it.
+                    //fprintf(stderr, "store_patch: using existing patch_number %d for '%s'\n", e->patch_number, patch_string);
+                    return;
+                }
+        }
+        // We need to allocate a new number.
         e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
-        //fprintf(stderr, "store_patch: auto-assigning patch number %d\n", e->patch_number);
+        // next_user_patch_index is updated as needed at the bottom of the function (so it can reflect user-defined numbers too).
+        //fprintf(stderr, "store_patch: auto-assigning patch number %d for '%s'\n", e->patch_number, patch_string);
     }
     int patch_index = e->patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= MEMORY_PATCHES) {

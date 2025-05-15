@@ -643,14 +643,17 @@ class TestVoiceManagement(AmyTest):
     # Patch is bare sinewave oscillator but with a 100ms release.
     #amy.send(patch_number=1024, patch=amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
     #amy.send(time=10, synth=0, num_voices=3, patch_number=1024)
-    amy.send(time=10, synth=0, num_voices=3, patch=amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
+    patch = amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,0,100,0')
+    amy.send(time=10, synth=0, num_voices=2, patch=patch)
     amy.send(time=100, synth=0, note=60, vel=1)
     amy.send(time=200, synth=0, note=72, vel=1)
-    amy.send(time=300, synth=0, note=84, vel=1)
+    # Check if using the same string for a second synth reuses the same memory_patch (based on debug fprintfs).
+    amy.send(time=200, synth=1, num_voices=1, patch=patch)
+    amy.send(time=300, synth=1, note=84, vel=1)
     # We ran out of voices, this should steal the first one
     amy.send(time=400, synth=0, note=96, vel=1)
     # Stop one
-    amy.send(time=500, synth=0, note=84, vel=0)
+    amy.send(time=500, synth=1, note=84, vel=0)
     # Stop all the rest.
     amy.send(time=600, synth=0, vel=0)
 
