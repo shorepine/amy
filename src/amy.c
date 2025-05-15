@@ -719,6 +719,8 @@ void amy_reset_oscs() {
     if (AMY_HAS_ECHO) config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
     // Reset patches
     patches_reset();
+    // Reset instruments (synths)
+    instruments_reset();
     // Reset memorypcm
     pcm_unload_all_presets();
 }
@@ -1660,16 +1662,9 @@ void amy_play_message(char *message) {
 
 
 void amy_default_setup() {
-    // Juno 6 poly on channel 1
-    struct event e = amy_default_event();
-    e.num_voices = 6;
-    e.patch_number = 0;
-    e.instrument = 1;
-    amy_add_event(&e);
-
     // sine wave "bleeper" on ch 16
     // store memory patch 1024 sine wave
-    e = amy_default_event();
+    struct event e = amy_default_event();
     e.patch_number = 1024;
     patches_store_patch(&e, "w0");
     e.num_voices = 1;
@@ -1690,6 +1685,13 @@ void amy_default_setup() {
     e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
     amy_add_event(&e);
 
+    // Juno 6 poly on channel 1
+    // Define this last so if we release it, the oscs aren't fragmented.
+    e = amy_default_event();
+    e.num_voices = 6;
+    e.patch_number = 0;
+    e.instrument = 1;
+    amy_add_event(&e);
 }
 
 // amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue

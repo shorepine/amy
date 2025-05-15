@@ -210,6 +210,15 @@ void instruments_init() {
     }
 }
 
+void instruments_reset() {
+    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++) {
+        if(instruments[i]) {
+            instrument_free(instruments[i]);
+        }
+        instruments[i]  = NULL;
+    }
+}
+
 void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
     if (instrument_number < 0 || instrument_number >= MAX_INSTRUMENTS) {
         fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, MAX_INSTRUMENTS);

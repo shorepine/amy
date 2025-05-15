@@ -686,6 +686,7 @@ float atoff(const char *s);
 int8_t oscs_init();
 void patches_init();
 void instruments_init();
+void instruments_reset();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;

@@ -53,7 +53,7 @@ void patches_debug() {
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
         int num_voices = instrument_get_voices(i, voices);
         if (num_voices) {
-            fprintf(stderr, "instrument %d num_voices %d voices", i, num_voices);
+            fprintf(stderr, "instrument %d num_voices %d patch_num %d flags %d voices", i, num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %d", voices[j]);
             fprintf(stderr, "\n");
         }
