@@ -204,9 +204,10 @@ def message(**kwargs):
     for key, map_code in kw_map.items():
         if key in kwargs:
             arg = kwargs[key]
-            type_code = map_code[-1]
-            wire_code = map_code[:-1]
-            m += wire_code + arg_handlers[type_code](arg)
+            if arg is not None:   # Ignore sequence=None.
+                type_code = map_code[-1]
+                wire_code = map_code[:-1]
+                m += wire_code + arg_handlers[type_code](arg)
     #print("message:", m)
     return m + 'Z'
 
