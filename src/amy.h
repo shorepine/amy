@@ -685,8 +685,6 @@ SAMPLE exp2_lut(SAMPLE x);
 float atoff(const char *s);
 int8_t oscs_init();
 void patches_init();
-void instruments_init();
-void instruments_reset();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
@@ -746,7 +744,10 @@ extern void patches_store_patch(struct event *e, char * message);
 #define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
+extern void instruments_init();
+extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);

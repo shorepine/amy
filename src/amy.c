@@ -536,7 +536,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
     if (e->voices[0] != 0 || AMY_IS_SET(e->instrument)) {
-        if (AMY_IS_SET(e->patch_number)) {
+        if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             patches_load_patch(e);
         }
         patches_event_has_voices(e, callback, user_data);

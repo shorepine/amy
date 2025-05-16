@@ -732,6 +732,8 @@ amy.send(synth=0, note=70, vel=0)
 amy.send(synth=0, vel=0)
 # Once a synth has been initialized and associated with a set of voices, you can use it alone with patch_number
 amy.send(synth=0, patch_number=13)  # Load a different Juno patch, will remain 4-voice.
+# You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
+amy.send(synth=0, num_voices=0)
 # As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets.
 amy.send(synth=10, num_voices=3, patch='w7f0Z', synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'

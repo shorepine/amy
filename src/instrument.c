@@ -211,12 +211,15 @@ void instruments_init() {
 }
 
 void instruments_reset() {
-    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++) {
-        if(instruments[i]) {
-            instrument_free(instruments[i]);
-        }
-        instruments[i]  = NULL;
+    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++)
+        instrument_release(i);
+}
+
+void instrument_release(int instrument_number) {
+    if(instruments[instrument_number]) {
+        instrument_free(instruments[instrument_number]);
     }
+    instruments[instrument_number] = NULL;
 }
 
 void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
