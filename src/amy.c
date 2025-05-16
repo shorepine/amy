@@ -438,6 +438,7 @@ struct event amy_default_event() {
     AMY_UNSET(e.instrument);
     AMY_UNSET(e.instrument_flags);
     AMY_UNSET(e.to_instrument);
+    AMY_UNSET(e.midi_grab_notes);
     AMY_UNSET(e.pedal);
     AMY_UNSET(e.num_voices);
     return e;
@@ -1666,7 +1667,7 @@ void amy_default_setup() {
     // store memory patch 1024 sine wave
     struct event e = amy_default_event();
     e.patch_number = 1024;
-    patches_store_patch(&e, "w0");
+    patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
     e.num_voices = 1;
     e.instrument = 16;
     amy_add_event(&e);

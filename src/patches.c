@@ -267,6 +267,10 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
             AMY_UNSET(e->to_instrument);
             // Then continue handling any other args.
         }
+        if (AMY_IS_SET(e->midi_grab_notes)) {
+            // Set the grab_midi state.
+            instrument_set_midi_grab_notes(e->instrument, e->midi_grab_notes);
+        }
         if (AMY_IS_SET(e->pedal)) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);
@@ -397,13 +401,13 @@ void patches_load_patch(struct event *e) {
                 ++v;
                 ++num_voices;
             }
-        }
-        // Was this deleting the instrument?
-        if (num_voices == 0) {
-            instrument_release(e->instrument);
-            // Delete the instrument number so we don't forward the 'rest' of the event to it.
-            AMY_UNSET(e->instrument);
-            return;
+            // Was this deleting the instrument?  i.e. was e->num_voices set but setting the num_voices to zero?
+            if (num_voices == 0) {
+                instrument_release(e->instrument);
+                // Delete the instrument number so we don't forward the 'rest' of the event to it.
+                AMY_UNSET(e->instrument);
+                return;
+            }
         }
         //fprintf(stderr, "Allocated %d voices to instrument %d patch %d\n", num_voices, e->instrument, patch_number);
         //for (int i = 0; i < num_voices; ++i) {

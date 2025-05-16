@@ -34,6 +34,7 @@ void amy_send_midi_note_off(uint16_t osc) {
 
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
 void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    if (!instrument_midi_grab_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
     e.instrument = channel;
@@ -45,6 +46,7 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t t
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
 void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    if (!instrument_midi_grab_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
     e.instrument = channel;

@@ -99,6 +99,7 @@ struct instrument_info {
     // Sustain tracking
     bool in_sustain;  // Pedal is down.
     bool pending_release[MAX_VOICES_PER_INSTRUMENT];
+    bool midi_grab_notes;  // Flag to automatically play midi notes.
 };
 
 
@@ -114,6 +115,7 @@ struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, ui
     instrument->patch_number = patch_number;
     instrument->flags = flags;
     instrument->in_sustain = false;
+    instrument->midi_grab_notes = true;
     instrument->released_voices = voice_fifo_init(num_voices, "released");
     instrument->active_voices = voice_fifo_init(num_voices, "active");
     for (uint8_t voice = 0; voice < num_voices; ++voice) {
@@ -234,6 +236,8 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
+    if (old_instrument_number == new_instrument_number)
+        return;  // Degenerate change.
     if (instruments[new_instrument_number]) {
         instrument_free(instruments[new_instrument_number]);
     }
@@ -325,4 +329,20 @@ uint32_t instrument_get_flags(int instrument_number) {
         return -1;
     }
     return instrument->flags;
+}
+
+bool instrument_midi_grab_notes(int instrument_number) {
+    struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument == NULL) {
+        return false;
+    }
+    return instrument->midi_grab_notes;
+}
+
+void instrument_set_midi_grab_notes(int instrument_number, bool midi_grab_notes) {
+    struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument == NULL) {
+        fprintf(stderr, "set_midi_grab_notes: instrument_number %d is not defined.\n", instrument_number);
+    }
+    instrument->midi_grab_notes = midi_grab_notes;
 }

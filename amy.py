@@ -159,7 +159,7 @@ def message(**kwargs):
         ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
         ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
         ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
-        ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), # 'i' is prefix for some two-letter synth-level codes.
+        ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('midi_grab_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
         ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
         ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
     ])
@@ -178,9 +178,13 @@ def message(**kwargs):
         if 'patch' in kwargs and not ('patch_number' in kwargs or 'synth' in kwargs or 'voices' in kwargs):
             print('\'patch\' is only valid with a \'patch_number\' or to define a new \'synth\' or \'voices\'.')
             # And yet we plow ahead...
+        if 'patch' in kwargs:
+            # Try to avoid mistakenly calling 'patch' when you meant 'patch_number'.
+            if not isinstance(kwargs['patch'], str):
+                raise ValueError('\'patch\' should be a wire command string, not \'' + str(kwargs['patch']) + '\'.')
         if 'num_partials' in kwargs:
-            if 'patch' in kwargs:
-                raise ValueError('You cannot use \'num_partials\' and \'patch\' in the same message.')
+            if 'preset' in kwargs:
+                raise ValueError('You cannot use \'num_partials\' and \'preset\' in the same message.')
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 

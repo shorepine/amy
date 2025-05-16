@@ -211,6 +211,7 @@ void amy_parse_synth_layer_message(char *message, struct event *e) {
     else if (cmd == 'f')  e->instrument_flags = atoi(message);
     else if (cmd == 'v')  e->num_voices = atoi(message);
     else if (cmd == 't')  e->to_instrument = atoi(message);
+    else if (cmd == 'm')  e->midi_grab_notes = atoi(message);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 
