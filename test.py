@@ -460,7 +460,7 @@ class TestJunoPatch(AmyTest):
 
   def run(self):
     # Also test the synth mechanism.
-    amy.send(time=0, synth=1, voices="0,1,2,3", load_patch=20)
+    amy.send(time=0, synth=1, num_voices=4, load_patch=20)
     amy.send(time=50, synth=1, note=48, vel=1)
     amy.send(time=150, synth=1, note=60, vel=1)
     amy.send(time=250, synth=1, note=63, vel=1)
@@ -641,7 +641,7 @@ class TestVoiceManagement(AmyTest):
   def run(self):
     # Patch is bare sinewave oscillator but with a 100ms release.
     amy.send(store_patch='1024,' + amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
-    amy.send(time=10, synth=0, voices='0,1,2', load_patch=1024)
+    amy.send(time=10, synth=0, num_voices=3, load_patch=1024)
     amy.send(time=100, synth=0, note=60, vel=1)
     amy.send(time=200, synth=0, note=72, vel=1)
     amy.send(time=300, synth=0, note=84, vel=1)
@@ -669,6 +669,44 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestDefaultChan1Synth(AmyTest):
+  """Test default setup of Juno synth on synth 1 (MIDI channel 1)."""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+
+  def run(self):
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=300, synth=1, note=63, vel=1)
+    amy.send(time=500, synth=1, note=67, vel=1)
+    amy.send(time=700, synth=1, note=74, vel=1)
+    amy.send(time=800, synth=1, note=60, vel=0)
+    amy.send(time=850, synth=1, note=63, vel=0)
+    amy.send(time=900, synth=1, note=67, vel=0)
+    amy.send(time=950, synth=1, note=74, vel=0)
+
+
+class TestSynthProgChange(AmyTest):
+  """Test switchting default synth to DX7, do oscs allocate OK?"""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+
+  def run(self):
+    # DX7 first patch, uses 9 oscs/voice, num_voices is inherited from previous init.
+    amy.send(time=0, synth=1, load_patch=128)
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=300, synth=1, note=63, vel=1)
+    amy.send(time=500, synth=1, note=67, vel=1)
+    amy.send(time=700, synth=1, note=74, vel=1)
+    amy.send(time=800, synth=1, note=60, vel=0)
+    amy.send(time=850, synth=1, note=63, vel=0)
+    amy.send(time=900, synth=1, note=67, vel=0)
+    amy.send(time=950, synth=1, note=74, vel=0)
+
+
 class TestSynthDrums(AmyTest):
   """Test MIDI drums using synth-level note translation."""
 
@@ -691,7 +729,7 @@ class TestSynthFlags(AmyTest):
     # The default config is NOT set, set up MIDI drums on instrument 1 here.
     amy.send(store_patch='1024,w7f0');
     # synth_flags=3 means do MIDI drums note translation and ignore note-offs.
-    amy.send(synth=1, synth_flags=3, voices='0,1,2,3', load_patch=1024)
+    amy.send(synth=1, synth_flags=3, num_voices=4, load_patch=1024)
     amy.send(time=100, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=37, vel=100/127)  # snare
@@ -713,7 +751,7 @@ class TestSustainPedal(AmyTest):
   """Test sustain pedal."""
 
   def run(self):
-    amy.send(time=0, synth=1, voices='0,1,2,3', load_patch=256)
+    amy.send(time=0, synth=1, num_voices=4, load_patch=256)
     amy.send(time=50, synth=1, note=60, vel=1)
     amy.send(time=100, synth=1, note=60, vel=0)
     amy.send(time=150, synth=1, pedal=127)

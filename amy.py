@@ -149,16 +149,17 @@ def parse_ctrl_coefs(coefs):
 
 # Construct an AMY message
 def message(**kwargs):
-    # Each keyword maps to two chars, first is the wire protocol prefix, second is an arg type code
+    # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
               'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'gI', 'volume': 'VF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
               'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
               'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
               'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF', 'synth': 'iI', 'pedal': 'qI',
+              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
+              'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', 'to_synth': 'itI', # 'i' is prefix for some two-letter synth-level codes.
               'patch': 'pI', 'num_partials': 'pI', # Note alaising.
-              'algorithm': 'oI', 'synth_flags': 'oI', # Note aliasing.
+              'algorithm': 'oI',
               }
     arg_handlers = {
         'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
@@ -191,7 +192,9 @@ def message(**kwargs):
             if key != 'time' and key != 'sequence':
                 raise ValueError('No arg for key ' + key)
         else:
-            wire_code, type_code = kw_map[key]
+            map_code = kw_map[key]
+            type_code = map_code[-1]
+            wire_code = map_code[:-1]
             m += wire_code + arg_handlers[type_code](arg)
     #print("message:", m)
     return m + 'Z'

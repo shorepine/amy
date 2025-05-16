@@ -205,6 +205,10 @@ Here's the full list:
 | `H`    | `sequence` | int,int,int | Tick offset, period, tag for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `i`    | `synth`  | 0-31  | Define a set of voices for voice management. |
+| `if`   | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->patch translation; 2 = Drop note-off events. |
+| `ip`   | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
+| `it`   | `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
+| `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `instrument=X, load_patch=Y`. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
@@ -216,11 +220,9 @@ Here's the full list:
 | `n`    | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
-| `o`    | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->patch translation; 2 = Drop note-off events.  (Note alias with `algorithm` code). |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
-| `q`    | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `R`    | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
@@ -713,7 +715,7 @@ You can "record" patches in a sequence of commands like this:
 A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices, e.g.
 
 ```python
-amy.send(synth=0, voices='0,1,2', load_patch=1)     # 4-voice Juno path #1 on synth 0
+amy.send(synth=0, num_voices=3, load_patch=1)     # 3-voice Juno path #1 on synth 0
 # Play three notes simultaneously
 amy.send(synth=0, note=60, vel=1)
 amy.send(synth=0, note=64, vel=1)
@@ -728,7 +730,7 @@ amy.send(synth=0, vel=0)
 amy.send(synth=0, load_patch=13)  # Load a different Juno patch, will remain 4-voice.
 # As a special case, you can set up a MIDI drum synth that will translate note events into PCM presets.
 amy.send(store_patch='1024,w7f0')
-amy.send(synth=10, voices='3,4,5', load_patch=1024, synth_flags=3)
+amy.send(synth=10, num_voices=3, load_patch=1024, synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
 

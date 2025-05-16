@@ -414,9 +414,13 @@ struct event {
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
+    // Instrument-layer values.
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
+    uint8_t to_instrument;  // For moving setup between synth numbers.
     uint8_t pedal;  // MIDI pedal value.
+    uint16_t num_voices;
+    //
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
@@ -655,6 +659,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
 int16_t * amy_simple_fill_buffer() ;
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
+void print_osc_debug(int i /* osc */, bool show_eg);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 uint32_t amy_sysclock();
@@ -741,6 +746,7 @@ extern void patches_store_patch(char * message);
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
 extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
@@ -803,6 +809,14 @@ extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len,
 extern SAMPLE scan_max(SAMPLE* block, int len);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
+#define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
+#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
+#define AMY_RENDER_TASK_COREID (0)
+#define AMY_FILL_BUFFER_TASK_COREID (1)
+#define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
+#define AMY_FILL_BUFFER_TASK_STACK_SIZE (8 * 1024)
+#define AMY_RENDER_TASK_NAME      "amy_r_task"
+#define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"
 esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
 #endif

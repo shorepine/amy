@@ -259,13 +259,6 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 //todo
 #endif
 
-#define ESP_USB_HOST
-
-#ifdef ESP_USB_HOST
-extern void send_usb_midi_out(uint8_t * data, uint16_t len);
-extern bool midi_has_out;
-#endif
-
 
 #ifndef MACOS
 
@@ -280,12 +273,14 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 #endif
 
 void midi_out(uint8_t * bytes, uint16_t len) {
-    #ifdef ESP_USB_HOST
-    send_usb_midi_out(bytes,len);
-    #elif defined TUD_USB_GADGET
+    #if defined TUD_USB_GADGET
     tud_midi_stream_write(0, bytes, len);
-    #else
+    #elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
+    #elif defined PI_PICO
+    // TBD
+    #else
+    // linux? 
     #endif
 }
 

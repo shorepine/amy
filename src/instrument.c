@@ -221,11 +221,21 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
     instruments[instrument_number] = instrument_init(num_voices, amy_voices, patch_number, flags);
 }
 
+void instrument_change_number(int old_instrument_number, int new_instrument_number) {
+    if (instruments[new_instrument_number]) {
+        instrument_free(instruments[new_instrument_number]);
+    }
+    instruments[new_instrument_number] = instruments[old_instrument_number];
+    instruments[old_instrument_number] = NULL;
+}
+
+
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
+        //fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
+        // instrument_get_voices is used to test if an instrument is set or not, so no error message if it isn't.
     } else {
         num_voices = instrument->num_voices;
         for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];

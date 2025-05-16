@@ -81,10 +81,47 @@ void example_voice_chord(uint32_t start, uint16_t patch) {
     e.time = start;
     amy_add_event(&e);
     start += 2000;
-    
+
     strcpy(e.voices, "0,1,2");
     e.velocity = 0;
     e.time = start;
+    amy_add_event(&e);
+}
+
+void example_synth_chord(uint32_t start, uint16_t patch) {
+    // Like example_voice_chord, but use 'instrument' (synth) to avoid having to keep track of voices.
+    struct event e = amy_default_event();
+    e.time = start;
+    e.load_patch = patch;
+    e.num_voices = 3;
+    e.instrument = 0;
+    amy_add_event(&e);
+    start += 250;
+
+    e = amy_default_event();
+    e.velocity = 0.5;
+    e.instrument = 0;
+
+    e.time = start;
+    e.midi_note = 50;
+    amy_add_event(&e);
+
+    e.time += 1000;
+    e.midi_note = 54;  // Will get a new voice.
+    amy_add_event(&e);
+
+    e.time += 1000;
+    e.midi_note = 56;
+    amy_add_event(&e);
+
+    e.time += 2000;
+    e.velocity = 0;
+    // Voices are referenced only by their note, so have to turn them off individually.
+    e.midi_note = 50;
+    amy_add_event(&e);
+    e.midi_note = 54;
+    amy_add_event(&e);
+    e.midi_note = 56;
     amy_add_event(&e);
 }   
 
