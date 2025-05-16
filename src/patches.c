@@ -267,9 +267,9 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
             AMY_UNSET(e->to_instrument);
             // Then continue handling any other args.
         }
-        if (AMY_IS_SET(e->midi_grab_notes)) {
+        if (AMY_IS_SET(e->grab_midi_notes)) {
             // Set the grab_midi state.
-            instrument_set_midi_grab_notes(e->instrument, e->midi_grab_notes);
+            instrument_set_grab_midi_notes(e->instrument, e->grab_midi_notes);
         }
         if (AMY_IS_SET(e->pedal)) {
             // Pedal events are a special case

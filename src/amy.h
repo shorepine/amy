@@ -418,7 +418,7 @@ struct event {
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
     uint8_t to_instrument;  // For moving setup between synth numbers.
-    uint8_t midi_grab_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
+    uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
     //
@@ -757,8 +757,8 @@ extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices)
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
-extern bool instrument_midi_grab_notes(int instrument_number);
-extern void instrument_set_midi_grab_notes(int instrument_number, bool midi_grab_notes);
+extern bool instrument_grab_midi_notes(int instrument_number);
+extern void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;

@@ -209,7 +209,7 @@ Here's the full list:
 | `ip`   | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
 | `it`   | `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
 | `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `instrument=X, patch[_number]=Y`. |
-| `im`   | `midi_grab_notes` | 0/1 | Use `amy.send(instrument=CHANNEL, midi_grab_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
+| `im`   | `grab_midi_notes` | 0/1 | Use `amy.send(instrument=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
