@@ -3,7 +3,7 @@
 #ifndef __INTERP_PARTIALS_H
 #define __INTERP_PARTIALS_H
 
-#define NUM_INTERP_PARTIALS_PATCHES 1
+#define NUM_INTERP_PARTIALS_PRESETS 1
 
 #define NUM_PIANO_SAMPLE_TIMES_MS 20
 const uint16_t piano_sample_times_ms[NUM_PIANO_SAMPLE_TIMES_MS] = {
@@ -1885,7 +1885,7 @@ const uint8_t piano_harmonics_mags[NUM_PIANO_HARMONICS_MAGS] = {
     34, 36, 36, 36, 32, 27, 29, 23, 21, 21, 27, 17, 13, 26, 23, 19, 20, 25, 24, 18,
 };
 
-const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PATCHES] = {
+const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] = {
     {
         NUM_PIANO_SAMPLE_TIMES_MS,
         piano_sample_times_ms,
