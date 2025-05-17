@@ -90,11 +90,11 @@ amy_err_t setup_i2s(void) {
             .bit_order_lsb = false,
         },
         .gpio_cfg = {
-            .mclk = amy_global.config.mclk, 
-            .bclk = amy_global.config.bclk,
-            .ws = amy_global.config.lrc,
-            .dout = amy_global.config.dout,
-            .din = amy_global.config.din,
+            .mclk = amy_global.config.i2s_mclk, 
+            .bclk = amy_global.config.i2s_bclk,
+            .ws = amy_global.config.i2s_lrc,
+            .dout = amy_global.config.i2s_dout,
+            .din = amy_global.config.i2s_din,
             .invert_flags = {
                 .mclk_inv = false,
                 .bclk_inv = true, // invert bclk for pcm9211 
@@ -172,7 +172,6 @@ amy_err_t i2s_amy_init() {
 #include "pico-audio/audio_i2s.h"
 #include "pico/binary_info.h"
 
-bi_decl(bi_3pins_with_names(PICO_AUDIO_I2S_DATA_PIN, "I2S DIN", PICO_AUDIO_I2S_CLOCK_PIN_BASE, "I2S BCK", PICO_AUDIO_I2S_CLOCK_PIN_BASE+1, "I2S LRCK"));
 
 struct audio_buffer_pool *ap;
 
@@ -234,8 +233,8 @@ struct audio_buffer_pool *init_audio() {
     bool __unused ok;
     const struct audio_format *output_format;
     struct audio_i2s_config config = {
-            .data_pin = PICO_AUDIO_I2S_DATA_PIN,
-            .clock_pin_base = PICO_AUDIO_I2S_CLOCK_PIN_BASE,
+            .data_pin = amy_global.config.i2s_dout,
+            .clock_pin_base = amy_global.config.i2s_bclk,
             .dma_channel = 0,
             .pio_sm = 0,
     };
@@ -264,7 +263,6 @@ void core1_main() {
 
 amy_err_t i2s_amy_init() {
     set_sys_clock_khz(250000000 / 1000, false); 
-    //stdio_init_all();
     multicore_launch_core1(core1_main);
     sleep_ms(500);
     ap = init_audio();

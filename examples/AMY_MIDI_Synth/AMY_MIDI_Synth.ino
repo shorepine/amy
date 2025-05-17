@@ -23,9 +23,10 @@ void setup() {
   amy_config.cores = 2;
 
   // Pins for i2s board
-  amy_config.i2s_lrc = 11;
-  amy_config.i2s_bclk = 10;
-  amy_config.i2s_dout = 12;
+  amy_config.i2s_bclk = 8;
+  // On Pi Pico (RP2040, RP2530), i2s_lrc has to be i2s_bclk + 1, and what you set here is ignored
+  amy_config.i2s_lrc = 9;
+  amy_config.i2s_dout = 10;
 
   // Pins for UART MIDI
   amy_config.midi_out = -1;

@@ -7,6 +7,12 @@
 #include <emscripten.h>
 #endif
 
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#include "pico/stdlib.h"
+#include "hardware/uart.h"
+#include "hardware/irq.h"
+#endif
+
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
@@ -260,9 +266,6 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 
 
 
-#ifdef PI_PICO
-//todo
-#endif
 
 
 #ifndef MACOS
@@ -282,8 +285,8 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     tud_midi_stream_write(0, bytes, len);
     #elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
-    #elif defined PI_PICO
-    // TBD
+    #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+    uart_write_blocking(uart1, bytes, len);
     #else
     // linux? 
     #endif
@@ -301,7 +304,18 @@ void send_usb_midi_out(uint8_t *bytes, uint16_t len) {
 
 #endif
 
-#ifdef ESP_PLATFORM
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+// RX interrupt handler
+void on_pico_uart_rx() {
+    uint8_t byte[1];
+    while (uart_is_readable(uart1)) {
+        uart_read_blocking (uart1, byte, 1);
+        convert_midi_bytes_to_messages(byte,1,0);
+    }
+}
+#endif
+
+#if (defined ESP_PLATFORM) || (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
 void run_midi() {
 #else
   void *run_midi(void*vargp) {
@@ -350,7 +364,19 @@ void run_midi() {
             convert_midi_bytes_to_messages(data,length,0);
         }
     } // end loop forever
-    #endif // ESP_PLATFORM
+
+    #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+    uart_init(uart1, 31250);
+    gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_out));
+    gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
+    uart_set_hw_flow(uart1, false, false);
+    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
+    uart_set_fifo_enabled(uart1, false);
+    irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
+    irq_set_enabled(UART1_IRQ, true);
+    uart_set_irq_enables(uart1, true, false);
+
+    #endif // pi pico
 
     #ifdef TUD_USB_GADGET
     // check midi USB gadget
@@ -363,7 +389,7 @@ void run_midi() {
     }
     #endif
 
-#ifndef ESP_PLATFORM
+#if (!defined ESP_PLATFORM) && (!defined ARDUINO_ARCH_RP2040) && (!defined ARDUINO_ARCH_RP2530)
     return NULL;
 #endif
 }
