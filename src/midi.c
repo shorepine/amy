@@ -34,6 +34,7 @@ void amy_send_midi_note_off(uint16_t osc) {
 
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
 void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    if (!instrument_grab_midi_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
     e.instrument = channel;
@@ -45,6 +46,7 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t t
 
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
 void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
+    if (!instrument_grab_midi_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
     e.instrument = channel;
@@ -60,7 +62,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
     e.instrument = channel;
     e.source = EVENT_MIDI;
     // The MIDI patch number is within the block-of-256 of existing patch numbers, so DX7 patches will remain DX7.
-    e.load_patch = program + (instrument_get_patch_number(e.instrument) & 0xFF80);
+    e.patch_number = program + (instrument_get_patch_number(e.instrument) & 0xFF80);
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
     }

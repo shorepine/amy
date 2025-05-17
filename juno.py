@@ -210,8 +210,8 @@ class JunoPatch:
   sub_freq = '440'
   # List of the 5 basic oscs that need cloning.
   oscs_to_clone = set()
-  # Amy voices
-  amy_voices = list()
+  # Amy synth
+  amy_synth = None
 
   @staticmethod
   def from_patch_number(patch_number):
@@ -273,8 +273,8 @@ class JunoPatch:
     byte_values.append(val)
     return bytes(byte_values)
 
-  def set_voices(self, amy_voices):
-    self.amy_voices = amy_voices
+  def set_synth(self, amy_synth):
+    self.amy_synth = amy_synth
 
   def _breakpoint_string(self):
     """Format a breakpoint string from the ADSR parameters reaching a peak."""
@@ -310,7 +310,7 @@ class JunoPatch:
     return int(round(20 * math.pow(2, port_val * 127 / 30)))
 
   def init_AMY(self):
-    """Output AMY commands to set up patches on all the allocated voices.
+    """Output AMY commands to set up patches on all the allocated synth.
     Send amy.send(osc=0, note=50, vel=1) afterwards."""
     #amy.reset()
     # base_osc is pulse/PWM
@@ -320,7 +320,7 @@ class JunoPatch:
     # base_osc + 4 is LFO
     #   env0 is VCA
     #   env1 is VCF
-    # These are the canonical oscs (to add to amy.send(voices=..)).
+    # These are the canonical oscs (to add to amy.send(synth=..)).
     self.pwm_osc = 0
     self.saw_osc = 1
     self.sub_osc = 2
@@ -466,8 +466,7 @@ class JunoPatch:
     amy.send(pitch_bend=value)
 
   def amy_send(self, osc, **kwargs):
-    if self.amy_voices:
-      voices_str = ','.join([str(v) for v in self.amy_voices])
-      amy.send(voices=voices_str, osc=osc, **kwargs)
+    if self.amy_synth:
+      amy.send(synth=self.amy_synth, osc=osc, **kwargs)
     else:
       amy.send(osc=osc, **kwargs)

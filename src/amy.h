@@ -242,7 +242,7 @@ extern void (*amy_external_block_done_hook)(void);
 extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 
 enum params{
-    WAVE, PATCH, MIDI_NOTE,              // 0, 1, 2
+    WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
     AMP,                                 // 3..9
     DUTY=AMP + NUM_COMBO_COEFS,          // 10..16
     FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 17
@@ -382,9 +382,9 @@ struct event {
     uint32_t time;
     uint16_t osc;
     uint16_t wave;
-    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
+    int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
-    uint16_t load_patch;
+    uint16_t patch_number;
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];
     float filter_freq_coefs[NUM_COMBO_COEFS];
@@ -418,6 +418,7 @@ struct event {
     uint8_t instrument;
     uint32_t instrument_flags;  // Special flags to set when defining instruments.
     uint8_t to_instrument;  // For moving setup between synth numbers.
+    uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
     //
@@ -430,7 +431,7 @@ struct event {
 struct synthinfo {
     uint16_t osc; // self-reference
     uint16_t wave;
-    int16_t patch;  // Negative patch is voice count for build-your-own PARTIALS
+    int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
@@ -685,7 +686,6 @@ SAMPLE exp2_lut(SAMPLE x);
 float atoff(const char *s);
 int8_t oscs_init();
 void patches_init();
-void instruments_init();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
@@ -741,11 +741,14 @@ extern void patches_event_has_voices(struct event *e, void (*callback)(struct de
 extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
-extern void patches_store_patch(char * message);
+extern void patches_store_patch(struct event *e, char * message);
 #define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
 #define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
+extern void instruments_init();
+extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
@@ -754,6 +757,8 @@ extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices)
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern bool instrument_grab_midi_notes(int instrument_number);
+extern void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;
@@ -793,8 +798,8 @@ extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern SAMPLE amy_get_random();
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
-extern void pcm_unload_patch(uint16_t patch_number);
-extern void pcm_unload_all_patches();
+extern void pcm_unload_preset(uint16_t patch_number);
+extern void pcm_unload_all_presets();
 
 // filters
 extern void filters_init();

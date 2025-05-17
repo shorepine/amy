@@ -26,7 +26,7 @@ def generate_amy_pcm_header(sample_set, name, pcm_AMY_SAMPLE_RATE=22050):
         try:
             sf2 = Sf2File(open(fn, 'rb'))
         except:
-            print("For PCM patches, download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
+            print("For PCM presetes, download the sf2 files first. See comment in amy_headers.generate_amy_pcm_header()")
             return
         if is_inst:
             for i,inst in enumerate(sf2.instruments[:-1]):
@@ -352,7 +352,7 @@ def make_piano_patch():
     # This just allocates the 20 oscs needed for a INTERP_PARTIALS patch
     # dpwe wants to add a `num_suboscs` field to fix this behavior soon
     amy.send(chorus=0) # Piano sounds weird with chorus on
-    amy.send(osc=0, wave=amy.INTERP_PARTIALS, patch=0)
+    amy.send(osc=0, wave=amy.INTERP_PARTIALS, preset=0)
     amy.send(osc=20, wave=amy.PARTIAL)
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
@@ -415,7 +415,7 @@ def make_interp_partials(filename, data_dict):
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// Piano interpolated partials data table\n")
         f.write("#ifndef __INTERP_PARTIALS_H\n#define __INTERP_PARTIALS_H\n\n")
-        f.write("#define NUM_INTERP_PARTIALS_PATCHES %d\n\n" % len(data_dict))
+        f.write("#define NUM_INTERP_PARTIALS_PRESETS %d\n\n" % len(data_dict))
         map_contents = ""
         for tag, data in data_dict.items():
             for varname, dtype in [('sample_times_ms', 'uint16_t'),
@@ -440,7 +440,7 @@ def make_interp_partials(filename, data_dict):
     },
 """ % (TAG, tag, TAG, tag, TAG, tag, tag, tag, tag)
 
-        f.write("const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PATCHES] = {\n")
+        f.write("const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] = {\n")
         f.write(map_contents)
         f.write("};\n\n")
         f.write("#endif // ndef __INTERP_PARTIALS_H\n\n")

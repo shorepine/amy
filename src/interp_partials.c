@@ -69,7 +69,7 @@ float _env_lin_of_db(float db) {
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
     // We coerce this voice into being a partial, regardless of user wishes.
     synth[o].wave = PARTIAL;
-    synth[o].patch = -1;  // Flag that this is an envelope-based partial
+    synth[o].preset = -1;  // Flag that this is an envelope-based partial
     // Setup the specified frequency.
     synth[o].logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
     // Setup envelope.
@@ -95,8 +95,8 @@ void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partial
 }
 
 void interp_partials_note_on(uint16_t osc) {
-    // Choose the interp_partials patch.
-    const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
+    // Choose the interp_partials preset.
+    const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].preset % NUM_INTERP_PARTIALS_PRESETS];
     float midi_note = synth[osc].midi_note;
     float midi_vel = (int)roundf(synth[osc].velocity * 127.f);
     // Clip
@@ -158,8 +158,8 @@ void interp_partials_note_on(uint16_t osc) {
 }
 
 void interp_partials_note_off(uint16_t osc) {
-    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].patch % NUM_INTERP_PARTIALS_PATCHES];
-    //int num_oscs = partials_voice->num_harmonics[0];   // Assume first patch has the max #harmonics.
+    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].preset % NUM_INTERP_PARTIALS_PRESETS];
+    //int num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
     int num_oscs = 0; //MAX_NUM_HARMONICS;
     // Actual max num harmonics we may use is the number of 1s in the use_this_partial_map.
     for (int i = 0; i < MAX_NUM_HARMONICS; ++i) num_oscs += use_this_partial_map[i];

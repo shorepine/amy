@@ -1,3 +1,4 @@
+import collections
 import time
 from amy_constants import *
 
@@ -147,55 +148,74 @@ def parse_ctrl_coefs(coefs):
     return ','.join([to_str(x) for x in coefs])
 
 
+_KW_MAP_LIST = [   # Order matters because patch string must come last.
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
+    ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
+    ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
+    ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
+    ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
+    ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
+    ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('grab_midi_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
+    ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
+    ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
+]
+_KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
+_KW_MAP = dict(_KW_MAP_LIST)
+
+_ARG_HANDLERS = {
+    'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
+}
+
 # Construct an AMY message
 def message(**kwargs):
+    #print("message:", kwargs)
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
-    kw_map = {'osc': 'vI', 'wave': 'wI', 'note': 'nF', 'vel': 'lF', 'amp': 'aC', 'freq': 'fC', 'duty': 'dC', 'feedback': 'bF', 'time': 'tI',
-              'reset': 'SI', 'phase': 'PF', 'pan': 'QC', 'client': 'gI', 'volume': 'VF', 'pitch_bend': 'sF', 'filter_freq': 'FC', 'resonance': 'RF',
-              'bp0': 'AL', 'bp1': 'BL', 'eg0_type': 'TI', 'eg1_type': 'XI', 'debug': 'DI', 'chained_osc': 'cI', 'mod_source': 'LI', 
-              'eq': 'xL', 'filter_type': 'GI', 'ratio': 'IF', 'latency_ms': 'NI', 'algo_source': 'OL', 'load_sample': 'zL',
-              'chorus': 'kL', 'reverb': 'hL', 'echo': 'ML', 'load_patch': 'KI', 'store_patch': 'uS', 'voices': 'rL',
-              'external_channel': 'WI', 'portamento': 'mI', 'sequence': 'HL', 'tempo': 'jF',
-              'synth': 'iI', 'pedal': 'ipI', 'synth_flags': 'ifI', 'num_voices': 'ivI', 'to_synth': 'itI', # 'i' is prefix for some two-letter synth-level codes.
-              'patch': 'pI', 'num_partials': 'pI', # Note alaising.
-              'algorithm': 'oI',
-              }
-    arg_handlers = {
-        'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
-    }
-    unrecognized_keywords = set(kwargs).difference(set(kw_map))
-    if unrecognized_keywords:
-        raise ValueError('Unrecognized keyword(s): %s' % unrecognized_keywords)
+    global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
     if show_warnings:
         # Check for possible user confusions.
-        if 'voices' in kwargs and 'patch' in kwargs and 'osc' not in kwargs:
-            print('You specified \'voices\' and \'patch\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
-        if 'voices' in kwargs and 'synth' in kwargs and not 'load_patch' in kwargs:
-            print('You specified both \'synth\' and \'voices\' in a non-\'load_patch\' message, but \'synth\' defines the voices.')
-        if 'store_patch' in kwargs and len(kwargs) > 1:
-            print('\'store_patch\' should be the only arg in a message.')
+        if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
+            print('You specified \'voices\' and \'preset\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
+        if 'voices' in kwargs and 'synth' in kwargs and not ('patch_number' in kwargs or 'patch' in kwargs):
+            print('You specified both \'synth\' and \'voices\' in a non-\'patch\'/\'patch_number\' message, but \'synth\' defines the voices.')
+        if 'patch' in kwargs and not ('patch_number' in kwargs or 'synth' in kwargs or 'voices' in kwargs):
+            print('\'patch\' is only valid with a \'patch_number\' or to define a new \'synth\' or \'voices\'.')
             # And yet we plow ahead...
+        if 'patch' in kwargs:
+            # Try to avoid mistakenly calling 'patch' when you meant 'patch_number'.
+            if not isinstance(kwargs['patch'], str):
+                raise ValueError('\'patch\' should be a wire command string, not \'' + str(kwargs['patch']) + '\'.')
         if 'num_partials' in kwargs:
-            if 'patch' in kwargs:
-                raise ValueError('You cannot use \'num_partials\' and \'patch\' in the same message.')
+            if 'preset' in kwargs:
+                raise ValueError('You cannot use \'num_partials\' and \'preset\' in the same message.')
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 
     if(insert_time is not None and 'time' not in kwargs):
         kwargs['time'] = insert_time()
 
-    m = ""
+    # Validity check all the passed args.
+    prioritized_keys = []
     for key, arg in kwargs.items():
+        if key not in _KW_MAP:
+            raise ValueError('Unknown keyword ' + key)
+        priority = _KW_PRIORITY[key]
         if arg is None:
-            # Just ignore time or sequence=None
+            # Ignore time=None or sequence=None
             if key != 'time' and key != 'sequence':
                 raise ValueError('No arg for key ' + key)
         else:
-            map_code = kw_map[key]
-            type_code = map_code[-1]
-            wire_code = map_code[:-1]
-            m += wire_code + arg_handlers[type_code](arg)
+            prioritized_keys.append((priority, key))
+    # Sort by priority, then strip the priority value.
+    prioritized_keys = [e[1] for e in sorted(prioritized_keys)]
+    # We process the passed args by testing each entry in the known keys in order, to make sure 'patch' is added last.
+    m = ''
+    for key in prioritized_keys:
+        map_code = _KW_MAP[key]
+        arg = kwargs[key]
+        type_code = map_code[-1]
+        wire_code = map_code[:-1]
+        m += wire_code + _ARG_HANDLERS[type_code](arg)
     #print("message:", m)
     return m + 'Z'
 
@@ -414,7 +434,7 @@ def play_patches(wait=1, patch_total = 256, **kwargs):
     while True:
         patch = random.randint(0,256) #patch_count % patch_total
         print("Sending patch %d" %(patch))
-        send(osc=0, load_patch=patch)
+        send(osc=0, patch_number=patch)
         time.sleep(wait/4.0)            
         patch_count = patch_count + 1
         send(osc=0, note=50, vel=1, **kwargs)

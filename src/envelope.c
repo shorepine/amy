@@ -116,9 +116,9 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
             // OK. partials (et al) need a frame to fade out to avoid clicks. This is in conflict with the breakpoint release, 
             // which will set it to the bp end value before the fade out, often 0 so the fadeout never gets to hit. 
             // I'm not sure i love this solution, but PARTIAL is such a weird type that i guess having it called out like this is fine.
-            // We had to add a further special case (testing patch is not negative) because "build your own partial" mode wants
+            // We had to add a further special case (testing preset is not negative) because "build your own partial" mode wants
             // to fully respect the actual envelope, else it pops up to full amplitude after the release.
-            if(synth[osc].wave==PARTIAL && synth[osc].patch >= 0) {
+            if(synth[osc].wave==PARTIAL && synth[osc].preset >= 0) {
                 scale = F2S(1.0f);
                 synth[osc].last_scale[bp_set] = scale;
                 //return scale;

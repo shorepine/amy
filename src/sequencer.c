@@ -56,6 +56,7 @@ void add_delta_to_sequencer(struct delta *d, void*user_data) {
 uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uint32_t tag) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
+    //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, tick, period, tag);
     sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
     while ((*entry_ll_ptr) != NULL) {
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
