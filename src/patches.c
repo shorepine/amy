@@ -288,11 +288,11 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
             num_voices = instrument_get_voices(e->instrument, voices);
         } else {
             // velocity is present, this is a note-on/note-off.
-            if (! (AMY_IS_SET(e->midi_note) && e->midi_note != 0) && AMY_IS_UNSET(e->preset)) {
-                // velocity without a note number (or for midi_note=0).  This is valid for velocity==0 => all-notes-off.
+            if (AMY_IS_UNSET(e->midi_note) && AMY_IS_UNSET(e->preset)) {
+                // velocity without midi_note is valid for velocity==0 => all-notes-off.
                 if (e->velocity != 0) {
                     // Attempted a note-on to all voices, suppress.
-                    fprintf(stderr, "note-on for synth %d without specifying note (or note 0) - ignored.\n", e->instrument);
+                    fprintf(stderr, "note-on with no note for synth %d - ignored.\n", e->instrument);
                     return;
                 }
                 // All notes off - find out which voices are actually currently active, so we can turn them off.

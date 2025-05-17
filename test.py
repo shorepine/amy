@@ -654,7 +654,7 @@ class TestVoiceManagement(AmyTest):
     amy.send(time=400, synth=0, note=96, vel=1)
     # Stop one
     amy.send(time=500, synth=1, note=84, vel=0)
-    # Stop all the rest.
+    # Stop all the rest - vel=0 without note= means all notes off.
     amy.send(time=600, synth=0, vel=0)
 
 

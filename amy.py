@@ -148,27 +148,30 @@ def parse_ctrl_coefs(coefs):
     return ','.join([to_str(x) for x in coefs])
 
 
+_KW_MAP_LIST = [   # Order matters because patch string must come last.
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
+    ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
+    ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
+    ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
+    ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
+    ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
+    ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('grab_midi_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
+    ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
+    ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
+]
+_KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
+_KW_MAP = dict(_KW_MAP_LIST)
+
+_ARG_HANDLERS = {
+    'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
+}
+
 # Construct an AMY message
 def message(**kwargs):
+    #print("message:", kwargs)
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
-    kw_map = collections.OrderedDict([   # Order matters because patch string must come last.
-        ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
-        ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
-        ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
-        ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
-        ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
-        ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
-        ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('grab_midi_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
-        ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
-        ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
-    ])
-    arg_handlers = {
-        'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
-    }
-    unrecognized_keywords = set(kwargs).difference(set(kw_map))
-    if unrecognized_keywords:
-        raise ValueError('Unrecognized keyword(s): %s' % unrecognized_keywords)
+    global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
@@ -191,23 +194,28 @@ def message(**kwargs):
     if(insert_time is not None and 'time' not in kwargs):
         kwargs['time'] = insert_time()
 
-    m = ""
     # Validity check all the passed args.
+    prioritized_keys = []
     for key, arg in kwargs.items():
-        if key not in kw_map:
+        if key not in _KW_MAP:
             raise ValueError('Unknown keyword ' + key)
+        priority = _KW_PRIORITY[key]
         if arg is None:
-            # Just ignore time or sequence=None
+            # Ignore time=None or sequence=None
             if key != 'time' and key != 'sequence':
                 raise ValueError('No arg for key ' + key)
+        else:
+            prioritized_keys.append((priority, key))
+    # Sort by priority, then strip the priority value.
+    prioritized_keys = [e[1] for e in sorted(prioritized_keys)]
     # We process the passed args by testing each entry in the known keys in order, to make sure 'patch' is added last.
-    for key, map_code in kw_map.items():
-        if key in kwargs:
-            arg = kwargs[key]
-            if arg is not None:   # Ignore sequence=None.
-                type_code = map_code[-1]
-                wire_code = map_code[:-1]
-                m += wire_code + arg_handlers[type_code](arg)
+    m = ''
+    for key in prioritized_keys:
+        map_code = _KW_MAP[key]
+        arg = kwargs[key]
+        type_code = map_code[-1]
+        wire_code = map_code[:-1]
+        m += wire_code + _ARG_HANDLERS[type_code](arg)
     #print("message:", m)
     return m + 'Z'
 
