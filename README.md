@@ -31,7 +31,7 @@ It supports
  * Each oscillator has 2 envelope generators, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band EQ
- * Built in patches for PCM, DX7, piano, Juno and partials
+ * Built in preset patches for PCM, DX7, piano, Juno and partials
  * A front end for Juno-6 patches and conversion setup commands 
  * Built-in clock and pattern sequencer
  * Can use multi-core (including microcontrollers) for rendering if available
@@ -88,7 +88,7 @@ In Python, rendering to a buffer of samples, using the high level API:
 
 ```python
 >>> import amy
->>> m = amy.message(voices='0', load_patch=130, note=50, vel=1)
+>>> m = amy.message(voices='0', patch_number=130, note=50, vel=1)
 >>> print(m) # Show the wire protocol message
 v0n50l1K130r0Z
 >>> amy.send_raw(m)
@@ -101,7 +101,7 @@ You can also start a thread playing live audio:
 ```python
 >>> import amy
 >>> amy.live() # can optinally pass in playback and capture audio device IDs, amy.live(2, 1) 
->>> amy.send(voices='0', load_patch=130, note=50, vel=1)
+>>> amy.send(voices='0', patch_number=130, note=50, vel=1)
 >>> amy.stop()
 ```
 
@@ -205,23 +205,24 @@ Here's the full list:
 | `H`    | `sequence` | int,int,int | Tick offset, period, tag for sequencing | 
 | `h`    | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
 | `i`    | `synth`  | 0-31  | Define a set of voices for voice management. |
-| `if`   | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->patch translation; 2 = Drop note-off events. |
+| `if`   | `synth_flags` | uint | Flags for synth creation: 1 = Use MIDI drum note->preset translation; 2 = Drop note-off events. |
 | `ip`   | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
 | `it`   | `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
-| `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `instrument=X, load_patch=Y`. |
+| `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `instrument=X, patch[_number]=Y`. |
+| `im`   | `grab_midi_notes` | 0/1 | Use `amy.send(instrument=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
 | `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
-| `K`    | `load_patch` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified voice (or starting at the selected oscillator). |
+| `K`    | `patch_number` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified instrument or voice. |
 | `l`    | `vel` | float 0-1+ | Velocity: > 0 to trigger note on, 0 to trigger note off |
 | `L`    | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
 | `m`    | `portamento` | uint | Time constant (in ms) for pitch changes when note is changed without intervening note-off.  default 0 (immediate), 100 is good. |
 | `M`    | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, filter_coef (-1 is HPF, 0 is flat, +1 is LPF). |
-| `n`    | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed |
+| `n`    | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed. |
 | `N`    | `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `o`    | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `patch` | int | Which predefined PCM or Partials patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `load_patch`). |
+| `p`    | `preset` | int | Which predefined PCM or Partials preset patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `patch_number`). |
 | `P`    | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `Q`    | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `r`    | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
@@ -230,13 +231,13 @@ Here's the full list:
 | `S`    | `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock (immediately, ignoring `time`). RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `t`    | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `T`    | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `u`    | `store_patch` | number,string | Store up to 32 patches in RAM with ID number (1024-1055) and AMY message after a comma. Must be sent alone |
+| `u`    | `patch` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch_number`, or directly configure a `synth`. |
 | `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
 | `w`    | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `z`    | `load_sample` | uint x 6 | Signal to start loading sample. patch, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `patch` and `length=0` to unload a sample from RAM. |
+| `z`    | `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
 
 
 
@@ -293,17 +294,17 @@ If you are including AMY in a program, you can set the hook `void (*amy_external
 Sequencer examples:
 
 ```python
-amy.send(osc=2, vel=1, wave=amy.PCM, patch=2, sequence="1000,,3") # play a PCM drum at absolute tick 1000 
+amy.send(osc=2, vel=1, wave=amy.PCM, preset=2, sequence="1000,,3") # play a PCM drum at absolute tick 1000 
 
-amy.send(osc=0, vel=1, wave=amy.PCM, patch=0, sequence=",24,1") # play a PCM drum every eighth note.
-amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, sequence=",48,2") # play a PCM drum every quarter note.
+amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, sequence=",24,1") # play a PCM drum every eighth note.
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence=",48,2") # play a PCM drum every quarter note.
 amy.send(sequence=",,1") # remove the eighth note sequence
-amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, note=70, sequence=",48,2") # change the quarter note event
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, note=70, sequence=",48,2") # change the quarter note event
 
 amy.send(reset=amy.RESET_SEQUENCER) # clears the sequence
 
-amy.send(osc=0, vel=1, wave=amy.PCM, patch=0, sequence="0,384,1") # first slot of a 16 1/8th note drum machine
-amy.send(osc=1, vel=1, wave=amy.PCM, patch=1, sequence="216,384,2") # ninth slot of a 16 1/8th note drum machine
+amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, sequence="0,384,1") # first slot of a 16 1/8th note drum machine
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence="216,384,2") # ninth slot of a 16 1/8th note drum machine
 
 
 ```
@@ -484,11 +485,11 @@ If you are building your own audio system around AMY you will want to fill in th
 Try default DX7 patches, from 128 to 256:
 
 ```python
-amy.send(voices='0', load_patch=128)
-amy.send(voices='0', note=50,vel=1)
+amy.send(voices='0', patch_number=128)  # Set up a voice.
+amy.send(voices='0', note=50, vel=1)  # Play a note on the voice.
 ```
 
-The `load_patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
+The `patch_number` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
 
 ![DX7 Algorithms](https://raw.githubusercontent.com/shorepine/alles/main/pics/dx7_algorithms.jpg)
 
@@ -543,12 +544,12 @@ Additive synthesis is simply adding together oscillators to make more complex to
 
 ![Partials](https://raw.githubusercontent.com/shorepine/alles/main/pics/partials.png)
 
-We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
+We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these preset patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
 
 ```python
-amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, patch=5) # a nice organ tone
-amy.send(osc=0, vel=1, note=55, wave=amy.PARTIALS, patch=5) # change the frequency
-amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, patch=6, ratio=0.2) # ratio slows down the partial playback
+amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, preset=5) # a nice organ tone
+amy.send(osc=0, vel=1, note=55, wave=amy.PARTIALS, preset=5) # change the frequency
+amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, preset=6, ratio=0.2) # ratio slows down the partial playback
 ```
 
 The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
@@ -635,21 +636,21 @@ Please see our [piano voice documentation](https://shorepine.github.io/amy/piano
 
 ## PCM
 
-AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and patch numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the baked-in PCM sample bank using `amy_headers.py`. 
+AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and preset numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the baked-in PCM sample bank using `amy_headers.py`. 
 
 
 ```python
-amy.send(osc=0, wave=amy.PCM, vel=1, patch=10) # cowbell
-amy.send(osc=0, wave=amy.PCM, vel=1, patch=10, note=70) # higher cowbell! 
+amy.send(osc=0, wave=amy.PCM, vel=1, preset=10) # cowbell
+amy.send(osc=0, wave=amy.PCM, vel=1, preset=10, note=70) # higher cowbell! 
 ```
 
 You can turn on sample looping, helpful for instruments, using `feedback`:
 
 ```python
-amy.send(wave=amy.PCM,vel=1,patch=21,feedback=0) # clean guitar string, no looping
-amy.send(wave=amy.PCM,vel=1,patch=21,feedback=1) # loops forever until note off
+amy.send(wave=amy.PCM,vel=1,preset=21,feedback=0) # clean guitar string, no looping
+amy.send(wave=amy.PCM,vel=1,preset=21,feedback=1) # loops forever until note off
 amy.send(vel=0) # note off
-amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
+amy.send(wave=amy.PCM,vel=1,preset=35,feedback=1) # nice violin
 ```
 
 ## Sampler (aka Memory PCM)
@@ -657,27 +658,27 @@ amy.send(wave=amy.PCM,vel=1,patch=35,feedback=1) # nice violin
 You can also load your own samples into AMY at runtime. We support sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
 
 ```python
-amy.load_sample("G1.wav", patch=3)
-amy.send(osc=0, wave=amy.PCM, patch=3, vel=1) # plays the sample
+amy.load_sample("G1.wav", preset=3)
+amy.send(osc=0, wave=amy.PCM, preset=3, vel=1) # plays the sample
 ```
 
-You can use any patch number. If it overlaps with an existing PCM baked in number, it will play the memory sample instead of the baked in sample until you `unload_sample` the patch.
+You can use any preset number. If it overlaps with an existing PCM baked in number, it will play the memory sample instead of the baked in sample until you `unload_sample` the preset.
 
 If the WAV file has sampler metadata like loop points or base MIDI note, we use that in AMY. You can set it directly as well using `loopstart`, `loopend`, `midinote` or `length` in the `load_sample` call. To unload a sample:
 
 ```python
-amy.unload_sample(3) # unloads the RAM for patch 3
+amy.unload_sample(3) # unloads the RAM for preset 3
 ```
 
-Under the hood, if AMY receives a `load_sample` message (with patch number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
+Under the hood, if AMY receives a `load_sample` message (with preset number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
 
 ## <a name="voices_and_patches"></a>Voices, patches, and synths (DX7, Piano, Juno-6, custom) support
 
 Up until now, we have been directly controlling the AMY oscillators, which are the fundamental building blocks for sound production.  However, as we've seen, most interesting tones involve multiple oscillators.  AMY provides a second layer of organization, **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.  You can also manage a set of voices using a **synth**, which takes care of allocating available voices to successive notes.
 
-A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
+A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` or `synth` args when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
 
-To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers and a piano, you allocate them to one or more voices, then send note events, or parameter moidifications, to those voices. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
+To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers and a piano, you allocate them to one or more voices (either directly or as part of a synth), then send note events, or parameter moidifications, to those voices. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
 amy.send(voices='0,1,2,3', load_patch=1)     # Juno patch #1 on voice 0-3
@@ -688,16 +689,20 @@ amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the Juno vo
 
 The code in `amy_headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches by storing alternative wire-protocol setup strings in `patches.h`.
 
-You can also create your own patches at runtime and use them for voices with `store_patch='PATCH_NUMBER,AMY_PATCH_STRING'` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
+You can also create your own patches at runtime and use them for voices with `amy.send(patch_number=PATCH_NUMBER, patch='AMY_PATCH_STRING')` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
 
 So you can do:
 ```
 >>> import amy; amy.live()  # Not needed on Tulip.
->>> amy.send(store_patch='1024,v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
->>> amy.send(voices=0, load_patch=1024)
+>>> amy.send(patch_number=1024, patch='v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
+>>> amy.send(voices=0, patch_number=1024)
 >>> amy.send(voices=0, vel=2, note=50)
 ```
-AMY infers the number of oscs needed for the patch at `store_patch` time. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
+You can also directly specify the patch string when loading a patch into a voice or synth, if you won't need to reference it again:
+```
+>>> amy.send(voices=0, patch='v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
+```
+AMY infers the number of oscs needed for the patch from the `patch` string. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
 
 You can "record" patches in a sequence of commands like this:
 ```
@@ -707,15 +712,15 @@ You can "record" patches in a sequence of commands like this:
 >>> bass_drum = amy.retrieve_patch()
 >>> bass_drum
 'v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z'
->>> amy.send(store_patch='1024,' + bass_drum)
+>>> amy.send(patch_number=1024, patch=bass_drum)
 ```
 
-**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `load_patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and manage your own oscillator mapping in your code.
+**Note on patches and AMY timing**: If you're using AMY's time scheduler (see below) note that unlike all other AMY commands, allocating new voices from patches (using `patch_number` or `patch`) will happen once AMY receives the message, not using any advance clock (`time`) you may have set. This default is the right decision for almost all use cases of AMY, but if you do need to be able to "schedule" voice allocations within the short term scheduling window, you can load patches by sending the patch string directly to AMY using the timer, and manage your own oscillator mapping in your code.
 
-A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices, e.g.
+A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices; the `synth` arg becomes a smart alias for the appropriate `voices`, e.g.
 
 ```python
-amy.send(synth=0, num_voices=3, load_patch=1)     # 3-voice Juno path #1 on synth 0
+amy.send(synth=0, num_voices=3, patch_number=1)     # 3-voice Juno path #1 on synth 0
 # Play three notes simultaneously
 amy.send(synth=0, note=60, vel=1)
 amy.send(synth=0, note=64, vel=1)
@@ -724,14 +729,15 @@ amy.send(synth=0, note=67, vel=1)
 amy.send(synth=0, note=70, vel=1)
 # We can send note-offs to individual notes
 amy.send(synth=0, note=70, vel=0)
-# .. or we can send note-offs to all the currently-active synth voices by not specifying a note
+# .. or we can send note-offs to all the currently-active synth voices by sending a note-off with no note.
 amy.send(synth=0, vel=0)
-# Once a synth has been initialized and associated with a set of voices, you can use it alone with load_patch
-amy.send(synth=0, load_patch=13)  # Load a different Juno patch, will remain 4-voice.
-# As a special case, you can set up a MIDI drum synth that will translate note events into PCM presets.
-amy.send(store_patch='1024,w7f0')
-amy.send(synth=10, num_voices=3, load_patch=1024, synth_flags=3)
+# Once a synth has been initialized and associated with a set of voices, you can use it alone with patch_number
+amy.send(synth=0, patch_number=13)  # Load a different Juno patch, will remain 4-voice.
+# You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
+amy.send(synth=0, num_voices=0)
+# As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets.
+amy.send(synth=10, num_voices=3, patch='w7f0Z', synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
 
-(Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `patch` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.)
+(Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `preset` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.)

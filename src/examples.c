@@ -17,13 +17,13 @@ void example_reset(uint32_t start) {
 void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
     struct event e = amy_default_event();
-    e.load_patch = 1;
+    e.patch_number = 1;
     strcpy(e.voices, "0,1");
     amy_add_event(&e);
     delay_ms(250);
 
     e = amy_default_event();
-    e.load_patch = 131;
+    e.patch_number = 131;
     strcpy(e.voices, "0");
     amy_add_event(&e);
     delay_ms(250);
@@ -46,7 +46,7 @@ void example_voice_alloc() {
 
     // now try to alloc voice 0 with a juno, should use oscs 0-4 again
     e = amy_default_event();
-    e.load_patch = 2;
+    e.patch_number = 2;
     strcpy(e.voices, "0");
     amy_add_event(&e);
     delay_ms(250);
@@ -56,7 +56,7 @@ void example_voice_alloc() {
 void example_voice_chord(uint32_t start, uint16_t patch) {
     struct event e = amy_default_event();
     e.time = start;
-    e.load_patch = patch;
+    e.patch_number = patch;
     strcpy(e.voices, "0,1,2");
     amy_add_event(&e);
     start += 250;
@@ -92,7 +92,7 @@ void example_synth_chord(uint32_t start, uint16_t patch) {
     // Like example_voice_chord, but use 'instrument' (synth) to avoid having to keep track of voices.
     struct event e = amy_default_event();
     e.time = start;
-    e.load_patch = patch;
+    e.patch_number = patch;
     e.num_voices = 3;
     e.instrument = 0;
     amy_add_event(&e);
@@ -129,7 +129,7 @@ void example_synth_chord(uint32_t start, uint16_t patch) {
 void example_patches() {
     struct event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
-        e.load_patch = i;
+        e.patch_number = i;
         strcpy(e.voices, "0");
         fprintf(stderr, "sending patch %d\n", i);
         amy_add_event(&e);
@@ -172,7 +172,7 @@ void example_ks(uint32_t start) {
     e.velocity = 1;
     e.wave = KS;
     e.feedback = 0.996f;
-    e.patch = 15;
+    e.preset = 15;
     e.osc = 0;
     e.midi_note = 60;
     amy_add_event(&e);
@@ -214,11 +214,11 @@ void example_multimbral_fm() {
     char *voices[] = {"0","1","2","3","4","5"};
     int notes[] = {60, 70, 64, 68, 72, 82};
     e.velocity = 0.5;
-    e.load_patch = 128;
+    e.patch_number = 128;
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e.midi_note = notes[i];
         e.pan_coefs[0] = (i%2);
-        e.load_patch++;
+        e.patch_number++;
         strcpy(e.voices, voices[i]);
         amy_add_event(&e);
         delay_ms(1000);
@@ -231,7 +231,7 @@ void example_drums(uint32_t start, int loops) {
 
     // bd, snare, hat, cow, hicow
     int oscs[] = {0, 1, 2, 3, 4};
-    int patches[] = {1, 5, 0, 10, 10};
+    int presets[] = {1, 5, 0, 10, 10};
 
     // Reset all used oscs first, just in case
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
@@ -250,7 +250,7 @@ void example_drums(uint32_t start, int loops) {
 
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
         e.osc = oscs[i];
-        e.patch = patches[i];
+        e.preset = presets[i];
         amy_add_event(&e);
     }
     // Update high cowbell.
