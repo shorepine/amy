@@ -3,6 +3,9 @@
 
 #include "amy.h"
 #include "midi.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
@@ -272,7 +275,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
             }, bytes, len
         );
 }
-#endif
+#else
 
 void midi_out(uint8_t * bytes, uint16_t len) {
     #if defined TUD_USB_GADGET
@@ -285,6 +288,8 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     // linux? 
     #endif
 }
+
+#endif
 
 #if (defined TULIP) || (defined AMYBOARD)
   #define MALLOC_CAP_SYSEX MALLOC_CAP_SPIRAM
