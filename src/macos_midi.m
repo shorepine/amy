@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #define unichar OSX_UNICHAR
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
@@ -103,3 +104,4 @@ void* run_midi(void*argp){
     }
     return NULL;
 }
+#endif
