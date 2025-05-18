@@ -36,7 +36,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 \
 -s ALLOW_MEMORY_GROWTH=1 \
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
--s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_sysclock', '_amy_live_stop', '_amy_get_input_buffer', '_amy_set_external_input_buffer', '_amy_live_start', '_amy_start', '_sequencer_ticks', '_malloc', '_free']"
+-s EXPORTED_FUNCTIONS="['_amy_play_message', '_amy_reset_sysclock', '_amy_sysclock', '_amy_live_stop', '_amy_get_input_buffer', '_amy_set_external_input_buffer', '_amy_live_start', '_amy_start_web', '_sequencer_ticks', '_malloc', '_free']"
 
 PYTHON = python3
 

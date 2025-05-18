@@ -375,5 +375,11 @@ void run_midi() {
 }
 #endif
 
+#ifdef __linux__
+void run_midi() {
+    fprintf(stderr, "no MIDI support on linux yet\n");
+}
+#endif
+
 
 #endif // check for macos desktop 

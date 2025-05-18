@@ -532,6 +532,7 @@ typedef struct delay_line {
 
 typedef struct  {
     // feature flags
+    uint8_t set_default_synth;
     uint8_t has_reverb;
     uint8_t has_echo;
     uint8_t has_chorus;
@@ -540,12 +541,12 @@ typedef struct  {
     uint8_t has_midi_uart;
     uint8_t has_midi_gadget;
     uint8_t has_midi_mac;
+    uint8_t has_midi_web;
 
     uint8_t has_partials;
     uint8_t has_custom; 
 
     // variables
-    uint8_t set_default_synth;
     uint16_t max_oscs;
     uint8_t cores;
     uint8_t ks_oscs;
