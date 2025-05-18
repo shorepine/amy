@@ -307,11 +307,13 @@ void send_usb_midi_out(uint8_t *bytes, uint16_t len) {
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
 // RX interrupt handler
 void on_pico_uart_rx() {
-    uint8_t byte[1];
+    uint8_t bytes[32];
+    uint8_t i = 0;
     while (uart_is_readable(uart1)) {
-        uart_read_blocking (uart1, byte, 1);
-        convert_midi_bytes_to_messages(byte,1,0);
+        uart_read_blocking (uart1, bytes + i, 1);
+        i++;
     }
+    convert_midi_bytes_to_messages(bytes,i,0);
 }
 #endif
 
@@ -375,7 +377,6 @@ void run_midi() {
     irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(uart1, true, false);
-
     #endif // pi pico
 
     #ifdef TUD_USB_GADGET

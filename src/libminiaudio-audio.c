@@ -46,6 +46,10 @@ void main_loop__em()
 }
 #endif
 
+void amy_update() {
+    // does nothing on miniaudio
+}
+
 void amy_print_devices() {
     ma_context context;
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
