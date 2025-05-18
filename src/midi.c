@@ -184,7 +184,7 @@ void parse_sysex() {
             amy_play_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-	  amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
+    	   amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
     }
 }
