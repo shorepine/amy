@@ -94,13 +94,9 @@ timing: amy-module
 docs/amy.js: $(TARGET)
 	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
-docs/amy-audioin.js: $(TARGET)
-	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
-
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
 	-rm -f amy_constants.py
 	-rm -f docs/amy.js
-	-rm -f docs/amy-audioin.js
 	-rm -f $(TARGET)
