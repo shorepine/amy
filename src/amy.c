@@ -1729,7 +1729,7 @@ void amy_start(amy_config_t c) {
     #else
     run_midi();
     #endif
-    
+
     amy_profiles_init();
     sequencer_init();
     oscs_init();
