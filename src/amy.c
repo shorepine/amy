@@ -1704,7 +1704,6 @@ void amy_stop() {
 
 void amy_start(amy_config_t c) {
     global_init(c);
-    #ifndef ESP_PLATFORM
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
         #ifndef __EMSCRIPTEN__
@@ -1714,9 +1713,12 @@ void amy_start(amy_config_t c) {
         }
         #endif
     #endif
-    #else
+    #ifdef ESP_PLATFORM
     xQueueSemaphore = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(run_midi, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+    #endif
+    #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+    run_midi(); // returns
     #endif
     amy_profiles_init();
     sequencer_init();

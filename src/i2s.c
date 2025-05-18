@@ -162,6 +162,10 @@ amy_err_t i2s_amy_init() {
     return AMY_OK;
 }
 
+void amy_update() {
+    // does nothing on esp
+}
+
 
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
 
@@ -198,12 +202,12 @@ static inline uint32_t _millis(void)
     return to_ms_since_boot(get_absolute_time());
 }
 
-void pi_pico_fill_audio_buffer() {
-    
+void amy_update() {
     amy_prepare_buffer();
-    send_message_to_other_core(32);
-    amy_render(0, AMY_OSCS/2, 0);
-    await_message_from_other_core(64);
+    //send_message_to_other_core(32);
+    amy_render(0, AMY_OSCS, 0);
+    //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+    //await_message_from_other_core(64);
     int16_t *block = amy_fill_buffer();
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
@@ -253,22 +257,23 @@ struct audio_buffer_pool *init_audio() {
 
 void core1_main() {
     while(1) {
-        int32_t ret = 0;
-        while(ret!=32) ret = await_message_from_other_core();
-        amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-        send_message_to_other_core(64);
+        //uart_puts(uart0, "core0\n");
+        //int32_t ret = 0;
+        //while(ret!=32) ret = await_message_from_other_core();
+        //uart_puts(uart0, "core1\n");
+        //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+        //uart_puts(uart0, "core2\n");
+        //send_message_to_other_core(64);
+        //uart_puts(uart0, "core3\n");
     }
 
 }
 
 amy_err_t i2s_amy_init() {
     set_sys_clock_khz(250000000 / 1000, false); 
-    multicore_launch_core1(core1_main);
+    //multicore_launch_core1(core1_main);
     sleep_ms(500);
     ap = init_audio();
-    while(1) {
-        pi_pico_fill_audio_buffer();
-    }
     return AMY_OK;
 }
 

@@ -650,6 +650,7 @@ extern struct mod_synthinfo* msynth;
 extern struct state amy_global; 
 
 
+void amy_update();
 
 struct event amy_default_event();
 void amy_deltas_reset();
