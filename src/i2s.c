@@ -6,17 +6,17 @@
 // teensy 3.6, 4.0, 4.1
 
 // Only run this code on MCUs
-#if defined(ESP_PLATFORM) || !defined(PICO_ON_DEVICE) || !defined(ARDUINO)
-#include <esp_task.h>
+#if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO) 
+
 #include "amy.h"
 
 
 
 #ifdef ESP_PLATFORM
+#include <esp_task.h>
+
 ///////////////////////////////////////////////////////////////
 // ESP32, S3, P4 (maybe others)
-
-
 
 
 TaskHandle_t amy_render_handle;
@@ -90,11 +90,11 @@ amy_err_t setup_i2s(void) {
             .bit_order_lsb = false,
         },
         .gpio_cfg = {
-            .mclk = amy_global.config.mclk, 
-            .bclk = amy_global.config.bclk,
-            .ws = amy_global.config.lrc,
-            .dout = amy_global.config.dout,
-            .din = amy_global.config.din,
+            .mclk = amy_global.config.i2s_mclk, 
+            .bclk = amy_global.config.i2s_bclk,
+            .ws = amy_global.config.i2s_lrc,
+            .dout = amy_global.config.i2s_dout,
+            .din = amy_global.config.i2s_din,
             .invert_flags = {
                 .mclk_inv = false,
                 .bclk_inv = true, // invert bclk for pcm9211 
@@ -162,8 +162,121 @@ amy_err_t i2s_amy_init() {
     return AMY_OK;
 }
 
+void amy_update() {
+    // does nothing on esp
+}
 
-#elif defined PICO_ON_DEVICE 
+
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+
+#include "hardware/clocks.h"
+#include "hardware/structs/clocks.h"
+#include "pico/multicore.h"
+#include "pico/stdlib.h"
+#include "pico-audio/audio_i2s.h"
+#include "pico/binary_info.h"
+
+
+struct audio_buffer_pool *ap;
+
+int32_t await_message_from_other_core() {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
+         __wfe();
+     }
+     int32_t msg = sio_hw->fifo_rd;
+     __sev();
+     return msg;
+ }
+
+ // Send 32-bit message to other core
+ void send_message_to_other_core(int32_t t) {
+     while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
+         __wfe();
+     }
+     sio_hw->fifo_wr = t;
+     __sev();
+ }
+
+static inline uint32_t _millis(void)
+{
+    return to_ms_since_boot(get_absolute_time());
+}
+
+void amy_update() {
+    amy_prepare_buffer();
+    //send_message_to_other_core(32);
+    amy_render(0, AMY_OSCS, 0);
+    //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+    //await_message_from_other_core(64);
+    int16_t *block = amy_fill_buffer();
+    size_t written = 0;
+    struct audio_buffer *buffer = take_audio_buffer(ap, true);
+    int16_t *samples = (int16_t *) buffer->buffer->bytes;
+    for (uint i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; i++) {
+        samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
+    }
+    buffer->sample_count = AMY_BLOCK_SIZE;
+    give_audio_buffer(ap, buffer);
+}
+
+
+struct audio_buffer_pool *init_audio() {
+    static audio_format_t audio_format = {
+            .format = AUDIO_BUFFER_FORMAT_PCM_S16,
+            .sample_freq = AMY_SAMPLE_RATE,
+            .channel_count = AMY_NCHANS,
+    };
+
+    static struct audio_buffer_format producer_format = {
+            .format = &audio_format,
+            .sample_stride = sizeof(int16_t) * AMY_NCHANS,
+    };
+
+    struct audio_buffer_pool *producer_pool = audio_new_producer_pool(&producer_format, 3, AMY_BLOCK_SIZE);
+
+    bool __unused ok;
+    const struct audio_format *output_format;
+    struct audio_i2s_config config = {
+            .data_pin = amy_global.config.i2s_dout,
+            .clock_pin_base = amy_global.config.i2s_bclk,
+            .dma_channel = 0,
+            .pio_sm = 0,
+    };
+
+    output_format = audio_i2s_setup(&audio_format, &config);
+    if (!output_format) {
+        panic("PicoAudio: Unable to open audio device.\n");
+    }
+
+    ok = audio_i2s_connect(producer_pool);
+    assert(ok);
+    audio_i2s_set_enabled(true);
+
+    return producer_pool;
+}
+
+void core1_main() {
+    while(1) {
+        //uart_puts(uart0, "core0\n");
+        //int32_t ret = 0;
+        //while(ret!=32) ret = await_message_from_other_core();
+        //uart_puts(uart0, "core1\n");
+        //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+        //uart_puts(uart0, "core2\n");
+        //send_message_to_other_core(64);
+        //uart_puts(uart0, "core3\n");
+    }
+
+}
+
+amy_err_t i2s_amy_init() {
+    set_sys_clock_khz(250000000 / 1000, false); 
+    //multicore_launch_core1(core1_main);
+    sleep_ms(500);
+    ap = init_audio();
+    return AMY_OK;
+}
+
 
 
 

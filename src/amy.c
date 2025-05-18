@@ -351,6 +351,7 @@ amy_config_t amy_default_config() {
     c.delta_fifo_len = 2400;
     c.has_audio_in = 1;
     c.has_midi_uart = 0;
+    c.has_midi_web = 0;
     c.has_midi_gadget = 0;
     c.set_default_synth = 1;
     c.cores = 1;
@@ -1530,7 +1531,7 @@ int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
     #ifdef __EMSCRIPTEN__
     // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
-    emscripten_audio_worklet_post_function_v(0, amy_block_processed);
+    //emscripten_audio_worklet_post_function_v(0, amy_block_processed);
     #else
     amy_block_processed();
     #endif
@@ -1702,20 +1703,33 @@ void amy_stop() {
     oscs_deinit();
 }
 
+
+#ifdef __EMSCRIPTEN__
+void amy_start_web() {
+    // a shim for web AMY, as it's annoying to build structs in js
+    amy_config_t amy_config = amy_default_config();
+    amy_config.has_midi_web = 1;
+    amy_start(amy_config);
+}
+#endif
+
 void amy_start(amy_config_t c) {
     global_init(c);
-    #ifndef ESP_PLATFORM
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
-        if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
+        #ifndef __EMSCRIPTEN__
+        if(amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
             pthread_t midi_thread_id;
             pthread_create(&midi_thread_id, NULL, run_midi, NULL);
         }
-    #endif
-    #else
+        #endif
+    #elif defined ESP_PLATFORM
     xQueueSemaphore = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(run_midi, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+    #else
+    run_midi();
     #endif
+
     amy_profiles_init();
     sequencer_init();
     oscs_init();

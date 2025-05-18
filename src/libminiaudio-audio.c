@@ -46,6 +46,10 @@ void main_loop__em()
 }
 #endif
 
+void amy_update() {
+    // does nothing on miniaudio
+}
+
 void amy_print_devices() {
     ma_context context;
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
@@ -209,16 +213,24 @@ void *miniaudio_run(void *vargp) {
     return NULL;
 }
 
-void amy_live_start() {
-    // kick off a thread running miniaudio_run
-    amy_global.running = 1;
-    #ifdef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+void amy_live_start_web_audioin() {
+    amy_global.config.has_audio_in = 1;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
-    #else
+}
+void amy_live_start_web() {
+    amy_global.config.has_audio_in = 0;
+    emscripten_cancel_main_loop();
+    miniaudio_init();
+    emscripten_set_main_loop(main_loop__em, 0, 0);
+}
+#endif
+void amy_live_start() {
+    // kick off a thread running miniaudio_run
+    amy_global.running = 1;
     pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
-    #endif
 }
 
 

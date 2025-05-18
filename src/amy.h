@@ -532,6 +532,7 @@ typedef struct delay_line {
 
 typedef struct  {
     // feature flags
+    uint8_t set_default_synth;
     uint8_t has_reverb;
     uint8_t has_echo;
     uint8_t has_chorus;
@@ -540,12 +541,12 @@ typedef struct  {
     uint8_t has_midi_uart;
     uint8_t has_midi_gadget;
     uint8_t has_midi_mac;
+    uint8_t has_midi_web;
 
     uint8_t has_partials;
     uint8_t has_custom; 
 
     // variables
-    uint8_t set_default_synth;
     uint16_t max_oscs;
     uint8_t cores;
     uint8_t ks_oscs;
@@ -650,6 +651,7 @@ extern struct mod_synthinfo* msynth;
 extern struct state amy_global; 
 
 
+void amy_update();
 
 struct event amy_default_event();
 void amy_deltas_reset();
@@ -814,8 +816,15 @@ extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len,
 extern SAMPLE scan_max(SAMPLE* block, int len);
 // Use the esp32 optimized biquad filter if available
 #ifdef ESP_PLATFORM
-#define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
-#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX )
+
+// On Arduino, something doesn't allow ESP_TASK_PRIO_MAX in tasks
+#ifdef ARDUINO
+#define AMY_RENDER_TASK_PRIORITY (20) 
+#define AMY_FILL_BUFFER_TASK_PRIORITY (20)
+#else
+#define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX)
+#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX)
+#endif
 #define AMY_RENDER_TASK_COREID (0)
 #define AMY_FILL_BUFFER_TASK_COREID (1)
 #define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)

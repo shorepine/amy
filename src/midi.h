@@ -38,9 +38,11 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 #ifdef ESP_PLATFORM
 #define MIDI_TASK_COREID (0)
-#define MIDI_TASK_STACK_SIZE (16 * 1024)
+#define MIDI_TASK_STACK_SIZE (8 * 1024)
 #define MIDI_TASK_NAME      "amy_midi_task"
 #define MIDI_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 2)
+void run_midi();
+#elif  (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
 void run_midi();
 #else
 void *run_midi(void*vargp);

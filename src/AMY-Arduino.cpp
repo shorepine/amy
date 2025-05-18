@@ -1,6 +1,6 @@
 // AMY-Arduino.cpp
 // connector for Arduino
-
+#if 0
 #include "Arduino.h"
 #include "AMY-Arduino.h"
 
@@ -86,7 +86,7 @@ void AMY::fm(uint32_t start) {
     example_fm(start);
 }
 
-
+#endif
 
 
 

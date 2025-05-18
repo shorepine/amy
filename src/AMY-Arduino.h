@@ -20,6 +20,7 @@ extern "C" {
   #include "examples.h"
 }
 
+#if 0
 
 class AMY
 {
@@ -49,5 +50,5 @@ class AMY
 #endif
 
 
-
+#endif
 

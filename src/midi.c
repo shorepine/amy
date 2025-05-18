@@ -3,6 +3,15 @@
 
 #include "amy.h"
 #include "midi.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#include "pico/stdlib.h"
+#include "hardware/uart.h"
+#include "hardware/irq.h"
+#endif
 
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
@@ -175,7 +184,7 @@ void parse_sysex() {
             amy_play_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-	  amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
+    	   amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
     }
 }
@@ -256,54 +265,36 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 }
 
 
+///// Per platform MIDI in and out stuff
+///////////////////////////////////////////////
 
-#ifdef PI_PICO
-//todo
-#endif
+#if !(defined MACOS && !defined __EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
 
-
-#ifndef MACOS
-
-#ifdef __EMSCRIPTEN__
 void midi_out(uint8_t * bytes, uint16_t len) {
+#ifdef __EMSCRIPTEN__
     EM_ASM(
             if(midiOutputDevice != null) {
                 midiOutputDevice.send(HEAPU8.subarray($0, $0 + $1));
             }, bytes, len
         );
-}
-#endif
-
-void midi_out(uint8_t * bytes, uint16_t len) {
-    #if defined TUD_USB_GADGET
+#elif defined TUD_USB_GADGET
     tud_midi_stream_write(0, bytes, len);
-    #elif defined ESP_PLATFORM
+#elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
-    #elif defined PI_PICO
-    // TBD
-    #else
-    // linux? 
-    #endif
-}
-
-#if (defined TULIP) || (defined AMYBOARD)
-  #define MALLOC_CAP_SYSEX MALLOC_CAP_SPIRAM
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+    uart_write_blocking(uart1, bytes, len);
 #else
-  #define MALLOC_CAP_SYSEX MALLOC_CAP_DEFAULT
-
-void send_usb_midi_out(uint8_t *bytes, uint16_t len) {
-}
-
+    // teensy
+    // linux
 #endif
 
-#ifdef ESP_PLATFORM
+}
+
+
+// "run_midi" sets up MIDI on MCU platforms
+#if (defined ESP_PLATFORM)
 void run_midi() {
-#else
-  void *run_midi(void*vargp) {
-#endif
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
-
-    #ifdef ESP_PLATFORM
     // Setup UART2 to listen for MIDI messages 
     const int uart_num = UART_NUM_1;
     uart_config_t uart_config = {
@@ -313,7 +304,6 @@ void run_midi() {
         .stop_bits = UART_STOP_BITS_1,
         //.flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
-
 
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
@@ -345,10 +335,36 @@ void run_midi() {
             convert_midi_bytes_to_messages(data,length,0);
         }
     } // end loop forever
-    #endif // ESP_PLATFORM
+}
+#endif
 
-    #ifdef TUD_USB_GADGET
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+// RX interrupt handler
+void on_pico_uart_rx() {
+    uint8_t byte[1];
+    while (uart_is_readable(uart1)) {
+        uart_read_blocking (uart1, byte, 1);
+        convert_midi_bytes_to_messages(byte,1,0);
+    }
+}
+void run_midi() {
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    uart_init(uart1, 31250);
+    gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_out));
+    gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
+    uart_set_hw_flow(uart1, false, false);
+    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
+    uart_set_fifo_enabled(uart1, false);
+    irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
+    irq_set_enabled(UART1_IRQ, true);
+    uart_set_irq_enables(uart1, true, false);
+}
+#endif
+
+#ifdef TUD_USB_GADGET
+void run_midi() {
     // check midi USB gadget
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
     while(1) {
         while ( tud_midi_available() ) {
             uint8_t packet[4];
@@ -356,11 +372,14 @@ void run_midi() {
             convert_midi_bytes_to_messages(packet+1, 3, 1);
         }
     }
-    #endif
-
-#ifndef ESP_PLATFORM
-    return NULL;
-#endif
 }
+#endif
 
-#endif // MACOS
+#ifdef __linux__
+void run_midi() {
+    fprintf(stderr, "no MIDI support on linux yet\n");
+}
+#endif
+
+
+#endif // check for macos desktop 
