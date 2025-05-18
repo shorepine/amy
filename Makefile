@@ -10,6 +10,9 @@ ifeq ($(UNAME_S),Darwin)
 	LIBS = -framework AudioUnit -framework CoreAudio -framework CoreFoundation -framework CoreMIDI -framework Cocoa -lstdc++ 
 	# Needed for brew's python3.12+ on MacOS
 	EXTRA_PIP_ENV = PIP_BREAK_SYSTEM_PACKAGES=1 
+	CC = clang
+else
+	CC = gcc
 endif
 
 
@@ -22,8 +25,7 @@ ifeq ($(shell uname -m), armv6l)
 LIBS += -ldl  -latomic
 endif
 
-CC = gcc
-CFLAGS += -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations -Wno-c2x-extensions -Wno-c23-extensions
+CFLAGS += -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations -Wno-c2x-extensions
 CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
@@ -71,10 +73,10 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 .PRECIOUS: $(TARGET) $(OBJECTS)
 
 amy-example: $(OBJECTS) src/amy-example.o
-	$(CC) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
 
 amy-message: $(OBJECTS) src/amy-message.o
-	$(CC) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 amy-module: amy-example
 	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; cd src; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall; cd ..
@@ -90,13 +92,15 @@ timing: amy-module
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
 docs/amy.js: $(TARGET)
-	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 docs/amy-audioin.js: $(TARGET)
-	 emcc $(SOURCES) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
 	-rm -f amy_constants.py
+	-rm -f docs/amy.js
+	-rm -f docs/amy-audioin.js
 	-rm -f $(TARGET)

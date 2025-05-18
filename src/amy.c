@@ -1707,10 +1707,12 @@ void amy_start(amy_config_t c) {
     #ifndef ESP_PLATFORM
     #ifdef _POSIX_THREADS
         pthread_mutex_init(&amy_queue_lock, NULL);
+        #ifndef __EMSCRIPTEN__
         if(amy_global.config.has_midi_uart || amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
             pthread_t midi_thread_id;
             pthread_create(&midi_thread_id, NULL, run_midi, NULL);
         }
+        #endif
     #endif
     #else
     xQueueSemaphore = xSemaphoreCreateMutex();
