@@ -1531,7 +1531,7 @@ int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
     #ifdef __EMSCRIPTEN__
     // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
-    emscripten_audio_worklet_post_function_v(0, amy_block_processed);
+    //emscripten_audio_worklet_post_function_v(0, amy_block_processed);
     #else
     amy_block_processed();
     #endif
