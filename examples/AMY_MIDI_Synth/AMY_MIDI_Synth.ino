@@ -6,6 +6,8 @@
 // 
 // esp32s3 [n32r8]
 // rp2040 (Pi Pico) -- use 250Mhz and -O3 for 6 note juno polyphony
+// rp2350 (Pi Pico)
+// Please see https://github.com/shorepine/amy/issues/354 for the full list
 
 void setup() {
   amy_config_t amy_config = amy_default_config();
@@ -20,8 +22,7 @@ void setup() {
   amy_config.set_default_synth = 1;
   
   // If using a multicore capable chip, set cores to 2 so that you can have more polyphony
-  // Currently we support 2 cores on ESP32, ESP32S3, RP2040
-  // We plan to support it on RP2350
+  // Currently we support 2 cores on ESP32, ESP32S3, RP2040, RP2350
   amy_config.cores = 2;
 
   // Pins for i2s board
