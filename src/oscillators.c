@@ -473,10 +473,13 @@ void sine_mod_trigger(uint16_t osc) {
     sine_note_on(osc, freq_of_logfreq(msynth[osc]->logfreq));
 }
 
+
 // Returns a SAMPLE between -1 and 1.
 SAMPLE amy_get_random() {
 #ifndef AMY_USE_FIXEDPOINT
     return ((float)rand() / 2147483647.0) - 0.5;
+#elif defined PICO_ON_DEVICE
+    return 0;
 #else
     assert(RAND_MAX == 2147483647); // 2^31 - 1
     return SHIFTR((SAMPLE)rand(), (31 - S_FRAC_BITS)) - F2S(0.5);
@@ -491,6 +494,7 @@ void noise_note_on(uint16_t osc) {
 }
 
 SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
+    char m[10];
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE max_value = 0;
     SAMPLE last_white = synth[osc]->last_two[0];

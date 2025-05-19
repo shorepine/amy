@@ -341,12 +341,15 @@ void run_midi() {
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 // RX interrupt handler
 void on_pico_uart_rx() {
-    uint8_t byte[1];
+    uint8_t bytes[128];
+    uint8_t i = 0;
     while (uart_is_readable(uart1)) {
-        uart_read_blocking (uart1, byte, 1);
-        convert_midi_bytes_to_messages(byte,1,0);
+        uart_read_blocking (uart1, bytes + i, 1);
+        i++;
     }
+    convert_midi_bytes_to_messages(bytes,i,0);
 }
+
 void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     uart_init(uart1, 31250);
