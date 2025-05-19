@@ -478,7 +478,8 @@ void sine_mod_trigger(uint16_t osc) {
 SAMPLE amy_get_random() {
 #ifndef AMY_USE_FIXEDPOINT
     return ((float)rand() / 2147483647.0) - 0.5;
-#elif defined PICO_ON_DEVICE
+// there's something up with RP2350 where the 2nd core can't call rand(), we need to figure this out
+#elif defined PICO_RP2350
     return 0;
 #else
     assert(RAND_MAX == 2147483647); // 2^31 - 1
