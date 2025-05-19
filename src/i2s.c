@@ -175,39 +175,39 @@ void amy_update() {
 #include "pico/stdlib.h"
 #include "pico-audio/audio_i2s.h"
 #include "pico/binary_info.h"
+#include "pico/util/queue.h"
 
 
 struct audio_buffer_pool *ap;
-
-int32_t await_message_from_other_core() {
-     while (!(sio_hw->fifo_st & SIO_FIFO_ST_VLD_BITS)) {
-         __wfe();
-     }
-     int32_t msg = sio_hw->fifo_rd;
-     __sev();
-     return msg;
- }
-
- // Send 32-bit message to other core
- void send_message_to_other_core(int32_t t) {
-     while (!(sio_hw->fifo_st & SIO_FIFO_ST_RDY_BITS)) {
-         __wfe();
-     }
-     sio_hw->fifo_wr = t;
-     __sev();
- }
 
 static inline uint32_t _millis(void)
 {
     return to_ms_since_boot(get_absolute_time());
 }
 
+typedef struct
+{
+    int32_t (*func)(int32_t);
+    int32_t data;
+} queue_entry_t;
+
+queue_t call_queue;
+queue_t results_queue;
+
+
+int32_t render_other_core(int32_t data) {
+    amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+    return AMY_OK;
+}
+
 void amy_update() {
+    int32_t res;
+
     amy_prepare_buffer();
-    //send_message_to_other_core(32);
-    amy_render(0, AMY_OSCS, 0);
-    //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-    //await_message_from_other_core(64);
+    queue_entry_t entry = {render_other_core, AMY_OK};
+    queue_add_blocking(&call_queue, &entry);
+    amy_render(0, AMY_OSCS/2, 0);
+    queue_remove_blocking(&results_queue, &res);
     int16_t *block = amy_fill_buffer();
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
@@ -255,23 +255,22 @@ struct audio_buffer_pool *init_audio() {
     return producer_pool;
 }
 
-void core1_main() {
-    while(1) {
-        //uart_puts(uart0, "core0\n");
-        //int32_t ret = 0;
-        //while(ret!=32) ret = await_message_from_other_core();
-        //uart_puts(uart0, "core1\n");
-        //amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-        //uart_puts(uart0, "core2\n");
-        //send_message_to_other_core(64);
-        //uart_puts(uart0, "core3\n");
-    }
 
+void core1_main() {
+    while (1) {
+        queue_entry_t entry;
+        queue_remove_blocking(&call_queue, &entry);
+        int32_t result = entry.func(entry.data);
+        queue_add_blocking(&results_queue, &result);
+    }
 }
 
+
 amy_err_t i2s_amy_init() {
-    set_sys_clock_khz(250000000 / 1000, false); 
-    //multicore_launch_core1(core1_main);
+    queue_init(&call_queue, sizeof(queue_entry_t), 2);
+    queue_init(&results_queue, sizeof(int32_t), 2);
+    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
     sleep_ms(500);
     ap = init_audio();
     return AMY_OK;

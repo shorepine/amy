@@ -374,6 +374,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_SPIRAM;
     c.ram_caps_sample = MALLOC_CAP_SPIRAM;
+    c.ram_caps_sysex = MALLOC_CAP_SPIRAM;
     #else
     c.ram_caps_events = MALLOC_CAP_DEFAULT;
     c.ram_caps_synth = MALLOC_CAP_DEFAULT;
@@ -381,6 +382,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_DEFAULT;
     c.ram_caps_sample = MALLOC_CAP_DEFAULT;
+    c.ram_caps_sysex = MALLOC_CAP_DEFAULT;
     #endif    
 
     c.capture_device_id = -1;

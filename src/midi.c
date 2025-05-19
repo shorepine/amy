@@ -294,7 +294,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 // "run_midi" sets up MIDI on MCU platforms
 #if (defined ESP_PLATFORM)
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     // Setup UART2 to listen for MIDI messages 
     const int uart_num = UART_NUM_1;
     uart_config_t uart_config = {
@@ -348,7 +348,7 @@ void on_pico_uart_rx() {
     }
 }
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     uart_init(uart1, 31250);
     gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_out));
     gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
@@ -364,7 +364,7 @@ void run_midi() {
 #ifdef TUD_USB_GADGET
 void run_midi() {
     // check midi USB gadget
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     while(1) {
         while ( tud_midi_available() ) {
             uint8_t packet[4];

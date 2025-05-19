@@ -558,6 +558,7 @@ typedef struct  {
 
     // memory caps for MCUs
     uint32_t ram_caps_events;
+    uint32_t ram_caps_sysex;
     uint32_t ram_caps_synth;
     uint32_t ram_caps_block;
     uint32_t ram_caps_fbl;
