@@ -446,9 +446,7 @@ struct synthinfo {
     float detune;
     float step;
     float substep;
-    SAMPLE sample;  // Used by KS, otherwise?
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE.
-    float volume;
     float logratio;
     float resonance;
     float portamento_alpha;
@@ -471,8 +469,6 @@ struct synthinfo {
   
     // State variable for the dc-removal filter.
     SAMPLE hpf_state[2];
-    // Constant offset to add to sawtooth before integrating.
-    SAMPLE dc_offset;
     // Selected lookup table and size.
     const LUT *lut;
     float eq_l;
