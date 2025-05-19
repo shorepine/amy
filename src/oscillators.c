@@ -473,6 +473,9 @@ void sine_mod_trigger(uint16_t osc) {
     sine_note_on(osc, freq_of_logfreq(msynth[osc]->logfreq));
 }
 
+#if defined PICO_RP2350
+#include "pico/rand.h"
+#endif
 
 // Returns a SAMPLE between -1 and 1.
 SAMPLE amy_get_random() {
@@ -480,7 +483,8 @@ SAMPLE amy_get_random() {
     return ((float)rand() / 2147483647.0) - 0.5;
 // there's something up with RP2350 where the 2nd core can't call rand(), we need to figure this out
 #elif defined PICO_RP2350
-    return 0;
+    assert(RAND_MAX == 2147483647); // 2^31 - 1
+    return SHIFTR((SAMPLE)get_rand_32(), (31 - S_FRAC_BITS)) - F2S(0.5);
 #else
     assert(RAND_MAX == 2147483647); // 2^31 - 1
     return SHIFTR((SAMPLE)rand(), (31 - S_FRAC_BITS)) - F2S(0.5);
