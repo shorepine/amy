@@ -141,15 +141,19 @@ void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t) = NULL;
 
 
 #ifndef MALLOC_CAPS_DEFINED
-#define MALLOC_CAPS_DEFINED
-void * malloc_caps(uint32_t size, uint32_t flags) {
-#ifdef ESP_PLATFORM
-    return heap_caps_malloc(size, flags);
-#else
+  #define MALLOC_CAPS_DEFINED
+  void * malloc_caps(uint32_t size, uint32_t flags) {
+    void *result;
+  #ifdef ESP_PLATFORM
+    result = heap_caps_malloc(size, flags);
+  #else
     // ignore flags
-    return malloc(size);
-#endif
-}
+    result = malloc(size);
+  #endif
+    //if (size > 400000) abort();
+    //fprintf(stderr, "malloc(%ld) @0x%lx\n", size, result);
+    return result;
+  }
 #endif
 
 
@@ -662,7 +666,6 @@ void reset_osc(uint16_t i ) {
     msynth[i].feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     synth[i].phase = F2P(0);
     AMY_UNSET(synth[i].trigger_phase);
-    synth[i].volume = 0;
     synth[i].eq_l = 0;
     synth[i].eq_m = 0;
     synth[i].eq_h = 0;
@@ -673,7 +676,6 @@ void reset_osc(uint16_t i ) {
     synth[i].velocity = 0;
     synth[i].step = 0;
     synth[i].source = EVENT_NONE;
-    synth[i].sample = F2S(0);
     synth[i].mod_value = F2S(0);
     synth[i].substep = 0;
     synth[i].status = SYNTH_OFF;
@@ -689,7 +691,6 @@ void reset_osc(uint16_t i ) {
     synth[i].hpf_state[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i].filter_delay[j] = 0;
     synth[i].last_filt_norm_bits = 0;
-    synth[i].dc_offset = 0;
     synth[i].algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i].algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
