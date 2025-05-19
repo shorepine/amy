@@ -86,44 +86,44 @@ static inline void copy(SAMPLE* a, SAMPLE* b) {
 SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
-    //printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc].amp);
+    //printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc]->amp);
 
     // out = buf
     // in = mod
     // so render_mod is mod, buf (out)
     SAMPLE max_value = 0;
-    if(synth[osc].wave == SINE) max_value = render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
+    if(synth[osc]->wave == SINE) max_value = render_fm_sine(out, osc, in, feedback_level, algo_osc, amp);
     return max_value;
 }
 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     // Perform the vital parts of amy.c:1089 ff since these oscs aren't turned on elsewhere.
-    synth[osc].note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
-    synth[osc].status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
-    if (AMY_IS_SET(synth[osc].trigger_phase))
-        synth[osc].phase = synth[osc].trigger_phase;
-    if(synth[osc].wave==SINE) fm_sine_note_on(osc, algo_osc);
+    synth[osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
+    synth[osc]->status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
+    if (AMY_IS_SET(synth[osc]->trigger_phase))
+        synth[osc]->phase = synth[osc]->trigger_phase;
+    if(synth[osc]->wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 
 void algo_note_off(uint16_t osc) {
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(AMY_IS_SET(synth[osc].algo_source[i])) {
-            uint16_t o = synth[osc].algo_source[i];
-            AMY_UNSET(synth[o].note_on_clock);
-            synth[o].note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
+        if(AMY_IS_SET(synth[osc]->algo_source[i])) {
+            uint16_t o = synth[osc]->algo_source[i];
+            AMY_UNSET(synth[o]->note_on_clock);
+            synth[o]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
         }
     }
     // osc note off, start release
-    AMY_UNSET(synth[osc].note_on_clock);
-    synth[osc].note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;          
+    AMY_UNSET(synth[osc]->note_on_clock);
+    synth[osc]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
 }
 
 
 void algo_note_on(uint16_t osc, float freq) {
-    msynth[osc].logfreq = logfreq_of_freq(freq);
+    msynth[osc]->logfreq = logfreq_of_freq(freq);
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(AMY_IS_SET(synth[osc].algo_source[i])) {
-            note_on_mod(synth[osc].algo_source[i], osc);
+        if(AMY_IS_SET(synth[osc]->algo_source[i])) {
+            note_on_mod(synth[osc]->algo_source[i], osc);
         }
     }
 }
@@ -150,7 +150,7 @@ void algo_init() {
 }
 
 SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
-    struct FmAlgorithm algo = algorithms[synth[osc].algorithm];
+    struct FmAlgorithm algo = algorithms[synth[osc]->algorithm];
     SAMPLE max_value = 0;
 
     // starts at op 6
@@ -164,13 +164,13 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     //for (int i = 0; i < 3; ++i)
     //    zero(scratch[core][i]);
     
-    SAMPLE amp = SHIFTR(F2S(msynth[osc].amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
+    SAMPLE amp = SHIFTR(F2S(msynth[osc]->amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
-        if(AMY_IS_SET(synth[osc].algo_source[op]) && synth[synth[osc].algo_source[op]].status == SYNTH_IS_ALGO_SOURCE) {
+        if(AMY_IS_SET(synth[osc]->algo_source[op]) && synth[synth[osc]->algo_source[op]]->status == SYNTH_IS_ALGO_SOURCE) {
             SAMPLE feedback_level = 0;
             SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 
-                feedback_level = F2S(synth[osc].feedback);
+                feedback_level = F2S(synth[osc]->feedback);
             } // main algo voice stores feedback, not the op 
 
             if(algo.ops[op] & IN_BUS_ONE) { 
@@ -200,7 +200,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
                 zero(out_buf);
             }
 
-            SAMPLE value = render_mod(in_buf, out_buf, synth[osc].algo_source[op], feedback_level, osc, mod_amp);
+            SAMPLE value = render_mod(in_buf, out_buf, synth[osc]->algo_source[op], feedback_level, osc, mod_amp);
             if (out_buf == buf && value > max_value)  max_value = value;
 
             if (out_buf == SCRATCH) {

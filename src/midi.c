@@ -20,11 +20,11 @@ uint8_t sysex_flag = 0;
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
-    if(synth[osc].source != EVENT_MIDI) {
+    if(synth[osc]->source != EVENT_MIDI) {
         uint8_t bytes[3];
         bytes[0] = 0x90;
-        bytes[1] = (uint8_t)roundf(synth[osc].midi_note);
-        bytes[2] = (uint8_t)roundf(synth[osc].velocity*127.0f);
+        bytes[1] = (uint8_t)roundf(synth[osc]->midi_note);
+        bytes[2] = (uint8_t)roundf(synth[osc]->velocity*127.0f);
         midi_out(bytes, 3);
     }
 }
@@ -32,11 +32,11 @@ void amy_send_midi_note_on(uint16_t osc) {
 // Send a MIDI note off OUT
 void amy_send_midi_note_off(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
-    if(synth[osc].source != EVENT_MIDI) {
+    if(synth[osc]->source != EVENT_MIDI) {
         uint8_t bytes[3];
         bytes[0] = 0x80;
-        bytes[1] = (uint8_t)roundf(synth[osc].midi_note);
-        bytes[2] = (uint8_t)roundf(synth[osc].velocity*127.0f);
+        bytes[1] = (uint8_t)roundf(synth[osc]->midi_note);
+        bytes[2] = (uint8_t)roundf(synth[osc]->velocity*127.0f);
         midi_out(bytes, 3);
     }
 }

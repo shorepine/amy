@@ -643,8 +643,8 @@ struct custom_oscillator {
 
 
 // Shared structures
-extern struct synthinfo* synth;
-extern struct mod_synthinfo* msynth;
+extern struct synthinfo** synth;
+extern struct mod_synthinfo** msynth;
 extern struct state amy_global; 
 
 
@@ -684,6 +684,9 @@ SAMPLE exp2_lut(SAMPLE x);
 
 float atoff(const char *s);
 int8_t oscs_init();
+void alloc_osc(int osc);
+void free_osc(int osc);
+void ensure_osc_allocd(int osc);
 void patches_init();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;

@@ -68,37 +68,38 @@ float _env_lin_of_db(float db) {
 
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
     // We coerce this voice into being a partial, regardless of user wishes.
-    synth[o].wave = PARTIAL;
-    synth[o].preset = -1;  // Flag that this is an envelope-based partial
+    ensure_osc_allocd(o);
+    synth[o]->wave = PARTIAL;
+    synth[o]->preset = -1;  // Flag that this is an envelope-based partial
     // Setup the specified frequency.
-    synth[o].logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
+    synth[o]->logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
     // Setup envelope.
-    synth[o].breakpoint_times[0][0] = 0;
-    synth[o].breakpoint_values[0][0] = 0;
+    synth[o]->breakpoint_times[0][0] = 0;
+    synth[o]->breakpoint_values[0][0] = 0;
     int last_time = 0;
     for (int bp = 0; bp < partials_voice->num_sample_times_ms; ++bp) {
-        synth[o].breakpoint_times[0][bp + 1] = (partials_voice->sample_times_ms[bp] - last_time) * AMY_SAMPLE_RATE / 1000;
-        synth[o].breakpoint_values[0][bp + 1] = _env_lin_of_db(harm_param[bp + 1]);
+        synth[o]->breakpoint_times[0][bp + 1] = (partials_voice->sample_times_ms[bp] - last_time) * AMY_SAMPLE_RATE / 1000;
+        synth[o]->breakpoint_values[0][bp + 1] = _env_lin_of_db(harm_param[bp + 1]);
         last_time = partials_voice->sample_times_ms[bp];
     }
     // Final release
-    synth[o].breakpoint_times[0][partials_voice->num_sample_times_ms + 1] = 200 * AMY_SAMPLE_RATE / 1000;
-    synth[o].breakpoint_values[0][partials_voice->num_sample_times_ms + 1] = 0;
+    synth[o]->breakpoint_times[0][partials_voice->num_sample_times_ms + 1] = 200 * AMY_SAMPLE_RATE / 1000;
+    synth[o]->breakpoint_values[0][partials_voice->num_sample_times_ms + 1] = 0;
     // Decouple osc freq and amp from note and amp.
-    synth[o].logfreq_coefs[COEF_NOTE] = 0;
-    synth[o].amp_coefs[COEF_VEL] = 0;
+    synth[o]->logfreq_coefs[COEF_NOTE] = 0;
+    synth[o]->amp_coefs[COEF_VEL] = 0;
     // Other osc params.
-    synth[o].status = SYNTH_IS_ALGO_SOURCE;
-    synth[o].note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-    AMY_UNSET(synth[o].note_off_clock);
+    synth[o]->status = SYNTH_IS_ALGO_SOURCE;
+    synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+    AMY_UNSET(synth[o]->note_off_clock);
     partial_note_on(o);
 }
 
 void interp_partials_note_on(uint16_t osc) {
     // Choose the interp_partials preset.
-    const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].preset % NUM_INTERP_PARTIALS_PRESETS];
-    float midi_note = synth[osc].midi_note;
-    float midi_vel = (int)roundf(synth[osc].velocity * 127.f);
+    const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
+    float midi_note = synth[osc]->midi_note;
+    float midi_vel = (int)roundf(synth[osc]->velocity * 127.f);
     // Clip
     if (midi_vel < partials_voice->velocities[0]) midi_vel = partials_voice->velocities[0];
     if (midi_vel > partials_voice->velocities[partials_voice->num_velocities - 1]) midi_vel = partials_voice->velocities[partials_voice->num_velocities - 1];
@@ -158,14 +159,14 @@ void interp_partials_note_on(uint16_t osc) {
 }
 
 void interp_partials_note_off(uint16_t osc) {
-    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc].preset % NUM_INTERP_PARTIALS_PRESETS];
+    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
     //int num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
     int num_oscs = 0; //MAX_NUM_HARMONICS;
     // Actual max num harmonics we may use is the number of 1s in the use_this_partial_map.
     for (int i = 0; i < MAX_NUM_HARMONICS; ++i) num_oscs += use_this_partial_map[i];
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
-        AMY_UNSET(synth[o].note_on_clock);
-        synth[o].note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+        AMY_UNSET(synth[o]->note_on_clock);
+        synth[o]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     }
 }
