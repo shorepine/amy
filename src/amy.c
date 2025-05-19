@@ -360,12 +360,7 @@ amy_config_t amy_default_config() {
     c.has_midi_gadget = 0;
     c.set_default_synth = 1;
     c.cores = 1;
-
-    #ifndef ARDUINO
     c.max_oscs = 180;
-    #else
-    c.max_oscs = 120;
-    #endif
 
     // caps
     #if (defined TULIP) || (defined AMYBOARD)

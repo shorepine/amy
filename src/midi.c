@@ -7,7 +7,7 @@
 #include <emscripten.h>
 #endif
 
-#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
@@ -281,7 +281,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     tud_midi_stream_write(0, bytes, len);
 #elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
-#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
     uart_write_blocking(uart1, bytes, len);
 #else
     // teensy
@@ -338,7 +338,7 @@ void run_midi() {
 }
 #endif
 
-#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 // RX interrupt handler
 void on_pico_uart_rx() {
     uint8_t byte[1];
@@ -358,6 +358,7 @@ void run_midi() {
     irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(uart1, true, false);
+
 }
 #endif
 

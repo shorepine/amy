@@ -6,7 +6,7 @@
 // teensy 3.6, 4.0, 4.1
 
 // Only run this code on MCUs
-#if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO) 
+#if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO) || defined(ARDUINO_ARCH_RP2350)
 
 #include "amy.h"
 
@@ -167,7 +167,7 @@ void amy_update() {
 }
 
 
-#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 
 #include "hardware/clocks.h"
 #include "hardware/structs/clocks.h"
@@ -176,7 +176,6 @@ void amy_update() {
 #include "pico-audio/audio_i2s.h"
 #include "pico/binary_info.h"
 #include "pico/util/queue.h"
-
 
 struct audio_buffer_pool *ap;
 
@@ -202,12 +201,15 @@ int32_t render_other_core(int32_t data) {
 
 void amy_update() {
     int32_t res;
-
     amy_prepare_buffer();
-    queue_entry_t entry = {render_other_core, AMY_OK};
-    queue_add_blocking(&call_queue, &entry);
-    amy_render(0, AMY_OSCS/2, 0);
-    queue_remove_blocking(&results_queue, &res);
+    if(amy_global.config.cores > 1) {
+        queue_entry_t entry = {render_other_core, AMY_OK};
+        queue_add_blocking(&call_queue, &entry);
+        amy_render(0, AMY_OSCS/2, 0);
+        queue_remove_blocking(&results_queue, &res);
+    } else {
+        amy_render(0, AMY_OSCS, 0);        
+    }
     int16_t *block = amy_fill_buffer();
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
@@ -267,11 +269,18 @@ void core1_main() {
 
 
 amy_err_t i2s_amy_init() {
-    queue_init(&call_queue, sizeof(queue_entry_t), 2);
-    queue_init(&results_queue, sizeof(int32_t), 2);
-    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
-    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
-    sleep_ms(500);
+    #if defined PICO_RP2350
+    uart_puts(uart0, "rp2350\n");
+    #else
+    uart_puts(uart0, "rp2040\n");
+    #endif
+    if(amy_global.config.cores > 1) {
+        queue_init(&call_queue, sizeof(queue_entry_t), 2);
+        queue_init(&results_queue, sizeof(int32_t), 2);
+        uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+        multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+        sleep_ms(500);
+    }
     ap = init_audio();
     return AMY_OK;
 }

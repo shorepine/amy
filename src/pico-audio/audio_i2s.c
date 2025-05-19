@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-
-#ifdef ARDUINO_ARCH_RP2040
-
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 #include <stdio.h>
 
 #include "audio_i2s.h"
@@ -55,10 +53,24 @@ const audio_format_t *audio_i2s_setup(const audio_format_t *intended_audio_forma
     gpio_set_function(config->clock_pin_base, func);
     gpio_set_function(config->clock_pin_base + 1, func);
 
+#if PICO_PIO_USE_GPIO_BASE
+    if(config->data_pin >= 32 || config->clock_pin_base + 1 >= 32) {
+        assert(config->data_pin >= 16 && config->clock_pin_base >= 16);
+        pio_set_gpio_base(audio_pio, 16);
+    }
+#endif
     uint8_t sm = shared_state.pio_sm = config->pio_sm;
     pio_sm_claim(audio_pio, sm);
 
-    uint offset = pio_add_program(audio_pio, &audio_i2s_program);
+
+    const struct pio_program *program =
+#if PICO_AUDIO_I2S_CLOCK_PINS_SWAPPED
+        &audio_i2s_swapped_program
+#else
+        &audio_i2s_program
+#endif
+        ;
+    uint offset = pio_add_program(audio_pio, program);
 
     audio_i2s_program_init(audio_pio, sm, offset, config->data_pin, config->clock_pin_base);
 

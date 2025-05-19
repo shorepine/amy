@@ -1,3 +1,4 @@
+#if 1
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -16,4 +17,6 @@ static void __attribute__((constructor)) _clear_usb_ram() {
     memset(usb_ram_alloc_ptr, 0, USB_DPRAM_SIZE - USB_DPRAM_MAX);
 }
 #endif
+#endif
+
 #endif
