@@ -37,7 +37,7 @@ void partials_note_on(uint16_t osc) {
         int num_partials = -synth[osc]->preset;
         for (int i = 0; i < num_partials; ++i) {
             int o = osc + 1 + i;
-            ensure_osc_allocd(o);
+            ensure_osc_allocd(o, NULL);
             if (synth[o]->wave == PARTIAL) {  // User has marked this as a partial.
                 // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
                 // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
@@ -69,7 +69,7 @@ void partials_note_on(uint16_t osc) {
         if(osc + 1 + oscs > AMY_OSCS) {
             fprintf(stderr,"Asking for more oscs than you have -- starting %d, + 1 + %d more\n", osc, oscs);
         }
-        for (int i = osc + 1; i < osc + 1 + oscs; ++i)  ensure_osc_allocd(i);
+        for (int i = osc + 1; i < osc + 1 + oscs; ++i)  ensure_osc_allocd(i, NULL);
     }
 }
 

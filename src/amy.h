@@ -121,6 +121,8 @@ extern const uint16_t pcm_samples;
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
+#define DEFAULT_NUM_BREAKPOINTS 8
+// We need a max on the number of breakpoints to lay out the params enum statically.  Otherwise, it's dynamic.
 #define MAX_BREAKPOINTS 24
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
@@ -462,10 +464,11 @@ struct synthinfo {
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
-    uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
-    float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
+    uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) was [MAX_BREAKPOINTS] now dynamically sized.
+    float *breakpoint_values[MAX_BREAKPOINT_SETS];  // was [MAX_BREAKPOINTS] now dynamically sized.
     uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
+    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // actual length of breakpoint_times/breakpoint values
   
     // State variable for the dc-removal filter.
     SAMPLE hpf_state[2];
@@ -683,9 +686,9 @@ SAMPLE exp2_lut(SAMPLE x);
 
 float atoff(const char *s);
 int8_t oscs_init();
-void alloc_osc(int osc);
+void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
-void ensure_osc_allocd(int osc);
+void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void patches_init();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;

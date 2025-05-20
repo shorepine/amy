@@ -67,7 +67,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
 
     // Scan breakpoints to find which one is release (the last one)
     bp_r = -1;
-    for(int i = 0; i < MAX_BREAKPOINTS; ++i) {
+    for(int i = 0; i < synth[osc]->max_num_breakpoints[bp_set]; ++i) {
         uint32_t this_seg_time = synth[osc]->breakpoint_times[bp_set][i];
         if (!AMY_IS_SET(this_seg_time))
             break;
