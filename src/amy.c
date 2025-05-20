@@ -360,12 +360,7 @@ amy_config_t amy_default_config() {
     c.has_midi_gadget = 0;
     c.set_default_synth = 1;
     c.cores = 1;
-
-    #ifndef ARDUINO
     c.max_oscs = 180;
-    #else
-    c.max_oscs = 120;
-    #endif
 
     // caps
     #if (defined TULIP) || (defined AMYBOARD)
@@ -375,6 +370,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_SPIRAM;
     c.ram_caps_sample = MALLOC_CAP_SPIRAM;
+    c.ram_caps_sysex = MALLOC_CAP_SPIRAM;
     #else
     c.ram_caps_events = MALLOC_CAP_DEFAULT;
     c.ram_caps_synth = MALLOC_CAP_DEFAULT;
@@ -382,6 +378,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_DEFAULT;
     c.ram_caps_sample = MALLOC_CAP_DEFAULT;
+    c.ram_caps_sysex = MALLOC_CAP_DEFAULT;
     #endif    
 
     c.capture_device_id = -1;
@@ -1382,6 +1379,7 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
     }
     AMY_PROFILE_STOP(MIX_WITH_PAN)
 }
+
 
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)

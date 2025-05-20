@@ -7,7 +7,7 @@
 #include <emscripten.h>
 #endif
 
-#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
@@ -281,7 +281,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
     tud_midi_stream_write(0, bytes, len);
 #elif defined ESP_PLATFORM
     uart_write_bytes(UART_NUM_1, bytes, len);
-#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
     uart_write_blocking(uart1, bytes, len);
 #else
     // teensy
@@ -294,7 +294,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 // "run_midi" sets up MIDI on MCU platforms
 #if (defined ESP_PLATFORM)
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     // Setup UART2 to listen for MIDI messages 
     const int uart_num = UART_NUM_1;
     uart_config_t uart_config = {
@@ -338,17 +338,20 @@ void run_midi() {
 }
 #endif
 
-#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2530)
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 // RX interrupt handler
 void on_pico_uart_rx() {
-    uint8_t byte[1];
+    uint8_t bytes[128];
+    uint8_t i = 0;
     while (uart_is_readable(uart1)) {
-        uart_read_blocking (uart1, byte, 1);
-        convert_midi_bytes_to_messages(byte,1,0);
+        uart_read_blocking (uart1, bytes + i, 1);
+        i++;
     }
+    convert_midi_bytes_to_messages(bytes,i,0);
 }
+
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     uart_init(uart1, 31250);
     gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_out));
     gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
@@ -358,13 +361,14 @@ void run_midi() {
     irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(uart1, true, false);
+
 }
 #endif
 
 #ifdef TUD_USB_GADGET
 void run_midi() {
     // check midi USB gadget
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, MALLOC_CAP_SYSEX);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     while(1) {
         while ( tud_midi_available() ) {
             uint8_t packet[4];
