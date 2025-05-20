@@ -151,21 +151,16 @@ void run_sequencer() {
 
 #elif defined PI_PICO
 // pico: do it with a hardware timer
-static void sequencer_timer_callback(void* arg) {
+
+#include "pico/time.h"
+
+static bool sequencer_timer_callback(repeating_timer_t *rt) {
     sequencer_check_and_fill();
 }
 
 void run_sequencer() {
-    /*
-    const esp_timer_create_args_t periodic_timer_args = {
-            .callback = &sequencer_timer_callback,
-            //.dispatch_method = ESP_TIMER_ISR,
-            .name = "sequencer"
-    };
-    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-    // 500us = 0.5ms
-    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
-    */
+    repeating_timer_t timer;
+    add_repeating_timer_us (500, sequencer_timer_callback, NULL, &timer);
 }
 
 #elif defined _POSIX_THREADS
