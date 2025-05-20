@@ -132,7 +132,8 @@ void patches_store_patch(struct event *e, char * patch_string) {
             strncpy(sub_message, patch_string + start, i - start + 1);
             sub_message[i - start + 1]= 0;
             struct event patch_event = amy_default_event();
-	    amy_parse_message(sub_message, &patch_event);
+    	    amy_parse_message(sub_message, &patch_event);
+            amy_handle_event(&patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;
@@ -498,6 +499,7 @@ void patches_load_patch(struct event *e) {
             sub_message[i-start+1]= 0;
             struct event patch_event = amy_default_event();
             amy_parse_message(sub_message, &patch_event);
+            amy_handle_event(&patch_event);
             patch_event.time = e->time;
             if(patch_event.status == EVENT_SCHEDULED) {
                 for(uint8_t v=0;v<num_voices;v++)

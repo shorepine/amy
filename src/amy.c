@@ -447,6 +447,9 @@ struct event amy_default_event() {
     AMY_UNSET(e.grab_midi_notes);
     AMY_UNSET(e.pedal);
     AMY_UNSET(e.num_voices);
+    AMY_UNSET(e.sequence[SEQUENCE_TICK]);
+    AMY_UNSET(e.sequence[SEQUENCE_PERIOD]);
+    AMY_UNSET(e.sequence[SEQUENCE_TAG]);
     return e;
 }
 
@@ -1725,7 +1728,11 @@ void amy_reset_sysclock() {
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_default_event();
+    // Parse the wire string into an event
     amy_parse_message(message, &e);
+    // Do whatever we might need to do with the event before we add it 
+    amy_handle_event(&e);
+    // If this was an event to be played, play it 
     if(e.status == EVENT_SCHEDULED) {
         amy_add_event(&e);
     }
@@ -1765,7 +1772,7 @@ void amy_default_setup() {
     amy_add_event(&e);
 }
 
-// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue
+// amy_play_message -> amy_parse_message -> amy_handle_event -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue
 // fill_audio_buffer_task -> read delta global delta queue -> play_delta -> apply delta to synth[d.osc]
 
 void amy_stop() {

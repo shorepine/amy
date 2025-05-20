@@ -53,7 +53,7 @@ void add_delta_to_sequencer(struct delta *d, void*user_data) {
     (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
 }
 
-uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uint32_t tag) {
+uint8_t sequencer_add_event(struct event *e) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, tick, period, tag);
@@ -61,7 +61,7 @@ uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uin
     while ((*entry_ll_ptr) != NULL) {
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
         // This can delete all the deltas from a source event if it matches tag
-        if ((*entry_ll_ptr)->tag == tag) {
+        if ((*entry_ll_ptr)->tag == e->sequence[SEQUENCE_TAG]) {
             //fprintf(stderr, "ll %p found tag %d, deleting\n", (*entry_ll_ptr), tag);
             sequence_entry_ll_t *doomed = *entry_ll_ptr;
             *entry_ll_ptr = doomed->next; // close up list.
@@ -71,15 +71,15 @@ uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uin
         }
     }
 
-    if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
-    if(tick != 0 && period == 0 && tick <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
+    if(e->sequence[SEQUENCE_TICK] == 0 && e->sequence[SEQUENCE_PERIOD] == 0) return 0; // Ignore non-schedulable event.
+    if(e->sequence[SEQUENCE_TICK] != 0 && e->sequence[SEQUENCE_PERIOD] == 0 && e->sequence[SEQUENCE_TICK] <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
 
     // Get all the deltas for this event
     // For each delta, add a new entry at the end
     sequence_callback_info_t cbinfo;
-    cbinfo.tag = tag;
-    cbinfo.tick = tick;
-    cbinfo.period = period;
+    cbinfo.tag = e->sequence[SEQUENCE_TAG];
+    cbinfo.tick = e->sequence[SEQUENCE_TICK];
+    cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
     amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
