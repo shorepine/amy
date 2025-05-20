@@ -130,6 +130,8 @@ void sequencer_check_and_fill() {
     }
 }
 
+///// Sequencers per platform
+
 #ifdef ESP_PLATFORM
 // ESP: do it with hardware timer
 static void sequencer_timer_callback(void* arg) {
@@ -146,8 +148,29 @@ void run_sequencer() {
     // 500us = 0.5ms
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
+
+#elif defined PI_PICO
+// pico: do it with a hardware timer
+static void sequencer_timer_callback(void* arg) {
+    sequencer_check_and_fill();
+}
+
+void run_sequencer() {
+    /*
+    const esp_timer_create_args_t periodic_timer_args = {
+            .callback = &sequencer_timer_callback,
+            //.dispatch_method = ESP_TIMER_ISR,
+            .name = "sequencer"
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+    // 500us = 0.5ms
+    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
+    */
+}
+
 #elif defined _POSIX_THREADS
-void * run_sequencer(void *vargs) {
+// posix: threads
+void * sequencer_thread(void *vargs) {
     // Loop forever, checking for time and sleeping
     while(1) {
         sequencer_check_and_fill();            
@@ -155,23 +178,22 @@ void * run_sequencer(void *vargs) {
         nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
     }
 }
-#endif
+void run_sequencer() {
+    pthread_t sequencer_thread_id;
+    pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
+}
 
+#else
+
+void run_sequencer() {
+    fprintf(stderr, "No sequencer support for this chip / platform\n");
+}
+
+#endif
 
 void sequencer_init() {
     amy_global.sequence_entry_ll_start = NULL;
-    sequencer_recompute();        
-
-    #ifdef ESP_PLATFORM
-    // This kicks off a timer 
+    sequencer_recompute();
     run_sequencer();
-    #elif defined _POSIX_THREADS
-    // This kicks off a thread
-    pthread_t sequencer_thread_id;
-    pthread_create(&sequencer_thread_id, NULL, run_sequencer, NULL);
-    #else
-    fprintf(stderr, "No sequencer support for this chip / platform\n");
-    #endif
-
 }
 

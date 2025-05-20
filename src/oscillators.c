@@ -499,7 +499,6 @@ void noise_note_on(uint16_t osc) {
 }
 
 SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
-    char m[10];
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE max_value = 0;
     SAMPLE last_white = synth[osc]->last_two[0];
