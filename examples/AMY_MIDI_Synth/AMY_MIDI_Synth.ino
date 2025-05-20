@@ -9,6 +9,18 @@
 // rp2350 (Pi Pico)
 // Please see https://github.com/shorepine/amy/issues/354 for the full list
 
+
+void test_sequencer() {
+    struct event e = amy_default_event();
+    e.sequence[0] = 0;
+    e.sequence[1] = 48;
+    e.sequence[2] = 1;
+    e.velocity = 1;
+    e.midi_note = 60;
+    e.synth = 1;
+    amy_play_event(&e);
+}
+
 void setup() {
   amy_config_t amy_config = amy_default_config();
 
@@ -32,8 +44,8 @@ void setup() {
   amy_config.i2s_dout = 10;
 
   // Pins for UART MIDI
-  amy_config.midi_out = 11;
-  amy_config.midi_in = 12;
+  amy_config.midi_out = 4;
+  amy_config.midi_in = 5;
 
   // Features
   amy_config.has_chorus = 1;
@@ -42,6 +54,8 @@ void setup() {
 
   amy_start(amy_config);
   amy_live_start();
+
+  test_sequencer();
 }
 
 void loop() {

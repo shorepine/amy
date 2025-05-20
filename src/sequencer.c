@@ -81,6 +81,7 @@ uint8_t sequencer_add_event(struct event *e) {
     cbinfo.tick = e->sequence[SEQUENCE_TICK];
     cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
+    fprintf(stderr, "add tick %d period %d tag %d\n", cbinfo.tick, cbinfo.period, cbinfo.tag);
     amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
@@ -149,18 +150,19 @@ void run_sequencer() {
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
 
-#elif defined PI_PICO
+#elif (defined PICO_RP2350) || (defined PICO_RP2040)
 // pico: do it with a hardware timer
 
 #include "pico/time.h"
+repeating_timer_t pico_sequencer_timer;
 
 static bool sequencer_timer_callback(repeating_timer_t *rt) {
     sequencer_check_and_fill();
+    return true;
 }
 
 void run_sequencer() {
-    repeating_timer_t timer;
-    add_repeating_timer_us (500, sequencer_timer_callback, NULL, &timer);
+    add_repeating_timer_us(-500, sequencer_timer_callback, NULL, &pico_sequencer_timer);
 }
 
 #elif defined _POSIX_THREADS
