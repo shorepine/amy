@@ -46,7 +46,7 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t t
     if (!instrument_grab_midi_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     e.midi_note = note;
     e.velocity = ((float)vel/127.0f);
@@ -58,7 +58,7 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t 
     if (!instrument_grab_midi_notes(channel)) return;
     struct event e = amy_default_event();
     e.time = time;
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     e.midi_note = note;
     e.velocity = 0;
@@ -68,10 +68,10 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t 
 void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time) {
     struct event e = amy_default_event();
     e.time = time;
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     // The MIDI patch number is within the block-of-256 of existing patch numbers, so DX7 patches will remain DX7.
-    e.patch_number = program + (instrument_get_patch_number(e.instrument) & 0xFF80);
+    e.patch_number = program + (instrument_get_patch_number(e.synth) & 0xFF80);
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
     }
@@ -80,7 +80,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
 void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
     struct event e = amy_default_event();
     e.time = time;
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     e.pedal = value;
     amy_add_event(&e);
@@ -89,7 +89,7 @@ void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
 void amy_received_all_notes_off(uint8_t channel, uint32_t time) {
     struct event e = amy_default_event();
     e.time = time;
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     // All notes off is indicated by vel = 0 and note = 0
     e.velocity = 0;
@@ -101,7 +101,7 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
     struct event e = amy_default_event();
     e.time = time;
     // Currently, pitch bend is global and not applied per-channel, but preserve the info.
-    e.instrument = channel;
+    e.synth = channel;
     e.source = EVENT_MIDI;
     // The integer range is -8192 to 8191, the float range is -1/6th to +1/6th,
     // units are octaves, so +/- 2 semitones.

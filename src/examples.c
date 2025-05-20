@@ -89,18 +89,18 @@ void example_voice_chord(uint32_t start, uint16_t patch) {
 }
 
 void example_synth_chord(uint32_t start, uint16_t patch) {
-    // Like example_voice_chord, but use 'instrument' (synth) to avoid having to keep track of voices.
+    // Like example_voice_chord, but use 'synth' to avoid having to keep track of voices.
     struct event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
     e.num_voices = 3;
-    e.instrument = 0;
+    e.synth = 0;
     amy_add_event(&e);
     start += 250;
 
     e = amy_default_event();
     e.velocity = 0.5;
-    e.instrument = 0;
+    e.synth = 0;
 
     e.time = start;
     e.midi_note = 50;

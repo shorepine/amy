@@ -68,7 +68,8 @@ float _env_lin_of_db(float db) {
 
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
     // We coerce this voice into being a partial, regardless of user wishes.
-    ensure_osc_allocd(o);
+    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS}; 
+    ensure_osc_allocd(o, max_num_breakpoints);
     synth[o]->wave = PARTIAL;
     synth[o]->preset = -1;  // Flag that this is an envelope-based partial
     // Setup the specified frequency.
