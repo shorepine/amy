@@ -1724,7 +1724,7 @@ void amy_reset_sysclock() {
     sequencer_recompute();
 }
 
-// given a string play / schedule the event directly
+// given a wire message string play / schedule the event directly (WIRE API)
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_default_event();
@@ -1735,6 +1735,15 @@ void amy_play_message(char *message) {
     // If this was an event to be played, play it 
     if(e.status == EVENT_SCHEDULED) {
         amy_add_event(&e);
+    }
+}
+
+// given an event play / schedule the event directly (C API)
+void amy_play_event(struct event *e) {
+    amy_handle_event(e);
+    // If this was an event to be played, play it 
+    if(e->status == EVENT_SCHEDULED) {
+        amy_add_event(e);
     }
 }
 

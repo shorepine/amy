@@ -661,6 +661,7 @@ void amy_update();
 struct event amy_default_event();
 void amy_deltas_reset();
 void amy_add_event(struct event *e);
+void amy_play_event(struct event *e);
 void add_delta_to_queue(struct delta *d, void*user_data);
 void amy_add_event_internal(struct event *e, uint16_t base_osc);
 void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
