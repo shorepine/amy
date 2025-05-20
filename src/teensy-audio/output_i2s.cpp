@@ -49,16 +49,10 @@ static int32_t dataLB[AUDIO_BLOCK_SAMPLES] = {0};
 static int32_t dataRA[AUDIO_BLOCK_SAMPLES] = {0};
 static int32_t dataRB[AUDIO_BLOCK_SAMPLES] = {0};
 
-void audioCallbackPassthrough(int32_t** inputs, int32_t** outputs)
-{
-	for (size_t i = 0; i < AUDIO_BLOCK_SAMPLES; i++)
-	{
-		outputs[0][i] = inputs[0][i];
-		outputs[1][i] = inputs[1][i];
-	}
-}
+extern "C" void teensy_i2s_fill_buffer(int32_t** inputs, int32_t** outputs);
 
-void (*i2sAudioCallback)(int32_t** inputs, int32_t** outputs) = audioCallbackPassthrough;
+
+void (*i2sAudioCallback)(int32_t** inputs, int32_t** outputs) = teensy_i2s_fill_buffer;
 
 DMAMEM __attribute__((aligned(32))) static uint64_t i2s_tx_buffer[AUDIO_BLOCK_SAMPLES*2];
 #include "utility/imxrt_hw.h"

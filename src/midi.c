@@ -366,8 +366,10 @@ void run_midi() {
 #endif
 
 #ifdef __IMXRT1062__
+extern void teensy_start_midi();
+
 void run_midi() {
-    // nothing yet
+    teensy_start_midi();
 }
 #endif
 
