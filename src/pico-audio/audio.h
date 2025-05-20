@@ -1,3 +1,4 @@
+#if (defined PICO_RP2350) || (defined PICO_RP2040)
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -306,3 +307,4 @@ typedef struct __packed pio_audio_channel_config {
 #endif
 
 #endif //_AUDIO_H
+#endif

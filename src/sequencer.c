@@ -81,7 +81,6 @@ uint8_t sequencer_add_event(struct event *e) {
     cbinfo.tick = e->sequence[SEQUENCE_TICK];
     cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
-    fprintf(stderr, "add tick %d period %d tag %d\n", cbinfo.tick, cbinfo.period, cbinfo.tag);
     amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }

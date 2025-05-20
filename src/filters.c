@@ -15,7 +15,8 @@ SAMPLE ** eq_coeffs;
 SAMPLE *** eq_delay;
 
 
-
+#pragma GCC diagnostic push                             // save the actual diag context
+#pragma GCC diagnostic ignored "-Wuninitialized"  // disable maybe warnings
 float dsps_sqrtf_f32_ansi(float f)
 {
     int* f_ptr = (int*)&f;
@@ -23,6 +24,7 @@ float dsps_sqrtf_f32_ansi(float f)
     float* f_result = (float*)&result;
     return *f_result;  
 }
+#pragma GCC diagnostic pop 
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {

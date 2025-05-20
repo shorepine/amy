@@ -365,6 +365,14 @@ void run_midi() {
 }
 #endif
 
+#ifdef __IMXRT1062__
+extern void teensy_start_midi();
+
+void run_midi() {
+    teensy_start_midi();
+}
+#endif
+
 #ifdef TUD_USB_GADGET
 void run_midi() {
     // check midi USB gadget

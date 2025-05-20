@@ -287,8 +287,40 @@ amy_err_t i2s_amy_init() {
 
 
 
-#else // teensy? m7? etc
+#elif defined __IMXRT1062__
+extern void teensy_setup_i2s();
+extern int16_t teensy_get_serial_byte();
+void teensy_i2s_fill_buffer(int32_t** inputs, int32_t** outputs) {
+    amy_prepare_buffer();
+    amy_render(0, AMY_OSCS, 0);        
+    int16_t *block = amy_fill_buffer();
+    for (size_t i = 0; i < AMY_BLOCK_SIZE; i++) {
+        outputs[0][i] = block[i*2];
+        outputs[1][i] = block[i*2+1];
+    }
+}
 
+amy_err_t i2s_amy_init() {
+    teensy_setup_i2s();
+    return AMY_OK;
+}
+
+void amy_update() {
+    // do midi in here
+    uint8_t bytes[1];
+    int16_t t = teensy_get_serial_byte();
+    if(t>=0) {
+        bytes[0] = t;
+        convert_midi_bytes_to_messages(bytes,1,0);
+    }
+}
+
+
+
+
+#else
+
+//daisy
 
 #endif
 

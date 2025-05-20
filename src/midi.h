@@ -44,6 +44,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 void run_midi();
 #elif  (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 void run_midi();
+#elif defined __IMXRT1062__
+void run_midi();
 #else
 void *run_midi(void*vargp);
 #endif
