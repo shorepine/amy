@@ -417,9 +417,9 @@ struct event {
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     char voices[MAX_PARAM_LEN];
     // Instrument-layer values.
-    uint8_t instrument;
-    uint32_t instrument_flags;  // Special flags to set when defining instruments.
-    uint8_t to_instrument;  // For moving setup between synth numbers.
+    uint8_t synth;
+    uint32_t synth_flags;  // Special flags to set when defining instruments.
+    uint8_t to_synth;  // For moving setup between synth numbers.
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
@@ -746,9 +746,9 @@ extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(struct event *e, char * message);
-#define _INSTRUMENT_FLAGS_MIDI_DRUMS (0x01)
-#define _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS (0x02)
-#define _INSTRUMENT_FLAGS_NEGATE_PEDAL (0x04)
+#define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
+#define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
+#define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
 extern void instruments_init();
 extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
