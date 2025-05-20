@@ -3,8 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
-
-#ifdef ARDUINO_ARCH_RP2040
+#if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 
 #ifndef _PICO_AUDIO_I2S_H
 #define _PICO_AUDIO_I2S_H
@@ -108,6 +107,12 @@ extern "C" {
 #define PICO_AUDIO_I2S_CLOCK_PIN_BASE 26
 #endif
 
+// The default order is CLOCK_PIN_BASE=LRCLK, CLOCK_PIN_BASE+1=BCLK
+// The swapped order is CLOCK_PIN_BASE=BCLK,  CLOCK_PIN_BASE+1=LRCLK
+#ifndef PICO_AUDIO_I2S_CLOCK_PINS_SWAPPED
+#define PICO_AUDIO_I2S_CLOCK_PINS_SWAPPED 0
+#endif
+
 // todo this needs to come from a build config
 /** \brief Base configuration structure used when setting up
  * \ingroup pico_audio_i2s
@@ -182,4 +187,3 @@ void audio_i2s_set_enabled(bool enabled);
 
 #endif //_AUDIO_I2S_H
 #endif
-

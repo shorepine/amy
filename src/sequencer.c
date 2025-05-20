@@ -53,7 +53,7 @@ void add_delta_to_sequencer(struct delta *d, void*user_data) {
     (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
 }
 
-uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uint32_t tag) {
+uint8_t sequencer_add_event(struct event *e) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, tick, period, tag);
@@ -61,7 +61,7 @@ uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uin
     while ((*entry_ll_ptr) != NULL) {
         // Do this first, then add the new one / replacement one at the end. Not a big deal 
         // This can delete all the deltas from a source event if it matches tag
-        if ((*entry_ll_ptr)->tag == tag) {
+        if ((*entry_ll_ptr)->tag == e->sequence[SEQUENCE_TAG]) {
             //fprintf(stderr, "ll %p found tag %d, deleting\n", (*entry_ll_ptr), tag);
             sequence_entry_ll_t *doomed = *entry_ll_ptr;
             *entry_ll_ptr = doomed->next; // close up list.
@@ -71,16 +71,17 @@ uint8_t sequencer_add_event(struct event *e, uint32_t tick, uint32_t period, uin
         }
     }
 
-    if(tick == 0 && period == 0) return 0; // Ignore non-schedulable event.
-    if(tick != 0 && period == 0 && tick <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
+    if(e->sequence[SEQUENCE_TICK] == 0 && e->sequence[SEQUENCE_PERIOD] == 0) return 0; // Ignore non-schedulable event.
+    if(e->sequence[SEQUENCE_TICK] != 0 && e->sequence[SEQUENCE_PERIOD] == 0 && e->sequence[SEQUENCE_TICK] <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
 
     // Get all the deltas for this event
     // For each delta, add a new entry at the end
     sequence_callback_info_t cbinfo;
-    cbinfo.tag = tag;
-    cbinfo.tick = tick;
-    cbinfo.period = period;
+    cbinfo.tag = e->sequence[SEQUENCE_TAG];
+    cbinfo.tick = e->sequence[SEQUENCE_TICK];
+    cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
+    fprintf(stderr, "add tick %d period %d tag %d\n", cbinfo.tick, cbinfo.period, cbinfo.tag);
     amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
@@ -130,6 +131,8 @@ void sequencer_check_and_fill() {
     }
 }
 
+///// Sequencers per platform
+
 #ifdef ESP_PLATFORM
 // ESP: do it with hardware timer
 static void sequencer_timer_callback(void* arg) {
@@ -146,8 +149,25 @@ void run_sequencer() {
     // 500us = 0.5ms
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
+
+#elif (defined PICO_RP2350) || (defined PICO_RP2040)
+// pico: do it with a hardware timer
+
+#include "pico/time.h"
+repeating_timer_t pico_sequencer_timer;
+
+static bool sequencer_timer_callback(repeating_timer_t *rt) {
+    sequencer_check_and_fill();
+    return true;
+}
+
+void run_sequencer() {
+    add_repeating_timer_us(-500, sequencer_timer_callback, NULL, &pico_sequencer_timer);
+}
+
 #elif defined _POSIX_THREADS
-void * run_sequencer(void *vargs) {
+// posix: threads
+void * sequencer_thread(void *vargs) {
     // Loop forever, checking for time and sleeping
     while(1) {
         sequencer_check_and_fill();            
@@ -155,23 +175,22 @@ void * run_sequencer(void *vargs) {
         nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
     }
 }
-#endif
+void run_sequencer() {
+    pthread_t sequencer_thread_id;
+    pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
+}
 
+#else
+
+void run_sequencer() {
+    fprintf(stderr, "No sequencer support for this chip / platform\n");
+}
+
+#endif
 
 void sequencer_init() {
     amy_global.sequence_entry_ll_start = NULL;
-    sequencer_recompute();        
-
-    #ifdef ESP_PLATFORM
-    // This kicks off a timer 
+    sequencer_recompute();
     run_sequencer();
-    #elif defined _POSIX_THREADS
-    // This kicks off a thread
-    pthread_t sequencer_thread_id;
-    pthread_create(&sequencer_thread_id, NULL, run_sequencer, NULL);
-    #else
-    fprintf(stderr, "No sequencer support for this chip / platform\n");
-    #endif
-
 }
 

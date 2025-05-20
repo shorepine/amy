@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifdef ARDUINO_ARCH_RP2040
 #ifndef _PICO_AUDIO_H
 #define _PICO_AUDIO_H
 
@@ -307,4 +306,3 @@ typedef struct __packed pio_audio_channel_config {
 #endif
 
 #endif //_AUDIO_H
-#endif

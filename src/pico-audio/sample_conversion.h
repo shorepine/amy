@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifdef ARDUINO_ARCH_RP2040
-
 #ifndef SOFTWARE_SAMPLE_CONVERSION_H
 #define SOFTWARE_SAMPLE_CONVERSION_H
 
@@ -22,19 +20,19 @@ public:
     typedef _sample_t sample_t;
 };
 
-typedef struct : public FmtDetails<uint8_t> {
-} FmtU8;
+struct FmtU8 : public FmtDetails<uint8_t> {
+};
 
-typedef struct : public FmtDetails<int8_t> {
-} FmtS8;
+struct FmtS8 : public FmtDetails<int8_t> {
+};
 
-typedef struct : public FmtDetails<uint16_t> {
-} FmtU16;
+struct FmtU16 : public FmtDetails<uint16_t> {
+};
 
-typedef struct : public FmtDetails<int16_t> {
-} FmtS16;
+struct FmtS16 : public FmtDetails<int16_t> {
+};
 
-// Multi channel is just N samples back to back
+// Multi-channel is just N samples back to back
 template<typename Fmt, uint ChannelCount>
 struct MultiChannelFmt {
     static const uint channel_count = ChannelCount;
@@ -287,4 +285,3 @@ void producer_pool_blocking_give(audio_connection_t *connection, audio_buffer_t 
 }
 
 #endif //SOFTWARE_SAMPLE_CONVERSION_H
-#endif

@@ -239,15 +239,31 @@ int _next_alpha(char *s) {
     return p;
 }
 
-// given a string return an event
+
+// Given an event from parsing or the C API, deal with it
+void amy_handle_event(struct event *e) {
+    if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
+        uint8_t added = sequencer_add_event(e);
+        (void)added; // we don't need to do anything with this info at this time
+        e->status = EVENT_SEQUENCE;
+    } else {
+        // if time is set, play then
+        // if time and latency is set, play in time + latency
+        // if time is not set, play now
+        // if time is not set + latency is set, play in latency
+        uint32_t playback_time = amy_sysclock();
+        if(AMY_IS_SET(e->time)) playback_time = e->time;
+        playback_time += amy_global.latency_ms;
+        e->time = playback_time;
+        e->status = EVENT_SCHEDULED;
+    }
+}
+
+// given a string return a parsed event
 void amy_parse_message(char * message, struct event *e) {
     char cmd = '\0';
     uint16_t pos = 0;
     int16_t length = strlen(message);
-
-    // default values for sequence message
-    uint32_t seq_message[3] = {0,0,0};
-    uint8_t sequence_message = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_global.transfer_flag) {
@@ -256,24 +272,12 @@ void amy_parse_message(char * message, struct event *e) {
         return;
     }
 
-    uint32_t sysclock = amy_sysclock();
-
     e->source = EVENT_USER;
 
-    //printf("parse_message: %s\n", message);
-    
-    // cut the osc cruft max etc add, they put a 0 and then more things after the 0  // Anyone want to explain what this means?
-    int new_length = length;
-    for(int d = 0; d < length; d++) {
-        if(message[d] == 0) { new_length = d; d = length + 1;  }
-    }
-    length = new_length;
-    //fprintf(stderr, "%s\n", message);
 
     while(pos < length + 1) {
         cmd = message[pos];
         char *arg = message + pos + 1;
-        //if(cmd == '_' && pos==0) sync_response = 1;
         if(isalpha(cmd)) {
             switch(cmd) {
             case 'a': parse_coef_message(arg, e->amp_coefs);break;
@@ -288,7 +292,7 @@ void amy_parse_message(char * message, struct event *e) {
             case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
             case 'G': e->filter_type = atoi(arg); break;
             /* g used for Alles for client # */
-            case 'H': parse_list_uint32_t(arg, seq_message, 3, 0); sequence_message = 1; break;
+            case 'H': parse_list_uint32_t(arg, e->sequence, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
                 float reverb_params[4] = {AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness),
                                           AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness)};
@@ -400,21 +404,4 @@ void amy_parse_message(char * message, struct event *e) {
         pos += 1 + _next_alpha(message + 1 + pos);
     }
 
-    if(length>0) { // only do this if we got some data 
-        if(sequence_message) {
-            uint8_t added = sequencer_add_event(e, seq_message[0], seq_message[1], seq_message[2]);
-            (void)added; // we don't need to do anything with this info at this time
-            e->status = EVENT_SEQUENCE;
-        } else {
-            // if time is set, play then
-            // if time and latency is set, play in time + latency
-            // if time is not set, play now
-            // if time is not set + latency is set, play in latency
-            uint32_t playback_time = sysclock;
-            if(AMY_IS_SET(e->time)) playback_time = e->time;
-            playback_time += amy_global.latency_ms;
-            e->time = playback_time;
-            e->status = EVENT_SCHEDULED;
-        }
-    }
 }

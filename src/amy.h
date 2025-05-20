@@ -207,6 +207,11 @@ enum coefs{
 #define ENVELOPE_DX7 2
 #define ENVELOPE_TRUE_EXPONENTIAL 3
 
+// Sequence enum
+#define SEQUENCE_TICK 0
+#define SEQUENCE_PERIOD 1
+#define SEQUENCE_TAG 2
+
 // Reset masks
 #define RESET_SEQUENCER 4096
 #define RESET_ALL_OSCS 8192
@@ -423,6 +428,7 @@ struct event {
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
+    uint32_t sequence[3]; // tick, period, tag
     //
     uint8_t status;
     uint8_t source;
@@ -561,6 +567,7 @@ typedef struct  {
 
     // memory caps for MCUs
     uint32_t ram_caps_events;
+    uint32_t ram_caps_sysex;
     uint32_t ram_caps_synth;
     uint32_t ram_caps_block;
     uint32_t ram_caps_fbl;
@@ -655,6 +662,7 @@ void amy_update();
 struct event amy_default_event();
 void amy_deltas_reset();
 void amy_add_event(struct event *e);
+void amy_play_event(struct event *e);
 void add_delta_to_queue(struct delta *d, void*user_data);
 void amy_add_event_internal(struct event *e, uint16_t base_osc);
 void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
@@ -703,6 +711,7 @@ amy_config_t amy_default_config();
 // external functions
 void amy_play_message(char *message);
 void amy_parse_message(char * message, struct event *e);
+void amy_handle_event(struct event *e);
 void amy_restart();
 void amy_start(amy_config_t);
 void amy_stop();
@@ -845,6 +854,5 @@ extern void retrigger_mod_source(uint16_t osc);
 
 
 #endif
-
 
 

@@ -360,12 +360,7 @@ amy_config_t amy_default_config() {
     c.has_midi_gadget = 0;
     c.set_default_synth = 1;
     c.cores = 1;
-
-    #ifndef ARDUINO
     c.max_oscs = 180;
-    #else
-    c.max_oscs = 120;
-    #endif
 
     // caps
     #if (defined TULIP) || (defined AMYBOARD)
@@ -375,6 +370,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_SPIRAM;
     c.ram_caps_sample = MALLOC_CAP_SPIRAM;
+    c.ram_caps_sysex = MALLOC_CAP_SPIRAM;
     #else
     c.ram_caps_events = MALLOC_CAP_DEFAULT;
     c.ram_caps_synth = MALLOC_CAP_DEFAULT;
@@ -382,6 +378,7 @@ amy_config_t amy_default_config() {
     c.ram_caps_fbl = MALLOC_CAP_DEFAULT;
     c.ram_caps_delay = MALLOC_CAP_DEFAULT;
     c.ram_caps_sample = MALLOC_CAP_DEFAULT;
+    c.ram_caps_sysex = MALLOC_CAP_DEFAULT;
     #endif    
 
     c.capture_device_id = -1;
@@ -447,6 +444,9 @@ struct event amy_default_event() {
     AMY_UNSET(e.grab_midi_notes);
     AMY_UNSET(e.pedal);
     AMY_UNSET(e.num_voices);
+    AMY_UNSET(e.sequence[SEQUENCE_TICK]);
+    AMY_UNSET(e.sequence[SEQUENCE_PERIOD]);
+    AMY_UNSET(e.sequence[SEQUENCE_TAG]);
     return e;
 }
 
@@ -1380,6 +1380,7 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
     AMY_PROFILE_STOP(MIX_WITH_PAN)
 }
 
+
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)
     // Returns abs max of what it wrote.
@@ -1721,13 +1722,26 @@ void amy_reset_sysclock() {
     sequencer_recompute();
 }
 
-// given a string play / schedule the event directly
+// given a wire message string play / schedule the event directly (WIRE API)
 void amy_play_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
     struct event e = amy_default_event();
+    // Parse the wire string into an event
     amy_parse_message(message, &e);
+    // Do whatever we might need to do with the event before we add it 
+    amy_handle_event(&e);
+    // If this was an event to be played, play it 
     if(e.status == EVENT_SCHEDULED) {
         amy_add_event(&e);
+    }
+}
+
+// given an event play / schedule the event directly (C API)
+void amy_play_event(struct event *e) {
+    amy_handle_event(e);
+    // If this was an event to be played, play it 
+    if(e->status == EVENT_SCHEDULED) {
+        amy_add_event(e);
     }
 }
 
@@ -1765,7 +1779,7 @@ void amy_default_setup() {
     amy_add_event(&e);
 }
 
-// amy_play_message -> amy_parse_message -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue
+// amy_play_message -> amy_parse_message -> amy_handle_event -> amy_add_event -> add_delta_to_queue -> i_deltas queue -> global delta queue
 // fill_audio_buffer_task -> read delta global delta queue -> play_delta -> apply delta to synth[d.osc]
 
 void amy_stop() {
