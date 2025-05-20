@@ -53,7 +53,7 @@ void patches_debug() {
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
         int num_voices = instrument_get_voices(i, voices);
         if (num_voices) {
-            fprintf(stderr, "synth %d num_voices %d patch_num %d flags %d voices", i, num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
+            fprintf(stderr, "synth %d num_voices %d patch_num %d flags %" PRIu32" voices", i, num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %d", voices[j]);
             fprintf(stderr, "\n");
         }
@@ -425,6 +425,8 @@ void patches_load_patch(struct event *e) {
         return;
     }
     // At this point, we have the voices[] array and num_voices set up to be initialized.
+    char empty[1];
+    empty[0] = 0; // prevent gcc warning
     char *message;
     uint16_t patch_osc = 0;
     if(patch_number >= _PATCHES_FIRST_USER_PATCH) {
@@ -434,6 +436,7 @@ void patches_load_patch(struct event *e) {
             message = memory_patch[patch_index];
         } else {
             num_voices = 0; // don't do anything
+            message = empty;
         }
     } else {
         message = (char*)patch_commands[patch_number];

@@ -1,3 +1,4 @@
+#if (defined PICO_RP2350) || (defined PICO_RP2040)
 #if 1
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
@@ -19,4 +20,5 @@ static void __attribute__((constructor)) _clear_usb_ram() {
 #endif
 #endif
 
+#endif
 #endif

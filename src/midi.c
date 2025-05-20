@@ -365,6 +365,12 @@ void run_midi() {
 }
 #endif
 
+#ifdef __IMXRT1062__
+void run_midi() {
+    // nothing yet
+}
+#endif
+
 #ifdef TUD_USB_GADGET
 void run_midi() {
     // check midi USB gadget

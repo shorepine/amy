@@ -287,8 +287,22 @@ amy_err_t i2s_amy_init() {
 
 
 
-#else // teensy? m7? etc
+#elif defined __IMXRT1062__
+// teensy 4
 
+amy_err_t i2s_amy_init() {
+    //ap = init_audio();
+    return AMY_OK;
+}
+
+void amy_update() {
+
+}
+
+
+#else
+
+//daisy
 
 #endif
 

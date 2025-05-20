@@ -1,3 +1,4 @@
+#if (defined PICO_RP2350) || (defined PICO_RP2040)
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -252,3 +253,5 @@ audio_buffer_t *mono_s8_to_stereo_consumer_take(audio_connection_t *connection, 
 void stereo_to_stereo_producer_give(audio_connection_t *connection, audio_buffer_t *buffer) {
     return producer_pool_blocking_give<Stereo<FmtS16>, Stereo<FmtS16>>(connection, buffer);
 }
+
+#endif
