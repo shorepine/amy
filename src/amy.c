@@ -441,9 +441,9 @@ struct event amy_default_event() {
     e.bp0[0] = 0;
     e.bp1[0] = 0;
     e.voices[0] = 0;
-    AMY_UNSET(e.instrument);
-    AMY_UNSET(e.instrument_flags);
-    AMY_UNSET(e.to_instrument);
+    AMY_UNSET(e.synth);
+    AMY_UNSET(e.synth_flags);
+    AMY_UNSET(e.to_synth);
     AMY_UNSET(e.grab_midi_notes);
     AMY_UNSET(e.pedal);
     AMY_UNSET(e.num_voices);
@@ -545,7 +545,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
-    if (e->voices[0] != 0 || AMY_IS_SET(e->instrument)) {
+    if (e->voices[0] != 0 || AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             patches_load_patch(e);
         }
@@ -1702,7 +1702,7 @@ void amy_default_setup() {
     e.patch_number = 1024;
     patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
     e.num_voices = 1;
-    e.instrument = 16;
+    e.synth = 16;
     amy_add_event(&e);
 
     // GM drum synth on channel 10
@@ -1715,8 +1715,8 @@ void amy_default_setup() {
     e.patch_number = 1025;
     patches_store_patch(&e, "w7f0");
     e.num_voices = 6;
-    e.instrument = 10;
-    e.instrument_flags = _INSTRUMENT_FLAGS_MIDI_DRUMS | _INSTRUMENT_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
+    e.synth = 10;
+    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
     amy_add_event(&e);
 
     // Juno 6 poly on channel 1
@@ -1724,7 +1724,7 @@ void amy_default_setup() {
     e = amy_default_event();
     e.num_voices = 6;
     e.patch_number = 0;
-    e.instrument = 1;
+    e.synth = 1;
     amy_add_event(&e);
 }
 

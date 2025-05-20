@@ -202,15 +202,15 @@ void parse_coef_message(char *message, float *coefs) {
 void amy_parse_synth_layer_message(char *message, struct event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the instrument number.
-        e->instrument = atoi(message);
+        e->synth = atoi(message);
         return;
     }
     char cmd = message[0];
     message++;
     if (cmd == 'p')  e->pedal = atoi(message);
-    else if (cmd == 'f')  e->instrument_flags = atoi(message);
+    else if (cmd == 'f')  e->synth_flags = atoi(message);
     else if (cmd == 'v')  e->num_voices = atoi(message);
-    else if (cmd == 't')  e->to_instrument = atoi(message);
+    else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
