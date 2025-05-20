@@ -218,7 +218,7 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
     //fprintf(stderr, "config_chorus: osc %d level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
     //        CHORUS_MOD_SOURCE, level, max_delay, lfo_freq, depth);
     if (level > 0) {
-        ensure_osc_allocd(CHORUS_MOD_SOURCE);
+        ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
         // only allocate delay lines if chorus is more than inaudible.
         if (chorus_delay_lines[0] == NULL) {
             alloc_chorus_delay_lines();
@@ -508,7 +508,7 @@ void amy_add_event_internal(struct event *e, uint16_t base_osc) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; ensure_osc_allocd(d.data.i); callback(&d, user_data);}
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; ensure_osc_allocd(d.data.i, NULL); callback(&d, user_data);}
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -541,7 +541,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
     d.osc += base_osc;
 
     // Ensure this osc has its synthinfo allocated.
-    ensure_osc_allocd(d.osc);
+    ensure_osc_allocd(d.osc, NULL);
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
@@ -593,7 +593,7 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
             } else{
                 d.data.i = t.algo_source[i];
             }
-            ensure_osc_allocd(d.data.i);
+            ensure_osc_allocd(d.data.i, NULL);
             callback(&d, user_data); 
         }
     }
@@ -604,7 +604,14 @@ void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callba
         // amy_parse_message sets bp_is_set for anything including an empty string,
         // but direct calls to amy_add_event can just put a nonempty string into bp0/1.
         if(AMY_IS_SET(e->bp_is_set[i]) || bps[i][0] != 0) {
+            // TODO(dpwe): Modify parse_breakpoints *not* to need an entire synthinfo, but to work with
+            // vectors of breakpoint times/values.
             struct synthinfo t;
+            uint32_t breakpoint_times[MAX_BREAKPOINTS];
+            float breakpoint_values[MAX_BREAKPOINTS];
+            t.max_num_breakpoints[i] = MAX_BREAKPOINTS;
+            t.breakpoint_times[i] = (uint32_t *)&breakpoint_times;
+            t.breakpoint_values[i] = (float *)&breakpoint_values;
             int num_bps = parse_breakpoint(&t, bps[i], i);
             for(uint8_t j = 0; j < num_bps; j++) {
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
@@ -700,7 +707,8 @@ void reset_osc(uint16_t i ) {
     synth[i]->algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i]->algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-        for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) {
+        // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
+        for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
             AMY_UNSET(synth[i]->breakpoint_times[j][k]);
             AMY_UNSET(synth[i]->breakpoint_values[j][k]);
         }
@@ -756,12 +764,29 @@ void amy_deltas_reset() {
     }
 }
 
-void alloc_osc(int osc) {
-    void *ptr = malloc_caps(sizeof(struct synthinfo) + sizeof(struct mod_synthinfo), amy_global.config.ram_caps_events);
+void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
+    uint8_t default_num_breakpoints[MAX_BREAKPOINT_SETS] = {DEFAULT_NUM_BREAKPOINTS, DEFAULT_NUM_BREAKPOINTS};
+    if (max_num_breakpoints == NULL) {
+        max_num_breakpoints = default_num_breakpoints;
+    }
+    int total_num_breakpoints = 0;
+    for (int i=0; i < MAX_BREAKPOINT_SETS; ++i)  total_num_breakpoints += max_num_breakpoints[i];
+    uint8_t *ptr = malloc_caps(sizeof(struct synthinfo) + sizeof(struct mod_synthinfo)
+                               + total_num_breakpoints * (sizeof(float) + sizeof(uint32_t)),
+                               amy_global.config.ram_caps_events);
     synth[osc] = (struct synthinfo *)ptr;
-    msynth[osc] = (struct mod_synthinfo *)(((uint8_t *)ptr) + sizeof(struct synthinfo));
+    msynth[osc] = (struct mod_synthinfo *)(ptr + sizeof(struct synthinfo));
+    // Point to the breakpoint sets.
+    uint8_t *breakpoint_area = ptr + sizeof(struct synthinfo) + sizeof(struct mod_synthinfo);
+    for (int i=0; i < MAX_BREAKPOINT_SETS; ++i) {
+        synth[osc]->max_num_breakpoints[i] = max_num_breakpoints[i];
+        synth[osc]->breakpoint_times[i] = (uint32_t *)breakpoint_area;
+        breakpoint_area +=  max_num_breakpoints[i] * sizeof(uint32_t);  // must be a multiple of 4 bytes
+        synth[osc]->breakpoint_values[i] = (float *)breakpoint_area;
+        breakpoint_area += sizeof(float) * max_num_breakpoints[i];
+    }
     reset_osc(osc);
-    //fprintf(stderr, "alloc_osc %d\n", osc);
+    //fprintf(stderr, "alloc_osc %d num_breakpoints %d,%d\n", osc, synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
 }
 
 void free_osc(int osc) {
@@ -772,8 +797,20 @@ void free_osc(int osc) {
     msynth[osc] = NULL;
 }
 
-void ensure_osc_allocd(int osc) {
-    if (synth[osc] == NULL) alloc_osc(osc);
+void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
+    if (synth[osc] == NULL) alloc_osc(osc, max_num_breakpoints);
+    else if (max_num_breakpoints) {
+        bool realloc_needed = false;
+        for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
+            if (synth[osc]->max_num_breakpoints[i] < max_num_breakpoints[i])
+                realloc_needed = true;
+        }
+        if (realloc_needed) {
+            //fprintf(stderr, "realloc for osc %d (breakpoints %d, %d -> %d, %d\n", osc, synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1], max_num_breakpoints[0], max_num_breakpoints[1]);
+            free_osc(osc);
+            alloc_osc(osc, max_num_breakpoints);
+        }
+    }
 }
 
 
@@ -856,7 +893,7 @@ void print_osc_debug(int i /* osc */, bool show_eg) {
     if(show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
             fprintf(stderr,"  eg%d (type %d): ", j, synth[i]->eg_type[j]);
-            for(uint8_t k=0;k<MAX_BREAKPOINTS;k++) {
+            for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
                 fprintf(stderr,"%" PRIi32 ": %f ", synth[i]->breakpoint_times[j][k], synth[i]->breakpoint_values[j][k]);
             }
             fprintf(stderr,"\n");
@@ -1043,7 +1080,7 @@ void play_delta(struct delta *d) {
     if (PARAM_IS_BP_COEF(d->param)) {
         uint8_t pos = d->param - BP_START;
         uint8_t bp_set = 0;
-        if(pos > (MAX_BREAKPOINTS * 2)) { bp_set = 1; pos = pos - (MAX_BREAKPOINTS * 2); }
+        while(pos >= (MAX_BREAKPOINTS * 2)) { ++bp_set; pos -= (MAX_BREAKPOINTS * 2); }
         if(pos % 2 == 0) {
             synth[d->osc]->breakpoint_times[bp_set][pos / 2] = d->data.i;
         } else {
@@ -1511,7 +1548,7 @@ void amy_prepare_buffer() {
 #endif
 
     if(AMY_HAS_CHORUS==1) {
-        ensure_osc_allocd(CHORUS_MOD_SOURCE);
+        ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
         hold_and_modify(CHORUS_MOD_SOURCE);
         if(amy_global.chorus.level!=0)  {
             bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));

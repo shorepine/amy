@@ -135,7 +135,7 @@ float int_db_to_float_lin(uint32_t db) {
 }
 
 // helper to parse the special bp string
-int parse_breakpoint_core_float_lin(struct synthinfo * e, char* message, uint8_t which_bpset) {
+int parse_breakpoint_core_float_lin(struct synthinfo * s, char* message, uint8_t which_bpset) {
     // This is the classic version, int_time_delta_ms,float_lin_val,...
     float vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
@@ -143,18 +143,23 @@ int parse_breakpoint_core_float_lin(struct synthinfo * e, char* message, uint8_t
                                     AMY_UNSET_VALUE(vals[0]));
     // Distribute out to times and vals, casting times to ints.
     for (int i = 0; i < num_vals; ++i) {
-        if ((i % 2) == 0)
-            if (AMY_IS_SET(vals[i]))
-                e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples((int)vals[i]);
-            else  // Have to translate the "unset" value for the non-float type.
-                e->breakpoint_times[which_bpset][i >> 1] = AMY_UNSET_VALUE(e->breakpoint_times[which_bpset][i >> 1]);
-        else
-            e->breakpoint_values[which_bpset][i >> 1] = vals[i];
+        int bp_index = (i >> 1);
+        if (bp_index >= s->max_num_breakpoints[which_bpset]) {
+            fprintf(stderr, "overran bpset %d length %d trying to write %d\n", which_bpset, s->max_num_breakpoints[which_bpset], bp_index);
+        } else {
+            if ((i % 2) == 0)
+                if (AMY_IS_SET(vals[i]))
+                    s->breakpoint_times[which_bpset][bp_index] = ms_to_samples((int)vals[i]);
+                else  // Have to translate the "unset" value for the non-float type.
+                    s->breakpoint_times[which_bpset][bp_index] = AMY_UNSET_VALUE(s->breakpoint_times[which_bpset][bp_index]);
+            else
+                s->breakpoint_values[which_bpset][bp_index] = vals[i];
+        }
     }
     return num_vals;
 }
 
-int parse_breakpoint_core_int_db(struct synthinfo * e, char* message, uint8_t which_bpset) {
+int parse_breakpoint_core_int_db(struct synthinfo * s, char* message, uint8_t which_bpset) {
     // This is for the special faster additive-synth version, int_time_delta_ms,uint_db_val,...
     uint32_t vals[2 * MAX_BREAKPOINTS];
     // Read all the values as floats.
@@ -163,28 +168,36 @@ int parse_breakpoint_core_int_db(struct synthinfo * e, char* message, uint8_t wh
     // Distribute out to times and vals, casting int db values to linear floats.
     // Both ms_to_samples and int_db_to_float_lin pass through AMY_UNSET suitably translated.
     for (int i = 0; i < num_vals; ++i) {
-        if ((i % 2) == 0)
-            e->breakpoint_times[which_bpset][i >> 1] = ms_to_samples(vals[i]);
-        else
-            e->breakpoint_values[which_bpset][i >> 1] = int_db_to_float_lin(vals[i]);
+        int bp_index = (i >> 1);
+        if (bp_index >= s->max_num_breakpoints[which_bpset]) {
+            fprintf(stderr, "overran bpset %d length %d trying to write %d\n", which_bpset, s->max_num_breakpoints[which_bpset], bp_index);
+        } else {
+            if ((i % 2) == 0)
+                s->breakpoint_times[which_bpset][bp_index] = ms_to_samples(vals[i]);
+            else
+                s->breakpoint_values[which_bpset][bp_index] = int_db_to_float_lin(vals[i]);
+        }
     }
     return num_vals;
 }
 
-int parse_breakpoint(struct synthinfo * e, char* message, uint8_t which_bpset) {
+int parse_breakpoint(struct synthinfo * s, char* message, uint8_t which_bpset) {
     int num_vals;
     // Test for special case BP string that begins ".." meaning it's unsigned integer dB values.
     if (message[0] == '.' && message[1] == '.') {
-        num_vals = parse_breakpoint_core_int_db(e, message + 2, which_bpset);
+        num_vals = parse_breakpoint_core_int_db(s, message + 2, which_bpset);
     } else {
-        num_vals = parse_breakpoint_core_float_lin(e, message, which_bpset);
+        num_vals = parse_breakpoint_core_float_lin(s, message, which_bpset);
     }
     // Values that are not specified at the end of the list indicate the total length of the BP set.
     for (int i = num_vals; i < 2 * MAX_BREAKPOINTS; ++i) {
-        if ((i % 2) == 0)
-            AMY_UNSET(e->breakpoint_times[which_bpset][i >> 1]);
-        else
-            AMY_UNSET(e->breakpoint_values[which_bpset][i >> 1]);
+        int bp_index = (i >> 1);
+        if (bp_index < s->max_num_breakpoints[which_bpset]) {
+            if ((i % 2) == 0)
+                AMY_UNSET(s->breakpoint_times[which_bpset][bp_index]);
+            else
+                AMY_UNSET(s->breakpoint_values[which_bpset][bp_index]);
+        }
     }
     // Return the number of breakpoints that were present.
     return (num_vals + 1) >> 1;
