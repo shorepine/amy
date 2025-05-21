@@ -23,6 +23,16 @@ struct voice_fifo {
 
 // Fifo must provide init, put, get, remove, empty
 
+void voice_fifo_debug(struct voice_fifo *fifo) {
+    fprintf(stderr, "fifo %s entries 0x%lx len %d head %d tail %d: ", fifo->name, (long)fifo->entries, fifo->length, fifo->head, fifo->tail);
+    uint8_t current = fifo->tail;
+    while(current != fifo->head) {
+        fprintf(stderr, "%d ", fifo->entries[current]);
+        current = (current + 1) % fifo->length;
+    }
+    fprintf(stderr, "\n");
+}
+
 struct voice_fifo *voice_fifo_init(int size, char *name) {
     if (size <=0 || size > MAX_VOICES_PER_INSTRUMENT) {
         fprintf(stderr, "init_voice_fifo: size %d value error (max size is %d)\n", size, MAX_VOICES_PER_INSTRUMENT);
@@ -32,7 +42,7 @@ struct voice_fifo *voice_fifo_init(int size, char *name) {
     result->head = 0;
     result->tail = 0;
     result->length = MAX_VOICES_PER_INSTRUMENT + 1;  // One more than max size.  fixed in this implementation.
-    result->name = name;
+    result->name = name;  // very dicey - only works because I'm passing statically-allocated names.
     return result;
 }
 
@@ -73,7 +83,7 @@ void voice_fifo_remove(struct voice_fifo *fifo, uint8_t val) {
     for (index = fifo->tail; index != fifo->head; index = (index + 1) % fifo->length) {
         if (fifo->entries[index] == val) {
             // Copy entries beyond the value to remove back one position.
-            uint8_t new_head = (fifo->head - 1) % fifo->length;
+            uint8_t new_head = (fifo->head + fifo->length - 1) % fifo->length;
             while (index != new_head) {
                 uint8_t next_index = (index + 1) % fifo->length;
                 fifo->entries[index] = fifo->entries[next_index];
@@ -102,6 +112,16 @@ struct instrument_info {
     bool grab_midi_notes;  // Flag to automatically play midi notes.
 };
 
+void instrument_debug(struct instrument_info *instrument) {
+    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d flags %d in_sustain %d grab_midi %d\n",
+            (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->flags,
+            instrument->in_sustain, instrument->grab_midi_notes);
+    for (int i = 0; i < instrument->num_voices; ++i)
+        fprintf(stderr, "voice %d amy_voice %d note_per_voice %d pending_release %d\n",
+                i, instrument->amy_voices[i], instrument->note_per_voice[i], instrument->pending_release[i]);
+    voice_fifo_debug(instrument->active_voices);
+    voice_fifo_debug(instrument->released_voices);
+}
 
 // Instrument provides note_on, note_off, all_notes_off, sustain(bool)
 
@@ -160,6 +180,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         fprintf(stderr, "note off for %d does not match note on\n", note);
+        //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
     }
     if (instrument->in_sustain) {

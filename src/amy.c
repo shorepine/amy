@@ -721,8 +721,9 @@ void reset_osc(uint16_t i ) {
 }
 
 void amy_reset_oscs() {
-    // include chorus osc
-    for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
+    // We reset oscs by freeing them.
+    // Include chorus osc (osc=AMY_OSCS)
+    for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
@@ -792,6 +793,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
 void free_osc(int osc) {
     if (synth[osc] != NULL) {
         free(synth[osc]);
+        //fprintf(stderr, "free_osc %d\n", osc);
     }
     synth[osc] = NULL;
     msynth[osc] = NULL;
