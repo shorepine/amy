@@ -508,7 +508,7 @@ void amy_add_event_internal(struct event *e, uint16_t base_osc) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; ensure_osc_allocd(d.data.i, NULL); callback(&d, user_data);}
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); callback(&d, user_data);}
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -723,7 +723,8 @@ void reset_osc(uint16_t i ) {
 void amy_reset_oscs() {
     // We reset oscs by freeing them.
     // Include chorus osc (osc=AMY_OSCS)
-    for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);
+    for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);  // include chorus osc.
+    //for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
@@ -787,13 +788,13 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
         breakpoint_area += sizeof(float) * max_num_breakpoints[i];
     }
     reset_osc(osc);
-    //fprintf(stderr, "alloc_osc %d num_breakpoints %d,%d\n", osc, synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
+    //fprintf(stderr, "alloc_osc %d (0x%lx) num_breakpoints %d,%d\n", osc, (long)synth[osc], synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
 }
 
 void free_osc(int osc) {
     if (synth[osc] != NULL) {
+        //fprintf(stderr, "free_osc %d (0x%lx)\n", osc, (long)synth[osc]);
         free(synth[osc]);
-        //fprintf(stderr, "free_osc %d\n", osc);
     }
     synth[osc] = NULL;
     msynth[osc] = NULL;
@@ -1043,6 +1044,9 @@ void play_delta(struct delta *d) {
     //fprintf(stderr,"play_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data.i, global.delta_qsize);
     //uint8_t trig=0;
     // todo: delta-only side effect, remove
+
+    if (d->param != RESET_OSC)  ensure_osc_allocd(d->osc, NULL);
+
     if(d->param == MIDI_NOTE) {
         synth[d->osc]->midi_note = d->data.f;
         // Midi note and Velocity are propagated to chained_osc.
@@ -1117,7 +1121,7 @@ void play_delta(struct delta *d) {
             all_notes_off(); 
         }
         if(d->data.i < AMY_OSCS+1) { 
-            reset_osc(*(uint32_t *)&d->data); 
+            reset_osc(d->data.i);
         } 
     }
     if(d->param == MOD_SOURCE) {

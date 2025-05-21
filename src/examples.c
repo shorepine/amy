@@ -126,6 +126,101 @@ void example_synth_chord(uint32_t start, uint16_t patch) {
 }   
 
 
+void example_sustain_pedal(uint32_t start, uint16_t patch) {
+    // Reproduce TestSustainPedal, to track segfault.
+    struct event e = amy_default_event();
+    e.time = start;
+    e.reset_osc = RESET_ALL_OSCS;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.num_voices = 4;
+    e.patch_number = patch;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 60;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 60;
+    e.velocity = 0;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.pedal = 127;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 63;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 63;
+    e.velocity = 0;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 67;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 67;
+    e.velocity = 0;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 72;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.pedal = 0;
+    amy_add_event(&e);
+
+    start += 50;
+    e = amy_default_event();
+    e.time = start;
+    e.synth = 1;
+    e.midi_note = 72;
+    e.velocity = 0;
+    amy_add_event(&e);
+}   
+
+
+
 void example_patches() {
     struct event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
