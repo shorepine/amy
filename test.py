@@ -658,6 +658,33 @@ class TestVoiceManagement(AmyTest):
     amy.send(time=600, synth=0, vel=0)
 
 
+class TestVoiceStealing(AmyTest):
+  """There's a bug with the default 6 voices."""
+
+  def __init__(self):
+    super().__init__()
+    self.config_default = True
+  
+  def run(self):
+    # Default juno synth.
+    amy.send(time=40, synth=1, note=60, vel=1)
+    amy.send(time=120, synth=1, note=64, vel=1)
+    amy.send(time=200, synth=1, note=67, vel=1)
+    amy.send(time=280, synth=1, note=70, vel=1)
+    amy.send(time=360, synth=1, note=72, vel=1)
+    amy.send(time=440, synth=1, note=76, vel=1)
+    amy.send(time=520, synth=1, note=79, vel=1)
+    amy.send(time=600, synth=1, note=82, vel=1)
+    amy.send(time=800, synth=1, note=60, vel=0)
+    amy.send(time=820, synth=1, note=64, vel=0)
+    amy.send(time=840, synth=1, note=67, vel=0)
+    amy.send(time=860, synth=1, note=70, vel=0)
+    amy.send(time=880, synth=1, note=72, vel=0)
+    amy.send(time=900, synth=1, note=76, vel=0)
+    amy.send(time=920, synth=1, note=79, vel=0)
+    amy.send(time=940, synth=1, note=82, vel=0)
+
+
 class TestMidiDrums(AmyTest):
   """Test MIDI drums on channel 10 via injection."""
 
@@ -756,6 +783,7 @@ class TestSustainPedal(AmyTest):
   """Test sustain pedal."""
 
   def run(self):
+    amy.send(time=0, reset=amy.RESET_ALL_OSCS)
     amy.send(time=0, synth=1, num_voices=4, patch_number=256)
     amy.send(time=50, synth=1, note=60, vel=1)
     amy.send(time=100, synth=1, note=60, vel=0)
@@ -767,6 +795,8 @@ class TestSustainPedal(AmyTest):
     amy.send(time=650, synth=1, note=72, vel=1)   # This note is held across the pedal release
     amy.send(time=750, synth=1, pedal=0)
     amy.send(time=900, synth=1, note=72, vel=0)
+
+
 
 
 def main(argv):
@@ -797,7 +827,8 @@ def main(argv):
     #TestJunoTrumpetPatch().test()
     #TestPcmLoop().test()
     #TestBYOPNoteOff().test()
-    TestInterpPartials().test()
+    #TestInterpPartials().test()
+    TestVoiceStealing().test()
 
   amy.send(debug=0)
   print("tests done.")
