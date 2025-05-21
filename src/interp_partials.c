@@ -167,7 +167,9 @@ void interp_partials_note_off(uint16_t osc) {
     for (int i = 0; i < MAX_NUM_HARMONICS; ++i) num_oscs += use_this_partial_map[i];
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
-        AMY_UNSET(synth[o]->note_on_clock);
-        synth[o]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+        if (synth[o]) {  // For high notes, some partials may be unused, unintialized (?)
+            AMY_UNSET(synth[o]->note_on_clock);
+            synth[o]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+        }
     }
 }

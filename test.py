@@ -828,7 +828,8 @@ def main(argv):
     #TestPcmLoop().test()
     #TestBYOPNoteOff().test()
     #TestInterpPartials().test()
-    TestVoiceStealing().test()
+    #TestVoiceStealing().test()
+    TestSustainPedal().test()
 
   amy.send(debug=0)
   print("tests done.")
