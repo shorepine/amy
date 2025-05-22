@@ -268,11 +268,6 @@ void core1_main() {
 
 
 amy_err_t i2s_amy_init() {
-    #if defined PICO_RP2350
-    uart_puts(uart0, "rp2350\n");
-    #else
-    uart_puts(uart0, "rp2040\n");
-    #endif
     if(amy_global.config.cores > 1) {
         queue_init(&call_queue, sizeof(queue_entry_t), 2);
         queue_init(&results_queue, sizeof(int32_t), 2);
