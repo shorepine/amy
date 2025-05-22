@@ -357,10 +357,10 @@ void run_midi() {
     gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
     uart_set_hw_flow(uart1, false, false);
     uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
-    uart_set_fifo_enabled(uart1, false);
-    irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
-    irq_set_enabled(UART1_IRQ, true);
-    uart_set_irq_enables(uart1, true, false);
+    uart_set_fifo_enabled(uart1, true);
+    //irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
+    //irq_set_enabled(UART1_IRQ, true);
+    //uart_set_irq_enables(uart1, true, false);
 
 }
 #endif
