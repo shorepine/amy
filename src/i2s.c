@@ -198,6 +198,8 @@ int32_t render_other_core(int32_t data) {
     return AMY_OK;
 }
 
+extern void on_pico_uart_rx();
+
 void amy_update() {
     int32_t res;
     amy_prepare_buffer();
@@ -218,6 +220,8 @@ void amy_update() {
     }
     buffer->sample_count = AMY_BLOCK_SIZE;
     give_audio_buffer(ap, buffer);
+    // check MIDI
+    on_pico_uart_rx();
 }
 
 
