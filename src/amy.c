@@ -397,7 +397,7 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
     }
 
 // Add a API facing event, convert into delta directly
-void amy_parse_event_to_deltas(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 

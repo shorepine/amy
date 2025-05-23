@@ -336,7 +336,7 @@ void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, vo
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
-            amy_parse_event_to_deltas(e, target_osc, callback, user_data);
+            amy_event_to_deltas_then(e, target_osc, callback, user_data);
 	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
@@ -481,7 +481,7 @@ void patches_load_patch(amy_event *e) {
                         // from the default setup was applied *after* the reset, so the osc state was not reset.
                         amy_event reset_event = amy_default_event();
                         reset_event.reset_osc = osc + j;
-                        amy_parse_event_to_deltas(&reset_event, 0, add_delta_to_queue, NULL);
+                        amy_event_to_deltas_then(&reset_event, 0, add_delta_to_queue, NULL);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
@@ -507,7 +507,7 @@ void patches_load_patch(amy_event *e) {
             if(patch_event.status == EVENT_SCHEDULED) {
                 for(uint8_t v=0;v<num_voices;v++)
                     if(AMY_IS_SET(voice_to_base_osc[voices[v]]))
-                        amy_parse_event_to_deltas(&patch_event, voice_to_base_osc[voices[v]], add_delta_to_queue, NULL);
+                        amy_event_to_deltas_then(&patch_event, voice_to_base_osc[voices[v]], add_delta_to_queue, NULL);
             }
             start = i+1;
             //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);

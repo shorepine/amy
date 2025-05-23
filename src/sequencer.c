@@ -81,7 +81,7 @@ uint8_t sequencer_add_event(amy_event *e) {
     cbinfo.tick = e->sequence[SEQUENCE_TICK];
     cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
-    amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
+    amy_event_to_deltas_then(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
 

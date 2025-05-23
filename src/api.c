@@ -161,7 +161,7 @@ void amy_add_message(char *message) {
     amy_process_event(&e);
     // If this was an event to be played, play it 
     if(e.status == EVENT_SCHEDULED) {
-   	    amy_parse_event_to_deltas(&e, 0, add_delta_to_queue, NULL);
+   	    amy_event_to_deltas_then(&e, 0, add_delta_to_queue, NULL);
     }
 }
 
@@ -170,7 +170,7 @@ void amy_add_event(amy_event *e) {
     amy_process_event(e);
     // If this was an event to be played, play it 
     if(e->status == EVENT_SCHEDULED) {
-   	    amy_parse_event_to_deltas(e, 0, add_delta_to_queue, NULL);
+   	    amy_event_to_deltas_then(e, 0, add_delta_to_queue, NULL);
     }
 }
 

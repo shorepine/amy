@@ -663,7 +663,7 @@ int8_t global_init(amy_config_t c);
 void amy_deltas_reset();
 void add_delta_to_queue(struct delta *d, void*user_data);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
-void amy_parse_event_to_deltas(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
+void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void print_osc_debug(int i /* osc */, bool show_eg);
