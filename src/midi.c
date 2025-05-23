@@ -293,7 +293,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 // "run_midi" sets up MIDI on MCU platforms
 #if (defined ESP_PLATFORM)
-void run_midi() {
+void run_midi_task() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     // Setup UART2 to listen for MIDI messages 
     const int uart_num = UART_NUM_1;
@@ -336,6 +336,11 @@ void run_midi() {
         }
     } // end loop forever
 }
+
+void run_midi() {
+    xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+}
+
 #endif
 
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)

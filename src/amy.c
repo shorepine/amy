@@ -86,17 +86,48 @@ SAMPLE *echo_delays[AMY_MAX_CHANNELS];
 SAMPLE *delay_mod = NULL;
 
 
+// Set up the mutex for accessing the queue during rendering (for multicore)
+
 #ifdef _POSIX_THREADS
 pthread_mutex_t amy_queue_lock; 
-#endif
+void amy_grab_lock() {
+    pthread_mutex_lock(&amy_queue_lock); 
+}
+void amy_release_lock() {
+    pthread_mutex_unlock(&amy_queue_lock);
+}
+void amy_init_lock() {
+    pthread_mutex_init(&amy_queue_lock, NULL);
+}
+#elif defined ESP_PLATFORM
 
-#ifdef ESP_PLATFORM
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-SemaphoreHandle_t xQueueSemaphore;
+SemaphoreHandle_t amy_queue_lock;
 TaskHandle_t midi_handle;
+
+void amy_grab_lock() {
+    xSemaphoreTake(amy_queue_lock, portMAX_DELAY);
+}
+void amy_release_lock() {
+    xSemaphoreGive( amy_queue_lock );
+}
+void amy_init_lock() {
+    amy_queue_lock = xSemaphoreCreateMutex();
+}
+#else
+
+void amy_grab_lock() {
+}
+void amy_release_lock() {
+}
+void amy_init_lock() {
+}
+
 #endif
+
+
 
 // Global state 
 struct state amy_global;
@@ -296,6 +327,8 @@ int8_t global_init(amy_config_t c) {
     amy_global.echo.feedback = F2S(ECHO_DEFAULT_FEEDBACK);
     amy_global.echo.filter_coef = ECHO_DEFAULT_FILTER_COEF;
 
+    amy_init_lock();
+
     return 0;
 }
 
@@ -331,13 +364,7 @@ float midi_note_for_logfreq(float logfreq) {
 
 void add_delta_to_queue(struct delta *d, void*user_data) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
-#if defined ESP_PLATFORM && !defined ARDUINO
-    //  take the queue mutex before starting
-    xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
-#elif defined _POSIX_THREADS
-    //fprintf(stderr,"add_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data, amy_global.delta_qsize);
-    pthread_mutex_lock(&amy_queue_lock); 
-#endif
+    amy_grab_lock();
 
     if(amy_global.delta_qsize < AMY_DELTA_FIFO_LEN) {
         // scan through the memory to find a free slot, starting at write pointer
@@ -367,11 +394,7 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
         // todo -- report this somehow?
         fprintf(stderr, "AMY queue is full\n");
     }
-#if defined ESP_PLATFORM  && !defined ARDUINO
-    xSemaphoreGive( xQueueSemaphore );
-#elif defined _POSIX_THREADS
-    pthread_mutex_unlock(&amy_queue_lock);
-#endif
+    amy_release_lock();
     AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
 
 }
@@ -1351,13 +1374,7 @@ void amy_prepare_buffer() {
     AMY_PROFILE_START(AMY_PREPARE_BUFFER)
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
-
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // put a mutex around this so that the event parser doesn't touch these while i'm running
-    xSemaphoreTake(xQueueSemaphore, portMAX_DELAY);
-#elif defined _POSIX_THREADS
-    pthread_mutex_lock(&amy_queue_lock);
-#endif
+    amy_grab_lock();
 
     // find any deltas that need to be played from the (in-order) queue
     struct delta *delta_start = amy_global.delta_start;
@@ -1372,12 +1389,7 @@ void amy_prepare_buffer() {
     }
     amy_global.delta_start = delta_start;
 
-#if defined ESP_PLATFORM && !defined ARDUINO
-    // give the mutex back
-    xSemaphoreGive(xQueueSemaphore);
-#elif defined _POSIX_THREADS
-    pthread_mutex_unlock(&amy_queue_lock);
-#endif
+    amy_release_lock();
 
     if(AMY_HAS_CHORUS==1) {
         ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
