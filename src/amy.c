@@ -397,7 +397,7 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
     }
 
 // Add a API facing event, convert into delta directly
-void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void amy_parse_event_to_deltas(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
@@ -1409,7 +1409,7 @@ void amy_block_processed(void) {
 #endif
 }
 
-void amy_process_event(struct event *e) {
+void amy_process_event(amy_event *e) {
     if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
@@ -1550,5 +1550,39 @@ void amy_reset_sysclock() {
     amy_global.total_blocks = 0;
     amy_global.sequencer_tick_count = 0;
     sequencer_recompute();
+}
+
+
+void amy_default_setup() {
+    // sine wave "bleeper" on ch 16
+    // store memory patch 1024 sine wave
+    amy_event e = amy_default_event();
+    e.patch_number = 1024;
+    patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
+    e.num_voices = 1;
+    e.synth = 16;
+    amy_add_event(&e);
+
+    // GM drum synth on channel 10
+    // Somehow, we need to select simple round-robin voice allocation, because the note numbers don't indicate the voice, so using the same
+    // voice for successive events with the same note number can end up truncating samples.
+    // We could make the voice management use the outer product of preset number and note when calculating "same note"
+    
+    // {'wave': amy.PCM, 'freq': 0}
+    e = amy_default_event();
+    e.patch_number = 1025;
+    patches_store_patch(&e, "w7f0");
+    e.num_voices = 6;
+    e.synth = 10;
+    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
+    amy_add_event(&e);
+
+    // Juno 6 poly on channel 1
+    // Define this last so if we release it, the oscs aren't fragmented.
+    e = amy_default_event();
+    e.num_voices = 6;
+    e.patch_number = 0;
+    e.synth = 1;
+    amy_add_event(&e);
 }
 

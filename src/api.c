@@ -71,8 +71,8 @@ amy_config_t amy_default_config() {
 
 
 // create a new default API accessible event
-struct event amy_default_event() {
-    struct event e;
+amy_event amy_default_event() {
+    amy_event e;
     e.status = EVENT_EMPTY;
     AMY_UNSET(e.time);
     AMY_UNSET(e.osc);
@@ -144,31 +144,17 @@ output_sample_type * amy_simple_fill_buffer() {
 }
 
 
-void amy_increase_volume() {
-    amy_global.volume += 0.5f;
-    if(amy_global.volume > MAX_VOLUME) amy_global.volume = MAX_VOLUME;    
-}
-
-void amy_decrease_volume() {
-    amy_global.volume -= 0.5f;
-    if(amy_global.volume < 0) amy_global.volume = 0;    
-}
-
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
 uint32_t amy_sysclock() {
-    // Time is returned in integer microseconds.  uint32_t rollover is 49.7 days.
+    // Time is returned in integer milliseconds.  uint32_t rollover is 49.7 days.
     return (uint32_t)((amy_global.total_blocks * AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE) * 1000);
-}
-
-void amy_set_pitch_bend(float value) {
-    amy_global.pitch_bend = value;
 }
 
 
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
     //fprintf(stderr, "amy_play_message: %s\n", message);
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     // Parse the wire string into an event
     amy_parse_message(message, &e);
     // Do whatever we might need to do with the event before we add it 
@@ -180,7 +166,7 @@ void amy_add_message(char *message) {
 }
 
 // given an event play / schedule the event directly (C API)
-void amy_add_event(struct event *e) {
+void amy_add_event(amy_event *e) {
     amy_process_event(e);
     // If this was an event to be played, play it 
     if(e->status == EVENT_SCHEDULED) {
@@ -189,38 +175,6 @@ void amy_add_event(struct event *e) {
 }
 
 
-void amy_default_setup() {
-    // sine wave "bleeper" on ch 16
-    // store memory patch 1024 sine wave
-    struct event e = amy_default_event();
-    e.patch_number = 1024;
-    patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
-    e.num_voices = 1;
-    e.synth = 16;
-    amy_add_event(&e);
-
-    // GM drum synth on channel 10
-    // Somehow, we need to select simple round-robin voice allocation, because the note numbers don't indicate the voice, so using the same
-    // voice for successive events with the same note number can end up truncating samples.
-    // We could make the voice management use the outer product of preset number and note when calculating "same note"
-    
-    // {'wave': amy.PCM, 'freq': 0}
-    e = amy_default_event();
-    e.patch_number = 1025;
-    patches_store_patch(&e, "w7f0");
-    e.num_voices = 6;
-    e.synth = 10;
-    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
-    amy_process_event(&e);
-
-    // Juno 6 poly on channel 1
-    // Define this last so if we release it, the oscs aren't fragmented.
-    e = amy_default_event();
-    e.num_voices = 6;
-    e.patch_number = 0;
-    e.synth = 1;
-    amy_process_event(&e);
-}
 
 void amy_stop() {
     oscs_deinit();

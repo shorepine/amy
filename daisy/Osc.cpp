@@ -30,7 +30,7 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 }
 
 void polyphony(uint32_t start, uint16_t patch) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
     e.load_patch = patch;
     strcpy(e.voices, "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14");

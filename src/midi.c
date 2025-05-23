@@ -44,7 +44,7 @@ void amy_send_midi_note_off(uint16_t osc) {
 // Given a MIDI note on IN, create a AMY message on that instrument and play it
 void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
     if (!instrument_grab_midi_notes(channel)) return;
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.source = EVENT_MIDI;
@@ -56,7 +56,7 @@ void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t t
 // Given a MIDI note off IN, create a AMY message on that instrument and play it
 void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
     if (!instrument_grab_midi_notes(channel)) return;
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.source = EVENT_MIDI;
@@ -66,7 +66,7 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t 
 }
 
 void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.source = EVENT_MIDI;
@@ -78,7 +78,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
 }
 
 void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.source = EVENT_MIDI;
@@ -87,7 +87,7 @@ void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
 }
 
 void amy_received_all_notes_off(uint8_t channel, uint32_t time) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.source = EVENT_MIDI;
@@ -98,7 +98,7 @@ void amy_received_all_notes_off(uint8_t channel, uint32_t time) {
 }
 
 void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byte, uint32_t time) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = time;
     // Currently, pitch bend is global and not applied per-channel, but preserve the info.
     e.synth = channel;

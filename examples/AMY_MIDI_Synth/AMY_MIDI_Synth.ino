@@ -11,7 +11,7 @@
 
 
 void test_sequencer() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.sequence[0] = 0;
     e.sequence[1] = 48;
     e.sequence[2] = 1;

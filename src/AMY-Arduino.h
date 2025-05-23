@@ -35,8 +35,8 @@ class AMY
     void fm(uint32_t start);
     void reset();
     void reset(uint32_t start);
-    struct event default_event();
-    void add_event(struct event e);
+    amy_event default_event();
+    void add_event(amy_event e);
     void send_message(char * message);
     void volume(float vol);
 

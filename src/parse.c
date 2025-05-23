@@ -212,7 +212,7 @@ void parse_coef_message(char *message, float *coefs) {
 }
 
 // Parser for synth-layer ('i') prefix.
-void amy_parse_synth_layer_message(char *message, struct event *e) {
+void amy_parse_synth_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the instrument number.
         e->synth = atoi(message);
@@ -242,7 +242,7 @@ int _next_alpha(char *s) {
 
 
 // given a string return a parsed event
-void amy_parse_message(char * message, struct event *e) {
+void amy_parse_message(char * message, amy_event *e) {
     char cmd = '\0';
     uint16_t pos = 0;
     int16_t length = strlen(message);

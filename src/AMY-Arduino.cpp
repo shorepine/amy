@@ -10,11 +10,11 @@ AMY::AMY()
 }
 
 
-struct event AMY::default_event() {
+amy_event AMY::default_event() {
     return amy_default_event();
 }
 
-void AMY::add_event(struct event e) {
+void AMY::add_event(amy_event e) {
     amy_add_event(e);
 }
 

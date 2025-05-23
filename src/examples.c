@@ -7,7 +7,7 @@
 extern void delay_ms(uint32_t ms);
 
 void example_reset(uint32_t start) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.osc = 0;
     e.reset_osc = RESET_ALL_OSCS;
     e.time = start;
@@ -16,7 +16,7 @@ void example_reset(uint32_t start) {
 
 void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.patch_number = 1;
     strcpy(e.voices, "0,1");
     amy_add_event(&e);
@@ -54,7 +54,7 @@ void example_voice_alloc() {
 
 
 void example_voice_chord(uint32_t start, uint16_t patch) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
     strcpy(e.voices, "0,1,2");
@@ -90,7 +90,7 @@ void example_voice_chord(uint32_t start, uint16_t patch) {
 
 void example_synth_chord(uint32_t start, uint16_t patch) {
     // Like example_voice_chord, but use 'synth' to avoid having to keep track of voices.
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
     e.num_voices = 3;
@@ -128,7 +128,7 @@ void example_synth_chord(uint32_t start, uint16_t patch) {
 
 void example_sustain_pedal(uint32_t start, uint16_t patch) {
     // Reproduce TestSustainPedal, to track segfault.
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
     e.reset_osc = RESET_ALL_OSCS;
     amy_add_event(&e);
@@ -222,7 +222,7 @@ void example_sustain_pedal(uint32_t start, uint16_t patch) {
 
 
 void example_patches() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
         e.patch_number = i;
         strcpy(e.voices, "0");
@@ -261,7 +261,7 @@ void example_chorus() {
 
 // Play a KS tone
 void example_ks(uint32_t start) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
 
     e.velocity = 1;
@@ -275,7 +275,7 @@ void example_ks(uint32_t start) {
 
 // make a 440hz sine
 void example_sine(uint32_t start) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start;
     e.freq_coefs[0] = 440;
     e.wave = SINE;
@@ -285,7 +285,7 @@ void example_sine(uint32_t start) {
 
 // Schedule a bleep now
 void bleep(uint32_t start) {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.osc = 0;
     e.time = start;
     e.wave = SINE;
@@ -305,7 +305,7 @@ void bleep(uint32_t start) {
 
 
 void example_multimbral_fm() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     char *voices[] = {"0","1","2","3","4","5"};
     int notes[] = {60, 70, 64, 68, 72, 82};
     e.velocity = 0.5;
@@ -330,14 +330,14 @@ void example_drums(uint32_t start, int loops) {
 
     // Reset all used oscs first, just in case
     for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
-        struct event e_reset = amy_default_event();
+        amy_event e_reset = amy_default_event();
         e_reset.time = start;
         e_reset.osc = oscs[i];    
         e_reset.reset_osc = oscs[i];
         amy_add_event(&e_reset);
     }
 
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.time = start + 1;
     float volume = 0.5;
     e.wave = PCM;
@@ -426,7 +426,7 @@ void example_drums(uint32_t start, int loops) {
 
 void example_fm(uint32_t start) {
     // Direct construction of an FM tone, as in the documentation.
-    struct event e;
+    amy_event e;
 
     // Modulating oscillator (op 2)
     e = amy_default_event();
@@ -510,7 +510,7 @@ void example_init_custom() {
 }
 
 void example_custom_beep() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.osc = 50;
     e.time = amy_sysclock();
     e.freq_coefs[0] = 880;
