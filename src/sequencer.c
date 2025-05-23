@@ -53,7 +53,7 @@ void add_delta_to_sequencer(struct delta *d, void*user_data) {
     (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
 }
 
-uint8_t sequencer_add_event(struct event *e) {
+uint8_t sequencer_add_event(amy_event *e) {
     // add this event to the list of sequencer events in the LL
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, tick, period, tag);
@@ -81,7 +81,7 @@ uint8_t sequencer_add_event(struct event *e) {
     cbinfo.tick = e->sequence[SEQUENCE_TICK];
     cbinfo.period = e->sequence[SEQUENCE_PERIOD];
     cbinfo.pointer = entry_ll_ptr;
-    amy_parse_event_to_deltas(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
+    amy_event_to_deltas_then(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
     return 1;
 }
 

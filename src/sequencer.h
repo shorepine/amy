@@ -15,7 +15,7 @@ typedef struct sequence_callback_info_t {
 uint32_t sequencer_ticks();
 void sequencer_init();
 void sequencer_recompute();
-uint8_t sequencer_add_event(struct event *e);
+uint8_t sequencer_add_event(amy_event *e);
 void sequencer_reset();
 extern void (*amy_external_sequencer_hook)(uint32_t);
 

@@ -225,6 +225,35 @@ PHASOR render_lut_cub(SAMPLE* buf,
     return phase;
 }
 
+/* Audio in */
+
+void audio_in_note_on(uint16_t osc, uint8_t channel) {
+    // do i need to do anything here? probably not
+}
+
+void external_audio_in_note_on(uint16_t osc, uint8_t channel) {
+    // do i need to do anything here? probably not
+}
+
+SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
+    uint16_t c = 0;
+    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+        buf[c++] = SMULR7(L2S(amy_in_block[i]), F2S(msynth[osc]->amp));
+    }
+    // We have to return something for max_value or else the zero-amp reaper will come along. 
+    return F2S(1.0); //max_value;
+}
+
+SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel) {
+    uint16_t c = 0;
+    for(uint16_t i=channel;i<AMY_BLOCK_SIZE*AMY_NCHANS;i=i+(AMY_NCHANS)) {
+        buf[c++] = SMULR7(L2S(amy_external_in_block[i]), F2S(msynth[osc]->amp));
+    }
+    // We have to return something for max_value or else the zero-amp reaper will come along. 
+    return F2S(1.0); //max_value;
+}
+
+
 /* Pulse wave */
 void pulse_note_on(uint16_t osc, float freq) {
     //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, synth[osc]->logfreq, msynth[osc]->amp, msynth[osc]->last_amp);

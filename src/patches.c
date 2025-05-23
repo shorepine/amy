@@ -96,7 +96,7 @@ void patches_reset() {
     next_user_patch_index = 0;
 }
 
-void patches_store_patch(struct event *e, char * patch_string) {
+void patches_store_patch(amy_event *e, char * patch_string) {
     // amy patch string. Either pull patch_number from e, or allocate a new one and write it to e.
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch_number, patch_string);
@@ -131,9 +131,9 @@ void patches_store_patch(struct event *e, char * patch_string) {
         if (patch_string[i] == 'Z' || patch_string[i] == '\0') {
             strncpy(sub_message, patch_string + start, i - start + 1);
             sub_message[i - start + 1]= 0;
-            struct event patch_event = amy_default_event();
+            amy_event patch_event = amy_default_event();
     	    amy_parse_message(sub_message, &patch_event);
-            amy_handle_event(&patch_event);
+            amy_process_event(&patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;
@@ -227,7 +227,7 @@ struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWE
 };
 
 
-bool setup_drum_event(struct event *e, uint8_t note) {
+bool setup_drum_event(amy_event *e, uint8_t note) {
   // Special-case processing to convert MIDI drum notes into PCM patch events.
   bool forward_note = false;
   if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
@@ -244,7 +244,7 @@ bool setup_drum_event(struct event *e, uint8_t note) {
 
 // This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
     uint16_t voices[MAX_VOICES];
     uint8_t num_voices;
     uint32_t flags = 0;
@@ -332,11 +332,11 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
     AMY_UNSET(e->patch_number);
     int instrument = e->synth;
     AMY_UNSET(e->synth);
-    // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
+    // for each voice, send the event to the base osc (+ e->osc if given)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
-            amy_parse_event_to_deltas(e, target_osc, callback, user_data);
+            amy_event_to_deltas_then(e, target_osc, callback, user_data);
 	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
@@ -358,7 +358,7 @@ void release_voice_oscs(int voice) {
     }
 }
 
-void patches_load_patch(struct event *e) {
+void patches_load_patch(amy_event *e) {
     // Given an event with a patch/patch_number AND a voices/instrument spec in it.
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
     // This means to set/reset the voices and load the messages from ROM and set them.
@@ -479,9 +479,9 @@ void patches_load_patch(struct event *e) {
                         // This was important because for testing the patch reassignment, we were running the default
                         // osc setup, then changing the patch, which reset the oscs here, but then the osc config
                         // from the default setup was applied *after* the reset, so the osc state was not reset.
-                        struct event reset_event = amy_default_event();
+                        amy_event reset_event = amy_default_event();
                         reset_event.reset_osc = osc + j;
-                        amy_add_event_internal(&reset_event, 0);
+                        amy_event_to_deltas_then(&reset_event, 0, add_delta_to_queue, NULL);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
@@ -500,14 +500,14 @@ void patches_load_patch(struct event *e) {
         if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
             strncpy(sub_message, message + start, i - start + 1);
             sub_message[i-start+1]= 0;
-            struct event patch_event = amy_default_event();
+            amy_event patch_event = amy_default_event();
             amy_parse_message(sub_message, &patch_event);
-            amy_handle_event(&patch_event);
+            amy_process_event(&patch_event);
             patch_event.time = e->time;
             if(patch_event.status == EVENT_SCHEDULED) {
                 for(uint8_t v=0;v<num_voices;v++)
                     if(AMY_IS_SET(voice_to_base_osc[voices[v]]))
-                        amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
+                        amy_event_to_deltas_then(&patch_event, voice_to_base_osc[voices[v]], add_delta_to_queue, NULL);
             }
             start = i+1;
             //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);

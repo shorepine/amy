@@ -5,13 +5,14 @@
 // We've tested this with the following boards:
 // 
 // esp32s3 [n32r8]
-// rp2040 (Pi Pico) -- use 250Mhz and -O3 for 6 note juno polyphony
+// rp2040 (Pi Pico) -- use 250Mhz and -O3 for 6 note juno polyphony and turn off serial debug if you have it on
 // rp2350 (Pi Pico)
+// teensy4 
 // Please see https://github.com/shorepine/amy/issues/354 for the full list
 
 
 void test_sequencer() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     e.sequence[0] = 0;
     e.sequence[1] = 48;
     e.sequence[2] = 1;

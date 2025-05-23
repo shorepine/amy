@@ -11,6 +11,10 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifdef _POSIX_THREADS
+#include <pthread.h>
+extern pthread_mutex_t amy_queue_lock; 
+#endif
 
 // This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.
 typedef struct {
@@ -243,10 +247,6 @@ typedef int amy_err_t;
 #define PROGMEM 
 #endif
 
-extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
-extern float (*amy_external_coef_hook)(uint16_t);
-extern void (*amy_external_block_done_hook)(void);
-extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 
 enum params{
     WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
@@ -385,7 +385,7 @@ struct delta {
 
 
 // API accessible events, are converted to delta types for the synth to play back 
-struct event {
+typedef struct amy_event {
     uint32_t time;
     uint16_t osc;
     uint16_t wave;
@@ -433,7 +433,7 @@ struct event {
     uint8_t status;
     uint8_t source;
     uint32_t reset_osc;
-};
+} amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
@@ -656,31 +656,25 @@ extern struct synthinfo** synth;
 extern struct mod_synthinfo** msynth;
 extern struct state amy_global; 
 
+extern output_sample_type * amy_in_block;
+extern output_sample_type * amy_external_in_block;
 
-void amy_update();
-
-struct event amy_default_event();
+int8_t global_init(amy_config_t c);
 void amy_deltas_reset();
-void amy_add_event(struct event *e);
-void amy_play_event(struct event *e);
 void add_delta_to_queue(struct delta *d, void*user_data);
-void amy_add_event_internal(struct event *e, uint16_t base_osc);
-void amy_parse_event_to_deltas(struct event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
-int16_t * amy_simple_fill_buffer() ;
+void amy_add_event_internal(amy_event *e, uint16_t base_osc);
+void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void print_osc_debug(int i /* osc */, bool show_eg);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
-uint32_t amy_sysclock();
 float freq_for_midi_note(float midi_note);
 float logfreq_for_midi_note(float midi_note);
 float midi_note_for_logfreq(float logfreq);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);
-void amy_increase_volume();
-void amy_decrease_volume();
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, int max_delay, float lfo_freq, float depth);
@@ -706,17 +700,37 @@ int16_t * amy_fill_buffer();
 uint32_t ms_to_samples(uint32_t ms) ;
 
 
-amy_config_t amy_default_config();
 
-// external functions
-void amy_play_message(char *message);
-void amy_parse_message(char * message, struct event *e);
-void amy_handle_event(struct event *e);
-void amy_restart();
+// API
+void amy_add_message(char *message);
+void amy_add_event(amy_event *e);
+void amy_parse_message(char * message, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();
+int16_t * amy_simple_fill_buffer() ;
+void amy_update();
+amy_config_t amy_default_config();
+amy_event amy_default_event();
+uint32_t amy_sysclock();
+void amy_get_input_buffer(output_sample_type * samples);
+void amy_set_external_input_buffer(output_sample_type * samples);
+extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
+extern float (*amy_external_coef_hook)(uint16_t);
+extern void (*amy_external_block_done_hook)(void);
+extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
+
+
+#ifdef __EMSCRIPTEN__
+void amy_start_web();
+#endif
+
+
+// external functions
+void amy_default_setup();
+void amy_process_event(amy_event *e);
+void amy_restart();
 void amy_reset_oscs();
 void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
@@ -734,6 +748,12 @@ extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
 extern void custom_init();
+
+void audio_in_note_on(uint16_t osc, uint8_t channel);
+void external_audio_in_note_on(uint16_t osc, uint8_t channel);
+SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel);
+SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel);
+
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
@@ -749,12 +769,12 @@ extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
 extern void interp_partials_note_on(uint16_t osc);
 extern void interp_partials_note_off(uint16_t osc);
-extern void patches_load_patch(struct event *e); 
-extern void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d, void*user_data), void*user_data );
+extern void patches_load_patch(amy_event *e); 
+extern void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, void*user_data), void*user_data );
 extern void patches_reset();
 extern void all_notes_off();
 extern void patches_debug();
-extern void patches_store_patch(struct event *e, char * message);
+extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)

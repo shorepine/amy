@@ -111,7 +111,7 @@ In C, using the high level structures directly;
 ```c
 #include "amy.h"
 void bleep() {
-    struct event e = amy_default_event();
+    amy_event e = amy_default_event();
     int32_t start = amy_sysclock();   // Right now..
     e.time = start;
     e.osc = 0;
