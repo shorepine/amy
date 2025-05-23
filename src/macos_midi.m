@@ -4,6 +4,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreMidi/CoreMidi.h>
 #include <mach/mach_time.h>
+#include <pthread.h>
 #undef unichar
 #import "midi.h"
 
@@ -34,7 +35,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 }
 
 
-void* run_midi(void*argp){
+void* run_midi_macos(void*argp){
     sysex_buffer = malloc(MAX_SYSEX_BYTES);
 
     if (@available(macOS 11, *))  {
@@ -104,4 +105,10 @@ void* run_midi(void*argp){
     }
     return NULL;
 }
+
+void run_midi() {
+    pthread_t midi_thread_id;
+    pthread_create(&midi_thread_id, NULL, run_midi_macos, NULL);
+}
+
 #endif

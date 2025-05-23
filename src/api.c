@@ -186,21 +186,7 @@ void amy_start_web() {
 
 void amy_start(amy_config_t c) {
     global_init(c);
-    #ifdef _POSIX_THREADS
-        pthread_mutex_init(&amy_queue_lock, NULL);
-        #ifndef __EMSCRIPTEN__
-        if(amy_global.config.has_midi_gadget || amy_global.config.has_midi_mac) {
-            pthread_t midi_thread_id;
-            pthread_create(&midi_thread_id, NULL, run_midi, NULL);
-        }
-        #endif
-    #elif defined ESP_PLATFORM
-    xQueueSemaphore = xSemaphoreCreateMutex();
-    xTaskCreatePinnedToCore(run_midi, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
-    #else
     run_midi();
-    #endif
-
     amy_profiles_init();
     sequencer_init();
     oscs_init();
