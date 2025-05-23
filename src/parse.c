@@ -240,24 +240,6 @@ int _next_alpha(char *s) {
 }
 
 
-// Given an event from parsing or the C API, deal with it
-void amy_handle_event(struct event *e) {
-    if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
-        uint8_t added = sequencer_add_event(e);
-        (void)added; // we don't need to do anything with this info at this time
-        e->status = EVENT_SEQUENCE;
-    } else {
-        // if time is set, play then
-        // if time and latency is set, play in time + latency
-        // if time is not set, play now
-        // if time is not set + latency is set, play in latency
-        uint32_t playback_time = amy_sysclock();
-        if(AMY_IS_SET(e->time)) playback_time = e->time;
-        playback_time += amy_global.latency_ms;
-        e->time = playback_time;
-        e->status = EVENT_SCHEDULED;
-    }
-}
 
 // given a string return a parsed event
 void amy_parse_message(char * message, struct event *e) {

@@ -2,11 +2,11 @@ from distutils.core import setup, Extension
 import glob
 import os
 # the c++ extension module
-sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'partials.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'midi.c']
+sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'partials.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'midi.c', 'api.c']
 os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 
-comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG"]
+comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG", "-Wno-unused-but-set-variable", "-Wno-unreachable-code"]
 link_args = ["-L/opt/homebrew/lib","-lpthread"]
 
 if os.uname()[0] == 'Darwin':

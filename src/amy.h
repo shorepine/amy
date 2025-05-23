@@ -11,6 +11,10 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifdef _POSIX_THREADS
+#include <pthread.h>
+extern pthread_mutex_t amy_queue_lock; 
+#endif
 
 // This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.
 typedef struct {
@@ -656,9 +660,11 @@ extern struct synthinfo** synth;
 extern struct mod_synthinfo** msynth;
 extern struct state amy_global; 
 
+extern output_sample_type * amy_in_block;
+extern output_sample_type * amy_external_in_block;
 
 void amy_update();
-
+int8_t global_init(amy_config_t c);
 struct event amy_default_event();
 void amy_deltas_reset();
 void amy_add_event(struct event *e);
@@ -708,15 +714,20 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 amy_config_t amy_default_config();
 
-// external functions
-void amy_play_message(char *message);
+// API
+void amy_add_message(char *message);
+void amy_add_event(struct event *e);
 void amy_parse_message(char * message, struct event *e);
-void amy_handle_event(struct event *e);
-void amy_restart();
 void amy_start(amy_config_t);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();
+
+
+
+// external functions
+void amy_process_event(struct event *e);
+void amy_restart();
 void amy_reset_oscs();
 void amy_print_devices();
 void amy_set_custom(struct custom_oscillator* custom);
@@ -734,6 +745,12 @@ extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
 extern void custom_init();
+
+void audio_in_note_on(uint16_t osc, uint8_t channel);
+void external_audio_in_note_on(uint16_t osc, uint8_t channel);
+SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel);
+SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel);
+
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);

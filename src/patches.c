@@ -133,7 +133,7 @@ void patches_store_patch(struct event *e, char * patch_string) {
             sub_message[i - start + 1]= 0;
             struct event patch_event = amy_default_event();
     	    amy_parse_message(sub_message, &patch_event);
-            amy_handle_event(&patch_event);
+            amy_process_event(&patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;
@@ -332,7 +332,7 @@ void patches_event_has_voices(struct event *e, void (*callback)(struct delta *d,
     AMY_UNSET(e->patch_number);
     int instrument = e->synth;
     AMY_UNSET(e->synth);
-    // for each voice, send the event to the base osc (+ e->osc if given, added by amy_add_event)
+    // for each voice, send the event to the base osc (+ e->osc if given)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
@@ -481,7 +481,7 @@ void patches_load_patch(struct event *e) {
                         // from the default setup was applied *after* the reset, so the osc state was not reset.
                         struct event reset_event = amy_default_event();
                         reset_event.reset_osc = osc + j;
-                        amy_add_event_internal(&reset_event, 0);
+                        amy_parse_event_to_deltas(&reset_event, 0, add_delta_to_queue, NULL);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
@@ -502,12 +502,12 @@ void patches_load_patch(struct event *e) {
             sub_message[i-start+1]= 0;
             struct event patch_event = amy_default_event();
             amy_parse_message(sub_message, &patch_event);
-            amy_handle_event(&patch_event);
+            amy_process_event(&patch_event);
             patch_event.time = e->time;
             if(patch_event.status == EVENT_SCHEDULED) {
                 for(uint8_t v=0;v<num_voices;v++)
                     if(AMY_IS_SET(voice_to_base_osc[voices[v]]))
-                        amy_add_event_internal(&patch_event, voice_to_base_osc[voices[v]]);
+                        amy_parse_event_to_deltas(&patch_event, voice_to_base_osc[voices[v]], add_delta_to_queue, NULL);
             }
             start = i+1;
             //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);

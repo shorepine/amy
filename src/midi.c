@@ -181,7 +181,7 @@ void parse_sysex() {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
             sysex_buffer[sysex_len] = 0;
-            amy_play_message((char*)(sysex_buffer+3));
+            amy_add_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
     	   amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);

@@ -67,7 +67,7 @@ int main(int argc, char ** argv) {
                     break;
             }
         } else {
-            amy_play_message(input);
+            amy_add_message(input);
         }
     }
     
