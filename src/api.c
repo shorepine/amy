@@ -8,16 +8,16 @@
 // Hooks
 
 // Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
-uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t len ) = NULL;
+uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
 
 // Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
-float (*amy_external_coef_hook)(uint16_t) = NULL;
+float (*amy_external_coef_hook)(uint16_t channel) = NULL;
 
 // Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
 void (*amy_external_block_done_hook)(void) = NULL;
 
 // Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
-void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t) = NULL;
+void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
 
 
 
@@ -153,22 +153,16 @@ uint32_t amy_sysclock() {
 
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
-    //fprintf(stderr, "amy_play_message: %s\n", message);
     amy_event e = amy_default_event();
     // Parse the wire string into an event
     amy_parse_message(message, &e);
-    // Do whatever we might need to do with the event before we add it 
-    amy_process_event(&e);
-    // If this was an event to be played, play it 
-    if(e.status == EVENT_SCHEDULED) {
-   	    amy_event_to_deltas_then(&e, 0, add_delta_to_queue, NULL);
-    }
+    amy_add_event(&e);
 }
 
 // given an event play / schedule the event directly (C API)
 void amy_add_event(amy_event *e) {
     amy_process_event(e);
-    // If this was an event to be played, play it 
+    // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
     if(e->status == EVENT_SCHEDULED) {
    	    amy_event_to_deltas_then(e, 0, add_delta_to_queue, NULL);
     }
