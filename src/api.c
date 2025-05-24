@@ -109,7 +109,7 @@ amy_event amy_default_event() {
     AMY_UNSET(e.eg_type[0]);
     AMY_UNSET(e.eg_type[1]);
     AMY_UNSET(e.reset_osc);
-    AMY_UNSET(e.source);
+    AMY_UNSET(e.note_source);
     e.algo_source[0] = 0;
     e.bp0[0] = 0;
     e.bp1[0] = 0;
@@ -138,7 +138,7 @@ void amy_set_external_input_buffer(output_sample_type * samples) {
 }
 
 output_sample_type * amy_simple_fill_buffer() {
-    amy_prepare_buffer();
+    amy_execute_deltas();
     amy_render(0, AMY_OSCS, 0);
     return amy_fill_buffer();
 }

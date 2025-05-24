@@ -128,7 +128,7 @@ void esp_fill_audio_buffer_task() {
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
 
         // Get ready to render
-        amy_prepare_buffer();
+        amy_execute_deltas();
         // Tell the other core to start rendering
         xTaskNotifyGive(amy_render_handle);
         // Render me
@@ -202,7 +202,7 @@ extern void on_pico_uart_rx();
 
 void amy_update() {
     int32_t res;
-    amy_prepare_buffer();
+    amy_execute_deltas();
     if(amy_global.config.cores > 1) {
         queue_entry_t entry = {render_other_core, AMY_OK};
         queue_add_blocking(&call_queue, &entry);
@@ -290,7 +290,7 @@ amy_err_t i2s_amy_init() {
 extern void teensy_setup_i2s();
 extern int16_t teensy_get_serial_byte();
 void teensy_i2s_fill_buffer(int32_t** inputs, int32_t** outputs) {
-    amy_prepare_buffer();
+    amy_execute_deltas();
     amy_render(0, AMY_OSCS, 0);        
     int16_t *block = amy_fill_buffer();
     for (size_t i = 0; i < AMY_BLOCK_SIZE; i++) {
