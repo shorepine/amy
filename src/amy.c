@@ -776,6 +776,7 @@ int8_t oscs_init() {
 }
 
 void print_osc_debug(int i /* osc */, bool show_eg) {
+    if (synth[i] == NULL)  {fprintf(stderr, "osc %d not defined\n", i); return; }
     fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d algo_source %d,%d,%d,%d,%d,%d  \n",
             i, synth[i]->status, synth[i]->wave, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
