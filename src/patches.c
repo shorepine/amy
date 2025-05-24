@@ -21,7 +21,7 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 
 #define _PATCHES_FIRST_USER_PATCH 1024
 
-#define MAX_VOICES 32
+#define MAX_VOICES 64
 #define MEMORY_PATCHES 32
 char * memory_patch[MEMORY_PATCHES];
 uint16_t next_user_patch_index = 0;
@@ -395,6 +395,7 @@ void patches_load_patch(amy_event *e) {
                 }
                 if (v == MAX_VOICES)  {
                     fprintf(stderr, "ran out of voices allocating %d voices to synth %d for patch %d, ignoring.", e->num_voices, e->synth, patch_number);
+                    patches_debug();
                     return;
                 }
                 voices[i] = v;

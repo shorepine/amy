@@ -330,21 +330,21 @@ void amy_parse_message(char * message, amy_event *e) {
             case 'S':
                 e->reset_osc = atoi(arg);
                 // if we're resetting all of AMY, do it now
-                if(e->reset_osc & RESET_AMY) {
-                    amy_stop();
-                    amy_start(amy_global.config);
-                }
-                // if we're resetting timebase, do it NOW
-                if(e->reset_osc & RESET_TIMEBASE) {
-                    amy_reset_sysclock();
-                    AMY_UNSET(e->reset_osc);
-                }
-                if(e->reset_osc & RESET_EVENTS) {
-                    amy_deltas_reset();
-                    AMY_UNSET(e->reset_osc);
-                }
-                if(e->reset_osc & RESET_SYNTHS) {
-                    amy_reset_oscs();
+                if (e->reset_osc & (RESET_AMY | RESET_TIMEBASE | RESET_EVENTS | RESET_SYNTHS)) {
+                    if(e->reset_osc & RESET_AMY) {
+                        amy_stop();
+                        amy_start(amy_global.config);
+                    }
+                    // if we're resetting timebase, do it NOW
+                    if(e->reset_osc & RESET_TIMEBASE) {
+                        amy_reset_sysclock();
+                    }
+                    if(e->reset_osc & RESET_EVENTS) {
+                        amy_deltas_reset();
+                    }
+                    if(e->reset_osc & RESET_SYNTHS) {
+                        amy_reset_oscs();
+                    }
                     AMY_UNSET(e->reset_osc);
                 }
                 break;
