@@ -19,7 +19,7 @@ void test_sequencer() {
     e.velocity = 1;
     e.midi_note = 60;
     e.synth = 1;
-    amy_play_event(&e);
+    amy_add_event(&e);
 }
 
 void setup() {
@@ -56,7 +56,7 @@ void setup() {
   amy_start(amy_config);
   amy_live_start();
 
-  test_sequencer();
+  //test_sequencer();
 }
 
 void loop() {
