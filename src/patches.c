@@ -133,7 +133,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
             sub_message[i - start + 1]= 0;
             amy_event patch_event = amy_default_event();
     	    amy_parse_message(sub_message, &patch_event);
-            amy_process_event(&patch_event);
             if(AMY_IS_SET(patch_event.osc) && patch_event.osc > max_osc)
                 max_osc = patch_event.osc;
             start = i+1;

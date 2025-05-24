@@ -105,7 +105,6 @@ void amy_init_lock() {
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 SemaphoreHandle_t amy_queue_lock;
-TaskHandle_t midi_handle;
 
 void amy_grab_lock() {
     xSemaphoreTake(amy_queue_lock, portMAX_DELAY);

@@ -293,6 +293,8 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 // "run_midi" sets up MIDI on MCU platforms
 #if (defined ESP_PLATFORM)
+TaskHandle_t midi_handle;
+
 void run_midi_task() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     // Setup UART2 to listen for MIDI messages 
