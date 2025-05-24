@@ -292,6 +292,13 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 
 // "run_midi" sets up MIDI on MCU platforms
+
+#if (defined __EMSCRIPTEN__)
+void run_midi() {
+    // do nothing, this is all done with callbacks
+}
+#endif
+
 #if (defined ESP_PLATFORM)
 TaskHandle_t midi_handle;
 

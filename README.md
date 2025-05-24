@@ -144,7 +144,7 @@ void main() {
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
     amy_live_start(1);
-    amy_play_message("v0n50l1K130r0Z");
+    amy_add_message("v0n50l1K130r0Z");
 }
 ```
 

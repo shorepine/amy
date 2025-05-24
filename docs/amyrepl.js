@@ -1,5 +1,5 @@
 // amyrepl.js
-var amy_play_message = null;
+var amy_add_message = null;
 var amy_live_start = null;
 var amy_reset_sysclock = null
 var amy_module = null;
@@ -17,8 +17,8 @@ amyModule().then(async function(am) {
   amy_start = amy_module.cwrap(
     'amy_start', null, ['number', 'number', 'number', 'number']
   );
-  amy_play_message = amy_module.cwrap(
-    'amy_play_message', null, ['string'], {async: true} 
+  amy_add_message = amy_module.cwrap(
+    'amy_add_message', null, ['string'], {async: true} 
   );
   amy_reset_sysclock = amy_module.cwrap(
     'amy_reset_sysclock', null, null
@@ -29,7 +29,7 @@ amyModule().then(async function(am) {
 
 async function start_python() {
   // Let micropython call an exported AMY function
-  await mp.registerJsModule('amy_js_message', amy_play_message);
+  await mp.registerJsModule('amy_js_message', amy_add_message);
 
   // time.sleep on this would block the browser from executing anything, so we override it to a JS thing
   mp.registerJsModule("time", {
