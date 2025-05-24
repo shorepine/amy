@@ -47,17 +47,17 @@ def preset(which,osc=0, **kwargs):
     if(which==7): # closed hat
         send(osc=osc, wave=NOISE, bp0="25,1,50,0,0,0", **kwargs)
     if(which==8): # closed hat from PCM 
-        send(osc=osc, wave=PCM, patch=0, **kwargs)
+        send(osc=osc, wave=PCM, preset=0, **kwargs)
     if(which==9): # cowbell from PCM
-        send(osc=osc, wave=PCM, patch=10, **kwargs)
+        send(osc=osc, wave=PCM, preset=10, **kwargs)
     if(which==10): # high cowbell from PCM
-        send(osc=osc, wave=PCM, patch=10, note=70, **kwargs)
+        send(osc=osc, wave=PCM, preset=10, note=70, **kwargs)
     if(which==11): # snare from PCM
-        send(osc=osc, wave=PCM, patch=5, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, preset=5, freq=0, **kwargs)
     if(which==12): # FM bass 
-        send(osc=osc, wave=ALGO, patch=21, **kwargs)
+        send(osc=osc, wave=ALGO, preset=21, **kwargs)
     if(which==13): # Pcm bass drum
-        send(osc=osc, wave=PCM, patch=1, freq=0, **kwargs)
+        send(osc=osc, wave=PCM, preset=1, freq=0, **kwargs)
     if(which==14): # filtered algo 
         send(wave=ALGO, patch=62, filter_freq="125,0,0,4", resonance=2.5, filter_type=FILTER_LPF, bp0="1,1,499,0,0,0")
 
@@ -353,14 +353,14 @@ except ImportError:
     def b64(b):
         return ubinascii.b2a_base64(b)[:-1]
 
-def load_sample_bytes(b, stereo=False, patch=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
+def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
     from math import ceil
     if(stereo):
         # just choose first channel
         b = bytes([b[j] for i in range(0,len(b),4) for j in (i,i+1)])
     n_frames = len(b)/2
-    s = "%d,%d,%d,%d,%d,%d" % (patch, n_frames, sr, midinote, loopstart, loopend)
+    s = "%d,%d,%d,%d,%d,%d" % (preset, n_frames, sr, midinote, loopstart, loopend)
     send(load_sample=s)
     last_f = 0
     for i in range(ceil(n_frames/94)):
@@ -368,9 +368,9 @@ def load_sample_bytes(b, stereo=False, patch=0, midinote=60, loopstart=0, loopen
         message = b64(frames_bytes)
         send_raw(message.decode('ascii'))
         last_f = last_f + 188
-    print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, n_frames*2, n_frames, midinote))
+    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, n_frames*2, n_frames, midinote))
 
-def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
+def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil
     import amy_wave # our version of a wave file reader that looks for sampler metadata
     # tulip has ubinascii, normal has base64
@@ -389,7 +389,7 @@ def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
             midinote=60
 
     # Tell AMY we're sending over a sample
-    s = "%d,%d,%d,%d,%d,%d" % (patch, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
+    s = "%d,%d,%d,%d,%d,%d" % (preset, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
     send(load_sample=s)
     # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
@@ -400,7 +400,7 @@ def load_sample(wavfilename, patch=0, midinote=0, loopstart=0, loopend=0):
             frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
         message = b64(frames_bytes)
         send_raw(message.decode('ascii'))
-    print("Loaded sample over wire protocol. Patch #%d. %d bytes, %d frames, midinote %d" % (patch, w.getnframes()*2, w.getnframes(), midinote))
+    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, w.getnframes()*2, w.getnframes(), midinote))
 
 
 """
@@ -421,7 +421,7 @@ def test():
     while True:
         for wave in [SINE, SAW_DOWN, PULSE, TRIANGLE, NOISE]:
             for i in range(12):
-                send(osc=0, wave=wave, note=40+i, patch=i, vel=1)
+                send(osc=0, wave=wave, note=40+i, preset=i, vel=1)
                 time.sleep(0.5)
 
 
