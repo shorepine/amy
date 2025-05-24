@@ -19,23 +19,23 @@ const char* profile_tag_name(enum itags tag) {
         case AMY_ADD_DELTA: return "AMY_ADD_DELTA";
         case PLAY_DELTA: return "PLAY_DELTA";
         case MIX_WITH_PAN: return "MIX_WITH_PAN";
-        case AMY_RENDER: return "AMY_RENDER";            
-        case AMY_PREPARE_BUFFER: return "AMY_PREPARE_BUFFER";            
-        case AMY_FILL_BUFFER: return "AMY_FILL_BUFFER";            
-        case RENDER_LUT_FM: return "RENDER_LUT_FM";            
-        case RENDER_LUT_FB: return "RENDER_LUT_FB";            
-        case RENDER_LUT: return "RENDER_LUT";            
-        case RENDER_LUT_CUB: return "RENDER_LUT_CUB";            
-        case RENDER_LUT_FM_FB: return "RENDER_LUT_FM_FB";            
-        case RENDER_LPF_LUT: return "RENDER_LPF_LUT";            
-        case DSPS_BIQUAD_F32_ANSI_SPLIT_FB: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB";            
+        case AMY_RENDER: return "AMY_RENDER";
+        case AMY_EXECUTE_DELTAS: return "AMY_EXECUTE_DELTAS";
+        case AMY_FILL_BUFFER: return "AMY_FILL_BUFFER";
+        case RENDER_LUT_FM: return "RENDER_LUT_FM";
+        case RENDER_LUT_FB: return "RENDER_LUT_FB";
+        case RENDER_LUT: return "RENDER_LUT";
+        case RENDER_LUT_CUB: return "RENDER_LUT_CUB";
+        case RENDER_LUT_FM_FB: return "RENDER_LUT_FM_FB";
+        case RENDER_LPF_LUT: return "RENDER_LPF_LUT";
+        case DSPS_BIQUAD_F32_ANSI_SPLIT_FB: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB";
         case DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE: return "DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE";
-        case DSPS_BIQUAD_F32_ANSI_COMMUTED: return "DSPS_BIQUAD_F32_ANSI_COMMUTED";            
-        case PARAMETRIC_EQ_PROCESS: return "PARAMETRIC_EQ_PROCESS";            
-        case HPF_BUF: return "HPF_BUF";            
-        case SCAN_MAX: return "SCAN_MAX";            
-        case DSPS_BIQUAD_F32_ANSI: return "DSPS_BIQUAD_F32_ANSI";            
-        case BLOCK_NORM: return "BLOCK_NORM";       
+        case DSPS_BIQUAD_F32_ANSI_COMMUTED: return "DSPS_BIQUAD_F32_ANSI_COMMUTED";
+        case PARAMETRIC_EQ_PROCESS: return "PARAMETRIC_EQ_PROCESS";
+        case HPF_BUF: return "HPF_BUF";
+        case SCAN_MAX: return "SCAN_MAX";
+        case DSPS_BIQUAD_F32_ANSI: return "DSPS_BIQUAD_F32_ANSI";
+        case BLOCK_NORM: return "BLOCK_NORM";
         case CALIBRATE: return "CALIBRATE";
         case AMY_ESP_FILL_BUFFER: return "AMY_ESP_FILL_BUFFER";
         case NO_TAG: return "NO_TAG";
@@ -439,6 +439,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
     // you must set both voices & load_patch together to load a patch 
     if (e->voices[0] != 0 || AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
+            amy_execute_deltas();
             patches_load_patch(e);
         }
         patches_event_has_voices(e, callback, user_data);
@@ -466,7 +467,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
     EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
     EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
     EVENT_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
-    EVENT_TO_DELTA_I(source, EVENT_SOURCE)
+    EVENT_TO_DELTA_I(note_source, NOTE_SOURCE)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
     EVENT_TO_DELTA_F(eq_l, EQ_L)
@@ -580,7 +581,7 @@ void reset_osc(uint16_t i ) {
     synth[i]->portamento_alpha = 0;
     synth[i]->velocity = 0;
     synth[i]->step = 0;
-    synth[i]->source = EVENT_NONE;
+    AMY_UNSET(synth[i]->note_source);
     synth[i]->mod_value = F2S(0);
     synth[i]->substep = 0;
     synth[i]->status = SYNTH_OFF;
@@ -775,7 +776,7 @@ int8_t oscs_init() {
 }
 
 void print_osc_debug(int i /* osc */, bool show_eg) {
-    fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d source %d,%d,%d,%d,%d,%d  \n",
+    fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d algo_source %d,%d,%d,%d,%d,%d  \n",
             i, synth[i]->status, synth[i]->wave, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
@@ -908,7 +909,7 @@ float portamento_ms_to_alpha(uint16_t portamento_ms) {
 // play an delta, now -- tell the audio loop to start making noise
 void play_delta(struct delta *d) {
     AMY_PROFILE_START(PLAY_DELTA)
-    //fprintf(stderr,"play_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data.i, global.delta_qsize);
+    //fprintf(stderr,"play_delta: time %d osc %d param %d val 0x%x, qsize %d\n", amy_global.total_blocks, d->osc, d->param, d->data.i, amy_global.delta_qsize);
     //uint8_t trig=0;
     // todo: delta-only side effect, remove
 
@@ -935,7 +936,7 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
-    DELTA_TO_SYNTH_I(EVENT_SOURCE, source)
+    DELTA_TO_SYNTH_I(NOTE_SOURCE, note_source)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
     // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
@@ -1369,8 +1370,8 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
 
 // this takes scheduled deltas and plays them at the right time
-void amy_prepare_buffer() {
-    AMY_PROFILE_START(AMY_PREPARE_BUFFER)
+void amy_execute_deltas() {
+    AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
     amy_grab_lock();
@@ -1398,7 +1399,7 @@ void amy_prepare_buffer() {
             render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
         }
     }
-    AMY_PROFILE_STOP(AMY_PREPARE_BUFFER)
+    AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
 
 }
 

@@ -200,10 +200,8 @@ enum coefs{
 #define EVENT_TRANSFER_DATA 2
 #define EVENT_SEQUENCE 3
 
-// event.source values
-#define EVENT_NONE 0
-#define EVENT_USER 1
-#define EVENT_MIDI 2
+// note_source values
+#define NOTE_SOURCE_MIDI 2
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
@@ -223,6 +221,7 @@ enum coefs{
 #define RESET_AMY 32768
 #define RESET_EVENTS 65536
 #define RESET_ALL_NOTES 131072
+#define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
 
 #define true 1
 #define false 0
@@ -250,28 +249,28 @@ typedef int amy_err_t;
 
 enum params{
     WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
-    AMP,                                 // 3..9
-    DUTY=AMP + NUM_COMBO_COEFS,          // 10..16
-    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 17
-    FREQ,                                // 18..24
-    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 25
-    PHASE, DETUNE, VOLUME, PITCH_BEND,   // 26, 26, 28, 29
-    PAN,                                 // 30..36
-    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 37..43
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 44
-    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 45, 46, 47
-    MOD_SOURCE, FILTER_TYPE,             // 48, 49
-    EQ_L, EQ_M, EQ_H,                    // 50, 51, 52
-    ALGORITHM, LATENCY, TEMPO,           // 53, 54, 55
+    AMP,                                 // 3..11
+    DUTY=AMP + NUM_COMBO_COEFS,          // 12..20
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 21
+    FREQ,                                // 22..30
+    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 31
+    PHASE, DETUNE, VOLUME, PITCH_BEND,   // 32, 33, 34, 35
+    PAN,                                 // 36..44
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 45..53
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 54
+    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 55, 56, 57
+    MOD_SOURCE, FILTER_TYPE,             // 58, 59
+    EQ_L, EQ_M, EQ_H,                    // 60, 61, 62
+    ALGORITHM, LATENCY, TEMPO,           // 63, 64, 65
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
-    BP_START=ALGO_SOURCE_END + 1,        // 107..138
-    BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2), // 139
-    EG0_TYPE, EG1_TYPE,                  // 140, 141
-    CLONE_OSC,                           // 142
-    RESET_OSC,                           // 143
-    EVENT_SOURCE,                        // 144
-    NO_PARAM                             // 145
+    BP_START=ALGO_SOURCE_END + 1,        // 107..202
+    BP_END=BP_START + (MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS * 2), // 203
+    EG0_TYPE, EG1_TYPE,                  // 204, 205
+    CLONE_OSC,                           // 206
+    RESET_OSC,                           // 207
+    NOTE_SOURCE,                        // 208
+    NO_PARAM                             // 209
 };
 
 ///////////////////////////////////////
@@ -282,7 +281,7 @@ enum params{
 enum itags{
     RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, FILTER_PROCESS_STAGE0,
     FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_DELTA, PLAY_DELTA,  MIX_WITH_PAN, AMY_RENDER, 
-    AMY_PREPARE_BUFFER, AMY_FILL_BUFFER, RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
+    AMY_EXECUTE_DELTAS, AMY_FILL_BUFFER, RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
     RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
     PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, BLOCK_NORM, CALIBRATE, AMY_ESP_FILL_BUFFER, NO_TAG
 };
@@ -431,7 +430,7 @@ typedef struct amy_event {
     uint32_t sequence[3]; // tick, period, tag
     //
     uint8_t status;
-    uint8_t source;
+    uint8_t note_source;  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
 } amy_event;
 
@@ -489,7 +488,8 @@ struct synthinfo {
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
-    uint8_t source;
+    // Was the most recent note on/off received e.g. from MIDI?
+    uint8_t note_source;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
@@ -695,7 +695,7 @@ void patches_init();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
-void amy_prepare_buffer();
+void amy_execute_deltas();
 int16_t * amy_fill_buffer();
 uint32_t ms_to_samples(uint32_t ms) ;
 

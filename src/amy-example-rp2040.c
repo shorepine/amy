@@ -66,7 +66,7 @@ static inline uint32_t _millis(void)
 
 void rp2040_fill_audio_buffer() {
     
-    amy_prepare_buffer();
+    amy_execute_deltas();
     send_message_to_other_core(32);
     amy_render(0, AMY_OSCS/2, 0);
     await_message_from_other_core(64);

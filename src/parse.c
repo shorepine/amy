@@ -254,9 +254,6 @@ void amy_parse_message(char * message, amy_event *e) {
         return;
     }
 
-    e->source = EVENT_USER;
-
-
     while(pos < length + 1) {
         cmd = message[pos];
         char *arg = message + pos + 1;
@@ -344,6 +341,10 @@ void amy_parse_message(char * message, amy_event *e) {
                 }
                 if(e->reset_osc & RESET_EVENTS) {
                     amy_deltas_reset();
+                    AMY_UNSET(e->reset_osc);
+                }
+                if(e->reset_osc & RESET_SYNTHS) {
+                    amy_reset_oscs();
                     AMY_UNSET(e->reset_osc);
                 }
                 break;

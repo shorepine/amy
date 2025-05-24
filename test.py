@@ -783,7 +783,7 @@ class TestSustainPedal(AmyTest):
   """Test sustain pedal."""
 
   def run(self):
-    amy.send(time=0, reset=amy.RESET_ALL_OSCS)
+    amy.send(time=0, reset=amy.RESET_SYNTHS)
     amy.send(time=0, synth=1, num_voices=4, patch_number=256)
     amy.send(time=50, synth=1, note=60, vel=1)
     amy.send(time=100, synth=1, note=60, vel=0)
