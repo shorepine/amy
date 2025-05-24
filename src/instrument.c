@@ -8,7 +8,7 @@
 // tulip/shared/py/synth.py.
 
 #include "amy.h"
-
+#include <inttypes.h>
 #define MAX_VOICES_PER_INSTRUMENT 16
 
 #define INSTRUMENT_RAM_CAPS SYNTH_RAM_CAPS
@@ -113,7 +113,7 @@ struct instrument_info {
 };
 
 void instrument_debug(struct instrument_info *instrument) {
-    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d flags %d in_sustain %d grab_midi %d\n",
+    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d flags %" PRIu32 " in_sustain %d grab_midi %d\n",
             (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->flags,
             instrument->in_sustain, instrument->grab_midi_notes);
     for (int i = 0; i < instrument->num_voices; ++i)
