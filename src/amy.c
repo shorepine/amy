@@ -530,7 +530,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
 
     EVENT_TO_DELTA_F(velocity, VELOCITY)
 end:
-    AMY_PROFILE_STOP(AMY_ADD_DELTA)
+    AMY_PROFILE_STOP(AMY_ADD_DELTA);
 
 }
 
