@@ -289,7 +289,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 
 int8_t global_init(amy_config_t c) {
     amy_global.config = c;
-    amy_global.delta_start = NULL;
+    amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
@@ -365,14 +365,14 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
     amy_grab_lock();
 
     struct delta *new_d = delta_get(d);
-    amy_global.delta_qsize++;
 
     // insert it into the sorted list for fast playback
-    struct delta **pptr = &amy_global.delta_start;
+    struct delta **pptr = &amy_global.delta_queue;
     while(*pptr && d->time >= (*pptr)->time)
         pptr = &(*pptr)->next;
     new_d->next = *pptr;
     *pptr = new_d;
+    amy_global.delta_qsize++;
 
     amy_release_lock();
     AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
@@ -620,13 +620,13 @@ void amy_reset_oscs() {
 
 
 void amy_deltas_reset() {
-    struct delta *d = amy_global.delta_start;
+    struct delta *d = amy_global.delta_queue;
     while(d) {
         // delta_release returns d->next
         d = delta_release(d);
     }
 
-    amy_global.delta_start = NULL;
+    amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
 }
 
@@ -780,7 +780,7 @@ void show_debug(uint8_t type) {
     esp_show_debug();
     #endif
     if(type>0) {
-        struct delta * ptr = amy_global.delta_start;
+        struct delta * ptr = amy_global.delta_queue;
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
@@ -1349,13 +1349,13 @@ void amy_execute_deltas() {
     amy_grab_lock();
 
     // find any deltas that need to be played from the (in-order) queue
-    struct delta *d = amy_global.delta_start;
+    struct delta *d = amy_global.delta_queue;
     while(d && sysclock >= d->time) {
         play_delta(d);
         d = delta_release(d);
         amy_global.delta_qsize--;
     }
-    amy_global.delta_start = d;
+    amy_global.delta_queue = d;
 
     amy_release_lock();
 

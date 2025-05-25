@@ -619,7 +619,7 @@ struct state {
     SAMPLE hpf_state;
     SAMPLE eq[3];
     uint16_t delta_qsize;
-    struct delta * delta_start; // start of the sorted list
+    struct delta * delta_queue; // start of the sorted queue of deltas to execute.
     int16_t latency_ms;
     float tempo;
     uint32_t total_blocks;
