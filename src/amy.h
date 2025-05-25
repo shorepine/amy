@@ -131,6 +131,8 @@ extern const uint16_t pcm_samples;
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define AMY_BYTES_PER_SAMPLE 2
+// We need some fixed vectors of per-instrument vectors.
+#define MAX_VOICES_PER_INSTRUMENT 32
 
 // Constants for filters.c, needed for synth structure.
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
@@ -555,7 +557,11 @@ typedef struct  {
     uint16_t max_oscs;
     uint8_t cores;
     uint8_t ks_oscs;
-    uint32_t delta_fifo_len;
+    uint32_t max_sequencer_tags;
+    uint32_t max_voices;
+    uint32_t max_synths;
+    uint32_t max_memory_patches;
+    uint32_t num_deltas;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -613,7 +619,6 @@ struct state {
     SAMPLE hpf_state;
     SAMPLE eq[3];
     uint16_t delta_qsize;
-    int16_t next_delta_write;
     struct delta * delta_start; // start of the sorted list
     int16_t latency_ms;
     float tempo;
@@ -691,7 +696,7 @@ int8_t oscs_init();
 void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
 void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
-void patches_init();
+void patches_init(int max_memory_patches);
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
@@ -778,7 +783,8 @@ extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
-extern void instruments_init();
+extern void instruments_init(int num_instruments);
+extern void instruments_free();
 extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
 extern void instrument_release(int instrument_number);
@@ -872,6 +878,11 @@ extern SAMPLE compute_mod_scale(uint16_t osc);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
 
+// deltas
+void deltas_pool_init(int max_delta_pool_size);
+void deltas_pool_free();
+struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
+struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.
 
 #endif
 

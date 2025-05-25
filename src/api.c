@@ -29,7 +29,6 @@ amy_config_t amy_default_config() {
     c.has_partials = 1;
     c.has_custom = 1;
     c.ks_oscs = 1;
-    c.delta_fifo_len = 2400;
     c.has_audio_in = 1;
     c.has_midi_uart = 0;
     c.has_midi_web = 0;
@@ -37,6 +36,11 @@ amy_config_t amy_default_config() {
     c.set_default_synth = 1;
     c.cores = 1;
     c.max_oscs = 180;
+    c.max_sequencer_tags = 256;
+    c.max_voices = 64;
+    c.max_synths = 64;
+    c.num_deltas = 4096;
+    c.max_memory_patches = 32;
 
     // caps
     #if (defined TULIP) || (defined AMYBOARD)

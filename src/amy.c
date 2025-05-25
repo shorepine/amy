@@ -289,7 +289,6 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 
 int8_t global_init(amy_config_t c) {
     amy_global.config = c;
-    amy_global.next_delta_write = 0;
     amy_global.delta_start = NULL;
     amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;
@@ -365,34 +364,16 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
     amy_grab_lock();
 
-    if(amy_global.delta_qsize < AMY_DELTA_FIFO_LEN) {
-        // scan through the memory to find a free slot, starting at write pointer
-        uint16_t write_location = amy_global.next_delta_write;
-        int16_t found = -1;
-        // guaranteed to find eventually if qsize stays accurate
-        while(found<0) {
-            if(deltas[write_location].time == UINT32_MAX) found = write_location;
-            write_location = (write_location + 1) % AMY_DELTA_FIFO_LEN;
-        }
-        // found a mem location. copy the data in and update the write pointers.
-        deltas[found].time = d->time;
-        deltas[found].osc = d->osc;
-        deltas[found].param = d->param;
-        deltas[found].data.i = d->data.i;  // Copying uint32_t of union will copy float value if that's where it is.
-        amy_global.next_delta_write = write_location;
-        amy_global.delta_qsize++;
+    struct delta *new_d = delta_get(d);
+    amy_global.delta_qsize++;
 
-        // now insert it into the sorted list for fast playback
-        struct delta **pptr = &amy_global.delta_start;
-        while(d->time >= (*pptr)->time)
-            pptr = &(*pptr)->next;
-        deltas[found].next = *pptr;
-        *pptr = &deltas[found];
-    } else {
-        // if there's no room in the queue, just skip the message
-        // todo -- report this somehow?
-        fprintf(stderr, "AMY queue is full\n");
-    }
+    // insert it into the sorted list for fast playback
+    struct delta **pptr = &amy_global.delta_start;
+    while(*pptr && d->time >= (*pptr)->time)
+        pptr = &(*pptr)->next;
+    new_d->next = *pptr;
+    *pptr = new_d;
+
     amy_release_lock();
     AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
 
@@ -639,24 +620,14 @@ void amy_reset_oscs() {
 
 
 void amy_deltas_reset() {
-    // make a fencepost last delta with no next, time of end-1, and call it start for now, all other deltas get inserted before it
-    deltas[0].next = NULL;
-    deltas[0].time = UINT32_MAX - 1;
-    deltas[0].osc = 0;
-    deltas[0].data.i = 0;
-    deltas[0].param = NO_PARAM;
-    amy_global.next_delta_write = 1;
-    amy_global.delta_start = &deltas[0];
-    amy_global.delta_qsize = 1;
-
-    // set all the other deltas to empty
-    for(uint16_t i=1;i<AMY_DELTA_FIFO_LEN;i++) {
-        deltas[i].time = UINT32_MAX;
-        deltas[i].next = NULL;
-        deltas[i].osc = 0;
-        deltas[i].data.i = 0;
-        deltas[i].param = NO_PARAM;
+    struct delta *d = amy_global.delta_start;
+    while(d) {
+        // delta_release returns d->next
+        d = delta_release(d);
     }
+
+    amy_global.delta_start = NULL;
+    amy_global.delta_qsize = 0;
 }
 
 void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
@@ -716,8 +687,8 @@ int8_t oscs_init() {
         ks_init();
     filters_init();
     algo_init();
-    patches_init();
-    instruments_init();
+    patches_init(amy_global.config.max_memory_patches);
+    instruments_init(amy_global.config.max_synths);
 
     if(pcm_samples) {
         pcm_init();
@@ -725,7 +696,6 @@ int8_t oscs_init() {
     if(amy_global.config.has_custom) {
         custom_init();
     }
-    deltas = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_DELTA_FIFO_LEN, amy_global.config.ram_caps_events);
     // synth and msynth are now pointers to arrays of pointers to dynamically-allocated synth structures.
     synth = (struct synthinfo **) malloc_caps(sizeof(struct synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     bzero(synth, sizeof(struct synthinfo *) * (AMY_OSCS+1));
@@ -736,6 +706,7 @@ int8_t oscs_init() {
     // set all oscillators to their default values
     amy_reset_oscs();
     // reset the deltas queue
+    deltas_pool_init(amy_global.config.num_deltas);
     amy_deltas_reset();
 
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
@@ -1378,17 +1349,13 @@ void amy_execute_deltas() {
     amy_grab_lock();
 
     // find any deltas that need to be played from the (in-order) queue
-    struct delta *delta_start = amy_global.delta_start;
-    if (amy_global.delta_qsize > 1 && delta_start->time == UINT32_MAX) {
-        fprintf(stderr, "WARN: time=UINT32_MAX found at qsize=%d\n", amy_global.delta_qsize);
-    }
-    while(sysclock >= delta_start->time) {
-        play_delta(delta_start);
-        delta_start->time = UINT32_MAX;
+    struct delta *d = amy_global.delta_start;
+    while(d && sysclock >= d->time) {
+        play_delta(d);
+        d = delta_release(d);
         amy_global.delta_qsize--;
-        delta_start = delta_start->next;
     }
-    amy_global.delta_start = delta_start;
+    amy_global.delta_start = d;
 
     amy_release_lock();
 
@@ -1599,3 +1566,60 @@ void amy_default_setup() {
     amy_add_event(&e);
 }
 
+/// Delta pool management
+
+struct delta *free_deltas_pool = NULL;
+
+void deltas_pool_init(int max_delta_pool_size) {
+    free_deltas_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
+                                             amy_global.config.ram_caps_synth);
+    struct delta *d = free_deltas_pool;
+    // Link all the deltas together
+    for (int i = 1; i < max_delta_pool_size; ++i) {
+        d->next = d + 1;
+        d->osc = 0;
+        d->data.i = 0;
+        d->param = NO_PARAM;
+        d->time = UINT32_MAX - 1;
+        d = d->next;
+    }
+    d->next = NULL;  // end of the chain
+}
+
+void deltas_pool_free() {
+    free(free_deltas_pool);
+    free_deltas_pool = NULL;
+}
+
+struct delta *delta_get(struct delta *from) {
+    // fetch the next free delta.
+    struct delta *d = free_deltas_pool;
+    if (d == NULL)  {
+        fprintf(stderr, "**PANIC: Ran out of deltas.\n");
+        abort();
+    }
+    free_deltas_pool = d->next;
+    if (from != NULL) {
+        d->data.i = from->data.i;
+        d->param = from->param;
+        d->time = from->time;
+        d->osc = from->osc;
+        // don't copy from->next
+    }
+    d->next = NULL;
+    return d;
+}
+
+struct delta *delta_release(struct delta *d) {
+    // return a delta to the pool.  Returns the next value, for ease closing up
+    struct delta *next_delta = d->next;
+    d->next = free_deltas_pool;
+    d->osc = 0;
+    d->data.i = 0;
+    d->param = NO_PARAM;
+    d->time = UINT32_MAX - 1;
+
+    free_deltas_pool = d;
+
+    return next_delta;
+}

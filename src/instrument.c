@@ -9,7 +9,6 @@
 
 #include "amy.h"
 #include <inttypes.h>
-#define MAX_VOICES_PER_INSTRUMENT 32
 
 #define INSTRUMENT_RAM_CAPS SYNTH_RAM_CAPS
 
@@ -228,17 +227,28 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
 
 ////// Interface of instrument mechanism to AMY records.
 
-#define MAX_INSTRUMENTS 32
-struct instrument_info *instruments[MAX_INSTRUMENTS];
+//#define MAX_INSTRUMENTS 32
+//struct instrument_info *instruments[MAX_INSTRUMENTS];
+struct instrument_info **instruments = NULL;
+int max_instruments = 0;
 
-void instruments_init() {
-    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++) {
+void instruments_free() {
+    if (instruments != NULL)  {
+        instruments_reset();
+        free(instruments);
+    }
+}
+
+void instruments_init(int num_instruments) {
+    max_instruments = num_instruments;
+    instruments = (struct instrument_info **)malloc_caps(max_instruments * sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
+    for(uint16_t i = 0; i < max_instruments; i++) {
         instruments[i]  = NULL;
     }
 }
 
 void instruments_reset() {
-    for(uint16_t i=0;i<MAX_INSTRUMENTS;i++)
+    for(uint16_t i = 0; i < max_instruments; i++)
         instrument_release(i);
 }
 
@@ -250,8 +260,8 @@ void instrument_release(int instrument_number) {
 }
 
 void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
-    if (instrument_number < 0 || instrument_number >= MAX_INSTRUMENTS) {
-        fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, MAX_INSTRUMENTS);
+    if (instrument_number < 0 || instrument_number >= max_instruments) {
+        fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, max_instruments);
         return;
     }
     if(instruments[instrument_number]) {
