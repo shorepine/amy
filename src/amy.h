@@ -769,6 +769,7 @@ extern void partials_note_on(uint16_t osc);
 extern void partials_note_off(uint16_t osc);
 extern void interp_partials_note_on(uint16_t osc);
 extern void interp_partials_note_off(uint16_t osc);
+extern int interp_partials_max_partials_for_patch(int interp_partials_patch_number);
 extern void patches_load_patch(amy_event *e); 
 extern void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, void*user_data), void*user_data );
 extern void patches_reset();

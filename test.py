@@ -785,8 +785,8 @@ class TestSustainPedal(AmyTest):
   def run(self):
     amy.send(time=0, reset=amy.RESET_SYNTHS)
     amy.send(time=0, synth=1, num_voices=4, patch_number=256)
-    amy.send(time=50, synth=1, note=60, vel=1)
-    amy.send(time=100, synth=1, note=60, vel=0)
+    amy.send(time=50, synth=1, note=76, vel=1)
+    amy.send(time=100, synth=1, note=76, vel=0)
     amy.send(time=150, synth=1, pedal=127)
     amy.send(time=250, synth=1, note=63, vel=1)
     amy.send(time=300, synth=1, note=63, vel=0)

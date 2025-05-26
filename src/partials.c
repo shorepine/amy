@@ -101,7 +101,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     } else if (synth[osc]->wave == INTERP_PARTIALS) {
         //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
         //num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
-        num_oscs = 20; ///////////////////  FOR NOW!!!
+        num_oscs = interp_partials_max_partials_for_patch(synth[osc]->preset);
     } else {
         // Set up from partials map.
         partial_breakpoint_map_t preset = partial_breakpoint_map[synth[osc]->preset % PARTIALS_PRESETS];
