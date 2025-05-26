@@ -424,6 +424,71 @@ void example_drums(uint32_t start, int loops) {
     }
 }
 
+void example_sequencer_drums(uint32_t start) {
+    // Play a drum pattern using the low-level sequencer structure
+    amy_event e = amy_default_event();
+    e.time = start;
+    e.reset_osc = RESET_ALL_OSCS;
+    amy_add_event(&e);
+
+    // Set tempo so 16 ticks is 108 BPM (not 48 as default).  So we make the BPM one-sixth
+    e = amy_default_event();
+    e.tempo = 108.0f/3;
+    amy_add_event(&e);
+
+    // Setup oscs for bd, snare, hat, cow, hicow
+    int oscs[] = {0, 1, 2, 3, 4};
+    int presets[] = {1, 5, 0, 10, 10};
+    e = amy_default_event();
+    e.time = start + 1;
+    e.wave = PCM;
+    for (unsigned int i = 0; i < sizeof(oscs) / sizeof(int); ++i) {
+        e.osc = oscs[i];
+        e.preset = presets[i];
+        amy_add_event(&e);
+    }
+    // Update high cowbell.
+    e = amy_default_event();
+    e.time = start + 1;
+    e.osc = 4;
+    e.midi_note = 70;
+    amy_add_event(&e);
+
+    // Add patterns.
+    // Hi hat every 8 ticks.
+    e = amy_default_event();
+    e.sequence[SEQUENCE_TAG] = 0;
+    e.sequence[SEQUENCE_PERIOD] = 8;
+    e.sequence[SEQUENCE_TICK] = 0;
+    e.osc = 2;
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Bass drum every 32 ticks.
+    e.sequence[SEQUENCE_TAG] = 1;
+    e.sequence[SEQUENCE_PERIOD] = 32;
+    e.sequence[SEQUENCE_TICK] = 0;
+    e.osc = 0;
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Snare every 32 ticks, counterphase to BD.
+    e.sequence[SEQUENCE_TAG] = 2;
+    e.sequence[SEQUENCE_PERIOD] = 32;
+    e.sequence[SEQUENCE_TICK] = 16;
+    e.osc = 1;
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Cow once every other cycle.
+    e.sequence[SEQUENCE_TAG] = 3;
+    e.sequence[SEQUENCE_PERIOD] = 64;
+    e.sequence[SEQUENCE_TICK] = 60;
+    e.osc = 3;
+    e.velocity = 1.0;
+    amy_add_event(&e);
+}
+
 void example_fm(uint32_t start) {
     // Direct construction of an FM tone, as in the documentation.
     amy_event e;

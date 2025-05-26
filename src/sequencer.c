@@ -75,12 +75,6 @@ void sequencer_recompute() {
     amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
 }
 
-void append_delta_to_list(struct delta *d, void *user_data) {
-    struct delta **append_here = (struct delta **)user_data;
-    while (*append_here)  append_here = &((*append_here)->next);
-    *append_here = delta_get(d);  // delta_get returns a delta whose next is NULL.
-}
-
 uint8_t sequencer_add_event(amy_event *e) {
     // add this event to the list of sequencer events in the LL.
     // e->sequence is set up.
@@ -104,7 +98,7 @@ uint8_t sequencer_add_event(amy_event *e) {
     sequences[tag].tick = e->sequence[SEQUENCE_TICK];
     sequences[tag].period = e->sequence[SEQUENCE_PERIOD];
     // Copy all the deltas for this event to the sequences entry.
-    amy_event_to_deltas_then(e, 0, append_delta_to_list, (void*)&sequences[tag].deltas);
+    amy_event_to_deltas_queue(e, 0, &sequences[tag].deltas);
 
     if (tag > highest_tag) highest_tag = tag;  // To limit scanning through tags.
 
@@ -132,7 +126,7 @@ void sequencer_check_and_fill() {
                     struct delta *d = sequences[tag].deltas;
                     while(d) {
                         // assume the d->time is 0 and that's good.
-                        add_delta_to_queue(d, NULL);
+                        add_delta_to_queue(d, &amy_global.delta_queue);
                         d = d->next;
                     }
                     // Delete absolute tick addressed sequence entry if sent

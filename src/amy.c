@@ -360,29 +360,32 @@ float midi_note_for_logfreq(float logfreq) {
 
 
 
-void add_delta_to_queue(struct delta *d, void *unused_user_data) {
+void add_delta_to_queue(struct delta *d, struct delta **queue) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
     amy_grab_lock();
+
+    // hack.  Update the (decorative) global queue size if we're adding to the global queue.
+    if (queue == &amy_global.delta_queue)
+        amy_global.delta_qsize++;
 
     struct delta *new_d = delta_get(d);
 
     // insert it into the sorted list for fast playback
-    struct delta **pptr = &amy_global.delta_queue;
+    struct delta **pptr = queue;
     while(*pptr && d->time >= (*pptr)->time)
         pptr = &(*pptr)->next;
     new_d->next = *pptr;
     *pptr = new_d;
-    amy_global.delta_qsize++;
 
     amy_release_lock();
     AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
 
 }
 
-#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); callback(&d, user_data);}
-#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
+#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
+#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
         EVENT_TO_DELTA_F(FIELD[i], FLAG + i)
@@ -395,12 +398,12 @@ void add_delta_to_queue(struct delta *d, void *unused_user_data) {
                 d.data.f = logfreq_of_freq(e->FIELD[i]);  \
             else \
                 d.data.f = e->FIELD[i]; \
-            callback(&d, user_data); \
+            add_delta_to_queue(&d, queue); \
         }    \
     }
 
 // Add a API facing event, convert into delta directly
-void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
@@ -423,7 +426,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
             amy_execute_deltas();
             patches_load_patch(e);
         }
-        patches_event_has_voices(e, callback, user_data);
+        patches_event_has_voices(e, queue);
         goto end;
     }
 
@@ -468,7 +471,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
                 d.data.i = t.algo_source[i];
             }
             ensure_osc_allocd(d.data.i, NULL);
-            callback(&d, user_data); 
+            add_delta_to_queue(&d, queue);
         }
     }
 
@@ -491,19 +494,19 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
                     d.param = BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2);
                     d.data.i = t.breakpoint_times[i][j];
-                    callback(&d, user_data);
+                    add_delta_to_queue(&d, queue);
                 }
                 if(AMY_IS_SET(t.breakpoint_values[i][j])) {
                     d.param = BP_START + (j * 2 + 1) + (i * MAX_BREAKPOINTS * 2);
                     d.data.f = t.breakpoint_values[i][j];
-                    callback(&d, user_data);
+                    add_delta_to_queue(&d, queue);
                 }
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
                 d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
                 d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
-                callback(&d, user_data);
+                add_delta_to_queue(&d, queue);
             }
         }
     }
@@ -620,12 +623,7 @@ void amy_reset_oscs() {
 
 
 void amy_deltas_reset() {
-    struct delta *d = amy_global.delta_queue;
-    while(d) {
-        // delta_release returns d->next
-        d = delta_release(d);
-    }
-
+    delta_release_list(amy_global.delta_queue);
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
 }

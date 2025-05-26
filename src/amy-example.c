@@ -64,7 +64,8 @@ int main(int argc, char ** argv) {
     amy_live_start();
     //example_voice_chord(0,0);
     //example_synth_chord(0, /* patch */ 256);
-    example_sustain_pedal(0, /* patch */ 256);
+    //example_sustain_pedal(0, /* patch */ 256);
+    example_sequencer_drums(0);
 
     // Now just spin for 15s
     uint32_t start = amy_sysclock();

@@ -168,7 +168,7 @@ void amy_add_event(amy_event *e) {
     amy_process_event(e);
     // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
     if(e->status == EVENT_SCHEDULED) {
-   	    amy_event_to_deltas_then(e, 0, add_delta_to_queue, NULL);
+        amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
 

@@ -26,8 +26,9 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 //#define MEMORY_PATCHES 32
 //char * memory_patch[MEMORY_PATCHES];
 //uint16_t memory_patch_oscs[MEMORY_PATCHES];
-uint32_t memory_patches = 0;
+uint32_t max_num_memory_patches = 0;
 char **memory_patch = NULL;
+struct delta **memory_patch_deltas = NULL;
 uint16_t *memory_patch_oscs = NULL;
 uint16_t next_user_patch_index = 0;
 uint8_t * osc_to_voice = NULL;
@@ -42,18 +43,21 @@ void patches_free() {
 }
 
 void patches_init(int max_memory_patches) {
-    memory_patches = max_memory_patches;
+    max_num_memory_patches = max_memory_patches;
     uint8_t *alloc_base = malloc_caps(
-        memory_patches * (sizeof(char *) + sizeof(uint16_t))
+            max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
             + AMY_OSCS * sizeof(uint8_t)
             + amy_global.config.max_voices * sizeof(uint16_t),
         amy_global.config.ram_caps_synth
     );
     memory_patch = (char **)alloc_base;
-    bzero(memory_patch, memory_patches * sizeof(char *));
-    memory_patch_oscs = (uint16_t *)(alloc_base + memory_patches * sizeof(char *));
-    osc_to_voice = alloc_base + memory_patches * (sizeof(char *) + sizeof(uint16_t));
-    voice_to_base_osc = (uint16_t *)(alloc_base + memory_patches * (sizeof(char *) + sizeof(uint16_t))
+    bzero(memory_patch, max_num_memory_patches * sizeof(char *));
+    memory_patch_deltas = (struct delta **)(alloc_base + max_num_memory_patches * sizeof(char *));
+    bzero(memory_patch_deltas, max_num_memory_patches * sizeof(struct delta *));
+    memory_patch_oscs = (uint16_t *)(alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *)));
+    osc_to_voice = alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t));
+    voice_to_base_osc = (uint16_t *)(alloc_base
+                                     + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
                                      + AMY_OSCS * sizeof(uint8_t));
     patches_reset();
 }
@@ -65,9 +69,11 @@ void patches_reset() {
     for(uint32_t i = 0; i < AMY_OSCS; i++) {
         AMY_UNSET(osc_to_voice[i]);
     }
-    for(uint32_t i = 0; i < memory_patches; i++) {
+    for(uint32_t i = 0; i < max_num_memory_patches; i++) {
         if (memory_patch[i] != NULL)  free(memory_patch[i]);
         memory_patch[i] = NULL;
+        if (memory_patch_deltas[i] != NULL)  delta_release_list(memory_patch_deltas[i]);
+        memory_patch_deltas[i] = NULL;
         memory_patch_oscs[i] = 0;
     }
     next_user_patch_index = 0;
@@ -89,9 +95,10 @@ void patches_debug() {
         i += j;
         fprintf(stderr, "\n");
     }
-    for(uint8_t i = 0; i < memory_patches; i++) {
+    for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
-            fprintf(stderr, "memory_patch %d oscs %d patch %s\n", i, memory_patch_oscs[i], memory_patch[i]);
+            fprintf(stderr, "memory_patch %d oscs %d #deltas %d patch %s\n",
+                    i, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
@@ -120,8 +127,8 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch_number, patch_string);
     if (!AMY_IS_SET(e->patch_number)) {
         // Check for a repeated string
-        for (uint32_t i = 0; i < memory_patches; ++i) {
-            if (memory_patch_oscs[i] > 0)
+        for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
+            if (memory_patch_oscs[i] > 0 && memory_patch[i] != NULL)
                 if (strcmp(memory_patch[i], patch_string) == 0) {
                     e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
                     // Actually, we don't need to store it, we already have it.
@@ -135,9 +142,9 @@ void patches_store_patch(amy_event *e, char * patch_string) {
         //fprintf(stderr, "store_patch: auto-assigning patch number %d for '%s'\n", e->patch_number, patch_string);
     }
     int patch_index = (int)e->patch_number - _PATCHES_FIRST_USER_PATCH;
-    if (patch_index < 0 || patch_index >= (int)memory_patches) {
-        fprintf(stderr, "patch number %d is out of range (%d .. %" PRIu32 ")\n",
-                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + memory_patches);
+    if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
+        fprintf(stderr, "patch number %d is out of range (%d .. %d)\n",
+                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
@@ -160,6 +167,8 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     memory_patch[patch_index] = malloc(strlen(patch_string)+1);
     memory_patch_oscs[patch_index] = max_osc + 1;
     strcpy(memory_patch[patch_index], patch_string);
+    // Also store as deltas
+    amy_event_to_deltas_queue(e, 0, &memory_patch_deltas[patch_index]);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s (e->num_vx=%d)\n", patch_index, max_osc, patch_string, e->num_voices);
 }
 
@@ -261,7 +270,7 @@ bool setup_drum_event(amy_event *e, uint8_t note) {
 
 // This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void patches_event_has_voices(amy_event *e, struct delta **queue) {
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices;
     uint32_t flags = 0;
@@ -353,7 +362,7 @@ void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, vo
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
-            amy_event_to_deltas_then(e, target_osc, callback, user_data);
+            amy_event_to_deltas_queue(e, target_osc, queue);
 	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
@@ -374,6 +383,8 @@ void release_voice_oscs(int32_t voice) {
         AMY_UNSET(voice_to_base_osc[voice]);
     }
 }
+
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
 
 void patches_load_patch(amy_event *e) {
     // Given an event with a patch/patch_number AND a voices/instrument spec in it.
@@ -499,7 +510,7 @@ void patches_load_patch(amy_event *e) {
                         // from the default setup was applied *after* the reset, so the osc state was not reset.
                         amy_event reset_event = amy_default_event();
                         reset_event.reset_osc = osc + j;
-                        amy_event_to_deltas_then(&reset_event, 0, add_delta_to_queue, NULL);
+                        amy_event_to_deltas_queue(&reset_event, 0, &amy_global.delta_queue);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
@@ -511,24 +522,9 @@ void patches_load_patch(amy_event *e) {
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
     // Now actually initialize the newly-allocated osc blocks with the patch
-    uint16_t start = 0;
-    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
-    char sub_message[256];
-    for(uint16_t i=0;i<strlen(message) + 1;i++) {
-        if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
-            strncpy(sub_message, message + start, i - start + 1);
-            sub_message[i-start+1]= 0;
-            amy_event patch_event = amy_default_event();
-            amy_parse_message(sub_message, &patch_event);
-            amy_process_event(&patch_event);
-            patch_event.time = e->time;
-            if(patch_event.status == EVENT_SCHEDULED) {
-                for(uint8_t v=0;v<num_voices;v++)
-                    if(AMY_IS_SET(voice_to_base_osc[voices[v]]))
-                        amy_event_to_deltas_then(&patch_event, voice_to_base_osc[voices[v]], add_delta_to_queue, NULL);
-            }
-            start = i+1;
-            //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
+    for(uint8_t v = 0; v < num_voices; v++) {
+        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
+            parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
         }
     }
     // Finally, store as an instrument if instrument number is specified.
@@ -536,5 +532,28 @@ void patches_load_patch(amy_event *e) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
         instrument_add_new(e->synth, num_voices, voices, patch_number, flags);
+    }
+}
+
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
+    // Work though the patch string and send to voices.
+    // Now actually initialize the newly-allocated osc blocks with the patch
+    uint16_t start = 0;
+    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
+    char sub_message[256];
+    for(uint16_t i=0;i<strlen(message) + 1;i++) {
+        if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
+            strncpy(sub_message, message + start, i - start + 1);
+            sub_message[i - start + 1]= 0;
+            amy_event patch_event = amy_default_event();
+            amy_parse_message(sub_message, &patch_event);
+            amy_process_event(&patch_event);
+            patch_event.time = time;
+            if(patch_event.status == EVENT_SCHEDULED) {
+                amy_event_to_deltas_queue(&patch_event, base_osc, queue);
+            }
+            start = i+1;
+            //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
+        }
     }
 }
