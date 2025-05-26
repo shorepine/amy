@@ -38,6 +38,19 @@ const bool use_this_partial_map[MAX_NUM_HARMONICS] = {
     1, 0, 0, 0, 1, 0, 1, 0, 0, 0,  // 31-40
 };
 
+int _max_partials_for_partials_voice(const interp_partials_voice_t *partials_voice) {
+    int max_num_partials = 0;
+    for (int h = 0; h < partials_voice->num_harmonics[0]; ++h) {
+        if (use_this_partial_map[h]) ++max_num_partials;
+    }
+    return max_num_partials;
+}
+
+int interp_partials_max_partials_for_patch(int interp_partials_patch_number) {
+    const interp_partials_voice_t *partials_voice = &interp_partials_map[interp_partials_patch_number % NUM_INTERP_PARTIALS_PRESETS];
+    return _max_partials_for_partials_voice(partials_voice);
+}
+
 void _cumulate_scaled_harmonic_params(float *harm_param, int harmonic_index, float alpha, const interp_partials_voice_t *partials_voice) {
     int num_bps = partials_voice->num_sample_times_ms;
     // Pitch
@@ -141,10 +154,7 @@ void interp_partials_note_on(uint16_t osc) {
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
     // Make sure enough oscs are alloc'd in our dynamic osc alloc world.
     // This has to be enough for any note in this map.  Assume num_harmonics[0] is largest (lowest pitch).
-    uint8_t max_num_partials = 0;
-    for (int h = 0; h < partials_voice->num_harmonics[0]; ++h) {
-        if (use_this_partial_map[h]) ++max_num_partials;
-    }
+    uint8_t max_num_partials = _max_partials_for_partials_voice(partials_voice);
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS};
     for (int o = 0; o < max_num_partials; ++o) {
         ensure_osc_allocd(osc + 1 + o, max_num_breakpoints);
