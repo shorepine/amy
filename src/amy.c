@@ -430,6 +430,13 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         goto end;
     }
 
+    // Is this, in fact, a non-load_patch or store_patch event that has patch_number set?
+    // If so, add the event to the stored patch queue, not the execution queue.
+    if (AMY_IS_SET(e->patch_number)) {
+        queue = queue_for_patch_number(e->patch_number);
+        //fprintf(stderr, "event added to patch %d: osc %d wave %d...\n", e->patch_number, e->osc, e->wave);
+    }
+
     // Everything else only added to queue if set
     EVENT_TO_DELTA_I(wave, WAVE)
     EVENT_TO_DELTA_I(preset, PRESET)
@@ -514,6 +521,14 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
 
     EVENT_TO_DELTA_F(velocity, VELOCITY)
+
+    if (AMY_IS_SET(e->patch_number)) {
+        // If this was an event with a patch number, maybe we increased the number of oscs for this patch, update it.
+        int num_oscs = update_num_oscs_for_patch_number(e->patch_number);
+        //fprintf(stderr, "patch %d max oscs %d\n", e->patch_number, num_oscs);
+    }
+
+
 end:
     AMY_PROFILE_STOP(AMY_ADD_DELTA);
 
@@ -786,7 +801,7 @@ void show_debug(uint8_t type) {
             fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
-        fprintf(stderr, "deltas_queue len %" PRIi32 "d, free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
+        fprintf(stderr, "deltas_queue len %" PRIi32 ", free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
         sequencer_debug();
     }
     if(type>1) {
@@ -952,18 +967,22 @@ void play_delta(struct delta *d) {
     }
     if(d->param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
-        if(d->data.i & RESET_ALL_OSCS) { 
-            amy_reset_oscs(); 
+        if(d->data.i & RESET_ALL_OSCS) {
+            amy_reset_oscs();
         }
-        if(d->data.i & RESET_SEQUENCER) { 
-            sequencer_reset(); 
+        if(d->data.i & RESET_SEQUENCER) {
+            sequencer_reset();
         }
-        if(d->data.i & RESET_ALL_NOTES) { 
-            all_notes_off(); 
+        if(d->data.i & RESET_ALL_NOTES) {
+            all_notes_off();
         }
-        if(d->data.i < AMY_OSCS+1) { 
+        if(d->data.i & RESET_PATCH) {
+            // If we got here, it's a full reset of patches.
+            patches_reset();
+        }
+        if(d->data.i < AMY_OSCS+1) {
             reset_osc(d->data.i);
-        } 
+        }
     }
     if(d->param == MOD_SOURCE) {
         uint16_t mod_osc = d->data.i;

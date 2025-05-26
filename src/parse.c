@@ -347,6 +347,11 @@ void amy_parse_message(char * message, amy_event *e) {
                     }
                     AMY_UNSET(e->reset_osc);
                 }
+                if ((e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
+                    // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
+                    patches_reset_patch(e->patch_number);
+                    AMY_UNSET(e->reset_osc);
+                }
                 break;
             /* t used for time */
             case 't': e->time=atol(arg); break;

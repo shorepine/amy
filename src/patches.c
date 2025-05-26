@@ -37,6 +37,7 @@ uint16_t *voice_to_base_osc = NULL;
 void patches_free() {
     if (memory_patch) free(memory_patch);
     memory_patch = NULL;
+    memory_patch_deltas = NULL;
     memory_patch_oscs = NULL;
     osc_to_voice = NULL;
     voice_to_base_osc = NULL;
@@ -62,6 +63,20 @@ void patches_init(int max_memory_patches) {
     patches_reset();
 }
 
+void patches_reset_patch(int patch_number) {
+    int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+    if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
+        fprintf(stderr, "reset patch number %d is out of range (%d .. %d)\n",
+                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        return;
+    }
+    if (memory_patch[patch_index] != NULL)  free(memory_patch[patch_index]);
+    memory_patch[patch_index] = NULL;
+    if (memory_patch_deltas[patch_index] != NULL)  delta_release_list(memory_patch_deltas[patch_index]);
+    memory_patch_deltas[patch_index] = NULL;
+    memory_patch_oscs[patch_index] = 0;
+}
+
 void patches_reset() {
     for(uint32_t v = 0; v < amy_global.config.max_voices; v++) {
         AMY_UNSET(voice_to_base_osc[v]);
@@ -70,11 +85,7 @@ void patches_reset() {
         AMY_UNSET(osc_to_voice[i]);
     }
     for(uint32_t i = 0; i < max_num_memory_patches; i++) {
-        if (memory_patch[i] != NULL)  free(memory_patch[i]);
-        memory_patch[i] = NULL;
-        if (memory_patch_deltas[i] != NULL)  delta_release_list(memory_patch_deltas[i]);
-        memory_patch_deltas[i] = NULL;
-        memory_patch_oscs[i] = 0;
+        patches_reset_patch(_PATCHES_FIRST_USER_PATCH + i);
     }
     next_user_patch_index = 0;
 }
@@ -98,7 +109,7 @@ void patches_debug() {
     for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
             fprintf(stderr, "memory_patch %d oscs %d #deltas %d patch %s\n",
-                    i, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
+                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
@@ -109,6 +120,33 @@ void patches_debug() {
             fprintf(stderr, "\n");
         }
     }
+}
+
+struct delta **queue_for_patch_number(int patch_number) {
+    int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+    if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
+        fprintf(stderr, "queue for patch number %d is out of range (%d .. %d)\n",
+                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        return NULL;
+    }
+    return &memory_patch_deltas[patch_index];
+}
+
+int update_num_oscs_for_patch_number(int patch_number) {
+    int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+    if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
+        fprintf(stderr, "queue for patch number %d is out of range (%d .. %d)\n",
+                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        return 0;
+    }
+    uint16_t max_osc = 0;
+    struct delta *d = memory_patch_deltas[patch_index];
+    while(d) {
+        if (d->osc > max_osc)  max_osc = d->osc;
+        d = d->next;
+    }
+    memory_patch_oscs[patch_index] = max_osc + 1;
+    return memory_patch_oscs[patch_index];
 }
 
 void all_notes_off() {
@@ -133,7 +171,6 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         d = d->next;
     }
 }
-
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.
@@ -187,13 +224,7 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
     // Store the patch as deltas and  find out how many oscs this message uses
     parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->time);
-    uint16_t max_osc = 0;
-    struct delta *d = memory_patch_deltas[patch_index];
-    while(d) {
-        if (d->osc > max_osc)  max_osc = d->osc;
-        d = d->next;
-    }
-    memory_patch_oscs[patch_index] = max_osc + 1;
+    update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
     // Store a copy of the patch string
     if (memory_patch[patch_index] != NULL) { free(memory_patch[patch_index]); }
     memory_patch[patch_index] = malloc(strlen(patch_string)+1);

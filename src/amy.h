@@ -224,6 +224,7 @@ enum coefs{
 #define RESET_EVENTS 65536
 #define RESET_ALL_NOTES 131072
 #define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
+#define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
 
 #define true 1
 #define false 0
@@ -777,7 +778,10 @@ extern void interp_partials_note_off(uint16_t osc);
 extern int interp_partials_max_partials_for_patch(int interp_partials_patch_number);
 extern void patches_load_patch(amy_event *e); 
 extern void patches_event_has_voices(amy_event *e, struct delta **queue);
+extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
+extern struct delta **queue_for_patch_number(int patch_number);
+extern int update_num_oscs_for_patch_number(int patch_number);
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(amy_event *e, char * message);
