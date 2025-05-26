@@ -144,7 +144,7 @@ void example_sustain_pedal(uint32_t start, uint16_t patch) {
     e = amy_default_event();
     e.time = start;
     e.synth = 1;
-    e.midi_note = 60;
+    e.midi_note = 76;
     e.velocity = 1.0f;
     amy_add_event(&e);
 
@@ -152,7 +152,7 @@ void example_sustain_pedal(uint32_t start, uint16_t patch) {
     e = amy_default_event();
     e.time = start;
     e.synth = 1;
-    e.midi_note = 60;
+    e.midi_note = 76;
     e.velocity = 0;
     amy_add_event(&e);
 
