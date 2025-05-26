@@ -20,15 +20,54 @@ esp_timer_handle_t periodic_timer;
 
 uint32_t sequencer_ticks() { return amy_global.sequencer_tick_count; }
 
+typedef struct sequence_info_t {
+    struct delta *deltas;
+    //uint32_t tag;  // tag is implicit, it's its index in the table
+    uint32_t tick; // 0 means not used
+    uint32_t period; // 0 means not used
+} sequence_info_t;
+
+struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
+int max_sequences = 0;
+int highest_tag = -1;
+
+void sequencer_init(int max_sequencer_tags) {
+    max_sequences = max_sequencer_tags;
+    sequences = (struct sequence_info_t *)malloc_caps(max_sequences * sizeof(struct sequence_info_t),
+                                                      amy_global.config.ram_caps_synth);
+    for (int i = 0; i < max_sequences; ++i) {
+        sequences[i].deltas = NULL;
+        sequences[i].tick = 0;
+        sequences[i].period = 0;
+    }
+}
+
+void sequencer_free() {
+    if (sequences != NULL) free(sequences);
+    max_sequences = 0;
+}
+
 void sequencer_reset() {
     // Remove all events
-    sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
-    while ((*entry_ll_ptr) != NULL) {
-        sequence_entry_ll_t *doomed = *entry_ll_ptr;
-        *entry_ll_ptr = doomed->next; // close up list.
-        free(doomed);
+    for (int i = 0; i < max_sequences; ++i) {
+        if (sequences[i].deltas) {
+            delta_release_list(sequences[i].deltas);
+            sequences[i].deltas = NULL;
+            sequences[i].tick = 0;
+            sequences[i].period = 0;
+        }
     }
-    amy_global.sequence_entry_ll_start = NULL;
+    highest_tag = -1;
+}
+
+void sequencer_debug() {
+    fprintf(stderr, "sequencer: max_sequences %d highest_tag %d\n", max_sequences, highest_tag);
+    for (int tag = 0; tag < max_sequences; ++tag) {
+        if (sequences[tag].deltas) {
+            fprintf(stderr, "sequence tag %d tick %d period %d num_deltas %d\n",
+                    tag, sequences[tag].tick, sequences[tag].period, delta_list_len(sequences[tag].deltas));
+        }
+    }
 }
 
 void sequencer_recompute() {
@@ -36,52 +75,39 @@ void sequencer_recompute() {
     amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
 }
 
-void add_delta_to_sequencer(struct delta *d, void*user_data) {
-    sequence_callback_info_t * cbinfo = (sequence_callback_info_t *)user_data;
-    sequence_entry_ll_t ***entry_ll_ptr = &(cbinfo->pointer); 
-    (**entry_ll_ptr) = malloc(sizeof(sequence_entry_ll_t));
-    //fprintf(stderr, "ll %p adding tag %d period %d tick %d data %d param %d osc %d\n",
-    //    (**entry_ll_ptr), cbinfo->tag, cbinfo->period, cbinfo->tick, d->data, d->param, d->osc);
-    (**entry_ll_ptr)->tick = cbinfo->tick;
-    (**entry_ll_ptr)->period = cbinfo->period;
-    (**entry_ll_ptr)->tag = cbinfo->tag;
-    (**entry_ll_ptr)->d.time = 0;
-    (**entry_ll_ptr)->d.data = d->data;
-    (**entry_ll_ptr)->d.param = d->param;
-    (**entry_ll_ptr)->d.osc = d->osc;
-    (**entry_ll_ptr)->next = NULL;
-    (*entry_ll_ptr) = &((**entry_ll_ptr)->next);
+void append_delta_to_list(struct delta *d, void *user_data) {
+    struct delta **append_here = (struct delta **)user_data;
+    while (*append_here)  append_here = &((*append_here)->next);
+    *append_here = delta_get(d);  // delta_get returns a delta whose next is NULL.
 }
 
 uint8_t sequencer_add_event(amy_event *e) {
-    // add this event to the list of sequencer events in the LL
+    // add this event to the list of sequencer events in the LL.
+    // e->sequence is set up.
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
-    //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, tick, period, tag);
-    sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
-    while ((*entry_ll_ptr) != NULL) {
-        // Do this first, then add the new one / replacement one at the end. Not a big deal 
-        // This can delete all the deltas from a source event if it matches tag
-        if ((*entry_ll_ptr)->tag == e->sequence[SEQUENCE_TAG]) {
-            //fprintf(stderr, "ll %p found tag %d, deleting\n", (*entry_ll_ptr), tag);
-            sequence_entry_ll_t *doomed = *entry_ll_ptr;
-            *entry_ll_ptr = doomed->next; // close up list.
-            free(doomed);
-        } else {
-            entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
-        }
+    //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], e->sequence[SEQUENCE_TAG]);
+    int tag = e->sequence[SEQUENCE_TAG];
+    if (tag > max_sequences) {
+        fprintf(stderr, "sequencer tag %d (with tick %d, period %d) is greater than or eq max_sequences %d\n",
+                tag, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], max_sequences);
+        // ignore
+        return 0;
     }
+    // Release any existing deltas for this tag, even if we're just going to rewrite them.
+    delta_release_list(sequences[tag].deltas);
+    sequences[tag].deltas = NULL;
 
     if(e->sequence[SEQUENCE_TICK] == 0 && e->sequence[SEQUENCE_PERIOD] == 0) return 0; // Ignore non-schedulable event.
     if(e->sequence[SEQUENCE_TICK] != 0 && e->sequence[SEQUENCE_PERIOD] == 0 && e->sequence[SEQUENCE_TICK] <= amy_global.sequencer_tick_count) return 0; // don't schedule things in the past.
 
-    // Get all the deltas for this event
-    // For each delta, add a new entry at the end
-    sequence_callback_info_t cbinfo;
-    cbinfo.tag = e->sequence[SEQUENCE_TAG];
-    cbinfo.tick = e->sequence[SEQUENCE_TICK];
-    cbinfo.period = e->sequence[SEQUENCE_PERIOD];
-    cbinfo.pointer = entry_ll_ptr;
-    amy_event_to_deltas_then(e, 0, add_delta_to_sequencer, (void*)&cbinfo);
+    // Save the tick & period.
+    sequences[tag].tick = e->sequence[SEQUENCE_TICK];
+    sequences[tag].period = e->sequence[SEQUENCE_PERIOD];
+    // Copy all the deltas for this event to the sequences entry.
+    amy_event_to_deltas_then(e, 0, append_delta_to_list, (void*)&sequences[tag].deltas);
+
+    if (tag > highest_tag) highest_tag = tag;  // To limit scanning through tags.
+
     return 1;
 }
 
@@ -91,30 +117,30 @@ void sequencer_check_and_fill() {
     while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
         amy_global.sequencer_tick_count++;
         // Scan through LL looking for matches
-        sequence_entry_ll_t **entry_ll_ptr = &amy_global.sequence_entry_ll_start; // Start pointing to the root node.
-        while ((*entry_ll_ptr) != NULL) {
-            uint8_t deleted = 0;
-            uint8_t hit = 0;
-            uint8_t delete = 0;
-            if((*entry_ll_ptr)->period != 0) { // period set 
-                uint32_t offset = amy_global.sequencer_tick_count % (*entry_ll_ptr)->period;
-                if(offset == (*entry_ll_ptr)->tick) hit = 1;
-            } else {
-                // Test for absolute tick (no period set)
-                if ((*entry_ll_ptr)->tick == amy_global.sequencer_tick_count) { hit = 1; delete = 1; }
-            }
-            if(hit) {
-                add_delta_to_queue(&(*entry_ll_ptr)->d, NULL);
-                // Delete absolute tick addressed sequence entry if sent
-                if(delete) {
-                    sequence_entry_ll_t *doomed = *entry_ll_ptr;
-                    *entry_ll_ptr = doomed->next; // close up list.
-                    free(doomed);
-                    deleted = 1;
+        for (int tag = 0; tag <= highest_tag; ++tag) {
+            if (sequences[tag].deltas != NULL) {
+                bool hit = false;
+                bool delete = false;
+                if(sequences[tag].period != 0) { // period set
+                    uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
+                    if (offset == sequences[tag].tick) hit = true;
+                } else {
+                    // Test for absolute tick (no period set)
+                    if (sequences[tag].tick == amy_global.sequencer_tick_count) { hit = true; delete = true; }
                 }
-            }
-            if(!deleted) {
-                entry_ll_ptr = &((*entry_ll_ptr)->next); // Update to point to the next field in the preceding list node.
+                if(hit) {
+                    struct delta *d = sequences[tag].deltas;
+                    while(d) {
+                        // assume the d->time is 0 and that's good.
+                        add_delta_to_queue(d, NULL);
+                        d = d->next;
+                    }
+                    // Delete absolute tick addressed sequence entry if sent
+                    if(delete) {
+                        delta_release_list(sequences[tag].deltas);
+                        sequences[tag].deltas = NULL;
+                    }
+                }
             }
         }
         // call the right hook:
@@ -187,9 +213,7 @@ void run_sequencer() {
 
 #endif
 
-void sequencer_init() {
-    amy_global.sequence_entry_ll_start = NULL;
+void sequencer_start() {
     sequencer_recompute();
     run_sequencer();
 }
-

@@ -360,7 +360,7 @@ float midi_note_for_logfreq(float logfreq) {
 
 
 
-void add_delta_to_queue(struct delta *d, void*user_data) {
+void add_delta_to_queue(struct delta *d, void *unused_user_data) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
     amy_grab_lock();
 
@@ -689,6 +689,7 @@ int8_t oscs_init() {
     algo_init();
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
+    sequencer_init(amy_global.config.max_sequencer_tags);
 
     if(pcm_samples) {
         pcm_init();
@@ -787,6 +788,8 @@ void show_debug(uint8_t type) {
             fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
+        fprintf(stderr, "deltas_queue len %d, free len %d\n", delta_list_len(amy_global.delta_queue), delta_num_free());
+        sequencer_debug();
     }
     if(type>1) {
         // print out all the osc data
@@ -1592,7 +1595,7 @@ void deltas_pool_free() {
 }
 
 struct delta *delta_get(struct delta *from) {
-    // fetch the next free delta.
+    // fetch the next free delta, copy in values if a reference is provided.
     struct delta *d = free_deltas_pool;
     if (d == NULL)  {
         fprintf(stderr, "**PANIC: Ran out of deltas.\n");
@@ -1622,4 +1625,22 @@ struct delta *delta_release(struct delta *d) {
     free_deltas_pool = d;
 
     return next_delta;
+}
+
+void delta_release_list(struct delta *d) {
+    // return a delta and all its sequestrae to the pool.
+    while(d)  d = delta_release(d);
+}
+
+int delta_list_len(struct delta *d) {
+    int len = 0;
+    while(d) {
+        ++len;
+        d = d->next;
+    }
+    return len;
+}
+
+int delta_num_free() {
+    return delta_list_len(free_deltas_pool);
 }

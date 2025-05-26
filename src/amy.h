@@ -666,7 +666,7 @@ extern output_sample_type * amy_external_in_block;
 
 int8_t global_init(amy_config_t c);
 void amy_deltas_reset();
-void add_delta_to_queue(struct delta *d, void*user_data);
+void add_delta_to_queue(struct delta *d, void *unused_user_data);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
 void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
 int web_audio_buffer(float *samples, int length);
@@ -880,10 +880,14 @@ extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
 
 // deltas
-void deltas_pool_init(int max_delta_pool_size);
-void deltas_pool_free();
-struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
-struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.
+extern void deltas_pool_init(int max_delta_pool_size);
+extern void deltas_pool_free();
+extern struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
+extern struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.
+extern void delta_release_list(struct delta *d);  // releases a whole list of deltas.
+extern int delta_list_len(struct delta *d);
+extern int delta_num_free();  // The size of the remaining pool.
+
 
 #endif
 

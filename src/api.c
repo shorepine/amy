@@ -192,7 +192,7 @@ void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
     amy_profiles_init();
-    sequencer_init();
+    sequencer_start();
     oscs_init();
     if(amy_global.config.set_default_synth)amy_default_setup();
 }
