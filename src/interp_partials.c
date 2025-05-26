@@ -68,8 +68,6 @@ float _env_lin_of_db(float db) {
 
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
     // We coerce this voice into being a partial, regardless of user wishes.
-    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS}; 
-    ensure_osc_allocd(o, max_num_breakpoints);
     synth[o]->wave = PARTIAL;
     synth[o]->preset = -1;  // Flag that this is an envelope-based partial
     // Setup the specified frequency.
@@ -141,6 +139,16 @@ void interp_partials_note_on(uint16_t osc) {
     //        amy_global.total_blocks*AMY_BLOCK_SIZE, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics,
     //        harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
+    // Make sure enough oscs are alloc'd in our dynamic osc alloc world.
+    // This has to be enough for any note in this map.  Assume num_harmonics[0] is largest (lowest pitch).
+    uint8_t max_num_partials = 0;
+    for (int h = 0; h < partials_voice->num_harmonics[0]; ++h) {
+        if (use_this_partial_map[h]) ++max_num_partials;
+    }
+    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS};
+    for (int o = 0; o < max_num_partials; ++o) {
+        ensure_osc_allocd(osc + 1 + o, max_num_breakpoints);
+    }
     for (int h = 0; h < num_harmonics; ++h) {
         if (use_this_partial_map[h]) {
             for (int i = 0; i < MAX_NUM_MAGNITUDES + 1; ++i)  harm_param[i] = 0;
