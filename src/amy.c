@@ -788,7 +788,7 @@ void show_debug(uint8_t type) {
             fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
-        fprintf(stderr, "deltas_queue len %d, free len %d\n", delta_list_len(amy_global.delta_queue), delta_num_free());
+        fprintf(stderr, "deltas_queue len %" PRIi32 "d, free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
         sequencer_debug();
     }
     if(type>1) {
@@ -1632,8 +1632,8 @@ void delta_release_list(struct delta *d) {
     while(d)  d = delta_release(d);
 }
 
-int delta_list_len(struct delta *d) {
-    int len = 0;
+int32_t delta_list_len(struct delta *d) {
+    int32_t len = 0;
     while(d) {
         ++len;
         d = d->next;
@@ -1641,6 +1641,6 @@ int delta_list_len(struct delta *d) {
     return len;
 }
 
-int delta_num_free() {
+int32_t delta_num_free() {
     return delta_list_len(free_deltas_pool);
 }

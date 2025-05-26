@@ -136,7 +136,7 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     }
     int patch_index = (int)e->patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)memory_patches) {
-        fprintf(stderr, "patch number %d is out of range (%d .. %d)\n",
+        fprintf(stderr, "patch number %d is out of range (%d .. %" PRIu32 ")\n",
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + memory_patches);
         return;
     }
@@ -163,7 +163,7 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s (e->num_vx=%d)\n", patch_index, max_osc, patch_string, e->num_voices);
 }
 
-extern int parse_list_uint16_t(char *message, uint16_t *vals, int max_num_vals, uint16_t skipped_val);
+extern int32_t parse_list_uint16_t(char *message, uint16_t *vals, int32_t max_num_vals, uint16_t skipped_val);
 
 
 // This code was originally in midi.c, but putting it here allows endogenous use of MIDI drums.
@@ -347,7 +347,7 @@ void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, vo
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     e->voices[0] = 0;
     AMY_UNSET(e->patch_number);
-    int instrument = e->synth;
+    int32_t instrument = e->synth;
     AMY_UNSET(e->synth);
     // for each voice, send the event to the base osc (+ e->osc if given)
     for(uint8_t i=0;i<num_voices;i++) {
@@ -361,7 +361,7 @@ void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, vo
     e->synth = instrument;
 }
 
-void release_voice_oscs(int voice) {
+void release_voice_oscs(int32_t voice) {
     if(AMY_IS_SET(voice_to_base_osc[voice])) {
         //fprintf(stderr, "Already set voice %d, removing it\n", voice);
         // Remove the oscs for this old voice
@@ -387,7 +387,7 @@ void patches_load_patch(amy_event *e) {
         // Instrument specified.
         if (AMY_IS_UNSET(e->patch_number)) {
             // If no patch number is provided, pull from existing instrument.
-            int old_patch_number = instrument_get_patch_number(e->synth);
+            int32_t old_patch_number = instrument_get_patch_number(e->synth);
             if (old_patch_number == -1) {
                 fprintf(stderr, "attempting to configure synth %d (%d voices) without patch/patch_number, but no previous patch found\n",
                         e->synth, e->num_voices);
@@ -400,13 +400,13 @@ void patches_load_patch(amy_event *e) {
         num_voices = instrument_get_voices(e->synth, voices);
         if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
             // If we did already have voice oscs, release them.
-            for (int i = 0; i < num_voices; ++i) {
+            for (int32_t i = 0; i < num_voices; ++i) {
                 release_voice_oscs(voices[i]);
             }
             num_voices = 0;
             // Find avaliable voices with a single pass through voice_to_base_osc.
             uint32_t v = 0;
-            for (int i = 0; i < e->num_voices; ++i) {
+            for (int32_t i = 0; i < e->num_voices; ++i) {
                 while (v < amy_global.config.max_voices) {
                     if (AMY_IS_UNSET(voice_to_base_osc[v])) break;
                     ++v;
@@ -448,7 +448,7 @@ void patches_load_patch(amy_event *e) {
     char *message;
     uint16_t patch_osc = 0;
     if(patch_number >= _PATCHES_FIRST_USER_PATCH) {
-        int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
         patch_osc = memory_patch_oscs[patch_index];
         if(patch_osc > 0){
             message = memory_patch[patch_index];

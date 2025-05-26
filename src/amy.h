@@ -885,8 +885,8 @@ extern void deltas_pool_free();
 extern struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
 extern struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.
 extern void delta_release_list(struct delta *d);  // releases a whole list of deltas.
-extern int delta_list_len(struct delta *d);
-extern int delta_num_free();  // The size of the remaining pool.
+extern int32_t delta_list_len(struct delta *d);
+extern int32_t delta_num_free();  // The size of the remaining pool.
 
 
 #endif

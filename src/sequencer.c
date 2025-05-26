@@ -28,14 +28,14 @@ typedef struct sequence_info_t {
 } sequence_info_t;
 
 struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
-int max_sequences = 0;
-int highest_tag = -1;
+int32_t max_sequences = 0;
+int32_t highest_tag = -1;
 
 void sequencer_init(int max_sequencer_tags) {
     max_sequences = max_sequencer_tags;
     sequences = (struct sequence_info_t *)malloc_caps(max_sequences * sizeof(struct sequence_info_t),
                                                       amy_global.config.ram_caps_synth);
-    for (int i = 0; i < max_sequences; ++i) {
+    for (int32_t i = 0; i < max_sequences; ++i) {
         sequences[i].deltas = NULL;
         sequences[i].tick = 0;
         sequences[i].period = 0;
@@ -49,7 +49,7 @@ void sequencer_free() {
 
 void sequencer_reset() {
     // Remove all events
-    for (int i = 0; i < max_sequences; ++i) {
+    for (int32_t i = 0; i < max_sequences; ++i) {
         if (sequences[i].deltas) {
             delta_release_list(sequences[i].deltas);
             sequences[i].deltas = NULL;
@@ -61,10 +61,10 @@ void sequencer_reset() {
 }
 
 void sequencer_debug() {
-    fprintf(stderr, "sequencer: max_sequences %d highest_tag %d\n", max_sequences, highest_tag);
-    for (int tag = 0; tag < max_sequences; ++tag) {
+    fprintf(stderr, "sequencer: max_sequences %" PRIi32" highest_tag %" PRIi32 "\n", max_sequences, highest_tag);
+    for (int32_t tag = 0; tag < max_sequences; ++tag) {
         if (sequences[tag].deltas) {
-            fprintf(stderr, "sequence tag %d tick %d period %d num_deltas %d\n",
+            fprintf(stderr, "sequence tag %" PRIu32" tick %" PRIu32 " period %"PRIu32 " num_deltas %"PRIu32 "\n",
                     tag, sequences[tag].tick, sequences[tag].period, delta_list_len(sequences[tag].deltas));
         }
     }
@@ -86,9 +86,9 @@ uint8_t sequencer_add_event(amy_event *e) {
     // e->sequence is set up.
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], e->sequence[SEQUENCE_TAG]);
-    int tag = e->sequence[SEQUENCE_TAG];
+    int32_t tag = e->sequence[SEQUENCE_TAG];
     if (tag > max_sequences) {
-        fprintf(stderr, "sequencer tag %d (with tick %d, period %d) is greater than or eq max_sequences %d\n",
+        fprintf(stderr, "sequencer tag %" PRIi32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIi32"\n",
                 tag, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], max_sequences);
         // ignore
         return 0;
@@ -117,7 +117,7 @@ void sequencer_check_and_fill() {
     while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
         amy_global.sequencer_tick_count++;
         // Scan through LL looking for matches
-        for (int tag = 0; tag <= highest_tag; ++tag) {
+        for (int32_t tag = 0; tag <= highest_tag; ++tag) {
             if (sequences[tag].deltas != NULL) {
                 bool hit = false;
                 bool delete = false;
