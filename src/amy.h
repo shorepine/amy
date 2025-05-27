@@ -781,7 +781,7 @@ extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern struct delta **queue_for_patch_number(int patch_number);
-extern int update_num_oscs_for_patch_number(int patch_number);
+extern void update_num_oscs_for_patch_number(int patch_number);
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(amy_event *e, char * message);
