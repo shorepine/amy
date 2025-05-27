@@ -707,8 +707,8 @@ function initMemory() {
   if (Module["wasmMemory"]) {
     wasmMemory = Module["wasmMemory"];
   } else {
-    var INITIAL_MEMORY = Module["INITIAL_MEMORY"] || 268435456;
-    assert(INITIAL_MEMORY >= 134217728, "INITIAL_MEMORY should be larger than STACK_SIZE, was " + INITIAL_MEMORY + "! (STACK_SIZE=" + 134217728 + ")");
+    var INITIAL_MEMORY = Module["INITIAL_MEMORY"] || 134217728;
+    assert(INITIAL_MEMORY >= 67108864, "INITIAL_MEMORY should be larger than STACK_SIZE, was " + INITIAL_MEMORY + "! (STACK_SIZE=" + 67108864 + ")");
     /** @suppress {checkTypes} */ wasmMemory = new WebAssembly.Memory({
       "initial": INITIAL_MEMORY / 65536,
       // In theory we should not need to emit the maximum if we want "unlimited"
@@ -1085,7 +1085,7 @@ var handleException = e => {
   checkStackCookie();
   if (e instanceof WebAssembly.RuntimeError) {
     if (_emscripten_stack_get_current() <= 0) {
-      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 134217728)");
+      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 67108864)");
     }
   }
   quit_(1, e);
