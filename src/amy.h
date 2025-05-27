@@ -569,6 +569,7 @@ typedef struct  {
     int8_t i2s_dout;
     int8_t i2s_din;
     int8_t i2s_bclk;
+    int8_t i2s_mclk;
     int8_t midi_out;
     int8_t midi_in;
 
