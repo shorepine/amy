@@ -96,7 +96,7 @@ def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=la
       <P>The Roland Juno-60 included a preset called Piano, which we can now hear with
       <div class="editor mb-4">
 piano_example(base_note=74, volume=10, 
-                init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=7))
+                init_command=lambda: amy.send(time=0, voices='0,1,2', patch_number=7))
       </div>
       <P>(Try changing the base_note or volume or the patch number and running again)</P>
       <P><img src="juno.png"  class="img-fluid"></P>
@@ -104,7 +104,7 @@ piano_example(base_note=74, volume=10,
       <p>The DX7 similarly provides a number of <a href="https://www.synthmania.com/dx7.htm">presets claiming to be pianos</a>, including 135-137 (in our numbering which starts at 128):</p>
       <div class="editor mb-4">
   piano_example(base_note=50, volume=25, 
-                init_command=lambda: amy.send(time=0, voices='0,1,2', load_patch=137))
+                init_command=lambda: amy.send(time=0, voices='0,1,2', patch_number=137))
       </div>
       <P><img src="dx7.png" class="img-fluid"></P>
       <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
@@ -236,14 +236,14 @@ def setup_piano_voice(harms_params, base_osc=0, **kwargs):
         amy.send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
       </div>
 
-      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY (using store_patch) with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
+      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
       <div class="editor mb-4 preload-python">
 patch_string = 'v0w10Zv%dw%dZ' % (NUM_HARMONICS[0] + 1, amy.PARTIAL)
 
 # The lowest note provides an upper-bound on the number of partials we need to allocate.
 def init_piano_voices(num_partials=NUM_HARMONICS[0]):
-    amy.send(store_patch='1024,' + patch_string)
-    amy.send(voices='0,1,2', load_patch=1024)
+    amy.send(patch_number='1024', patch=patch_string)
+    amy.send(voices='0,1,2', patch_number=1024)
     init_piano_voice(num_partials, voices='0,1,2')
     # piano_note_on (below) overwrites these settings before each note,
     # but pre-configure each note to C4.mf so we can experiment.
