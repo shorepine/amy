@@ -132,12 +132,12 @@ struct delta **queue_for_patch_number(int patch_number) {
     return &memory_patch_deltas[patch_index];
 }
 
-int update_num_oscs_for_patch_number(int patch_number) {
+void update_num_oscs_for_patch_number(int patch_number) {
     int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
         fprintf(stderr, "queue for patch number %d is out of range (%d .. %d)\n",
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
-        return 0;
+        return;
     }
     int num_oscs = 0;
     struct delta *d = memory_patch_deltas[patch_index];
@@ -146,7 +146,6 @@ int update_num_oscs_for_patch_number(int patch_number) {
         d = d->next;
     }
     memory_patch_oscs[patch_index] = num_oscs;
-    return memory_patch_oscs[patch_index];
 }
 
 void all_notes_off() {

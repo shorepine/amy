@@ -524,8 +524,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     if (AMY_IS_SET(e->patch_number)) {
         // If this was an event with a patch number, maybe we increased the number of oscs for this patch, update it.
-        int num_oscs = update_num_oscs_for_patch_number(e->patch_number);
-        //fprintf(stderr, "patch %d max oscs %d\n", e->patch_number, num_oscs);
+        update_num_oscs_for_patch_number(e->patch_number);
     }
 
 
