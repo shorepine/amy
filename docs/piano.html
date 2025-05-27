@@ -40,6 +40,8 @@
 
     <script type="module">      
       mp = await loadMicroPython({
+        pystack: 64 * 1024, 
+        heapsize: 8 * 1024 * 1024,
         stdout:(line) => { console.log(line) }, 
         linebuffer: true,
       });
