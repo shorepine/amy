@@ -2771,6 +2771,8 @@ var _amy_set_external_input_buffer = Module["_amy_set_external_input_buffer"] = 
 
 var _amy_start_web = Module["_amy_start_web"] = createExportWrapper("amy_start_web", 0);
 
+var _amy_start_web_no_synths = Module["_amy_start_web_no_synths"] = createExportWrapper("amy_start_web_no_synths", 0);
+
 var _fflush = createExportWrapper("fflush", 1);
 
 var _emscripten_stack_get_end = () => (_emscripten_stack_get_end = wasmExports["emscripten_stack_get_end"])();
