@@ -814,6 +814,15 @@ class TestPatchFromEvents(AmyTest):
     amy.send(time=800, synth=0, vel=0)
 
 
+class TestBreakpointsRealloc(AmyTest):
+  """A default osc has only 8 breakpoints, but it should realloc to 24 if you try to set a long bpset."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SINE, bp0='100,1,100,0,100,1,100,0,100,1,100,0,100,1,100,0')
+    amy.send(time=100, osc=0, note=60, vel=1)
+    amy.send(time=900, osc=0, vel=0)
+
+
 
 def main(argv):
   if len(argv) > 1:
