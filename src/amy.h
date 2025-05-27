@@ -730,6 +730,7 @@ extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 
 #ifdef __EMSCRIPTEN__
 void amy_start_web();
+void amy_start_web_no_synths();
 #endif
 
 

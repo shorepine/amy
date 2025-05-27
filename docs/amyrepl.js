@@ -25,6 +25,9 @@ amyModule().then(async function(am) {
   amy_start_web = am.cwrap(
     'amy_start_web', null, null
   );
+  amy_start_web_no_synths = am.cwrap(
+    'amy_start_web_no_synths', null, null
+  );
   amy_add_message = am.cwrap(
     'amy_add_message', null, ['string']
   );
@@ -46,7 +49,7 @@ amyModule().then(async function(am) {
   amy_process_single_midi_byte = am.cwrap(
     'amy_process_single_midi_byte', null, ['number, number']
   );
-  amy_start_web();
+  amy_start_web_no_synths();
   amy_module = am;
 });
 
