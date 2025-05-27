@@ -108,7 +108,7 @@ void patches_debug() {
     }
     for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
-            fprintf(stderr, "memory_patch %d oscs %d #deltas %d patch %s\n",
+            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32" patch %s\n",
                     i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
@@ -528,7 +528,7 @@ void patches_load_patch(amy_event *e) {
             message = memory_patch[patch_index];
             deltas = memory_patch_deltas[patch_index];
         } else {
-            fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %d (synth %d num_voices %d), ignored\n",
+            fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
                     patch_number, patch_osc, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
             return;
         }
