@@ -139,13 +139,13 @@ int update_num_oscs_for_patch_number(int patch_number) {
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
         return 0;
     }
-    uint16_t max_osc = 0;
+    int num_oscs = 0;
     struct delta *d = memory_patch_deltas[patch_index];
     while(d) {
-        if (d->osc > max_osc)  max_osc = d->osc;
+        if (d->osc >= num_oscs)  num_oscs = d->osc + 1;
         d = d->next;
     }
-    memory_patch_oscs[patch_index] = max_osc + 1;
+    memory_patch_oscs[patch_index] = num_oscs;
     return memory_patch_oscs[patch_index];
 }
 
@@ -165,6 +165,9 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     while(d) {
         d_offset = *d;
         d_offset.osc += base_osc;
+        if (d_offset.param == CHAINED_OSC || d_offset.param == MOD_SOURCE || d_offset.param == RESET_OSC
+            || (d_offset.param >= ALGO_SOURCE_START && d_offset.param < ALGO_SOURCE_START + MAX_ALGO_OPS))
+            d_offset.data.i += base_osc;
         d_offset.time = time;
         // assume the d->time is 0 and that's good.
         add_delta_to_queue(&d_offset, &amy_global.delta_queue);
@@ -526,8 +529,9 @@ void patches_load_patch(amy_event *e) {
             message = memory_patch[patch_index];
             deltas = memory_patch_deltas[patch_index];
         } else {
-            num_voices = 0; // don't do anything
-            message = empty;
+            fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %d (synth %d num_voices %d), ignored\n",
+                    patch_number, patch_osc, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
+            return;
         }
     } else {
         message = (char*)patch_commands[patch_number];

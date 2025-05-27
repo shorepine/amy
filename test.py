@@ -797,6 +797,22 @@ class TestSustainPedal(AmyTest):
     amy.send(time=900, synth=1, note=72, vel=0)
 
 
+class TestPatchFromEvents(AmyTest):
+  """Test defining a patch from events with patch_number."""
+  def __init__(self):
+    super().__init__()
+    self.config_default = True   # So that the patch space is already partly populated.
+
+  def run(self):
+    amy.send(time=0, patch_number=1039, reset=amy.RESET_PATCH)
+    amy.send(time=0, patch_number=1039, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
+    amy.send(time=0, patch_number=1039, osc=1, wave=amy.SINE, freq=131, bp0='0,1,500,0,200,0')
+    amy.send(time=0, synth=0, num_voices=4, patch_number=1039)
+    amy.send(time=100, synth=0, note=60, vel=1)
+    amy.send(time=300, synth=0, note=64, vel=1)
+    amy.send(time=500, synth=0, note=67, vel=1)
+    amy.send(time=800, synth=0, vel=0)
+
 
 
 def main(argv):
@@ -829,7 +845,8 @@ def main(argv):
     #TestBYOPNoteOff().test()
     #TestInterpPartials().test()
     #TestVoiceStealing().test()
-    TestSustainPedal().test()
+    #TestSustainPedal().test()
+    TestPatchFromEvents().test()
 
   amy.send(debug=0)
   print("tests done.")

@@ -22,3 +22,4 @@ void example_synth_chord(uint32_t start, uint16_t patch);
 void example_sustain_pedal(uint32_t start, uint16_t patch);
 void example_voice_alloc();
 void example_reset(uint32_t start);
+void example_patch_from_events();

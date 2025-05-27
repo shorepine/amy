@@ -130,8 +130,9 @@ void instrument_debug(struct instrument_info *instrument) {
 
 struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
-    if (num_voices > MAX_VOICES_PER_INSTRUMENT) {
-        fprintf(stderr, "num_voices %d > MAX_VOICES_PER_INSTRUMENT %d\n", num_voices, MAX_VOICES_PER_INSTRUMENT);
+    if (num_voices <= 0 || num_voices > MAX_VOICES_PER_INSTRUMENT) {
+        fprintf(stderr, "num_voices %d not within 1 .. MAX_VOICES_PER_INSTRUMENT %d\n", num_voices, MAX_VOICES_PER_INSTRUMENT);
+        abort();
         return NULL;
     }
     instrument->num_voices = num_voices;

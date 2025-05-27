@@ -874,6 +874,7 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     // Check to see if chaining this osc would cause a loop.
     uint16_t next_osc = chained_osc;
     do {
+        ensure_osc_allocd(chained_osc, NULL);
         if (next_osc == osc) {
             fprintf(stderr, "chaining osc %d to osc %d would cause loop.\n",
                     chained_osc, osc);
@@ -1414,6 +1415,10 @@ void amy_process_event(amy_event *e) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
         e->status = EVENT_SEQUENCE;
+    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
+        // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
+        patches_reset_patch(e->patch_number);
+        AMY_UNSET(e->reset_osc);
     } else {
         // if time is set, play then
         // if time and latency is set, play in time + latency
@@ -1558,7 +1563,7 @@ void amy_default_setup() {
     // store memory patch 1024 sine wave
     amy_event e = amy_default_event();
     e.patch_number = 1024;
-    patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
+    patches_store_patch(&e, "v0w0");  // Just osc=0 sinewave to have one delta, else the number of oscs is zero = no patch.
     e.num_voices = 1;
     e.synth = 16;
     amy_add_event(&e);

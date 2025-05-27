@@ -588,3 +588,64 @@ void example_custom_beep() {
     amy_add_event(&e);
 }
 
+void example_patch_from_events() {
+    int time = amy_sysclock();
+    int number = 1039;
+    amy_event e = amy_default_event();
+    e.time = time;
+    e.patch_number = number;
+    e.reset_osc = RESET_PATCH;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time;
+    e.patch_number = number;
+    e.osc = 0;
+    e.wave = SAW_DOWN;
+    e.chained_osc = 1;
+    strcpy(e.bp0, "0,1,1000,0.1,200,0");
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time;
+    e.patch_number = number;
+    e.osc = 1;
+    e.wave = SINE;
+    e.freq_coefs[COEF_CONST] = 131.0f;
+    strcpy(e.bp0, "0,1,500,0,200,0");
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time;
+    e.synth = 0;
+    e.num_voices = 4;
+    e.patch_number = number;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time + 100;
+    e.synth = 0;
+    e.midi_note = 60.0f;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time + 300;
+    e.synth = 0;
+    e.midi_note = 64.0f;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time + 500;
+    e.synth = 0;
+    e.midi_note = 67.0f;
+    e.velocity = 1.0f;
+    amy_add_event(&e);
+
+    e = amy_default_event();
+    e.time = time + 800;
+    e.synth = 0;
+    e.velocity = 0.0f;
+    amy_add_event(&e);
+}
