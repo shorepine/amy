@@ -131,6 +131,8 @@ extern const uint16_t pcm_samples;
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define AMY_BYTES_PER_SAMPLE 2
+// We need some fixed vectors of per-instrument vectors.
+#define MAX_VOICES_PER_INSTRUMENT 32
 
 // Constants for filters.c, needed for synth structure.
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
@@ -222,6 +224,7 @@ enum coefs{
 #define RESET_EVENTS 65536
 #define RESET_ALL_NOTES 131072
 #define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
+#define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
 
 #define true 1
 #define false 0
@@ -555,7 +558,11 @@ typedef struct  {
     uint16_t max_oscs;
     uint8_t cores;
     uint8_t ks_oscs;
-    uint32_t delta_fifo_len;
+    uint32_t max_sequencer_tags;
+    uint32_t max_voices;
+    uint32_t max_synths;
+    uint32_t max_memory_patches;
+    uint32_t num_deltas;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -613,8 +620,7 @@ struct state {
     SAMPLE hpf_state;
     SAMPLE eq[3];
     uint16_t delta_qsize;
-    int16_t next_delta_write;
-    struct delta * delta_start; // start of the sorted list
+    struct delta * delta_queue; // start of the sorted queue of deltas to execute.
     int16_t latency_ms;
     float tempo;
     uint32_t total_blocks;
@@ -661,9 +667,9 @@ extern output_sample_type * amy_external_in_block;
 
 int8_t global_init(amy_config_t c);
 void amy_deltas_reset();
-void add_delta_to_queue(struct delta *d, void*user_data);
+void add_delta_to_queue(struct delta *d, struct delta **queue);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
-void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data );
+void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue);
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void print_osc_debug(int i /* osc */, bool show_eg);
@@ -691,7 +697,7 @@ int8_t oscs_init();
 void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
 void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
-void patches_init();
+void patches_init(int max_memory_patches);
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algorithm_source(struct synthinfo * e, char* message) ;
 void hold_and_modify(uint16_t osc) ;
@@ -771,15 +777,19 @@ extern void interp_partials_note_on(uint16_t osc);
 extern void interp_partials_note_off(uint16_t osc);
 extern int interp_partials_max_partials_for_patch(int interp_partials_patch_number);
 extern void patches_load_patch(amy_event *e); 
-extern void patches_event_has_voices(amy_event *e, void (*callback)(struct delta *d, void*user_data), void*user_data );
+extern void patches_event_has_voices(amy_event *e, struct delta **queue);
+extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
+extern struct delta **queue_for_patch_number(int patch_number);
+extern int update_num_oscs_for_patch_number(int patch_number);
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
-extern void instruments_init();
+extern void instruments_init(int num_instruments);
+extern void instruments_free();
 extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
 extern void instrument_release(int instrument_number);
@@ -872,6 +882,15 @@ extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sa
 extern SAMPLE compute_mod_scale(uint16_t osc);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
+
+// deltas
+extern void deltas_pool_init(int max_delta_pool_size);
+extern void deltas_pool_free();
+extern struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
+extern struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.
+extern void delta_release_list(struct delta *d);  // releases a whole list of deltas.
+extern int32_t delta_list_len(struct delta *d);
+extern int32_t delta_num_free();  // The size of the remaining pool.
 
 
 #endif

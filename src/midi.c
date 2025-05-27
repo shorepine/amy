@@ -130,12 +130,10 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
     // Update web MIDI out hook if set
     #ifdef __EMSCRIPTEN__
-    // TODO - send bytes like the audio callback hook does
-    EM_ASM({
+    EM_ASM(
         if(typeof amy_external_midi_input_js_hook === 'function') {
-            amy_external_midi_input_js_hook();
-        }
-    });
+            amy_external_midi_input_js_hook(HEAPU8.subarray($0, $0+$1), $1, $2);
+        }, data, len, sysex);
     #endif
 }
 

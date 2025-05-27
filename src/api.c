@@ -29,7 +29,6 @@ amy_config_t amy_default_config() {
     c.has_partials = 1;
     c.has_custom = 1;
     c.ks_oscs = 1;
-    c.delta_fifo_len = 2400;
     c.has_audio_in = 1;
     c.has_midi_uart = 0;
     c.has_midi_web = 0;
@@ -37,6 +36,11 @@ amy_config_t amy_default_config() {
     c.set_default_synth = 1;
     c.cores = 1;
     c.max_oscs = 180;
+    c.max_sequencer_tags = 256;
+    c.max_voices = 64;
+    c.max_synths = 64;
+    c.num_deltas = 4096;
+    c.max_memory_patches = 32;
 
     // caps
     #if (defined TULIP) || (defined AMYBOARD)
@@ -164,7 +168,7 @@ void amy_add_event(amy_event *e) {
     amy_process_event(e);
     // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
     if(e->status == EVENT_SCHEDULED) {
-   	    amy_event_to_deltas_then(e, 0, add_delta_to_queue, NULL);
+        amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
 
@@ -188,7 +192,7 @@ void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
     amy_profiles_init();
-    sequencer_init();
+    sequencer_start();
     oscs_init();
     if(amy_global.config.set_default_synth)amy_default_setup();
 }

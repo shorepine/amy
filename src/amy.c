@@ -289,8 +289,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
 
 int8_t global_init(amy_config_t c) {
     amy_global.config = c;
-    amy_global.next_delta_write = 0;
-    amy_global.delta_start = NULL;
+    amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;
     amy_global.pitch_bend = 0;
@@ -361,47 +360,32 @@ float midi_note_for_logfreq(float logfreq) {
 
 
 
-void add_delta_to_queue(struct delta *d, void*user_data) {
+void add_delta_to_queue(struct delta *d, struct delta **queue) {
     AMY_PROFILE_START(ADD_DELTA_TO_QUEUE)
     amy_grab_lock();
 
-    if(amy_global.delta_qsize < AMY_DELTA_FIFO_LEN) {
-        // scan through the memory to find a free slot, starting at write pointer
-        uint16_t write_location = amy_global.next_delta_write;
-        int16_t found = -1;
-        // guaranteed to find eventually if qsize stays accurate
-        while(found<0) {
-            if(deltas[write_location].time == UINT32_MAX) found = write_location;
-            write_location = (write_location + 1) % AMY_DELTA_FIFO_LEN;
-        }
-        // found a mem location. copy the data in and update the write pointers.
-        deltas[found].time = d->time;
-        deltas[found].osc = d->osc;
-        deltas[found].param = d->param;
-        deltas[found].data.i = d->data.i;  // Copying uint32_t of union will copy float value if that's where it is.
-        amy_global.next_delta_write = write_location;
+    // hack.  Update the (decorative) global queue size if we're adding to the global queue.
+    if (queue == &amy_global.delta_queue)
         amy_global.delta_qsize++;
 
-        // now insert it into the sorted list for fast playback
-        struct delta **pptr = &amy_global.delta_start;
-        while(d->time >= (*pptr)->time)
-            pptr = &(*pptr)->next;
-        deltas[found].next = *pptr;
-        *pptr = &deltas[found];
-    } else {
-        // if there's no room in the queue, just skip the message
-        // todo -- report this somehow?
-        fprintf(stderr, "AMY queue is full\n");
-    }
+    struct delta *new_d = delta_get(d);
+
+    // insert it into the sorted list for fast playback
+    struct delta **pptr = queue;
+    while(*pptr && d->time >= (*pptr)->time)
+        pptr = &(*pptr)->next;
+    new_d->next = *pptr;
+    *pptr = new_d;
+
     amy_release_lock();
     AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
 
 }
 
-#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; callback(&d, user_data); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); callback(&d, user_data);}
-#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); callback(&d, user_data);}
+#define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
+#define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+#define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
         EVENT_TO_DELTA_F(FIELD[i], FLAG + i)
@@ -414,12 +398,12 @@ void add_delta_to_queue(struct delta *d, void*user_data) {
                 d.data.f = logfreq_of_freq(e->FIELD[i]);  \
             else \
                 d.data.f = e->FIELD[i]; \
-            callback(&d, user_data); \
+            add_delta_to_queue(&d, queue); \
         }    \
     }
 
 // Add a API facing event, convert into delta directly
-void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(struct delta *d, void*user_data), void*user_data ) {
+void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
@@ -442,8 +426,15 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
             amy_execute_deltas();
             patches_load_patch(e);
         }
-        patches_event_has_voices(e, callback, user_data);
+        patches_event_has_voices(e, queue);
         goto end;
+    }
+
+    // Is this, in fact, a non-load_patch or store_patch event that has patch_number set?
+    // If so, add the event to the stored patch queue, not the execution queue.
+    if (AMY_IS_SET(e->patch_number)) {
+        queue = queue_for_patch_number(e->patch_number);
+        //fprintf(stderr, "event added to patch %d: osc %d wave %d...\n", e->patch_number, e->osc, e->wave);
     }
 
     // Everything else only added to queue if set
@@ -487,7 +478,7 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
                 d.data.i = t.algo_source[i];
             }
             ensure_osc_allocd(d.data.i, NULL);
-            callback(&d, user_data); 
+            add_delta_to_queue(&d, queue);
         }
     }
 
@@ -510,19 +501,19 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
                     d.param = BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2);
                     d.data.i = t.breakpoint_times[i][j];
-                    callback(&d, user_data);
+                    add_delta_to_queue(&d, queue);
                 }
                 if(AMY_IS_SET(t.breakpoint_values[i][j])) {
                     d.param = BP_START + (j * 2 + 1) + (i * MAX_BREAKPOINTS * 2);
                     d.data.f = t.breakpoint_values[i][j];
-                    callback(&d, user_data);
+                    add_delta_to_queue(&d, queue);
                 }
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
                 d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
                 d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
-                callback(&d, user_data);
+                add_delta_to_queue(&d, queue);
             }
         }
     }
@@ -530,6 +521,14 @@ void amy_event_to_deltas_then(amy_event *e, uint16_t base_osc, void (*callback)(
     // add this last -- this is a trigger, that if sent alongside osc setup parameters, you want to run after those
 
     EVENT_TO_DELTA_F(velocity, VELOCITY)
+
+    if (AMY_IS_SET(e->patch_number)) {
+        // If this was an event with a patch number, maybe we increased the number of oscs for this patch, update it.
+        int num_oscs = update_num_oscs_for_patch_number(e->patch_number);
+        //fprintf(stderr, "patch %d max oscs %d\n", e->patch_number, num_oscs);
+    }
+
+
 end:
     AMY_PROFILE_STOP(AMY_ADD_DELTA);
 
@@ -639,24 +638,9 @@ void amy_reset_oscs() {
 
 
 void amy_deltas_reset() {
-    // make a fencepost last delta with no next, time of end-1, and call it start for now, all other deltas get inserted before it
-    deltas[0].next = NULL;
-    deltas[0].time = UINT32_MAX - 1;
-    deltas[0].osc = 0;
-    deltas[0].data.i = 0;
-    deltas[0].param = NO_PARAM;
-    amy_global.next_delta_write = 1;
-    amy_global.delta_start = &deltas[0];
-    amy_global.delta_qsize = 1;
-
-    // set all the other deltas to empty
-    for(uint16_t i=1;i<AMY_DELTA_FIFO_LEN;i++) {
-        deltas[i].time = UINT32_MAX;
-        deltas[i].next = NULL;
-        deltas[i].osc = 0;
-        deltas[i].data.i = 0;
-        deltas[i].param = NO_PARAM;
-    }
+    delta_release_list(amy_global.delta_queue);
+    amy_global.delta_queue = NULL;
+    amy_global.delta_qsize = 0;
 }
 
 void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
@@ -716,8 +700,9 @@ int8_t oscs_init() {
         ks_init();
     filters_init();
     algo_init();
-    patches_init();
-    instruments_init();
+    patches_init(amy_global.config.max_memory_patches);
+    instruments_init(amy_global.config.max_synths);
+    sequencer_init(amy_global.config.max_sequencer_tags);
 
     if(pcm_samples) {
         pcm_init();
@@ -725,7 +710,6 @@ int8_t oscs_init() {
     if(amy_global.config.has_custom) {
         custom_init();
     }
-    deltas = (struct delta*)malloc_caps(sizeof(struct delta) * AMY_DELTA_FIFO_LEN, amy_global.config.ram_caps_events);
     // synth and msynth are now pointers to arrays of pointers to dynamically-allocated synth structures.
     synth = (struct synthinfo **) malloc_caps(sizeof(struct synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     bzero(synth, sizeof(struct synthinfo *) * (AMY_OSCS+1));
@@ -736,6 +720,7 @@ int8_t oscs_init() {
     // set all oscillators to their default values
     amy_reset_oscs();
     // reset the deltas queue
+    deltas_pool_init(amy_global.config.num_deltas);
     amy_deltas_reset();
 
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
@@ -809,13 +794,15 @@ void show_debug(uint8_t type) {
     esp_show_debug();
     #endif
     if(type>0) {
-        struct delta * ptr = amy_global.delta_start;
+        struct delta * ptr = amy_global.delta_queue;
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
             fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
+        fprintf(stderr, "deltas_queue len %" PRIi32 ", free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
+        sequencer_debug();
     }
     if(type>1) {
         // print out all the osc data
@@ -887,6 +874,7 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     // Check to see if chaining this osc would cause a loop.
     uint16_t next_osc = chained_osc;
     do {
+        ensure_osc_allocd(chained_osc, NULL);
         if (next_osc == osc) {
             fprintf(stderr, "chaining osc %d to osc %d would cause loop.\n",
                     chained_osc, osc);
@@ -980,18 +968,22 @@ void play_delta(struct delta *d) {
     }
     if(d->param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
-        if(d->data.i & RESET_ALL_OSCS) { 
-            amy_reset_oscs(); 
+        if(d->data.i & RESET_ALL_OSCS) {
+            amy_reset_oscs();
         }
-        if(d->data.i & RESET_SEQUENCER) { 
-            sequencer_reset(); 
+        if(d->data.i & RESET_SEQUENCER) {
+            sequencer_reset();
         }
-        if(d->data.i & RESET_ALL_NOTES) { 
-            all_notes_off(); 
+        if(d->data.i & RESET_ALL_NOTES) {
+            all_notes_off();
         }
-        if(d->data.i < AMY_OSCS+1) { 
+        if(d->data.i & RESET_PATCH) {
+            // If we got here, it's a full reset of patches.
+            patches_reset();
+        }
+        if(d->data.i < AMY_OSCS+1) {
             reset_osc(d->data.i);
-        } 
+        }
     }
     if(d->param == MOD_SOURCE) {
         uint16_t mod_osc = d->data.i;
@@ -1378,17 +1370,13 @@ void amy_execute_deltas() {
     amy_grab_lock();
 
     // find any deltas that need to be played from the (in-order) queue
-    struct delta *delta_start = amy_global.delta_start;
-    if (amy_global.delta_qsize > 1 && delta_start->time == UINT32_MAX) {
-        fprintf(stderr, "WARN: time=UINT32_MAX found at qsize=%d\n", amy_global.delta_qsize);
-    }
-    while(sysclock >= delta_start->time) {
-        play_delta(delta_start);
-        delta_start->time = UINT32_MAX;
+    struct delta *d = amy_global.delta_queue;
+    while(d && sysclock >= d->time) {
+        play_delta(d);
+        d = delta_release(d);
         amy_global.delta_qsize--;
-        delta_start = delta_start->next;
     }
-    amy_global.delta_start = delta_start;
+    amy_global.delta_queue = d;
 
     amy_release_lock();
 
@@ -1427,6 +1415,10 @@ void amy_process_event(amy_event *e) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
         e->status = EVENT_SEQUENCE;
+    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
+        // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
+        patches_reset_patch(e->patch_number);
+        AMY_UNSET(e->reset_osc);
     } else {
         // if time is set, play then
         // if time and latency is set, play in time + latency
@@ -1571,7 +1563,7 @@ void amy_default_setup() {
     // store memory patch 1024 sine wave
     amy_event e = amy_default_event();
     e.patch_number = 1024;
-    patches_store_patch(&e, "v0");  // Just osc=0 to have something; sinewave is the default state.
+    patches_store_patch(&e, "v0w0");  // Just osc=0 sinewave to have one delta, else the number of oscs is zero = no patch.
     e.num_voices = 1;
     e.synth = 16;
     amy_add_event(&e);
@@ -1599,3 +1591,78 @@ void amy_default_setup() {
     amy_add_event(&e);
 }
 
+/// Delta pool management
+
+struct delta *free_deltas_pool = NULL;
+
+void deltas_pool_init(int max_delta_pool_size) {
+    free_deltas_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
+                                             amy_global.config.ram_caps_synth);
+    struct delta *d = free_deltas_pool;
+    // Link all the deltas together
+    for (int i = 1; i < max_delta_pool_size; ++i) {
+        d->next = d + 1;
+        d->osc = 0;
+        d->data.i = 0;
+        d->param = NO_PARAM;
+        d->time = UINT32_MAX - 1;
+        d = d->next;
+    }
+    d->next = NULL;  // end of the chain
+}
+
+void deltas_pool_free() {
+    free(free_deltas_pool);
+    free_deltas_pool = NULL;
+}
+
+struct delta *delta_get(struct delta *from) {
+    // fetch the next free delta, copy in values if a reference is provided.
+    struct delta *d = free_deltas_pool;
+    if (d == NULL)  {
+        fprintf(stderr, "**PANIC: Ran out of deltas.\n");
+        abort();
+    }
+    free_deltas_pool = d->next;
+    if (from != NULL) {
+        d->data.i = from->data.i;
+        d->param = from->param;
+        d->time = from->time;
+        d->osc = from->osc;
+        // don't copy from->next
+    }
+    d->next = NULL;
+    return d;
+}
+
+struct delta *delta_release(struct delta *d) {
+    // return a delta to the pool.  Returns the next value, for ease closing up
+    struct delta *next_delta = d->next;
+    d->next = free_deltas_pool;
+    d->osc = 0;
+    d->data.i = 0;
+    d->param = NO_PARAM;
+    d->time = UINT32_MAX - 1;
+
+    free_deltas_pool = d;
+
+    return next_delta;
+}
+
+void delta_release_list(struct delta *d) {
+    // return a delta and all its sequestrae to the pool.
+    while(d)  d = delta_release(d);
+}
+
+int32_t delta_list_len(struct delta *d) {
+    int32_t len = 0;
+    while(d) {
+        ++len;
+        d = d->next;
+    }
+    return len;
+}
+
+int32_t delta_num_free() {
+    return delta_list_len(free_deltas_pool);
+}
