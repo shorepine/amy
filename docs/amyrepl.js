@@ -1,31 +1,54 @@
 // amyrepl.js
 var amy_add_message = null;
-var amy_live_start = null;
 var amy_reset_sysclock = null
 var amy_module = null;
 var everything_started = false;
 var mp = null;
 var editors = [];
 var run_at_starts = [];
+var amy_live_start_web = null;
+var audio_started = false;
+var amy_sysclock = null;
+var amy_module = null;
 
-// Once AMY module is loaded, do...
+// Once AMY module is loaded, register its functions and start AMY (not yet audio, you need to click for that)
 amyModule().then(async function(am) {
-  amy_module = am;
-  amy_live_start = amy_module.cwrap(
-    'amy_live_start', null, null, {async: true}    
+  amy_live_start_web = am.cwrap(
+    'amy_live_start_web', null, null, {async: true}    
   );
-  amy_start = amy_module.cwrap(
-    'amy_start', null, ['number', 'number', 'number', 'number']
+  amy_live_start_web_audioin = am.cwrap(
+    'amy_live_start_web_audioin', null, null, {async: true}    
   );
-  amy_add_message = amy_module.cwrap(
-    'amy_add_message', null, ['string'], {async: true} 
+  amy_live_stop = am.cwrap(
+    'amy_live_stop', null,  null, {async: true}    
   );
-  amy_reset_sysclock = amy_module.cwrap(
+  amy_start_web = am.cwrap(
+    'amy_start_web', null, null
+  );
+  amy_add_message = am.cwrap(
+    'amy_add_message', null, ['string']
+  );
+  amy_reset_sysclock = am.cwrap(
     'amy_reset_sysclock', null, null
   );
-  amy_start(1,1,1,1);
+  amy_ticks = am.cwrap(
+    'sequencer_ticks', 'number', [null]
+  );
+  amy_sysclock = am.cwrap(
+    'amy_sysclock', 'number', [null]
+  );
+//  amy_get_input_buffer = am.cwrap(
+//    'amy_get_input_buffer', null, ['number']
+//  );
+//  amy_set_input_buffer = am.cwrap(
+//    'amy_set_external_input_buffer', null, ['number']
+//  );
+  amy_process_single_midi_byte = am.cwrap(
+    'amy_process_single_midi_byte', null, ['number, number']
+  );
+  amy_start_web();
+  amy_module = am;
 });
-
 
 async function start_python() {
   // Let micropython call an exported AMY function
@@ -51,7 +74,7 @@ async function start_python_and_audio() {
   // Don't run this twice
   if(everything_started) return;
   // Start the audio worklet (miniaudio)
-  await amy_live_start();
+  await amy_live_start_web();
   await start_python();
   // Wait 200ms on first run only before playing amy commands back to avoid clicks
   await new Promise((r) => setTimeout(r, 200));
