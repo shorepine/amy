@@ -484,13 +484,10 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
 
     char * bps[MAX_BREAKPOINT_SETS] = {e->bp0, e->bp1};
-    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {DEFAULT_NUM_BREAKPOINTS, DEFAULT_NUM_BREAKPOINTS};
-    bool has_breakpoints = false;
     for (uint8_t i = 0; i < MAX_BREAKPOINT_SETS; i++) {
         // amy_parse_message sets bp_is_set for anything including an empty string,
         // but direct calls to amy_add_event can just put a nonempty string into bp0/1.
         if(AMY_IS_SET(e->bp_is_set[i]) || bps[i][0] != 0) {
-            has_breakpoints = true;
             // TODO(dpwe): Modify parse_breakpoints *not* to need an entire synthinfo, but to work with
             // vectors of breakpoint times/values.
             struct synthinfo t;
@@ -500,7 +497,6 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             t.breakpoint_times[i] = (uint32_t *)&breakpoint_times;
             t.breakpoint_values[i] = (float *)&breakpoint_values;
             int num_bps = parse_breakpoint(&t, bps[i], i);
-            if (num_bps + 1 > max_num_breakpoints[i]) max_num_breakpoints[i] = num_bps + 1;  // We need one more .. not sure why.
             for(uint8_t j = 0; j < num_bps; j++) {
                 if(AMY_IS_SET(t.breakpoint_times[i][j])) {
                     d.param = BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2);
@@ -519,22 +515,6 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
                 d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
                 add_delta_to_queue(&d, queue);
             }
-        }
-    }
-    if (has_breakpoints && AMY_IS_SET(e->osc)) {
-        bool need_realloc = true;
-        if (synth[e->osc] != NULL) {
-            need_realloc = false;
-            for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
-                if (max_num_breakpoints[i] > synth[e->osc]->max_num_breakpoints[i]) {
-                    need_realloc = true;
-                    break;
-                }
-            }
-        }
-        if (need_realloc) {
-            // Special-case realloc of breakpoints if it exceeds the current number.
-            ensure_osc_allocd(e->osc, max_num_breakpoints);
         }
     }
 
@@ -700,9 +680,15 @@ void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
     if (synth[osc] == NULL) alloc_osc(osc, max_num_breakpoints);
     else if (max_num_breakpoints) {
         bool realloc_needed = false;
+        uint8_t new_max_num_breakpoints[MAX_BREAKPOINT_SETS];
         for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
-            if (synth[osc]->max_num_breakpoints[i] < max_num_breakpoints[i])
+            new_max_num_breakpoints[i] = DEFAULT_NUM_BREAKPOINTS;
+            if (synth[osc]->max_num_breakpoints[i] < max_num_breakpoints[i]) {
                 realloc_needed = true;
+                // Increase num_breakpoints in blocks of DEFAULT_NUM_BREAKPOINTS.
+                new_max_num_breakpoints[i] = MIN(MAX_BREAKPOINTS,
+                                                 DEFAULT_NUM_BREAKPOINTS * ((max_num_breakpoints[i] + DEFAULT_NUM_BREAKPOINTS - 1) / DEFAULT_NUM_BREAKPOINTS));
+            }
         }
         if (realloc_needed) {
             //fprintf(stderr, "realloc for osc %d (breakpoints %d, %d -> %d, %d (wave=%d)\n", osc, synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1], max_num_breakpoints[0], max_num_breakpoints[1], synth[osc]->wave);
@@ -720,7 +706,7 @@ void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
             }
             // Reallocate the structure.
             free_osc(osc);
-            alloc_osc(osc, max_num_breakpoints);
+            alloc_osc(osc, new_max_num_breakpoints);
             // Save the pointers to the newly-alloc'd vectors.
             uint32_t *saved_breakpoint_times[MAX_BREAKPOINT_SETS];
             float *saved_breakpoint_values[MAX_BREAKPOINT_SETS];
@@ -1000,13 +986,22 @@ void play_delta(struct delta *d) {
         uint8_t pos = d->param - BP_START;
         uint8_t bp_set = 0;
         while(pos >= (MAX_BREAKPOINTS * 2)) { ++bp_set; pos -= (MAX_BREAKPOINTS * 2); }
+        int bp_index = pos / 2;
+        if (bp_index + 1 > synth[d->osc]->max_num_breakpoints[bp_set]) {
+            uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];
+            for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i)
+                max_num_breakpoints[i] = synth[d->osc]->max_num_breakpoints[i];
+            max_num_breakpoints[bp_set] = bp_index + 1;
+            // realloc rounds up in blocks of DEFAULT_NUM_BREAKPOINTS (8).
+            ensure_osc_allocd(d->osc, max_num_breakpoints);
+        }
         if(pos % 2 == 0) {
             synth[d->osc]->breakpoint_times[bp_set][pos / 2] = d->data.i;
         } else {
             synth[d->osc]->breakpoint_values[bp_set][(pos-1) / 2] = d->data.f;
         }
-        //trig=1;
     }
+
     if (PARAM_IS_COMBO_COEF(d->param, AMP) ||
         PARAM_IS_BP_COEF(d->param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
