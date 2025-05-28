@@ -68,6 +68,7 @@ amy_config_t amy_default_config() {
     c.i2s_dout = -1;
     c.i2s_din = -1;
     c.i2s_bclk = -1;
+    c.i2s_mclk = -1;
     c.midi_out = -1;
     c.midi_in = -1;
     return c;
