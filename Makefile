@@ -1,6 +1,6 @@
 # Makefile for libamy , including an example
 
-TARGET = amy-example amy-message
+TARGET = amy-example amy-message amy-piano
 LIBS = -lpthread  -lm 
 
 UNAME_S := $(shell uname -s)
@@ -29,17 +29,16 @@ CFLAGS += -g -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-
 CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 \
--DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1 -sASYNCIFY -sASSERTIONS \
--s ASYNCIFY_STACK_SIZE=128000 \
--s INITIAL_MEMORY=256mb \
--s TOTAL_STACK=128mb \
--s ALLOW_MEMORY_GROWTH=1 \
+-DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1  \
+-sSTACK_SIZE=128000\
+-sSTACK_OVERFLOW_CHECK=2 \
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
 -s EXPORTED_FUNCTIONS="['_amy_add_message', '_amy_add_event', '_amy_reset_sysclock', '_amy_sysclock', '_amy_process_single_midi_byte', '_amy_live_stop', '_amy_get_input_buffer', '_amy_set_external_input_buffer', '_amy_live_start_web', '_amy_live_start_web_audioin', '_amy_start_web', '_amy_start_web_no_synths', '_sequencer_ticks', '_malloc', '_free']" \
 -s SUPPORT_LONGJMP=emscripten \
 -s INITIAL_MEMORY=128mb -s TOTAL_STACK=64mb -s ALLOW_MEMORY_GROWTH=1 \
--s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000 -s ASSERTIONS
+-s ASSERTIONS=2 \
+-s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000 
 
 PYTHON = python3
 
@@ -77,6 +76,10 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 
 amy-example: $(OBJECTS) src/amy-example.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
+
+
+amy-piano: $(OBJECTS) src/amy-piano.o
+	$(CC) $(CFLAGS) $(OBJECTS) src/amy-piano.o -Wall $(LIBS) -o $@
 
 amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
