@@ -563,7 +563,6 @@ typedef struct  {
     uint32_t max_voices;
     uint32_t max_synths;
     uint32_t max_memory_patches;
-    uint32_t num_deltas;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -888,7 +887,7 @@ extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
 
 // deltas
-extern void deltas_pool_init(int max_delta_pool_size);
+extern void deltas_pool_init();
 extern void deltas_pool_free();
 extern struct delta *delta_get(struct delta *d);  // clone existing delta values if d not NULL.
 extern struct delta *delta_release(struct delta *d);  // returns d->next of the node just released.

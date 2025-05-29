@@ -795,7 +795,7 @@ int8_t oscs_init() {
     // set all oscillators to their default values
     amy_reset_oscs();
     // reset the deltas queue
-    deltas_pool_init(amy_global.config.num_deltas);
+    deltas_pool_init();
     amy_deltas_reset();
 
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
@@ -1681,10 +1681,16 @@ void amy_default_setup() {
 
 struct delta *free_deltas_pool = NULL;
 
-void deltas_pool_init(int max_delta_pool_size) {
-    free_deltas_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
-                                             amy_global.config.ram_caps_synth);
-    struct delta *d = free_deltas_pool;
+#define MAX_DELTA_BLOCKS 16
+struct delta *delta_blocks[MAX_DELTA_BLOCKS];
+int next_delta_block = 0;
+
+#define DELTA_BLOCK_SIZE 2048
+
+struct delta *deltas_pool_alloc(int max_delta_pool_size, struct delta *tail) {
+    struct delta *new_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
+                                                         amy_global.config.ram_caps_synth);
+    struct delta *d = new_pool;
     // Link all the deltas together
     for (int i = 1; i < max_delta_pool_size; ++i) {
         d->next = d + 1;
@@ -1694,11 +1700,29 @@ void deltas_pool_init(int max_delta_pool_size) {
         d->time = UINT32_MAX - 1;
         d = d->next;
     }
-    d->next = NULL;  // end of the chain
+    d->next = tail;  // join up the end of the chain with passed-in chain (or NULL).
+    return new_pool;
+}
+
+void deltas_add_pool_block(void) {
+    fprintf(stderr, "deltas_add_pool_block %d\n", next_delta_block);
+    if (next_delta_block >= MAX_DELTA_BLOCKS) {
+        fprintf(stderr, "**PANIC: Ran out of deltas (%d blocks of %d deltas)\n", MAX_DELTA_BLOCKS, DELTA_BLOCK_SIZE);
+        abort();
+    }
+    free_deltas_pool = delta_blocks[next_delta_block++] = deltas_pool_alloc(DELTA_BLOCK_SIZE, free_deltas_pool);
+}
+
+void deltas_pool_init() {
+    deltas_pool_free();
+    deltas_add_pool_block();
 }
 
 void deltas_pool_free() {
-    free(free_deltas_pool);
+    for (int i = 0; i < next_delta_block; ++i) {
+        free(delta_blocks[i]);
+    }
+    next_delta_block = 0;
     free_deltas_pool = NULL;
 }
 
@@ -1706,8 +1730,8 @@ struct delta *delta_get(struct delta *from) {
     // fetch the next free delta, copy in values if a reference is provided.
     struct delta *d = free_deltas_pool;
     if (d == NULL)  {
-        fprintf(stderr, "**PANIC: Ran out of deltas.\n");
-        abort();
+        deltas_add_pool_block();
+        d = free_deltas_pool;
     }
     free_deltas_pool = d->next;
     if (from != NULL) {
