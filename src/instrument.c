@@ -263,7 +263,6 @@ void instrument_release(int instrument_number) {
 void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
     if (instrument_number < 0 || instrument_number >= max_instruments) {
         fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, max_instruments);
-        abort();
         return;
     }
     if(instruments[instrument_number]) {
