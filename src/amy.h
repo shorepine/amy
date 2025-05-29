@@ -125,7 +125,7 @@ extern const uint16_t pcm_samples;
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
-#define DEFAULT_NUM_BREAKPOINTS 24
+#define DEFAULT_NUM_BREAKPOINTS 8
 // We need a max on the number of breakpoints to lay out the params enum statically.  Otherwise, it's dynamic.
 #define MAX_BREAKPOINTS 24
 #define MAX_BREAKPOINT_SETS 2
@@ -418,11 +418,12 @@ typedef struct amy_event {
     float eq_m;
     float eq_h;
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
-    char algo_source[MAX_PARAM_LEN];
+    // Convert these two at least to vectors of ints, save several hundred bytes
+    int16_t algo_source[MAX_ALGO_OPS];
+    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     char bp0[MAX_PARAM_LEN];
     char bp1[MAX_PARAM_LEN];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
-    char voices[MAX_PARAM_LEN];
     // Instrument-layer values.
     uint8_t synth;
     uint32_t synth_flags;  // Special flags to set when defining instruments.
@@ -700,7 +701,7 @@ void free_osc(int osc);
 void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void patches_init(int max_memory_patches);
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
-void parse_algorithm_source(struct synthinfo * e, char* message) ;
+void parse_algo_source(char* message, int16_t *vals);
 void hold_and_modify(uint16_t osc) ;
 void amy_execute_deltas();
 int16_t * amy_fill_buffer();
@@ -711,7 +712,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 // API
 void amy_add_message(char *message);
 void amy_add_event(amy_event *e);
-void amy_parse_message(char * message, amy_event *e);
+void amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
 void amy_live_start();
@@ -719,6 +720,7 @@ void amy_live_stop();
 int16_t * amy_simple_fill_buffer() ;
 void amy_update();
 amy_config_t amy_default_config();
+void clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
 void amy_get_input_buffer(output_sample_type * samples);
@@ -894,6 +896,7 @@ extern void delta_release_list(struct delta *d);  // releases a whole list of de
 extern int32_t delta_list_len(struct delta *d);
 extern int32_t delta_num_free();  // The size of the remaining pool.
 
+extern int peek_stack(char *tag);
 
 #endif
 

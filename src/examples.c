@@ -18,13 +18,14 @@ void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
     amy_event e = amy_default_event();
     e.patch_number = 1;
-    strcpy(e.voices, "0,1");
+    e.voices[0] = 0;
+    e.voices[1] = 1;
     amy_add_event(&e);
     delay_ms(250);
 
     e = amy_default_event();
     e.patch_number = 131;
-    strcpy(e.voices, "0");
+    e.voices[0] = 0;
     amy_add_event(&e);
     delay_ms(250);
 
@@ -32,14 +33,14 @@ void example_voice_alloc() {
     e = amy_default_event();
     e.velocity = 1;
     e.midi_note = 60;
-    strcpy(e.voices,"0");
+    e.voices[0] = 0;
     amy_add_event(&e);
     delay_ms(2000);
 
     e = amy_default_event();
     e.velocity = 1;
     e.midi_note = 60;
-    strcpy(e.voices,"1");
+    e.voices[0] = 1;
     amy_add_event(&e);
     delay_ms(2000);
 
@@ -47,7 +48,7 @@ void example_voice_alloc() {
     // now try to alloc voice 0 with a juno, should use oscs 0-4 again
     e = amy_default_event();
     e.patch_number = 2;
-    strcpy(e.voices, "0");
+    e.voices[0] = 0;
     amy_add_event(&e);
     delay_ms(250);
 }
@@ -57,7 +58,9 @@ void example_voice_chord(uint32_t start, uint16_t patch) {
     amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
-    strcpy(e.voices, "0,1,2");
+    e.voices[0] = 0;
+    e.voices[1] = 1;
+    e.voices[2] = 2;
     amy_add_event(&e);
     start += 250;
 
@@ -65,24 +68,26 @@ void example_voice_chord(uint32_t start, uint16_t patch) {
     e.time = start;
     e.velocity=0.5;
 
-    strcpy(e.voices, "0");
+    e.voices[0] = 0;
     e.midi_note = 50;
     amy_add_event(&e);
     start += 1000;
 
-    strcpy(e.voices, "1");
+    e.voices[0] = 1;
     e.midi_note = 54;
     e.time = start;
     amy_add_event(&e);
     start += 1000;
 
-    strcpy(e.voices, "2");
+    e.voices[0] = 2;
     e.midi_note = 56;
     e.time = start;
     amy_add_event(&e);
     start += 2000;
 
-    strcpy(e.voices, "0,1,2");
+    e.voices[0] = 0;
+    e.voices[1] = 1;
+    e.voices[2] = 2;
     e.velocity = 0;
     e.time = start;
     amy_add_event(&e);
@@ -225,20 +230,20 @@ void example_patches() {
     amy_event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
         e.patch_number = i;
-        strcpy(e.voices, "0");
+        e.voices[0] = 0;
         fprintf(stderr, "sending patch %d\n", i);
         amy_add_event(&e);
         delay_ms(250);
 
         e = amy_default_event();
-        strcpy(e.voices, "0");
+        e.voices[0] = 0;
         e.osc = 0;
         e.midi_note = 50;
         e.velocity = 0.5;
         amy_add_event(&e);
 
         delay_ms(1000);
-        strcpy(e.voices, "0");
+        e.voices[0] = 0;
         e.velocity = 0;
         amy_add_event(&e);
 
@@ -306,7 +311,6 @@ void bleep(uint32_t start) {
 
 void example_multimbral_fm() {
     amy_event e = amy_default_event();
-    char *voices[] = {"0","1","2","3","4","5"};
     int notes[] = {60, 70, 64, 68, 72, 82};
     e.velocity = 0.5;
     e.patch_number = 128;
@@ -314,7 +318,7 @@ void example_multimbral_fm() {
         e.midi_note = notes[i];
         e.pan_coefs[0] = (i%2);
         e.patch_number++;
-        strcpy(e.voices, voices[i]);
+        e.voices[0] = i;
         amy_add_event(&e);
         delay_ms(1000);
     }
@@ -522,7 +526,8 @@ void example_fm(uint32_t start) {
     e.osc = 7;
     e.wave = ALGO;
     e.algorithm = 1;  // algo 1 has op 2 driving op 1 driving output (plus a second chain for ops 6,5,4,3).
-    strcpy(e.algo_source, ",,,,9,8");
+    e.algo_source[4] = 9;
+    e.algo_source[5] = 8;
     amy_add_event(&e);
 
     // Add a note on event.

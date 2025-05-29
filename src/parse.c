@@ -110,12 +110,21 @@ void copy_param_list_substring(char *dest, const char *src) {
 }
 
 // helper to parse the list of source oscs for an algorithm
-void parse_algorithm_source(struct synthinfo * t, char *message) {
-    int num_parsed = parse_list_int16_t(message, t->algo_source, MAX_ALGO_OPS,
-                                            AMY_UNSET_VALUE(t->algo_source[0]));
+void parse_algo_source(char *message, int16_t *vals) {
+    int num_parsed = parse_list_int16_t(message, vals, MAX_ALGO_OPS,
+                                        AMY_UNSET_VALUE(vals[0]));
     // Clear unspecified values.
     for (int i = num_parsed; i < MAX_ALGO_OPS; ++i) {
-        AMY_UNSET(t->algo_source[i]);
+        AMY_UNSET(vals[i]);
+    }
+}
+
+void parse_voices(char *message, uint16_t *vals) {
+    int num_parsed = parse_list_uint16_t(message, vals, MAX_VOICES_PER_INSTRUMENT,
+                                         AMY_UNSET_VALUE(vals[0]));
+    // Clear unspecified values.
+    for (int i = num_parsed; i < MAX_VOICES_PER_INSTRUMENT; ++i) {
+        AMY_UNSET(vals[i]);
     }
 }
 
@@ -229,7 +238,7 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
 }
 
 int _next_alpha(char *s) {
-    // Return how many chars to skip to get to the next alphanumeric (or EOS).
+    // Return how many chars to skip to get to the next alphabet (command prefix) (or EOS).
     int p = 0;
     while (*(s + p)) {
         char c = *(s + p);
@@ -242,10 +251,10 @@ int _next_alpha(char *s) {
 
 
 // given a string return a parsed event
-void amy_parse_message(char * message, amy_event *e) {
+void amy_parse_message(char * message, int length, amy_event *e) {
+    peek_stack("parse_message");
     char cmd = '\0';
     uint16_t pos = 0;
-    int16_t length = strlen(message);
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if(amy_global.transfer_flag) {
@@ -254,7 +263,7 @@ void amy_parse_message(char * message, amy_event *e) {
         return;
     }
 
-    while(pos < length + 1) {
+    while(pos < length) {
         cmd = message[pos];
         char *arg = message + pos + 1;
         if(isalpha(cmd)) {
@@ -319,12 +328,12 @@ void amy_parse_message(char * message, amy_event *e) {
             case 'n': e->midi_note=atof(arg); break;
             case 'N': e->latency_ms = atoi(arg);  break;
             case 'o': e->algorithm=atoi(arg); break;
-            case 'O': copy_param_list_substring(e->algo_source, arg); break;
+            case 'O': parse_algo_source(arg, e->algo_source); break;
             case 'p': e->preset=atoi(arg); break;
             case 'P': e->phase=atoff(arg); break;
             /* q unused */
             case 'Q': parse_coef_message(arg, e->pan_coefs); break;
-            case 'r': copy_param_list_substring(e->voices, arg); break;
+            case 'r': parse_voices(arg, e->voices); break;
             case 'R': e->resonance=atoff(arg); break;
             case 's': e->pitch_bend = atoff(arg); break;
             case 'S':
@@ -379,12 +388,15 @@ void amy_parse_message(char * message, amy_event *e) {
             }
             /* Y,y available */
             /* Z used for end of message */
+            case 'Z':
+                break;
             default:
                 break;
             }
         }
         // Skip over arg, line up for the next cmd.
-        pos += 1 + _next_alpha(message + 1 + pos);
+        ++pos;  // move over the current command.
+        if (pos > length) fprintf(stderr, "parse string overrun %d %d %s\n", pos, length, message);
+        pos += _next_alpha(message + pos);  // Skip over any non-alpha argument to the current command.
     }
-
 }

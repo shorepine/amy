@@ -287,7 +287,33 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     return 0;
 }
 
+#ifdef DEBUG_STACK
+
+static uint8_t *stack_baseline = NULL;
+
+uint8_t *get_sp() {
+    uint8_t d[64];
+    return (uint8_t *)&d;
+    //return NULL;
+}
+
+int peek_stack(char *tag) {
+    if (stack_baseline == NULL) {
+        stack_baseline = get_sp();
+    }
+    int stack_depth = (int)(stack_baseline - get_sp());
+    fprintf(stderr, "stack: '%s': %d\n", tag, stack_depth);
+    return stack_depth;
+}
+
+#else  // !DEBUG_STACK
+
+int peek_stack(char *tag)  { return 0; }
+
+#endif
+
 int8_t global_init(amy_config_t c) {
+    peek_stack("init");
     amy_global.config = c;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
@@ -407,6 +433,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
+    peek_stack("event_to_deltas");
     // Synth defaults if not set, these are required for the delta struct
     d.time = e->time;
     d.osc = e->osc;
@@ -421,12 +448,13 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
-    if (e->voices[0] != 0 || AMY_IS_SET(e->synth)) {
+    if (AMY_IS_SET(e->voices[0]) || AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             amy_execute_deltas();
             patches_load_patch(e);
+        } else {
+            patches_event_has_voices(e, queue);
         }
-        patches_event_has_voices(e, queue);
         goto end;
     }
 
@@ -467,15 +495,20 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
-    if(e->algo_source[0] != 0) {
-        struct synthinfo t;
-        parse_algorithm_source(&t, e->algo_source);
-        for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { 
+    bool algo_ops_set = false;
+    for (int i = 0; i < MAX_ALGO_OPS; ++i) {
+        if(AMY_IS_SET(e->algo_source[i])) {
+            algo_ops_set = true;
+            break;
+        }
+    }
+    if (algo_ops_set) {
+        for(uint8_t i = 0; i < MAX_ALGO_OPS; i++) {
             d.param = ALGO_SOURCE_START + i;
-            if (AMY_IS_SET(t.algo_source[i])) {
-                d.data.i = t.algo_source[i] + base_osc;
+            if (AMY_IS_SET(e->algo_source[i])) {
+                d.data.i = e->algo_source[i] + base_osc;
             } else{
-                d.data.i = t.algo_source[i];
+                d.data.i = e->algo_source[i];
             }
             ensure_osc_allocd(d.data.i, NULL);
             add_delta_to_queue(&d, queue);
@@ -643,6 +676,7 @@ void amy_deltas_reset() {
 }
 
 void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
+    peek_stack("alloc_osc");
     uint8_t default_num_breakpoints[MAX_BREAKPOINT_SETS] = {DEFAULT_NUM_BREAKPOINTS, DEFAULT_NUM_BREAKPOINTS};
     if (max_num_breakpoints == NULL) {
         max_num_breakpoints = default_num_breakpoints;
@@ -1462,6 +1496,7 @@ void amy_block_processed(void) {
 }
 
 void amy_process_event(amy_event *e) {
+    peek_stack("process_event");
     if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
