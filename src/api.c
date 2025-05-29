@@ -39,7 +39,6 @@ amy_config_t amy_default_config() {
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
     c.max_synths = 64;
-    c.num_deltas = 6000;
     c.max_memory_patches = 32;
 
     // caps
@@ -78,57 +77,65 @@ amy_config_t amy_default_config() {
 // create a new default API accessible event
 amy_event amy_default_event() {
     amy_event e;
-    e.status = EVENT_EMPTY;
-    AMY_UNSET(e.time);
-    AMY_UNSET(e.osc);
-    AMY_UNSET(e.preset);
-    AMY_UNSET(e.wave);
-    AMY_UNSET(e.patch_number);
-    AMY_UNSET(e.phase);
-    AMY_UNSET(e.feedback);
-    AMY_UNSET(e.velocity);
-    AMY_UNSET(e.midi_note);
-    AMY_UNSET(e.volume);
-    AMY_UNSET(e.pitch_bend);
-    AMY_UNSET(e.tempo);
-    AMY_UNSET(e.latency_ms);
-    AMY_UNSET(e.ratio);
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
-        AMY_UNSET(e.amp_coefs[i]);
-        AMY_UNSET(e.freq_coefs[i]);
-        AMY_UNSET(e.filter_freq_coefs[i]);
-        AMY_UNSET(e.duty_coefs[i]);
-        AMY_UNSET(e.pan_coefs[i]);
-    }
-    AMY_UNSET(e.resonance);
-    AMY_UNSET(e.portamento_ms);
-    AMY_UNSET(e.filter_type);
-    AMY_UNSET(e.chained_osc);
-    AMY_UNSET(e.mod_source);
-    AMY_UNSET(e.eq_l);
-    AMY_UNSET(e.eq_m);
-    AMY_UNSET(e.eq_h);
-    AMY_UNSET(e.algorithm);
-    AMY_UNSET(e.bp_is_set[0]);
-    AMY_UNSET(e.bp_is_set[1]);
-    AMY_UNSET(e.eg_type[0]);
-    AMY_UNSET(e.eg_type[1]);
-    AMY_UNSET(e.reset_osc);
-    AMY_UNSET(e.note_source);
-    e.algo_source[0] = 0;
-    e.bp0[0] = 0;
-    e.bp1[0] = 0;
-    e.voices[0] = 0;
-    AMY_UNSET(e.synth);
-    AMY_UNSET(e.synth_flags);
-    AMY_UNSET(e.to_synth);
-    AMY_UNSET(e.grab_midi_notes);
-    AMY_UNSET(e.pedal);
-    AMY_UNSET(e.num_voices);
-    AMY_UNSET(e.sequence[SEQUENCE_TICK]);
-    AMY_UNSET(e.sequence[SEQUENCE_PERIOD]);
-    AMY_UNSET(e.sequence[SEQUENCE_TAG]);
+    clear_event(&e);
     return e;
+}
+
+void clear_event(amy_event *e) {
+    e->status = EVENT_EMPTY;
+    AMY_UNSET(e->time);
+    AMY_UNSET(e->osc);
+    AMY_UNSET(e->preset);
+    AMY_UNSET(e->wave);
+    AMY_UNSET(e->patch_number);
+    AMY_UNSET(e->phase);
+    AMY_UNSET(e->feedback);
+    AMY_UNSET(e->velocity);
+    AMY_UNSET(e->midi_note);
+    AMY_UNSET(e->volume);
+    AMY_UNSET(e->pitch_bend);
+    AMY_UNSET(e->tempo);
+    AMY_UNSET(e->latency_ms);
+    AMY_UNSET(e->ratio);
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+        AMY_UNSET(e->amp_coefs[i]);
+        AMY_UNSET(e->freq_coefs[i]);
+        AMY_UNSET(e->filter_freq_coefs[i]);
+        AMY_UNSET(e->duty_coefs[i]);
+        AMY_UNSET(e->pan_coefs[i]);
+    }
+    AMY_UNSET(e->resonance);
+    AMY_UNSET(e->portamento_ms);
+    AMY_UNSET(e->filter_type);
+    AMY_UNSET(e->chained_osc);
+    AMY_UNSET(e->mod_source);
+    AMY_UNSET(e->eq_l);
+    AMY_UNSET(e->eq_m);
+    AMY_UNSET(e->eq_h);
+    AMY_UNSET(e->algorithm);
+    AMY_UNSET(e->bp_is_set[0]);
+    AMY_UNSET(e->bp_is_set[1]);
+    AMY_UNSET(e->eg_type[0]);
+    AMY_UNSET(e->eg_type[1]);
+    AMY_UNSET(e->reset_osc);
+    AMY_UNSET(e->note_source);
+    for (int i = 0; i < MAX_ALGO_OPS; ++i) {
+        AMY_UNSET(e->algo_source[i]);
+    }
+    for (int i = 0; i < MAX_VOICES_PER_INSTRUMENT; ++i) {
+        AMY_UNSET(e->voices[i]);
+    }
+    e->bp0[0] = 0;
+    e->bp1[0] = 0;
+    AMY_UNSET(e->synth);
+    AMY_UNSET(e->synth_flags);
+    AMY_UNSET(e->to_synth);
+    AMY_UNSET(e->grab_midi_notes);
+    AMY_UNSET(e->pedal);
+    AMY_UNSET(e->num_voices);
+    AMY_UNSET(e->sequence[SEQUENCE_TICK]);
+    AMY_UNSET(e->sequence[SEQUENCE_PERIOD]);
+    AMY_UNSET(e->sequence[SEQUENCE_TAG]);
 }
 
 
@@ -158,14 +165,17 @@ uint32_t amy_sysclock() {
 
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
-    amy_event e = amy_default_event();
+    peek_stack("add_message");
+    amy_event e; // = amy_default_event();
+    clear_event(&e);
     // Parse the wire string into an event
-    amy_parse_message(message, &e);
+    amy_parse_message(message, strlen(message), &e);
     amy_add_event(&e);
 }
 
 // given an event play / schedule the event directly (C API)
 void amy_add_event(amy_event *e) {
+    peek_stack("add_event");
     amy_process_event(e);
     // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
     if(e->status == EVENT_SCHEDULED) {

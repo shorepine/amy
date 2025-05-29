@@ -173,11 +173,15 @@ int main(int argc, char ** argv) {
 	amy_add_message("l0t3000r2Z");
 
 
+    show_debug(99);
+
     // Now just spin for 15s
     uint32_t start = amy_sysclock();
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
+
+    show_debug(99);
 
     amy_live_stop();
 

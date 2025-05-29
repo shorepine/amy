@@ -58,10 +58,11 @@ int main(int argc, char ** argv) {
     amy_config_t amy_config = amy_default_config();
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
-    amy_config.set_default_synth = 1;
+    amy_config.set_default_synth = 0; //////////////////
     amy_start(amy_config);
     
     amy_live_start();
+    //example_fm(0);
     //example_voice_chord(0,0);
     //example_synth_chord(0, /* patch */ 256);
     //example_sustain_pedal(0, /* patch */ 256);
@@ -73,6 +74,8 @@ int main(int argc, char ** argv) {
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
+
+    //show_debug(99);
 
     amy_live_stop();
 

@@ -166,7 +166,8 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         d_offset.osc += base_osc;
         if (d_offset.param == CHAINED_OSC || d_offset.param == MOD_SOURCE || d_offset.param == RESET_OSC
             || (d_offset.param >= ALGO_SOURCE_START && d_offset.param < ALGO_SOURCE_START + MAX_ALGO_OPS))
-            d_offset.data.i += base_osc;
+            if (!(AMY_IS_UNSET((int16_t)d_offset.data.i) || AMY_IS_UNSET((uint16_t)d_offset.data.i)))  // CHAINED_OSC is uint16_t, but ALGO_SOURCE is int16_t.
+                d_offset.data.i += base_osc;
         d_offset.time = time;
         // assume the d->time is 0 and that's good.
         add_delta_to_queue(&d_offset, &amy_global.delta_queue);
@@ -179,13 +180,15 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
     //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
-    char sub_message[256];
+    //char sub_message[256];
     for(uint16_t i=0;i<strlen(message) + 1;i++) {
         if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
-            strncpy(sub_message, message + start, i - start + 1);
-            sub_message[i - start + 1]= 0;
+            //strncpy(sub_message, message + start, i - start + 1);
+            //sub_message[i - start + 1]= 0;
+            int length = i - start + 1;
             amy_event patch_event = amy_default_event();
-            amy_parse_message(sub_message, &patch_event);
+            //amy_parse_message(sub_message, strlen(sub_message), &patch_event);
+            amy_parse_message(message + start, length, &patch_event);
             amy_process_event(&patch_event);
             patch_event.time = time;
             if(patch_event.status == EVENT_SCHEDULED) {
@@ -198,6 +201,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
+    peek_stack("store_patch");
     // amy patch string. Either pull patch_number from e, or allocate a new one and write it to e.
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch_number, patch_string);
@@ -329,24 +333,40 @@ bool setup_drum_event(amy_event *e, uint8_t note) {
   return forward_note;
 }
 
+int copy_voices(uint16_t *from, uint16_t *to) {
+    // Copy voice vectors up until first unset; return how many copied.
+    int num_voices = 0;
+    for (int i = 0; i < MAX_VOICES_PER_INSTRUMENT; ++i) {
+        if (AMY_IS_SET(from[i])) {
+            to[num_voices] = from[i];
+            ++num_voices;
+        } else {
+            break;
+        }
+    }
+    return num_voices;
+}
+
+
 
 // This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(amy_event *e, struct delta **queue) {
+    peek_stack("has_voices");
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-    uint8_t num_voices;
+    uint8_t num_voices = 0;
     uint32_t flags = 0;
     if (!AMY_IS_SET(e->synth)) {
         // No instrument, just directly naming the voices.
-        num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES_PER_INSTRUMENT, 0);
+        num_voices = copy_voices(e->voices, voices);
     } else {
         // We have an instrument specified - decide which of its voices are actually to be used.
 
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
-        if (e->voices[0] != 0 && !AMY_IS_SET(e->patch_number)) {
-            fprintf(stderr, "You specified both synth %d and voices %s.  Synth implies voices, ignoring voices.\n",
-                    e->synth, e->voices);
+        if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
+            fprintf(stderr, "You specified both synth %d and voices %d...  Synth implies voices, ignoring voices.\n",
+                    e->synth, e->voices[0]);
         }
         flags = instrument_get_flags(e->synth);
         if (AMY_IS_SET(e->to_synth)) {
@@ -416,7 +436,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
             return;  // Ignore the note off, as requested.
     }
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
-    e->voices[0] = 0;
+    AMY_UNSET(e->voices[0]);
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     AMY_UNSET(e->synth);
@@ -452,6 +472,7 @@ void patches_load_patch(amy_event *e) {
     // Given an event with a patch/patch_number AND a voices/instrument spec in it.
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
     // This means to set/reset the voices and load the messages from ROM and set them.
+    peek_stack("load_patch");
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
     uint16_t patch_number = e->patch_number;
@@ -507,17 +528,15 @@ void patches_load_patch(amy_event *e) {
         //}
         //fprintf(stderr, "\n");
     }
-    if (e->voices[0]) {
-        num_voices = parse_list_uint16_t(e->voices, voices, MAX_VOICES_PER_INSTRUMENT, 0);
+    if (AMY_IS_SET(e->voices[0])) {
+        num_voices = copy_voices(e->voices, voices);
     }
     if (num_voices == 0) {
-        fprintf(stderr, "patch_number %d but no voices allocated, ignored (synth %d num_voices %d voices '%s')\n",
-                patch_number, e->synth, e->num_voices, e->voices);
+        fprintf(stderr, "patch_number %d but no voices allocated, ignored (synth %d num_voices %d voices %d...)\n",
+                patch_number, e->synth, e->num_voices, e->voices[0]);
         return;
     }
     // At this point, we have the voices[] array and num_voices set up to be initialized.
-    char empty[1];
-    empty[0] = 0; // prevent gcc warning
     char *message;
     struct delta *deltas = NULL;
     uint16_t patch_osc = 0;
@@ -573,9 +592,18 @@ void patches_load_patch(amy_event *e) {
                         // This was important because for testing the patch reassignment, we were running the default
                         // osc setup, then changing the patch, which reset the oscs here, but then the osc config
                         // from the default setup was applied *after* the reset, so the osc state was not reset.
-                        amy_event reset_event = amy_default_event();
-                        reset_event.reset_osc = osc + j;
-                        amy_event_to_deltas_queue(&reset_event, 0, &amy_global.delta_queue);
+                        //amy_event reset_event = amy_default_event();
+                        //reset_event.reset_osc = osc + j;
+                        //amy_event_to_deltas_queue(&reset_event, 0, &amy_global.delta_queue);
+                        // That's a lot of stack usage to add a single delta.  Let's cut to the chase.
+                        struct delta d = {
+                            .time = 0,
+                            .osc = 0,
+                            .param = RESET_OSC,
+                            .data.i = osc + j,
+                            .next = NULL,
+                        };
+                        add_delta_to_queue(&d, &amy_global.delta_queue);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;

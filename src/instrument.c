@@ -254,17 +254,22 @@ void instruments_reset() {
 }
 
 void instrument_release(int instrument_number) {
-    if(instruments[instrument_number]) {
+    if(instrument_number < max_instruments && instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
     }
     instruments[instrument_number] = NULL;
 }
 
-void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
+bool instrument_number_ok(int instrument_number, char *tag) {
     if (instrument_number < 0 || instrument_number >= max_instruments) {
-        fprintf(stderr, "instrument_number %d is out of range 0..%d\n", instrument_number, max_instruments);
-        return;
+        fprintf(stderr, "instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
+        return false;
     }
+    return true;
+}
+
+void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
+    if (!instrument_number_ok(instrument_number, "add_new")) return;
     if(instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
     }
@@ -272,6 +277,8 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
+    if (!instrument_number_ok(old_instrument_number, "change:old")) return;
+    if (!instrument_number_ok(new_instrument_number, "change:new")) return;
     if (old_instrument_number == new_instrument_number)
         return;  // Degenerate change.
     if (instruments[new_instrument_number]) {
@@ -283,6 +290,7 @@ void instrument_change_number(int old_instrument_number, int new_instrument_numb
 
 
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
+    if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
@@ -297,6 +305,7 @@ int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
 
 uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off) {
     // Called from patches_event_has_voices for events including an instrument, velocity, and note (note-on/note-off).
+    if (!instrument_number_ok(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "note_event: instrument_number %d is not defined.\n", instrument_number);
@@ -317,6 +326,7 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
 }
 
 int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
+    if (!instrument_number_ok(instrument_number, "all_off")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "all_notes_off: instrument_number %d is not defined.\n", instrument_number);
@@ -327,6 +337,7 @@ int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
 
 int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices) {
     // Will return nonzero voices if the result is to release multiple notes.
+    if (!instrument_number_ok(instrument_number, "sustain")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "sustain: instrument_number %d is not defined.\n", instrument_number);
@@ -350,6 +361,7 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
 }
 
 int instrument_get_patch_number(int instrument_number) {
+    if (!instrument_number_ok(instrument_number, "get_patch")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "get_patch_number: instrument_number %d is not defined.\n", instrument_number);
@@ -359,15 +371,17 @@ int instrument_get_patch_number(int instrument_number) {
 }
 
 uint32_t instrument_get_flags(int instrument_number) {
+    if (!instrument_number_ok(instrument_number, "get_flags")) return (uint32_t)-1;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "get_flags: instrument_number %d is not defined.\n", instrument_number);
-        return -1;
+        return (uint32_t)-1;
     }
     return instrument->flags;
 }
 
 bool instrument_grab_midi_notes(int instrument_number) {
+    if (!instrument_number_ok(instrument_number, "grab_midi")) return false;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         return false;
@@ -376,6 +390,7 @@ bool instrument_grab_midi_notes(int instrument_number) {
 }
 
 void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes) {
+    if (!instrument_number_ok(instrument_number, "set_grab")) return;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         fprintf(stderr, "set_grab_midi_notes: instrument_number %d is not defined.\n", instrument_number);

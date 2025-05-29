@@ -287,7 +287,33 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     return 0;
 }
 
+#ifdef DEBUG_STACK
+
+static uint8_t *stack_baseline = NULL;
+
+uint8_t *get_sp() {
+    uint8_t d[64];
+    return (uint8_t *)&d;
+    //return NULL;
+}
+
+int peek_stack(char *tag) {
+    if (stack_baseline == NULL) {
+        stack_baseline = get_sp();
+    }
+    int stack_depth = (int)(stack_baseline - get_sp());
+    fprintf(stderr, "stack: '%s': %d\n", tag, stack_depth);
+    return stack_depth;
+}
+
+#else  // !DEBUG_STACK
+
+int peek_stack(char *tag)  { return 0; }
+
+#endif
+
 int8_t global_init(amy_config_t c) {
+    peek_stack("init");
     amy_global.config = c;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
@@ -407,6 +433,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
 
+    peek_stack("event_to_deltas");
     // Synth defaults if not set, these are required for the delta struct
     d.time = e->time;
     d.osc = e->osc;
@@ -421,12 +448,13 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
-    if (e->voices[0] != 0 || AMY_IS_SET(e->synth)) {
+    if (AMY_IS_SET(e->voices[0]) || AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             amy_execute_deltas();
             patches_load_patch(e);
+        } else {
+            patches_event_has_voices(e, queue);
         }
-        patches_event_has_voices(e, queue);
         goto end;
     }
 
@@ -467,17 +495,21 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
-    if(e->algo_source[0] != 0) {
-        struct synthinfo t;
-        parse_algorithm_source(&t, e->algo_source);
-        for(uint8_t i=0;i<MAX_ALGO_OPS;i++) { 
+    bool algo_ops_set = false;
+    for (int i = 0; i < MAX_ALGO_OPS; ++i) {
+        if(AMY_IS_SET(e->algo_source[i])) {
+            algo_ops_set = true;
+            break;
+        }
+    }
+    if (algo_ops_set) {
+        for(uint8_t i = 0; i < MAX_ALGO_OPS; i++) {
             d.param = ALGO_SOURCE_START + i;
-            if (AMY_IS_SET(t.algo_source[i])) {
-                d.data.i = t.algo_source[i] + base_osc;
+            if (AMY_IS_SET(e->algo_source[i])) {
+                d.data.i = e->algo_source[i] + base_osc;
             } else{
-                d.data.i = t.algo_source[i];
+                d.data.i = e->algo_source[i];
             }
-            ensure_osc_allocd(d.data.i, NULL);
             add_delta_to_queue(&d, queue);
         }
     }
@@ -643,6 +675,7 @@ void amy_deltas_reset() {
 }
 
 void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
+    peek_stack("alloc_osc");
     uint8_t default_num_breakpoints[MAX_BREAKPOINT_SETS] = {DEFAULT_NUM_BREAKPOINTS, DEFAULT_NUM_BREAKPOINTS};
     if (max_num_breakpoints == NULL) {
         max_num_breakpoints = default_num_breakpoints;
@@ -762,7 +795,7 @@ int8_t oscs_init() {
     // set all oscillators to their default values
     amy_reset_oscs();
     // reset the deltas queue
-    deltas_pool_init(amy_global.config.num_deltas);
+    deltas_pool_init();
     amy_deltas_reset();
 
     fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
@@ -1059,6 +1092,7 @@ void play_delta(struct delta *d) {
         synth[d->osc]->algo_source[which_source] = d->data.i;
         if(AMY_IS_SET(synth[d->osc]->algo_source[which_source])) {
             int osc = synth[d->osc]->algo_source[which_source];
+            ensure_osc_allocd(osc, NULL);
             synth[osc]->status = SYNTH_IS_ALGO_SOURCE;
             // Configure the amp envelope appropriately, just once when named as an algo_source.
             synth[osc]->eg_type[0] = ENVELOPE_DX7;
@@ -1462,6 +1496,7 @@ void amy_block_processed(void) {
 }
 
 void amy_process_event(amy_event *e) {
+    peek_stack("process_event");
     if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
@@ -1646,10 +1681,16 @@ void amy_default_setup() {
 
 struct delta *free_deltas_pool = NULL;
 
-void deltas_pool_init(int max_delta_pool_size) {
-    free_deltas_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
-                                             amy_global.config.ram_caps_synth);
-    struct delta *d = free_deltas_pool;
+#define MAX_DELTA_BLOCKS 16
+struct delta *delta_blocks[MAX_DELTA_BLOCKS];
+int next_delta_block = 0;
+
+#define DELTA_BLOCK_SIZE 2048
+
+struct delta *deltas_pool_alloc(int max_delta_pool_size, struct delta *tail) {
+    struct delta *new_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
+                                                         amy_global.config.ram_caps_synth);
+    struct delta *d = new_pool;
     // Link all the deltas together
     for (int i = 1; i < max_delta_pool_size; ++i) {
         d->next = d + 1;
@@ -1659,11 +1700,29 @@ void deltas_pool_init(int max_delta_pool_size) {
         d->time = UINT32_MAX - 1;
         d = d->next;
     }
-    d->next = NULL;  // end of the chain
+    d->next = tail;  // join up the end of the chain with passed-in chain (or NULL).
+    return new_pool;
+}
+
+void deltas_add_pool_block(void) {
+    fprintf(stderr, "deltas_add_pool_block %d\n", next_delta_block);
+    if (next_delta_block >= MAX_DELTA_BLOCKS) {
+        fprintf(stderr, "**PANIC: Ran out of deltas (%d blocks of %d deltas)\n", MAX_DELTA_BLOCKS, DELTA_BLOCK_SIZE);
+        abort();
+    }
+    free_deltas_pool = delta_blocks[next_delta_block++] = deltas_pool_alloc(DELTA_BLOCK_SIZE, free_deltas_pool);
+}
+
+void deltas_pool_init() {
+    deltas_pool_free();
+    deltas_add_pool_block();
 }
 
 void deltas_pool_free() {
-    free(free_deltas_pool);
+    for (int i = 0; i < next_delta_block; ++i) {
+        free(delta_blocks[i]);
+    }
+    next_delta_block = 0;
     free_deltas_pool = NULL;
 }
 
@@ -1671,8 +1730,8 @@ struct delta *delta_get(struct delta *from) {
     // fetch the next free delta, copy in values if a reference is provided.
     struct delta *d = free_deltas_pool;
     if (d == NULL)  {
-        fprintf(stderr, "**PANIC: Ran out of deltas.\n");
-        abort();
+        deltas_add_pool_block();
+        d = free_deltas_pool;
     }
     free_deltas_pool = d->next;
     if (from != NULL) {
