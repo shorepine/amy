@@ -166,7 +166,8 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         d_offset.osc += base_osc;
         if (d_offset.param == CHAINED_OSC || d_offset.param == MOD_SOURCE || d_offset.param == RESET_OSC
             || (d_offset.param >= ALGO_SOURCE_START && d_offset.param < ALGO_SOURCE_START + MAX_ALGO_OPS))
-            d_offset.data.i += base_osc;
+            if (!(AMY_IS_UNSET((int16_t)d_offset.data.i) || AMY_IS_UNSET((uint16_t)d_offset.data.i)))  // CHAINED_OSC is uint16_t, but ALGO_SOURCE is int16_t.
+                d_offset.data.i += base_osc;
         d_offset.time = time;
         // assume the d->time is 0 and that's good.
         add_delta_to_queue(&d_offset, &amy_global.delta_queue);

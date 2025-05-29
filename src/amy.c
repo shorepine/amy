@@ -510,7 +510,6 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             } else{
                 d.data.i = e->algo_source[i];
             }
-            ensure_osc_allocd(d.data.i, NULL);
             add_delta_to_queue(&d, queue);
         }
     }
@@ -1093,6 +1092,7 @@ void play_delta(struct delta *d) {
         synth[d->osc]->algo_source[which_source] = d->data.i;
         if(AMY_IS_SET(synth[d->osc]->algo_source[which_source])) {
             int osc = synth[d->osc]->algo_source[which_source];
+            ensure_osc_allocd(osc, NULL);
             synth[osc]->status = SYNTH_IS_ALGO_SOURCE;
             // Configure the amp envelope appropriately, just once when named as an algo_source.
             synth[osc]->eg_type[0] = ENVELOPE_DX7;
