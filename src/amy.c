@@ -88,7 +88,20 @@ SAMPLE *delay_mod = NULL;
 
 // Set up the mutex for accessing the queue during rendering (for multicore)
 
-#ifdef _POSIX_THREADS
+#ifdef __EMSCRIPTEN__
+#include <emscripten/threading.h>
+#include <emscripten/wasm_worker.h>
+emscripten_lock_t amy_queue_lock = EMSCRIPTEN_LOCK_T_STATIC_INITIALIZER;
+void amy_grab_lock() {
+    emscripten_lock_busyspin_wait_acquire(&amy_queue_lock, 100);
+}
+void amy_release_lock() {
+    emscripten_lock_release(&amy_queue_lock);
+}
+void amy_init_lock() {
+}
+
+#elif defined _POSIX_THREADS
 pthread_mutex_t amy_queue_lock; 
 void amy_grab_lock() {
     pthread_mutex_lock(&amy_queue_lock); 
@@ -540,6 +553,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
                     d.data.f = t.breakpoint_values[i][j];
                     add_delta_to_queue(&d, queue);
                 }
+                //fprintf(stderr, "bp %d/%d\n", j, num_bps);
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
