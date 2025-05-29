@@ -11,9 +11,11 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifndef __EMSCRIPTEN__
 #ifdef _POSIX_THREADS
 #include <pthread.h>
 extern pthread_mutex_t amy_queue_lock; 
+#endif
 #endif
 
 // This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.

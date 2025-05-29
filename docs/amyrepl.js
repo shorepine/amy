@@ -104,7 +104,7 @@ async function print_error(text) {
 async function runCodeBlock(index) {
   if(!everything_started) await start_python_and_audio();
   var py = editors[index].getValue();
-  amy_reset_sysclock();
+  await amy_add_message("S16384Z");
   try {
     mp.runPythonAsync(py);
   } catch (e) {
