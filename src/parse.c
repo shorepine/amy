@@ -254,7 +254,7 @@ void amy_parse_message(char * message, amy_event *e) {
         return;
     }
 
-    while(pos < length + 1) {
+    while(pos < length) {
         cmd = message[pos];
         char *arg = message + pos + 1;
         if(isalpha(cmd)) {
