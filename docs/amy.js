@@ -298,9 +298,12 @@ function writeStackCookie() {
   // We write cookies to the final two words in the stack and detect if they are
   // ever overwritten.
   (growMemViews(), HEAPU32)[((max) >> 2)] = 34821223;
+  checkInt32(34821223);
   (growMemViews(), HEAPU32)[(((max) + (4)) >> 2)] = 2310721022;
+  checkInt32(2310721022);
   // Also test the global address 0 for integrity.
   (growMemViews(), HEAPU32)[((0) >> 2)] = 1668509029;
+  checkInt32(1668509029);
 }
 
 function checkStackCookie() {
@@ -444,6 +447,44 @@ function unexportedRuntimeSymbol(sym) {
 }
 
 initWorkerLogging();
+
+var MAX_UINT8 = (2 ** 8) - 1;
+
+var MAX_UINT16 = (2 ** 16) - 1;
+
+var MAX_UINT32 = (2 ** 32) - 1;
+
+var MAX_UINT53 = (2 ** 53) - 1;
+
+var MAX_UINT64 = (2 ** 64) - 1;
+
+var MIN_INT8 = -(2 ** (8 - 1));
+
+var MIN_INT16 = -(2 ** (16 - 1));
+
+var MIN_INT32 = -(2 ** (32 - 1));
+
+var MIN_INT53 = -(2 ** (53 - 1));
+
+var MIN_INT64 = -(2 ** (64 - 1));
+
+function checkInt(value, bits, min, max) {
+  assert(Number.isInteger(Number(value)), `attempt to write non-integer (${value}) into integer heap`);
+  assert(value <= max, `value (${value}) too large to write as ${bits}-bit value`);
+  assert(value >= min, `value (${value}) too small to write as ${bits}-bit value`);
+}
+
+var checkInt1 = value => checkInt(value, 1, 1);
+
+var checkInt8 = value => checkInt(value, 8, MIN_INT8, MAX_UINT8);
+
+var checkInt16 = value => checkInt(value, 16, MIN_INT16, MAX_UINT16);
+
+var checkInt32 = value => checkInt(value, 32, MIN_INT32, MAX_UINT32);
+
+var checkInt53 = value => checkInt(value, 53, MIN_INT53, MAX_UINT53);
+
+var checkInt64 = value => checkInt(value, 64, MIN_INT64, MAX_UINT64);
 
 // end include: runtime_debug.js
 // include: memoryprofiler.js
@@ -740,6 +781,7 @@ function initRuntime() {
   assert(!runtimeInitialized);
   runtimeInitialized = true;
   if (ENVIRONMENT_IS_WASM_WORKER) return _wasmWorkerInitializeRuntime();
+  setStackLimits();
   checkStackCookie();
   // No ATINITS hooks
   wasmExports["__wasm_call_ctors"]();
@@ -1173,8 +1215,20 @@ var _wasmWorkerInitializeRuntime = () => {
   assert(wwParams.stackSize % 16 == 0);
   // Wasm workers basically never exit their runtime
   noExitRuntime = 1;
+  // _emscripten_wasm_worker_initialize() initializes the stack for this
+  // Worker, but it cannot call to extern __set_stack_limits() function, or
+  // Binaryen breaks with "Fatal: Module::addFunction: __set_stack_limits
+  // already exists".  So for now, invoke this function from JS side. TODO:
+  // remove this in the future.  Note that this call is not exactly correct,
+  // since this limit will include the TLS slot, that will be part of the
+  // region between wwParams.stackLowestAddress and wwParams.stackSize, so we
+  // need to fix up the call below.
+  ___set_stack_limits(wwParams.stackLowestAddress + wwParams.stackSize, wwParams.stackLowestAddress);
   // Run the C side Worker initialization for stack and TLS.
   __emscripten_wasm_worker_initialize(wwParams.stackLowestAddress, wwParams.stackSize);
+  // Fix up stack base. (TLS frame is created at the bottom address end of the stack)
+  // See https://github.com/emscripten-core/emscripten/issues/16496
+  ___set_stack_limits(_emscripten_stack_get_base(), _emscripten_stack_get_end());
   // Write the stack cookie last, after we have set up the proper bounds and
   // current position of the stack.
   writeStackCookie();
@@ -1276,6 +1330,12 @@ var ptrToString = ptr => {
   return "0x" + ptr.toString(16).padStart(8, "0");
 };
 
+var setStackLimits = () => {
+  var stackLow = _emscripten_stack_get_base();
+  var stackHigh = _emscripten_stack_get_end();
+  ___set_stack_limits(stackLow, stackHigh);
+};
+
 /**
      * @param {number} ptr
      * @param {number} value
@@ -1285,22 +1345,27 @@ var ptrToString = ptr => {
   switch (type) {
    case "i1":
     (growMemViews(), HEAP8)[ptr] = value;
+    checkInt8(value);
     break;
 
    case "i8":
     (growMemViews(), HEAP8)[ptr] = value;
+    checkInt8(value);
     break;
 
    case "i16":
     (growMemViews(), HEAP16)[((ptr) >> 1)] = value;
+    checkInt16(value);
     break;
 
    case "i32":
     (growMemViews(), HEAP32)[((ptr) >> 2)] = value;
+    checkInt32(value);
     break;
 
    case "i64":
     (growMemViews(), HEAP64)[((ptr) >> 3)] = BigInt(value);
+    checkInt64(value);
     break;
 
    case "float":
@@ -1412,6 +1477,12 @@ var UTF8Decoder = typeof TextDecoder != "undefined" ? new TextDecoder : undefine
 
 var ___assert_fail = (condition, filename, line, func) => abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [ filename ? UTF8ToString(filename) : "unknown filename", line, func ? UTF8ToString(func) : "unknown function" ]);
 
+var ___handle_stack_overflow = requested => {
+  var base = _emscripten_stack_get_base();
+  var end = _emscripten_stack_get_end();
+  abort(`stack overflow (Attempt to set SP to ${ptrToString(requested)}` + `, with stack limits [${ptrToString(end)} - ${ptrToString(base)}` + "]). If you require more stack space build with -sSTACK_SIZE=<bytes>");
+};
+
 var __abort_js = () => abort("native code called abort()");
 
 var _emscripten_get_now;
@@ -1455,6 +1526,7 @@ function _clock_time_get(clk_id, ignored_precision, ptime) {
   // "now" is in ms, and wasi times are in ns.
   var nsec = Math.round(now * 1e3 * 1e3);
   (growMemViews(), HEAP64)[((ptime) >> 3)] = BigInt(nsec);
+  checkInt64(nsec);
   return 0;
 }
 
@@ -1889,7 +1961,10 @@ var _emscripten_resize_heap = requestedSize => {
     // but limit overreserving (default to capping at +96MB overgrowth at most)
     overGrownHeapSize = Math.min(overGrownHeapSize, requestedSize + 100663296);
     var newSize = Math.min(maxHeapSize, alignMemory(Math.max(requestedSize, overGrownHeapSize), 65536));
+    var t0 = _emscripten_get_now();
     var replacement = growMemory(newSize);
+    var t1 = _emscripten_get_now();
+    dbg(`Heap resize call from ${oldSize} to ${newSize} took ${(t1 - t0)} msecs. Success: ${!!replacement}`);
     if (replacement) {
       return true;
     }
@@ -2016,6 +2091,7 @@ var _fd_write = (fd, iov, iovcnt, pnum) => {
     num += len;
   }
   (growMemViews(), HEAPU32)[((pnum) >> 2)] = num;
+  checkInt32(num);
   return 0;
 };
 
@@ -2177,6 +2253,7 @@ var Asyncify = {
     var bottomOfCallStack = Asyncify.exportCallStack[0];
     var rewindId = Asyncify.getCallStackId(bottomOfCallStack);
     (growMemViews(), HEAP32)[(((ptr) + (8)) >> 2)] = rewindId;
+    checkInt32(rewindId);
   },
   getDataRewindFuncName(ptr) {
     var id = (growMemViews(), HEAP32)[(((ptr) + (8)) >> 2)];
@@ -2518,7 +2595,7 @@ var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "addRunDependency", "removeRunDependency", "out", "err", "callMain", "abort", "wasmMemory", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "writeStackCookie", "checkStackCookie", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "ptrToString", "exitJS", "getHeapMax", "growMemory", "ENV", "ERRNO_CODES", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "dynCallLegacy", "dynCall", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "alignMemory", "wasmTable", "noExitRuntime", "addOnPreRun", "addOnPostRun", "sigToWasmTypes", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "UTF16Decoder", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "checkWasiClock", "flush_NO_FILESYSTEM", "safeSetTimeout", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_stdin_getChar_buffer", "FS_unlink", "FS_createPath", "FS_createDevice", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_readFiles", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_createDataFile", "FS_forceLoadFile", "FS_createLazyFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "runAndAbortIfError", "Asyncify", "Fibers", "SDL", "SDL_gfx", "allocateUTF8", "allocateUTF8OnStack", "print", "printErr", "jstoi_s", "_wasmWorkers", "_wasmWorkersID", "_wasmWorkerDelayedMessageQueue", "_wasmWorkerAppendToQueue", "_wasmWorkerRunPostMessage", "_wasmWorkerInitializeRuntime", "EmAudio", "EmAudioCounter", "emscriptenRegisterAudioObject", "emscriptenDestroyAudioContext", "emscriptenGetAudioObject", "emscriptenGetContextQuantumSize", "_EmAudioDispatchProcessorCallback" ];
+var unexportedSymbols = [ "run", "addRunDependency", "removeRunDependency", "out", "err", "callMain", "abort", "wasmMemory", "wasmExports", "HEAPF32", "HEAPF64", "HEAP8", "HEAPU8", "HEAP16", "HEAPU16", "HEAP32", "HEAPU32", "HEAP64", "HEAPU64", "writeStackCookie", "checkStackCookie", "INT53_MAX", "INT53_MIN", "bigintToI53Checked", "stackSave", "stackRestore", "stackAlloc", "ptrToString", "exitJS", "getHeapMax", "growMemory", "ENV", "setStackLimits", "ERRNO_CODES", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "readEmAsmArgsArray", "readEmAsmArgs", "runEmAsmFunction", "dynCallLegacy", "dynCall", "handleException", "keepRuntimeAlive", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "alignMemory", "wasmTable", "noExitRuntime", "addOnPreRun", "addOnPostRun", "sigToWasmTypes", "freeTableIndexes", "functionsInTableMap", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "UTF16Decoder", "stringToUTF8OnStack", "writeArrayToMemory", "JSEvents", "specialHTMLTargets", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "UNWIND_CACHE", "ExitStatus", "checkWasiClock", "flush_NO_FILESYSTEM", "safeSetTimeout", "emSetImmediate", "emClearImmediate_deps", "emClearImmediate", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "requestFullscreen", "requestFullScreen", "setCanvasSize", "getUserMedia", "createContext", "getPreloadedImageData__data", "wget", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "SYSCALLS", "preloadPlugins", "FS_stdin_getChar_buffer", "FS_unlink", "FS_createPath", "FS_createDevice", "FS_readFile", "FS", "FS_root", "FS_mounts", "FS_devices", "FS_streams", "FS_nextInode", "FS_nameTable", "FS_currentPath", "FS_initialized", "FS_ignorePermissions", "FS_filesystems", "FS_syncFSRequests", "FS_readFiles", "FS_lookupPath", "FS_getPath", "FS_hashName", "FS_hashAddNode", "FS_hashRemoveNode", "FS_lookupNode", "FS_createNode", "FS_destroyNode", "FS_isRoot", "FS_isMountpoint", "FS_isFile", "FS_isDir", "FS_isLink", "FS_isChrdev", "FS_isBlkdev", "FS_isFIFO", "FS_isSocket", "FS_flagsToPermissionString", "FS_nodePermissions", "FS_mayLookup", "FS_mayCreate", "FS_mayDelete", "FS_mayOpen", "FS_checkOpExists", "FS_nextfd", "FS_getStreamChecked", "FS_getStream", "FS_createStream", "FS_closeStream", "FS_dupStream", "FS_doSetAttr", "FS_chrdev_stream_ops", "FS_major", "FS_minor", "FS_makedev", "FS_registerDevice", "FS_getDevice", "FS_getMounts", "FS_syncfs", "FS_mount", "FS_unmount", "FS_lookup", "FS_mknod", "FS_statfs", "FS_statfsStream", "FS_statfsNode", "FS_create", "FS_mkdir", "FS_mkdev", "FS_symlink", "FS_rename", "FS_rmdir", "FS_readdir", "FS_readlink", "FS_stat", "FS_fstat", "FS_lstat", "FS_doChmod", "FS_chmod", "FS_lchmod", "FS_fchmod", "FS_doChown", "FS_chown", "FS_lchown", "FS_fchown", "FS_doTruncate", "FS_truncate", "FS_ftruncate", "FS_utime", "FS_open", "FS_close", "FS_isClosed", "FS_llseek", "FS_read", "FS_write", "FS_mmap", "FS_msync", "FS_ioctl", "FS_writeFile", "FS_cwd", "FS_chdir", "FS_createDefaultDirectories", "FS_createDefaultDevices", "FS_createSpecialDirectories", "FS_createStandardStreams", "FS_staticInit", "FS_init", "FS_quit", "FS_findObject", "FS_analyzePath", "FS_createFile", "FS_createDataFile", "FS_forceLoadFile", "FS_createLazyFile", "FS_absolutePath", "FS_createFolder", "FS_createLink", "FS_joinPath", "FS_mmapAlloc", "FS_standardizePath", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "runAndAbortIfError", "Asyncify", "Fibers", "SDL", "SDL_gfx", "allocateUTF8", "allocateUTF8OnStack", "print", "printErr", "jstoi_s", "_wasmWorkers", "_wasmWorkersID", "_wasmWorkerDelayedMessageQueue", "_wasmWorkerAppendToQueue", "_wasmWorkerRunPostMessage", "_wasmWorkerInitializeRuntime", "EmAudio", "EmAudioCounter", "emscriptenRegisterAudioObject", "emscriptenDestroyAudioContext", "emscriptenGetAudioObject", "emscriptenGetContextQuantumSize", "_EmAudioDispatchProcessorCallback" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -2704,6 +2781,7 @@ var wasmImports;
 function assignWasmImports() {
   wasmImports = {
     /** @export */ __assert_fail: ___assert_fail,
+    /** @export */ __handle_stack_overflow: ___handle_stack_overflow,
     /** @export */ _abort_js: __abort_js,
     /** @export */ clock_time_get: _clock_time_get,
     /** @export */ emscripten_asm_const_double: _emscripten_asm_const_double,
@@ -2792,6 +2870,8 @@ var __emscripten_stack_alloc = a0 => (__emscripten_stack_alloc = wasmExports["_e
 var _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmExports["emscripten_stack_get_current"])();
 
 var __emscripten_wasm_worker_initialize = createExportWrapper("_emscripten_wasm_worker_initialize", 2);
+
+var ___set_stack_limits = Module["___set_stack_limits"] = createExportWrapper("__set_stack_limits", 2);
 
 var dynCall_ii = Module["dynCall_ii"] = createExportWrapper("dynCall_ii", 2);
 

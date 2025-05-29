@@ -125,7 +125,7 @@ extern const uint16_t pcm_samples;
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
-#define DEFAULT_NUM_BREAKPOINTS 8
+#define DEFAULT_NUM_BREAKPOINTS 3
 // We need a max on the number of breakpoints to lay out the params enum statically.  Otherwise, it's dynamic.
 #define MAX_BREAKPOINTS 24
 #define MAX_BREAKPOINT_SETS 2

@@ -17,6 +17,9 @@ extern SAMPLE ** fbl;
 #endif
 #define MINIAUDIO_IMPLEMENTATION
 
+#define MA_AUDIO_WORKLETS_THREAD_STACK_SIZE 131072
+#define MINIAUDIO_IMPLEMENTATION
+
 #include "miniaudio.h"
 
 #include <stdio.h>

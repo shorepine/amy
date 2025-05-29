@@ -39,7 +39,7 @@ amy_config_t amy_default_config() {
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
     c.max_synths = 64;
-    c.num_deltas = 4096;
+    c.num_deltas = 6000;
     c.max_memory_patches = 32;
 
     // caps

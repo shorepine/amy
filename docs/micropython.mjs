@@ -4030,7 +4030,7 @@ async function createWasm() {
       checkStackCookie();
       if (e instanceof WebAssembly.RuntimeError) {
         if (_emscripten_stack_get_current() <= 0) {
-          err('Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 67108864)');
+          err('Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 128000)');
         }
       }
       quit_(1, e);
