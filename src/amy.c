@@ -1719,7 +1719,7 @@ struct delta *deltas_pool_alloc(int max_delta_pool_size, struct delta *tail) {
 }
 
 void deltas_add_pool_block(void) {
-    fprintf(stderr, "deltas_add_pool_block %d\n", next_delta_block);
+    //fprintf(stderr, "deltas_add_pool_block %d\n", next_delta_block);
     if (next_delta_block >= MAX_DELTA_BLOCKS) {
         fprintf(stderr, "**PANIC: Ran out of deltas (%d blocks of %d deltas)\n", MAX_DELTA_BLOCKS, DELTA_BLOCK_SIZE);
         abort();
