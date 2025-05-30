@@ -1,6 +1,6 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
-#ifndef AMY_MCU
+#if !(defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 
 #include "amy.h"
 #include "examples.h"

@@ -203,7 +203,7 @@ extern void on_pico_uart_rx();
 void amy_update() {
     int32_t res;
     amy_execute_deltas();
-    if(amy_global.config.cores > 1) {
+    if(AMY_HAS_DUALCORE) {
         queue_entry_t entry = {render_other_core, AMY_OK};
         queue_add_blocking(&call_queue, &entry);
         amy_render(0, AMY_OSCS/2, 0);
@@ -222,6 +222,9 @@ void amy_update() {
     give_audio_buffer(ap, buffer);
     // check MIDI
     on_pico_uart_rx();
+    #ifdef TUD_USB_GADGET
+        pico_process_midi();
+    #endif
 }
 
 
@@ -272,7 +275,7 @@ void core1_main() {
 
 
 amy_err_t i2s_amy_init() {
-    if(amy_global.config.cores > 1) {
+    if(AMY_HAS_DUALCORE) {
         queue_init(&call_queue, sizeof(queue_entry_t), 2);
         queue_init(&results_queue, sizeof(int32_t), 2);
         uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);

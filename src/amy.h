@@ -33,10 +33,7 @@ extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
-// Just a marker, not to be used inside #if directly
-#define AMY_MCU
-
-#if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__))
+#if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #define AMY_MCU
 #endif
 
@@ -72,7 +69,7 @@ extern const uint16_t pcm_samples;
 #define AMY_NCHANS 2
 
 #define AMY_CORES ((amy_global.config.features & AMY_FEATURE_DUALCORE) ? 2 : 1)
-
+#define AMY_HAS_DUALCORE (amy_global.config.features & AMY_FEATURE_DUALCORE)
 #define AMY_HAS_REVERB (amy_global.config.features & AMY_FEATURE_REVERB)
 #define AMY_HAS_AUDIO_IN (amy_global.config.features & AMY_FEATURE_AUDIO_IN)
 #define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features & AMY_FEATURE_DEFAULT_SYNTHS)
@@ -196,7 +193,7 @@ enum coefs{
 #define AUDIO_IN1 14
 #define AUDIO_EXT0 15
 #define AUDIO_EXT1 16
-#define MIDI 17
+#define AMY_MIDI 17
 #define CUSTOM 18
 #define WAVE_OFF 19
 

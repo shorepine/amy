@@ -47,4 +47,8 @@ void run_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
 #endif
+
+void check_tusb_midi();
+void init_tusb_midi();
+
 #endif // __MIDI_H

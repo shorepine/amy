@@ -947,7 +947,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc]->wave==AUDIO_IN1) audio_in_note_on(osc, 1);
     if(synth[osc]->wave==AUDIO_EXT0) external_audio_in_note_on(osc, 0);
     if(synth[osc]->wave==AUDIO_EXT1) external_audio_in_note_on(osc, 1);
-    if(synth[osc]->wave==MIDI) {
+    if(synth[osc]->wave==AMY_MIDI) {
         amy_send_midi_note_on(osc);
     }
     if(AMY_HAS_PARTIALS) {
@@ -1175,7 +1175,7 @@ void play_delta(struct delta *d) {
             if(synth[d->osc]->wave==KS) ks_note_off(d->osc);
             else if(synth[d->osc]->wave==ALGO)  algo_note_off(d->osc);
             else if(synth[d->osc]->wave==PCM) pcm_note_off(d->osc);
-            else if(synth[d->osc]->wave==MIDI) amy_send_midi_note_off(d->osc);
+            else if(synth[d->osc]->wave==AMY_MIDI) amy_send_midi_note_off(d->osc);
             else if(synth[d->osc]->wave==CUSTOM) custom_note_off(d->osc);
             else if(synth[d->osc]->wave==PARTIALS || synth[d->osc]->wave==BYO_PARTIALS || synth[d->osc]->wave==INTERP_PARTIALS) {
                 AMY_UNSET(synth[d->osc]->note_on_clock);
@@ -1370,7 +1370,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc]->wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
             if(synth[osc]->wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
             if(synth[osc]->wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
-            if(synth[osc]->wave == MIDI) max_val = 1;
+            if(synth[osc]->wave == AMY_MIDI) max_val = 1;
             if(synth[osc]->wave == KS) {
                 if(amy_global.config.ks_oscs) {
                     max_val = render_ks(buf, osc);
