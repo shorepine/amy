@@ -56,9 +56,10 @@ int main(int argc, char ** argv) {
     amy_external_render_hook = render;
 
     amy_config_t amy_config = amy_default_config();
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
-    amy_config.set_default_synth = 0; //////////////////
+    amy_config.features &= ~AMY_HAS_DEFAULT_SYNTHS;
     amy_start(amy_config);
     
     amy_live_start();

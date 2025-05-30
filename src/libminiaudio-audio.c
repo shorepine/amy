@@ -149,7 +149,7 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     
-    if(amy_global.config.has_audio_in) {
+    if(AMY_HAS_AUDIO_IN) {
         if (amy_global.config.playback_device_id >= (int32_t)playbackCount || amy_global.config.capture_device_id >= (int32_t)captureCount) {
             printf("invalid device\n");
             exit(1);
@@ -161,7 +161,7 @@ amy_err_t miniaudio_init() {
         }
     }
 
-    if(amy_global.config.has_audio_in) {
+    if(AMY_HAS_AUDIO_IN) {
         deviceConfig = ma_device_config_init(ma_device_type_duplex);
     } else {
         deviceConfig = ma_device_config_init(ma_device_type_playback);
@@ -175,7 +175,7 @@ amy_err_t miniaudio_init() {
     deviceConfig.playback.format   = DEVICE_FORMAT;
     deviceConfig.playback.channels = AMY_NCHANS;
 
-    if(amy_global.config.has_audio_in) {
+    if(AMY_HAS_AUDIO_IN) {
         if(amy_global.config.capture_device_id >= 0) {
             deviceConfig.capture.pDeviceID = &pCaptureInfos[amy_global.config.capture_device_id].id;
         } else {
@@ -218,13 +218,13 @@ void *miniaudio_run(void *vargp) {
 
 #ifdef __EMSCRIPTEN__
 void amy_live_start_web_audioin() {
-    amy_global.config.has_audio_in = 1;
+    amy_global.config.features &= AMY_HAS_AUDIO_IN;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
-    amy_global.config.has_audio_in = 0;
+    amy_global.config.features &= ~AMY_HAS_AUDIO_IN;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);

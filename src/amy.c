@@ -672,7 +672,7 @@ void amy_reset_oscs() {
     // Reset chorus oscillator etc.
     if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if (AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
-    if (AMY_HAS_ECHO) config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
+    if (AMY_HAS_ECHO)   config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
     // Reset patches
     patches_reset();
     // Reset instruments (synths)
@@ -796,7 +796,7 @@ int8_t oscs_init() {
     if(pcm_samples) {
         pcm_init();
     }
-    if(amy_global.config.has_custom) {
+    if(AMY_HAS_CUSTOM) {
         custom_init();
     }
     // synth and msynth are now pointers to arrays of pointers to dynamically-allocated synth structures.
@@ -950,11 +950,11 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     if(synth[osc]->wave==MIDI) {
         amy_send_midi_note_on(osc);
     }
-    if(amy_global.config.has_partials) {
+    if(AMY_HAS_PARTIALS) {
         if(synth[osc]->wave==PARTIALS || synth[osc]->wave==BYO_PARTIALS) partials_note_on(osc);
         if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_on(osc);
     }
-    if(amy_global.config.has_custom) {
+    if(AMY_HAS_CUSTOM) {
         if(synth[osc]->wave==CUSTOM) custom_note_on(osc, initial_freq);
     }
 }
@@ -1379,12 +1379,12 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(pcm_samples)
                 if(synth[osc]->wave == PCM) max_val = render_pcm(buf, osc);
             if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
-            if(amy_global.config.has_partials) {
+            if(AMY_HAS_PARTIALS) {
                 if(synth[osc]->wave == PARTIALS || synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
                     max_val = render_partials(buf, osc);
             }
         }
-        if(amy_global.config.has_custom) {
+        if(AMY_HAS_CUSTOM) {
             if(synth[osc]->wave == CUSTOM) max_val = render_custom(buf, osc);
         }
         if(AMY_IS_SET(synth[osc]->chained_osc)) {
@@ -1479,7 +1479,7 @@ void amy_execute_deltas() {
 
     amy_release_lock();
 
-    if(AMY_HAS_CHORUS==1) {
+    if(AMY_HAS_CHORUS) {
         ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
         hold_and_modify(CHORUS_MOD_SOURCE);
         if(amy_global.chorus.level!=0)  {
@@ -1553,7 +1553,7 @@ int16_t * amy_fill_buffer() {
             parametric_eq_process(fbl[0]);
         }
 
-        if(AMY_HAS_CHORUS==1) {
+        if(AMY_HAS_CHORUS) {
             // apply chorus.
             if(amy_global.chorus.level > 0 && chorus_delay_lines[0] != NULL) {
                 // apply time-varying delays to both chans.
@@ -1568,7 +1568,7 @@ int16_t * amy_fill_buffer() {
             }
         }
     }
-    if (AMY_HAS_ECHO == 1) {
+    if (AMY_HAS_ECHO) {
         // Apply echo.
         if (amy_global.echo.level > 0 && echo_delay_lines[0] != NULL ) {
             for (int16_t c=0; c < AMY_NCHANS; ++c) {
