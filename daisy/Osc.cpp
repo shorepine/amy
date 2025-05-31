@@ -29,7 +29,28 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
         //Set the left and right outputs
         out[i]     = (block[i]/32767.0); //osc_out;
         out[i + 1] = (block[i+1]/32767.0); //osc_out;
+	// Copy the inputs
+	amy_in_block[i] = (short int)(in[i] * 32767.0);
+	amy_in_block[i + 1] = (short int)(in[i + 1] * 32767.0);
     }
+}
+
+void test_audio_in() {
+    amy_event e = amy_default_event();
+    e.reset_osc = RESET_SYNTHS;
+    amy_add_event(&e);
+    e = amy_default_event();
+    e.osc = 80;
+    e.wave = AUDIO_IN0;
+    e.pan_coefs[COEF_CONST] = 0;
+    e.velocity = 10.0f;
+    amy_add_event(&e);
+    e.osc = 81;
+    e.wave = AUDIO_IN1;
+    e.pan_coefs[COEF_CONST] = 1.0f;
+    amy_add_event(&e);
+    // Add echo.
+    //amy_add_message("");
 }
 
 void polyphony(uint32_t start, uint16_t patch) {
@@ -43,17 +64,19 @@ void polyphony(uint32_t start, uint16_t patch) {
     }
 }
 
+#define MAX_POLYPHONY 17
+
 void event_polyphony(uint32_t start, uint16_t patch) {
     //patch = 256;
     amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
-    for (int i = 0; i < 20; ++i)
+    for (int i = 0; i < MAX_POLYPHONY; ++i)
 	e.voices[i] = i;
     amy_add_event(&e);
     start += 250;
     uint8_t note = 40;
-    for(uint8_t i=0;i<20;i++) {
+    for(uint8_t i=0;i<MAX_POLYPHONY;i++) {
         e = amy_default_event();
         e.time = start;
         e.velocity = 0.5;
@@ -129,7 +152,9 @@ int main(void)
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
 
-    //polyphony(0, 0);
+    //event_polyphony(0, 0);
+    test_audio_in();
+
     amy_event e = amy_default_event();
     // Switch midi chan 1 voice to piano.
     e.synth = 1;
