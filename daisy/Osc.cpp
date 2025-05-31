@@ -1,4 +1,5 @@
 #include "daisy_seed.h"
+//#include "daisy_pod.h"
 #include "daisysp.h"
 extern "C" {
     #include "amy.h"
@@ -11,6 +12,8 @@ using namespace daisysp;
 
 // Declare a DaisySeed object called hardware
 DaisySeed  hardware;
+MidiUartHandler midi;
+FIFO<MidiEvent, 128> event_log;
 
 Switch button1;
 
@@ -30,26 +33,73 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 }
 
 void polyphony(uint32_t start, uint16_t patch) {
+    uint8_t data[3] = {0x90, 0x00, 0x7f};
+    uint8_t note = 40;
+    for(uint8_t i=0;i<15;i++) {
+	data[1] = note;
+	amy_event_midi_message_received(data, 3, 0, start);
+        start += 1000;
+        note += 2;
+    }
+}
+
+void event_polyphony(uint32_t start, uint16_t patch) {
+    //patch = 256;
     amy_event e = amy_default_event();
     e.time = start;
-    e.load_patch = patch;
-    strcpy(e.voices, "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14");
-    amy_add_event(e);
+    e.patch_number = patch;
+    for (int i = 0; i < 20; ++i)
+	e.voices[i] = i;
+    amy_add_event(&e);
     start += 250;
-    uint8_t note = 30;
-    for(uint8_t i=0;i<15;i++) {
+    uint8_t note = 40;
+    for(uint8_t i=0;i<20;i++) {
         e = amy_default_event();
         e.time = start;
-        e.velocity=0.5;
-        sprintf(e.voices, "%d", i);
+        e.velocity = 0.5;
+        e.voices[0] = i;
         e.midi_note = note;
-        amy_add_event(e);
+        amy_add_event(&e);
         start += 1000;
         note += 2;
     }
 }   
 
 
+// Typical Switch case for Message Type.
+void HandleMidiMessage(MidiEvent m)
+{
+    uint8_t data[3];
+    data[0] = m.channel;
+    data[1] = m.data[0];
+    data[2] = m.data[1];
+    bool good_event = true;
+    switch(m.type)
+    {
+        case NoteOff:
+	    data[0] |= 0x80;
+	    break;
+        case NoteOn:
+	    data[0] |= 0x90;
+	    break;
+        case ControlChange:
+	    data[0] |= 0xB0;
+	    break;
+        case ProgramChange:
+	    data[0] |= 0xC0;
+            break;
+        case PitchBend:
+	    data[0] |= 0xE0;
+            break;
+        default:
+	    good_event = false;
+	    break;
+    }
+    if (good_event) {
+	uint32_t time = UINT32_MAX;
+	amy_event_midi_message_received(data, 3, 0, time);
+    }
+}
 
 int main(void)
 {
@@ -79,11 +129,29 @@ int main(void)
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
 
-    polyphony(0, 0);
+    //polyphony(0, 0);
+    amy_event e = amy_default_event();
+    // Switch midi chan 1 voice to piano.
+    e.synth = 1;
+    e.patch_number = 256;
+    e.num_voices = 6;
+    e.time = 1000;
+    amy_add_event(&e);
 
     //Start calling the audio callback
     hardware.StartAudio(AudioCallback);
 
     // Loop forever
-    for(;;) {}
+    MidiUartHandler::Config midi_config;
+    midi.Init(midi_config);
+    midi.StartReceive();
+    for(;;)
+    {
+        midi.Listen();
+        // Handle MIDI Events
+        while(midi.HasEvents())
+        {
+            HandleMidiMessage(midi.PopEvent());
+        }
+    }
 }
