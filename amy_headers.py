@@ -401,7 +401,7 @@ def make_patches(filename):
 def write_vector_as_c(f, data, name, dtype='uint8_t', items_per_row=20):
     num_name = "NUM_%s" % name.upper()
     f.write("#define %s %d\n" % (num_name, len(data)))
-    f.write("const %s %s[%s] = {\n" % (dtype, name, num_name))
+    f.write("const %s %s[%s] PROGMEM = {\n" % (dtype, name, num_name))
     for start in range(0, len(data), items_per_row):
         data_row = data[start : start + items_per_row]
         f.write("    " + ", ".join("%d" % d for d in data_row) + ",\n")
@@ -440,7 +440,7 @@ def make_interp_partials(filename, data_dict):
     },
 """ % (TAG, tag, TAG, tag, TAG, tag, tag, tag, tag)
 
-        f.write("const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] = {\n")
+        f.write("const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] PROGMEM = {\n")
         f.write(map_contents)
         f.write("};\n\n")
         f.write("#endif // ndef __INTERP_PARTIALS_H\n\n")
