@@ -228,7 +228,7 @@ void pcm_unload_preset(uint16_t preset_number) {
     while(*preset_pointer != NULL) {
         if((*preset_pointer)->preset_number == preset_number) {
 	    memorypcm_ll_t *next = (*preset_pointer)->next;
-	    fprintf(stderr, "unload_preset: unloading %d\n", (*preset_pointer)->preset_number);
+	    //fprintf(stderr, "unload_preset: unloading %d\n", (*preset_pointer)->preset_number);
             // free the memory we allocated
             free((*preset_pointer));
 	    // close up the list
@@ -238,24 +238,17 @@ void pcm_unload_preset(uint16_t preset_number) {
             preset_pointer = &(*preset_pointer)->next;
         }
     }
-    fprintf(stderr, "pcm_unload_preset: preset %d not found\n", preset_number);
+    //fprintf(stderr, "pcm_unload_preset: preset %d not found\n", preset_number);  // This happens during a routine load_preset.
 }
 
 void pcm_unload_all_presets() {
     memorypcm_ll_t *preset_pointer = memorypcm_ll_start;
     while(preset_pointer != NULL) {
         memorypcm_ll_t *next_pointer = preset_pointer->next;
-	fprintf(stderr, "unload_all_presets: unloading %d\n", preset_pointer->preset_number);
+	//fprintf(stderr, "unload_all_presets: unloading %d\n", preset_pointer->preset_number);
         free(preset_pointer);
         // Go to the next one
         preset_pointer = next_pointer;
     }
     memorypcm_ll_start = NULL;
 }
-
-
-
-
-
-
-
