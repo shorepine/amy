@@ -163,6 +163,8 @@ int main(void)
     e.time = 1000;
     amy_add_event(&e);
 
+    config_echo(0.5f, 500.0f, 500.0f, 0.5f, 0.3f);
+
     //Start calling the audio callback
     hardware.StartAudio(AudioCallback);
 

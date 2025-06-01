@@ -73,6 +73,7 @@ void amy_profiles_print() {}
 #include "pcm_tiny.h"
 #elif defined AMY_DAISY
 #include "pcm_tiny.h"
+//#include "pcm_small.h"
 #else
 #include "pcm_small.h"
 #endif
@@ -219,21 +220,21 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
 }
 
 void dealloc_echo_delay_lines(void) {
-    for (uint16_t c = 0; c < AMY_NCHANS; ++c)
-        if (echo_delay_lines[c]) free(echo_delay_lines[c]);
+    for (int c = AMY_NCHANS - 1; c >= 0; --c)
+        if (echo_delay_lines[c]) free_delay_line(echo_delay_lines[c]);
 }
 
 
 void alloc_chorus_delay_lines(void) {
-    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
+    for(int c = 0; c < AMY_NCHANS; ++c) {
         chorus_delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
     }
-    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
 }
 
 void dealloc_chorus_delay_lines(void) {
-    for(uint16_t c=0;c<AMY_NCHANS;++c) {
-        if (chorus_delay_lines[c]) free(chorus_delay_lines[c]);
+    for(int c = AMY_NCHANS - 1; c >= 0; --c) {
+        if (chorus_delay_lines[c]) free_delay_line(chorus_delay_lines[c]);
         chorus_delay_lines[c] = NULL;
     }
     free(delay_mod);

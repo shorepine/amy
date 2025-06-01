@@ -197,6 +197,7 @@ void amy_start_web() {
     amy_config.has_midi_web = 1;
     amy_start(amy_config);
 }
+
 void amy_start_web_no_synths() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
