@@ -544,6 +544,7 @@ typedef struct delay_line {
 typedef struct  {
     // feature flags
     uint8_t set_default_synth;
+    uint8_t startup_bleep;
     uint8_t has_reverb;
     uint8_t has_echo;
     uint8_t has_chorus;

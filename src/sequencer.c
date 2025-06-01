@@ -169,7 +169,7 @@ void run_sequencer() {
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
 
-#elif (defined PICO_RP2350) || (defined PICO_RP2040)
+#elif defined(PICO_RP2350) || defined(PICO_RP2040)
 // pico: do it with a hardware timer
 
 #include "pico/time.h"

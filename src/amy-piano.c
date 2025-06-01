@@ -1,6 +1,9 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
 
+// This doesn't compile under ARDUINO because of no usleep.  Arduino tries to compile everything anyway.
+#ifndef ARDUINO
+
 #include "amy.h"
 #include "examples.h"
 #include "libminiaudio-audio.h"
@@ -188,4 +191,4 @@ int main(int argc, char ** argv) {
     return 0;
 }
 
-
+#endif

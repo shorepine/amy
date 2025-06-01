@@ -424,7 +424,7 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < (uint32_t)AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -1080,7 +1080,7 @@ void play_delta(struct delta *d) {
             // If we got here, it's a full reset of patches.
             patches_reset();
         }
-        if(d->data.i < AMY_OSCS+1) {
+        if(d->data.i < (uint32_t)AMY_OSCS + 1) {
             reset_osc(d->data.i);
         }
     }

@@ -288,47 +288,6 @@ void example_sine(uint32_t start) {
     amy_add_event(&e);
 }
 
-// Schedule a bleep now
-void bleep(uint32_t start) {
-    amy_event e = amy_default_event();
-    e.osc = 0;
-    e.time = start;
-    e.wave = SINE;
-    e.freq_coefs[COEF_CONST] = 220;
-    e.pan_coefs[COEF_CONST] = 0.9;
-    e.velocity = 1;
-    amy_add_event(&e);
-    e.time = start + 150;
-    e.freq_coefs[COEF_CONST] = 440;
-    e.pan_coefs[COEF_CONST] = 0.1;
-    amy_add_event(&e);
-    e.time = start + 300;
-    e.velocity = 0;
-    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
-    amy_add_event(&e);
-}
-
-// Schedule a bleep now using default bleep synth (0)
-void bleep_synth(uint32_t start) {
-    amy_event e = amy_default_event();
-    e.synth = 0;
-    e.time = start;
-    // you have to use notes with synths, so the voice manager can grok.
-    e.midi_note = 57;
-    e.pan_coefs[COEF_CONST] = 0.9;
-    e.velocity = 1;
-    amy_add_event(&e);
-    e.time = start + 150;
-    e.midi_note = 69;
-    e.pan_coefs[COEF_CONST] = 0.1;
-    amy_add_event(&e);
-    e.time = start + 300;
-    e.velocity = 0;
-    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
-    amy_add_event(&e);
-}
-
-
 void example_multimbral_fm() {
     amy_event e = amy_default_event();
     int notes[] = {60, 70, 64, 68, 72, 82};

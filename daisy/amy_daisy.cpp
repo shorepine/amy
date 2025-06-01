@@ -170,13 +170,11 @@ int main(void)
 
     // Initialize Amy
     amy_config_t amy_config = amy_default_config();
+    amy_config.startup_bleep = 1;
     amy_start(amy_config); // initializes amy 
 
     // Start the sequencer timer for AMY.
     init_sequencer();
-
-    // Startup chime.
-    bleep_synth(0);
 
     //example_sequencer_drums_synth(1000);
     //event_polyphony(0, 0);
