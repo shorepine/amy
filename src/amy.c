@@ -1668,7 +1668,7 @@ void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
 /*   # filter_freq goes from ? 100 to 6400 Hz with 18 steps/octave */
 /*   return float("%.3f" % (13 * exp2(0.0938 * val * 127))) */
 	    e = amy_default_event();
-	    e.synth = 0;
+	    e.synth = 1;
 	    e.filter_freq_coefs[COEF_CONST] = exp2f(0.0938f * (float)bytes[2]);
 	    amy_add_event(&e);
 	} else if (bytes[1] == 71) {
@@ -1676,7 +1676,7 @@ void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
 /*   # Q goes from 0.5 to 16 exponentially */
 /*   return float("%.3f" % (0.7 * exp2(4.0 * val))) */
 	    e = amy_default_event();
-	    e.synth = 0;
+	    e.synth = 1;
 	    e.resonance = 0.7f * exp2f(0.03125f * (float)bytes[2]);
 	    amy_add_event(&e);
 	}
