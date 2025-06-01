@@ -44,7 +44,7 @@ void qspi_free(void *ptr) {
 	qspi_used -= last_alloc + sizeof(uint32_t);
 	//fprintf(stderr, "qspi_free: %ld bytes, used = %d\n", last_alloc, qspi_used);
     } else {
-	fprintf(stderr, "qspi_free: punt (ptr = qspi_heap + %d)\n", (uint8_t*)ptr - (uint8_t *)ptr);
+	fprintf(stderr, "qspi_free: punt (ptr = qspi_heap + %d)\n", (uint8_t*)ptr - (uint8_t *)qspi_heap);
 	// Don't actually recover the memory.
     }
 }
