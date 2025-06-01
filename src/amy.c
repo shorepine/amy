@@ -73,6 +73,7 @@ void amy_profiles_print() {}
 #include "pcm_tiny.h"
 #elif defined AMY_DAISY
 #include "pcm_tiny.h"
+//#include "pcm_small.h"
 #else
 #include "pcm_small.h"
 #endif
@@ -219,21 +220,21 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
 }
 
 void dealloc_echo_delay_lines(void) {
-    for (uint16_t c = 0; c < AMY_NCHANS; ++c)
-        if (echo_delay_lines[c]) free(echo_delay_lines[c]);
+    for (int c = AMY_NCHANS - 1; c >= 0; --c)
+        if (echo_delay_lines[c]) free_delay_line(echo_delay_lines[c]);
 }
 
 
 void alloc_chorus_delay_lines(void) {
-    for(uint16_t c=0;c<AMY_NCHANS;++c) {
+    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
+    for(int c = 0; c < AMY_NCHANS; ++c) {
         chorus_delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
     }
-    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
 }
 
 void dealloc_chorus_delay_lines(void) {
-    for(uint16_t c=0;c<AMY_NCHANS;++c) {
-        if (chorus_delay_lines[c]) free(chorus_delay_lines[c]);
+    for(int c = AMY_NCHANS - 1; c >= 0; --c) {
+        if (chorus_delay_lines[c]) free_delay_line(chorus_delay_lines[c]);
         chorus_delay_lines[c] = NULL;
     }
     free(delay_mod);
@@ -423,7 +424,7 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < (uint32_t)AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -1079,7 +1080,7 @@ void play_delta(struct delta *d) {
             // If we got here, it's a full reset of patches.
             patches_reset();
         }
-        if(d->data.i < AMY_OSCS+1) {
+        if(d->data.i < (uint32_t)AMY_OSCS + 1) {
             reset_osc(d->data.i);
         }
     }
@@ -1684,13 +1685,13 @@ void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
 }
 
 void amy_default_setup() {
-    // sine wave "bleeper" on ch 16
+    // sine wave "bleeper" on ch 0 (not a MIDI channel)
     // store memory patch 1024 sine wave
     amy_event e = amy_default_event();
     e.patch_number = 1024;
     patches_store_patch(&e, "v0w0");  // Just osc=0 sinewave to have one delta, else the number of oscs is zero = no patch.
     e.num_voices = 1;
-    e.synth = 16;
+    e.synth = 0;
     amy_add_event(&e);
 
     // GM drum synth on channel 10
@@ -1716,6 +1717,13 @@ void amy_default_setup() {
     amy_add_event(&e);
 
     amy_external_midi_input_hook = juno_filter_midi_handler;
+
+    // DX7 4 note poly on channel 2
+    e = amy_default_event();
+    e.num_voices = 4;
+    e.patch_number = 128;
+    e.synth = 2;
+    amy_add_event(&e);
 }
 
 /// Delta pool management

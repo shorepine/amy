@@ -405,5 +405,12 @@ void run_midi() {
 }
 #endif
 
+#ifdef AMY_DAISY
+// Daisy seed
+void run_midi() {
+    // MIDI handled in main.
+}
+#endif
+
 
 #endif // check for macos desktop 

@@ -288,27 +288,6 @@ void example_sine(uint32_t start) {
     amy_add_event(&e);
 }
 
-// Schedule a bleep now
-void bleep(uint32_t start) {
-    amy_event e = amy_default_event();
-    e.osc = 0;
-    e.time = start;
-    e.wave = SINE;
-    e.freq_coefs[COEF_CONST] = 220;
-    e.pan_coefs[COEF_CONST] = 0.9;
-    e.velocity = 1;
-    amy_add_event(&e);
-    e.time = start + 150;
-    e.freq_coefs[COEF_CONST] = 440;
-    e.pan_coefs[COEF_CONST] = 0.1;
-    amy_add_event(&e);
-    e.time = start + 300;
-    e.velocity = 0;
-    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
-    amy_add_event(&e);
-}
-
-
 void example_multimbral_fm() {
     amy_event e = amy_default_event();
     int notes[] = {60, 70, 64, 68, 72, 82};
@@ -489,6 +468,49 @@ void example_sequencer_drums(uint32_t start) {
     e.sequence[SEQUENCE_PERIOD] = 64;
     e.sequence[SEQUENCE_TICK] = 60;
     e.osc = 3;
+    e.velocity = 1.0;
+    amy_add_event(&e);
+}
+
+void example_sequencer_drums_synth(uint32_t start) {
+    // Play a drum pattern using the low-level sequencer structure driving default system drums synth (10)
+    amy_event e;
+
+    // Add patterns.
+    // Hi hat every 8 ticks.
+    e = amy_default_event();
+    e.sequence[SEQUENCE_TAG] = 0;
+    e.sequence[SEQUENCE_PERIOD] = 24;
+    e.sequence[SEQUENCE_TICK] = 0;
+    e.synth = 10;
+    e.midi_note = 42;  // Closed Hat
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Bass drum every 32 ticks.
+    e.sequence[SEQUENCE_TAG] = 1;
+    e.sequence[SEQUENCE_PERIOD] = 96;
+    e.sequence[SEQUENCE_TICK] = 0;
+    e.synth = 10;
+    e.midi_note = 35;  // Std kick
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Snare every 32 ticks, counterphase to BD.
+    e.sequence[SEQUENCE_TAG] = 2;
+    e.sequence[SEQUENCE_PERIOD] = 96;
+    e.sequence[SEQUENCE_TICK] = 48;
+    e.synth = 10;
+    e.midi_note = 38;  // Snare
+    e.velocity = 1.0;
+    amy_add_event(&e);
+
+    // Cow once every other cycle.
+    e.sequence[SEQUENCE_TAG] = 3;
+    e.sequence[SEQUENCE_PERIOD] = 192;
+    e.sequence[SEQUENCE_TICK] = 180;
+    e.synth = 10;
+    e.midi_note = 56;  // Cowbell
     e.velocity = 1.0;
     amy_add_event(&e);
 }

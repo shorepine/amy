@@ -2,7 +2,7 @@
 // C callable entry points to amy
 
 #include "amy.h"
-
+#include "examples.h"  // for bleep()
 
 //////////////////////
 // Hooks
@@ -34,6 +34,7 @@ amy_config_t amy_default_config() {
     c.has_midi_web = 0;
     c.has_midi_gadget = 0;
     c.set_default_synth = 1;
+    c.startup_bleep = 0;
     c.cores = 1;
     c.max_oscs = 180;
     c.max_sequencer_tags = 256;
@@ -197,6 +198,7 @@ void amy_start_web() {
     amy_config.has_midi_web = 1;
     amy_start(amy_config);
 }
+
 void amy_start_web_no_synths() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
@@ -206,11 +208,56 @@ void amy_start_web_no_synths() {
 }
 #endif
 
+// Schedule a bleep now
+void bleep(uint32_t start) {
+    amy_event e = amy_default_event();
+    e.osc = AMY_OSCS - 1;  // Use a high-up osc to avoid collisions?
+    e.time = start;
+    e.wave = SINE;
+    e.freq_coefs[COEF_CONST] = 220;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    e.velocity = 1;
+    amy_add_event(&e);
+    e.time = start + 150;
+    e.freq_coefs[COEF_CONST] = 440;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(&e);
+    e.time = start + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc.
+    amy_add_event(&e);
+}
+
+// Schedule a bleep now using default bleep synth (0)
+void bleep_synth(uint32_t start) {
+    amy_event e = amy_default_event();
+    e.synth = 0;
+    e.time = start;
+    // you have to use notes with synths, so the voice manager can grok.
+    e.midi_note = 57;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    e.velocity = 1;
+    amy_add_event(&e);
+    e.time = start + 150;
+    e.midi_note = 69;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(&e);
+    e.time = start + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
+    amy_add_event(&e);
+}
+
 void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
     amy_profiles_init();
     sequencer_start();
     oscs_init();
-    if(amy_global.config.set_default_synth)amy_default_setup();
+    if(amy_global.config.set_default_synth) {
+	amy_default_setup();
+	if (amy_global.config.startup_bleep) bleep_synth(0);
+    } else {
+	if (amy_global.config.startup_bleep) bleep(0);
+    }
 }

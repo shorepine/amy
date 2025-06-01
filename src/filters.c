@@ -587,7 +587,7 @@ void parametric_eq_process_full(SAMPLE *block) {
 
 }
 
-static SAMPLE inline MAXABS2(SAMPLE a, SAMPLE b) {
+inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
     if (a < 0) a = -a;
     if (b < 0) b = -b;
     if (a > b) return a;

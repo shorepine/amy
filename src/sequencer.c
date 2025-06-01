@@ -169,7 +169,7 @@ void run_sequencer() {
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
 }
 
-#elif (defined PICO_RP2350) || (defined PICO_RP2040)
+#elif defined(PICO_RP2350) || defined(PICO_RP2040)
 // pico: do it with a hardware timer
 
 #include "pico/time.h"
@@ -197,6 +197,11 @@ void * sequencer_thread(void *vargs) {
 void run_sequencer() {
     pthread_t sequencer_thread_id;
     pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
+}
+
+#elif defined AMY_DAISY
+void run_sequencer() {
+    // Set up in DaisyMain.cc
 }
 
 #else
