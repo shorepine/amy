@@ -402,6 +402,7 @@ void run_midi() {
 #ifdef __linux__
 void run_midi() {
     //fprintf(stderr, "no MIDI support on linux yet\n");
+}
 #endif
 
 #ifdef AMY_DAISY
