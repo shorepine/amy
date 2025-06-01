@@ -1,9 +1,10 @@
 #include "daisy_seed.h"
-//#include "daisy_pod.h"
 #include "daisysp.h"
+
 extern "C" {
     #include "amy.h"
     #include "examples.h"
+    extern void sequencer_check_and_fill();
 }
 // Use the daisy namespace to prevent having to type
 // daisy:: before all libdaisy functions
@@ -13,9 +14,6 @@ using namespace daisysp;
 // Declare a DaisySeed object called hardware
 DaisySeed  hardware;
 MidiUartHandler midi;
-FIFO<MidiEvent, 128> event_log;
-
-Switch button1;
 
 void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
@@ -124,6 +122,32 @@ void HandleMidiMessage(MidiEvent m)
     }
 }
 
+void sequencer_timer_callback(void* arg) {
+    sequencer_check_and_fill();
+}
+
+void init_sequencer() {
+    // Platform support of sequencer is to call sequencer_check_and_fill() every 0.5 ms.
+    TimerHandle         tim5;
+    TimerHandle::Config tim_cfg;
+
+    /** TIM5 with IRQ enabled */
+    tim_cfg.periph     = TimerHandle::Config::Peripheral::TIM_5;
+    tim_cfg.enable_irq = true;
+
+    /** Configure frequency (2000Hz) */
+    auto tim_target_freq = 2000;
+    auto tim_base_freq   = System::GetPClk2Freq();
+    tim_cfg.period       = tim_base_freq / tim_target_freq;
+
+    /** Initialize timer */
+    tim5.Init(tim_cfg);
+    tim5.SetCallback(sequencer_timer_callback);
+
+    /** Start the timer, and generate callbacks at the end of each period */
+    tim5.Start();
+}
+
 int main(void)
 {
     // Configure and Initialize the Daisy Seed
@@ -141,29 +165,37 @@ int main(void)
     //Add pin 21 as an analog input in this config. We'll use this to read the knob
     adcConfig.InitSingle(hardware.GetPin(21));
 
-    //Initialize the button on pin 28
-    button1.Init(hardware.GetPin(28), samplerate / 48.f);
-
     //Set the ADC to use our configuration
     hardware.adc.Init(&adcConfig, 1);
 
     //Start the adc
     hardware.adc.Start();
+
+    // Initialize Amy
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
+
+    // Start the sequencer timer.
+    init_sequencer();
+
+    // Startup chime.
+    bleep_synth(0);
+
+    example_sequencer_drums_synth(1000);
 
     //event_polyphony(0, 0);
     test_audio_in();
 
+
     amy_event e = amy_default_event();
     // Switch midi chan 1 voice to piano.
-    e.synth = 1;
-    e.patch_number = 256;
-    e.num_voices = 6;
-    e.time = 1000;
-    amy_add_event(&e);
+    //e.synth = 1;
+    //e.patch_number = 256;
+    //e.num_voices = 6;
+    //e.time = 1000;
+    //amy_add_event(&e);
 
-    config_echo(0.5f, 500.0f, 500.0f, 0.5f, 0.3f);
+    config_echo(0.1f, 500.0f, 500.0f, 0.5f, 0.3f);
 
     //Start calling the audio callback
     hardware.StartAudio(AudioCallback);

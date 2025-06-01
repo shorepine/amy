@@ -256,7 +256,7 @@ struct pcm_sample_info {
 // drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
 
 struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
-    {28, 60},  // "Std Kick", 35)
+    {1, 39},   // "808-KIK", 35)
     {25, 60},  // "Pwr Kick", 36),
     {2, 45},   // "Snare", 37),
     {5, 41},   // "Snare4", 38),

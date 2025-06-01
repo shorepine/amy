@@ -199,6 +199,11 @@ void run_sequencer() {
     pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
 }
 
+#elif defined AMY_DAISY
+void run_sequencer() {
+    // Set up in DaisyMain.cc
+}
+
 #else
 
 void run_sequencer() {
