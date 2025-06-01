@@ -2,6 +2,10 @@
 
 #include "amy.h"
 
+#ifdef AMY_DAISY
+#define malloc_caps(a, b) qspi_malloc(a)
+#define free(a) qspi_free(a)
+#endif
 
 
 // This is for any in-memory PCM samples.
@@ -193,35 +197,22 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     // if preset was already a memorypcm, we need to unload it
     pcm_unload_preset(preset_number); // this is a no-op if preset doesn't exist or is a const pcm
     // now alloc a new LL entry and preset (the old LL entry is removed with pcm_unload_preset)
-    memorypcm_ll_t *prev_preset_pointer = NULL;
-    memorypcm_ll_t *new_preset_pointer = malloc(sizeof(memorypcm_ll_t));
-    if(memorypcm_ll_start == NULL) {
-        memorypcm_ll_start = new_preset_pointer;
-    } else { // find the end
-        memorypcm_ll_t *preset_pointer = memorypcm_ll_start;
-        while(preset_pointer != NULL) {
-            prev_preset_pointer = preset_pointer;
-            preset_pointer = preset_pointer->next;
-        }
-        prev_preset_pointer->next = new_preset_pointer;
+    memorypcm_ll_t *new_preset_pointer = malloc_caps(sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + length * sizeof(int16_t),
+						     amy_global.config.ram_caps_sample);
+    if(new_preset_pointer  == NULL) {
+        fprintf(stderr, "No RAM left for sample load\n");
+        return NULL; // no ram for sample
     }
-    new_preset_pointer->next = NULL;
+    new_preset_pointer->next = memorypcm_ll_start;
+    memorypcm_ll_start = new_preset_pointer;
     new_preset_pointer->preset_number = preset_number;
-    // Now alloc a preset
-    memorypcm_preset_t *memory_preset = malloc_caps(sizeof(memorypcm_preset_t), amy_global.config.ram_caps_sample);
+    memorypcm_preset_t *memory_preset = (memorypcm_preset_t *)(((uint8_t *)new_preset_pointer) + sizeof(memorypcm_ll_t));
     memory_preset->samplerate = samplerate;
     memory_preset->log2sr = log2f((float)samplerate / ZERO_LOGFREQ_IN_HZ);
     memory_preset->midinote = midinote;
     memory_preset->loopstart = loopstart;
     memory_preset->length = length;
-    memory_preset->sample_ram = malloc_caps(length*2, amy_global.config.ram_caps_sample);
-    if(memory_preset->sample_ram  == NULL) {
-        fprintf(stderr, "No RAM left for sample load\n");
-        free(memory_preset);
-        free(new_preset_pointer);
-        prev_preset_pointer->next = NULL;
-        return NULL; // no ram for sample
-    }
+    memory_preset->sample_ram = (int16_t *)(((uint8_t *)memory_preset) + sizeof(memorypcm_preset_t));
     if(loopend == 0) {  // loop whole sample
         memory_preset->loopend = memory_preset->length-1;
     } else {
@@ -233,45 +224,28 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
 
 void pcm_unload_preset(uint16_t preset_number) {
     // run through the LL looking for the preset
-    memorypcm_ll_t *preset_pointer = memorypcm_ll_start;
-    memorypcm_ll_t *prev_preset_pointer = NULL;
-    while(preset_pointer != NULL) {
-        if(preset_pointer->preset_number == preset_number) {
-            // free the ram for the sample, if set        
-            if(preset_pointer->preset->sample_ram != NULL) {
-                free(preset_pointer->preset->sample_ram);
-            }
-            // if this was the first one, reset that
-            if(memorypcm_ll_start == preset_pointer) {
-                memorypcm_ll_start = NULL;
-            }
-            // free the preset
-            free(preset_pointer->preset);
-            // reset the next pointer
-            if(prev_preset_pointer != NULL) {
-                prev_preset_pointer->next = preset_pointer->next;
-            }
-            // free the ll entry
-            free(preset_pointer);
-            // End the loop
-            preset_pointer = NULL;
+    memorypcm_ll_t **preset_pointer = &memorypcm_ll_start;
+    while(*preset_pointer != NULL) {
+        if((*preset_pointer)->preset_number == preset_number) {
+	    memorypcm_ll_t *next = (*preset_pointer)->next;
+	    fprintf(stderr, "unload_preset: unloading %d\n", (*preset_pointer)->preset_number);
+            // free the memory we allocated
+            free((*preset_pointer));
+	    // close up the list
+	    *preset_pointer = next;
+	    return;
         } else {
-            prev_preset_pointer = preset_pointer;
-            preset_pointer = preset_pointer->next;
+            preset_pointer = &(*preset_pointer)->next;
         }
     }
+    fprintf(stderr, "pcm_unload_preset: preset %d not found\n", preset_number);
 }
 
 void pcm_unload_all_presets() {
     memorypcm_ll_t *preset_pointer = memorypcm_ll_start;
     while(preset_pointer != NULL) {
         memorypcm_ll_t *next_pointer = preset_pointer->next;
-        if(preset_pointer->preset->sample_ram != NULL) {
-            free(preset_pointer->preset->sample_ram);
-        }
-        // free the preset
-        free(preset_pointer->preset);
-        // free the LL entry
+	fprintf(stderr, "unload_all_presets: unloading %d\n", preset_pointer->preset_number);
         free(preset_pointer);
         // Go to the next one
         preset_pointer = next_pointer;
