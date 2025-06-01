@@ -1,12 +1,12 @@
 # Project Name
-TARGET = Osc
+TARGET = amy_daisy
 AMY = ${HOME}/github/shorepine/tulipcc/amy/src
 APP_TYPE=BOOT_SRAM
 OPT = -O3
 
 
 # Sources
-CPP_SOURCES = Osc.cpp
+CPP_SOURCES = amy_daisy.cpp
 C_SOURCES = ${AMY}/amy.c ${AMY}/oscillators.c ${AMY}/algorithms.c ${AMY}/envelope.c ${AMY}/examples.c ${AMY}/filters.c ${AMY}/pcm.c ${AMY}/partials.c ${AMY}/custom.c ${AMY}/delay.c ${AMY}/log2_exp2.c ${AMY}/patches.c ${AMY}/api.c ${AMY}/sequencer.c ${AMY}/midi.c ${AMY}/instrument.c ${AMY}/parse.c ${AMY}/transfer.c ${AMY}/interp_partials.c
 
 

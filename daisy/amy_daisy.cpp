@@ -1,3 +1,6 @@
+// amy_daisy.cpp
+// Core daisy function to run AMY on the Daisy hardware/firmware environment.
+
 #include "daisy_seed.h"
 #include "daisysp.h"
 
@@ -6,12 +9,10 @@ extern "C" {
     #include "examples.h"
     extern void sequencer_check_and_fill();
 }
-// Use the daisy namespace to prevent having to type
-// daisy:: before all libdaisy functions
+
 using namespace daisy;
 using namespace daisysp;
 
-// Declare a DaisySeed object called hardware
 DaisySeed  hardware;
 MidiUartHandler midi;
 
@@ -21,13 +22,13 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
 {
     short int * block = amy_simple_fill_buffer();
 
-    //Fill the block with samples
+    // Fill the block with samples.
     for(size_t i = 0; i < size; i += 2)
     {
-        //Set the left and right outputs
-        out[i]     = (block[i]/32767.0); //osc_out;
-        out[i + 1] = (block[i+1]/32767.0); //osc_out;
-	// Copy the inputs
+        // Set the left and right outputs.
+        out[i]     = (block[i]/32767.0);
+        out[i + 1] = (block[i+1]/32767.0);
+	// Copy the inputs.
 	amy_in_block[i] = (short int)(in[i] * 32767.0);
 	amy_in_block[i + 1] = (short int)(in[i + 1] * 32767.0);
     }
@@ -47,11 +48,10 @@ void test_audio_in() {
     e.wave = AUDIO_IN1;
     e.pan_coefs[COEF_CONST] = 1.0f;
     amy_add_event(&e);
-    // Add echo.
-    //amy_add_message("");
 }
 
-void polyphony(uint32_t start, uint16_t patch) {
+void midi_polyphony(uint32_t start, uint16_t patch) {
+    // Play mulitple notes via note-ons to MIDI channel 1.
     uint8_t data[3] = {0x90, 0x00, 0x7f};
     uint8_t note = 40;
     for(uint8_t i=0;i<15;i++) {
@@ -65,7 +65,7 @@ void polyphony(uint32_t start, uint16_t patch) {
 #define MAX_POLYPHONY 17
 
 void event_polyphony(uint32_t start, uint16_t patch) {
-    //patch = 256;
+    // Verify polyphony by directly configuring a lot of voices and playing them all at once.
     amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
@@ -87,9 +87,8 @@ void event_polyphony(uint32_t start, uint16_t patch) {
 }   
 
 
-// Typical Switch case for Message Type.
-void HandleMidiMessage(MidiEvent m)
-{
+void HandleMidiMessage(MidiEvent m) {
+    // MIDI message already part-digested by libDaisy, work back to raw bytes for AMY.
     uint8_t data[3];
     data[0] = m.channel;
     data[1] = m.data[0];
@@ -151,8 +150,6 @@ void init_sequencer() {
 int main(void)
 {
     // Configure and Initialize the Daisy Seed
-    // These are separate to allow reconfiguration of any of the internal
-    // components before initialization.
     hardware.Configure();
     hardware.Init();
     hardware.SetAudioBlockSize(128);
@@ -175,41 +172,36 @@ int main(void)
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config); // initializes amy 
 
-    // Start the sequencer timer.
+    // Start the sequencer timer for AMY.
     init_sequencer();
 
     // Startup chime.
     bleep_synth(0);
 
-    example_sequencer_drums_synth(1000);
-
+    //example_sequencer_drums_synth(1000);
     //event_polyphony(0, 0);
-    test_audio_in();
+    //test_audio_in();
 
-
-    amy_event e = amy_default_event();
     // Switch midi chan 1 voice to piano.
+    //amy_event e = amy_default_event();
     //e.synth = 1;
     //e.patch_number = 256;
     //e.num_voices = 6;
     //e.time = 1000;
     //amy_add_event(&e);
 
-    config_echo(0.1f, 500.0f, 500.0f, 0.5f, 0.3f);
+    //config_echo(0.1f, 500.0f, 500.0f, 0.5f, 0.3f);
 
     //Start calling the audio callback
     hardware.StartAudio(AudioCallback);
 
-    // Loop forever
+    // Loop forever while forwarding MIDI messages.
     MidiUartHandler::Config midi_config;
     midi.Init(midi_config);
     midi.StartReceive();
-    for(;;)
-    {
+    for(;;) {
         midi.Listen();
-        // Handle MIDI Events
-        while(midi.HasEvents())
-        {
+        while(midi.HasEvents()) {
             HandleMidiMessage(midi.PopEvent());
         }
     }
