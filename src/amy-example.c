@@ -59,7 +59,7 @@ int main(int argc, char ** argv) {
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
-    amy_config.features &= ~AMY_HAS_DEFAULT_SYNTHS;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
     
     amy_live_start();

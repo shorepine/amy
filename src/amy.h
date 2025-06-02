@@ -68,17 +68,17 @@ extern const uint16_t pcm_samples;
 // Always use 2 channels. Clients that want mono can deinterleave
 #define AMY_NCHANS 2
 
-#define AMY_CORES ((amy_global.config.features & AMY_FEATURE_DUALCORE) ? 2 : 1)
-#define AMY_HAS_STARTUP_BLEEP (amy_global.config.features & AMY_FEATURE_STARTUP_BLEEP)
-#define AMY_HAS_DUALCORE (amy_global.config.features & AMY_FEATURE_DUALCORE)
-#define AMY_HAS_REVERB (amy_global.config.features & AMY_FEATURE_REVERB)
-#define AMY_HAS_AUDIO_IN (amy_global.config.features & AMY_FEATURE_AUDIO_IN)
-#define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features & AMY_FEATURE_DEFAULT_SYNTHS)
-#define AMY_HAS_CHORUS (amy_global.config.features & AMY_FEATURE_CHORUS)
-#define AMY_HAS_ECHO (amy_global.config.features & AMY_FEATURE_ECHO)
+#define AMY_CORES ((amy_global.config.features.dualcore) ? 2 : 1)
+#define AMY_HAS_STARTUP_BLEEP (amy_global.config.features.startup_bleep)
+#define AMY_HAS_DUALCORE (amy_global.config.features.dualcore)
+#define AMY_HAS_REVERB (amy_global.config.features.reverb)
+#define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
+#define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
+#define AMY_HAS_CHORUS (amy_global.config.features.chorus)
+#define AMY_HAS_ECHO (amy_global.config.features.echo)
 #define AMY_KS_OSCS amy_global.config.ks_oscs
-#define AMY_HAS_PARTIALS  (amy_global.config.features & AMY_FEATURE_PARTIALS)
-#define AMY_HAS_CUSTOM  (amy_global.config.features & AMY_FEATURE_CUSTOM)
+#define AMY_HAS_PARTIALS  (amy_global.config.features.partials)
+#define AMY_HAS_CUSTOM  (amy_global.config.features.custom)
 #define AMY_OSCS amy_global.config.max_oscs
 
 // On which MIDI channel to install the default MIDI drums handler.
@@ -559,19 +559,20 @@ typedef struct delay_line {
 #define AMY_MIDI_IS_MACOS 0x04
 #define AMY_MIDI_IS_WEBMIDI 0x08
 
-#define AMY_FEATURE_CHORUS 0x0001
-#define AMY_FEATURE_REVERB 0x0002
-#define AMY_FEATURE_ECHO 0x0004
-#define AMY_FEATURE_AUDIO_IN 0x0008
-#define AMY_FEATURE_DEFAULT_SYNTHS 0x0010
-#define AMY_FEATURE_PARTIALS 0x0020
-#define AMY_FEATURE_CUSTOM 0x0040
-#define AMY_FEATURE_DUALCORE 0x0080
-#define AMY_FEATURE_STARTUP_BLEEP 0x0100
-
 
 typedef struct  {
-    uint16_t features;
+    // Space optimized representation of the date
+    struct {
+        uint8_t chorus : 1;
+        uint8_t reverb : 1;
+        uint8_t echo : 1;
+        uint8_t audio_in : 1;
+        uint8_t default_synths : 1;
+        uint8_t partials : 1;
+        uint8_t custom : 1;
+        uint8_t dualcore : 1;
+        uint8_t startup_bleep : 1;
+    } features;
     uint8_t midi;    
     uint8_t audio;
 

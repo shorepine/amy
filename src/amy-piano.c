@@ -15,7 +15,7 @@ void delay_ms(uint32_t ms) {
 int main(int argc, char ** argv) {
     amy_config_t amy_config = amy_default_config();
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
-    amy_config.features &= ~AMY_HAS_DEFAULT_SYNTHS;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
     
     amy_live_start();

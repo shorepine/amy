@@ -22,7 +22,15 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 
 amy_config_t amy_default_config() {
     amy_config_t c;
-    c.features = AMY_FEATURE_REVERB | AMY_FEATURE_ECHO | AMY_FEATURE_CHORUS | AMY_FEATURE_PARTIALS | AMY_FEATURE_CUSTOM | AMY_FEATURE_AUDIO_IN | AMY_FEATURE_DEFAULT_SYNTHS;
+    c.features.reverb = 1;
+    c.features.echo = 1;
+    c.features.chorus = 1;
+    c.features.partials = 1;
+    c.features.custom = 1;
+    c.features.audio_in = 1;
+    c.features.default_synths = 1;
+    c.features.startup_bleep = 0;
+
     c.midi = AMY_MIDI_IS_NONE;
     #ifndef AMY_MCU
     c.audio = AMY_AUDIO_IS_MINIAUDIO;
@@ -200,7 +208,7 @@ void amy_start_web_no_synths() {
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
-    amy_config.features &= ~AMY_FEATURE_DEFAULT_SYNTHS;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
 }
 #endif

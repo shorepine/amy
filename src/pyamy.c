@@ -49,7 +49,7 @@ static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * amystart_no_default_wrapper(PyObject *self, PyObject *args) {
     amy_config_t amy_config = amy_default_config();
-    amy_config.features &= ~AMY_FEATURE_DEFAULT_SYNTHS;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config); // initializes amy 
     return Py_None;
 }
