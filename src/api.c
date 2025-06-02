@@ -30,7 +30,6 @@ amy_config_t amy_default_config() {
     c.audio = AMY_AUDIO_IS_I2S;
     #endif
     c.ks_oscs = 1;
-    c.startup_bleep = 0;
 
     c.max_oscs = 180;
     c.max_sequencer_tags = 256;
@@ -253,5 +252,5 @@ void amy_start(amy_config_t c) {
     sequencer_start();
     oscs_init();
     if(AMY_HAS_DEFAULT_SYNTHS)amy_default_setup();
-   	if (amy_global.config.startup_bleep) bleep_synth(0);
+    if(AMY_HAS_STARTUP_BLEEP) bleep_synth(0);
 }
