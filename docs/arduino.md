@@ -3,7 +3,10 @@
 
 
 ## ESP32, ESP32-S3, ESP32-P4
+
 Tested: Arduino IDE 2.3.6 (mac)
+
+
 
 ## Teensy 4.0, 4.1
 
@@ -21,9 +24,12 @@ For UART MIDI, we use Serial8, the pins you set in AMY config are ignored. That'
 
 
 
-
-
 ## Pi Pico RP2040 and Pi Pico 2 RP2350
 
 Tested: Arduino IDE 2.3.6 (mac)
+
+
+## Electro-Smith Daisy Seed
+
+See [Daisy README](../daisy/README.md)
 
