@@ -260,5 +260,5 @@ void amy_start(amy_config_t c) {
     sequencer_start();
     oscs_init();
     if(AMY_HAS_DEFAULT_SYNTHS)amy_default_setup();
-    if(AMY_HAS_STARTUP_BLEEP) bleep_synth(0);
+    if(AMY_HAS_STARTUP_BLEEP) bleep(0);
 }
