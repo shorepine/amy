@@ -113,17 +113,6 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         // Release starts from wherever we got to
         v0 = synth[osc]->last_scale[bp_set];
         if(elapsed > synth[osc]->breakpoint_times[bp_set][bp_r]) {
-            // OK. partials (et al) need a frame to fade out to avoid clicks. This is in conflict with the breakpoint release, 
-            // which will set it to the bp end value before the fade out, often 0 so the fadeout never gets to hit. 
-            // I'm not sure i love this solution, but PARTIAL is such a weird type that i guess having it called out like this is fine.
-            // We had to add a further special case (testing preset is not negative) because "build your own partial" mode wants
-            // to fully respect the actual envelope, else it pops up to full amplitude after the release.
-            if(synth[osc]->wave==PARTIAL && synth[osc]->preset >= 0) {
-                scale = F2S(1.0f);
-                synth[osc]->last_scale[bp_set] = scale;
-                //return scale;
-                goto return_label;
-            }
             //printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, msynth[osc]->amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
             //synth[osc]->status=SYNTH_OFF;

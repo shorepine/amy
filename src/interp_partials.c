@@ -38,6 +38,82 @@ const bool use_this_partial_map[MAX_NUM_HARMONICS] = {
     1, 0, 0, 0, 1, 0, 1, 0, 0, 0,  // 31-40
 };
 
+
+// choose a preset from the .h file
+void partials_note_on(uint16_t osc) {
+    int num_partials = synth[osc]->preset;
+    for (int i = 0; i < num_partials; ++i) {
+        int o = osc + 1 + i;
+        ensure_osc_allocd(o, NULL);
+        if (synth[o]->wave == PARTIAL) {  // User has marked this as a partial.
+            // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
+            // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
+            synth[o]->preset = synth[osc]->preset;
+
+            synth[o]->logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
+            synth[o]->status = SYNTH_IS_ALGO_SOURCE;
+            synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+            AMY_UNSET(synth[o]->note_off_clock);
+            msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
+            partial_note_on(o);
+        }
+    }
+}
+
+void partials_note_off(uint16_t osc) {
+    int num_oscs = synth[osc]->preset;
+    for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
+        uint16_t o = i % AMY_OSCS;
+        AMY_UNSET(synth[o]->note_on_clock);
+        synth[o]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+    }
+}
+
+
+// render a full partial set at offset osc (with preset)
+// freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
+// do all presets have sustain point?
+SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
+    SAMPLE max_value = 0;
+    uint16_t num_oscs = 0;
+    // No preset partials map, we are in "build-your-own".  The max number of oscs is taken from algo_source[0].
+    num_oscs = synth[osc]->preset;
+
+    if (synth[osc]->wave == INTERP_PARTIALS) {
+        //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
+        //num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
+        num_oscs = interp_partials_max_partials_for_patch(synth[osc]->preset);
+    }
+
+    // now, render everything, add it up
+    float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
+    //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
+    for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
+        uint16_t o = i % AMY_OSCS;
+        if(synth[o]->status ==SYNTH_IS_ALGO_SOURCE) {
+            // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
+            synth[o]->velocity = msynth[osc]->amp;
+            // We also use dynamic, fractional note to propagate parent freq modulation.
+            synth[o]->midi_note = midi_note;
+            // hold_and_modify contains a special case for wave == PARTIAL so that
+            // envelope value are delayed by 1 frame compared to other oscs
+            // so that partials fade in over one frame from zero amp.
+            hold_and_modify(o);
+            //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
+            //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
+            SAMPLE value = render_partial(buf, o);
+            if (value > max_value) max_value = value;
+            // Deferred termination of this partial, after final ramp-out.
+            if (synth[o]->amp_coefs[COEF_CONST] == 0)  partial_note_off(o);
+        }
+    }
+    return max_value;
+}
+
+
+
+
+
 int _max_partials_for_partials_voice(const interp_partials_voice_t *partials_voice) {
     int max_num_partials = 0;
     for (int h = 0; h < partials_voice->num_harmonics[0]; ++h) {
@@ -82,7 +158,7 @@ float _env_lin_of_db(float db) {
 void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partials_voice_t *partials_voice) {
     // We coerce this voice into being a partial, regardless of user wishes.
     synth[o]->wave = PARTIAL;
-    synth[o]->preset = -1;  // Flag that this is an envelope-based partial
+    synth[o]->preset = 1;  // Flag that this is an envelope-based partial
     // Setup the specified frequency.
     synth[o]->logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
     // Setup envelope.

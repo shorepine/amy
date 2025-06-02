@@ -952,7 +952,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
         amy_send_midi_note_on(osc);
     }
     if(AMY_HAS_PARTIALS) {
-        if(synth[osc]->wave==PARTIALS || synth[osc]->wave==BYO_PARTIALS) partials_note_on(osc);
+        if(synth[osc]->wave==BYO_PARTIALS) partials_note_on(osc);
         if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_on(osc);
     }
     if(AMY_HAS_CUSTOM) {
@@ -1018,8 +1018,7 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(NOTE_SOURCE, note_source)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-    // For now, if the wave type is BYO_PARTIALS, negate the patch number (which is also num_partials) and treat like regular PARTIALS - partials_note_on knows what to do.
-    if (d->param == PRESET) synth[d->osc]->preset = ((synth[d->osc]->wave == BYO_PARTIALS) ? -1 : 1) * (uint16_t)d->data.i;
+    if (d->param == PRESET) synth[d->osc]->preset = (uint16_t)d->data.i;
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) synth[d->osc]->trigger_phase = F2P(d->data.f);
 
@@ -1178,14 +1177,14 @@ void play_delta(struct delta *d) {
             else if(synth[d->osc]->wave==PCM) pcm_note_off(d->osc);
             else if(synth[d->osc]->wave==AMY_MIDI) amy_send_midi_note_off(d->osc);
             else if(synth[d->osc]->wave==CUSTOM) custom_note_off(d->osc);
-            else if(synth[d->osc]->wave==PARTIALS || synth[d->osc]->wave==BYO_PARTIALS || synth[d->osc]->wave==INTERP_PARTIALS) {
+            else if(synth[d->osc]->wave==BYO_PARTIALS || synth[d->osc]->wave==INTERP_PARTIALS) {
                 AMY_UNSET(synth[d->osc]->note_on_clock);
                 synth[d->osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
                 if(synth[d->osc]->wave==INTERP_PARTIALS) interp_partials_note_off(d->osc);
                 else partials_note_off(d->osc);
             } else {
                 // osc note off, start release
-                // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PARTIALS, PCM, or CUSTOM.
+                // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
                 // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                 // those waves on note-off.
                 AMY_UNSET(synth[d->osc]->note_on_clock);
@@ -1381,7 +1380,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if(synth[osc]->wave == PCM) max_val = render_pcm(buf, osc);
             if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS) {
-                if(synth[osc]->wave == PARTIALS || synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
+                if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
                     max_val = render_partials(buf, osc);
             }
         }
