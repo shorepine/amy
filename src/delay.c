@@ -15,6 +15,44 @@ int is_power_of_two(int val) {
     return -1;  // zero is not a power of 2.
 }
 
+#ifdef AMY_DAISY
+// Put delay lines in QSPI on Daisy
+
+#define QSPI_HEAP_SIZE 1048576
+
+uint8_t __attribute__((section((".sdram_bss")))) qspi_heap[QSPI_HEAP_SIZE];
+uint32_t qspi_used = 0;
+
+void *qspi_malloc(size_t num_bytes) {
+    //fprintf(stderr, "qspi_malloc: %d bytes, used = %d\n", num_bytes, qspi_used);
+    if ((qspi_used + num_bytes) >= QSPI_HEAP_SIZE) {
+	fprintf(stderr, "qspi_malloc: out of heap\n");
+	abort();
+    }
+    // Save the size of this block.
+    *(uint32_t *)(qspi_heap + qspi_used) = num_bytes;
+    qspi_used += sizeof(uint32_t);
+    void *result = (void *)(qspi_heap + qspi_used);
+    qspi_used += num_bytes;
+    return result;
+}
+
+void qspi_free(void *ptr) {
+    uint32_t last_alloc = *(uint32_t *)((uint8_t*)ptr - sizeof(uint32_t));
+    if (ptr == (void *)(qspi_heap + (qspi_used - last_alloc))) {
+	// We're just freeing the last alloc, yay.
+	qspi_used -= last_alloc + sizeof(uint32_t);
+	//fprintf(stderr, "qspi_free: %ld bytes, used = %d\n", last_alloc, qspi_used);
+    } else {
+	fprintf(stderr, "qspi_free: punt (ptr = qspi_heap + %d)\n", (uint8_t*)ptr - (uint8_t *)qspi_heap);
+	// Don't actually recover the memory.
+    }
+}
+
+#define malloc_caps(a, b) qspi_malloc(a)
+#define free(a) qspi_free(a)
+
+#endif
 
 delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     // Check that len is a power of 2.
@@ -24,8 +62,8 @@ delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
         fprintf(stderr, "delay line len must be power of 2, not %d\n", len);
         abort();
     }
-    delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t), ram_type); 
-    delay_line->samples = (SAMPLE*)malloc_caps(len * sizeof(SAMPLE), ram_type);
+    delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t) + len * sizeof(SAMPLE), ram_type); 
+    delay_line->samples = (SAMPLE*)(((uint8_t*)delay_line) + sizeof(delay_line_t));
     delay_line->len = len;
     delay_line->log_2_len = log_2_len;
     delay_line->fixed_delay = fixed_delay;
@@ -33,12 +71,13 @@ delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     for (int i = 0; i < len; ++i) {
         delay_line->samples[i] = 0;
     }
+    //fprintf(stderr, "new_delay_line: len %d fixed_del %d ->0x%x\n", len, fixed_delay, (uint32_t)delay_line);
     return delay_line;
 }
 
 void free_delay_line(delay_line_t *delay_line) {
-    free(delay_line->samples);
-    free(delay_line);
+    //printf("free_delay_line: 0x%x\n", (uint32_t)delay_line);
+    free(delay_line);  // the samples are part of the same malloc.
 }
 
 static SAMPLE FRACTIONAL_SAMPLE(PHASOR phase, const SAMPLE *delay, int index_mask, int index_bits) {

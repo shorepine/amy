@@ -6,23 +6,23 @@
 #define NUM_INTERP_PARTIALS_PRESETS 1
 
 #define NUM_PIANO_SAMPLE_TIMES_MS 20
-const uint16_t piano_sample_times_ms[NUM_PIANO_SAMPLE_TIMES_MS] = {
+const uint16_t piano_sample_times_ms[NUM_PIANO_SAMPLE_TIMES_MS] PROGMEM = {
     4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096,
 };
 
 #define NUM_PIANO_VELOCITIES 3
-const uint8_t piano_velocities[NUM_PIANO_VELOCITIES] = {
+const uint8_t piano_velocities[NUM_PIANO_VELOCITIES] PROGMEM = {
     40, 80, 120,
 };
 
 #define NUM_PIANO_NOTES 21
-const uint8_t piano_notes[NUM_PIANO_NOTES] = {
+const uint8_t piano_notes[NUM_PIANO_NOTES] PROGMEM = {
     24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100,
     104,
 };
 
 #define NUM_PIANO_NUM_HARMONICS 63
-const uint8_t piano_num_harmonics[NUM_PIANO_NUM_HARMONICS] = {
+const uint8_t piano_num_harmonics[NUM_PIANO_NUM_HARMONICS] PROGMEM = {
     40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
     40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 37, 33, 32, 23, 28, 26, 22,
     22, 21, 17, 17, 17, 13, 13, 13, 11, 11, 11, 8, 8, 9, 7, 7, 7, 6, 5, 5,
@@ -30,7 +30,7 @@ const uint8_t piano_num_harmonics[NUM_PIANO_NUM_HARMONICS] = {
 };
 
 #define NUM_PIANO_HARMONICS_FREQ 1760
-const uint16_t piano_harmonics_freq[NUM_PIANO_HARMONICS_FREQ] = {
+const uint16_t piano_harmonics_freq[NUM_PIANO_HARMONICS_FREQ] PROGMEM = {
     2272, 3586, 4290, 4791, 5181, 5498, 5767, 5996, 6209, 6397, 6566, 6721, 6865, 6999, 7124, 7243, 7356, 7462, 7562, 7660,
     7752, 7841, 7928, 8009, 8091, 8171, 8246, 8321, 8398, 8464, 8565, 8629, 8704, 8765, 8826, 8895, 8955, 9012, 9069, 9128,
     2172, 3587, 4287, 4787, 5175, 5493, 5762, 5996, 6205, 6393, 6561, 6716, 6860, 6993, 7118, 7237, 7348, 7456, 7555, 7652,
@@ -122,7 +122,7 @@ const uint16_t piano_harmonics_freq[NUM_PIANO_HARMONICS_FREQ] = {
 };
 
 #define NUM_PIANO_HARMONICS_MAGS 35200
-const uint8_t piano_harmonics_mags[NUM_PIANO_HARMONICS_MAGS] = {
+const uint8_t piano_harmonics_mags[NUM_PIANO_HARMONICS_MAGS] PROGMEM = {
     39, 40, 41, 42, 37, 37, 40, 39, 42, 46, 41, 42, 44, 41, 41, 39, 42, 41, 40, 40,
     51, 53, 55, 56, 55, 50, 48, 53, 49, 49, 51, 52, 53, 52, 52, 52, 53, 50, 52, 50,
     65, 68, 70, 72, 73, 73, 73, 73, 73, 73, 72, 72, 72, 72, 71, 71, 70, 70, 68, 67,
@@ -1885,7 +1885,7 @@ const uint8_t piano_harmonics_mags[NUM_PIANO_HARMONICS_MAGS] = {
     34, 36, 36, 36, 32, 27, 29, 23, 21, 21, 27, 17, 13, 26, 23, 19, 20, 25, 24, 18,
 };
 
-const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] = {
+const interp_partials_voice_t interp_partials_map[NUM_INTERP_PARTIALS_PRESETS] PROGMEM = {
     {
         NUM_PIANO_SAMPLE_TIMES_MS,
         piano_sample_times_ms,

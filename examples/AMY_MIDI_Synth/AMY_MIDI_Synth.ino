@@ -25,18 +25,15 @@ void test_sequencer() {
 void setup() {
   amy_config_t amy_config = amy_default_config();
 
+  // If using a multicore capable chip, set cores to 2 so that you can have more polyphony
+  // Currently we support 2 cores on ESP32, ESP32S3, RP2040, RP2350
+  amy_config.cores = 2;
+
   // If you set has_audio_in you also need to set i2s_din pin
   amy_config.has_audio_in = 0;
 
   // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
   amy_config.has_midi_uart = 1;
-
-  // If you want the default synths (Juno on channel 1, drums on channel 10)
-  amy_config.set_default_synth = 1;
-  
-  // If using a multicore capable chip, set cores to 2 so that you can have more polyphony
-  // Currently we support 2 cores on ESP32, ESP32S3, RP2040, RP2350
-  amy_config.cores = 2;
 
   // Pins for i2s board
   amy_config.i2s_bclk = 8;
@@ -52,6 +49,10 @@ void setup() {
   amy_config.has_chorus = 1;
   amy_config.has_reverb = 1;
   amy_config.has_echo = 1;
+
+  // If you want the default synths (Juno on channel 1, drums on channel 10)
+  amy_config.set_default_synth = 1;
+  amy_config.startup_bleep = 1;
 
   amy_start(amy_config);
   amy_live_start();

@@ -2,7 +2,7 @@
 // C callable entry points to amy
 
 #include "amy.h"
-
+#include "examples.h"  // for bleep()
 
 //////////////////////
 // Hooks
@@ -30,6 +30,8 @@ amy_config_t amy_default_config() {
     c.audio = AMY_AUDIO_IS_I2S;
     #endif
     c.ks_oscs = 1;
+    c.startup_bleep = 0;
+
     c.max_oscs = 180;
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
@@ -193,6 +195,7 @@ void amy_start_web() {
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_start(amy_config);
 }
+
 void amy_start_web_no_synths() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
@@ -203,6 +206,46 @@ void amy_start_web_no_synths() {
 }
 #endif
 
+// Schedule a bleep now
+void bleep(uint32_t start) {
+    amy_event e = amy_default_event();
+    e.osc = AMY_OSCS - 1;  // Use a high-up osc to avoid collisions?
+    e.time = start;
+    e.wave = SINE;
+    e.freq_coefs[COEF_CONST] = 220;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    e.velocity = 1;
+    amy_add_event(&e);
+    e.time = start + 150;
+    e.freq_coefs[COEF_CONST] = 440;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(&e);
+    e.time = start + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc.
+    amy_add_event(&e);
+}
+
+// Schedule a bleep now using default bleep synth (0)
+void bleep_synth(uint32_t start) {
+    amy_event e = amy_default_event();
+    e.synth = 0;
+    e.time = start;
+    // you have to use notes with synths, so the voice manager can grok.
+    e.midi_note = 57;
+    e.pan_coefs[COEF_CONST] = 0.9;
+    e.velocity = 1;
+    amy_add_event(&e);
+    e.time = start + 150;
+    e.midi_note = 69;
+    e.pan_coefs[COEF_CONST] = 0.1;
+    amy_add_event(&e);
+    e.time = start + 300;
+    e.velocity = 0;
+    e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc 0.
+    amy_add_event(&e);
+}
+
 void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
@@ -210,4 +253,5 @@ void amy_start(amy_config_t c) {
     sequencer_start();
     oscs_init();
     if(AMY_HAS_DEFAULT_SYNTHS)amy_default_setup();
+   	if (amy_global.config.startup_bleep) bleep_synth(0);
 }
