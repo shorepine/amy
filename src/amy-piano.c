@@ -1,8 +1,6 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
-
-// This doesn't compile under ARDUINO because of no usleep.  Arduino tries to compile everything anyway.
-#ifndef ARDUINO
+#ifndef ARDUINO 
 
 #include "amy.h"
 #include "examples.h"
@@ -15,9 +13,8 @@ void delay_ms(uint32_t ms) {
 
 int main(int argc, char ** argv) {
     amy_config_t amy_config = amy_default_config();
-    amy_config.playback_device_id = -1;
-    amy_config.capture_device_id = -1;
-    amy_config.set_default_synth = 0;
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
     
     amy_live_start();

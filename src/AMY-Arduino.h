@@ -4,7 +4,6 @@
 #ifndef AMYARDUINOH
 #define AMYARDUINOH
 
-
 #include "Arduino.h"
 
 extern "C" {

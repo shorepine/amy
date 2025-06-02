@@ -33,6 +33,10 @@ extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
 
+#if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
+#define AMY_MCU
+#endif
+
 
 // Set block size and SR. We try for 256/44100, but some platforms don't let us:
 #ifdef AMY_DAISY
@@ -64,14 +68,17 @@ extern const uint16_t pcm_samples;
 // Always use 2 channels. Clients that want mono can deinterleave
 #define AMY_NCHANS 2
 
-#define AMY_CORES amy_global.config.cores
-#define AMY_HAS_REVERB amy_global.config.has_reverb
-#define AMY_HAS_CHORUS amy_global.config.has_chorus
-#define AMY_HAS_ECHO amy_global.config.has_echo
+#define AMY_CORES ((amy_global.config.features.dualcore) ? 2 : 1)
+#define AMY_HAS_STARTUP_BLEEP (amy_global.config.features.startup_bleep)
+#define AMY_HAS_DUALCORE (amy_global.config.features.dualcore)
+#define AMY_HAS_REVERB (amy_global.config.features.reverb)
+#define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
+#define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
+#define AMY_HAS_CHORUS (amy_global.config.features.chorus)
+#define AMY_HAS_ECHO (amy_global.config.features.echo)
 #define AMY_KS_OSCS amy_global.config.ks_oscs
-#define AMY_HAS_PARTIALS amy_global.config.has_partials
-#define AMY_HAS_CUSTOM amy_global.config.has_custom
-#define AMY_DELTA_FIFO_LEN amy_global.config.delta_fifo_len
+#define AMY_HAS_PARTIALS  (amy_global.config.features.partials)
+#define AMY_HAS_CUSTOM  (amy_global.config.features.custom)
 #define AMY_OSCS amy_global.config.max_oscs
 
 // On which MIDI channel to install the default MIDI drums handler.
@@ -187,7 +194,7 @@ enum coefs{
 #define AUDIO_IN1 14
 #define AUDIO_EXT0 15
 #define AUDIO_EXT1 16
-#define MIDI 17
+#define AMY_MIDI 17
 #define CUSTOM 18
 #define WAVE_OFF 19
 
@@ -541,26 +548,35 @@ typedef struct delay_line {
 ///////////////////////////////////////
 // config
 
-typedef struct  {
-    // feature flags
-    uint8_t set_default_synth;
-    uint8_t startup_bleep;
-    uint8_t has_reverb;
-    uint8_t has_echo;
-    uint8_t has_chorus;
-    uint8_t has_audio_in;
-    
-    uint8_t has_midi_uart;
-    uint8_t has_midi_gadget;
-    uint8_t has_midi_mac;
-    uint8_t has_midi_web;
+#define AMY_AUDIO_IS_NONE 0x00
+#define AMY_AUDIO_IS_I2S 0x01
+#define AMY_AUDIO_IS_USB_GADGET 0x02
+#define AMY_AUDIO_IS_MINIAUDIO 0x04
 
-    uint8_t has_partials;
-    uint8_t has_custom; 
+#define AMY_MIDI_IS_NONE 0x0
+#define AMY_MIDI_IS_UART 0x01
+#define AMY_MIDI_IS_USB_GADGET 0x02
+#define AMY_MIDI_IS_MACOS 0x04
+#define AMY_MIDI_IS_WEBMIDI 0x08
+
+
+typedef struct  {
+    struct {
+        uint8_t chorus : 1;
+        uint8_t reverb : 1;
+        uint8_t echo : 1;
+        uint8_t audio_in : 1;
+        uint8_t default_synths : 1;
+        uint8_t partials : 1;
+        uint8_t custom : 1;
+        uint8_t dualcore : 1;
+        uint8_t startup_bleep : 1;
+    } features;
+    uint8_t midi;    
+    uint8_t audio;
 
     // variables
     uint16_t max_oscs;
-    uint8_t cores;
     uint8_t ks_oscs;
     uint32_t max_sequencer_tags;
     uint32_t max_voices;

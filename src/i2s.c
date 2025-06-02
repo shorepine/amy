@@ -32,7 +32,7 @@ i2s_chan_handle_t rx_handle;
 // default ESP setup i2s
 amy_err_t setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
-    if(amy_global.config.has_audio_in) {
+    if(AMY_HAS_AUDIO_IN) {
         i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
     } else {
         i2s_new_channel(&chan_cfg, &tx_handle, NULL);        
@@ -55,11 +55,11 @@ amy_err_t setup_i2s(void) {
     };
     /* Initialize the channel */
     i2s_channel_init_std_mode(tx_handle, &std_cfg);
-    if(amy_global.config.has_audio_in) i2s_channel_init_std_mode(rx_handle, &std_cfg);
+    if(AMY_HAS_AUDIO_IN) i2s_channel_init_std_mode(rx_handle, &std_cfg);
 
     /* Before writing data, start the TX channel first */
     i2s_channel_enable(tx_handle);
-    if(amy_global.config.has_audio_in) i2s_channel_enable(rx_handle);
+    if(AMY_HAS_AUDIO_IN) i2s_channel_enable(rx_handle);
     return AMY_OK;
 }
 
@@ -203,7 +203,7 @@ extern void on_pico_uart_rx();
 void amy_update() {
     int32_t res;
     amy_execute_deltas();
-    if(amy_global.config.cores > 1) {
+    if(AMY_HAS_DUALCORE) {
         queue_entry_t entry = {render_other_core, AMY_OK};
         queue_add_blocking(&call_queue, &entry);
         amy_render(0, AMY_OSCS/2, 0);
@@ -222,6 +222,9 @@ void amy_update() {
     give_audio_buffer(ap, buffer);
     // check MIDI
     on_pico_uart_rx();
+    #ifdef TUD_USB_GADGET
+        pico_process_midi();
+    #endif
 }
 
 
@@ -272,7 +275,7 @@ void core1_main() {
 
 
 amy_err_t i2s_amy_init() {
-    if(amy_global.config.cores > 1) {
+    if(AMY_HAS_DUALCORE) {
         queue_init(&call_queue, sizeof(queue_entry_t), 2);
         queue_init(&results_queue, sizeof(int32_t), 2);
         uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
@@ -287,17 +290,12 @@ amy_err_t i2s_amy_init() {
 
 
 #elif defined __IMXRT1062__
+
+
 extern void teensy_setup_i2s();
+extern void teensy_i2s_send(int16_t *samples);
+
 extern int16_t teensy_get_serial_byte();
-void teensy_i2s_fill_buffer(int32_t** inputs, int32_t** outputs) {
-    amy_execute_deltas();
-    amy_render(0, AMY_OSCS, 0);        
-    int16_t *block = amy_fill_buffer();
-    for (size_t i = 0; i < AMY_BLOCK_SIZE; i++) {
-        outputs[0][i] = block[i*2];
-        outputs[1][i] = block[i*2+1];
-    }
-}
 
 amy_err_t i2s_amy_init() {
     teensy_setup_i2s();
@@ -305,6 +303,11 @@ amy_err_t i2s_amy_init() {
 }
 
 void amy_update() {
+    amy_execute_deltas();
+    amy_render(0, AMY_OSCS, 0);        
+    int16_t *block = amy_fill_buffer();
+    teensy_i2s_send(block);
+
     // do midi in here
     uint8_t bytes[1];
     int16_t t = teensy_get_serial_byte();

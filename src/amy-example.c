@@ -1,7 +1,8 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
 
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
+#ifndef ARDUINO
+
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"
@@ -56,9 +57,10 @@ int main(int argc, char ** argv) {
     amy_external_render_hook = render;
 
     amy_config_t amy_config = amy_default_config();
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
-    amy_config.set_default_synth = 0; //////////////////
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
     
     amy_live_start();

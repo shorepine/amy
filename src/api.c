@@ -20,22 +20,25 @@ void (*amy_external_block_done_hook)(void) = NULL;
 void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
 
 
-
 amy_config_t amy_default_config() {
     amy_config_t c;
-    c.has_reverb = 1;
-    c.has_echo = 1;
-    c.has_chorus = 1;
-    c.has_partials = 1;
-    c.has_custom = 1;
+    c.features.reverb = 1;
+    c.features.echo = 1;
+    c.features.chorus = 1;
+    c.features.partials = 1;
+    c.features.custom = 1;
+    c.features.audio_in = 1;
+    c.features.default_synths = 1;
+    c.features.startup_bleep = 0;
+
+    c.midi = AMY_MIDI_IS_NONE;
+    #ifndef AMY_MCU
+    c.audio = AMY_AUDIO_IS_MINIAUDIO;
+    #else
+    c.audio = AMY_AUDIO_IS_I2S;
+    #endif
     c.ks_oscs = 1;
-    c.has_audio_in = 1;
-    c.has_midi_uart = 0;
-    c.has_midi_web = 0;
-    c.has_midi_gadget = 0;
-    c.set_default_synth = 1;
-    c.startup_bleep = 0;
-    c.cores = 1;
+
     c.max_oscs = 180;
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
@@ -195,15 +198,17 @@ void amy_stop() {
 void amy_start_web() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
-    amy_config.has_midi_web = 1;
+    amy_config.midi = AMY_MIDI_IS_WEBMIDI;
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_start(amy_config);
 }
 
 void amy_start_web_no_synths() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
-    amy_config.set_default_synth = 0;
-    amy_config.has_midi_web = 1;
+    amy_config.midi = AMY_MIDI_IS_WEBMIDI;
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
 }
 #endif
@@ -254,10 +259,6 @@ void amy_start(amy_config_t c) {
     amy_profiles_init();
     sequencer_start();
     oscs_init();
-    if(amy_global.config.set_default_synth) {
-	amy_default_setup();
-	if (amy_global.config.startup_bleep) bleep_synth(0);
-    } else {
-	if (amy_global.config.startup_bleep) bleep(0);
-    }
+    if(AMY_HAS_DEFAULT_SYNTHS)amy_default_setup();
+    if(AMY_HAS_STARTUP_BLEEP) bleep(0);
 }

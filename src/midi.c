@@ -2,17 +2,22 @@
 // i deal with parsing and receiving midi on many platforms
 
 #include "amy.h"
-#include "midi.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
 
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
+#define TUD_USB_GADGET
+#include "tusb.h"
+#include "class/midi/midi.h"
+#include "class/midi/midi_device.h"
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 #endif
 
+
+#include "midi.h"
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
@@ -362,6 +367,8 @@ void on_pico_uart_rx() {
     convert_midi_bytes_to_messages(bytes,i,0);
 }
 
+extern void pico_setup_midi();
+
 void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     uart_init(uart1, 31250);
@@ -373,8 +380,20 @@ void run_midi() {
     //irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
     //irq_set_enabled(UART1_IRQ, true);
     //uart_set_irq_enables(uart1, true, false);
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+        pico_setup_midi();
+    }
 
 }
+
+void check_tusb_midi() {
+    while ( tud_midi_available() ) {
+        uint8_t packet[4];
+        tud_midi_packet_read(packet);
+        convert_midi_bytes_to_messages(packet+1, 3, 1);
+    }
+}
+
 #endif
 
 #ifdef __IMXRT1062__
@@ -385,19 +404,7 @@ void run_midi() {
 }
 #endif
 
-#ifdef TUD_USB_GADGET
-void run_midi() {
-    // check midi USB gadget
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    while(1) {
-        while ( tud_midi_available() ) {
-            uint8_t packet[4];
-            tud_midi_packet_read(packet);
-            convert_midi_bytes_to_messages(packet+1, 3, 1);
-        }
-    }
-}
-#endif
+
 
 #ifdef __linux__
 void run_midi() {

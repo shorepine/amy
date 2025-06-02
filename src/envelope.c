@@ -25,7 +25,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     if(synth[mod_osc]->wave == SINE) value = compute_mod_sine(mod_osc);
     if(pcm_samples)
         if(synth[mod_osc]->wave == PCM) value = compute_mod_pcm(mod_osc);
-    if(AMY_HAS_CUSTOM == 1) {
+    if(AMY_HAS_CUSTOM) {
         if(synth[mod_osc]->wave == CUSTOM) value = compute_mod_custom(mod_osc);
     }
     synth[mod_osc]->mod_value = value;
