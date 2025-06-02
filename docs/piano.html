@@ -238,7 +238,7 @@ def setup_piano_voice(harms_params, base_osc=0, **kwargs):
         amy.send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, **kwargs)
       </div>
 
-      <p>We can now set up a <code>PARTIALS</code> patch #1024 in AMY with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
+      <p>We can now set up a <code>BYO_PARTIALS</code> patch #1024 in AMY with independent per-harmonic envelopes. We set up the piano once, pre-configured to C4.mf for each note and scaled during playback. We&#39;re setting 20 breakpoints independently for 20 harmonics with data read from the <code>piano-params.json</code> file written by <code>piano_heterodyne.ipynb</code>.</p>
       <div class="editor mb-4 preload-python">
 patch_string = 'v0w10Zv%dw%dZ' % (NUM_HARMONICS[0] + 1, amy.PARTIAL)
 

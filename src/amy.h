@@ -187,16 +187,15 @@ enum coefs{
 #define PCM 7
 #define ALGO 8
 #define PARTIAL 9
-#define PARTIALS 10
-#define BYO_PARTIALS 11
-#define INTERP_PARTIALS 12
-#define AUDIO_IN0 13
-#define AUDIO_IN1 14
-#define AUDIO_EXT0 15
-#define AUDIO_EXT1 16
-#define AMY_MIDI 17
-#define CUSTOM 18
-#define WAVE_OFF 19
+#define BYO_PARTIALS 10
+#define INTERP_PARTIALS 11
+#define AUDIO_IN0 12
+#define AUDIO_IN1 13
+#define AUDIO_EXT0 14
+#define AUDIO_EXT1 15
+#define AMY_MIDI 16
+#define CUSTOM 17
+#define WAVE_OFF 18
 
 // synth[].status values
 #define SYNTH_OFF 0

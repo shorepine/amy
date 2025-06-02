@@ -124,12 +124,6 @@ class TestPcmShift(AmyTest):
     amy.send(time=500, note=70, vel=1)
 
 
-class TestPartial(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.PARTIALS, patch=1)
-    amy.send(time=100, note=60, vel=1)
-
 
 class TestSineEnv(AmyTest):
 

@@ -159,32 +159,6 @@ class TestPcmLoopEnvFilt(AmyTest):
     amy.send(time=500, osc=0, vel=0)
 
 
-class TestPartial(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.PARTIALS, preset=1)
-    amy.send(time=100, note=60, vel=1)
-
-
-class TestPartialNoteOff(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.PARTIALS, preset=5)
-    amy.send(time=100, note=60, vel=5)
-    amy.send(time=500, note=60, vel=0)
-
-
-class TestPartialEnvFiltMod(AmyTest):
-
-  def run(self):
-    # PARTIALS uses a whole bunch of oscs following the parent osc, so put the modulator BEFORE.
-    amy.send(time=0, osc=0, freq='0.5')
-    amy.send(time=0, osc=1, wave=amy.PARTIALS, preset=5)
-    amy.send(time=0, osc=1, mod_source=0, freq=',,,,,-0.1')  # Downward sigh from 1 Hz sine beginning.
-    amy.send(time=0, osc=1, filter_type=amy.FILTER_LPF24, filter_freq='2000,0,0,0,3', bp1='0,1,500,0,200,0')
-    amy.send(time=0, osc=1, bp0='100,1,1000,0,1000,0')
-    amy.send(time=100, osc=1, note=60, vel=5)
-    amy.send(time=500, osc=1, note=60, vel=0)
 
 class TestBuildYourOwnPartials(AmyTest):
 

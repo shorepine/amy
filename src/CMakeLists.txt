@@ -31,7 +31,6 @@ if (TARGET tinyusb_device)
             log2_exp2.c
             examples.c
             oscillators.c
-            partials.c
             interp_partials.c
             pcm.c
     )

@@ -504,7 +504,7 @@ def generate_all():
                          {'piano': json.load(open("experiments/piano-params.json", "r"))})
 
 def main():
-    print("Generating all headers needed for AMY (except for partials patches, see partials.py if you want to DIY...")
+    print("Generating all headers needed for AMY...")
     generate_all()
     print("Done.")
 

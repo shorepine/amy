@@ -38,8 +38,6 @@ It supports
 
 The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into AMY setup commands, and also a pure-Python implementation of the AMY FM synthesizer in [`dx7_simulator.py`](https://github.com/shorepine/amy/blob/main/experiments/dx7_simulator.py).
 
-The partial tone synthesizer provides [`partials.py`](https://github.com/shorepine/amy/blob/main/partials.py), where you can model the partials of any arbitrary audio into AMY setup commands for live partial playback of hundreds of oscillators. 
-
 The Juno-6 emulation is in [`juno.py`](https://github.com/shorepine/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY commands and generate patches.
 
 [The piano voice and the code to generate the partials are described here](https://shorepine.github.io/amy/piano.html).
@@ -210,7 +208,7 @@ Here's the full list:
 | `it`   | `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
 | `iv`   | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `synth=X, patch[_number]=Y`. |
 | `im`   | `grab_midi_notes` | 0/1 | Use `amy.send(synth=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
-| `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency / For the PARTIALS base note, ratio controls the speed of the playback |
+| `I`    | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency  |
 | `j`    | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `k`    | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `K`    | `patch_number` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified synth or voice. |
@@ -234,7 +232,7 @@ Here's the full list:
 | `u`    | `patch` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch_number`, or directly configure a `synth`. |
 | `v`    | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `V`    | `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
-| `w`    | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, PARTIALS, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
+| `w`    | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `x`    | `eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `X`    | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `z`    | `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
@@ -538,75 +536,9 @@ amy.send(osc=0, vel=0)
 ```
 
 
-## Partials
-
-Additive synthesis is simply adding together oscillators to make more complex tones. You can modulate the breakpoints of these oscillators over time, for example, changing their pitch or time without artifacts, as the synthesis is simply playing sine waves back at certain amplitudes and frequencies (and phases). It's well suited to certain types of instruments. 
-
-![Partials](https://raw.githubusercontent.com/shorepine/alles/main/pics/partials.png)
-
-We have analyzed the partials of a group of instruments and stored them as presets baked into the synth. Each of these preset patches are comprised of multiple sine wave oscillators, changing over time. The `PARTIALS` type has the presets:
-
-```python
-amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, preset=5) # a nice organ tone
-amy.send(osc=0, vel=1, note=55, wave=amy.PARTIALS, preset=5) # change the frequency
-amy.send(osc=0, vel=1, note=50, wave=amy.PARTIALS, preset=6, ratio=0.2) # ratio slows down the partial playback
-```
-
-The presets are just the start of what you can do with partials in AMY. You can analyze any piece of audio and decompose it into sine waves and play it back on the synthesizer in real time. It requires a little setup on the client end, here on macOS:
-
-```bash
-brew install python3 swig ffmpeg
-python3 -m pip install pydub numpy --user
-tar xvf loris-1.8.tar
-cd loris-1.8
-CPPFLAGS=`python3-config --includes` PYTHON=`which python3` ./configure --with-python --prefix=`python3-config --prefix`
-make
-make install
-cd ..
-```
-
-And then in python (run `python3`):
-
-```python
-import partials, amy
-(m, s) = partials.sequence('sounds/sleepwalk_original_45s.mp3')  # Any audio file
-153 partials and 977 breakpoints, max oscs used at once was 8
-
-amy.live() # Start AMY playing audio
-partials.play(s)
-```
-
-https://user-images.githubusercontent.com/76612/131150119-6fa69e3c-3244-476b-a209-1bd5760bc979.mp4
-
-
-You can see, given any audio file, you can hear a sine wave decomposition version of in AMY. This particular sound emitted 109 partials, with a total of 1029 breakpoints among them to play back to the mesh. Of those 109 partials, only 8 are active at once. `partials.sequence()` performs voice stealing to ensure we use as few oscillators as necessary to play back a set. 
-
-There's a lot of parameters you can (and should!) play with in Loris. `partials.sequence`  and `partials.play`takes the following with their defaults:
-
-```python
-def sequence(filename, # any audio filename
-             max_len_s = 10, # analyze first N seconds
-             amp_floor=-30, # only accept partials at this amplitude in dB, lower #s == more partials
-             hop_time=0.04, # time between analysis windows, impacts distance between breakpoints
-             max_oscs=amy.OSCS, # max AMY oscs to take up
-             freq_res = 10, # freq resolution of analyzer, higher # -- less partials & breakpoints 
-             freq_drift=20, # max difference in Hz within a single partial
-             analysis_window = 100 # analysis window size 
-             ) # returns (metadata, sequence)
-
-def play(sequence, # from partials.sequence
-         osc_offset=0, # start at this oscillator #
-         sustain_ms = -1, # if the instrument should sustain, here's where (in ms)
-         sustain_len_ms = 0, # how long to sustain for
-         time_ratio = 1, # playback speed -- 0.5 , half speed
-         pitch_ratio = 1, # frequency scale, 0.5 , half freq
-         amp_ratio = 1, # amplitude scale
-         )
-```
-
 ## Build-your-own Partials
 
-You can also explicitly control partials in "build-your-own partials" mode, accessed via `wave=amy.BYO_PARTIALS`.  This sets up a string of oscs as individual sinusoids, just like `PARTIALS` mode, but it's up to you to control the details of each partial via its parameters, envelopes, etc.  You just have to say how many partials you want with `num_partials`.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
+You can also explicitly control partials in "build-your-own partials" mode, accessed via `wave=amy.BYO_PARTIALS`.  This sets up a string of oscs as individual sinusoids, but it's up to you to control the details of each partial via its parameters, envelopes, etc.  You just have to say how many partials you want with `num_partials`.  You can then individually set up the amplitude `bp0` envelopes of the next `num_partials` oscs for arbitrary control, subject to the limit of 7 breakpoints plus release for each envelope.  For instance, to get an 8-harmonic pluck tone with a 50 ms attack, and harmonic weights and decay times inversely proportional to to the harmonic number:
 
 ```python
 num_partials = 8
@@ -619,14 +551,14 @@ for i in range(1, num_partials + 1):
 amy.send(osc=0, note=60, vel=1)
 ```
 
-You can add a filter (or an envelope etc.) to the sum of all the `PARTIAL` oscs by configuring it on the parent `PARTIALS` osc:
+You can add a filter (or an envelope etc.) to the sum of all the `PARTIAL` oscs by configuring it on the parent `BYO_PARTIALS` osc:
 
 ```
 amy.send(osc=0, filter=amy.FILTER_HPF, resonance=4, filter_freq={'const': 200, 'eg1': 4}, bp1='0,0,1000,1,0,0')
 amy.send(osc=0, note=60, vel=1)
 # etc.
 ```
-Note that the default `bp0` amplitude envelope of the `PARTIALS` osc is a gate, so if you want to have a nonzero release on your partials, you'll need to add a slower release to the `PARTIALS` osc to avoid it cutting them off.
+Note that the default `bp0` amplitude envelope of the `BYO_PARTIALS` osc is a gate, so if you want to have a nonzero release on your partials, you'll need to add a slower release to the `BYO_PARTIALS` osc to avoid it cutting them off.
 
 
 ## Interpolated partials
