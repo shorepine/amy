@@ -1,6 +1,6 @@
 // amy-message.c
 // hacked from amy-example.c, this code shows using miniaudio and allows entry it AMY ASCII commands.
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
+#ifndef ARDUINO
 
 #include "amy.h"
 #include "libminiaudio-audio.h"

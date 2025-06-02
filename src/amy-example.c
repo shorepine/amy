@@ -1,7 +1,8 @@
 // amy-example.c
 // a simple C example that plays audio using AMY out your speaker 
 
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) &&!defined(ARDUINO)
+#ifndef ARDUINO
+
 #include "amy.h"
 #include "examples.h"
 #include "miniaudio.h"

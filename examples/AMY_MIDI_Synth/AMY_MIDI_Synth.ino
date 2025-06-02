@@ -27,7 +27,7 @@ void setup() {
 
 
   // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
-  amy_config.has_midi_uart = 1;
+  amy_config.midi = AMY_MIDI_IS_UART;
 
   // Pins for i2s board
   amy_config.i2s_bclk = 8;
@@ -38,11 +38,6 @@ void setup() {
   // Pins for UART MIDI
   amy_config.midi_out = 4;
   amy_config.midi_in = 5;
-
-  // Features
-  amy_config.has_chorus = 1;
-  amy_config.has_reverb = 1;
-  amy_config.has_echo = 1;
 
 
   amy_start(amy_config);

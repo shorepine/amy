@@ -218,13 +218,13 @@ void *miniaudio_run(void *vargp) {
 
 #ifdef __EMSCRIPTEN__
 void amy_live_start_web_audioin() {
-    amy_global.config.features &= AMY_HAS_AUDIO_IN;
+    amy_global.config.features.audio_in = 1;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
-    amy_global.config.features &= ~AMY_HAS_AUDIO_IN;
+    amy_global.config.features.audio_in = 1;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
