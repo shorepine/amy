@@ -561,7 +561,6 @@ typedef struct delay_line {
 
 
 typedef struct  {
-    // Space optimized representation of the date
     struct {
         uint8_t chorus : 1;
         uint8_t reverb : 1;
