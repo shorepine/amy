@@ -162,8 +162,13 @@ _KW_MAP_LIST = [   # Order matters because patch string must come last.
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
 _KW_MAP = dict(_KW_MAP_LIST)
 
+def string_or_comma_string(obj):
+    if isinstance(obj, list):
+        return ','.join(map(str, obj))
+    return str(obj)
+
 _ARG_HANDLERS = {
-    'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
+    'I': str, 'F': trunc, 'S': str, 'L': string_or_comma_string, 'C': parse_ctrl_coefs,
 }
 
 # Construct an AMY message
