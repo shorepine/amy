@@ -19,48 +19,6 @@ block_cb = None
     TODO : move this to patches.c
 """
 
-def preset(which,osc=0, **kwargs):
-    # Reset the osc first
-    reset(osc=osc)
-    if(which==0): # simple note. bp0 applied to amp by default (i.e., amp="0,0,1,1" for vel + bp0)
-        send(osc=osc, wave=SINE, bp0="10,1,240,0.7,500,0", **kwargs)
-    if(which==1): # filter bass.  bp0 is amplitude (default) and filter.
-        send(osc=osc, filter_freq="100,0,0,5", resonance=5, wave=SAW_DOWN, filter_type=FILTER_LPF, bp0="0,1,1000,0,100,0", **kwargs)
-    # TODO -- this is a good one to test the whistle on the bps... 
-    if(which==2): # long sine pad to test ADSR
-        send(osc=osc, wave=SINE, bp0="0,0,500,1,500,0.25,750,0", **kwargs)
-    if(which==3): # amp LFO example
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=1.5, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,1850,0.25,250,0", amp="0,0,1,1,0,1", mod_source=osc+1, **kwargs)
-    if(which==4): # pitch LFO going up 
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,250,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
-    if(which==5): # bass drum
-        # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, phase=0.5, **kwargs)
-        send(osc=osc, wave=SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
-    if(which==6): # noise snare
-        send(osc=osc, wave=NOISE, bp0="0,1,250,0,0,0",  **kwargs)
-    if(which==7): # closed hat
-        send(osc=osc, wave=NOISE, bp0="25,1,50,0,0,0", **kwargs)
-    if(which==8): # closed hat from PCM 
-        send(osc=osc, wave=PCM, preset=0, **kwargs)
-    if(which==9): # cowbell from PCM
-        send(osc=osc, wave=PCM, preset=10, **kwargs)
-    if(which==10): # high cowbell from PCM
-        send(osc=osc, wave=PCM, preset=10, note=70, **kwargs)
-    if(which==11): # snare from PCM
-        send(osc=osc, wave=PCM, preset=5, freq=0, **kwargs)
-    if(which==12): # FM bass 
-        send(osc=osc, wave=ALGO, preset=21, **kwargs)
-    if(which==13): # Pcm bass drum
-        send(osc=osc, wave=PCM, preset=1, freq=0, **kwargs)
-    if(which==14): # filtered algo 
-        send(wave=ALGO, patch=62, filter_freq="125,0,0,4", resonance=2.5, filter_type=FILTER_LPF, bp0="1,1,499,0,0,0")
-
 
 # Return a millis() epoch number for use in AMY timing
 # On most computers, this uses ms since midnight using datetime
@@ -252,6 +210,9 @@ def retrieve_patch():
     s = "".join(mess)
     mess =[]
     return s
+
+from patch import Patch
+
 
 # Convenience function to store an in-memory AMY patch
 # Call this, then call stop_store_patch(patch_number) when you're done
