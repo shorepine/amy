@@ -163,8 +163,12 @@ _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key
 _KW_MAP = dict(_KW_MAP_LIST)
 
 def string_or_comma_string(obj):
+    def str_none_is_empty(s):
+        if s is None:
+            return ""
+        return str(s)
     if isinstance(obj, list):
-        return ','.join(map(str, obj))
+        return ','.join(map(str_none_is_empty, obj))
     return str(obj)
 
 _ARG_HANDLERS = {
