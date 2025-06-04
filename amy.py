@@ -14,11 +14,6 @@ log = False
 show_warnings = True
 
 block_cb = None
-"""
-    A bunch of useful presets
-    TODO : move this to patches.c
-"""
-
 
 # Return a millis() epoch number for use in AMY timing
 # On most computers, this uses ms since midnight using datetime
@@ -105,6 +100,21 @@ def parse_ctrl_coefs(coefs):
 
     return ','.join([to_str(x) for x in coefs])
 
+def parse_list_or_comma_string(obj):
+
+    def str_none_is_empty(s):
+        if s is None:
+            return ""
+        return str(s)
+
+    if isinstance(obj, list):
+        return ','.join(map(str_none_is_empty, obj))
+    return str(obj)
+
+def str_of_int(arg):
+    """Cast arg to an int, but then convert it to a str for the wire string."""
+    return str(int(arg))
+
 
 _KW_MAP_LIST = [   # Order matters because patch string must come last.
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
@@ -120,17 +130,8 @@ _KW_MAP_LIST = [   # Order matters because patch string must come last.
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
 _KW_MAP = dict(_KW_MAP_LIST)
 
-def string_or_comma_string(obj):
-    def str_none_is_empty(s):
-        if s is None:
-            return ""
-        return str(s)
-    if isinstance(obj, list):
-        return ','.join(map(str_none_is_empty, obj))
-    return str(obj)
-
 _ARG_HANDLERS = {
-    'I': str, 'F': trunc, 'S': str, 'L': string_or_comma_string, 'C': parse_ctrl_coefs,
+    'I': str_of_int, 'F': trunc, 'S': str, 'L': parse_list_or_comma_string, 'C': parse_ctrl_coefs,
 }
 
 # Construct an AMY message
@@ -210,8 +211,6 @@ def retrieve_patch():
     s = "".join(mess)
     mess =[]
     return s
-
-from patch import Patch
 
 
 # Convenience function to store an in-memory AMY patch
@@ -398,19 +397,16 @@ def test():
 """
     Play all of the patches 
 """
-def play_patches(wait=1, patch_total = 256, **kwargs):
-    import random
-    patch_count = 0
-    while True:
-        patch = random.randint(0,256) #patch_count % patch_total
-        print("Sending patch %d" %(patch))
-        send(osc=0, patch_number=patch)
+from patches import Patch
+
+def play_patches(wait=1, **kwargs):
+    for patchClass in Patch.__subclasses__():
+        print("Patch", patchClass.__name__)
+        send(synth=0, num_voices=1, patch_number=patchClass())
         time.sleep(wait/4.0)            
-        patch_count = patch_count + 1
-        send(osc=0, note=50, vel=1, **kwargs)
+        send(synth=0, note=50, vel=1, **kwargs)
         time.sleep(wait)
-        send(osc=0, vel=0)
-        reset()
+        send(synth=0, vel=0)
         time.sleep(wait/4.0)
 
 
