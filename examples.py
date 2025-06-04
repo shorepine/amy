@@ -5,6 +5,14 @@
 import amy
 from time import sleep
 
+
+def example_multimbral_synth():
+    import example_patches as patches
+    amy.send(patch_number=4, num_voices=6, synth=1)  # juno-6 preset 4 on MIDI channel 1
+    amy.send(patch_number=129, num_voices=2, synth=2) # dx7 preset 1 on MIDI channel 2
+    amy.send(synth=3, num_voices=4, patch_number=patches.filter_bass()) # filter bass user patch on MIDI channel 3
+    amy.send(synth=4, num_voices=4, patch_number=patches.pitch_lfo()) # pitch LFO user patch on MIDI channel 4
+
 def example_reset(start=0):
     amy.send(osc=0, reset=amy.RESET_ALL_OSCS, time=start)
 
