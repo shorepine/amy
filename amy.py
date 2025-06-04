@@ -395,12 +395,39 @@ def test():
 
 
 """
-    Play all of the patches 
+    Play all of the patches
 """
-from patches import Patch
+def play_patches(wait=1, patch_total = 256, **kwargs):
+    import random
+    patch_count = 0
+    while True:
+        patch = random.randint(0,256) #patch_count % patch_total
+        print("Sending patch %d" % patch)
+        send(synth=0, num_voices=1, patch_number=patch)
+        time.sleep(wait/4.0)            
+        send(synth=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(synth=0, vel=0)
+        time.sleep(wait/4.0)
 
-def play_patches(wait=1, **kwargs):
-    for patchClass in Patch.__subclasses__():
+
+import example_patches
+
+def play_example_patches(wait=1, **kwargs):
+    try:
+        patchClasses = example_patches.Patch.__subclasses__()
+    except AttributeError:
+        # micropython does not have __subclasses__
+        patchClasses = [
+            example_patches.simple_sine,
+            example_patches.filter_bass,
+            example_patches.amp_lfo,
+            example_patches.pitch_lfo,
+            example_patches.bass_drum,
+            example_patches.noise_snare,
+            example_patches.closed_hat,
+        ]
+    for patchClass in patchClasses:
         print("Patch", patchClass.__name__)
         send(synth=0, num_voices=1, patch_number=patchClass())
         time.sleep(wait/4.0)            

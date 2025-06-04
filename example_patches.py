@@ -1,4 +1,4 @@
-"""patches.py
+"""example_patches.py
 
 This file provides a collection of illustrations of different voice configurations with AMY.
 
@@ -88,5 +88,5 @@ class noise_snare(Patch):
 class closed_hat(Patch):
     def setup(self, **kwargs):
         amy.send(patch_number=self.patch_number,
-                 osc=0, wave=amy.NOISE, bp0="25,1,50,0,0,0",
+                 osc=0, wave=amy.NOISE, bp0="5,1,30,0,0,0", filter_type=amy.FILTER_HPF, filter_freq=6000,
                  **kwargs)
