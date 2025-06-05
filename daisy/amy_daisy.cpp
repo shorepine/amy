@@ -8,19 +8,49 @@ extern "C" {
     #include "amy.h"
     #include "examples.h"
     extern void sequencer_check_and_fill();
+
+    void dfprintf(const char *format, int num, char *data, size_t len);
 }
 
 using namespace daisy;
 using namespace daisysp;
 
-DaisySeed  hardware;
+DaisySeed  hw;
 MidiUartHandler midi;
+
+#include <stdarg.h>
+
+void printhex1(int i) {
+    i &= 0x0f;
+    if (i < 10)
+	i += '0';
+    else
+	i += 'a' - 10;
+    hw.Print("%c", i);
+}
+
+void printhex2(int i) {
+    i &= 0xff;
+    printhex1(i >> 4);
+    printhex1(i &= 0x0f);
+}
+
+void dfprintf(const char *format, int num, char *data, size_t len) {
+    hw.Print("%s %d ", format, num);
+    for (int i = 0; i < len; ++i) {
+	if ((i % 4) == 0) hw.Print(" ");
+	printhex2(data[i]);
+	hw.Print(" ");
+    }
+    hw.PrintLine("");
+}
 
 void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
                    size_t                                size)
 {
-    short int * block = amy_simple_fill_buffer();
+    amy_render(0, AMY_OSCS, 0);
+    short int * block = amy_fill_buffer();
 
     // Fill the block with samples.
     for(size_t i = 0; i < size; i += 2)
@@ -84,7 +114,7 @@ void event_polyphony(uint32_t start, uint16_t patch) {
         start += 1000;
         note += 2;
     }
-}   
+}
 
 
 void HandleMidiMessage(MidiEvent m) {
@@ -107,6 +137,7 @@ void HandleMidiMessage(MidiEvent m) {
 	    break;
         case ProgramChange:
 	    data[0] |= 0xC0;
+	    //hw.PrintLine("ProgChange: 0x%x 0x%x\n", data[0], data[1]);
             break;
         case PitchBend:
 	    data[0] |= 0xE0;
@@ -150,28 +181,28 @@ void init_sequencer() {
 int main(void)
 {
     // Configure and Initialize the Daisy Seed
-    hardware.Configure();
-    hardware.Init();
-    hardware.SetAudioBlockSize(128);
+    hw.Configure();
+    hw.Init();
+    hw.SetAudioBlockSize(128);
 
     //How many samples we'll output per second
-    float samplerate = hardware.AudioSampleRate();
+    float samplerate = hw.AudioSampleRate();
 
     //Create an ADC configuration
     AdcChannelConfig adcConfig;
     //Add pin 21 as an analog input in this config. We'll use this to read the knob
-    adcConfig.InitSingle(hardware.GetPin(21));
+    adcConfig.InitSingle(hw.GetPin(21));
 
     //Set the ADC to use our configuration
-    hardware.adc.Init(&adcConfig, 1);
+    hw.adc.Init(&adcConfig, 1);
 
     //Start the adc
-    hardware.adc.Start();
+    hw.adc.Start();
 
     // Initialize Amy
     amy_config_t amy_config = amy_default_config();
-    amy_config.features.startup_bleep = 1; 
-    amy_start(amy_config); // initializes amy 
+    amy_config.features.startup_bleep = 1;
+    amy_start(amy_config); // initializes amy
 
     // Start the sequencer timer for AMY.
     init_sequencer();
@@ -191,13 +222,19 @@ int main(void)
     //config_echo(0.1f, 500.0f, 500.0f, 0.5f, 0.3f);
 
     //Start calling the audio callback
-    hardware.StartAudio(AudioCallback);
+    hw.StartAudio(AudioCallback);
 
     // Loop forever while forwarding MIDI messages.
     MidiUartHandler::Config midi_config;
     midi.Init(midi_config);
     midi.StartReceive();
+
+    // Initialize serial logging
+    //hw.StartLog(true);  // Block until terminal ready.
+    //hw.PrintLine("Hello World!");
+
     for(;;) {
+	amy_execute_deltas();
         midi.Listen();
         while(midi.HasEvents()) {
             HandleMidiMessage(midi.PopEvent());

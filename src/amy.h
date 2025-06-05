@@ -259,7 +259,7 @@ typedef int amy_err_t;
 
 
 enum params{
-    WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
+    WAVE, PRESET, MIDI_NOTE,             // 0, 1, 2
     AMP,                                 // 3..11
     DUTY=AMP + NUM_COMBO_COEFS,          // 12..20
     FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 21
@@ -280,7 +280,7 @@ enum params{
     EG0_TYPE, EG1_TYPE,                  // 204, 205
     CLONE_OSC,                           // 206
     RESET_OSC,                           // 207
-    NOTE_SOURCE,                        // 208
+    NOTE_SOURCE,                         // 208
     NO_PARAM                             // 209
 };
 
@@ -914,6 +914,13 @@ extern int32_t delta_list_len(struct delta *d);
 extern int32_t delta_num_free();  // The size of the remaining pool.
 
 extern int peek_stack(char *tag);
+
+#ifdef AMY_DAISY
+extern void dfprintf(const char *format, int num, char *data, size_t len);
+extern void *qspi_malloc(size_t num_bytes);
+extern void qspi_free(void *ptr);
+#endif
+
 
 #endif
 

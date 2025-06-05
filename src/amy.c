@@ -301,6 +301,7 @@ int8_t check_init(amy_err_t (*fn)(), char *name) {
     return 0;
 }
 
+//#define DEBUG_STACK
 #ifdef DEBUG_STACK
 
 static uint8_t *stack_baseline = NULL;
@@ -409,6 +410,9 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
         amy_global.delta_qsize++;
 
     struct delta *new_d = delta_get(d);
+
+    int size = amy_global.delta_qsize;
+    //dfprintf("add_delta qsize", size, (char *)new_d, sizeof(struct delta));
 
     // insert it into the sorted list for fast playback
     struct delta **pptr = queue;
@@ -1456,6 +1460,15 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
         fprintf(stderr, "time %" PRIu32 " core %d max_max=%.3f post-eq max=%.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, core, S2F(max_max), S2F(smax));
     }
 
+    if(AMY_HAS_CHORUS) {
+        ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
+        hold_and_modify(CHORUS_MOD_SOURCE);
+        if(amy_global.chorus.level!=0)  {
+            bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+            render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+        }
+    }
+
     AMY_PROFILE_STOP(AMY_RENDER)
 
 }
@@ -1479,14 +1492,6 @@ void amy_execute_deltas() {
 
     amy_release_lock();
 
-    if(AMY_HAS_CHORUS) {
-        ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
-        hold_and_modify(CHORUS_MOD_SOURCE);
-        if(amy_global.chorus.level!=0)  {
-            bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
-            render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
-        }
-    }
     AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
 
 }

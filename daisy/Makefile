@@ -4,6 +4,7 @@ AMY = ${HOME}/github/shorepine/tulipcc/amy/src
 APP_TYPE=BOOT_SRAM
 OPT = -O3
 
+LDFLAGS += -u _printf_float
 
 # Sources
 CPP_SOURCES = amy_daisy.cpp
