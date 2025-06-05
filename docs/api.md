@@ -116,9 +116,9 @@ amy_start(amy_config);
 | `playback_device_id` | Int | -1 | Which miniaudio device to use for audio output, -1 is auto |
 
 
+## `amy_event` and `amy.send` API:
 
-## `synth`s and `voice`s:
-
+### `synth`s and `voice`s:
 
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
@@ -133,7 +133,8 @@ amy_start(amy_config);
 | `u`    | **TODO**| `patch` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch_number`, or directly configure a `synth`. |
 
 
-## Oscillator control
+### Oscillator control
+
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
@@ -163,7 +164,7 @@ amy_start(amy_config);
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 
 
-## Other
+### Other
 
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
