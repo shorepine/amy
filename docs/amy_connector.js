@@ -1,4 +1,6 @@
-// amyrepl.js
+// amy_connector.js
+// helpers for JS to communicate with AMY, including webMIDI
+
 var amy_add_message = null;
 var amy_reset_sysclock = null
 var amy_module = null;
@@ -10,6 +12,10 @@ var amy_live_start_web = null;
 var audio_started = false;
 var amy_sysclock = null;
 var amy_module = null;
+var midiOutputDevice = null;
+var midiInputDevice = null;
+var amy_audioin_toggle = false;
+
 
 // Once AMY module is loaded, register its functions and start AMY (not yet audio, you need to click for that)
 amyModule().then(async function(am) {
@@ -47,22 +53,6 @@ amyModule().then(async function(am) {
   amy_module = am;
 });
 
-async function start_python() {
-  // Let micropython call an exported AMY function
-  await mp.registerJsModule('amy_js_message', amy_add_message);
-
-  // time.sleep on this would block the browser from executing anything, so we override it to a JS thing
-  mp.registerJsModule("time", {
-    sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
-  });
-
-  // Set up the micropython context, like _boot.py. 
-  await mp.runPythonAsync(`
-    import amy, amy_js_message, time
-    amy.override_send = amy_js_message
-  `);
-}
-
 async function run_async(code) {
   await mp.runPythonAsync(code);
 }
@@ -70,11 +60,30 @@ async function run_async(code) {
 async function start_python_and_audio() {
   // Don't run this twice
   if(everything_started) return;
+  
   // Start the audio worklet (miniaudio)
-  await amy_live_start_web();
-  await start_python();
-  // Wait 200ms on first run only before playing amy commands back to avoid clicks
-  await new Promise((r) => setTimeout(r, 200));
+  if(amy_audioin_toggle) {
+      await amy_live_start_web_audioin();
+  } else {
+      await amy_live_start_web();    
+  }
+  await sleep_ms(200);
+  // Let micropython call an exported AMY function
+  await mp.registerJsModule('amy_js_message', amy_add_message);
+
+  // time.sleep on this would block the browser from executing anything, so we override it to a JS thing
+  mp.registerJsModule("time", {
+    sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
+  });
+  await sleep_ms(200);
+
+  // Set up the micropython context, like _boot.py. 
+  await mp.runPythonAsync(`
+    import amy, amy_js_message, time
+    amy.override_send = amy_js_message
+  `);
+
+  await sleep_ms(200);
   everything_started = true;
   for(i=0;i<run_at_starts.length;i++) {
     if(run_at_starts[i]) {
@@ -147,5 +156,79 @@ function create_editor(element, index) {
 }
 
 
+// Called from AMY to update AMYboard about what tick it is, for the sequencer
+function amy_sequencer_js_hook(tick) {
+    mp.tulipTick(tick);
+}
 
+
+async function setup_midi_devices() {
+  var midi_in = document.amyboard_settings.midi_input;
+  var midi_out = document.amyboard_settings.midi_output;
+  if(WebMidi.inputs.length > midi_in.selectedIndex) {
+    if(midiInputDevice != null) midiInputDevice.destroy();
+    midiInputDevice = WebMidi.getInputById(WebMidi.inputs[midi_in.selectedIndex].id);
+    midiInputDevice.addListener("midimessage", e => {
+      for(byte in e.message.data) {
+        amy_process_single_midi_byte(e.message.data[byte], 1);
+      }
+    });
+  }
+  if(WebMidi.outputs.length > midi_out.selectedIndex) {
+    if(midiOutputDevice != null) midiOutputDevice.destroy();
+    midiOutputDevice = WebMidi.getOutputById(WebMidi.outputs[midi_out.selectedIndex].id);
+  }
+}
+
+async function start_midi() {
+  function onEnabled() {
+    // Populate the dropdowns
+    var midi_in = document.amyboard_settings.midi_input;
+    var midi_out = document.amyboard_settings.midi_output;
+
+    if(WebMidi.inputs.length>0) {
+      midi_in.options.length = 0;
+      WebMidi.inputs.forEach(input => {
+        midi_in.options[midi_in.options.length] = new Option("MIDI in: " + input.name);
+      });
+    }
+
+    if(WebMidi.outputs.length>0) {
+      midi_out.options.length = 0;
+      WebMidi.outputs.forEach(output => {
+        midi_out.options[midi_out.options.length] = new Option("MIDI out: "+ output.name);
+      });
+    }
+    // First run setup 
+    setup_midi_devices();
+  }
+
+  if(WebMidi.supported) {
+    WebMidi
+      .enable({sysex:true})
+      .then(onEnabled)
+      .catch(err => console.log("MIDI: " + err));
+  } else {
+    document.getElementById('midi-input-panel').style.display='none';
+    document.getElementById('midi-output-panel').style.display='none';
+  }
+}
+
+
+async function sleep_ms(ms) {
+    await new Promise((r) => setTimeout(r, ms));
+}
+
+
+async function toggle_audioin() {
+    if(!audio_started) await sleep_ms(1000);
+    await amy_live_stop();
+    if (document.getElementById('amy_audioin').checked) {
+        amy_audioin_toggle = true;
+        await amy_live_start_web_audioin();
+    } else {
+        amy_audioin_toggle = false;
+        await amy_live_start_web();
+    }
+}
 
