@@ -7,7 +7,7 @@ This page collects the current API for [AMY](https://github.com/shorepine/amy).
 
 
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
-| ------ | -------- | ----------  | ------------------------------------- |
+| ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `a`    | `amp_coefs[]` | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
 | `A`    | `bp0` | `bp0`    | string      | Envelope Generator 0's comma-separated breakpoint pairs of time(ms) and level, e.g. `100,0.5,50,0.25,200,0`. The last pair triggers on note off (release) |
 | `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
