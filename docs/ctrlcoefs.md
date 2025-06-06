@@ -1,2 +1,0 @@
-# AMY Control Coefficients (CtrlCoefs)
-
