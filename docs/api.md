@@ -2,22 +2,8 @@
 
 This page collects the current API for [AMY](https://github.com/shorepine/amy).
 
-## C API
 
-Hooks for external programs:
-```c
-// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
-uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
-
-// Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
-float (*amy_external_coef_hook)(uint16_t channel) = NULL;
-
-// Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
-void (*amy_external_block_done_hook)(void) = NULL;
-
-// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
-void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
-```
+## C / Arduino / Javascript API
 
 Parsing, creating and adding events to AMY:
 
@@ -105,18 +91,33 @@ amy_start(amy_config);
 | `max_voices` | Int | 64 | How many voices |
 | `max_synths` | Int | 64 | How many synths |
 | `max_memory_patches` | Int | 32 | How many in memory patches to supprot |
-| `i2s_lrc` | Int | -1 | Pin number for the I2S_LRC pin |
-| `i2s_dout` | Int | -1 | Pin number for the I2S_DOUT pin |
-| `i2s_din` | Int | -1 | Pin number for the I2S_DIN pin |
-| `i2s_bclk` | Int | -1 | Pin number for the I2S_BCLK pin |
-| `i2s_mclk` | Int | -1 | Pin number for the I2S_MCLK pin (optional) |
-| `midi_out` | Int | -1 | Pin number for the MIDI OUT UART pin |
-| `midi_in` | Int | -1 | Pin number for the MIDI IN UART pin |
-| `capture_device_id` | Int | -1 | Which miniaudio device to use for audio input, -1 is auto |
-| `playback_device_id` | Int | -1 | Which miniaudio device to use for audio output, -1 is auto |
+| `i2s_lrc`, `i2s_dout`, `i2s_din`, `i2s_bclk`, `i2s_mclk` | Int | -1 | Pin numbers for the I2S interface |
+| `midi_out`, `midi_in` | Int | -1 | Pin number for the MIDI UART pins |
+| `capture_device_id`, `playback_device_id` | Int | -1 | Which miniaudio device to use, -1 is auto |
+
+
+## Hooks
+
+Optionally called by AMY during rendering:
+
+```c
+// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
+uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
+
+// Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
+float (*amy_external_coef_hook)(uint16_t channel) = NULL;
+
+// Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
+void (*amy_external_block_done_hook)(void) = NULL;
+
+// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
+void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
+```
 
 
 ## `amy_event` and `amy.send` API:
+
+**NOTE:** as of now, a few `amy_event` methods are not availble to C, only using the wire code (or `amy.send()` in Python.)
 
 ### `synth`s and `voice`s:
 
