@@ -22,6 +22,12 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 // Called every sequencer tick
 void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 
+extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
+
+void amy_enable_juno_filter_midi_handler() {
+    amy_external_midi_input_hook = juno_filter_midi_handler;
+}
+
 
 amy_config_t amy_default_config() {
     amy_config_t c;

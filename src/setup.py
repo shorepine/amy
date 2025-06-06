@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 import glob
 import os
 # the c++ extension module
-sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'midi.c', 'api.c']
+sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'midi_mappings.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'midi.c', 'api.c']
 os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 

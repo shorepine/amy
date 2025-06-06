@@ -20,6 +20,8 @@ AMY responds to [MIDI sustain pedal messages.](http://midi.teragonaudio.com/tech
 
 AMY will turn off all notes when receiving an [All Notes Off control change.](http://midi.teragonaudio.com/tech/midispec/ntnoff.htm)
 
+If you enable a [MIDI input hook](api.md) you can add more controller mappings. In the AMY source we provide [midi_mappings.c](../src/midi_mappings.c) with examples. The `juno_filter_midi_handler` assigns MIDI CC 70 to `filter_freq` and 71 to `resonance`. You probably want to make your own [MIDI input hook](api.md) to expand on this for your use cases.
+
 AMY responds to a so far small set of [MIDI CC changes](http://midi.teragonaudio.com/tech/midispec/ctl.htm) to apply to [CtrlCoefs](synth.md) on that channel.
 
 **TODO: fill this in**

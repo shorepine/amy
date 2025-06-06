@@ -727,6 +727,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 
 // API
+void amy_enable_juno_filter_midi_handler();
 void amy_add_message(char *message);
 void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);

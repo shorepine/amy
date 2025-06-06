@@ -19,7 +19,7 @@ async function run_async(code) {
 async function start_python() {
   // Don't run this twice
   if(python_started) return;
-
+  console.log("1");
   // Let micropython call an exported AMY function
   await mp.registerJsModule('amy_js_message', amy_add_message);
 
@@ -27,6 +27,7 @@ async function start_python() {
   mp.registerJsModule("time", {
     sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
   });
+  console.log("2");
 
   // Set up the micropython context, like _boot.py. 
   await mp.runPythonAsync(`
@@ -34,12 +35,15 @@ async function start_python() {
     amy.override_send = amy_js_message
   `);
   await sleep_ms(200);
+  python_started = true;
+  console.log("3");
+
   for(i=0;i<run_at_starts.length;i++) {
     if(run_at_starts[i]) {
       await runCodeBlock(i);
     }
   }
-  python_started = true;
+  console.log("4");
 }
 
 async function resetAMY() {
@@ -100,7 +104,7 @@ function create_editor(element, index) {
   if(element.classList.contains("preload-python")) {
     run_at_start = true;
   }
-  editor.setSize(null,200);
+  editor.setSize(null,150);
   editor.setValue(code.trim()); 
   run_at_starts.push(run_at_start);
   editors.push(editor);

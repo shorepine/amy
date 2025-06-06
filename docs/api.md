@@ -63,6 +63,10 @@ amy_live_start();
 amy_live_stop();
 ```
 
+Default MIDI handlers:
+```c
+void amy_enable_juno_filter_midi_handler(); // assigns the Juno-6 MIDI CC handler
+```
 
 ## `amy_config_t`
 
@@ -111,7 +115,7 @@ float (*amy_external_coef_hook)(uint16_t channel) = NULL;
 // Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
 void (*amy_external_block_done_hook)(void) = NULL;
 
-// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
+// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY -- see midi_mappings.c
 void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
 
 // Called every sequencer tick

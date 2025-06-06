@@ -71,21 +71,21 @@ async function amy_js_start() {
 
 
 async function setup_midi_devices() {
-  var midi_in = document.amyboard_settings.midi_input;
-  var midi_out = document.amyboard_settings.midi_output;
-  if(WebMidi.inputs.length > midi_in.selectedIndex) {
-    if(midiInputDevice != null) midiInputDevice.destroy();
-    midiInputDevice = WebMidi.getInputById(WebMidi.inputs[midi_in.selectedIndex].id);
-    midiInputDevice.addListener("midimessage", e => {
-      for(byte in e.message.data) {
-        amy_process_single_midi_byte(e.message.data[byte], 1);
-      }
-    });
-  }
-  if(WebMidi.outputs.length > midi_out.selectedIndex) {
-    if(midiOutputDevice != null) midiOutputDevice.destroy();
-    midiOutputDevice = WebMidi.getOutputById(WebMidi.outputs[midi_out.selectedIndex].id);
-  }
+    var midi_in = document.amyboard_settings.midi_input;
+    var midi_out = document.amyboard_settings.midi_output;
+    if(WebMidi.inputs.length > midi_in.selectedIndex) {
+      if(midiInputDevice != null) midiInputDevice.destroy();
+      midiInputDevice = WebMidi.getInputById(WebMidi.inputs[midi_in.selectedIndex].id);
+      midiInputDevice.addListener("midimessage", e => {
+        for(byte in e.message.data) {
+          amy_process_single_midi_byte(e.message.data[byte], 1);
+        }
+      });
+    }
+    if(WebMidi.outputs.length > midi_out.selectedIndex) {
+      if(midiOutputDevice != null) midiOutputDevice.destroy();
+      midiOutputDevice = WebMidi.getOutputById(WebMidi.outputs[midi_out.selectedIndex].id);
+    }
 }
 
 async function start_midi() {
@@ -110,15 +110,16 @@ async function start_midi() {
     // First run setup 
     setup_midi_devices();
   }
-
-  if(WebMidi.supported) {
-    WebMidi
-      .enable({sysex:true})
-      .then(onEnabled)
-      .catch(err => console.log("MIDI: " + err));
-  } else {
-    document.getElementById('midi-input-panel').style.display='none';
-    document.getElementById('midi-output-panel').style.display='none';
+  if(typeof WebMidi != 'undefined') {
+    if(WebMidi.supported) {
+      WebMidi
+        .enable({sysex:true})
+        .then(onEnabled)
+        .catch(err => console.log("MIDI: " + err));
+    } else {
+      document.getElementById('midi-input-panel').style.display='none';
+      document.getElementById('midi-output-panel').style.display='none';
+    }
   }
 }
 
