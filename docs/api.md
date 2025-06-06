@@ -2,6 +2,7 @@
 
 This page collects the current API for [AMY](https://github.com/shorepine/amy).
 
+[**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
 
 ## C / Arduino / Javascript API
 
@@ -122,6 +123,11 @@ void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 
 **NOTE:** as of now, a few `amy_event` methods are not availble to C, only using the wire code (or `amy.send()` in Python.)
 
+Please see [AMY synthesizer details](synth.md) for more explanation on the synthesizer parameters.
+
+[**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
+
+
 ### `synth`s and `voice`s:
 
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
@@ -164,7 +170,7 @@ void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 
 ### CtrlCoefs
 
-These per-oscillator parameters use [CtrlCoefs](ctrlcoefs.md) notation
+These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |

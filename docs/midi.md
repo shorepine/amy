@@ -20,7 +20,7 @@ AMY responds to [MIDI sustain pedal messages.](http://midi.teragonaudio.com/tech
 
 AMY will turn off all notes when receiving an [All Notes Off control change.](http://midi.teragonaudio.com/tech/midispec/ntnoff.htm)
 
-AMY responds to a so far small set of [MIDI CC changes](http://midi.teragonaudio.com/tech/midispec/ctl.htm) to apply to [CtrlCoefs](ctrlcoefs.md) on that channel.
+AMY responds to a so far small set of [MIDI CC changes](http://midi.teragonaudio.com/tech/midispec/ctl.htm) to apply to [CtrlCoefs](synth.md) on that channel.
 
 **TODO: fill this in**
 
