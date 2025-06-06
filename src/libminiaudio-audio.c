@@ -224,7 +224,7 @@ void amy_live_start_web_audioin() {
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
-    amy_global.config.features.audio_in = 1;
+    amy_global.config.features.audio_in = 0;
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);

@@ -19,6 +19,15 @@ void (*amy_external_block_done_hook)(void) = NULL;
 // Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
 void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
 
+// Called every sequencer tick
+void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+
+extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
+
+void amy_enable_juno_filter_midi_handler() {
+    amy_external_midi_input_hook = juno_filter_midi_handler;
+}
+
 
 amy_config_t amy_default_config() {
     amy_config_t c;
@@ -81,11 +90,11 @@ amy_config_t amy_default_config() {
 // create a new default API accessible event
 amy_event amy_default_event() {
     amy_event e;
-    clear_event(&e);
+    amy_clear_event(&e);
     return e;
 }
 
-void clear_event(amy_event *e) {
+void amy_clear_event(amy_event *e) {
     e->status = EVENT_EMPTY;
     AMY_UNSET(e->time);
     AMY_UNSET(e->osc);
@@ -171,7 +180,7 @@ uint32_t amy_sysclock() {
 void amy_add_message(char *message) {
     peek_stack("add_message");
     amy_event e; // = amy_default_event();
-    clear_event(&e);
+    amy_clear_event(&e);
     // Parse the wire string into an event
     amy_parse_message(message, strlen(message), &e);
     amy_add_event(&e);

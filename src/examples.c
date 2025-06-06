@@ -289,16 +289,18 @@ void example_sine(uint32_t start) {
 }
 
 void example_multimbral_fm() {
-    amy_event e = amy_default_event();
+    amy_event e0 = amy_default_event();
+    amy_event e1 = amy_default_event();
     int notes[] = {60, 70, 64, 68, 72, 82};
-    e.velocity = 0.5;
-    e.patch_number = 128;
+    e1.velocity = 0.5;
+    e0.patch_number = 128;
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
-        e.midi_note = notes[i];
-        e.pan_coefs[0] = (i%2);
-        e.patch_number++;
-        e.voices[0] = i;
-        amy_add_event(&e);
+        e1.midi_note = notes[i];
+        e1.pan_coefs[0] = (i%2);
+        e0.patch_number++;
+        e0.voices[0] = i;
+        amy_add_event(&e0);
+        amy_add_event(&e1);
         delay_ms(1000);
     }
 }

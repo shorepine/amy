@@ -1,59 +1,25 @@
-// amyrepl.js
-var amy_add_message = null;
-var amy_reset_sysclock = null
-var amy_module = null;
-var everything_started = false;
+
+// Manage Micropython and AMY running together, for a web REPL experience
 var mp = null;
 var editors = [];
 var run_at_starts = [];
-var amy_live_start_web = null;
-var audio_started = false;
-var amy_sysclock = null;
-var amy_module = null;
+var python_started = false;
 
-// Once AMY module is loaded, register its functions and start AMY (not yet audio, you need to click for that)
-amyModule().then(async function(am) {
-  amy_live_start_web = am.cwrap(
-    'amy_live_start_web', null, null, {async: true}    
-  );
-  amy_live_start_web_audioin = am.cwrap(
-    'amy_live_start_web_audioin', null, null, {async: true}    
-  );
-  amy_live_stop = am.cwrap(
-    'amy_live_stop', null,  null, {async: true}    
-  );
-  amy_start_web = am.cwrap(
-    'amy_start_web', null, null
-  );
-  amy_start_web_no_synths = am.cwrap(
-    'amy_start_web_no_synths', null, null
-  );
-  amy_add_message = am.cwrap(
-    'amy_add_message', null, ['string']
-  );
-  amy_reset_sysclock = am.cwrap(
-    'amy_reset_sysclock', null, null
-  );
-  amy_ticks = am.cwrap(
-    'sequencer_ticks', 'number', [null]
-  );
-  amy_sysclock = am.cwrap(
-    'amy_sysclock', 'number', [null]
-  );
-//  amy_get_input_buffer = am.cwrap(
-//    'amy_get_input_buffer', null, ['number']
-//  );
-//  amy_set_input_buffer = am.cwrap(
-//    'amy_set_external_input_buffer', null, ['number']
-//  );
-  amy_process_single_midi_byte = am.cwrap(
-    'amy_process_single_midi_byte', null, ['number, number']
-  );
-  amy_start_web_no_synths();
-  amy_module = am;
-});
+
+async function start_python_and_amy() {
+  await amy_js_start();
+  await start_python();
+}
+
+async function run_async(code) {
+  await mp.runPythonAsync(code);
+}
+
 
 async function start_python() {
+  // Don't run this twice
+  if(python_started) return;
+  console.log("1");
   // Let micropython call an exported AMY function
   await mp.registerJsModule('amy_js_message', amy_add_message);
 
@@ -61,36 +27,27 @@ async function start_python() {
   mp.registerJsModule("time", {
     sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
   });
+  console.log("2");
 
   // Set up the micropython context, like _boot.py. 
   await mp.runPythonAsync(`
     import amy, amy_js_message, time
     amy.override_send = amy_js_message
   `);
-}
+  await sleep_ms(200);
+  python_started = true;
+  console.log("3");
 
-async function run_async(code) {
-  await mp.runPythonAsync(code);
-}
-
-async function start_python_and_audio() {
-  // Don't run this twice
-  if(everything_started) return;
-  // Start the audio worklet (miniaudio)
-  await amy_live_start_web();
-  await start_python();
-  // Wait 200ms on first run only before playing amy commands back to avoid clicks
-  await new Promise((r) => setTimeout(r, 200));
-  everything_started = true;
   for(i=0;i<run_at_starts.length;i++) {
     if(run_at_starts[i]) {
-      runCodeBlock(i);
+      await runCodeBlock(i);
     }
   }
+  console.log("4");
 }
 
 async function resetAMY() {
-  if(everything_started) {
+  if(python_started && amy_started) {
     await mp.runPythonAsync('amy.reset()\n');
   }
 }      
@@ -102,7 +59,8 @@ async function print_error(text) {
 };
 
 async function runCodeBlock(index) {
-  if(!everything_started) await start_python_and_audio();
+  // This is the case that someone clicks the green run button as their first click, so we have to wait for python/amy to start up
+  if(!(python_started && amy_started)) await sleep_ms(1000);
   var py = editors[index].getValue();
   await amy_add_message("S16384Z");
   try {
@@ -146,12 +104,16 @@ function create_editor(element, index) {
   if(element.classList.contains("preload-python")) {
     run_at_start = true;
   }
-  editor.setSize(null,200);
+  editor.setSize(null,150);
   editor.setValue(code.trim()); 
   run_at_starts.push(run_at_start);
   editors.push(editor);
 }
 
 
+// Called from AMY to update AMYboard about what tick it is, for the sequencer
+function amy_sequencer_js_hook(tick) {
+    mp.tulipTick(tick);
+}
 
 

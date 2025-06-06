@@ -14,53 +14,6 @@ log = False
 show_warnings = True
 
 block_cb = None
-"""
-    A bunch of useful presets
-    TODO : move this to patches.c
-"""
-
-def preset(which,osc=0, **kwargs):
-    # Reset the osc first
-    reset(osc=osc)
-    if(which==0): # simple note. bp0 applied to amp by default (i.e., amp="0,0,1,1" for vel + bp0)
-        send(osc=osc, wave=SINE, bp0="10,1,240,0.7,500,0", **kwargs)
-    if(which==1): # filter bass.  bp0 is amplitude (default) and filter.
-        send(osc=osc, filter_freq="100,0,0,5", resonance=5, wave=SAW_DOWN, filter_type=FILTER_LPF, bp0="0,1,1000,0,100,0", **kwargs)
-    # TODO -- this is a good one to test the whistle on the bps... 
-    if(which==2): # long sine pad to test ADSR
-        send(osc=osc, wave=SINE, bp0="0,0,500,1,500,0.25,750,0", **kwargs)
-    if(which==3): # amp LFO example
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=1.5, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,1850,0.25,250,0", amp="0,0,1,1,0,1", mod_source=osc+1, **kwargs)
-    if(which==4): # pitch LFO going up 
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, **kwargs)
-        send(osc=osc, wave=PULSE, bp0="150,1,250,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
-    if(which==5): # bass drum
-        # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
-        reset(osc=osc+1)
-        send(osc=osc+1, wave=SINE, amp=0.50, freq=0.25, phase=0.5, **kwargs)
-        send(osc=osc, wave=SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,1", mod_source=osc+1, **kwargs)
-    if(which==6): # noise snare
-        send(osc=osc, wave=NOISE, bp0="0,1,250,0,0,0",  **kwargs)
-    if(which==7): # closed hat
-        send(osc=osc, wave=NOISE, bp0="25,1,50,0,0,0", **kwargs)
-    if(which==8): # closed hat from PCM 
-        send(osc=osc, wave=PCM, preset=0, **kwargs)
-    if(which==9): # cowbell from PCM
-        send(osc=osc, wave=PCM, preset=10, **kwargs)
-    if(which==10): # high cowbell from PCM
-        send(osc=osc, wave=PCM, preset=10, note=70, **kwargs)
-    if(which==11): # snare from PCM
-        send(osc=osc, wave=PCM, preset=5, freq=0, **kwargs)
-    if(which==12): # FM bass 
-        send(osc=osc, wave=ALGO, preset=21, **kwargs)
-    if(which==13): # Pcm bass drum
-        send(osc=osc, wave=PCM, preset=1, freq=0, **kwargs)
-    if(which==14): # filtered algo 
-        send(wave=ALGO, patch=62, filter_freq="125,0,0,4", resonance=2.5, filter_type=FILTER_LPF, bp0="1,1,499,0,0,0")
-
 
 # Return a millis() epoch number for use in AMY timing
 # On most computers, this uses ms since midnight using datetime
@@ -147,6 +100,21 @@ def parse_ctrl_coefs(coefs):
 
     return ','.join([to_str(x) for x in coefs])
 
+def parse_list_or_comma_string(obj):
+
+    def str_none_is_empty(s):
+        if s is None:
+            return ""
+        return str(s)
+
+    if isinstance(obj, list):
+        return ','.join(map(str_none_is_empty, obj))
+    return str(obj)
+
+def str_of_int(arg):
+    """Cast arg to an int, but then convert it to a str for the wire string."""
+    return str(int(arg))
+
 
 _KW_MAP_LIST = [   # Order matters because patch string must come last.
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
@@ -163,7 +131,7 @@ _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key
 _KW_MAP = dict(_KW_MAP_LIST)
 
 _ARG_HANDLERS = {
-    'I': str, 'F': trunc, 'S': str, 'L': str, 'C': parse_ctrl_coefs,
+    'I': str_of_int, 'F': trunc, 'S': str, 'L': parse_list_or_comma_string, 'C': parse_ctrl_coefs,
 }
 
 # Construct an AMY message
@@ -243,6 +211,7 @@ def retrieve_patch():
     s = "".join(mess)
     mess =[]
     return s
+
 
 # Convenience function to store an in-memory AMY patch
 # Call this, then call stop_store_patch(patch_number) when you're done
@@ -426,21 +395,45 @@ def test():
 
 
 """
-    Play all of the patches 
+    Play all of the patches
 """
 def play_patches(wait=1, patch_total = 256, **kwargs):
     import random
     patch_count = 0
     while True:
         patch = random.randint(0,256) #patch_count % patch_total
-        print("Sending patch %d" %(patch))
-        send(osc=0, patch_number=patch)
+        print("Sending patch %d" % patch)
+        send(synth=0, num_voices=1, patch_number=patch)
         time.sleep(wait/4.0)            
-        patch_count = patch_count + 1
-        send(osc=0, note=50, vel=1, **kwargs)
+        send(synth=0, note=50, vel=1, **kwargs)
         time.sleep(wait)
-        send(osc=0, vel=0)
-        reset()
+        send(synth=0, vel=0)
+        time.sleep(wait/4.0)
+
+
+import example_patches
+
+def play_example_patches(wait=1, **kwargs):
+    try:
+        patchClasses = example_patches.Patch.__subclasses__()
+    except AttributeError:
+        # micropython does not have __subclasses__
+        patchClasses = [
+            example_patches.simple_sine,
+            example_patches.filter_bass,
+            example_patches.amp_lfo,
+            example_patches.pitch_lfo,
+            example_patches.bass_drum,
+            example_patches.noise_snare,
+            example_patches.closed_hat,
+        ]
+    for patchClass in patchClasses:
+        print("Patch", patchClass.__name__)
+        send(synth=0, num_voices=1, patch_number=patchClass())
+        time.sleep(wait/4.0)            
+        send(synth=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(synth=0, vel=0)
         time.sleep(wait/4.0)
 
 

@@ -28,7 +28,7 @@ endif
 CFLAGS += -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations 
 #CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
-EMSCRIPTEN_OPTIONS = -s WASM=1 \
+EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1  \
 -sSTACK_SIZE=128000\
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
@@ -47,7 +47,7 @@ all: default
 SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c src/parse.c \
 	src/filters.c src/oscillators.c src/pcm.c src/interp_partials.c src/custom.c \
 	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c \
-	src/libminiaudio-audio.c src/instrument.c src/midi.c src/api.c
+	src/libminiaudio-audio.c src/instrument.c src/midi.c src/api.c src/midi_mappings.c
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
  
@@ -95,7 +95,7 @@ timing: amy-module
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
 docs/amy.js: $(TARGET)
-	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	 emcc $(SOURCES) src/amy_bindings.cpp $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o
