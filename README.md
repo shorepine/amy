@@ -110,12 +110,12 @@ In Javascript (see [minimal.html](docs/minimal.html) for the full example):
 <!-- Now play MIDI notes over webMIDI -->
 ```
 
-AMY supports note commands, some MIDI controllers, and program changes to change the patch.
+AMY supports [note commands, some MIDI controllers, and program changes to change the patch.](docs/midi.md)
 
 
 ## Controlling AMY in code
 
-Presumably you'd like to explicitly tell AMY what to play. You can control AMY in almost anything. We mostly work in Python, C or Javascript, but AMY has been built to work using absolutely anything that can send a string.
+Presumably you'd like to explicitly tell AMY what to play. You can control AMY from almost anything. We mostly work in Python, C or Javascript, but AMY has been built to work with anything that can send a string.
 
 AMY has two API interfaces: _wire messages_ and `amy_event`. An AMY wire message is a string that looks like `v0n50l1K130r0Z`, with each letter corresponding to a field (like `v0` means `oscillator 0`, `n50` means midi note 50, `K130` means patch number 130, etc.) Wire messages are converted into `amy_event`s within AMY once received. 
 
@@ -147,13 +147,13 @@ It's good to understand what wire messages are but you don't need to construct t
 
 **TODO** : a nice omnigraffle or whatever diagram of many small oscillators making up a voice, many voices making up a synth
 
-AMY's lowest level of control is the **oscillator** - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. 
+AMY's lowest level of control is the `osc`illator - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. 
 
-We then provide **voices**, to make it easier to configure and use groups of oscillators in coordination. For example, a single Juno-6 note is a single voice made from 5 oscillators. 
+We then provide `voices`, to make it easier to configure and use groups of oscillators in coordination. For example, a single Juno-6 note is a single voice made from 5 oscillators. 
 
-You configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.  You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. 
+You configure a voice by using a `patch`, which is simply a stored list of AMY commands that set up one or more oscillators.  You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. 
 
-You then manage a set of voices using a **synth**, which takes care of allocating available voices to successive notes. For example a Juno-6 synth can play 6 notes of a patch at once. The **synth** in AMY allocates 6 **voices**, each with 5 **oscillators**, and handles note stealing and parameter changes. 
+You then manage a set of voices using a `synth`, which takes care of allocating available voices to successive notes. For example a Juno-6 synth can play 6 notes of a patch at once. The `synth` in AMY allocates 6 `voices`, each with 5 `osc`, and handles note stealing and parameter changes. 
 
 (Note that when you use voices, you'll need to include the `voices` or `synth` args when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
 
@@ -171,11 +171,11 @@ The code in `amy_headers.py` generates these patches and bakes them into AMY so 
 
 ### User patches
 
+**TODO: I think this is older still, dan to tell me what to put here**
+
 You can also create your own patches at runtime and use them for voices with `amy.send(patch_number=PATCH_NUMBER, patch='AMY_PATCH_STRING')` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
 
 So you can do:
-
-**TODO: I think this is older still**
 
 ```python
 >>> import amy; amy.live()  # Not needed on Tulip.
