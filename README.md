@@ -16,7 +16,9 @@ AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Bria
 
  * [**Interactive AMY tutorial**](https://shorepine.github.io/amy/tutorial.html)
  * [**AMY API**](docs/api.md)
+ * [**AMY's MIDI specification**](docs/midi.md)
  * [**AMY in Arduino Getting Started**](docs/arduino.md)
+ * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
 AMY supports
 
@@ -34,8 +36,8 @@ AMY supports
  * Each oscillator has 2 envelope generators, which can modify any combination of amplitude, frequency, PWM duty, filter cutoff, or pan over time
  * Each oscillator can also act as an modulator to modify any combination of parameters of another oscillator, for example, a bass drum can be indicated via a half phase sine wave at 0.25Hz modulating the frequency of another sine wave. 
  * Control of overall gain and 3-band EQ
- * 300+ built in preset patches for PCM, DX7, piano and Juno
- * A front end for DX7 and Juno-6 patches and conversion setup commands 
+ * 300+ built in preset patches for PCM, DX7, piano and Juno-6
+ * A front end for DX7 and Juno-6 SYSEX patches and conversion setup commands 
  * Built-in event clock and pattern sequencer, using hardware real time timers on microcontrollers
  * Multi-core (including microcontrollers) for rendering if available
 
@@ -78,7 +80,7 @@ make
 
 ## MIDI mode
 
-The simplest way to use AMY is to start it and them play MIDI notes to it. By default, AMY boots with a Juno-6 patch 0 on MIDI channel 1.
+AMY provides a [MIDI mode](docs/midi.md) by default that lets you control many parts of AMY over MIDI. You can even control the underlying oscillators over SYSEX. See our [MIDI documentation](docs/midi.md) for more details. The simplest way to use AMY is to start it and them play MIDI notes to it. By default, AMY boots with a Juno-6 patch 0 on MIDI channel 1.
 
 In Python:
 
@@ -113,11 +115,11 @@ AMY supports note commands, some MIDI controllers, and program changes to change
 
 ## Controlling AMY in code
 
-But presumably you'd like to explicitly tell AMY what to play. You can control AMY in C (or C++, or Arduino, or anything that can expose the C structure), JS, or Python.
+Presumably you'd like to explicitly tell AMY what to play. You can control AMY in almost anything. We mostly work in Python, C or Javascript, but AMY has been built to work using absolutely anything that can send a string.
 
 AMY has two API interfaces: _wire messages_ and `amy_event`. An AMY wire message is a string that looks like `v0n50l1K130r0Z`, with each letter corresponding to a field (like `v0` means `oscillator 0`, `n50` means midi note 50, `K130` means patch number 130, etc.) Wire messages are converted into `amy_event`s within AMY once received. 
 
-`amy_event` is a C struct (with bindings in JS as well) that you can fill in to define a single event of the synthesizer. For example, that wire message is converted into (C or JS):
+So in C, or JS, you'd fill an `amy_event` struct to define a single event of the synthesizer. For example, that wire message above is:
 
 ```c
 amy_event e = amy_default_event();
@@ -136,25 +138,35 @@ amy.send(osc=0, patch_number = 130, vel = 1, note = 50, voices = [0])
 
 Wire messages are used in AMY as a compact serialization of AMY events and become useful when communicating between AMY and other programs that may not be linked together. For example, [Alles](https://github.com/shorepine/alles) uses wire messages over Wi-Fi UDP to control a mesh of AMY synthesizers. [Tulip Web](https://tulip.computer/run) sends wire messages from the Micropython web process to the AudioWorklet running AMY on the web. We also store the Juno-6 and DX7 patches within AMY itself using wire messages, which helps keep the code size down. 
 
-It's important to understand what wire messages are but you don't need to construct them directly if you're linking AMY in your software. Use `amy_event` or `amy.send()` in Python to control AMY for almost all use cases.
+You can also send wire messages over SYSEX to AMY, if you want to control AMY over MIDI beyond the default MIDI mode. [See our MIDI documentation for more details.](docs/midi.md)
+
+It's good to understand what wire messages are but you don't need to construct them directly if you're linking AMY in your software. Use `amy_event` or `amy.send()` in Python to control AMY for almost all use cases.
 
 
-## Synths, voices and patches
+## Oscillators, voices, patches and synths
 
-AMY provides **voices**, to make it easier to configure and use groups of oscillators in coordination.  And you configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.  You can also manage a set of voices using a **synth**, which takes care of allocating available voices to successive notes.
+**TODO** : a nice omnigraffle or whatever diagram of many small oscillators making up a voice, many voices making up a synth
 
-A voice in AMY is a collection of oscillators. You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood.  (Note that when you use voices, you'll need to include the `voices` or `synth` args when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
+AMY's lowest level of control is the **oscillator** - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. 
+
+We then provide **voices**, to make it easier to configure and use groups of oscillators in coordination. For example, a single Juno-6 note is a single voice made from 5 oscillators. 
+
+You configure a voice by using a **patch**, which is simply a stored list of AMY commands that set up one or more oscillators.  You can assign any patch to any voice number, or set up mulitple voices to have the same patch (for example, a polyphonic synth), and AMY will allocate the oscillators it needs under the hood. 
+
+You then manage a set of voices using a **synth**, which takes care of allocating available voices to successive notes. For example a Juno-6 synth can play 6 notes of a patch at once. The **synth** in AMY allocates 6 **voices**, each with 5 **oscillators**, and handles note stealing and parameter changes. 
+
+(Note that when you use voices, you'll need to include the `voices` or `synth` args when addressing oscillators, and AMY will automatically route your command to the relevant oscillator in each voice set -- there's no other way to tell which oscillators are being used by which voices.)
 
 To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers and a piano, you allocate them to one or more voices (either directly or as part of a synth), then send note events, or parameter moidifications, to those voices. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
-amy.send(voices='0,1,2,3', load_patch=1)     # Juno patch #1 on voice 0-3
-amy.send(voices='4,5,6,7', load_patch=129)   # DX7 patch #2 on voices 4-7
+amy.send(voices='0,1,2,3', patch_number=1)     # Juno patch #1 on voice 0-3
+amy.send(voices='4,5,6,7', patch_number=129)   # DX7 patch #2 on voices 4-7
 amy.send(voices=0, note=60, vel=1)           # Play note 60 on voice 0
 amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the Juno voice (using its bottom oscillator)
 ```
 
-The code in `amy_headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches by storing alternative wire-protocol setup strings in `patches.h`.
+The code in `amy_headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches at compile time by storing alternative wire-protocol setup strings in `patches.h`, or by making user patches at runtime:
 
 
 ### User patches
@@ -218,28 +230,12 @@ amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 
 # Synthesizer details
 
-We'll use Python for showing examples of AMY.  Maybe you're running under [Tulip](https://github.com/shorepine/tulipcc), in which case AMY is already loaded, but if you're running under standard Python, make sure you've installed `libamy` and are running a live AMY first by running `make test` and then:
-```bash
-python
->>> import amy
->>> amy.live()
-```
 
 ## AMY's sequencer and timestamps
 
-AMY is meant to either receive messages in real time or scheduled events in the future. It can be used as a sequencer where you can schedule notes to play in the future or on a divider of the clock.
+AMY can accept a `time` (in milliseconds) parameter to schedule events in the future, and also provides a pattern sequencer for repeating events.
 
 The scheduled events are very helpful in cases where you can't rely on an accurate clock from the client, or don't have one. The clock used internally by AMY is based on the audio samples being generated out the speakers, which should run at an accurate 44,100 times a second.  This lets you do things like schedule fast moving parameter changes over short windows of time. 
-
-For example, to play two notes, one a second after the first, you could do:
-
-```python
-amy.send(osc=0, note=50, vel=1)
-time.sleep(1)
-amy.send(osc=0, note=52, vel=1)
-```
-
-But you'd be at the mercy of Python's internal timing, or your OS. A more precise way is to send the messages at the same time, but to indicate the intended time of the playback:
 
 ```python
 start = amy.millis()  # arbitrary start timestamp
@@ -252,7 +248,7 @@ Both `amy.send()`s will return immediately, but you'll hear the second note play
 
 ### The sequencer
 
-On supported platforms (right now any unix device with pthreads, and the ESP32 or related chip), AMY starts a sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. Note this will happen immediately, ignoring any `time` or `sequence`.
+AMY starts a musical sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. Note this will happen immediately, ignoring any `time` or `sequence`.
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
@@ -264,7 +260,7 @@ For pattern sequencers like drum machines, you will also want to use `tick` alon
 
 `tag` should be given, and will be `0` if not. You should set `tag` to a random or incrementing number in your code that you can refer to later. `tag` allows you to replace or delete the event once scheduled. 
 
-If you are including AMY in a program, you can set the hook `void (*amy_external_sequencer_hook)(uint32_t)` to any function. This will be called at every tick with the current tick number as an argument. 
+If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](docs/api.md) to any function. This will be called at every tick with the current tick number as an argument. 
 
 Sequencer examples:
 
@@ -285,6 +281,8 @@ amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence="216,384,2") # ninth slo
 ```
 
 ## Examples
+
+**TODO** : move these to tutorial
 
 Try to set the volume of the synth with `amy.send(volume=2)` -- that can be up to 10 or so.  The default is 1. 
 
