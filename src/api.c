@@ -81,11 +81,11 @@ amy_config_t amy_default_config() {
 // create a new default API accessible event
 amy_event amy_default_event() {
     amy_event e;
-    clear_event(&e);
+    amy_clear_event(&e);
     return e;
 }
 
-void clear_event(amy_event *e) {
+void amy_clear_event(amy_event *e) {
     e->status = EVENT_EMPTY;
     AMY_UNSET(e->time);
     AMY_UNSET(e->osc);
@@ -171,7 +171,7 @@ uint32_t amy_sysclock() {
 void amy_add_message(char *message) {
     peek_stack("add_message");
     amy_event e; // = amy_default_event();
-    clear_event(&e);
+    amy_clear_event(&e);
     // Parse the wire string into an event
     amy_parse_message(message, strlen(message), &e);
     amy_add_event(&e);

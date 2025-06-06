@@ -737,7 +737,7 @@ void amy_live_stop();
 int16_t * amy_simple_fill_buffer() ;
 void amy_update();
 amy_config_t amy_default_config();
-void clear_event(amy_event *e);
+void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
 void amy_get_input_buffer(output_sample_type * samples);

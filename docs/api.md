@@ -26,7 +26,7 @@ Parsing, creating and adding events to AMY:
 amy_event amy_default_event();
 
 // clears an existing AMY event
-clear_event(amy_event *e);
+amy_clear_event(amy_event *e);
 
 // given an event play / schedule the event directly
 amy_add_event(amy_event *e);
