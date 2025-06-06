@@ -4,10 +4,7 @@
 var amy_add_message = null;
 var amy_reset_sysclock = null
 var amy_module = null;
-var everything_started = false;
-var mp = null;
-var editors = [];
-var run_at_starts = [];
+var amy_started = false;
 var amy_live_start_web = null;
 var audio_started = false;
 var amy_sysclock = null;
@@ -15,6 +12,8 @@ var amy_module = null;
 var midiOutputDevice = null;
 var midiInputDevice = null;
 var amy_audioin_toggle = false;
+
+
 
 
 // Once AMY module is loaded, register its functions and start AMY (not yet audio, you need to click for that)
@@ -49,18 +48,16 @@ amyModule().then(async function(am) {
   amy_process_single_midi_byte = am.cwrap(
     'amy_process_single_midi_byte', null, ['number, number']
   );
-  amy_start_web_no_synths();
+  amy_start_web();
   amy_module = am;
 });
 
-async function run_async(code) {
-  await mp.runPythonAsync(code);
-}
 
-async function start_python_and_audio() {
+async function amy_js_start() {
   // Don't run this twice
-  if(everything_started) return;
-  
+  if(amy_started) return;
+  await start_midi();	
+  await sleep_ms(200);
   // Start the audio worklet (miniaudio)
   if(amy_audioin_toggle) {
       await amy_live_start_web_audioin();
@@ -68,98 +65,9 @@ async function start_python_and_audio() {
       await amy_live_start_web();    
   }
   await sleep_ms(200);
-  // Let micropython call an exported AMY function
-  await mp.registerJsModule('amy_js_message', amy_add_message);
-
-  // time.sleep on this would block the browser from executing anything, so we override it to a JS thing
-  mp.registerJsModule("time", {
-    sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
-  });
-  await sleep_ms(200);
-
-  // Set up the micropython context, like _boot.py. 
-  await mp.runPythonAsync(`
-    import amy, amy_js_message, time
-    amy.override_send = amy_js_message
-  `);
-
-  await sleep_ms(200);
-  everything_started = true;
-  for(i=0;i<run_at_starts.length;i++) {
-    if(run_at_starts[i]) {
-      runCodeBlock(i);
-    }
-  }
+  amy_started = true;
 }
 
-async function resetAMY() {
-  if(everything_started) {
-    await mp.runPythonAsync('amy.reset()\n');
-  }
-}      
-
-async function print_error(text) {
-    document.getElementById("python-output-text").innerHTML = "<pre>"+text+"</pre>";
-    let myModal = new bootstrap.Modal(document.getElementById('myModal'), {backdrop:false});
-    myModal.show();            
-};
-
-async function runCodeBlock(index) {
-  if(!everything_started) await start_python_and_audio();
-  var py = editors[index].getValue();
-  await amy_add_message("S16384Z");
-  try {
-    mp.runPythonAsync(py);
-  } catch (e) {
-    await print_error(e.message);
-  }
-}
-
-// Create editor block for notebook mode.
-function create_editor(element, index) {
-  code = element.textContent;
-  element.innerHTML = `
-  <div>
-    <section class="input">
-      <div><textarea id="code-${index}" name="code-${index}"></textarea></div> 
-    </section>
-    <div class="align-self-center my-3"> 
-      <button type="button" class="btn btn-sm btn-success" onclick="runCodeBlock(${index})">►</button> 
-      <button type="button" class="btn btn-sm btn-danger" onclick="resetAMY()">Reset</button> 
-    </div>
-  </div>`;
-
-  const editor = CodeMirror.fromTextArea(document.getElementById(`code-${index}`), { 
-    mode: { 
-      name: "python", 
-      version: 3, 
-      singleLineStringErrors: false,
-      lint: false
-    }, 
-    lineNumbers: true, 
-    indentUnit: 4, 
-    matchBrackets: true,
-    spellCheck: false,
-    autocorrect: false,
-    theme: "solarized dark",
-    lint: false,
-  }); 
-
-  run_at_start = false;
-  if(element.classList.contains("preload-python")) {
-    run_at_start = true;
-  }
-  editor.setSize(null,200);
-  editor.setValue(code.trim()); 
-  run_at_starts.push(run_at_start);
-  editors.push(editor);
-}
-
-
-// Called from AMY to update AMYboard about what tick it is, for the sequencer
-function amy_sequencer_js_hook(tick) {
-    mp.tulipTick(tick);
-}
 
 
 async function setup_midi_devices() {
@@ -221,7 +129,7 @@ async function sleep_ms(ms) {
 
 
 async function toggle_audioin() {
-    if(!audio_started) await sleep_ms(1000);
+    if(!amy_started) await sleep_ms(1000);
     await amy_live_stop();
     if (document.getElementById('amy_audioin').checked) {
         amy_audioin_toggle = true;
@@ -231,4 +139,5 @@ async function toggle_audioin() {
         await amy_live_start_web();
     }
 }
+
 

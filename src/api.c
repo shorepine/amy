@@ -19,6 +19,9 @@ void (*amy_external_block_done_hook)(void) = NULL;
 // Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
 void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
 
+// Called every sequencer tick
+void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+
 
 amy_config_t amy_default_config() {
     amy_config_t c;

@@ -14,6 +14,5 @@ void sequencer_start();
 
 void sequencer_recompute();
 uint8_t sequencer_add_event(amy_event *e);
-extern void (*amy_external_sequencer_hook)(uint32_t);
 
 #endif

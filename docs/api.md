@@ -112,6 +112,9 @@ void (*amy_external_block_done_hook)(void) = NULL;
 
 // Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
 void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
+
+// Called every sequencer tick
+void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 ```
 
 
@@ -141,15 +144,12 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `w`    | `wave` | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
 | `S`    | `reset_osc`| `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock (immediately, ignoring `time`). RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
-| `a`    | `amp_coefs[]` | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by Envelope Generator 0.) |
 | `A`    | `bp0` | `bp0`    | string      | Envelope Generator 0's comma-separated breakpoint pairs of time(ms) and level, e.g. `100,0.5,50,0.25,200,0`. The last pair triggers on note off (release) |
-| `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | `B`    | `bp1` | `bp1`    | string      | Breakpoints for Envelope Generator 1. See bp0 |
+| `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | `c`    | `chained_osc` | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
-| `d`    | `duty_coefs[]` | `duty`   |  float[,float...] | Duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
-| `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
-| `f`    | `freq_coefs[]` | `freq`   |  float[,float...]      | Frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
-| `F`    | `filter_freq_coefs[]` | `filter_freq` | float[,float...]  | Center/break frequency for variable filter, set of ControlCoefficients |
+
+
 | `G`    | `filter_type` | `filter_type` | 0-4 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass. |
 | `I`    | `ratio` | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency  |
 | `L`    | `mod_source` | `mod_source` | 0 to OSCS-1 | Which oscillator is used as an modulation/LFO source for this oscillator. Source oscillator will be silent. |
@@ -159,10 +159,22 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 | `O`    | `algo_source[]`| `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `preset` | `preset` | int | Which predefined PCM preset patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `patch_number`). |
 | `P`    | `phase` | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
-| `Q`    | `pan_coefs[]` | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
+
+
+### CtrlCoefs
+
+These per-oscillator parameters use [CtrlCoefs](ctrlcoefs.md) notation
+
+| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| ------ | -------- | ---------- | ----------  | ------------------------------------- |
+| `Q`    | `pan_coefs[]` | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
+| `a`    | `amp_coefs[]` | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by by Envelope Generator 0.) |
+| `d`    | `duty_coefs[]` | `duty`   |  float[,float...] | Duty cycle for pulse wave, ControlCoefficients, defaults to 0.5 |
+| `f`    | `freq_coefs[]` | `freq`   |  float[,float...]      | Frequency of oscillator, set of ControlCoefficients.  Default is 0,1,0,0,0,0,1 (from `note` pitch plus `pitch_bend`) |
+| `F`    | `filter_freq_coefs[]` | `filter_freq` | float[,float...]  | Center/break frequency for variable filter, set of ControlCoefficients |
 
 
 ### Other
@@ -180,5 +192,6 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 | `V`    | `volume`| `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `z`    | **TODO**| `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
+| `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
 
 

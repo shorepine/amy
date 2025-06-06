@@ -37,6 +37,7 @@
       <script type="text/javascript" src="enable-threads.js"></script>
       <script type="text/javascript" src="amy.js"></script>
       <script type="text/javascript" src="amy_connector.js"></script>
+      <script type="text/javascript" src="amyrepl.js"></script>
       <link rel="stylesheet" href="amyrepl.css"/>
 
   </head>
@@ -52,7 +53,6 @@
         stdout:(line) => { console.log(line) }, 
         linebuffer: true,
       });
-      await start_midi();
     </script>
 
 
@@ -160,8 +160,8 @@ amy.send(synth=1, note=50, vel=0)
 
   <script language="javascript">
     document.querySelectorAll('.editor').forEach(create_editor);
-    document.body.addEventListener('click', start_python_and_audio, true); 
-    document.body.addEventListener('keydown', start_python_and_audio, true);
+    document.body.addEventListener('click', start_python_and_amy, true); 
+    document.body.addEventListener('keydown', start_python_and_amy, true);
     function amy_sequencer_js_hook(i) {
       // do nothing
     }
