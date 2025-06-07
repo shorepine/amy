@@ -19,7 +19,6 @@ async function run_async(code) {
 async function start_python() {
   // Don't run this twice
   if(python_started) return;
-  console.log("1");
   // Let micropython call an exported AMY function
   await mp.registerJsModule('amy_js_message', amy_add_message);
 
@@ -27,7 +26,6 @@ async function start_python() {
   mp.registerJsModule("time", {
     sleep: async (s) => await new Promise((r) => setTimeout(r, s * 1000)),
   });
-  console.log("2");
 
   // Set up the micropython context, like _boot.py. 
   await mp.runPythonAsync(`
@@ -36,14 +34,12 @@ async function start_python() {
   `);
   await sleep_ms(200);
   python_started = true;
-  console.log("3");
 
   for(i=0;i<run_at_starts.length;i++) {
     if(run_at_starts[i]) {
       await runCodeBlock(i);
     }
   }
-  console.log("4");
 }
 
 async function resetAMY() {
