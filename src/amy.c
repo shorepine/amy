@@ -659,6 +659,8 @@ void reset_osc(uint16_t i ) {
 }
 
 void amy_reset_oscs() {
+    // Put the noise generator into a known state.
+    srand48(517730);
     // We reset oscs by freeing them.
     // Include chorus osc (osc=AMY_OSCS)
     for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);  // include chorus osc.
