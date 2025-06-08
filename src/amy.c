@@ -659,6 +659,8 @@ void reset_osc(uint16_t i ) {
 }
 
 void amy_reset_oscs() {
+    // Put the noise generator into a known state.
+    srand48(517730);
     // We reset oscs by freeing them.
     // Include chorus osc (osc=AMY_OSCS)
     for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);  // include chorus osc.
@@ -937,63 +939,24 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     //       synth[osc]->filter_logfreq_coefs[3], synth[osc]->filter_logfreq_coefs[4], synth[osc]->filter_logfreq_coefs[5]);
             // take care of fm & ks first -- no special treatment for bp/mod
     switch (synth[osc]->wave) {
-    case KS:
-	if(amy_global.config.ks_oscs)
-	    ks_note_on(osc);
-        break;
-    case SINE:
-	sine_note_on(osc, initial_freq);
-	break;
-    case SAW_DOWN:
-	saw_down_note_on(osc, initial_freq);
-	break;
-    case SAW_UP:
-	saw_up_note_on(osc, initial_freq);
-	break;
-    case TRIANGLE:
-	triangle_note_on(osc, initial_freq);
-	break;
-    case PULSE:
-	pulse_note_on(osc, initial_freq);
-	break;
-    case PCM:
-	pcm_note_on(osc);
-	break;
-    case ALGO:
-	algo_note_on(osc, initial_freq);
-	break;
-    case NOISE:
-	noise_note_on(osc);
-	break;
-    case AUDIO_IN0:
-	audio_in_note_on(osc, 0);
-	break;
-    case AUDIO_IN1:
-	audio_in_note_on(osc, 1);
-	break;
-    case AUDIO_EXT0:
-	external_audio_in_note_on(osc, 0);
-	break;
-    case AUDIO_EXT1:
-	external_audio_in_note_on(osc, 1);
-	break;
-    case AMY_MIDI:
-        amy_send_midi_note_on(osc);
-	break;
-    case BYO_PARTIALS:
-	if(AMY_HAS_PARTIALS)
-	    partials_note_on(osc);
-	break;
-    case INTERP_PARTIALS:
-	if(AMY_HAS_PARTIALS)
-	    interp_partials_note_on(osc);
-	break;
-    case CUSTOM:
-	if(AMY_HAS_CUSTOM)
-	    custom_note_on(osc, initial_freq);
-	break;
-    default:
-	break;
+    case KS: if(amy_global.config.ks_oscs) ks_note_on(osc); break;
+    case SINE: sine_note_on(osc, initial_freq); break;
+    case SAW_DOWN: saw_down_note_on(osc, initial_freq); break;
+    case SAW_UP: saw_up_note_on(osc, initial_freq); break;
+    case TRIANGLE: triangle_note_on(osc, initial_freq); break;
+    case PULSE: pulse_note_on(osc, initial_freq); break;
+    case PCM: pcm_note_on(osc); break;
+    case ALGO: algo_note_on(osc, initial_freq); break;
+    case NOISE: noise_note_on(osc); break;
+    case AUDIO_IN0: audio_in_note_on(osc, 0); break;
+    case AUDIO_IN1: audio_in_note_on(osc, 1); break;
+    case AUDIO_EXT0: external_audio_in_note_on(osc, 0); break;
+    case AUDIO_EXT1: external_audio_in_note_on(osc, 1); break;
+    case AMY_MIDI: amy_send_midi_note_on(osc); break;
+    case BYO_PARTIALS: if(AMY_HAS_PARTIALS) partials_note_on(osc); break;
+    case INTERP_PARTIALS: if(AMY_HAS_PARTIALS) interp_partials_note_on(osc); break;
+    case CUSTOM: if(AMY_HAS_CUSTOM) custom_note_on(osc, initial_freq); break;
+    default: break;
     }
 }
 
@@ -1269,6 +1232,8 @@ float combine_controls_mult(float *controls, float *coefs) {
         if (coefs[i] != 0)
             // COEF_MOD and COEF_BEND are applied as amp *= (1 + COEF * CONTROL).
             result *= ((i > COEF_EG1)? 1.0f : 0) + coefs[i] * controls[i];
+    // Apply a threshold to "fully off".
+    if (result <= 0.0011)  result = 0;  // A little bit more than 0.001 to avoid FP issues with exactly 0.001.
     return result;
 }
 
@@ -1342,7 +1307,6 @@ void hold_and_modify(uint16_t osc) {
         ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
         ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
         msynth[osc]->amp = combine_controls_mult(ctrl_inputs, synth[osc]->amp_coefs);
-        if (msynth[osc]->amp <= 0.001)  msynth[osc]->amp = 0;
     }
     // synth[osc]->feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
@@ -1732,31 +1696,6 @@ void amy_reset_sysclock() {
     sequencer_recompute();
 }
 
-void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
-    // An example of adding a handler for MIDI CCs.  Can't really build this in because it depends on your synth/patch config, controllers, wishes...
-    // Here, we use MIDI CC 70 to modify the Juno VCF center freq, and 71 for resonance.
-    amy_event e;
-    if (bytes[0] == 0xB0) {  // Channel 1 CC
-	if (bytes[1] == 70) {
-	    // Modify Synth 0 filter_freq.
-/* def to_filter_freq(val): */
-/*   # filter_freq goes from ? 100 to 6400 Hz with 18 steps/octave */
-/*   return float("%.3f" % (13 * exp2(0.0938 * val * 127))) */
-	    e = amy_default_event();
-	    e.synth = 1;
-	    e.filter_freq_coefs[COEF_CONST] = exp2f(0.0938f * (float)bytes[2]);
-	    amy_add_event(&e);
-	} else if (bytes[1] == 71) {
-/* def to_resonance(val): */
-/*   # Q goes from 0.5 to 16 exponentially */
-/*   return float("%.3f" % (0.7 * exp2(4.0 * val))) */
-	    e = amy_default_event();
-	    e.synth = 1;
-	    e.resonance = 0.7f * exp2f(0.03125f * (float)bytes[2]);
-	    amy_add_event(&e);
-	}
-    }
-}
 
 void amy_default_setup() {
     // sine wave "bleeper" on ch 0 (not a MIDI channel)
@@ -1789,8 +1728,6 @@ void amy_default_setup() {
     e.patch_number = 0;
     e.synth = 1;
     amy_add_event(&e);
-
-    amy_external_midi_input_hook = juno_filter_midi_handler;
 
     // DX7 4 note poly on channel 2
     e = amy_default_event();

@@ -530,7 +530,7 @@ static inline int32_t my_mrand48(void) {
 // Returns a SAMPLE between -1 and 1.
 inline static SAMPLE amy_get_random() {
 #ifndef AMY_USE_FIXEDPOINT
-    return ((float)rand() / 2147483647.0) - 0.5;
+    return ((float)drand48()) - 0.5f;
 #else
     //assert(RAND_MAX == 2147483647); // 2^31 - 1
     return SHIFTR((SAMPLE)my_mrand48(), (32 - S_FRAC_BITS));  // - F2S(0.5f);

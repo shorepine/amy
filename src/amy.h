@@ -728,6 +728,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 
 // API
+void amy_enable_juno_filter_midi_handler();
 void amy_add_message(char *message);
 void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);
@@ -740,7 +741,7 @@ void amy_update();
 int16_t *amy_render_audio();
 void amy_pass_to_i2s(int16_t *block);
 amy_config_t amy_default_config();
-void clear_event(amy_event *e);
+void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
 void amy_get_input_buffer(output_sample_type * samples);

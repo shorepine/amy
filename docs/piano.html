@@ -16,6 +16,7 @@
     <script src="micropython.mjs" type="module"></script>
     <script type="text/javascript" src="enable-threads.js"></script>
     <script type="text/javascript" src="amy.js"></script>
+    <script type="text/javascript" src="amy_connector.js"></script>
     <script type="text/javascript" src="amyrepl.js"></script>
     <link rel="stylesheet" href="amyrepl.css"/>
     <title>The AMY Additive Piano Voice</title>
@@ -482,6 +483,8 @@ amy.send(time=time + 500, voices='0', vel=0)
 
   <script language="javascript">
     document.querySelectorAll('.editor').forEach(create_editor);
+    document.body.addEventListener('click', start_python_and_amy, true); 
+    document.body.addEventListener('keydown', start_python_and_amy, true);
     function amy_sequencer_js_hook(i) {
       // do nothing
     }

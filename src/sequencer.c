@@ -4,7 +4,7 @@
 
 
 // Optional sequencer hook that's called every tick
-void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+extern void (*amy_external_sequencer_hook)(uint32_t);
 
 #ifdef ESP_PLATFORM
 #include "esp_timer.h"
@@ -140,7 +140,9 @@ void sequencer_check_and_fill() {
         // call the right hook:
 #ifdef __EMSCRIPTEN__
         EM_ASM({
-            amy_sequencer_js_hook($0);
+            if(typeof amy_sequencer_js_hook === 'function') {
+                amy_sequencer_js_hook($0);
+            }
         }, amy_global.sequencer_tick_count);
 #endif
         if(amy_external_sequencer_hook!=NULL) {

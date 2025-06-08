@@ -25,16 +25,17 @@ ifeq ($(shell uname -m), armv6l)
 LIBS += -ldl  -latomic
 endif
 
-CFLAGS += -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations 
+CFLAGS += -O3 -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations 
 #CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
-EMSCRIPTEN_OPTIONS = -s WASM=1 \
+EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -DMA_ENABLE_AUDIO_WORKLETS -sAUDIO_WORKLET=1 -sWASM_WORKERS=1  \
 -sSTACK_SIZE=128000\
 -sMODULARIZE -s 'EXPORT_NAME="amyModule"' \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall']" \
 -s EXPORTED_FUNCTIONS="['_amy_add_message', '_amy_add_event', '_amy_reset_sysclock', '_amy_sysclock', '_amy_process_single_midi_byte', '_amy_live_stop', '_amy_get_input_buffer', '_amy_set_external_input_buffer', '_amy_live_start_web', '_amy_live_start_web_audioin', '_amy_start_web', '_amy_start_web_no_synths', '_sequencer_ticks', '_malloc', '_free']" \
 -s SUPPORT_LONGJMP=emscripten \
+-s INITIAL_MEMORY=128mb -s TOTAL_STACK=64mb -s ALLOW_MEMORY_GROWTH=1  \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000 
 
 PYTHON = python3
@@ -47,7 +48,7 @@ all: default
 SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c src/parse.c \
 	src/filters.c src/oscillators.c src/pcm.c src/interp_partials.c src/custom.c \
 	src/delay.c src/log2_exp2.c src/patches.c src/transfer.c src/sequencer.c \
-	src/libminiaudio-audio.c src/instrument.c src/midi.c src/api.c
+	src/libminiaudio-audio.c src/instrument.c src/midi.c src/api.c src/midi_mappings.c
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
  
@@ -95,7 +96,7 @@ timing: amy-module
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
 docs/amy.js: $(TARGET)
-	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	 emcc $(SOURCES) src/amy_bindings.cpp $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o
