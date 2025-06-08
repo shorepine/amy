@@ -20,7 +20,8 @@ void AudioCallback(AudioHandle::InterleavingInputBuffer  in,
                    AudioHandle::InterleavingOutputBuffer out,
                    size_t                                size)
 {
-    short int * block = amy_simple_fill_buffer();
+    amy_render(0, AMY_OSCS, 0);
+    short int * block = amy_fill_buffer();
 
     // Fill the block with samples.
     for(size_t i = 0; i < size; i += 2)
@@ -198,6 +199,7 @@ int main(void)
     midi.Init(midi_config);
     midi.StartReceive();
     for(;;) {
+        amy_execute_deltas();
         midi.Listen();
         while(midi.HasEvents()) {
             HandleMidiMessage(midi.PopEvent());

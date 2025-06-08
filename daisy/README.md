@@ -11,6 +11,3 @@ make clean && make && make program-boot; sleep 1.5; make program-dfu
 ```
 
 After it flashes, you should hear the AMY startup chime from the Daisy's line out.  If you have a MIDI serial interface hooked up to the Daisy (D14 USART1Rx) you should be able to play the default Juno synth on channel 1.
-
-Known issues:
- - There's something going wrong as a result of MIDI program changes.  These are supposed to change the AMY synth patch, and they work at first, but after around 10 program changes, notes start getting misconfigured and/or the whole thing crashes.
