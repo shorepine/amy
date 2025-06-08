@@ -200,31 +200,49 @@ int32_t render_other_core(int32_t data) {
 
 extern void on_pico_uart_rx();
 
-void amy_update() {
-    int32_t res;
+
+void amy_poll_tasks() {
+    //if (ap->free_list == NULL) {
     amy_execute_deltas();
+    // check MIDI
+    on_pico_uart_rx();
+#ifdef TUD_USB_GADGET
+    pico_process_midi();
+#endif
+    //}
+}
+
+int16_t *amy_render_audio() {
+    //if (ap->free_list != NULL) {
     if(AMY_HAS_DUALCORE) {
+        int32_t res;
         queue_entry_t entry = {render_other_core, AMY_OK};
         queue_add_blocking(&call_queue, &entry);
         amy_render(0, AMY_OSCS/2, 0);
         queue_remove_blocking(&results_queue, &res);
     } else {
-        amy_render(0, AMY_OSCS, 0);        
+        amy_render(0, AMY_OSCS, 0);
     }
     int16_t *block = amy_fill_buffer();
+    return block;
+}
+
+void amy_pass_to_i2s(int16_t *block) {
     size_t written = 0;
     struct audio_buffer *buffer = take_audio_buffer(ap, true);
     int16_t *samples = (int16_t *) buffer->buffer->bytes;
     for (uint i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; i++) {
-        samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
+	samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
     }
     buffer->sample_count = AMY_BLOCK_SIZE;
     give_audio_buffer(ap, buffer);
-    // check MIDI
-    on_pico_uart_rx();
-    #ifdef TUD_USB_GADGET
-        pico_process_midi();
-    #endif
+}
+
+void amy_update() {
+    // Single function to update buffers.
+    amy_poll_tasks();
+    int16_t *block = amy_render_audio();
+    amy_pass_to_i2s(block);
 }
 
 

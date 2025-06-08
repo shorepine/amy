@@ -24,7 +24,7 @@ void test_sequencer() {
 
 void setup() {
   amy_config_t amy_config = amy_default_config();
-
+  amy_config.features.startup_bleep = 1;
 
   // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
   amy_config.midi = AMY_MIDI_IS_UART;
@@ -44,6 +44,12 @@ void setup() {
   amy_live_start();
 
   //test_sequencer();
+
+  // Increase the number of voices available to MIDI channel 1.
+  amy_event e = amy_default_event();
+  e.synth = 1;
+  e.num_voices = 12;  // I get 12 simultaneous juno patch 0 voices on a 250 MHz RP2040.
+  amy_add_event(&e);
 }
 
 void loop() {

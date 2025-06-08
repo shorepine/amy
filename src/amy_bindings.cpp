@@ -1,3 +1,6 @@
+// This file is only for web-amy, but arduino will try to compile it anyway.
+#ifndef ARDUINO
+
 #include <emscripten/bind.h>
 #include <string>
 #include <vector>
@@ -250,4 +253,5 @@ EMSCRIPTEN_BINDINGS(amy_module) {
     constant("MAX_ALGO_OPS", MAX_ALGO_OPS);
     constant("MAX_VOICES_PER_INSTRUMENT", MAX_VOICES_PER_INSTRUMENT);
     constant("MAX_PARAM_LEN", MAX_PARAM_LEN);
-} 
+}
+#endif // !ARDUINO
