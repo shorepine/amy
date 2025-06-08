@@ -1219,6 +1219,8 @@ float combine_controls_mult(float *controls, float *coefs) {
         if (coefs[i] != 0)
             // COEF_MOD and COEF_BEND are applied as amp *= (1 + COEF * CONTROL).
             result *= ((i > COEF_EG1)? 1.0f : 0) + coefs[i] * controls[i];
+    // Apply a threshold to "fully off".
+    if (result <= 0.0011)  result = 0;  // A little bit more than 0.001 to avoid FP issues with exactly 0.001.
     return result;
 }
 
@@ -1292,7 +1294,6 @@ void hold_and_modify(uint16_t osc) {
         ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
         ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
         msynth[osc]->amp = combine_controls_mult(ctrl_inputs, synth[osc]->amp_coefs);
-        if (msynth[osc]->amp <= 0.001)  msynth[osc]->amp = 0;
     }
     // synth[osc]->feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
