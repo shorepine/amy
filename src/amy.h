@@ -779,6 +779,8 @@ extern void algo_deinit();
 extern void pcm_init();
 extern void custom_init();
 
+void my_srand48(uint32_t seedval);
+
 void audio_in_note_on(uint16_t osc, uint8_t channel);
 void external_audio_in_note_on(uint16_t osc, uint8_t channel);
 SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel);
@@ -864,7 +866,6 @@ extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
-extern SAMPLE amy_get_random();
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern void pcm_unload_preset(uint16_t patch_number);
 extern void pcm_unload_all_presets();

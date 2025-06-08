@@ -502,21 +502,38 @@ void sine_mod_trigger(uint16_t osc) {
     sine_note_on(osc, freq_of_logfreq(msynth[osc]->logfreq));
 }
 
+
+// On the RP2040, rand and mrand48 etc. don't work on core1.
+// I think this is to do with the implicit state - it's not repeatable, nor strictly safe,
+// to potentially have two cores accessing the same rand_state memory at the same time.
+// However, we just want random values, and any bit pattern is acceptable.
+// So we make our own implementation of mrand48, and don't worry about it being called from both cores.
+
+static uint64_t rand_state = 0;
+static const uint64_t a = 0x5deece66dL;
+static const uint32_t c = 0xb;
+
+void my_srand48(uint32_t seedval) {
+    rand_state = ((uint64_t)seedval) << 32L;
+}
+
+static inline int32_t my_mrand48(void) {
+    // per https://www.ibm.com/docs/en/zos/2.4.0?topic=functions-mrand48-pseudo-random-number-generator
+    rand_state = (a * rand_state + c) & 0x0000ffffffffffffL;
+    return (int32_t)rand_state;
+}
+
 #if (defined PICO_RP2350) || (defined PICO_RP2040)
 #include "pico/rand.h"
 #endif
 
 // Returns a SAMPLE between -1 and 1.
-SAMPLE amy_get_random() {
+inline static SAMPLE amy_get_random() {
 #ifndef AMY_USE_FIXEDPOINT
     return ((float)rand() / 2147483647.0) - 0.5;
-// there's something up with RP2350 where the 2nd core can't call rand(), we need to figure this out
-#elif (defined PICO_RP2350) || (defined PICO_RP2040)
-    assert(RAND_MAX == 2147483647); // 2^31 - 1
-    return SHIFTR((SAMPLE)get_rand_32(), (31 - S_FRAC_BITS)) - F2S(0.5);
 #else
-    assert(RAND_MAX == 2147483647); // 2^31 - 1
-    return SHIFTR((SAMPLE)rand(), (31 - S_FRAC_BITS)) - F2S(0.5);
+    //assert(RAND_MAX == 2147483647); // 2^31 - 1
+    return SHIFTR((SAMPLE)my_mrand48(), (32 - S_FRAC_BITS));  // - F2S(0.5f);
 #endif
 }
 
