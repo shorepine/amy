@@ -1697,46 +1697,6 @@ void amy_reset_sysclock() {
 }
 
 
-void amy_default_setup() {
-    // sine wave "bleeper" on ch 0 (not a MIDI channel)
-    // store memory patch 1024 sine wave
-    amy_event e = amy_default_event();
-    e.patch_number = 1024;
-    patches_store_patch(&e, "v0w0");  // Just osc=0 sinewave to have one delta, else the number of oscs is zero = no patch.
-    e.num_voices = 1;
-    e.synth = 0;
-    amy_add_event(&e);
-
-    // GM drum synth on channel 10
-    // Somehow, we need to select simple round-robin voice allocation, because the note numbers don't indicate the voice, so using the same
-    // voice for successive events with the same note number can end up truncating samples.
-    // We could make the voice management use the outer product of preset number and note when calculating "same note"
-    
-    // {'wave': amy.PCM, 'freq': 0}
-    e = amy_default_event();
-    e.patch_number = 1025;
-    patches_store_patch(&e, "w7f0");
-    e.num_voices = 6;
-    e.synth = 10;
-    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Flag to perform note -> drum PCM patch translation.
-    amy_add_event(&e);
-
-    // Juno 6 poly on channel 1
-    // Define this last so if we release it, the oscs aren't fragmented.
-    e = amy_default_event();
-    e.num_voices = 6;
-    e.patch_number = 0;
-    e.synth = 1;
-    amy_add_event(&e);
-
-    // DX7 4 note poly on channel 2
-    e = amy_default_event();
-    e.num_voices = 4;
-    e.patch_number = 128;
-    e.synth = 2;
-    amy_add_event(&e);
-}
-
 /// Delta pool management
 
 struct delta *free_deltas_pool = NULL;

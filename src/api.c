@@ -22,12 +22,6 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 // Called every sequencer tick
 void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 
-extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
-
-void amy_enable_juno_filter_midi_handler() {
-    amy_external_midi_input_hook = juno_filter_midi_handler;
-}
-
 
 amy_config_t amy_default_config() {
     amy_config_t c;
@@ -222,6 +216,50 @@ void amy_start_web_no_synths() {
 }
 #endif
 
+// defined in midi_mappings.c
+extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
+
+void amy_default_synths() {
+    // Configure several default synthesizers for "out of box" playability.
+
+    // sine wave "bleeper" on ch 0 (not a MIDI channel)
+    amy_event e = amy_default_event();
+    e.patch_number = 1024;
+    // osc=0 sinewave.
+    // Sine is default, but we need to have one delta, else the number of oscs is zero = no patch.
+    patches_store_patch(&e, "v0w0");
+    e.num_voices = 1;
+    e.synth = 0;
+    amy_add_event(&e);
+
+    // GM drum synth on channel 10
+    e = amy_default_event();
+    e.patch_number = 1025;
+    patches_store_patch(&e, "w7f0");
+    e.num_voices = 6;
+    e.synth = 10;
+    // Flag to perform note -> drum PCM patch translation.
+    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;
+    amy_add_event(&e);
+
+    // DX7 6 note poly on channel 2
+    e = amy_default_event();
+    e.num_voices = 6;
+    e.patch_number = 128;
+    e.synth = 2;
+    amy_add_event(&e);
+
+    // Juno 6 poly on channel 1
+    // Define this last so if we release it, the oscs aren't fragmented.
+    e = amy_default_event();
+    e.num_voices = 6;
+    e.patch_number = 0;
+    e.synth = 1;
+    amy_add_event(&e);
+    // Add some MIDI CCs for the Juno (defined in midi_mappings.c).
+    amy_external_midi_input_hook = juno_filter_midi_handler;
+}
+
 // Schedule a bleep now
 void bleep(uint32_t start) {
     amy_event e = amy_default_event();
@@ -268,6 +306,11 @@ void amy_start(amy_config_t c) {
     amy_profiles_init();
     sequencer_start();
     oscs_init();
-    if(AMY_HAS_DEFAULT_SYNTHS)amy_default_setup();
-    if(AMY_HAS_STARTUP_BLEEP) bleep(0);
+    if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
+    if(AMY_HAS_STARTUP_BLEEP) {
+        if(AMY_HAS_DEFAULT_SYNTHS)
+            bleep_synth(0);  // bleep using the default sinewave synth voice.
+        else
+            bleep(0);  // bleep using raw oscs.
+    }
 }
