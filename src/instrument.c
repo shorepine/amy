@@ -100,6 +100,7 @@ struct instrument_info {
     struct voice_fifo *active_voices;
     uint8_t num_voices;
     uint16_t patch_number;  // What patch this instrument is currently set to.
+    int16_t bank_number;    // Optional top-7-bit word of Program, set by MIDI CC 0 (-1 if not set).
     uint32_t flags;         // Bitmask of special instrument properties (for MIDI Drums translation).
     // AMY "voice" index for each of the num_voices allocated voices.
     uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
@@ -112,8 +113,8 @@ struct instrument_info {
 };
 
 void instrument_debug(struct instrument_info *instrument) {
-    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d flags %" PRIu32 " in_sustain %d grab_midi %d\n",
-            (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->flags,
+    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d bank %d flags %" PRIu32 " in_sustain %d grab_midi %d\n",
+            (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->bank_number, instrument->flags,
             instrument->in_sustain, instrument->grab_midi_notes);
     for (int i = 0; i < instrument->num_voices; ++i)
         fprintf(stderr, "voice %d amy_voice %d note_per_voice %d pending_release %d\n",
@@ -137,6 +138,7 @@ struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, ui
     }
     instrument->num_voices = num_voices;
     instrument->patch_number = patch_number;
+    instrument->bank_number = -1;
     instrument->flags = flags;
     instrument->in_sustain = false;
     instrument->grab_midi_notes = true;
@@ -290,12 +292,12 @@ void instrument_change_number(int old_instrument_number, int new_instrument_numb
 
 
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
-    if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
+    // instrument_get_voices is used to test if an instrument is set or not, so no error message if it isn't.
+    //if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         //fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
-        // instrument_get_voices is used to test if an instrument is set or not, so no error message if it isn't.
     } else {
         num_voices = instrument->num_voices;
         for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];
@@ -307,10 +309,6 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
     // Called from patches_event_has_voices for events including an instrument, velocity, and note (note-on/note-off).
     if (!instrument_number_ok(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "note_event: instrument_number %d is not defined.\n", instrument_number);
-        return _INSTRUMENT_NO_VOICE;
-    }
     if (is_note_off) {
         // Note off.
         if (note == 0) {
@@ -328,10 +326,6 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
 int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
     if (!instrument_number_ok(instrument_number, "all_off")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "all_notes_off: instrument_number %d is not defined.\n", instrument_number);
-        return 0;
-    }
     return _instrument_all_notes_off(instrument, amy_voices);
 }
 
@@ -339,10 +333,6 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
     // Will return nonzero voices if the result is to release multiple notes.
     if (!instrument_number_ok(instrument_number, "sustain")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "sustain: instrument_number %d is not defined.\n", instrument_number);
-        return 0;
-    }
     if (sustain) {
         instrument->in_sustain = true;
         return 0;
@@ -363,20 +353,12 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
 int instrument_get_patch_number(int instrument_number) {
     if (!instrument_number_ok(instrument_number, "get_patch")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "get_patch_number: instrument_number %d is not defined.\n", instrument_number);
-        return -1;
-    }
     return instrument->patch_number;
 }
 
 uint32_t instrument_get_flags(int instrument_number) {
     if (!instrument_number_ok(instrument_number, "get_flags")) return (uint32_t)-1;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "get_flags: instrument_number %d is not defined.\n", instrument_number);
-        return (uint32_t)-1;
-    }
     return instrument->flags;
 }
 
@@ -392,8 +374,20 @@ bool instrument_grab_midi_notes(int instrument_number) {
 void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes) {
     if (!instrument_number_ok(instrument_number, "set_grab")) return;
     struct instrument_info *instrument = instruments[instrument_number];
-    if (instrument == NULL) {
-        fprintf(stderr, "set_grab_midi_notes: instrument_number %d is not defined.\n", instrument_number);
-    }
     instrument->grab_midi_notes = grab_midi_notes;
+}
+
+int instrument_bank_number(int instrument_number) {
+    if (!instrument_number_ok(instrument_number, "bank_number")) return -1;
+    struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument == NULL) {
+        return -1;
+    }
+    return instrument->bank_number;
+}
+
+void instrument_set_bank_number(int instrument_number, int bank_number) {
+    if (!instrument_number_ok(instrument_number, "set_bank_number")) return;
+    struct instrument_info *instrument = instruments[instrument_number];
+    instrument->bank_number = bank_number;
 }

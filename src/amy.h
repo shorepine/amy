@@ -728,7 +728,6 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 
 // API
-void amy_enable_juno_filter_midi_handler();
 void amy_add_message(char *message);
 void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);
@@ -759,7 +758,6 @@ void amy_start_web_no_synths();
 
 
 // external functions
-void amy_default_setup();
 void amy_process_event(amy_event *e);
 void amy_restart();
 void amy_reset_oscs();
@@ -830,6 +828,8 @@ extern int instrument_get_patch_number(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 extern bool instrument_grab_midi_notes(int instrument_number);
 extern void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes);
+extern int instrument_bank_number(int instrument_number);
+extern void instrument_set_bank_number(int instrument_number, int bank_number);
 
 extern SAMPLE render_partials(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_custom(SAMPLE *buf, uint16_t osc) ;

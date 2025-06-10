@@ -70,36 +70,32 @@ void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t 
     amy_add_event(&e);
 }
 
-
 void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value, uint32_t time) {
-    // if juno...
-    if(instrument_get_patch_number(channel)>=0 && instrument_get_patch_number(channel)<128) {
-        // An example of adding a handler for MIDI CCs.  
-        // Here, we use MIDI CC 70 to modify the Juno VCF center freq, and 71 for resonance.
-        amy_event e;
-        if (control == 70) {
-            // Modify Synth 0 filter_freq.
-            e = amy_default_event();
-            e.synth = channel;
-            e.filter_freq_coefs[COEF_CONST] = exp2f(0.0938f * (float)value);
-            amy_add_event(&e);
-        } else if (control == 71) {
-            e = amy_default_event();
-            e.synth = channel;
-            e.resonance = 0.7f * exp2f(0.03125f * (float)value);
-            amy_add_event(&e);
-        }
+    if (control == 0) {
+        // Bank select coarse.
+        instrument_set_bank_number(channel, value);
+    } else if (control == 7) {
+        // Use CC 7 for global volume control (on any channel).
+        amy_event e = amy_default_event();
+        // e.synth = channel;
+        e.volume = (float)value/12.7;  // Max volume is 10.
+        amy_add_event(&e);
     }
 }
-
 
 void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time) {
     amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
     e.note_source = NOTE_SOURCE_MIDI;
-    // The MIDI patch number is within the block-of-256 of existing patch numbers, so DX7 patches will remain DX7.
-    e.patch_number = program + (instrument_get_patch_number(e.synth) & 0xFF80);
+    // MIDI patches are in blocks of 128, potentially set by an earlier CC0.
+    int bank_number = instrument_bank_number(channel);
+    if (bank_number < 0) {
+        // If the bank hasn't been set, stay within the block of 128 of the current patch
+        // (so e.g. DX7 voices remain DX7).
+        bank_number = (instrument_get_patch_number(e.synth) & 0xFF80) >> 7;
+    }
+    e.patch_number = program + 128 * bank_number;
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
     }
