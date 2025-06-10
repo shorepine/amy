@@ -103,16 +103,18 @@ memorypcm_preset_t get_preset_for_preset_number(uint16_t preset_number) {
     if(preset_p == NULL) {
         const pcm_map_t cpreset =  pcm_map[preset_number];
         preset.sample_ram = (int16_t*)pcm + cpreset.offset;
-        preset.midinote = cpreset.midinote;
         preset.length = cpreset.length;
         preset.loopstart = cpreset.loopstart;
         preset.loopend = cpreset.loopend;
+        preset.midinote = cpreset.midinote;
+        preset.samplerate = PCM_AMY_SAMPLE_RATE;
     } else {
         preset.sample_ram = preset_p->sample_ram;
-        preset.midinote = preset_p->midinote;
         preset.length = preset_p->length;
         preset.loopstart = preset_p->loopstart;
         preset.loopend = preset_p->loopend;
+        preset.midinote = preset_p->midinote;
+        preset.samplerate = preset_p->samplerate;
     }
     return preset;
 }
