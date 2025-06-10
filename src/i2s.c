@@ -321,11 +321,6 @@ amy_err_t i2s_amy_init() {
 }
 
 void amy_update() {
-    amy_execute_deltas();
-    amy_render(0, AMY_OSCS, 0);        
-    int16_t *block = amy_fill_buffer();
-    teensy_i2s_send(block);
-
     // do midi in here
     uint8_t bytes[1];
     int16_t t = teensy_get_serial_byte();
@@ -333,6 +328,10 @@ void amy_update() {
         bytes[0] = t;
         convert_midi_bytes_to_messages(bytes,1,0);
     }
+    amy_execute_deltas();
+    amy_render(0, AMY_OSCS, 0);
+    int16_t *block = amy_fill_buffer();
+    teensy_i2s_send(block);
 }
 
 
