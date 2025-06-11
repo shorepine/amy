@@ -749,6 +749,7 @@ extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
 extern float (*amy_external_coef_hook)(uint16_t);
 extern void (*amy_external_block_done_hook)(void);
 extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
+extern void (*amy_external_sequencer_hook)(uint32_t);
 
 
 #ifdef __EMSCRIPTEN__
