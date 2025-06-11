@@ -379,12 +379,15 @@ void run_midi() {
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 // RX interrupt handler
 void on_pico_uart_rx() {
-    uint8_t bytes[128];
+    const int midi_buffer_size = 16;
+    uint8_t bytes[midi_buffer_size];
     uint8_t i = 0;
-    while (uart_is_readable(uart1)) {
+    while (uart_is_readable(uart1) && i < midi_buffer_size) {
         uart_read_blocking (uart1, bytes + i, 1);
         i++;
     }
+    //if (i >= midi_buffer_size)
+    //    fprintf(stderr, "midi_buffer_size %d of %d\n", i, midi_buffer_size);
     convert_midi_bytes_to_messages(bytes,i,0);
 }
 
