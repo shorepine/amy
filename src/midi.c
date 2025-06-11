@@ -76,10 +76,11 @@ void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value
         instrument_set_bank_number(channel, value);
     } else if (control == 7) {
         // Use CC 7 for global volume control (on any channel).
-        amy_event e = amy_default_event();
-        // e.synth = channel;
-        e.volume = (float)value/12.7;  // Max volume is 10.
-        amy_add_event(&e);
+        //amy_event e = amy_default_event();
+        //e.volume = (float)value/12.7;  // Max volume is 10.
+        //e.note_source = NOTE_SOURCE_MIDI;
+        //amy_add_event(&e);
+        amy_global.volume = (float)value/12.7;  // Max volume is 10.
     }
 }
 

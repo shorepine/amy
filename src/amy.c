@@ -1664,7 +1664,7 @@ int16_t * amy_fill_buffer() {
 
             // TODO -- the esp stuff here could sit outside of AMY
             // For some reason, have to drop a bit to stop hard wrapping on esp?
-            #ifdef ESP_PLATFORM
+#if defined(ESP_PLATFORM) || defined(__IMXRT1062__)
                 uintval >>= 1;
             #endif
             if (positive) {
