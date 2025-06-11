@@ -129,6 +129,7 @@ e.patch_number = 130;
 e.velocity = 1;
 e.midi_note = 50;
 e.voices = '0'
+amy_add_event(e);
 ```
 
 In Python, we provide `amy.py` that generates wire messages from a Pythonic `amy.send(**kwargs)`. In Python, you'd do
