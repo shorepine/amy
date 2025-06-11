@@ -323,8 +323,8 @@ amy_err_t i2s_amy_init() {
 void amy_update() {
     // do midi in here
     uint8_t bytes[1];
-    int16_t t = teensy_get_serial_byte();
-    if(t>=0) {
+    int t;
+    while((t = teensy_get_serial_byte()) >= 0) {
         bytes[0] = t;
         convert_midi_bytes_to_messages(bytes,1,0);
     }
