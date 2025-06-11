@@ -1135,7 +1135,7 @@ void play_delta(struct delta *d) {
 	    uint16_t osc = d->osc;
 	    while(AMY_IS_SET(osc)) {
 		synth[osc]->velocity = d->data.f;
-		if (synth[osc]->amp_coefs[COEF_VEL] == 0 || synth[osc]->amp_coefs[COEF_VEL] > 0.001) {
+		if (AMY_IS_SET(synth[osc]->chained_osc) || synth[osc]->amp_coefs[COEF_VEL] == 0 || synth[osc]->amp_coefs[COEF_VEL] > 0.001) {
 		    synth[osc]->status = SYNTH_AUDIBLE;
 		    // an osc came in with a note on.
 		    // start the bp clock
@@ -1449,8 +1449,12 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
-            if(synth[osc]->filter_type != FILTER_NONE)
+            if(synth[osc]->filter_type != FILTER_NONE) {
+		//fprintf(stderr, "time %.3f osc %d filter_type %d\n",
+		//	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+		//	osc, synth[osc]->filter_type);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
+	    }
             uint8_t handled = 0;
             if(amy_external_render_hook!=NULL) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
