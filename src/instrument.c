@@ -270,6 +270,14 @@ bool instrument_number_ok(int instrument_number, char *tag) {
     return true;
 }
 
+bool instrument_number_exists(int instrument_number, char *tag) {
+    if (instrument_number_ok(instrument_number, tag)) {
+        if (instruments[instrument_number])
+            return true;
+    }
+    return false;
+}
+
 void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
     if (!instrument_number_ok(instrument_number, "add_new")) return;
     if(instruments[instrument_number]) {
@@ -279,7 +287,7 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
-    if (!instrument_number_ok(old_instrument_number, "change:old")) return;
+    if (!instrument_number_exists(old_instrument_number, "change:old")) return;
     if (!instrument_number_ok(new_instrument_number, "change:new")) return;
     if (old_instrument_number == new_instrument_number)
         return;  // Degenerate change.
@@ -292,8 +300,8 @@ void instrument_change_number(int old_instrument_number, int new_instrument_numb
 
 
 int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
-    // instrument_get_voices is used to test if an instrument is set or not, so no error message if it isn't.
-    //if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
+    // instrument_get_voices is used to test if an instrument is set or not, so no error message if it doesn't exist, only if the number is out of range.
+    if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
@@ -307,7 +315,7 @@ int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
 
 uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off) {
     // Called from patches_event_has_voices for events including an instrument, velocity, and note (note-on/note-off).
-    if (!instrument_number_ok(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
+    if (!instrument_number_exists(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
     struct instrument_info *instrument = instruments[instrument_number];
     if (is_note_off) {
         // Note off.
@@ -324,14 +332,14 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
 }
 
 int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices) {
-    if (!instrument_number_ok(instrument_number, "all_off")) return 0;
+    if (!instrument_number_exists(instrument_number, "all_off")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
     return _instrument_all_notes_off(instrument, amy_voices);
 }
 
 int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices) {
     // Will return nonzero voices if the result is to release multiple notes.
-    if (!instrument_number_ok(instrument_number, "sustain")) return 0;
+    if (!instrument_number_exists(instrument_number, "sustain")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (sustain) {
         instrument->in_sustain = true;
@@ -351,19 +359,19 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
 }
 
 int instrument_get_patch_number(int instrument_number) {
-    if (!instrument_number_ok(instrument_number, "get_patch")) return -1;
+    if (!instrument_number_exists(instrument_number, "get_patch")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
     return instrument->patch_number;
 }
 
 uint32_t instrument_get_flags(int instrument_number) {
-    if (!instrument_number_ok(instrument_number, "get_flags")) return (uint32_t)-1;
+    if (!instrument_number_exists(instrument_number, "get_flags")) return (uint32_t)-1;
     struct instrument_info *instrument = instruments[instrument_number];
     return instrument->flags;
 }
 
 bool instrument_grab_midi_notes(int instrument_number) {
-    if (!instrument_number_ok(instrument_number, "grab_midi")) return false;
+    if (!instrument_number_exists(instrument_number, "grab_midi")) return false;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         return false;
@@ -372,13 +380,13 @@ bool instrument_grab_midi_notes(int instrument_number) {
 }
 
 void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes) {
-    if (!instrument_number_ok(instrument_number, "set_grab")) return;
+    if (!instrument_number_exists(instrument_number, "set_grab")) return;
     struct instrument_info *instrument = instruments[instrument_number];
     instrument->grab_midi_notes = grab_midi_notes;
 }
 
 int instrument_bank_number(int instrument_number) {
-    if (!instrument_number_ok(instrument_number, "bank_number")) return -1;
+    if (!instrument_number_exists(instrument_number, "bank_number")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
         return -1;
@@ -387,7 +395,7 @@ int instrument_bank_number(int instrument_number) {
 }
 
 void instrument_set_bank_number(int instrument_number, int bank_number) {
-    if (!instrument_number_ok(instrument_number, "set_bank_number")) return;
+    if (!instrument_number_exists(instrument_number, "set_bank_number")) return;
     struct instrument_info *instrument = instruments[instrument_number];
     instrument->bank_number = bank_number;
 }
