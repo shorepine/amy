@@ -901,7 +901,6 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
 #define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"
-esp_err_t dsps_biquad_f32_ae32(const float *input, float *output, int len, float *coef, float *w);
 #endif
 
 // envelopes
