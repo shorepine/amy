@@ -2,7 +2,6 @@
 // C callable entry points to amy
 
 #include "amy.h"
-#include "examples.h"  // for bleep()
 
 //////////////////////
 // Hooks
@@ -261,7 +260,7 @@ void amy_default_synths() {
 }
 
 // Schedule a bleep now
-void bleep(uint32_t start) {
+void amy_bleep(uint32_t start) {
     amy_event e = amy_default_event();
     e.osc = AMY_OSCS - 1;  // Use a high-up osc to avoid collisions?
     e.time = start;
@@ -281,7 +280,7 @@ void bleep(uint32_t start) {
 }
 
 // Schedule a bleep now using default bleep synth (0)
-void bleep_synth(uint32_t start) {
+void amy_bleep_synth(uint32_t start) {
     amy_event e = amy_default_event();
     e.synth = 0;
     e.time = start;
@@ -309,8 +308,8 @@ void amy_start(amy_config_t c) {
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
     if(AMY_HAS_STARTUP_BLEEP) {
         if(AMY_HAS_DEFAULT_SYNTHS)
-            bleep_synth(0);  // bleep using the default sinewave synth voice.
+            amy_bleep_synth(0);  // bleep using the default sinewave synth voice.
         else
-            bleep(0);  // bleep using raw oscs.
+            amy_bleep(0);  // bleep using raw oscs.
     }
 }
