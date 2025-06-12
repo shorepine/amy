@@ -71,6 +71,12 @@ int main(int argc, char ** argv) {
     //example_sequencer_drums(0);
     //example_patch_from_events();
 
+    // Check that pedal to a non-synth doesn't crash.
+    amy_event e = amy_default_event();
+    e.synth = 3;
+    e.pedal = 1;
+    amy_add_event(&e);
+
     // Now just spin for 15s
     uint32_t start = amy_sysclock();
     while(amy_sysclock() - start < 5000) {

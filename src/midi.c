@@ -292,7 +292,7 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 ///// Per platform MIDI in and out stuff
 ///////////////////////////////////////////////
 
-#if !(defined MACOS && !defined __EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
+#if !defined(MACOS) && !defined(__EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
 
 void midi_out(uint8_t * bytes, uint16_t len) {
 #ifdef __EMSCRIPTEN__
