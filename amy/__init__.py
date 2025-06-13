@@ -2,7 +2,13 @@
 from .constants import *
 import collections
 import time
-import c_amy as _amy  # Import the C module
+try:
+    import c_amy as _amy  # Import the C module
+    live = _amy.live
+except ImportError:
+    # C module is not required, so pass
+    pass
+
 
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
