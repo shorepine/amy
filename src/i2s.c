@@ -125,13 +125,21 @@ void esp_render_task( void * pvParameters) {
 
 #ifdef AMYBOARD
 static int32_t block32[AMY_BLOCK_SIZE * AMY_NCHANS];
+extern int16_t amy_in_block[AMY_BLOCK_SIZE * AMY_NCHANS];
+i2s_sample_type my_int32_block[AMY_BLOCK_SIZE * AMY_NCHANS];
+
 #endif
 
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
     while(1) {
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
-
+        if(AMY_HAS_AUDIO_IN) {
+            size_t read = 0;
+            i2s_channel_read(rx_handle, my_int32_block, AMY_BLOCK_SIZE * sizeof(i2s_sample_type) * AMY_NCHANS, &read, portMAX_DELAY);
+            for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
+                amy_in_block[i] = (i2s_sample_type)(my_int32_block[i] >> 16);
+        }
         // Get ready to render
         amy_execute_deltas();
         // Tell the other core to start rendering
