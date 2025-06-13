@@ -303,7 +303,7 @@ class TestJunoPatch(AmyTest):
   """Known Juno patch."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", load_patch=20)
+    amy.send(time=0, voices="0,1,2,3", patch_number=20)
     amy.send(time=50, voices="0", note=48, vel=1)
     amy.send(time=50, voices="1", note=60, vel=1)
     amy.send(time=50, voices="2", note=63, vel=1)
@@ -317,7 +317,7 @@ class TestJunoPatch3(AmyTest):
   """Known Juno patch with parametric EQ."""
 
   def run(self):
-    amy.send(time=0, voices="0", load_patch=3)
+    amy.send(time=0, voices="0", patch_number=3)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=900, voices="0", vel=0)
 

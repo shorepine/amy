@@ -1,7 +1,8 @@
 
 # piano.py
 # examples from piano.html
-import amy, piano_params
+import amy
+from . import piano_params
 
 def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None):
     amy.send(reset=amy.RESET_TIMEBASE)

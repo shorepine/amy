@@ -1,4 +1,4 @@
-# Makefile for libamy , including an example
+# Makefile for AMY , including an example
 
 TARGET = amy-example amy-message amy-piano
 LIBS =  -lm  -pthread
@@ -58,8 +58,8 @@ HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 PYTHONS = $(wildcard *.py)
 
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
-	cat src/amy.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f$$/\1/' | awk '{print $$2 "=" $$3}' > amy_constants.py
-	${PYTHON} amy_headers.py
+	cat src/amy.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f$$/\1/' | awk '{print $$2 "=" $$3}' > amy/constants.py
+	${PYTHON} -m amy.headers
 
 %.o: %.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -83,14 +83,14 @@ amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 amy-module: amy-example
-	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; cd src; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall; cd ..
+	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall; cd ..
 
 test: amy-module
-	${PYTHON} test.py
+	${PYTHON} -m amy.test
 
 # Report the median FILTER_PROCESS timing over 50 runs.
 timing: amy-module
-	for a in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do ${PYTHON} timing.py 2>&1 ; done > /tmp/timings.txt
+	for a in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do ${PYTHON} -m amy.timing 2>&1 ; done > /tmp/timings.txt
 	cat /tmp/timings.txt | grep AMY_RENDER: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
@@ -101,6 +101,6 @@ docs/amy.js: $(TARGET)
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
-	-rm -f amy_constants.py
+	-rm -f amy/constants.py
 	-rm -f docs/amy.js
 	-rm -f $(TARGET)

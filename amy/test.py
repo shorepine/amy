@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io.wavfile as wav
 
 import amy
+import c_amy as _amy
 import time
 
 
@@ -36,13 +37,12 @@ class AmyTest:
     self.config_default = False
 
   def test(self):
-    import libamy
     name = self.__class__.__name__
-    libamy.stop()
+    _amy.stop()
     if self.config_default:
-      libamy.start()
+      _amy.start()
     else:
-      libamy.start_no_default()
+      _amy.start_no_default()
     self.run()
     
     samples = amy.render(1.0)

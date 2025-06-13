@@ -18,7 +18,7 @@ extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
-// This is for baked in samples that come with AMY. The header file written by `amy_headers.py` writes this.
+// This is for baked in samples that come with AMY. The header file written by `amy/headers.py` writes this.
 typedef struct {
     uint32_t offset;
     uint32_t length;
@@ -595,7 +595,7 @@ typedef struct  {
     int8_t midi_out;
     int8_t midi_in;
     int8_t midi_uart;
-    
+
     // memory caps for MCUs
     uint32_t ram_caps_events;
     uint32_t ram_caps_sysex;

@@ -56,7 +56,7 @@ AMY will run on many modern microcontrollers under Arduino. On most platforms, w
 
 ## Using AMY in Python on any platform
 
-You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `libamy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
+You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `amy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
 
 [**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
 

@@ -1,17 +1,150 @@
 #!/usr/bin/env python3
 # examples.py
-# sound examples
+# sound examples and patch examples
 
 import amy
 from time import sleep
 
 
+class Patch:
+    """
+        Provides a collection of illustrations of different voice configurations with AMY.
+
+        You use them like this:
+
+        amy.send(synth=0, num_voices=4, patch=patches.filter_bass())
+    """
+    next_patch_number = 1024
+
+    @classmethod
+    def _new_patch_number(cls):
+        # just keep a global patch num around for these patches
+        new_num = cls.next_patch_number
+        cls.next_patch_number = cls.next_patch_number + 1
+        return new_num
+
+    @classmethod
+    def reset(cls):
+        cls.next_patch_number = 1024
+
+    def __init__(self, **kwargs):
+        self.patch_number = Patch._new_patch_number()
+        self.setup(**kwargs)
+
+    def __int__(self):
+        # When amy.message() tries to convert this into an int, just return the patch number.
+        return self.patch_number
+
+    def setup(self, **kwargs):
+        raise ValueError('Subclasses of Patch must define a setup(self, **kwargs) method.')
+
+
+class simple_sine(Patch):
+    def setup(self, **kwargs):
+        amy.send(patch_number=self.patch_number,
+                 wave=amy.SINE, bp0="10,1,240,0.7,500,0",
+                 **kwargs)
+
+class filter_bass(Patch):
+    def setup(self, **kwargs):
+        amy.send(patch_number=self.patch_number,
+                 osc=0, filter_freq="100,0,0,5", resonance=5, wave=amy.SAW_DOWN,
+                 filter_type=amy.FILTER_LPF, bp0="0,1,1000,0,100,0",
+                 **kwargs)
+
+class amp_lfo(Patch):
+    def setup(self, **kwargs):
+        # Not clear what to do with kwargs.  They probably don't want to apply to both oscs.
+        amy.send(patch_number=self.patch_number,
+                 osc=1, wave=amy.SINE, amp=0.50, freq=1.5,
+                 **kwargs)
+        amy.send(patch_number=self.patch_number,
+                 osc=0, wave=amy.PULSE, bp0="150,1,1850,0.25,250,0", amp="0,0,1,1,0,1", mod_source=1,
+                 **kwargs)
+
+class pitch_lfo(Patch):
+    def setup(self, **kwargs):
+        amy.send(patch_number=self.patch_number,
+                 osc=1, wave=amy.SINE, amp=0.50, freq=0.25,
+                 **kwargs)
+        amy.send(patch_number=self.patch_number,
+                 osc=0, wave=amy.PULSE, bp0="150,1,250,0,0,0", freq="261.63,1,0,0,0,1", mod_source=1,
+                 **kwargs)
+
+class bass_drum(Patch):
+    def setup(self, **kwargs):
+        # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
+        amy.send(patch_number=self.patch_number,
+                 osc=1, wave=amy.SINE, amp=0.50, freq=0.25, phase=0.5,
+                 **kwargs)
+        amy.send(patch_number=self.patch_number,
+                 osc=0, wave=amy.SINE, bp0="0,1,500,0,0,0", freq="261.63,1,0,0,0,1",  mod_source=1,
+                 **kwargs)
+
+class noise_snare(Patch):
+    def setup(self, **kwargs):
+        amy.send(patch_number=self.patch_number,
+                 osc=0, wave=amy.NOISE, bp0="0,1,250,0,0,0",
+                 **kwargs)
+
+class closed_hat(Patch):
+    def setup(self, **kwargs):
+        amy.send(patch_number=self.patch_number,
+                 osc=0, wave=amy.NOISE, bp0="5,1,30,0,0,0", filter_type=amy.FILTER_HPF, filter_freq=6000,
+                 **kwargs)
+
+
+
+
+"""
+    Various python examples of using AMY, including the port of all the C examples.c 
+"""
+
+
+# Plays the example patches defined in this file
+def play_example_patches(wait=1, **kwargs):
+    from . import examples
+    try:
+        patchClasses = examples.Patch.__subclasses__()
+    except AttributeError:
+        # micropython does not have __subclasses__
+        patchClasses = [
+            examples.simple_sine,
+            examples.filter_bass,
+            examples.amp_lfo,
+            examples.pitch_lfo,
+            examples.bass_drum,
+            examples.noise_snare,
+            examples.closed_hat,
+        ]
+    for patchClass in patchClasses:
+        print("Patch", patchClass.__name__)
+        send(synth=0, num_voices=1, patch=patchClass())
+        time.sleep(wait/4.0)            
+        send(synth=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(synth=0, vel=0)
+        time.sleep(wait/4.0)
+
+# Plays the baked in Juno, DX7 and piano patches
+def play_baked_patches(wait=1, patch_total = 256, **kwargs):
+    import random
+    patch_count = 0
+    while True:
+        patch = random.randint(0,256) #patch_count % patch_total
+        print("Sending patch %d" % patch)
+        send(synth=0, num_voices=1, patch_number=patch)
+        time.sleep(wait/4.0)            
+        send(synth=0, note=50, vel=1, **kwargs)
+        time.sleep(wait)
+        send(synth=0, vel=0)
+        time.sleep(wait/4.0)
+
 def example_multimbral_synth():
-    import example_patches as patches
     amy.send(patch_number=4, num_voices=6, synth=1)  # juno-6 preset 4 on MIDI channel 1
     amy.send(patch_number=129, num_voices=2, synth=2) # dx7 preset 1 on MIDI channel 2
-    amy.send(synth=3, num_voices=4, patch_number=patches.filter_bass()) # filter bass user patch on MIDI channel 3
-    amy.send(synth=4, num_voices=4, patch_number=patches.pitch_lfo()) # pitch LFO user patch on MIDI channel 4
+    amy.send(synth=3, num_voices=4, patch_number=filter_bass()) # filter bass user patch on MIDI channel 3
+    amy.send(synth=4, num_voices=4, patch_number=pitch_lfo()) # pitch LFO user patch on MIDI channel 4
 
 def example_reset(start=0):
     amy.send(osc=0, reset=amy.RESET_ALL_OSCS, time=start)
