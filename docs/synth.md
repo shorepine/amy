@@ -39,8 +39,8 @@ You then manage a set of voices using a `synth`, which takes care of allocating 
 To play a patch, for instance the built-in patches emulating Juno and DX7 synthesizers and a piano, you allocate them to one or more voices (either directly or as part of a synth), then send note events, or parameter moidifications, to those voices. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
-amy.send(voices='0,1,2,3', patch_number=1)     # Juno patch #1 on voice 0-3
-amy.send(voices='4,5,6,7', patch_number=129)   # DX7 patch #2 on voices 4-7
+amy.send(voices='0,1,2,3', patch=1)     # Juno patch #1 on voice 0-3
+amy.send(voices='4,5,6,7', patch=129)   # DX7 patch #2 on voices 4-7
 amy.send(voices=0, note=60, vel=1)           # Play note 60 on voice 0
 amy.send(voices=0, osc=0, filter_freq=8000)  # Open up the filter on the Juno voice (using its bottom oscillator)
 ```
@@ -52,14 +52,14 @@ The code in `amy/headers.py` generates these patches and bakes them into AMY so 
 
 **TODO: I think this is older still, dan to tell me what to put here**
 
-You can also create your own patches at runtime and use them for voices with `amy.send(patch_number=PATCH_NUMBER, patch='AMY_PATCH_STRING')` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
+You can also create your own patches at runtime and use them for voices with `amy.send(patch=PATCH_NUMBER, patch='AMY_PATCH_STRING')` where `PATCH_NUMBER` is a number in the range 1024-1055. This message must be on its own in the `amy.send()` command, not combined with any other parameters, because AMY will treat the rest of the message as a patch rather than interpreting the remaining arguments as ususal.
 
 So you can do:
 
 ```python
 >>> import amy; amy.live()  # Not needed on Tulip.
->>> amy.send(patch_number=1024, patch='v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
->>> amy.send(voices=0, patch_number=1024)
+>>> amy.send(patch=1024, patch='v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z')
+>>> amy.send(voices=0, patch=1024)
 >>> amy.send(voices=0, vel=2, note=50)
 ```
 You can also directly specify the patch string when loading a patch into a voice or synth, if you won't need to reference it again:
@@ -76,7 +76,7 @@ You can "record" patches in a sequence of commands like this:
 >>> bass_drum = amy.retrieve_patch()
 >>> bass_drum
 'v0S0Zv0S1Zv1w0f0.25P0.5a0.5Zv0w0f261.63,1,0,0,0,1A0,1,500,0,0,0L1Z'
->>> amy.send(patch_number=1024, patch=bass_drum)
+>>> amy.send(patch=1024, patch_string=bass_drum)
 ```
 
 
@@ -85,7 +85,7 @@ You can "record" patches in a sequence of commands like this:
 A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices; the `synth` arg becomes a smart alias for the appropriate `voices`, e.g.
 
 ```python
-amy.send(synth=0, num_voices=3, patch_number=1)     # 3-voice Juno path #1 on synth 0
+amy.send(synth=0, num_voices=3, patch=1)     # 3-voice Juno path #1 on synth 0
 # Play three notes simultaneously
 amy.send(synth=0, note=60, vel=1)
 amy.send(synth=0, note=64, vel=1)
@@ -96,12 +96,12 @@ amy.send(synth=0, note=70, vel=1)
 amy.send(synth=0, note=70, vel=0)
 # .. or we can send note-offs to all the currently-active synth voices by sending a note-off with no note.
 amy.send(synth=0, vel=0)
-# Once a synth has been initialized and associated with a set of voices, you can use it alone with patch_number
-amy.send(synth=0, patch_number=13)  # Load a different Juno patch, will remain 4-voice.
+# Once a synth has been initialized and associated with a set of voices, you can use it alone with patch
+amy.send(synth=0, patch=13)  # Load a different Juno patch, will remain 4-voice.
 # You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
 amy.send(synth=0, num_voices=0)
 # As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets.
-amy.send(synth=10, num_voices=3, patch='w7f0Z', synth_flags=3)
+amy.send(synth=10, num_voices=3, patch_string='w7f0Z', synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
 
@@ -152,7 +152,7 @@ amy.send(osc=0, wave=amy.PULSE, duty={'const': 0.5, 'mod': 0.25}, freq={'mod': 0
 amy.send(osc=0, note=60, vel=0.5)
 ```
 
-We have some helpful patches in `example_patches.py`, if you want to use them, or add to them. To make that filter bass, just do `amy.send(synth=0, num_voices=4, patch_number=patches.filter_bass())` and then `amy.send(synth=0,vel=1,note=50)` to hear it.
+We have some helpful patches in `amy.examples`, if you want to use them, or add to them. To make that filter bass, just do `amy.send(synth=0, num_voices=4, patch=amy.examples.filter_bass())` and then `amy.send(synth=0,vel=1,note=50)` to hear it.
 
 
 ## AMY's sequencer and timestamps
@@ -246,11 +246,11 @@ If you are building your own audio system around AMY you will want to fill in th
 Try default DX7 patches, from 128 to 256:
 
 ```python
-amy.send(voices='0', patch_number=128)  # Set up a voice.
+amy.send(voices='0', patch=128)  # Set up a voice.
 amy.send(voices='0', note=50, vel=1)  # Play a note on the voice.
 ```
 
-The `patch_number` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
+The `patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
 
 ![DX7 Algorithms](https://raw.githubusercontent.com/shorepine/alles/main/pics/dx7_algorithms.jpg)
 

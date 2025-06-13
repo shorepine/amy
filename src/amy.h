@@ -405,7 +405,7 @@ typedef struct amy_event {
     uint16_t wave;
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
-    uint16_t patch_number;
+    uint16_t patch;
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];
     float filter_freq_coefs[NUM_COMBO_COEFS];

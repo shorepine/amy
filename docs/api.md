@@ -143,9 +143,9 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `iv`   | `num_voices` | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `synth=X, patch[_number]=Y`. |
 | `im`   | `grab_midi_notes` | `grab_midi_notes` | 0/1 | Use `amy.send(synth=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
 | `ip`   | `pedal` | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
-| `K`    | `patch_number` | `patch_number` | uint 0-X | Apply a saved patch (e.g. DX7 or Juno) to a specified synth or voice. |
+| `K`    | `patch` | `patch` | uint 0-X | Apply a saved or user patch to a specified synth or voice. |
 | `r`    | `voices[]` | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
-| `u`    | **TODO**| `patch` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch_number`, or directly configure a `synth`. |
+| `u`    | **TODO**| `patch_string` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch`, or directly configure a `synth`. |
 
 
 ### Oscillator control
@@ -166,7 +166,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `n`    | `midi_note` | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed. |
 | `o`    | `algorithm` | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source[]`| `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `preset` | `preset` | int | Which predefined PCM preset patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `patch_number`). |
+| `p`    | `preset` | `preset` | int | Which predefined PCM preset patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `patch`). |
 | `P`    | `phase` | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |

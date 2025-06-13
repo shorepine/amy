@@ -1,5 +1,6 @@
 # AMY module
 from .constants import *
+from . import examples
 import collections
 import time
 try:
@@ -125,16 +126,16 @@ def str_of_int(arg):
     return str(int(arg))
 
 
-_KW_MAP_LIST = [   # Order matters because patch string must come last.
+_KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
     ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
     ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
     ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
-    ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch_number', 'KI'), ('voices', 'rL'),
+    ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('grab_midi_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
     ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
-    ('patch', 'uS'),  # Patch MUST be last because we can't identify when it ends except by end-of-message.
+    ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
 _KW_MAP = dict(_KW_MAP_LIST)
@@ -153,15 +154,15 @@ def message(**kwargs):
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
             print('You specified \'voices\' and \'preset\' but not \'osc\' so your command will apply to the voice\'s osc 0.')
-        if 'voices' in kwargs and 'synth' in kwargs and not ('patch_number' in kwargs or 'patch' in kwargs):
-            print('You specified both \'synth\' and \'voices\' in a non-\'patch\'/\'patch_number\' message, but \'synth\' defines the voices.')
-        if 'patch' in kwargs and not ('patch_number' in kwargs or 'synth' in kwargs or 'voices' in kwargs):
-            print('\'patch\' is only valid with a \'patch_number\' or to define a new \'synth\' or \'voices\'.')
+        if 'voices' in kwargs and 'synth' in kwargs and not ('patch' in kwargs or 'patch_string' in kwargs):
+            print('You specified both \'synth\' and \'voices\' in a non-\'patch\'/\'patch_string\' message, but \'synth\' defines the voices.')
+        if 'patch_string' in kwargs and not ('patch' in kwargs or 'synth' in kwargs or 'voices' in kwargs):
+            print('\'patch_string\' is only valid with a \'patch\' or to define a new \'synth\' or \'voices\'.')
             # And yet we plow ahead...
-        if 'patch' in kwargs:
-            # Try to avoid mistakenly calling 'patch' when you meant 'patch_number'.
-            if not isinstance(kwargs['patch'], str):
-                raise ValueError('\'patch\' should be a wire command string, not \'' + str(kwargs['patch']) + '\'.')
+        if 'patch_string' in kwargs:
+            # Try to avoid mistakenly calling 'patch_string' when you meant 'patch'.
+            if not isinstance(kwargs['patch_string'], str):
+                raise ValueError('\'patch_string\' should be a wire command string, not \'' + str(kwargs['patch_string']) + '\'.')
         if 'num_partials' in kwargs:
             if 'preset' in kwargs:
                 raise ValueError('You cannot use \'num_partials\' and \'preset\' in the same message.')
@@ -185,7 +186,7 @@ def message(**kwargs):
             prioritized_keys.append((priority, key))
     # Sort by priority, then strip the priority value.
     prioritized_keys = [e[1] for e in sorted(prioritized_keys)]
-    # We process the passed args by testing each entry in the known keys in order, to make sure 'patch' is added last.
+    # We process the passed args by testing each entry in the known keys in order, to make sure 'patch_string' is added last.
     m = ''
     for key in prioritized_keys:
         map_code = _KW_MAP[key]
@@ -234,11 +235,11 @@ def start_store_patch():
     override_send = amy_do_nothing
     log_patch()
 
-def stop_store_patch(patch_number):
+def stop_store_patch(patch):
     global saved_override, override_send
     override_send = saved_override
 
-    m = "u"+str(patch_number)+retrieve_patch()
+    m = "u"+str(patch)+retrieve_patch()
     send_raw(m)
 
 # Send an AMY message to amy
@@ -332,9 +333,9 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil
-    import amy_wave # our version of a wave file reader that looks for sampler metadata
+    from . import wave
     # tulip has ubinascii, normal has base64
-    w = amy_wave.open(wavfilename, 'r')
+    w = wave.open(wavfilename, 'r')
     
     if(loopstart==0): 
         if(hasattr(w,'_loopstart')): 
