@@ -106,12 +106,12 @@
         <P>AMY can receive MIDI messages while it is running and play just like a normal hardware synthesizer. You can send it note ons, offs, pitch bend, sustain, program changes and control change messages.
           Let's set up a <code>synth</code> to respond to MIDI channel 1. Make sure your MIDI devices are connected above at the top of this page (note: MIDI does not work on Safari, so try Chrome or Firefox.)</P>
         <div class="editor mb-4">
-amy.send(patch_number=4, synth=1, num_voices=6)
+amy.send(patch=4, synth=1, num_voices=6)
         </div>
-        <p>Run that code block and play some notes on your MIDI keyboard. Try changing the <code>patch_number</code> and running again. The <code>synth</code> parameter tells AMY which synthesizer we are allocating (and if you give a synth number between 1 and 16, will respond to that MIDI channel), and <code>num_voices</code> tells AMY how much polyphony to allow per synthesizer. Keep track of <code>num_voices</code> is important for microcontrollers where you have limited CPU cycles. The <code>patch_number</code> can be any of AMY's built in Juno-6 (0-127), DX-7 (128-255), or partials (256) patches. (Later, we'll show you how to construct your own patches.)</p>
+        <p>Run that code block and play some notes on your MIDI keyboard. Try changing the <code>patch</code> and running again. The <code>synth</code> parameter tells AMY which synthesizer we are allocating (and if you give a synth number between 1 and 16, will respond to that MIDI channel), and <code>num_voices</code> tells AMY how much polyphony to allow per synthesizer. Keep track of <code>num_voices</code> is important for microcontrollers where you have limited CPU cycles. The <code>patch</code> can be any of AMY's built in Juno-6 (0-127), DX-7 (128-255), or partials (256) patches. (Later, we'll show you how to construct your own patches.)</p>
         <p>No MIDI? That's ok, you can send the note on command to AMY directly:</p>
         <div class="editor mb-4">
-amy.send(patch_number=4, synth=1, num_voices=6)
+amy.send(patch=4, synth=1, num_voices=6)
 amy.send(synth=1, vel=1, note=50)
         </div>
         <P>Here you see we gave a <code>synth</code> number, and then <code>vel</code> for note on velocity and a MIDI note number of 50. <code>vel</code> in AMY is a signal to play a note on. If that note above is still playing, try `vel=0` to turn it off:
@@ -120,7 +120,7 @@ amy.send(synth=1, note=50, vel=0)
         </div>
         <P>You can adjust parameters of an entire synth, like moving a knob, by addressing it. Here we'll change the filter cutoff frequency of the Juno-6 patch we loaded. Trying changing the values!</P>
         <div class="editor mb-4">
-amy.send(patch_number=0, synth=1, num_voices=6)
+amy.send(patch=0, synth=1, num_voices=6)
 amy.send(synth=1, vel=1, note=50)
 amy.send(synth=1, filter_freq=[800], resonance=2.5)
         </div>

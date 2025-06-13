@@ -17,14 +17,14 @@ void example_reset(uint32_t start) {
 void example_voice_alloc() {
     // alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
     amy_event e = amy_default_event();
-    e.patch_number = 1;
+    e.patch = 1;
     e.voices[0] = 0;
     e.voices[1] = 1;
     amy_add_event(&e);
     delay_ms(250);
 
     e = amy_default_event();
-    e.patch_number = 131;
+    e.patch = 131;
     e.voices[0] = 0;
     amy_add_event(&e);
     delay_ms(250);
@@ -47,7 +47,7 @@ void example_voice_alloc() {
 
     // now try to alloc voice 0 with a juno, should use oscs 0-4 again
     e = amy_default_event();
-    e.patch_number = 2;
+    e.patch = 2;
     e.voices[0] = 0;
     amy_add_event(&e);
     delay_ms(250);
@@ -57,7 +57,7 @@ void example_voice_alloc() {
 void example_voice_chord(uint32_t start, uint16_t patch) {
     amy_event e = amy_default_event();
     e.time = start;
-    e.patch_number = patch;
+    e.patch = patch;
     e.voices[0] = 0;
     e.voices[1] = 1;
     e.voices[2] = 2;
@@ -97,7 +97,7 @@ void example_synth_chord(uint32_t start, uint16_t patch) {
     // Like example_voice_chord, but use 'synth' to avoid having to keep track of voices.
     amy_event e = amy_default_event();
     e.time = start;
-    e.patch_number = patch;
+    e.patch = patch;
     e.num_voices = 3;
     e.synth = 0;
     amy_add_event(&e);
@@ -142,7 +142,7 @@ void example_sustain_pedal(uint32_t start, uint16_t patch) {
     e.time = start;
     e.synth = 1;
     e.num_voices = 4;
-    e.patch_number = patch;
+    e.patch = patch;
     amy_add_event(&e);
 
     start += 50;
@@ -229,7 +229,7 @@ void example_sustain_pedal(uint32_t start, uint16_t patch) {
 void example_patches() {
     amy_event e = amy_default_event();
     for(uint16_t i=0;i<256;i++) {
-        e.patch_number = i;
+        e.patch = i;
         e.voices[0] = 0;
         fprintf(stderr, "sending patch %d\n", i);
         amy_add_event(&e);
@@ -293,11 +293,11 @@ void example_multimbral_fm() {
     amy_event e1 = amy_default_event();
     int notes[] = {60, 70, 64, 68, 72, 82};
     e1.velocity = 0.5;
-    e0.patch_number = 128;
+    e0.patch = 128;
     for (unsigned int i = 0; i < sizeof(notes) / sizeof(int); ++i) {
         e1.midi_note = notes[i];
         e1.pan_coefs[0] = (i%2);
-        e0.patch_number++;
+        e0.patch++;
         e0.voices[0] = i;
         amy_add_event(&e0);
         amy_add_event(&e1);
@@ -622,13 +622,13 @@ void example_patch_from_events() {
     int number = 1039;
     amy_event e = amy_default_event();
     e.time = time;
-    e.patch_number = number;
+    e.patch = number;
     e.reset_osc = RESET_PATCH;
     amy_add_event(&e);
 
     e = amy_default_event();
     e.time = time;
-    e.patch_number = number;
+    e.patch = number;
     e.osc = 0;
     e.wave = SAW_DOWN;
     e.chained_osc = 1;
@@ -637,7 +637,7 @@ void example_patch_from_events() {
 
     e = amy_default_event();
     e.time = time;
-    e.patch_number = number;
+    e.patch = number;
     e.osc = 1;
     e.wave = SINE;
     e.freq_coefs[COEF_CONST] = 131.0f;
@@ -648,7 +648,7 @@ void example_patch_from_events() {
     e.time = time;
     e.synth = 0;
     e.num_voices = 4;
-    e.patch_number = number;
+    e.patch = number;
     amy_add_event(&e);
 
     e = amy_default_event();

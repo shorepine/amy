@@ -310,7 +310,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                 config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
             }
             break;
-            case 'K': e->patch_number = atoi(arg); break;
+            case 'K': e->patch = atoi(arg); break;
             case 'l': e->velocity=atoff(arg); break;
             case 'L': e->mod_source=atoi(arg); break;
             case 'm': e->portamento_ms=atoi(arg); break;
@@ -360,7 +360,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             /* t used for time */
             case 't': e->time=atol(arg); break;
             case 'T': e->eg_type[0] = atoi(arg); break;
-            case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch_number.
+            case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
             case 'V': e->volume = atoff(arg); break;

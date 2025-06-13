@@ -42,9 +42,9 @@ AMY supports
  * Built-in event clock and pattern sequencer, using hardware real time timers on microcontrollers
  * Multi-core (including microcontrollers) for rendering if available
 
-The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/fm.py) that can convert any DX7 patch into an AMY patch.
+The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/amy/fm.py) that can convert any DX7 patch into an AMY patch.
 
-The Juno-6 emulation provides [`juno.py`](https://github.com/shorepine/amy/blob/main/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY patches.
+The Juno-6 emulation provides [`juno.py`](https://github.com/shorepine/amy/blob/main/amy/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY patches.
 
 [The partials-driven piano voice and the code to generate the partials are described here](https://shorepine.github.io/amy/piano.html).
 
@@ -56,7 +56,7 @@ AMY will run on many modern microcontrollers under Arduino. On most platforms, w
 
 ## Using AMY in Python on any platform
 
-You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `amy` library, run `cd src; pip install .`. You can also run `make test` to install the library and run a series of tests.
+You can `import amy` in Python and have it render either out to your speakers or to a buffer of samples you can process on your own. To install the `amy` library, run `pip install .`. You can also run `make test` to install the library and run a series of tests.
 
 [**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
 
@@ -125,17 +125,17 @@ So in C, or JS, you'd fill an `amy_event` struct to define a single event of the
 ```c
 amy_event e = amy_default_event();
 e.osc = 0;
-e.patch_number = 130;
+e.patch = 130;
 e.velocity = 1;
 e.midi_note = 50;
-e.voices = '0'
+e.voices[0] = 0;
 amy_add_event(e);
 ```
 
-In Python, we provide `amy.py` that generates wire messages from a Pythonic `amy.send(**kwargs)`. In Python, you'd do
+In Python, we provide the `amy` package that generates wire messages from a Pythonic `amy.send(**kwargs)`. In Python, you'd do
 
 ```python
-amy.send(osc=0, patch_number = 130, vel = 1, note = 50, voices = [0])
+amy.send(osc=0, patch = 130, vel = 1, note = 50, voices = [0])
 ```
 
 Wire messages are used in AMY as a compact serialization of AMY events and become useful when communicating between AMY and other programs that may not be linked together. For example, [Alles](https://github.com/shorepine/alles) uses wire messages over Wi-Fi UDP to control a mesh of AMY synthesizers. [Tulip Web](https://tulip.computer/run) sends wire messages from the Micropython web process to the AudioWorklet running AMY on the web. We also store the Juno-6 and DX7 patches within AMY itself using wire messages, which helps keep the code size down. 
@@ -143,4 +143,16 @@ Wire messages are used in AMY as a compact serialization of AMY events and becom
 You can also send wire messages over SYSEX to AMY, if you want to control AMY over MIDI beyond the default MIDI mode. [See our MIDI documentation for more details.](docs/midi.md)
 
 It's good to understand what wire messages are but you don't need to construct them directly if you're linking AMY in your software. Use `amy_event` or `amy.send()` in Python to control AMY for almost all use cases.
+
+# More information
+
+ * [**Interactive AMY tutorial**](https://shorepine.github.io/amy/tutorial.html)
+ * [**AMY API**](docs/api.md)
+ * [**AMY Synthesizer Details**](docs/synth.md)
+ * [**AMY's MIDI specification**](docs/midi.md)
+ * [**AMY in Arduino Getting Started**](docs/arduino.md)
+ * [**Other AMY web demos**](https://shorepine.github.io/amy/)
+
+ [![shore pine sound systems discord](https://raw.githubusercontent.com/shorepine/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)
+
 

@@ -180,9 +180,9 @@ class TestBYOPVoices(AmyTest):
     # Does build-your-own-partials work with the voices mechanism?
     num_partials = 4
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
-    #amy.send(patch_number=1024, patch=s)
-    #amy.send(time=0, voices='0,1,2,3', patch_number=1024)
-    amy.send(time=0, voices='0,1,2,3', patch=s)
+    #amy.send(patchr=1024, patch_string=s)
+    #amy.send(time=0, voices='0,1,2,3', patch=1024)
+    amy.send(time=0, voices='0,1,2,3', patch_string=s)
     for i in range(num_partials):
       amy.send(voices='0,1,2,3', osc=i + 1, freq=220 * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
     amy.send(time=100, voices=0, note=60, vel=1)
@@ -196,8 +196,8 @@ class TestBYOPNoteOff(AmyTest):
     # Partials were not seeing note-offs.
     num_partials = 8
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
-    amy.send(patch_number=1024, patch=s)
-    amy.send(time=0, voices='0,1', patch_number=1024)
+    amy.send(patch=1024, patch_string=s)
+    amy.send(time=0, voices='0,1', patch=1024)
     for i in range(num_partials):
       amy.send(voices='0,1', osc=i + 1, freq=220 * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
     amy.send(voices='0,1', bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
@@ -262,7 +262,7 @@ class TestSineEnv2(AmyTest):
 class TestAlgo(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0",  patch_number=21+128)
+    amy.send(time=0, voices="0",  patch=21+128)
     amy.send(time=100, voices="0", note=58, vel=1)
     amy.send(time=500, voices="0", vel=0)
 
@@ -270,7 +270,7 @@ class TestAlgo(AmyTest):
 class TestAlgo2(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0", patch_number=128+24)
+    amy.send(time=0, voices="0", patch=128+24)
     amy.send(time=100, voices="0", note=58, vel=1)
     amy.send(time=500, voices="0", vel=0)
 
@@ -279,7 +279,7 @@ class TestFMRepeat(AmyTest):
   # Douglas reports that the DX7 Marimba sometimes clicks at onset.
 
   def run(self):
-    amy.send(time=0, voices="0", patch_number=128+21)
+    amy.send(time=0, voices="0", patch=128+21)
     for i in range(5):
       t = 100 + round(i * 51200 / 441)
       amy.send(time=t, voices="0", note=32, vel=1)
@@ -435,7 +435,7 @@ class TestJunoPatch(AmyTest):
 
   def run(self):
     # Also test the synth mechanism.
-    amy.send(time=0, synth=1, num_voices=4, patch_number=20)
+    amy.send(time=0, synth=1, num_voices=4, patch=20)
     amy.send(time=50, synth=1, note=48, vel=1)
     amy.send(time=150, synth=1, note=60, vel=1)
     amy.send(time=250, synth=1, note=63, vel=1)
@@ -449,7 +449,7 @@ class TestJunoClip(AmyTest):
   """Juno patch that clips."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", patch_number=9)
+    amy.send(time=0, voices="0,1,2,3", patch=9)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=50, voices="1", note=57, vel=1)
     amy.send(time=50, voices="2", note=55, vel=1)
@@ -534,7 +534,7 @@ class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
 
   def run(self):
-    amy.send(time=0, voices="0,1", patch_number=2)
+    amy.send(time=0, voices="0,1", patch=2)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=200, voices="0", vel=0)
     amy.send(time=300, voices="1", note=60, vel=1)
@@ -545,7 +545,7 @@ class TestJunoCheapTrumpetPatch(AmyTest):
   """Try out the 'cheap' LPF hack."""
 
   def run(self):
-    amy.send(time=0, voices="0,1", patch_number=2)
+    amy.send(time=0, voices="0,1", patch=2)
     amy.send(time=0, voices="0,1", filter_type=amy.FILTER_LPF)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=200, voices="0", vel=0)
@@ -565,7 +565,7 @@ class TestFilterReleaseGlitch(AmyTest):
 class TestPortamento(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0,1,2", patch_number=0)
+    amy.send(time=0, voices="0,1,2", patch=0)
 
     # Starting-point pitches...
     amy.send(time=50, voices="0", note=60, vel=1)
@@ -615,14 +615,14 @@ class TestVoiceManagement(AmyTest):
 
   def run(self):
     # Patch is bare sinewave oscillator but with a 100ms release.
-    #amy.send(patch_number=1024, patch=amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
-    #amy.send(time=10, synth=0, num_voices=3, patch_number=1024)
-    patch = amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,0,100,0')
-    amy.send(time=10, synth=0, num_voices=2, patch=patch)
+    #amy.send(patch=1024, patch_string=amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
+    #amy.send(time=10, synth=0, num_voices=3, patch=1024)
+    patch_string = amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,0,100,0')
+    amy.send(time=10, synth=0, num_voices=2, patch_string=patch_string)
     amy.send(time=100, synth=0, note=60, vel=1)
     amy.send(time=200, synth=0, note=72, vel=1)
     # Check if using the same string for a second synth reuses the same memory_patch (based on debug fprintfs).
-    amy.send(time=200, synth=1, num_voices=1, patch=patch)
+    amy.send(time=200, synth=1, num_voices=1, patch_string=patch_string)
     amy.send(time=300, synth=1, note=84, vel=1)
     # We ran out of voices, this should steal the first one
     amy.send(time=400, synth=0, note=96, vel=1)
@@ -702,7 +702,7 @@ class TestSynthProgChange(AmyTest):
 
   def run(self):
     # DX7 first patch, uses 9 oscs/voice, num_voices is inherited from previous init.
-    amy.send(time=0, synth=1, patch_number=128)
+    amy.send(time=0, synth=1, patch=128)
     amy.send(time=100, synth=1, note=60, vel=1)
     amy.send(time=300, synth=1, note=63, vel=1)
     amy.send(time=500, synth=1, note=67, vel=1)
@@ -733,9 +733,9 @@ class TestSynthFlags(AmyTest):
 
   def run(self):
     # The default config is NOT set, set up MIDI drums on instrument 1 here.
-    amy.send(patch_number=1024, patch='w7f0');
+    amy.send(patch=1024, patch_string='w7f0');
     # synth_flags=3 means do MIDI drums note translation and ignore note-offs.
-    amy.send(synth=1, synth_flags=3, num_voices=4, patch_number=1024)
+    amy.send(synth=1, synth_flags=3, num_voices=4, patch=1024)
     amy.send(time=100, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=37, vel=100/127)  # snare
@@ -758,7 +758,7 @@ class TestSustainPedal(AmyTest):
 
   def run(self):
     amy.send(time=0, reset=amy.RESET_SYNTHS)
-    amy.send(time=0, synth=1, num_voices=4, patch_number=256)
+    amy.send(time=0, synth=1, num_voices=4, patch=256)
     amy.send(time=50, synth=1, note=76, vel=1)
     amy.send(time=100, synth=1, note=76, vel=0)
     amy.send(time=150, synth=1, pedal=127)
@@ -778,10 +778,10 @@ class TestPatchFromEvents(AmyTest):
     self.config_default = True   # So that the patch space is already partly populated.
 
   def run(self):
-    amy.send(time=0, patch_number=1039, reset=amy.RESET_PATCH)
-    amy.send(time=0, patch_number=1039, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
-    amy.send(time=0, patch_number=1039, osc=1, wave=amy.SINE, freq=131, bp0='0,1,500,0,200,0')
-    amy.send(time=0, synth=0, num_voices=4, patch_number=1039)
+    amy.send(time=0, patch=1039, reset=amy.RESET_PATCH)
+    amy.send(time=0, patch=1039, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
+    amy.send(time=0, patch=1039, osc=1, wave=amy.SINE, freq=131, bp0='0,1,500,0,200,0')
+    amy.send(time=0, synth=0, num_voices=4, patch=1039)
     amy.send(time=100, synth=0, note=60, vel=1)
     amy.send(time=300, synth=0, note=64, vel=1)
     amy.send(time=500, synth=0, note=67, vel=1)

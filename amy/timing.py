@@ -110,15 +110,15 @@ class TestNoiseOsc(AmyTest):
 class TestPcm(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, patch=1)
+    amy.send(time=0, osc=0, wave=amy.PCM, preset=1)
     amy.send(time=100, vel=1)
 
 
 class TestPcmShift(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, patch=10)
-    # Cowbell with no note should play at "default" pitch, midi 69 (for that patch)
+    amy.send(time=0, osc=0, wave=amy.PCM, preset=10)
+    # Cowbell with no note should play at "default" pitch, midi 69 (for that preset)
     amy.send(time=100, vel=1)
     # Specifying a note should shift its pitch.
     amy.send(time=500, note=70, vel=1)
@@ -132,22 +132,6 @@ class TestSineEnv(AmyTest):
     # amy.send(time=0, osc=0, bp0_target=amy.TARGET_AMP, bp0='50,1,250,0.1,50,0')
     amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,250,0.1,50,0')
     amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
-
-
-class TestAlgo(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.ALGO, patch=21)
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=500, vel=0)
-
-
-class TestAlgo2(AmyTest):
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.ALGO, patch=24)
-    amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
 
 
@@ -303,7 +287,7 @@ class TestJunoPatch(AmyTest):
   """Known Juno patch."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", patch_number=20)
+    amy.send(time=0, voices="0,1,2,3", patch=20)
     amy.send(time=50, voices="0", note=48, vel=1)
     amy.send(time=50, voices="1", note=60, vel=1)
     amy.send(time=50, voices="2", note=63, vel=1)
@@ -317,7 +301,7 @@ class TestJunoPatch3(AmyTest):
   """Known Juno patch with parametric EQ."""
 
   def run(self):
-    amy.send(time=0, voices="0", patch_number=3)
+    amy.send(time=0, voices="0", patch=3)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=900, voices="0", vel=0)
 
