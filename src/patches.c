@@ -21,11 +21,7 @@ if you get a osc and a voice, you add the osc to the base_osc lookup and send th
 
 #define _PATCHES_FIRST_USER_PATCH 1024
 
-//#define MAX_VOICES 64
-//uint16_t voice_to_base_osc[MAX_VOICES];
-//#define MEMORY_PATCHES 32
-//char * memory_patch[MEMORY_PATCHES];
-//uint16_t memory_patch_oscs[MEMORY_PATCHES];
+
 uint32_t max_num_memory_patches = 0;
 char **memory_patch = NULL;
 struct delta **memory_patch_deltas = NULL;

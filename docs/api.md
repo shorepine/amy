@@ -98,6 +98,7 @@ amy_start(amy_config);
 | `max_memory_patches` | Int | 32 | How many in memory patches to supprot |
 | `i2s_lrc`, `i2s_dout`, `i2s_din`, `i2s_bclk`, `i2s_mclk` | Int | -1 | Pin numbers for the I2S interface |
 | `midi_out`, `midi_in` | Int | -1 | Pin number for the MIDI UART pins |
+| `midi_uart` | 0,1,[2] | -1 | UART device index for MCU. Default 1 (`UART1`) on Pi Pico and ESP. Teensy is always `8` |
 | `capture_device_id`, `playback_device_id` | Int | -1 | Which miniaudio device to use, -1 is auto |
 
 
@@ -170,7 +171,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-
+| `l`    | `velocity` | `vel` | float | Note on velocity. Use to start an envelope or set amplitude |
 
 ### CtrlCoefs
 
