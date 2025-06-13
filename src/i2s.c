@@ -124,8 +124,11 @@ void esp_render_task( void * pvParameters) {
 }
 
 #ifdef AMYBOARD
+#define I2S_SAMPLE_TYPE I2S_BITS_PER_SAMPLE_32BIT
+typedef int32_t i2s_sample_type;
+
 static int32_t block32[AMY_BLOCK_SIZE * AMY_NCHANS];
-extern int16_t amy_in_block[AMY_BLOCK_SIZE * AMY_NCHANS];
+extern output_sample_type * amy_in_block;
 i2s_sample_type my_int32_block[AMY_BLOCK_SIZE * AMY_NCHANS];
 
 #endif
