@@ -233,10 +233,9 @@ extern void on_pico_uart_rx();
 void amy_poll_tasks() {
     //if (ap->free_list == NULL) {
     amy_execute_deltas();
-    // check MIDI
-    on_pico_uart_rx();
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) on_pico_uart_rx();
 #ifdef TUD_USB_GADGET
-    pico_process_midi();
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) on_pico_uart_rx();
 #endif
     //}
 }
@@ -350,12 +349,14 @@ amy_err_t i2s_amy_init() {
 }
 
 void amy_update() {
-    // do midi in here
-    uint8_t bytes[1];
-    int t;
-    while((t = teensy_get_serial_byte()) >= 0) {
-        bytes[0] = t;
-        convert_midi_bytes_to_messages(bytes,1,0);
+    if(amy_config.global.midi & AMY_MIDI_IS_UART) {
+        // do midi in here
+        uint8_t bytes[1];
+        int t;
+        while((t = teensy_get_serial_byte()) >= 0) {
+            bytes[0] = t;
+            convert_midi_bytes_to_messages(bytes,1,0);
+        }
     }
     amy_execute_deltas();
     amy_render(0, AMY_OSCS, 0);

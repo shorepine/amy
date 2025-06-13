@@ -1135,7 +1135,7 @@ void play_delta(struct delta *d) {
 	    uint16_t osc = d->osc;
 	    while(AMY_IS_SET(osc)) {
 		synth[osc]->velocity = d->data.f;
-		if (AMY_IS_SET(synth[osc]->chained_osc) || synth[osc]->amp_coefs[COEF_VEL] == 0 || synth[osc]->amp_coefs[COEF_VEL] > 0.001) {
+		if (AMY_IS_SET(synth[osc]->chained_osc) || synth[osc]->amp_coefs[COEF_VEL] == 0 || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH) {
 		    synth[osc]->status = SYNTH_AUDIBLE;
 		    // an osc came in with a note on.
 		    // start the bp clock
@@ -1233,7 +1233,7 @@ float combine_controls_mult(float *controls, float *coefs) {
             // COEF_MOD and COEF_BEND are applied as amp *= (1 + COEF * CONTROL).
             result *= ((i > COEF_EG1)? 1.0f : 0) + coefs[i] * controls[i];
     // Apply a threshold to "fully off".
-    if (result <= 0.0011)  result = 0;  // A little bit more than 0.001 to avoid FP issues with exactly 0.001.
+    if (result <= AMP_THRESH_PLUS)  result = 0; 
     return result;
 }
 

@@ -292,50 +292,43 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
 ///// Per platform MIDI in and out stuff
 ///////////////////////////////////////////////
 
-#if !defined(MACOS) && !defined(__EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
-
-void midi_out(uint8_t * bytes, uint16_t len) {
-#ifdef __EMSCRIPTEN__
-    EM_ASM(
-            if(midiOutputDevice != null) {
-                midiOutputDevice.send(HEAPU8.subarray($0, $0 + $1));
-            }, bytes, len
-        );
-#elif defined TUD_USB_GADGET
-    tud_midi_stream_write(0, bytes, len);
-#elif defined ESP_PLATFORM
-    uart_write_bytes(UART_NUM_1, bytes, len);
-#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
-    uart_write_blocking(uart1, bytes, len);
-#else
-    // teensy
-    // linux
-#endif
-
-}
-
-
-// "run_midi" sets up MIDI on MCU platforms
 
 #if (defined __EMSCRIPTEN__)
 void run_midi() {
     // do nothing, this is all done with callbacks
 }
+
+void midi_out(uint8_t * bytes, uint16_t len) {
+    EM_ASM(
+            if(midiOutputDevice != null) {
+                midiOutputDevice.send(HEAPU8.subarray($0, $0 + $1));
+            }, bytes, len
+        );
+}
 #endif
+
+#if !defined(MACOS) && !defined(__EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
+
+// "run_midi" sets up MIDI on MCU platforms
+
 
 #if (defined ESP_PLATFORM)
 TaskHandle_t midi_handle;
 
+int8_t esp_get_uart(int8_t index) {
+    if(index==0) return UART_NUM_0;
+    if(index==1) return UART_NUM_1;
+    if(index==2) return UART_NUM_2;
+    return -1;
+}
+
 void run_midi_task() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    // Setup UART2 to listen for MIDI messages 
-    const int uart_num = UART_NUM_1;
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     uart_config_t uart_config = {
         .baud_rate = 31250,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        //.flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
     };
 
     // Configure UART parameters
@@ -371,19 +364,29 @@ void run_midi_task() {
 }
 
 void run_midi() {
-    xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+    }
 }
 
 #endif
 
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
+
+uart_inst_t * rp_get_uart(int8_t index) {
+    if(index==0) return uart0;
+    if(index==1) return uart1;
+    return NULL;
+}
+
 // RX interrupt handler
 void on_pico_uart_rx() {
     const int midi_buffer_size = 16;
     uint8_t bytes[midi_buffer_size];
     uint8_t i = 0;
-    while (uart_is_readable(uart1) && i < midi_buffer_size) {
-        uart_read_blocking (uart1, bytes + i, 1);
+    while (uart_is_readable(rp_get_uart(amy_global.config.midi_uart)) && i < midi_buffer_size) {
+        uart_read_blocking (rp_get_uart(amy_global.config.midi_uart), bytes + i, 1);
         i++;
     }
     //if (i >= midi_buffer_size)
@@ -395,16 +398,14 @@ extern void pico_setup_midi();
 
 void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    uart_init(uart1, 31250);
-    gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_out));
-    gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(uart1, amy_global.config.midi_in));
-    uart_set_hw_flow(uart1, false, false);
-    uart_set_format(uart1, 8, 1, UART_PARITY_NONE);
-    uart_set_fifo_enabled(uart1, true);
-    //irq_set_exclusive_handler(UART1_IRQ, on_pico_uart_rx);
-    //irq_set_enabled(UART1_IRQ, true);
-    //uart_set_irq_enables(uart1, true, false);
-    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
+        gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
+        gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_in));
+        uart_set_hw_flow(rp_get_uart(amy_global.config.midi_uart), false, false);
+        uart_set_format(rp_get_uart(amy_global.config.midi_uart), 8, 1, UART_PARITY_NONE);
+        uart_set_fifo_enabled(rp_get_uart(amy_global.config.midi_uart), true);
+    } else if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
         pico_setup_midi();
     }
 
@@ -424,7 +425,7 @@ void check_tusb_midi() {
 extern void teensy_start_midi();
 
 void run_midi() {
-    teensy_start_midi();
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) teensy_start_midi();
 }
 #endif
 
@@ -443,5 +444,18 @@ void run_midi() {
 }
 #endif
 
+void midi_out(uint8_t * bytes, uint16_t len) {
+#if defined TUD_USB_GADGET
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) tud_midi_stream_write(0, bytes, len);
+#elif defined ESP_PLATFORM
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
+#elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_blocking(rp_get_uart(amy_global.config.midi_uart), bytes, len);
+#else
+    // teensy
+    // linux
+#endif
+
+}
 
 #endif // check for macos desktop 

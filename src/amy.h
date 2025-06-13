@@ -131,6 +131,10 @@ extern const uint16_t pcm_samples;
 
 #define MAX_VOLUME 11.0
 
+#define AMP_THRESH 0.001f
+// A little bit more than 0.001 to avoid FP issues with exactly 0.001.
+#define AMP_THRESH_PLUS 0.0011f
+
 // Rest of amy setup
 #define SAMPLE_MAX 32767
 #define MAX_ALGO_OPS 6 
@@ -590,7 +594,8 @@ typedef struct  {
     int8_t i2s_mclk;
     int8_t midi_out;
     int8_t midi_in;
-
+    int8_t midi_uart;
+    
     // memory caps for MCUs
     uint32_t ram_caps_events;
     uint32_t ram_caps_sysex;

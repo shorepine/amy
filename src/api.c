@@ -76,6 +76,16 @@ amy_config_t amy_default_config() {
     c.i2s_mclk = -1;
     c.midi_out = -1;
     c.midi_in = -1;
+    c.midi_uart = -1; 
+
+    #ifdef ESP_PLATFORM
+    c.midi_uart = 1;
+    #endif
+
+    #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
+    c.midi_uart = 1;
+    #endif
+
     return c;
 }
 
