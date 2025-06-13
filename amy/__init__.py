@@ -1,6 +1,9 @@
+# AMY module
+from .constants import *
 import collections
 import time
-from amy_constants import *
+import c_amy as _amy  # Import the C module
+
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
 insert_time = None
@@ -189,14 +192,13 @@ def message(**kwargs):
 
 
 def send_raw(m):
-    # override_send is used by e.g. Tulip, to send messages in a different way than libamy or UDP
+    # override_send is used by e.g. Tulip, to send messages in a different way than C or UDP
     global mess, log
     global override_send
     if(override_send is not None):
         override_send(m)
     else:
-        import libamy
-        libamy.send(m)
+        _amy.send_wire(m)
     if(log): mess.append(m)
 
 def log_patch():
@@ -273,39 +275,22 @@ def play(samples):
 # Render AMY's internal buffer to a numpy array of floats
 def render(seconds):
     import numpy as np
-    import libamy
     # Output a npy array of samples
     frame_count = int((seconds*AMY_SAMPLE_RATE)/AMY_BLOCK_SIZE)
     frames = []
     for f in range(frame_count):
-        frames.append( np.array(libamy.render())/32768.0 )
+        frames.append( np.array(_amy.render_to_list())/32768.0 )
     return np.hstack(frames).reshape((-1, AMY_NCHANS))
 
-def live(audio_playback_device=-1, audio_capture_device=-1):
-    import libamy
-    libamy.live(audio_playback_device, audio_capture_device)
-
-# Stops live mode
-def pause():
-    stop()
-
-def stop():
-    import libamy
-    libamy.pause()
-
 def restart():
-    import libamy
-    libamy.restart()
+    _amy.stop()
+    _amy.start()
 
 def inject_midi(a, b, c, d=None):
-    try:
-        import libamy
-    except ImportError:
-        pass
     if d is None:
-        libamy.inject_midi(a, b, c)
+        _amy.inject_midi(a, b, c)
     else:
-        libamy.inject_midi(a, b, c, d)
+        _amy.inject_midi(a, b, c, d)
     
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)
@@ -383,125 +368,8 @@ def reset(osc=None, **kwargs):
         send(reset=RESET_ALL_OSCS, **kwargs) 
 
 
-"""
-    Run a scale through all the synth's sounds
-"""
-def test():
-    while True:
-        for wave in [SINE, SAW_DOWN, PULSE, TRIANGLE, NOISE]:
-            for i in range(12):
-                send(osc=0, wave=wave, note=40+i, preset=i, vel=1)
-                time.sleep(0.5)
 
 
-"""
-    Play all of the patches
-"""
-def play_patches(wait=1, patch_total = 256, **kwargs):
-    import random
-    patch_count = 0
-    while True:
-        patch = random.randint(0,256) #patch_count % patch_total
-        print("Sending patch %d" % patch)
-        send(synth=0, num_voices=1, patch_number=patch)
-        time.sleep(wait/4.0)            
-        send(synth=0, note=50, vel=1, **kwargs)
-        time.sleep(wait)
-        send(synth=0, vel=0)
-        time.sleep(wait/4.0)
-
-
-import example_patches
-
-def play_example_patches(wait=1, **kwargs):
-    try:
-        patchClasses = example_patches.Patch.__subclasses__()
-    except AttributeError:
-        # micropython does not have __subclasses__
-        patchClasses = [
-            example_patches.simple_sine,
-            example_patches.filter_bass,
-            example_patches.amp_lfo,
-            example_patches.pitch_lfo,
-            example_patches.bass_drum,
-            example_patches.noise_snare,
-            example_patches.closed_hat,
-        ]
-    for patchClass in patchClasses:
-        print("Patch", patchClass.__name__)
-        send(synth=0, num_voices=1, patch_number=patchClass())
-        time.sleep(wait/4.0)            
-        send(synth=0, note=50, vel=1, **kwargs)
-        time.sleep(wait)
-        send(synth=0, vel=0)
-        time.sleep(wait/4.0)
-
-
-def eq_test():
-    reset()
-    eqs = [ [0,0,0], [15,0,0], [0,0,15], [0,15,0],[-15,-15,15],[-15,-15,30],[-15,30,-15], [30,-15,-15] ]
-    for eq in eqs:
-        print("eq_l = %f dB, eq_m = %f dB, eq_h = %f dB" % (eq[0], eq[1], eq[2]))
-        send(eq="%.2f,%.2f,%.2f" % (eq[0], eq[1], eq[2]))
-        drums(loops=2)
-        time.sleep(1)
-        reset()
-        time.sleep(0.250)
-
-"""
-    Sweep the filter
-"""
-def sweep(speed=0.100, res=0.5, loops = -1):
-    end = 2000
-    cur = 0
-    while(loops != 0):
-        for i in [0, 1, 4, 5, 1, 3, 4, 5]:
-            cur = (cur + 100) % end
-            send(osc=0,filter_type=FILTER_LPF, filter_freq=cur+250, resonance=res, wave=PULSE, note=50+i, duty=0.50, vel=1)
-            send(osc=1,filter_type=FILTER_LPF, filter_freq=cur+500, resonance=res, wave=PULSE, note=50+12+i, duty=0.25, vel=1)
-            send(osc=2,filter_type=FILTER_LPF, filter_freq=cur, resonance=res, wave=PULSE, note=50+6+i, duty=0.90, vel=1)
-            time.sleep(speed)
-
-"""
-    An example drum machine using osc+PCM presets
-"""
-def drums(bpm=120, loops=-1, volume=0.2, **kwargs):
-    preset(5, osc=0, **kwargs) # sample bass drum
-    preset(8, osc=3, **kwargs) # sample hat
-    preset(9, osc=4, pan=1, **kwargs) # sample cow
-    preset(10, osc=5, pan=0, **kwargs) # sample hi cow
-    preset(11, osc=2, **kwargs) # sample snare
-    preset(1, osc=7, **kwargs) # filter bass
-    [bass, snare, hat, cow, hicow, silent] = [1, 2, 4, 8, 16, 32]
-    pattern = [bass+hat, hat+hicow, bass+hat+snare, hat+cow, hat, hat+bass, snare+hat, hat]
-    bassline = [50, 0, 0, 0, 50, 52, 51, 0]
-    while (loops != 0):
-        loops = loops - 1
-        for i,x in enumerate(pattern):
-            if(x & bass): 
-                send(osc=0, vel=6*volume, note=44, **kwargs)
-            if(x & snare):
-                send(osc=2, vel=1.5*volume)
-            if(x & hat): 
-                send(osc=3, vel=1*volume)
-            if(x & cow): 
-                send(osc=4, vel=1*volume)
-            if(x & hicow): 
-                send(osc=5, vel=1*volume)
-            if(bassline[i]>0):
-                send(osc=7, vel=0.5*volume, note=bassline[i]-12, **kwargs)
-            else:
-                send(vel=0, osc=7, **kwargs)
-            time.sleep(1.0/(bpm*2/60))
-
-
-"""
-    C-major chord
-"""
-def c_major(octave=2,wave=SINE, **kwargs):
-    send(osc=0, freq=220.5*octave, wave=wave, vel=1, **kwargs)
-    send(osc=1, freq=138.5*octave, wave=wave, vel=1, **kwargs)
-    send(osc=2, freq=164.5*octave, wave=wave, vel=1, **kwargs)
 
 """
     Chorus control

@@ -1,7 +1,5 @@
-// libAMY
-
-// Brian Whitman
-// brian@variogr.am
+// DAn Ellis and Brian Whitman
+// brian@variogr.am / dan.ellis@gmail.com
 
 #include "amy.h"
 

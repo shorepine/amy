@@ -8,9 +8,13 @@ sounds/MuseScore_General.sf2
 loris-1.8/
 __pycache__/
 src/dist/
-src/libamy.egg-info/
+src/amy.egg-info/
 src/pcm_large.bin
 src/pcm_small.bin
+.python-version
+amy.egg-info/
+build/
+
 
 # Prerequisites
 *.d

@@ -1,10 +1,9 @@
 # fm.py
 # Some code to try to convert DX7 patches into AMY commands
 
-import amy
 import numpy as np
 import time
-
+import amy
 from dataclasses import dataclass
 from typing import List
 

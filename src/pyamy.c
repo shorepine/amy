@@ -20,12 +20,13 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     int arg1 = -1; int arg2 = -1;
-    if(! PyArg_ParseTuple(args, "ii", &arg1, &arg2)) {
+    if(PyTuple_Size(args) == 2) {
+        PyArg_ParseTuple(args, "ii", &arg1, &arg2);
         amy_global.config.playback_device_id = arg1;
         amy_global.config.capture_device_id = arg2;
     } else {
-        amy_global.config.playback_device_id = arg1;
-        amy_global.config.capture_device_id = arg2;
+        amy_global.config.playback_device_id = -1;
+        amy_global.config.capture_device_id = -1;
     }
     amy_live_start();
     return Py_None;
@@ -96,9 +97,9 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
 }
 
 
-static PyMethodDef libAMYMethods[] = {
-    {"render", render_wrapper, METH_VARARGS, "Render audio"},
-    {"send", send_wrapper, METH_VARARGS, "Send a message"},
+static PyMethodDef c_amyMethods[] = {
+    {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
+    {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
     {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
     {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
@@ -109,20 +110,19 @@ static PyMethodDef libAMYMethods[] = {
     { NULL, NULL, 0, NULL }
 };
 
-static struct PyModuleDef libamyDef =
+static struct PyModuleDef c_amyDef =
 {
     PyModuleDef_HEAD_INIT,
-    "libamy", /* name of module */
+    "c_amy", /* name of module */
     "",          /* module documentation, may be NULL */
     -1,          /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
-    libAMYMethods
+    c_amyMethods
 };
 
-PyMODINIT_FUNC PyInit_libamy(void)
+PyMODINIT_FUNC PyInit_c_amy(void)
 {   
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config);
-    return PyModule_Create(&libamyDef);
-
+    return PyModule_Create(&c_amyDef);
 }
 #endif
