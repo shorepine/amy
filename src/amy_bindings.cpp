@@ -50,8 +50,8 @@ static void set_preset(amy_event& e, int16_t val) { e.preset = val; }
 static float get_midi_note(const amy_event& e) { return e.midi_note; }
 static void set_midi_note(amy_event& e, float val) { e.midi_note = val; }
 
-static uint16_t get_patch(const amy_event& e) { return e.patch; }
-static void set_patch(amy_event& e, uint16_t val) { e.patch = val; }
+static uint16_t get_patch_number(const amy_event& e) { return e.patch_number; }
+static void set_patch_number(amy_event& e, uint16_t val) { e.patch_number = val; }
 
 static float get_feedback(const amy_event& e) { return e.feedback; }
 static void set_feedback(amy_event& e, float val) { e.feedback = val; }
@@ -203,7 +203,7 @@ EMSCRIPTEN_BINDINGS(amy_module) {
         .property("wave", &get_wave, &set_wave)
         .property("preset", &get_preset, &set_preset)
         .property("midi_note", &get_midi_note, &set_midi_note)
-        .property("patch", &get_patch, &set_patch)
+        .property("patch_number", &get_patch_number, &set_patch_number)
         .property("amp_coefs", &get_amp_coefs, &set_amp_coefs)
         .property("freq_coefs", &get_freq_coefs, &set_freq_coefs)
         .property("filter_freq_coefs", &get_filter_freq_coefs, &set_filter_freq_coefs)

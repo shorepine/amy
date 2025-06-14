@@ -103,7 +103,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->osc);
     AMY_UNSET(e->preset);
     AMY_UNSET(e->wave);
-    AMY_UNSET(e->patch);
+    AMY_UNSET(e->patch_number);
     AMY_UNSET(e->phase);
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
@@ -233,7 +233,7 @@ void amy_default_synths() {
 
     // sine wave "bleeper" on ch 0 (not a MIDI channel)
     amy_event e = amy_default_event();
-    e.patch= 1024;
+    e.patch_number= 1024;
     // osc=0 sinewave.
     // Sine is default, but we need to have one delta, else the number of oscs is zero = no patch.
     patches_store_patch(&e, "v0w0");
@@ -243,7 +243,7 @@ void amy_default_synths() {
 
     // GM drum synth on channel 10
     e = amy_default_event();
-    e.patch = 1025;
+    e.patch_number = 1025;
     patches_store_patch(&e, "w7f0");
     e.num_voices = 6;
     e.synth = 10;
@@ -254,7 +254,7 @@ void amy_default_synths() {
     // DX7 6 note poly on channel 2
     e = amy_default_event();
     e.num_voices = 6;
-    e.patch = 128;
+    e.patch_number = 128;
     e.synth = 2;
     amy_add_event(&e);
 
@@ -262,7 +262,7 @@ void amy_default_synths() {
     // Define this last so if we release it, the oscs aren't fragmented.
     e = amy_default_event();
     e.num_voices = 6;
-    e.patch = 0;
+    e.patch_number = 0;
     e.synth = 1;
     amy_add_event(&e);
     // Add some MIDI CCs for the Juno (defined in midi_mappings.c).

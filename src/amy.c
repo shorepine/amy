@@ -461,7 +461,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
     if (AMY_IS_SET(e->voices[0]) || AMY_IS_SET(e->synth)) {
-        if (AMY_IS_SET(e->patch) || AMY_IS_SET(e->num_voices)) {
+        if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             amy_execute_deltas();
             patches_load_patch(e);
         } else {
@@ -472,9 +472,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // Is this, in fact, a non-load_patch or store_patch event that has patch_number set?
     // If so, add the event to the stored patch queue, not the execution queue.
-    if (AMY_IS_SET(e->patch)) {
-        queue = queue_for_patch_number(e->patch);
-        //fprintf(stderr, "event added to patch %d: osc %d wave %d...\n", e->patch, e->osc, e->wave);
+    if (AMY_IS_SET(e->patch_number)) {
+        queue = queue_for_patch_number(e->patch_number);
+        //fprintf(stderr, "event added to patch %d: osc %d wave %d...\n", e->patch_number, e->osc, e->wave);
     }
 
     // Everything else only added to queue if set
@@ -567,9 +567,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     EVENT_TO_DELTA_F(velocity, VELOCITY)
 
-    if (AMY_IS_SET(e->patch)) {
+    if (AMY_IS_SET(e->patch_number)) {
         // If this was an event with a patch number, maybe we increased the number of oscs for this patch, update it.
-         update_num_oscs_for_patch_number(e->patch);
+         update_num_oscs_for_patch_number(e->patch_number);
     }
 
 
@@ -1556,9 +1556,9 @@ void amy_process_event(amy_event *e) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
         e->status = EVENT_SEQUENCE;
-    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch)) {
+    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
         // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
-        patches_reset_patch(e->patch);
+        patches_reset_patch(e->patch_number);
         AMY_UNSET(e->reset_osc);
     } else {
         // if time is set, play then

@@ -186,23 +186,23 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // amy patch string. Either pull patch_number from e, or allocate a new one and write it to e.
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch, patch_string);
-    if (!AMY_IS_SET(e->patch)) {
+    if (!AMY_IS_SET(e->patch_number)) {
         // Check for a repeated string
         for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
             if (memory_patch_oscs[i] > 0 && memory_patch[i] != NULL)
                 if (strcmp(memory_patch[i], patch_string) == 0) {
-                    e->patch = i + _PATCHES_FIRST_USER_PATCH;
+                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
                     // Actually, we don't need to store it, we already have it.
-                    //fprintf(stderr, "store_patch: using existing patch_number %d for '%s'\n", e->patch, patch_string);
+                    //fprintf(stderr, "store_patch: using existing patch_number %d for '%s'\n", e->patch_number, patch_string);
                     return;
                 }
         }
         // We need to allocate a new number.
-        e->patch = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
+        e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
         // next_user_patch_index is updated as needed at the bottom of the function (so it can reflect user-defined numbers too).
-        //fprintf(stderr, "store_patch: auto-assigning patch number %d for '%s'\n", e->patch, patch_string);
+        //fprintf(stderr, "store_patch: auto-assigning patch number %d for '%s'\n", e->patch_number, patch_string);
     }
-    int patch_index = (int)e->patch - _PATCHES_FIRST_USER_PATCH;
+    int patch_index = (int)e->patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
         fprintf(stderr, "patch number %d is out of range (%d .. %d)\n",
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
@@ -345,7 +345,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
 
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
-        if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch)) {
+        if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
             fprintf(stderr, "You specified both synth %d and voices %d...  Synth implies voices, ignoring voices.\n",
                     e->synth, e->voices[0]);
         }
@@ -418,7 +418,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     }
     // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     AMY_UNSET(e->voices[0]);
-    AMY_UNSET(e->patch);
+    AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     AMY_UNSET(e->synth);
     // for each voice, send the event to the base osc (+ e->osc if given)
@@ -456,11 +456,11 @@ void patches_load_patch(amy_event *e) {
     peek_stack("load_patch");
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
-    uint16_t patch_number = e->patch;
-    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch, e->num_voices);
+    uint16_t patch_number = e->patch_number;
+    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
     if (AMY_IS_SET(e->synth)) {
         // Instrument specified.
-        if (AMY_IS_UNSET(e->patch)) {
+        if (AMY_IS_UNSET(e->patch_number)) {
             // If no patch number is provided, pull from existing instrument.
             int32_t old_patch_number = instrument_get_patch_number(e->synth);
             if (old_patch_number == -1) {

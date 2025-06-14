@@ -96,7 +96,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
         // (so e.g. DX7 voices remain DX7).
         bank_number = (instrument_get_patch_number(e.synth) & 0xFF80) >> 7;
     }
-    e.patch = program + 128 * bank_number;
+    e.patch_number = program + 128 * bank_number;
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
     }
