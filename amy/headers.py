@@ -395,6 +395,7 @@ def make_patches(filename):
             f.write("%d," % (i))
         f.write("\n};\n#endif\n")
     amy.override_send = None
+    print("wrote", filename)
 
 
 def write_vector_as_c(f, data, name, dtype='uint8_t', items_per_row=20):
