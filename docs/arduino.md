@@ -51,15 +51,26 @@ e.osc = 0;
 e.patch_number = 130;
 e.velocity = 1;
 e.midi_note = 50;
-e.voices = '0'
+e.voices[0] = 0;
 amy_add_event(e);
 ```
+
+## Recommended DAC / ADC configurations
+
+The supported microcontrollers (excepting the Daisy, which is built in) use I2S as the default audio interface. I2S is a standard but some chips / boards may require setup beyond just wiring up the pins. For example, the [`WM8960`](https://www.waveshare.com/wiki/WM8960_Audio_HAT) and the `PCM9211` require registers to be set to route audio signals and amplification. 
+
+We can recommend simpler audio out DACs that "just work" with AMY with no extra setup:
+
+ * [PCM5101 / PCM5102](https://www.amazon.com/dp/B0DCGF2TN1?th=1)
+ * [UDA1334](https://www.adafruit.com/product/3678)
+
+ **TODO**: list audio in/out dacs
 
 ## Per-board notes
 
 ### ESP32, ESP32-S3, ESP32-P4
 
-Tested: Arduino IDE 2.3.6 (mac)
+Tested: Arduino IDE 2.3.6 (mac) + arduino-esp32 3.2.0
 
 
 ### Teensy 4.0, 4.1
@@ -72,7 +83,7 @@ if you set USB Type to Audio, it will appear as a USB audio device on your compu
 
 Note: USB audio from Teensy is fiddly and often slow to enumerate, i have to wait a minute or two before it shows up on my Mac. This seems to be unrelated to AMY. Please ask on the Teensy forums if you're having trouble with USB Audio. Once it is enumerated and running, it does seem stable.
 
-For I2S, you have to use the default i2s1 pins. The pins you set in AMY config are ignored. That's `21 -> BLCK`, `20 -> LRC`, `DOUT -> 7`
+For I2S, you have to use the default i2s1 pins. The pins you set in AMY config are ignored. That's `21 -> BLCK`, `20 -> LRC`, `DOUT -> 7`. This works with the [Teensy Audio Shield](https://www.pjrc.com/store/teensy3_audio.html) and the simpler [PT8211](https://www.pjrc.com/store/pt8211_kit.html). It will also work with other I2S DAC boards. 
 
 For UART MIDI, we use Serial8, the pins you set in AMY config are ignored. That's `MIDI_OUT -> 35`, `MIDI_IN -> 34`.
 
@@ -86,6 +97,17 @@ The `i2s_lrc` pin has to be `i2s_bclk` + 1.
 
 
 ### Electro-Smith Daisy Seed
+
+Tested: Arduino IDE 2.3.6 (mac) + DaisyDuino 1.7.0 + stm32duino 2.10.1
+
+Follow the DaisyDuino https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino getting started
+
+Make sure you install the STM32 board support, as seen here https://github.com/stm32duino/Arduino_Core_STM32/wiki/Getting-Started
+
+It's not mentioned on the other pages but make sure you also install this: https://www.st.com/en/development-tools/stm32cubeprog.html
+
+
+
 
 See [Daisy README](../daisy/README.md)
 
