@@ -17,7 +17,7 @@
 #endif
 
 
-#include "midi.h"
+#include "amy_midi.h"
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
@@ -428,7 +428,6 @@ void run_midi() {
     if(amy_global.config.midi & AMY_MIDI_IS_UART) teensy_start_midi();
 }
 #endif
-
 
 
 #ifdef __linux__

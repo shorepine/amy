@@ -38,7 +38,6 @@ We ship a single example in the Examples folder for AMY called `AMY_MIDI_Synth`.
  * RP2040 / RP2350 / Pi Pico: [`arduino-pico`](https://arduino-pico.readthedocs.io/en/latest/install.html#installing-via-arduino-boards-manager)
  * Teensy: [`teensyduino`](https://www.pjrc.com/teensy/td_download.html)
  * ESP32 / ESP32-S3 / etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html)
- * Electrosmith Daisy: [`DaisyDuino`](https://daisy.audio/tutorials/arduino-dev-env/)
 
 You can use both cores of supported chips (RP2040, RP2350 or ESP32 variants) for more oscillators and voices.
 
@@ -51,15 +50,26 @@ e.osc = 0;
 e.patch_number = 130;
 e.velocity = 1;
 e.midi_note = 50;
-e.voices = '0'
-amy_add_event(e);
+e.voices[0] = 0;
+amy_add_event(&e);
 ```
+
+## Recommended DAC / ADC configurations
+
+The supported microcontrollers (excepting the Daisy, which is built in) use I2S as the default audio interface. I2S is a standard but some chips / boards may require setup beyond just wiring up the pins. For example, the [`WM8960`](https://www.waveshare.com/wiki/WM8960_Audio_HAT) and the `PCM9211` require registers to be set to route audio signals and amplification. 
+
+We can recommend simpler audio out DACs that "just work" with AMY with no extra setup:
+
+ * [PCM5101 / PCM5102](https://www.amazon.com/dp/B0DCGF2TN1?th=1)
+ * [UDA1334](https://www.adafruit.com/product/3678)
+
+ **TODO**: list audio in/out dacs
 
 ## Per-board notes
 
 ### ESP32, ESP32-S3, ESP32-P4
 
-Tested: Arduino IDE 2.3.6 (mac)
+Tested: Arduino IDE 2.3.6 (mac) + arduino-esp32 3.2.0
 
 
 ### Teensy 4.0, 4.1
@@ -72,7 +82,7 @@ if you set USB Type to Audio, it will appear as a USB audio device on your compu
 
 Note: USB audio from Teensy is fiddly and often slow to enumerate, i have to wait a minute or two before it shows up on my Mac. This seems to be unrelated to AMY. Please ask on the Teensy forums if you're having trouble with USB Audio. Once it is enumerated and running, it does seem stable.
 
-For I2S, you have to use the default i2s1 pins. The pins you set in AMY config are ignored. That's `21 -> BLCK`, `20 -> LRC`, `DOUT -> 7`
+For I2S, you have to use the default i2s1 pins. The pins you set in AMY config are ignored. That's `21 -> BLCK`, `20 -> LRC`, `DOUT -> 7`. This works with the [Teensy Audio Shield](https://www.pjrc.com/store/teensy3_audio.html) and the simpler [PT8211](https://www.pjrc.com/store/pt8211_kit.html). It will also work with other I2S DAC boards. 
 
 For UART MIDI, we use Serial8, the pins you set in AMY config are ignored. That's `MIDI_OUT -> 35`, `MIDI_IN -> 34`.
 
@@ -87,5 +97,17 @@ The `i2s_lrc` pin has to be `i2s_bclk` + 1.
 
 ### Electro-Smith Daisy Seed
 
-See [Daisy README](../daisy/README.md)
+The Daisy works great with AMY.  However, it does not work with the Arduino[DaisyDuino](https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino). The size of AMY plus the size of the DaisyDuino support exceeds the segment size that DaisyDuino currently supports. We hope they fix this! [See this thread for more information.](https://forum.electro-smith.com/t/arduino-how-to-use-512k-ram-area-for-program-space/4839). 
+
+To use your Daisy with AMY, [you first have to the C/C++ toolchain.](https://daisy.audio/tutorials/cpp-dev-env/#follow-along-with-the-video-guide)
+
+It supports audio in, serial MIDI in, AMY sequencer.
+
+To use, get our [amy_daisy.cpp](https://github.com/shorepine/amy/raw/main/daisy/amy_daisy.cpp) and [Makefile](https://github.com/shorepine/amy/raw/main/daisy/Makefile), set your location of AMY in the `Makefile`, then set up your Daisy dev environment, then put the board into DFU mode, and run
+
+```
+make clean && make && make program-boot; sleep 1.5; make program-dfu
+```
+
+After it flashes, you should hear the AMY startup chime from the Daisy's line out.  If you have a MIDI serial interface hooked up to the Daisy (D14 USART1Rx) you should be able to play the default Juno synth on channel 1.
 

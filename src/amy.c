@@ -71,9 +71,8 @@ void amy_profiles_print() {}
 #include "pcm_tiny.h"
 #elif defined AMY_DAISY
 #include "pcm_tiny.h"
-//#include "pcm_small.h"
 #else
-#include "pcm_small.h"
+#include "pcm_tiny.h"
 #endif
 
 #include "clipping_lookup_table.h"

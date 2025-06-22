@@ -545,7 +545,7 @@ typedef struct delay_line {
 
 #include "delay.h"
 #include "sequencer.h"
-#include "midi.h"
+#include "amy_midi.h"
 #include "transfer.h"
 
 ///////////////////////////////////////

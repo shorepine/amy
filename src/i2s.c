@@ -194,7 +194,6 @@ void amy_update() {
     // does nothing on esp
 }
 
-
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 
 #include "hardware/clocks.h"
@@ -369,7 +368,7 @@ void amy_update() {
 
 #else
 
-//daisy
+//...
 
 #endif
 
