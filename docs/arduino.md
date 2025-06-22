@@ -97,9 +97,9 @@ The `i2s_lrc` pin has to be `i2s_bclk` + 1.
 
 ### Electro-Smith Daisy Seed
 
-The Daisy works great with AMY.  However, it does not work with the Arduino[DaisyDuino](https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino). The size of AMY plus the size of the DaisyDuino support exceeds the segment size that DaisyDuino currently supports. We hope they fix this! [See this thread for more information.](https://forum.electro-smith.com/t/arduino-how-to-use-512k-ram-area-for-program-space/4839). 
+The Daisy works great with AMY.  However, it does not work with the Arduino [DaisyDuino](https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino). The size of AMY plus the size of the DaisyDuino support exceeds the segment size that DaisyDuino currently supports. We hope they fix this! [See this thread for more information.](https://forum.electro-smith.com/t/arduino-how-to-use-512k-ram-area-for-program-space/4839). 
 
-To use your Daisy with AMY, [you first have to the C/C++ toolchain.](https://daisy.audio/tutorials/cpp-dev-env/#follow-along-with-the-video-guide)
+To use your Daisy with AMY, [you first have to set up the C/C++ toolchain.](https://daisy.audio/tutorials/cpp-dev-env/#follow-along-with-the-video-guide)
 
 It supports audio in, serial MIDI in, AMY sequencer.
 
