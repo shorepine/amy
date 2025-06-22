@@ -92,15 +92,20 @@ void HandleMidiMessage(MidiEvent m) {
 }
 
 
-void setup() {
-  hw = DAISY.init(DAISY_POD, AUDIO_SR_48K);
+extern "C" {
+	void daisy_setup() {
+	  hw = DAISY.init(DAISY_POD, AUDIO_SR_48K);
 
-  MIDI.setHandleNoteOn(handleNoteOn);
-  MIDI.begin(MIDI_CHANNEL_OMNI); // Listen to all incoming messages
+	  MIDI.setHandleNoteOn(handleNoteOn);
+	  MIDI.begin(MIDI_CHANNEL_OMNI); // Listen to all incoming messages
 
-  DAISY.begin(AudioCallback);
+	  DAISY.begin(AudioCallback);		
+	}
+
 }
 
+
+/*
 void loop() {
   // Read incoming messages
   MIDI.read();
@@ -167,5 +172,6 @@ int main(void)
         }
     }
 }
+*/
 
 #endif
