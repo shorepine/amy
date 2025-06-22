@@ -3,7 +3,7 @@ from setuptools import find_packages
 import glob
 import os
 # the c++ extension module
-sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'midi_mappings.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'midi.c', 'api.c']
+sources = ['algorithms.c', 'amy.c', 'delay.c', 'envelope.c', 'filters.c', 'parse.c', 'sequencer.c', 'transfer.c', 'midi_mappings.c', 'custom.c', 'patches.c', 'libminiaudio-audio.c', 'oscillators.c', 'interp_partials.c', 'pcm.c', 'pyamy.c', 'log2_exp2.c', 'instrument.c', 'amy_midi.c', 'api.c']
 
 for i in range(len(sources)):
 	sources[i] = "src/"+sources[i]

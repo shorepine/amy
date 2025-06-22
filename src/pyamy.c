@@ -3,7 +3,7 @@
 #include <Python.h>
 #include <math.h>
 #include "amy.h"
-#include "midi.h"
+#include "amy_midi.h"
 #include "libminiaudio-audio.h"
 
 // Python module wrapper for AMY commands

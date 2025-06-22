@@ -6,7 +6,7 @@
 #include <mach/mach_time.h>
 #include <pthread.h>
 #undef unichar
-#import "midi.h"
+#import "amy_midi.h"
 
 static CGEventSourceRef eventSource;
 MIDIClientRef midi_client;

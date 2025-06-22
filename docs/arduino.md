@@ -38,7 +38,6 @@ We ship a single example in the Examples folder for AMY called `AMY_MIDI_Synth`.
  * RP2040 / RP2350 / Pi Pico: [`arduino-pico`](https://arduino-pico.readthedocs.io/en/latest/install.html#installing-via-arduino-boards-manager)
  * Teensy: [`teensyduino`](https://www.pjrc.com/teensy/td_download.html)
  * ESP32 / ESP32-S3 / etc: [`arduino-esp32`](https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/installing.html)
- * Electrosmith Daisy: [`DaisyDuino`](https://daisy.audio/tutorials/arduino-dev-env/)
 
 You can use both cores of supported chips (RP2040, RP2350 or ESP32 variants) for more oscillators and voices.
 
@@ -98,16 +97,17 @@ The `i2s_lrc` pin has to be `i2s_bclk` + 1.
 
 ### Electro-Smith Daisy Seed
 
-Tested: Arduino IDE 2.3.6 (mac) + DaisyDuino 1.7.0 + stm32duino 2.10.1
+The Daisy works great with AMY.  However, it does not work with the Arduino[DaisyDuino](https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino). The size of AMY plus the size of the DaisyDuino support exceeds the segment size that DaisyDuino currently supports. We hope they fix this! [See this thread for more information.](https://forum.electro-smith.com/t/arduino-how-to-use-512k-ram-area-for-program-space/4839). 
 
-Follow the DaisyDuino https://daisy.audio/tutorials/arduino-dev-env/#welcome-to-daisyduino getting started
+To use your Daisy with AMY, [you first have to the C/C++ toolchain.](https://daisy.audio/tutorials/cpp-dev-env/#follow-along-with-the-video-guide)
 
-Make sure you install the STM32 board support, as seen here https://github.com/stm32duino/Arduino_Core_STM32/wiki/Getting-Started
+It supports audio in, serial MIDI in, AMY sequencer.
 
-It's not mentioned on the other pages but make sure you also install this: https://www.st.com/en/development-tools/stm32cubeprog.html
+To use, get our [amy_daisy.cpp](https://github.com/shorepine/amy/raw/main/daisy/amy_daisy.cpp) and [Makefile](https://github.com/shorepine/amy/raw/main/daisy/Makefile), set your location of AMY in the `Makefile`, then set up your Daisy dev environment, then put the board into DFU mode, and run
 
+```
+make clean && make && make program-boot; sleep 1.5; make program-dfu
+```
 
-
-
-See [Daisy README](../daisy/README.md)
+After it flashes, you should hear the AMY startup chime from the Daisy's line out.  If you have a MIDI serial interface hooked up to the Daisy (D14 USART1Rx) you should be able to play the default Juno synth on channel 1.
 

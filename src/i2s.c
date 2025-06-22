@@ -194,24 +194,6 @@ void amy_update() {
     // does nothing on esp
 }
 
-#elif (defined DSY_DSYDUINO_H)
-
-
-
-amy_err_t i2s_amy_init() {
-    
-    return AMY_OK;
-}
-
-void amy_update() {
-    if(amy_config.global.midi & AMY_MIDI_IS_UART) {
-
-    }
-
-    amy_execute_deltas();
-}
-
-
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 
 #include "hardware/clocks.h"
@@ -386,7 +368,7 @@ void amy_update() {
 
 #else
 
-//daisy
+//...
 
 #endif
 
