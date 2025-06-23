@@ -87,7 +87,6 @@ amy_start(amy_config);
 | `features.default_synths` | `0=off, 1=on` | On| If AMY boots with Juno-6 on `synth` 1 and GM drums on `synth` 10 |
 | `features.partials` | `0=off, 1=on` | On | If partials are enabled |
 | `features.custom` | `0=off, 1=on` | On | If custom C oscillators are enabled |
-| `features.dualcore` | `0=off, 1=on` | On for supported MCU | On ESP32-*, RP2350 and RP2040, if dual core rendering is enabled (more polyphony) |
 | `features.startup_bleep` | `0=off, 1=on` | On | If AMY plays a startup sound on boot |
 | `midi` | `AMY_MIDI_IS_NONE`, `AMY_MIDI_IS_UART`, `AMY_MIDI_IS_USB_GADGET`, `AMY_MIDI_IS_WEBMIDI` | `AMY_MIDI_IS_NONE` | Which MIDI interface(s) are active |
 | `audio` | `AMY_AUDIO_IS_NONE`, `AMY_AUDIO_IS_I2S`, `AMY_AUDIO_IS_USB_GADGET`, `AMY_AUDIO_IS_MINIAUDIO`| I2S or miniaudio | Which audio interface(s) are active |

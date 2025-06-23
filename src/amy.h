@@ -68,9 +68,16 @@ extern const uint16_t pcm_samples;
 // Always use 2 channels. Clients that want mono can deinterleave
 #define AMY_NCHANS 2
 
-#define AMY_CORES ((amy_global.config.features.dualcore) ? 2 : 1)
+
+// Use dual cores on supported platforms
+#ifdef ESP_PLATFORM || defined (ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350)
+#define AMY_DUALCORE
+#define AMY_CORES 2
+#else
+#define AMY_CORES 1
+#endif
+
 #define AMY_HAS_STARTUP_BLEEP (amy_global.config.features.startup_bleep)
-#define AMY_HAS_DUALCORE (amy_global.config.features.dualcore)
 #define AMY_HAS_REVERB (amy_global.config.features.reverb)
 #define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
 #define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
@@ -572,7 +579,6 @@ typedef struct  {
         uint8_t default_synths : 1;
         uint8_t partials : 1;
         uint8_t custom : 1;
-        uint8_t dualcore : 1;
         uint8_t startup_bleep : 1;
     } features;
     uint8_t midi;    
@@ -902,7 +908,7 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #define AMY_RENDER_TASK_COREID (0)
 #define AMY_FILL_BUFFER_TASK_COREID (1)
 #define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
-#define AMY_FILL_BUFFER_TASK_STACK_SIZE (8 * 1024)
+#define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024)
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
 #define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"
