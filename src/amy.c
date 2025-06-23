@@ -912,10 +912,10 @@ void oscs_deinit() {
     free(block);
     free(fbl[0]);
     free(per_osc_fb[0]);
-    if(AMY_CORES>1){ 
+    #ifdef AMY_DUALCORE 
         free(fbl[1]);
         free(per_osc_fb[1]);
-    }
+    #endif
     free(fbl);
     for (int i = 0; i < AMY_OSCS; ++i) free_osc(i);
     free(synth);
@@ -1582,10 +1582,10 @@ int16_t * amy_fill_buffer() {
     #endif
     // mix results from both cores.
     SAMPLE max_val = core_max[0];
-    if(AMY_CORES==2) {
+    #ifdef AMY_DUALCORE
         for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
         if (core_max[1] > max_val)  max_val = core_max[1];
-    }
+    #endif
     // Apply global processing only if there is some signal.
     if (max_val > 0) {
         // apply the eq filters if there is some signal and EQ is non-default.
