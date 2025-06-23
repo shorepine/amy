@@ -70,7 +70,7 @@ extern const uint16_t pcm_samples;
 
 
 // Use dual cores on supported platforms
-#ifdef ESP_PLATFORM || defined (ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350)
+#if (defined (ESP_PLATFORM) || defined (ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #define AMY_DUALCORE
 #define AMY_CORES 2
 #else
