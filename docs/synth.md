@@ -117,7 +117,7 @@ amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 
 On many synths (like this SH-101), you'll see a row of sliders that impact which control signal(s) can modify a parameter. Here the SH-101 lets you control the VCF (filter) by a constant frequence (FREQ), ADSR envelope (ENV), mod wheel (MOD), and keyboard velocity (KYBD). These slider values impact the ratio of each source's strength in the output filter frequency. 
 
-<img src="https://github.com/shorepine/amy/raw/main/docs/sh101.png" width="400"/>
+<img src="./sh101.png" width="400"/>
 
 We use this style of control in AMY, called `CtrlCoef` or Control Coefficients. They are a list of up to 9 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).
 
