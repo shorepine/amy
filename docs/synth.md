@@ -24,12 +24,14 @@
 
 ## Oscillators, voices, patches and synths
 
+Here's a diagram of how AMY manages oscillators, voices and synths. This is an example of a six polyphony Juno-6 synth. Each voice represents one unit of polyphony, and the 5 oscillators that are needed to make up the voice. The synth manages 6 voices:
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./amy_dark.png">
   <img src="./amy_light.png">
 </picture>
 
-AMY's lowest level of control is the `osc`illator - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. 
+AMY's lowest level of control is the `osc`illator - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. (You can increase this with [`amy_config`](api.md).)
 
 We then provide `voices`, to make it easier to configure and use groups of oscillators in coordination. For example, a single Juno-6 note is a single voice made from 5 oscillators. 
 
