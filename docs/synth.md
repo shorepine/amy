@@ -113,15 +113,16 @@ amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 (Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `preset` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.)
 
 
-## CtrlCoefficients
+## Control Coefficients
 
-**TODO**
+On many synths (like this SH-101), you'll see a row of sliders that impact which control signal(s) can modify a parameter. Here the SH-101 lets you control the VCF (filter) by a constant frequence (FREQ), ADSR envelope (ENV), mod wheel (MOD), and keyboard velocity (KYBD). These slider values impact the ratio of each source's strength in the output filter frequency. 
 
-Maybe a picture of synth panel with these knobs to explain the metaphor, link to tutorial
+<img src="https://github.com/shorepine/amy/raw/main/docs/sh101.png" width="400"/>
 
-ControlCoefficients are a list of up to 7 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).
+We use this style of control in AMY, called `CtrlCoef` or Control Coefficients. They are a list of up to 9 floats that are multiplied by a range of control signals, then summed up to give the final result (in this case, the filter frequency).
 
 The full set of parameters accepting **ControlCoefficients** is `amp`, `freq`, `filter_freq`, `duty`, and `pan`.   The control signals are:
+
  * `const`: A constant value of 1 - so the first number in the control coefficient list is the default value if all the others are zero.
  * `note`: The frequency corresponding to the `note` parameter to the note-on event (converted to unit-per-octave relative to middle C).
  * `vel`: The velocity, from the note-on event.
@@ -129,6 +130,8 @@ The full set of parameters accepting **ControlCoefficients** is `amp`, `freq`, `
  * `eg1`: The output of Envelope Generator 1.
  * `mod`: The output of the modulating oscillator, specified by the `mod_source` parameter.
  * `bend`: The current pitch bend value (from `amy.send(pitch_bend=0.5)` etc.).
+ * `ext0`: An external parameter, [set by your code](api.md) or 3rd party CV input or sensor
+ * `ext1`: An external parameter, [set by your code](api.md) or 3rd party CV input or sensor
 
 The set `50,0,0,0,1` means that we have a base frequency of 50 Hz, we ignore the note frequency and velocity and EG0, but we also add the output of EG1. Any coefficients that you do not specify, for instance by providing fewer than 7 values, are not modified.  You can also use empty strings to skip positional values, so `filter_freq=',,,,1'` couples EG1 to the filter frequency without changing any of the other coefficients.  (Note that when we passed `freq=220` in the first example, that was interpreted setting the `const` coefficient to 220, but leaving all the remaining coefficients untouched.)
 
