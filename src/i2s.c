@@ -11,7 +11,6 @@
 #include "amy.h"
 
 
-
 #ifdef ESP_PLATFORM
 #include <esp_task.h>
 
@@ -28,7 +27,7 @@ i2s_chan_handle_t rx_handle;
 
 
 #ifndef AMYBOARD
-
+#warning NOT_AMYBOARD
 // default ESP setup i2s
 amy_err_t setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
@@ -37,11 +36,12 @@ amy_err_t setup_i2s(void) {
     } else {
         i2s_new_channel(&chan_cfg, &tx_handle, NULL);        
     }
+#define I2S_32BIT
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AMY_SAMPLE_RATE),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
-            .mclk = I2S_GPIO_UNUSED,
+            .mclk = (amy_global.config.i2s_mclk == -1)? I2S_GPIO_UNUSED : amy_global.config.i2s_mclk,
             .bclk = amy_global.config.i2s_bclk,
             .ws = amy_global.config.i2s_lrc,
             .dout = amy_global.config.i2s_dout,
@@ -70,7 +70,8 @@ amy_err_t setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_SLAVE);  // ************* I2S_ROLE_SLAVE - needs external I2S clock input.
     i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
 
-     i2s_std_config_t std_cfg = {
+#define I2S_32BIT
+    i2s_std_config_t std_cfg = {
         .clk_cfg = {
             .sample_rate_hz = AMY_SAMPLE_RATE,
             .clk_src = I2S_CLK_SRC_EXTERNAL,
@@ -123,26 +124,31 @@ void esp_render_task( void * pvParameters) {
     }
 }
 
-#ifdef AMYBOARD
-#define I2S_SAMPLE_TYPE I2S_BITS_PER_SAMPLE_32BIT
-typedef int32_t i2s_sample_type;
-
-static int32_t block32[AMY_BLOCK_SIZE * AMY_NCHANS];
-extern output_sample_type * amy_in_block;
-i2s_sample_type my_int32_block[AMY_BLOCK_SIZE * AMY_NCHANS];
-
+#ifdef I2S_32BIT
+  static int32_t block32[AMY_BLOCK_SIZE * AMY_NCHANS];
+  #define I2S_BYTES_PER_SAMPLE 4
+#else
+  #define I2S_BYTES_PER_SAMPLE AMY_BYTES_PER_SAMPLE
 #endif
+extern output_sample_type * amy_in_block;
 
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
     while(1) {
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
-        #ifdef AMYBOARD
+        if(AMY_HAS_AUDIO_IN) {
             size_t read = 0;
-            i2s_channel_read(rx_handle, my_int32_block, AMY_BLOCK_SIZE * sizeof(i2s_sample_type) * AMY_NCHANS, &read, portMAX_DELAY);
+#ifdef I2S_32BIT
+            i2s_channel_read(rx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int32_t), &read, portMAX_DELAY);
             for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
-                amy_in_block[i] = (i2s_sample_type)(my_int32_block[i] >> 16);
-        #endif
+                amy_in_block[i] = (block32[i] >> 16);
+#else
+	    i2s_channel_read(rx_handle, amy_in_block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type), &read, portMAX_DELAY);
+#endif
+	    if(read != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
+		fprintf(stderr,"i2s input underrun: %d vs %d\n", read, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
+	    }
+	}
         // Get ready to render
         amy_execute_deltas();
         // Tell the other core to start rendering
@@ -159,20 +165,18 @@ void esp_fill_audio_buffer_task() {
 
         size_t written = 0;
 
-#ifdef AMYBOARD
-#define I2S_BYTES_PER_SAMPLE 4
+#ifdef I2S_32BIT // including AMYBOARD
 	// Convert to 32 bits
 	for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
 	    block32[i] = ((int32_t)block[i]) << 16;
         i2s_channel_write(tx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
 #else
-#define I2S_BYTES_PER_SAMPLE AMY_BYTES_PER_SAMPLE
         i2s_channel_write(tx_handle, block, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
 
-#endif //AMYBOARD
+#endif // ESP_PLATFORM / AMYBOARD
 
-        if(written != AMY_BLOCK_SIZE * I2S_BYTES_PER_SAMPLE * AMY_NCHANS) {
-            fprintf(stderr,"i2s underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * I2S_BYTES_PER_SAMPLE * AMY_NCHANS);
+        if(written != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
+            fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
         }
     }
 }
