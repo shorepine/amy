@@ -24,7 +24,10 @@
 
 ## Oscillators, voices, patches and synths
 
-**TODO** : a nice omnigraffle or whatever diagram of many small oscillators making up a voice, many voices making up a synth
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./amy_dark.png">
+  <img src="./amy_light.png">
+</picture>
 
 AMY's lowest level of control is the `osc`illator - a single waveform that you can define a number of parameters for, apply filters, frequency, pan, etc. By default AMY ships with support for 180 oscillators running at once. 
 
