@@ -11,15 +11,44 @@
 // Please see https://github.com/shorepine/amy/issues/354 for the full list
 
 
+void test_polyphony() {
+  // Allocate a synth with lots of voices to test polyphony.
+  // Increase the number of voices available to MIDI channel 1.
+  amy_event e = amy_default_event();
+  e.reset_osc = RESET_AMY;
+  amy_add_event(&e);
+  e = amy_default_event();
+  e.synth = 1;
+  e.patch_number = 1;
+  e.num_voices = 24;  // I get 12 simultaneous juno patch 0 voices on a 250 MHz RP2040.
+  amy_add_event(&e);
+}
+
 void test_sequencer() {
-    amy_event e = amy_default_event();
-    e.sequence[0] = 0;
-    e.sequence[1] = 48;
-    e.sequence[2] = 1;
-    e.velocity = 1;
-    e.midi_note = 60;
-    e.synth = 1;
-    amy_add_event(&e);
+  amy_event e = amy_default_event();
+  e.sequence[0] = 0;
+  e.sequence[1] = 48;
+  e.sequence[2] = 1;
+  e.velocity = 1;
+  e.midi_note = 60;
+  e.synth = 1;
+  amy_add_event(&e);
+}
+
+void test_audio_in() {
+  // Copy audio in to out, with echo.
+  amy_event e = amy_default_event();
+  e.osc = 170;
+  e.wave = AUDIO_IN0;
+  e.pan_coefs[COEF_CONST] = 0.0f;
+  e.velocity = 1.0f;
+  amy_add_event(&e);
+  e.osc = 171;
+  e.wave = AUDIO_IN1;
+  e.pan_coefs[COEF_CONST] = 1.0f;
+  e.velocity = 1.0f;
+  amy_add_event(&e);
+  config_echo(0.5f, 150.0f, 160.0f, 0.5f, 0.0f);  // I get errors on ESP32-S3 N8R8 if I go above 160.0ms
 }
 
 void setup() {
@@ -31,10 +60,12 @@ void setup() {
 
   // Pins for i2s board
   // Note: On the Teensy, all these settings are ignored, and blck = 21, lrc = 20, dout = 7.
+  amy_config.i2s_mclk = 7;
   amy_config.i2s_bclk = 8;
   // On Pi Pico (RP2040, RP2350), i2s_lrc has to be i2s_bclk + 1, and what you set here is ignored.
   amy_config.i2s_lrc = 9;
   amy_config.i2s_dout = 10;
+  amy_config.i2s_din = 11;
 
   // Pins for UART MIDI
   // Note: On the Teensy, these are ignored and midi_out = 35, midi_in = 34.
@@ -45,13 +76,9 @@ void setup() {
   amy_start(amy_config);
   amy_live_start();
 
+  test_polyphony();
   //test_sequencer();
-
-  // Increase the number of voices available to MIDI channel 1.
-  amy_event e = amy_default_event();
-  e.synth = 1;
-  e.num_voices = 12;  // I get 12 simultaneous juno patch 0 voices on a 250 MHz RP2040.
-  amy_add_event(&e);
+  //test_audio_in();
 }
 
 void loop() {
