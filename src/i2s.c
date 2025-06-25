@@ -155,7 +155,7 @@ void esp_fill_audio_buffer_task() {
         xTaskNotifyGive(amy_render_handle);
         // Render me
         amy_render(AMY_OSCS/2, AMY_OSCS, 0);
-        // Wait for the other core to finish
+    // Wait for the other core to finish
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
         // Write to i2s
@@ -197,7 +197,6 @@ amy_err_t i2s_amy_init() {
 void amy_update() {
     // does nothing on esp
 }
-
 
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
 
@@ -246,15 +245,11 @@ void amy_poll_tasks() {
 
 int16_t *amy_render_audio() {
     //if (ap->free_list != NULL) {
-    if(AMY_HAS_DUALCORE) {
-        int32_t res;
-        queue_entry_t entry = {render_other_core, AMY_OK};
-        queue_add_blocking(&call_queue, &entry);
-        amy_render(0, AMY_OSCS/2, 0);
-        queue_remove_blocking(&results_queue, &res);
-    } else {
-        amy_render(0, AMY_OSCS, 0);
-    }
+    int32_t res;
+    queue_entry_t entry = {render_other_core, AMY_OK};
+    queue_add_blocking(&call_queue, &entry);
+    amy_render(0, AMY_OSCS/2, 0);
+    queue_remove_blocking(&results_queue, &res);
     int16_t *block = amy_fill_buffer();
     return block;
 }
@@ -325,13 +320,11 @@ void core1_main() {
 
 
 amy_err_t i2s_amy_init() {
-    if(AMY_HAS_DUALCORE) {
-        queue_init(&call_queue, sizeof(queue_entry_t), 2);
-        queue_init(&results_queue, sizeof(int32_t), 2);
-        uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
-        multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
-        sleep_ms(500);
-    }
+    queue_init(&call_queue, sizeof(queue_entry_t), 2);
+    queue_init(&results_queue, sizeof(int32_t), 2);
+    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+    sleep_ms(500);
     ap = init_audio();
     return AMY_OK;
 }
@@ -373,7 +366,7 @@ void amy_update() {
 
 #else
 
-//daisy
+//...
 
 #endif
 
