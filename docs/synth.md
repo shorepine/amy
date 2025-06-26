@@ -24,7 +24,7 @@
 
 ## Oscillators, voices, patches and synths
 
-Here's a diagram of how AMY manages oscillators, voices and synths. This is an example of a six polyphony Juno-6 synth. Each voice represents one unit of polyphony, and the 5 oscillators that are needed to make up the voice. The synth manages 6 voices:
+Here's a diagram of how AMY manages oscillators,  and synths. This is an example of a six polyphony Juno-6 synth. Each voice represents one unit of polyphony, and the 5 oscillators that are needed to make up the voice. The synth manages 6 voices:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./amy_dark.png">
@@ -52,26 +52,9 @@ amy.send(synth=1, osc=0, filter_freq=8000)   # Open up the filter on the Juno vo
 
 The code in `amy/headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches at compile time by storing alternative wire-protocol setup strings in `patches.h`, or by making user patches at runtime:
 
-
-### User patches
-
-You can also create your own patches at runtime and use them for voices with a sequence of `amy.send(patch=PATCH_NUMBER, <configuration commands>)` where `PATCH_NUMBER` is a number in the range 1024-1055.  Without `patch=PATCH_NUMBER`, this command would directly configure an oscillator, but when `patch` is present, it instead appends the command to the stored patch configuration.  You can accumulate any number of commands into a single patch; you reset the patch with `amy.send(patch=PATCH_NUMBER, reset=amy.RESET_PATCH)`.
-
-So you can do:
-
-```python
->>> import amy; amy.live()  # Not needed on Tulip.
->>> amy.send(patch=1024, reset=amy.RESET_PATCH)
->>> amy.send(patch=1024, osc=1, wave=amy.SINE, freq=0.25, phase=0.5, amp=0.5)  # "Pitch sigh" modulator.
->>> amy.send(patch=1024, osc=0, wave=amy.SINE, freq='261.63,1,0,0,0,1', bp0='0,1,500,0,0,0', mod_source=1)  # decaying sine modulated by sigh.
->>> amy.send(synth=0, num_voices=1, patch=1024)
->>> amy.send(synth=0, vel=2, note=50)
-```
-AMY infers the number of oscs needed for the patch from the cumulated commands. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
-
 ### Synths
 
-A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices when defining the patch for those voices; the `synth` arg becomes a smart alias for the appropriate `voices`, e.g.
+A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices by providing the patch number when initializing the synth; the `synth` arg becomes a smart alias for passing note events to one of its voices (or configuration changes to all of them), e.g.
 
 ```python
 amy.send(synth=0, num_voices=3, patch=1)     # 3-voice Juno path #1 on synth 0
@@ -89,12 +72,31 @@ amy.send(synth=0, vel=0)
 amy.send(synth=0, patch=13)  # Load a different Juno patch, will remain 4-voice.
 # You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
 amy.send(synth=0, num_voices=0)
-# As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets.
+# As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets
+# and patch_string to directly define a patch using a wire-command string.
 amy.send(synth=10, num_voices=3, patch_string='w7f0Z', synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
 
 (Note: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `preset` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.)
+
+
+
+### User patches
+
+You can create your own patches at runtime and use them for synths with a sequence of `amy.send(patch=PATCH_NUMBER, <configuration commands>)` where `PATCH_NUMBER` is a number in the range 1024-1055.  Without `patch=PATCH_NUMBER`, this command would directly configure an oscillator, but when `patch` is present, it instead appends the command to the stored patch configuration.  You can accumulate any number of commands into a single patch; you reset the patch with `amy.send(patch=PATCH_NUMBER, reset=amy.RESET_PATCH)`.
+
+So you can do:
+
+```python
+>>> import amy; amy.live()  # Not needed on Tulip.
+>>> amy.send(patch=1024, reset=amy.RESET_PATCH)
+>>> amy.send(patch=1024, osc=1, wave=amy.SINE, freq=0.25, phase=0.5, amp=0.5)  # "Pitch sigh" modulator.
+>>> amy.send(patch=1024, osc=0, wave=amy.SINE, freq='261.63,1,0,0,0,1', bp0='0,1,500,0,0,0', mod_source=1)  # decaying sine modulated by sigh.
+>>> amy.send(synth=0, num_voices=1, patch=1024)
+>>> amy.send(synth=0, vel=2, note=50)
+```
+AMY infers the number of oscs needed for the patch from the cumulated commands. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
 
 
 ## Control Coefficients
@@ -238,8 +240,8 @@ If you are building your own audio system around AMY you will want to fill in th
 Try default DX7 patches, from 128 to 256:
 
 ```python
-amy.send(voices='0', patch=128)  # Set up a voice.
-amy.send(voices='0', note=50, vel=1)  # Play a note on the voice.
+amy.send(synth=0, num_voices=1, patch=128)  # Set up a voice.
+amy.send(synth=0, note=50, vel=1)  # Play a note on the voice.
 ```
 
 The `patch` lets you set which preset is used (0 to 127 are the Juno 106 analog synth presets, and 128 to 255 are the DX7 FM presets).  But let's make the classic FM bell tone ourselves, without a patch. We'll just be using two operators (two sine waves), one modulating the other.
@@ -248,7 +250,7 @@ The `patch` lets you set which preset is used (0 to 127 are the Juno 106 analog 
 
 When building your own algorithm sets, assign a separate oscillator as wave=`ALGO`, but the source oscillators as `SINE`. The algorithm #s are borrowed from the DX7. You don't have to use all 6 operators. Note that the `algo_source` parameter counts backwards from operator 6. When building operators, they can have their frequencies specified directly with `freq` or as a ratio of the root `ALGO` oscillator via `ratio`.
 
-
+*Rest of the FM example here???*
 
 
 ## Build-your-own Partials
