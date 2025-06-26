@@ -3,11 +3,11 @@
 // Simple AMY synth setup that just sets up the default MIDI synth.
 // Plug a MIDI keyboard into the MIDI in port and play notes, send program changes, etc
 // We've tested this with the following boards:
-// 
+//
 // esp32s3 [n32r8]
 // rp2040 (Pi Pico) -- use 250Mhz and -O3 for 6 note juno polyphony and turn off serial debug if you have it on
 // rp2350 (Pi Pico)
-// teensy4 
+// teensy4
 // Please see https://github.com/shorepine/amy/issues/354 for the full list
 
 
@@ -72,18 +72,17 @@ void setup() {
   amy_config.midi_out = 4;
   amy_config.midi_in = 5;
 
-
   amy_start(amy_config);
   amy_live_start();
 
-  test_polyphony();
+  //test_polyphony();
   //test_sequencer();
-  //test_audio_in();
+  test_audio_in();
 }
 
 void loop() {
   // Your loop() must contain this call to amy:
-  amy_update(); 
+  amy_update();
 
   // put your main code here, to run repeatedly:
 }
