@@ -52,7 +52,6 @@ void test_audio_in() {
 }
 
 void setup() {
-  delay(2000);
   amy_config_t amy_config = amy_default_config();
   amy_config.features.startup_bleep = 1;
 
@@ -72,7 +71,6 @@ void setup() {
   // Note: On the Teensy, these are ignored and midi_out = 35, midi_in = 34.
   amy_config.midi_out = 4;
   amy_config.midi_in = 5;
-
 
   amy_start(amy_config);
   amy_live_start();
