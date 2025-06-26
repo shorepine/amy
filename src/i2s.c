@@ -36,7 +36,10 @@ amy_err_t setup_i2s(void) {
     } else {
         i2s_new_channel(&chan_cfg, &tx_handle, NULL);        
     }
+// PCM5101 DAC works at either 32 bit or (default) 16 bit
+// PCM1808 ADC needs I2S_32BIT to work
 #define I2S_32BIT
+#ifdef I2S_32BIT
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AMY_SAMPLE_RATE),
         .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
@@ -53,6 +56,24 @@ amy_err_t setup_i2s(void) {
             },
         },
     };
+#else // 16 bit I2S
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AMY_SAMPLE_RATE),
+        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = {
+            .mclk = (amy_global.config.i2s_mclk == -1)? I2S_GPIO_UNUSED : amy_global.config.i2s_mclk,
+            .bclk = amy_global.config.i2s_bclk,
+            .ws = amy_global.config.i2s_lrc,
+            .dout = amy_global.config.i2s_dout,
+            .din = amy_global.config.i2s_din,
+            .invert_flags = {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv = false,
+            },
+        },
+    };
+#endif
     /* Initialize the channel */
     i2s_channel_init_std_mode(tx_handle, &std_cfg);
     if(AMY_HAS_AUDIO_IN) i2s_channel_init_std_mode(rx_handle, &std_cfg);
@@ -170,10 +191,10 @@ void esp_fill_audio_buffer_task() {
 	for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
 	    block32[i] = ((int32_t)block[i]) << 16;
         i2s_channel_write(tx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
-#else
+#else  // 16 bit I2S
         i2s_channel_write(tx_handle, block, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
 
-#endif // ESP_PLATFORM / AMYBOARD
+#endif
 
         if(written != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
             fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);

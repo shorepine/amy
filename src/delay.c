@@ -62,7 +62,11 @@ delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
         fprintf(stderr, "delay line len must be power of 2, not %d\n", len);
         abort();
     }
-    delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t) + len * sizeof(SAMPLE), ram_type); 
+    delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t) + len * sizeof(SAMPLE), ram_type);
+    if (delay_line == NULL) {
+	fprintf(stderr, "unable to alloc delay line of %d samples\n", len);
+	return NULL;
+    }
     delay_line->samples = (SAMPLE*)(((uint8_t*)delay_line) + sizeof(delay_line_t));
     delay_line->len = len;
     delay_line->log_2_len = log_2_len;

@@ -192,10 +192,23 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
     //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
     if (level > 0) {
         if (echo_delay_lines[0] == NULL) {
-            // Delay line len must be power of 2.
+	    bool success = true;
+	    // Delay line len must be power of 2.
             uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
-            for (int c = 0; c < AMY_NCHANS; ++c)
-                echo_delay_lines[c] = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
+            for (int c = 0; c < AMY_NCHANS; ++c) {
+                delay_line_t *delay_line = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
+		if (delay_line) {
+		    echo_delay_lines[c] = delay_line;
+		} else {
+		    success = false;
+		    break;
+		}
+	    }
+	    if (!success) {
+		fprintf(stderr, "unable to alloc echo of %d ms\n", (int)max_delay_ms);
+		echo_delay_lines[0] = echo_delay_lines[1] = NULL;
+		return;
+	    }
             amy_global.echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
@@ -224,8 +237,20 @@ void dealloc_echo_delay_lines(void) {
 
 void alloc_chorus_delay_lines(void) {
     delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
+    bool success = true;
     for(int c = 0; c < AMY_NCHANS; ++c) {
-        chorus_delay_lines[c] = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
+        delay_line_t *delay_line = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
+	if (delay_line) {
+	    chorus_delay_lines[c] = delay_line;
+	} else {
+	    success = false;
+	    break;
+	}
+	if (!success) {
+	    fprintf(stderr, "unable to alloc chorus of %d samples\n", (int)DELAY_LINE_LEN);
+	    chorus_delay_lines[0] = chorus_delay_lines[1] = NULL;
+	    return;
+	}
     }
 }
 

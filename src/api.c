@@ -48,7 +48,7 @@ amy_config_t amy_default_config() {
     c.max_memory_patches = 32;
 
     // caps
-    #if (defined TULIP) || (defined AMYBOARD)
+#if defined(TULIP) || defined(AMYBOARD) // || defined(ESP_PLATFORM)
     c.ram_caps_events = MALLOC_CAP_SPIRAM;
     c.ram_caps_synth = MALLOC_CAP_SPIRAM;
     c.ram_caps_block = MALLOC_CAP_DEFAULT;
