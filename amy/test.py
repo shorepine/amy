@@ -134,7 +134,7 @@ class TestPcmPatchChange(AmyTest):
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PCM, preset=9)  # Clap
     amy.send(time=100, vel=1)
-    amy.send(time=450, preset=11)  # Conga low
+    amy.send(time=450, preset=10)  # Cowbell
     amy.send(time=500, vel=1)
 
 
@@ -150,11 +150,11 @@ class TestPcmLoopEnvFilt(AmyTest):
   # Check that filter, amp-env, and pitch mod apply to PCM
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=23, feedback=1)
+    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
     amy.send(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='200,0,0,0,3', bp1='0,1,500,0,200,0')
     amy.send(time=0, osc=0, bp0='100,1,1000,0,1000,0')
     amy.send(time=0, osc=1, freq='1')
-    amy.send(time=0, osc=0, mod_source=1, freq=',,,,,-0.05')
+    amy.send(time=0, osc=0, mod_source=1, freq=',,,,,-0.2')
     amy.send(time=100, osc=0, note=64, vel=5)
     amy.send(time=500, osc=0, vel=0)
 
