@@ -10,7 +10,6 @@
 
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
-SAMPLE ** coeffs;
 SAMPLE ** eq_coeffs;
 SAMPLE *** eq_delay;
 
@@ -456,35 +455,20 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-void update_filter(uint16_t osc) {
-    // reset the delay for a filter
-    // normal mod / adsr will just change the coeffs
-    bzero(synth[osc]->filter_delay, 2 * FILT_NUM_DELAYS * sizeof(SAMPLE));
-}
-
-
 void filters_deinit() {
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
         for(uint16_t j=0;j<3;j++) free(eq_delay[i][j]);
         free(eq_delay[i]);
     }
     for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
-    for(uint16_t i=0;i<AMY_OSCS;i++) {
-        free(coeffs[i]);
-    }
-    free(coeffs);
     free(eq_coeffs);
     free(eq_delay);
 }
 
 
 void filters_init() {
-    coeffs = malloc_caps(sizeof(SAMPLE*)*AMY_OSCS, amy_global.config.ram_caps_fbl);
     eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
     eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, amy_global.config.ram_caps_fbl);
-    for(uint16_t i=0;i<AMY_OSCS;i++) {
-        coeffs[i] = malloc_caps(sizeof(SAMPLE)*5, amy_global.config.ram_caps_fbl);
-    }
     for(uint16_t i=0;i<3;i++) {
         eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, amy_global.config.ram_caps_fbl);
     }
@@ -745,6 +729,8 @@ SAMPLE block_denorm(SAMPLE* block, int len, int bits) {
 
 SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
 
+    SAMPLE coeffs[5];
+
     SAMPLE filtmax = scan_max(synth[osc]->filter_delay, 2 * FILT_NUM_DELAYS);
     if (max_val == 0 && filtmax == 0) return 0;
 
@@ -755,11 +741,11 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     float ratio = freq_of_logfreq(msynth[osc]->filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
     if(synth[osc]->filter_type==FILTER_LPF || synth[osc]->filter_type==FILTER_LPF24)
-        dsps_biquad_gen_lpf_f32(coeffs[osc], ratio, msynth[osc]->resonance);
+        dsps_biquad_gen_lpf_f32(coeffs, ratio, msynth[osc]->resonance);
     else if(synth[osc]->filter_type==FILTER_BPF)
-        dsps_biquad_gen_bpf_f32(coeffs[osc], ratio, msynth[osc]->resonance);
+        dsps_biquad_gen_bpf_f32(coeffs, ratio, msynth[osc]->resonance);
     else if(synth[osc]->filter_type==FILTER_HPF)
-        dsps_biquad_gen_hpf_f32(coeffs[osc], ratio, msynth[osc]->resonance);
+        dsps_biquad_gen_hpf_f32(coeffs, ratio, msynth[osc]->resonance);
     else {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc]->filter_type);
         return 0;
@@ -784,18 +770,18 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     //block_norm(&synth[osc]->hpf_state[0], 2, normbits - synth[osc]->last_filt_norm_bits);
     if(synth[osc]->filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
-        max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc]->filter_delay, max_val);
+        max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
     //} else if(synth[osc]->filter_type==FILTER_LPF) {
         // Optimized block-floating point 12 dB/oct LPF
-        //max_val = dsps_biquad_f32_ansi_split_fb_once(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc]->filter_delay, max_val);
+        //max_val = dsps_biquad_f32_ansi_split_fb_once(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
     } else {
         block_norm(synth[osc]->filter_delay, 2 * FILT_NUM_DELAYS, normbits - synth[osc]->last_filt_norm_bits);
         block_norm(block, AMY_BLOCK_SIZE, normbits);
-        dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc]->filter_delay);
+        dsps_biquad_f32_ansi_split_fb(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay);
         max_val = block_denorm(block, AMY_BLOCK_SIZE, normbits);
         synth[osc]->last_filt_norm_bits = normbits;
     }
-    //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs[osc], synth[osc]->filter_delay);
+    //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay);
     //block_denorm(synth[osc]->filter_delay, 2 * FILT_NUM_DELAYS, normbits);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
     // hpf_buf(block, &synth[osc]->hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
