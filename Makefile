@@ -102,5 +102,4 @@ clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h
 	-rm -f amy/constants.py
-	-rm -f docs/amy.js
 	-rm -f $(TARGET)
