@@ -250,7 +250,7 @@ The `patch` lets you set which preset is used (0 to 127 are the Juno 106 analog 
 
 When building your own algorithm sets, assign a separate oscillator as wave=`ALGO`, but the source oscillators as `SINE`. The algorithm #s are borrowed from the DX7. You don't have to use all 6 operators. Note that the `algo_source` parameter counts backwards from operator 6. When building operators, they can have their frequencies specified directly with `freq` or as a ratio of the root `ALGO` oscillator via `ratio`.
 
-*Rest of the FM example here???*
+[**Please see our interactive AMY tutorial for more on setting up ALGO tones**](https://shorepine.github.io/amy/tutorial.html#fm-tones)
 
 
 ## Build-your-own Partials

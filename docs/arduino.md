@@ -63,7 +63,13 @@ We can recommend simpler audio out DACs that "just work" with AMY with no extra 
  * [PCM5101 / PCM5102](https://www.amazon.com/dp/B0DCGF2TN1?th=1)
  * [UDA1334](https://www.adafruit.com/product/3678)
 
- **TODO**: list audio in/out dacs
+
+### Audio input DACs
+
+Here's an example of a PCM1808 and PCM5101 working together to provide audio in and out for AMY on an ESP32S3:
+
+<img src="AMY-Arduino-ESP32S3_bb.png" width="600"/>
+
 
 ## Per-board notes
 
