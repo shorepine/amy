@@ -54,6 +54,8 @@ void test_audio_in() {
 void setup() {
   amy_config_t amy_config = amy_default_config();
   amy_config.features.startup_bleep = 1;
+  // Install the default_synths on synths (MIDI chans) 1, 2, and 10 (this is the default).
+  amy_config.features.default_synths = 1;
 
   // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
   amy_config.midi = AMY_MIDI_IS_UART;
