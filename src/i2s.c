@@ -266,7 +266,7 @@ void amy_poll_tasks() {
 
 int16_t *amy_render_audio() {
     //if (ap->free_list != NULL) {
-//#define USE_SECOND_CORE
+#define USE_SECOND_CORE
 #ifdef USE_SECOND_CORE
     int32_t res;
     queue_entry_t entry = {render_other_core, AMY_OK};
@@ -363,6 +363,13 @@ void amy_pass_to_i2s(const int16_t *block) {
 }
 
 amy_err_t i2s_amy_init() {
+#ifdef USE_SECOND_CORE
+    queue_init(&call_queue, sizeof(queue_entry_t), 2);
+    queue_init(&results_queue, sizeof(int32_t), 2);
+    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+    sleep_ms(500);
+#endif
     return AMY_OK;
 }
 
