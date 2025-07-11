@@ -1109,6 +1109,7 @@ void play_delta(struct delta *d) {
         synth[d->osc]->mod_source = mod_osc;
         // NOTE: These are delta-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
+        ensure_osc_allocd(mod_osc, NULL);
         synth[mod_osc]->status = SYNTH_IS_MOD_SOURCE;
         // No longer record this osc in note_off state.
         AMY_UNSET(synth[mod_osc]->note_off_clock);
