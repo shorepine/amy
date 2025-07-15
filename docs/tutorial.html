@@ -175,7 +175,9 @@ amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence="216,384,2") # ninth slo
       </div>
 
       <div class="row py-3 my-5 px-1 mx-1 bg-light bg-gradient">
+        <a href="#FM">
         <h2 id="fm-tones">Constructing FM tones</h2>
+        </a>
         Let's set up a fully custom ALGO / FM patch, using two operators:
 
         <div class="editor mb-4">
@@ -184,7 +186,7 @@ amy.send(osc=1, wave=amy.SINE, ratio=0.2, amp={'const': 1, 'vel': 0, 'eg0': 1}, 
 amy.send(osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1')
 amy.send(osc=0, note=60, vel=1)
         </div>
-        <P>Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 2 modulate oscillator 1. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (osc 2 in this case) and operator 1 (osc 1).  From the picture, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have osc 2 providing the frequency-modulation input to osc 1.
+        <P>Let's unpack that last line: we're setting up a ALGO "oscillator" that controls up to 6 other oscillators. We only need two, so we set the `algo_source` to mostly not used and have oscillator 2 modulate oscillator 1. You can have the operators work with each other in all sorts of crazy ways. For this simple example, we just use the DX7 algorithm #1. And we'll use only operators 2 and 1. Therefore our `algo_source` lists the oscillators involved, counting backwards from 6. We're saying only have operator 2 (osc 2 in this case) and operator 1 (osc 1).  From the <A HREF="dx7_algorithms.jpg">algorithms picture</A>, we see DX7 algorithm 1 has operator 2 feeding operator 1, so we have osc 2 providing the frequency-modulation input to osc 1.
 
         <P>What's going on with `ratio`? And `amp`? Ratio, for FM synthesis operators, means the ratio of the frequency for that operator relative to the base note. So oscillator 1 will be played at 20% of the base note frequency, and oscillator 2 will take the frequency of the base note. In FM synthesis, the `amp` of a modulator input is  called "beta", which describes the strength of the modulation.  Here, osc 2 is providing the modulation with a constant beta of 1, which will result in a range of sinusoids with frequencies around the carrier at multiples of the modulator.  We set osc 2's amp ControlCoefficients for velocity and envelope generator 0 to 0 because they default to 1, but we don't want them for this example (FM sines don't receive the parent note's velocity, so we need to disable its influence).  Osc 1 has `bp0` decaying its amplitude to 0 over 1000 ms, but because beta is fixed there's no other change to the sound over that time.
 
