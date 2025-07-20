@@ -7,7 +7,7 @@
 #endif
 
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
-#define TUD_USB_GADGET
+//#define TUD_USB_GADGET
 #include "tusb.h"
 #include "class/midi/midi.h"
 #include "class/midi/midi_device.h"

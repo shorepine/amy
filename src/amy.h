@@ -749,7 +749,7 @@ void amy_live_stop();
 int16_t * amy_simple_fill_buffer() ;
 void amy_update();
 int16_t *amy_render_audio();
-void amy_pass_to_i2s(int16_t *block);
+void amy_pass_to_i2s(const int16_t *block);
 amy_config_t amy_default_config();
 void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
