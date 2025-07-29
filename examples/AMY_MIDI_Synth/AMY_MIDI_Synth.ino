@@ -116,7 +116,6 @@ void loop() {
   int now_millis = millis();
   if ((now_millis - last_millis) > (millis_interval * 150000L / (rp2040.f_cpu() / 1000L))) {
     last_millis = now_millis;
-    loop_count = 0;
     led_state = !led_state;
 #ifdef LED_BUILTIN
     digitalWrite(LED_BUILTIN, led_state);  // turn the LED on (HIGH is the voltage level)
