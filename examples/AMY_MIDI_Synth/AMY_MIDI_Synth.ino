@@ -112,9 +112,9 @@ void loop() {
   // Your loop() must contain this call to amy:
   amy_update();
 
-  // Flash on-board LED every 250ms for 150 MHz, scale with actual CPU clock rate.
+  // Flash on-board LED every 250ms
   int now_millis = millis();
-  if ((now_millis - last_millis) > (millis_interval * 150000L / (rp2040.f_cpu() / 1000L))) {
+  if ((now_millis - last_millis) > millis_interval) {
     last_millis = now_millis;
     led_state = !led_state;
 #ifdef LED_BUILTIN
