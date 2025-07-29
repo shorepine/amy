@@ -29,7 +29,7 @@ i2s_chan_handle_t rx_handle;
 #ifndef AMYBOARD
 #warning NOT_AMYBOARD
 // default ESP setup i2s
-amy_err_t setup_i2s(void) {
+amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     if(AMY_HAS_AUDIO_IN) {
         i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
@@ -87,7 +87,7 @@ amy_err_t setup_i2s(void) {
 #else
 // AMYBOARD i2s setup, which is weird
 #warning AMYBOARD
-amy_err_t setup_i2s(void) {
+amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_SLAVE);  // ************* I2S_ROLE_SLAVE - needs external I2S clock input.
     i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
 
@@ -205,7 +205,7 @@ void esp_fill_audio_buffer_task() {
 // init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
 amy_err_t i2s_amy_init() {
     // Start i2s
-    setup_i2s();
+    esp32_setup_i2s();
 
     // Create the second core rendering task
     xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
@@ -280,17 +280,6 @@ int16_t *amy_render_audio() {
     return block;
 }
 
-void amy_pass_to_i2s_old(const int16_t *block) {
-    size_t written = 0;
-    struct audio_buffer *buffer = take_audio_buffer(ap, true);
-    int16_t *samples = (int16_t *) buffer->buffer->bytes;
-    for (uint i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; i++) {
-	samples[i] = block[i]; // (vol * sine_wave_table[pos >> 16u]) >> 8u;
-    }
-    buffer->sample_count = AMY_BLOCK_SIZE;
-    give_audio_buffer(ap, buffer);
-}
-
 void amy_update() {
     // Single function to update buffers.
     amy_poll_tasks();
@@ -334,7 +323,6 @@ struct audio_buffer_pool *init_audio() {
     return producer_pool;
 }
 
-
 void core1_main() {
     while (1) {
         queue_entry_t entry;
@@ -344,25 +332,18 @@ void core1_main() {
     }
 }
 
-
-amy_err_t i2s_amy_init_old() {
-    queue_init(&call_queue, sizeof(queue_entry_t), 2);
-    queue_init(&results_queue, sizeof(int32_t), 2);
-    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
-    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
-    sleep_ms(500);
-    ap = init_audio();
-    return AMY_OK;
-}
-
-extern void i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples, int nframes);
+// Provided by pico_support.cpp
+extern void pico_setup_i2s(amy_config_t *config);
+extern void pico_i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples, int nframes);
 
 void amy_pass_to_i2s(const int16_t *block) {
     // len is the number of int16 sample frames.
-    i2s_read_write_buffer(amy_in_block, block, AMY_BLOCK_SIZE);
+    pico_i2s_read_write_buffer(amy_in_block, block, AMY_BLOCK_SIZE);
 }
 
 amy_err_t i2s_amy_init() {
+    pico_setup_i2s(&amy_global.config);
+
 #ifdef USE_SECOND_CORE
     queue_init(&call_queue, sizeof(queue_entry_t), 2);
     queue_init(&results_queue, sizeof(int32_t), 2);
@@ -402,9 +383,6 @@ void amy_update() {
     int16_t *block = amy_fill_buffer();
     teensy_i2s_send(block);
 }
-
-
-
 
 #else
 
