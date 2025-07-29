@@ -112,23 +112,12 @@ void pico_setup_i2s(amy_config_t *config) {
     i2s.setBuffers(6, AMY_BLOCK_SIZE * AMY_NCHANS, 0);
     // Set the system clock to a compatible value to the samplerate.
     // Best to do this before starting anything clock-dependent.
-    //i2s.setSysClk(AMY_SAMPLE_RATE); 
-    // 248.4 MHz is exactly achievable (REFDIV 2 FBDIV 207 PD1 5 PD2 1)
-    // and is 0.011% away from 11 * 512 * 44100.
-    // Possible clock rates:
-    // 135 600 kHz = 3 * 1024 * 44k
-    // 180 680 kHz = 4 * 1024 * 44k
-    // 226 000 kHz = 5 * 1024 * 44k
-    //// 248 600 kHz = 5.5 * 1024 * 44k
-    // 271 200 kHz = 6 * 1024 * 44k
-    // (44k = 44140.625 to be derivable from 12 MHz)
-    //set_sys_clock_khz(226000, false); // works
-    //set_sys_clock_khz(248600, false); // does not work.  mclk is not stably sync'd to bclk
-    //set_sys_clock_khz(248000, false); // does not work.  mclk is not stably sync'd to bclk
-    //set_sys_clock_khz(271200, false); // works
+    // The system clock rate must be an integer multiple of Fs * MCLKmult * 2, e.g. 22.58 MHz
+    // but it also has to be something we can generate with the sysclk PLL i.e. a multiple of
+    // 12 MHz in range 750..1600 MHz, which then divides down by two dividers of 1..7.
     //set_sys_clock_khz(F_CPU_MOD_KHZ, false);
+    // VCO_FREQ, PLL_PD1, PLL_PD2 from e.g. python pico-sdk/src/rp2_common/hardware_clocks/scripts/vcocalc.py 135.428
     set_sys_clock_pll(VCO_FREQ, PLL_PD1, PLL_PD2); 
-    // TRY (2 * 135600) = 271200 (within 0.1% of 12 * 512 * 44100) or 225.6 MHz
     // start I2S at the sample rate
     //i2s.setFrequency(AMY_SAMPLE_RATE);
     i2s.setFrequency(F_SAMP);  // Requested sample rate must be <= effective sample rate coming from sysclk because of int division (?).
