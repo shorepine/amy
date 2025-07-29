@@ -598,6 +598,7 @@ typedef struct  {
     int8_t i2s_din;
     int8_t i2s_bclk;
     int8_t i2s_mclk;
+    uint16_t i2s_mclk_mult;
     int8_t midi_out;
     int8_t midi_in;
     int8_t midi_uart;
