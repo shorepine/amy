@@ -94,7 +94,7 @@ void patches_debug() {
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
-        int num_voices = instrument_get_voices(i, voices);
+        int num_voices = instrument_get_num_voices(i, voices);
         if (num_voices) {
             fprintf(stderr, "synth %d num_voices %d patch_num %d flags %" PRIu32" voices", i, num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %d", voices[j]);
@@ -378,9 +378,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
     if (!AMY_IS_SET(e->synth)) {
         // No instrument, just directly naming the voices.
         num_voices = copy_voices(e->voices, voices);
-    } else {
-        // We have an instrument specified - decide which of its voices are actually to be used.
-
+    } else {  // We have an instrument specified - decide which of its voices are actually to be used.
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
         if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
@@ -415,7 +413,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             num_voices = patches_voices_for_note_onoff_event(e, voices, synth_flags);
         } else {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
-            num_voices = instrument_get_voices(e->synth, voices);
+            num_voices = instrument_get_num_voices(e->synth, voices);
         }
         if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & _SYNTH_FLAGS_IGNORE_NOTE_OFFS))
             return 0;  // Ignore the note off, as requested.
@@ -483,7 +481,7 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t 
         *ppatch_number = old_patch_number;
     }
     // If the instrument is alread initialized, copy the voice numbers.
-    num_voices = instrument_get_voices(e->synth, voices);
+    num_voices = instrument_get_num_voices(e->synth, voices);
     if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
         // If we did already have voice oscs, release them.
         for (int32_t i = 0; i < num_voices; ++i) {

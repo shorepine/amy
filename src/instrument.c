@@ -299,13 +299,13 @@ void instrument_change_number(int old_instrument_number, int new_instrument_numb
 }
 
 
-int instrument_get_voices(int instrument_number, uint16_t *amy_voices) {
-    // instrument_get_voices is used to test if an instrument is set or not, so no error message if it doesn't exist, only if the number is out of range.
-    if (!instrument_number_ok(instrument_number, "get_voices")) return 0;
+int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices) {
+    // instrument_get_num_voices is used to test if an instrument is set or not, so no error message if it doesn't exist, only if the number is out of range.
+    if (!instrument_number_ok(instrument_number, "get_num_voices")) return 0;
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        //fprintf(stderr, "get_voices: instrument_number %d is not defined.\n", instrument_number);
+        //fprintf(stderr, "get_num_voices: instrument_number %d is not defined.\n", instrument_number);
     } else {
         num_voices = instrument->num_voices;
         for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];
