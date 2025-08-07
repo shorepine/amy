@@ -1155,6 +1155,7 @@ void play_delta(struct delta *d) {
     // the only way a sound is made is if velocity (note on) is >0.
     // Ignore velocity deltas if we've already received one this frame.  This may be due to a loop in chained_oscs.
     if(d->param == VELOCITY) {
+        //fprintf(stderr, "play_delta velocity %.1f osc %d note %.1f time %d\n", d->data.f, d->osc, synth[d->osc]->midi_note, d->time);
         if (d->data.f > 0) { // new note on (even if something is already playing on this osc)
 	    // Calculation common to all chained oscs.
 	    float note_logfreq = 0;

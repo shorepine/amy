@@ -393,6 +393,10 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             AMY_UNSET(e->to_synth);
             // Then continue handling any other args.
         }
+        if (AMY_IS_SET(e->synth_delay_ms)) {
+            // Set the synth noteon delay.
+            instrument_set_noteon_delay_ms(e->synth, e->synth_delay_ms);
+        }
         if (AMY_IS_SET(e->grab_midi_notes)) {
             // Set the grab_midi state.
             instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
@@ -413,14 +417,24 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             bool stolen = false;
             num_voices = patches_voices_for_note_onoff_event(e, voices, synth_flags, &stolen);
             if (stolen) {
-                fprintf(stderr, "synth %d note %d: voice %d stolen\n", e->synth, (int)roundf(e->midi_note), voices[0]);
                 // Here, we issue a quick note-off for the stolen note, to support short decay.  Kind of an abstraction violation.
                 struct delta d = {
-                    .time = 0,
+                    .time = e->time,
                     .osc = voice_to_base_osc[voices[0]],
+                    .param = VELOCITY,
+                    .data.i = 0,
                     .next = NULL,
                 };
                 add_delta_to_queue(&d, &amy_global.delta_queue);
+                //fprintf(stderr, "synth %d note %d: voice %d stolen, osc %d time %d added note-off\n", e->synth, (int)roundf(e->midi_note), voices[0], d.osc, d.time);
+            }
+            // Apply noteon_delay_ms to note-on events.
+            if (instrument_noteon_delay_ms(e->synth)) {
+                uint32_t playback_time = amy_sysclock();
+                if(AMY_IS_SET(e->time)) playback_time = e->time;
+                playback_time += instrument_noteon_delay_ms(e->synth);
+                e->time = playback_time;
+                //fprintf(stderr, "synth %d note %d delay %d time %d\n", e->synth, (int)roundf(e->midi_note), instrument_noteon_delay_ms(e->synth), e->time);
             }
         } else {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
