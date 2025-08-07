@@ -659,6 +659,27 @@ class TestVoiceStealing(AmyTest):
     amy.send(time=940, synth=1, note=82, vel=0)
 
 
+class TestVoiceStealDecay(AmyTest):
+  """Issue #470 - voice stealing can cause clicks as note changes abruptly."""
+
+  def run(self):
+    amy.send(
+      synth=0, num_voices=2,
+      patch_string=amy.message(osc=0, wave=amy.SINE, bp0='50,1,200,0.5,50,0'),
+    )
+    amy.send(time=100, synth=0, note=40, vel=10)  # voice 0
+    amy.send(time=200, synth=0, note=50, vel=2)   # voice 1
+    amy.send(time=300, synth=0, note=60, vel=2)   # Steal voice 0, big click at t=0.3
+    amy.send(time=400, synth=0, note=65, vel=2)   # Steal voice 1
+    amy.send(time=500, synth=0, note=45, vel=10)  # Steal voice 0
+    # Now add synth_delay
+    amy.send(time=550, synth=0, synth_delay=50)
+    amy.send(time=600, synth=0, note=70, vel=2)   # Steal voice 1
+    amy.send(time=700, synth=0, note=75, vel=2)   # Steal voice 0, but no big click (at t=0.75)
+    amy.send(time=800, synth=0, note=80, vel=2)   # Steal voice 1
+    amy.send(time=900, synth=0, vel=0)  # All notes off
+
+
 class TestMidiDrums(AmyTest):
   """Test MIDI drums on channel 10 via injection."""
 
@@ -842,7 +863,8 @@ def main(argv):
     #TestInterpPartials().test()
     #TestVoiceStealing().test()
     #TestSustainPedal().test()
-    TestPatchFromEvents().test()
+    #TestPatchFromEvents().test()
+    TestVoiceStealDecay().test()
 
   amy.send(debug=0)
   print("tests done.")

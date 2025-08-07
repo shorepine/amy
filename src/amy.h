@@ -446,6 +446,7 @@ typedef struct amy_event {
     // Instrument-layer values.
     uint8_t synth;
     uint32_t synth_flags;  // Special flags to set when defining instruments.
+    uint16_t synth_delay_ms;  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     uint8_t to_synth;  // For moving setup between synth numbers.
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
@@ -833,12 +834,14 @@ extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
-extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
-extern int instrument_get_voices(int instrument_number, uint16_t *amy_voices);
+extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
+extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern uint16_t instrument_noteon_delay_ms(int instrument_number);
+extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);
 extern bool instrument_grab_midi_notes(int instrument_number);
 extern void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes);
 extern int instrument_bank_number(int instrument_number);

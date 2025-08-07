@@ -234,6 +234,7 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'v')  e->num_voices = atoi(message);
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
+    else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 

@@ -133,7 +133,8 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
-    ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'), ('grab_midi_notes', 'imI'), # 'i' is prefix for some two-letter synth-level codes.
+    ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
+    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'),  # 'i' is prefix for some two-letter synth-level codes.
     ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
