@@ -538,40 +538,41 @@ void patches_load_patch(amy_event *e) {
             // Invalid somehow, ignore event.
             return;
         }
-    }
-    if (AMY_IS_SET(e->voices[0])) {
+    } else if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
     }
     if (num_voices == 0) {
-        fprintf(stderr, "patch_number %d but no voices allocated, ignored (synth %d num_voices %d voices %d...)\n",
-                patch_number, e->synth, e->num_voices, e->voices[0]);
+        fprintf(stderr, "synth %d patch %d: no voices selected, ignored (e->num_voices %d e->voices [0] %d...)\n",
+                e->synth, patch_number, e->num_voices, e->voices[0]);
         return;
     }
     // At this point, we have the voices[] array and num_voices set up to be initialized.
     char *message;
     struct delta *deltas = NULL;
-    uint16_t patch_osc = 0;
-    if(patch_number >= _PATCHES_FIRST_USER_PATCH) {
+    uint16_t num_patch_oscs = 0;
+    if(patch_number < _PATCHES_FIRST_USER_PATCH) {
+        // Built-in patch
+        message = (char*)patch_commands[patch_number];
+        num_patch_oscs = patch_oscs[patch_number];
+    } else {
+        // User-defined patch
         int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-        patch_osc = memory_patch_oscs[patch_index];
-        if(patch_osc > 0){
+        num_patch_oscs = memory_patch_oscs[patch_index];
+        if(num_patch_oscs > 0){
             message = memory_patch[patch_index];
             deltas = memory_patch_deltas[patch_index];
         } else {
             fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
-                    patch_number, patch_osc, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
+                    patch_number, num_patch_oscs, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
             return;
         }
-    } else {
-        message = (char*)patch_commands[patch_number];
-        patch_osc = patch_oscs[patch_number];
     }
     for(uint8_t v=0;v<num_voices;v++)  {
         // Release all the oscs of any voices we're re-using before we start re-allocating oscs.
         release_voice_oscs(voices[v]);
     }
     for(uint8_t v=0;v<num_voices;v++)  {
-        // Find the first osc with patch_osc free oscs.
+        // Find the first osc with num_patch_oscs free oscs.
         uint8_t good = 0;
 
         uint16_t osc_start = (AMY_OSCS/2);
@@ -586,16 +587,16 @@ void patches_load_patch(amy_event *e) {
         for(uint16_t i=0;i<AMY_OSCS;i++) {
             uint16_t osc = (osc_start + i) % AMY_OSCS;
             if(AMY_IS_UNSET(osc_to_voice[osc])) {
-                // Are there num_voices patch_oscs free oscs after this one?
+                // Are there num_voices x num_patch_oscs free oscs after this one?
                 good = 1;
-                for(uint16_t j=0;j<patch_osc;j++) {
-                    good = good & (AMY_IS_UNSET(osc_to_voice[osc+j]));
+                for(uint16_t j=0; j < num_patch_oscs; j++) {
+                    good = good & (AMY_IS_UNSET(osc_to_voice[osc + j]));
                 }
                 if(good) {
                     //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[patch_number], osc, voices[v]);
                     //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
                     voice_to_base_osc[voices[v]] = osc; 
-                    for(uint16_t j=0;j<patch_osc;j++) {
+                    for(uint16_t j=0; j < num_patch_oscs; j++) {
                         //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
                         osc_to_voice[osc+j] = voices[v];
                         //reset_osc(osc+j);
