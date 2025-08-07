@@ -63,16 +63,19 @@ void amy_profiles_print() {}
 #endif
 
 
-
-// This defaults PCM size to small. If you want to be different, include "pcm_large.h" or "pcm_tiny.h"
+// Per-device PCM size. If you want to use a different one, please change it here
 #ifdef ALLES
 #include "pcm_large.h"
 #elif defined ARDUINO
 #include "pcm_tiny.h"
 #elif defined AMY_DAISY
 #include "pcm_tiny.h"
-#else
+#elif defined TULIP
+#include "pcm_small.h"
+#elif (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #include "pcm_tiny.h"
+#else
+#include "pcm_large.h"
 #endif
 
 #include "clipping_lookup_table.h"
