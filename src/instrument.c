@@ -159,10 +159,12 @@ void instrument_free(struct instrument_info *instrument) {
     free(instrument);
 }
 
-uint16_t _instrument_get_voice(struct instrument_info *instrument) {
-    if (!voice_fifo_empty(instrument->released_voices))
+uint16_t _instrument_get_voice(struct instrument_info *instrument, bool *pstolen) {
+    if (!voice_fifo_empty(instrument->released_voices)) {
         return voice_fifo_get(instrument->released_voices);
+    }
     // No released voices, have to steal.
+    if (pstolen) *pstolen = true;  // *pstolen is set if steal occurs, otherwise not touched.
     return voice_fifo_get(instrument->active_voices);
 }
 
@@ -210,7 +212,7 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
     return num_voices_turned_off;
 }
 
-uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
+uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, bool *pstolen) {
     if (note == 0) {
         // note == 0 is for all-notes-off, it's not allowed for note-on (sorry, C-1).
         fprintf(stderr, "note-on for note 0: ignored.\n");
@@ -219,7 +221,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note) {
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         // Not a re-onset, need to allocate a new voice.
-        voice = _instrument_get_voice(instrument);
+        voice = _instrument_get_voice(instrument, pstolen);
         voice_fifo_put(instrument->active_voices, voice);
     }
     instrument->note_per_voice[voice] = note;
@@ -313,8 +315,9 @@ int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices) {
     return num_voices;
 }
 
-uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off) {
+uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen) {
     // Called from patches_event_has_voices for events including an instrument, velocity, and note (note-on/note-off).
+    // *pstolen is set (if pstolen is nonnull) if the note is stolen, otherwise not touched.
     if (!instrument_number_exists(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
     struct instrument_info *instrument = instruments[instrument_number];
     if (is_note_off) {
@@ -327,7 +330,7 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
         return instrument_note_off(instrument, note);
     } else {
         // Note on.
-        return instrument_note_on(instrument, note);
+        return instrument_note_on(instrument, note, pstolen);
     }
 }
 

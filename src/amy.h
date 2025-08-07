@@ -833,7 +833,7 @@ extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
-extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off);
+extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);

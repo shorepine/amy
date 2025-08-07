@@ -329,7 +329,7 @@ int copy_voices(uint16_t *from, uint16_t *to) {
 }
 
 
-uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uint32_t synth_flags) {
+uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uint32_t synth_flags, bool *pstolen) {
     // Identify the specific voice (or voices) for a note on/off event.
     // e->velocity is assumed to be set when this function is called.
     int num_voices = 0;
@@ -357,7 +357,7 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
             note += 128 * e->preset;
         }
         bool is_note_off = (e->velocity == 0);
-        voices[0] = instrument_voice_for_note_event(e->synth, note, is_note_off);
+        voices[0] = instrument_voice_for_note_event(e->synth, note, is_note_off, pstolen);
         if (voices[0] == _INSTRUMENT_NO_VOICE) {
             // For now, I think this can only happen with a note-off that has no matching note-on.
             //fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->synth);
@@ -410,7 +410,18 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             }
             //fprintf(stderr, "synth %d pedal %d num_voices %d\n", e->synth, e->pedal, num_voices);
         } else if (AMY_IS_SET(e->velocity)) {
-            num_voices = patches_voices_for_note_onoff_event(e, voices, synth_flags);
+            bool stolen = false;
+            num_voices = patches_voices_for_note_onoff_event(e, voices, synth_flags, &stolen);
+            if (stolen) {
+                fprintf(stderr, "synth %d note %d: voice %d stolen\n", e->synth, (int)roundf(e->midi_note), voices[0]);
+                // Here, we issue a quick note-off for the stolen note, to support short decay.  Kind of an abstraction violation.
+                struct delta d = {
+                    .time = 0,
+                    .osc = voice_to_base_osc[voices[0]],
+                    .next = NULL,
+                };
+                add_delta_to_queue(&d, &amy_global.delta_queue);
+            }
         } else {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_num_voices(e->synth, voices);
