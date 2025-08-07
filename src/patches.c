@@ -329,14 +329,52 @@ int copy_voices(uint16_t *from, uint16_t *to) {
 }
 
 
+uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uint32_t synth_flags) {
+    // Identify the specific voice (or voices) for a note on/off event.
+    // e->velocity is assumed to be set when this function is called.
+    int num_voices = 0;
+    if (AMY_IS_UNSET(e->midi_note) && AMY_IS_UNSET(e->preset)) {
+        // velocity without midi_note is valid for velocity==0 => all-notes-off.
+        if (e->velocity != 0) {
+            // Attempted a note-on to all voices, suppress.
+            fprintf(stderr, "note-on with no note for synth %d - ignored.\n", e->synth);
+            return 0;
+        }
+        // All notes off - find out which voices are actually currently active, so we can turn them off.
+        num_voices = instrument_all_notes_off(e->synth, voices);
+    } else {
+        // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
+        uint16_t note = 0;
+        if (AMY_IS_SET(e->midi_note))  // midi note can be unset if preset is set.
+            note = (uint8_t)roundf(e->midi_note);
+        if (synth_flags & _SYNTH_FLAGS_MIDI_DRUMS) {
+            if (!setup_drum_event(e, note))
+                return 0;   // It's not a MIDI drum event we can emulate, just drop the event.
+        }
+        if (AMY_IS_SET(e->preset)) {
+            // This event includes a note *and* a preset, so it's like a drum sample note on.
+            // Wrap the preset number into the note, so we don't allocate the same pitch for different drums to the same voice.
+            note += 128 * e->preset;
+        }
+        bool is_note_off = (e->velocity == 0);
+        voices[0] = instrument_voice_for_note_event(e->synth, note, is_note_off);
+        if (voices[0] == _INSTRUMENT_NO_VOICE) {
+            // For now, I think this can only happen with a note-off that has no matching note-on.
+            //fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->synth);
+            // No, it also happens with note-offs when pedal is down.
+            return 0;
+        }
+        num_voices = 1;
+    }
+    //fprintf(stderr, "instrument %d vel %d note %d voice %d\n", e->synth, (int)roundf(127.f * e->velocity), (int)roundf(e->midi_note), voices[0]);
+    return num_voices;
+}
 
-// This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
-// So i know that the patch / voice alloc already exists and the patch has already been set!
-void patches_event_has_voices(amy_event *e, struct delta **queue) {
-    peek_stack("has_voices");
-    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+
+uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
+    // Convert an event that may specify a synth into a number of specific voices.
     uint8_t num_voices = 0;
-    uint32_t flags = 0;
+    uint32_t synth_flags = 0;
     if (!AMY_IS_SET(e->synth)) {
         // No instrument, just directly naming the voices.
         num_voices = copy_voices(e->voices, voices);
@@ -349,7 +387,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
             fprintf(stderr, "You specified both synth %d and voices %d...  Synth implies voices, ignoring voices.\n",
                     e->synth, e->voices[0]);
         }
-        flags = instrument_get_flags(e->synth);
+        synth_flags = instrument_get_flags(e->synth);
         if (AMY_IS_SET(e->to_synth)) {
             // This involves moving the instrument number.
             instrument_change_number(e->synth, e->to_synth);
@@ -364,7 +402,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         if (AMY_IS_SET(e->pedal)) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);
-            if (flags & _SYNTH_FLAGS_NEGATE_PEDAL) {
+            if (synth_flags & _SYNTH_FLAGS_NEGATE_PEDAL) {
                 sustain = !sustain;  // Some MIDI pedals report backwards.
             }
             // A sustain release can result in note-off events for multiple voices.
@@ -373,50 +411,29 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
                 e->velocity = 0;
             }
             //fprintf(stderr, "synth %d pedal %d num_voices %d\n", e->synth, e->pedal, num_voices);
-        } else if (!AMY_IS_SET(e->velocity)) {
+        } else if (AMY_IS_SET(e->velocity)) {
+            num_voices = patches_voices_for_note_onoff_event(e, voices, synth_flags);
+        } else {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_voices(e->synth, voices);
-        } else {
-            // velocity is present, this is a note-on/note-off.
-            if (AMY_IS_UNSET(e->midi_note) && AMY_IS_UNSET(e->preset)) {
-                // velocity without midi_note is valid for velocity==0 => all-notes-off.
-                if (e->velocity != 0) {
-                    // Attempted a note-on to all voices, suppress.
-                    fprintf(stderr, "note-on with no note for synth %d - ignored.\n", e->synth);
-                    return;
-                }
-                // All notes off - find out which voices are actually currently active, so we can turn them off.
-                num_voices = instrument_all_notes_off(e->synth, voices);
-            } else {
-                // It's a note-on or note-off event, so the instrument mechanism chooses which single voice to use.
-                uint16_t note = 0;
-                if (AMY_IS_SET(e->midi_note))  // midi note can be unset if preset is set.
-                    note = (uint8_t)roundf(e->midi_note);
-                if (flags & _SYNTH_FLAGS_MIDI_DRUMS) {
-                    if (!setup_drum_event(e, note))
-                        return;   // It's not a MIDI drum event we can emulate, just drop the event.
-                }
-		if (AMY_IS_SET(e->preset)) {
-		    // This event includes a note *and* a preset, so it's like a drum sample note on.
-		    // Wrap the preset number into the note, so we don't allocate the same pitch for different drums to the same voice.
-		    note += 128 * e->preset;
-		}
-                bool is_note_off = (e->velocity == 0);
-                voices[0] = instrument_voice_for_note_event(e->synth, note, is_note_off);
-                if (voices[0] == _INSTRUMENT_NO_VOICE) {
-                    // For now, I think this can only happen with a note-off that has no matching note-on.
-                    //fprintf(stderr, "synth %d did not find a voice, dropping message.\n", e->synth);
-                    // No, it also happens with note-offs when pedal is down.
-                    return;
-                }
-                num_voices = 1;
-            }
-            //fprintf(stderr, "instrument %d vel %d note %d voice %d\n", e->synth, (int)roundf(127.f * e->velocity), (int)roundf(e->midi_note), voices[0]);
         }
-        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (flags & _SYNTH_FLAGS_IGNORE_NOTE_OFFS))
-            return;  // Ignore the note off, as requested.
+        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & _SYNTH_FLAGS_IGNORE_NOTE_OFFS))
+            return 0;  // Ignore the note off, as requested.
     }
-    // clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
+    return num_voices;
+}
+
+// This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
+// So i know that the patch / voice alloc already exists and the patch has already been set!
+void patches_event_has_voices(amy_event *e, struct delta **queue) {
+    peek_stack("has_voices");
+    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+    uint8_t num_voices = patches_voices_for_event(e, voices);
+    if (num_voices == 0) {
+        // No voices to process, somehow event is to be ignored.
+        return;
+    }
+    // Clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
     AMY_UNSET(e->voices[0]);
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
@@ -449,6 +466,63 @@ void release_voice_oscs(int32_t voice) {
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
 
+
+uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t *ppatch_number) {
+    // When load_patch specifies a synth, convert that into voices.
+    // e->synth is assumed to be set.
+    int num_voices = 0;
+    if (AMY_IS_UNSET(e->patch_number)) {
+        // If no patch number is provided, pull from existing instrument.
+        int32_t old_patch_number = instrument_get_patch_number(e->synth);
+        if (old_patch_number == -1) {
+            fprintf(stderr, "attempting to configure synth %d (%d voices) without patch/patch_number, but no previous patch found\n",
+                    e->synth, e->num_voices);
+            return 0;  // Ignore
+        }
+        // Otherwise, inherit the existing patch number.
+        *ppatch_number = old_patch_number;
+    }
+    // If the instrument is alread initialized, copy the voice numbers.
+    num_voices = instrument_get_voices(e->synth, voices);
+    if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
+        // If we did already have voice oscs, release them.
+        for (int32_t i = 0; i < num_voices; ++i) {
+            release_voice_oscs(voices[i]);
+        }
+        num_voices = 0;
+        // Find avaliable voices with a single pass through voice_to_base_osc.
+        uint32_t v = 0;
+        for (int32_t i = 0; i < e->num_voices; ++i) {
+            while (v < amy_global.config.max_voices) {
+                if (AMY_IS_UNSET(voice_to_base_osc[v])) break;
+                ++v;
+            }
+            if (v == amy_global.config.max_voices)  {
+                fprintf(stderr, "ran out of voices allocating %d voices to synth %d for patch %d, ignoring.", e->num_voices, e->synth, *ppatch_number);
+                patches_debug();
+                return 0;
+            }
+            voices[i] = v;
+            ++v;
+            ++num_voices;
+        }
+        // Was this deleting the instrument?  i.e. was e->num_voices set but setting the num_voices to zero?
+        if (num_voices == 0) {
+            instrument_release(e->synth);
+            // Delete the instrument number so we don't forward the 'rest' of the event to it.
+            AMY_UNSET(e->synth);
+            return 0;
+        }
+    }
+    //fprintf(stderr, "Allocated %d voices to instrument %d patch %d\n", num_voices, e->synth, *ppatch_number);
+    //for (int i = 0; i < num_voices; ++i) {
+    //    fprintf(stderr, "%d; ", voices[i]);
+    //}
+    //fprintf(stderr, "\n");
+    return num_voices;
+}
+
+
 void patches_load_patch(amy_event *e) {
     // Given an event with a patch/patch_number AND a voices/instrument spec in it.
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
@@ -459,55 +533,11 @@ void patches_load_patch(amy_event *e) {
     uint16_t patch_number = e->patch_number;
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
     if (AMY_IS_SET(e->synth)) {
-        // Instrument specified.
-        if (AMY_IS_UNSET(e->patch_number)) {
-            // If no patch number is provided, pull from existing instrument.
-            int32_t old_patch_number = instrument_get_patch_number(e->synth);
-            if (old_patch_number == -1) {
-                fprintf(stderr, "attempting to configure synth %d (%d voices) without patch/patch_number, but no previous patch found\n",
-                        e->synth, e->num_voices);
-                return;  // Ignore
-            }
-            // Otherwise, inherit the existing patch number.
-            patch_number = old_patch_number;
+        num_voices = patches_voices_for_load_synth(e, voices, &patch_number);
+        if (num_voices == 0) {
+            // Invalid somehow, ignore event.
+            return;
         }
-        // If the instrument is alread initialized, copy the voice numbers.
-        num_voices = instrument_get_voices(e->synth, voices);
-        if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
-            // If we did already have voice oscs, release them.
-            for (int32_t i = 0; i < num_voices; ++i) {
-                release_voice_oscs(voices[i]);
-            }
-            num_voices = 0;
-            // Find avaliable voices with a single pass through voice_to_base_osc.
-            uint32_t v = 0;
-            for (int32_t i = 0; i < e->num_voices; ++i) {
-                while (v < amy_global.config.max_voices) {
-                    if (AMY_IS_UNSET(voice_to_base_osc[v])) break;
-                    ++v;
-                }
-                if (v == amy_global.config.max_voices)  {
-                    fprintf(stderr, "ran out of voices allocating %d voices to synth %d for patch %d, ignoring.", e->num_voices, e->synth, patch_number);
-                    patches_debug();
-                    return;
-                }
-                voices[i] = v;
-                ++v;
-                ++num_voices;
-            }
-            // Was this deleting the instrument?  i.e. was e->num_voices set but setting the num_voices to zero?
-            if (num_voices == 0) {
-                instrument_release(e->synth);
-                // Delete the instrument number so we don't forward the 'rest' of the event to it.
-                AMY_UNSET(e->synth);
-                return;
-            }
-        }
-        //fprintf(stderr, "Allocated %d voices to instrument %d patch %d\n", num_voices, e->synth, patch_number);
-        //for (int i = 0; i < num_voices; ++i) {
-        //    fprintf(stderr, "%d; ", voices[i]);
-        //}
-        //fprintf(stderr, "\n");
     }
     if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
