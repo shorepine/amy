@@ -788,6 +788,19 @@ class TestPatchFromEvents(AmyTest):
     amy.send(time=800, synth=0, vel=0)
 
 
+class TestInvalidPatchNumber(AmyTest):
+  """Test for crash with patch number out of range."""
+  def run(self):
+    patch = 25
+    amy.send(time=0, patch=patch, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
+    amy.send(time=0, patch=patch, osc=1, wave=amy.SINE, freq=131, bp0='0,1,500,0,200,0')
+    amy.send(time=0, synth=0, num_voices=4, patch=patch)
+    amy.send(time=100, synth=0, note=60, vel=1)
+    amy.send(time=300, synth=0, note=64, vel=1)
+    amy.send(time=500, synth=0, note=67, vel=1)
+    amy.send(time=800, synth=0, vel=0)
+
+
 class TestBreakpointsRealloc(AmyTest):
   """A default osc has only 8 breakpoints, but it should realloc to 24 if you try to set a long bpset."""
 

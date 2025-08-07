@@ -499,6 +499,11 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     if (AMY_IS_SET(e->patch_number)) {
         queue = queue_for_patch_number(e->patch_number);
         //fprintf(stderr, "event added to patch %d: osc %d wave %d...\n", e->patch_number, e->osc, e->wave);
+        if (queue == NULL) {
+            // The patch number was invalid (e.g., not in user range 1024+), so we got no queue, so ignore the event.
+            fprintf(stderr, "event ignored\n");
+            goto end;
+        }            
     }
 
     // Everything else only added to queue if set

@@ -71,10 +71,11 @@ int main(int argc, char ** argv) {
     //example_sequencer_drums(0);
     //example_patch_from_events();
 
-    // Check that pedal to a non-synth doesn't crash.
+    // Check that trying to program a non-user patch doesn't crash
     amy_event e = amy_default_event();
-    e.synth = 3;
-    e.pedal = 1;
+    e.patch_number = 25;
+    e.osc = 0;
+    e.wave = SINE;
     amy_add_event(&e);
 
     // Now just spin for 15s
