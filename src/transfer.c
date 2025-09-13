@@ -1,12 +1,128 @@
 // transfer.c
-// data transfer over AMY messages
+// data transfer in AMY:
+// loading files from disk (VFS, stdio, arduino)
+// base64 transfer decoding
 
 #include <stdlib.h>
 #include <ctype.h>
 #include "transfer.h"
+#include "amy.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
+#if (defined TULIP) || (defined AMYBOARD)
+#define AMY_FILE mp_obj_t
+#elif defined ARDUINO
+// unclear
+#else
+#define AMY_FILE FILE
+#endif
+
+
+AMY_FILE* get_file_pointer(char* filename) {
+    return (AMY_FILE*)fopen(filename, "rb");
+}
+
+void close_file(AMY_FILE * file_pointer) {
+    fclose(file_pointer);
+}
+
+
+// wav parsing - wav_reader_t typedef is now in transfer.h
+
+static uint32_t read_u32_le(AMY_FILE *fp) {
+    uint8_t b[4];
+    fread(b, 1, 4, fp);
+    return (uint32_t)b[0] | ((uint32_t)b[1] << 8) |
+           ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
+}
+
+static uint16_t read_u16_le(AMY_FILE *fp) {
+    uint8_t b[2];
+    fread(b, 1, 2, fp);
+    return (uint16_t)b[0] | ((uint16_t)b[1] << 8);
+}
+
+wav_reader_t *wav_open(AMY_FILE *fp) {
+    if (!fp) return NULL;
+
+    char id[5] = {0};
+
+    // RIFF header
+    fread(id, 1, 4, fp);
+    if (strncmp(id, "RIFF", 4) != 0) return NULL;
+    fseek(fp, 4, SEEK_CUR); // skip chunk size
+    fread(id, 1, 4, fp);
+    if (strncmp(id, "WAVE", 4) != 0) return NULL;
+
+    wav_reader_t *wav = calloc(1, sizeof(*wav));
+    wav->fp = fp;
+
+    // Parse chunks
+    while (!feof(fp)) {
+        if (fread(id, 1, 4, fp) != 4) break;
+        uint32_t chunk_size = read_u32_le(fp);
+
+        if (strncmp(id, "fmt ", 4) == 0) {
+            uint16_t audio_format = read_u16_le(fp);
+            wav->num_channels = read_u16_le(fp);
+            wav->sample_rate = read_u32_le(fp);
+            fseek(fp, 6, SEEK_CUR); // byte rate (4), block align (2)
+            wav->bits_per_sample = read_u16_le(fp);
+
+            // Skip any extra bytes
+            if (chunk_size > 16) fseek(fp, chunk_size - 16, SEEK_CUR);
+
+            if (audio_format != 1 || wav->bits_per_sample != 16) {
+                free(wav);
+                return NULL; // only PCM 16-bit supported
+            }
+
+        } else if (strncmp(id, "data", 4) == 0) {
+            wav->data_offset = ftell(fp);
+            wav->data_size = chunk_size;
+            wav->num_samples = wav->data_size / (wav->num_channels * (wav->bits_per_sample / 8));
+            fseek(fp, chunk_size, SEEK_CUR);
+        } else {
+            // skip unhandled chunk
+            fseek(fp, chunk_size, SEEK_CUR);
+        }
+    }
+
+    if (wav->data_offset == 0) {
+        free(wav);
+        return NULL; // no data chunk found
+    }
+
+    return wav;
+}
+
+size_t wav_read(wav_reader_t *wav, uint32_t start_frame, uint32_t num_frames, int16_t *samples) {
+    if (!wav || !samples) return 0;
+
+    uint32_t bytes_per_frame = wav->num_channels * (wav->bits_per_sample / 8);
+    uint32_t start_byte = wav->data_offset + (start_frame * bytes_per_frame);
+
+    if (start_frame >= wav->num_samples) return 0;
+
+    if (start_frame + num_frames > wav->num_samples)
+        num_frames = wav->num_samples - start_frame;
+
+    fseek(wav->fp, start_byte, SEEK_SET);
+    size_t read = fread(samples, bytes_per_frame, num_frames, wav->fp);
+    return read;
+}
+
+void wav_close(wav_reader_t *wav) {
+    if (wav) free(wav);
+}
+
+
+/// b64 transfer 
+
+// Base64 encoding table
+const char b64_table[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 // We keep one decbuf around and reuse it during transfer
 b64_buffer_t decbuf;

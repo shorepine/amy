@@ -1,60 +1,51 @@
-// transfer.h
-// data transfer over AMY messages
-// b64 stuff from https://github.com/jwerle/b64.c
-
-// bytes -> b64 length: 4 * n / 3 gives unpadded length.
-// ((4 * n / 3) + 3) & ~3 gives padded length 
-
-// so if max AMY message is 255 chars, 252 bytes of b64 is max = 189 bytes of pcm 
-
 #ifndef TRANSFER_H
-#define TRANSFER_H 1
-#include <stdint.h>
-#include "amy.h"
+#define TRANSFER_H
 
-typedef struct b64_buffer {
-    char * ptr;
-    int bufc;
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+
+#if (defined TULIP) || (defined AMYBOARD)
+#define AMY_FILE mp_obj_t
+#elif defined ARDUINO
+// unclear
+#else
+#define AMY_FILE FILE
+#endif
+
+// File operations
+AMY_FILE* get_file_pointer(char* filename);
+void close_file(AMY_FILE * file_pointer);
+
+// WAV parsing structures and functions
+typedef struct {
+    AMY_FILE *fp;
+    uint32_t num_samples;
+    uint16_t num_channels;
+    uint32_t sample_rate;
+    uint16_t bits_per_sample;
+    uint32_t data_offset;
+    uint32_t data_size;
+} wav_reader_t;
+
+wav_reader_t *wav_open(AMY_FILE *fp);
+size_t wav_read(wav_reader_t *wav, uint32_t start_frame, uint32_t num_frames, int16_t *samples);
+void wav_close(wav_reader_t *wav);
+
+// Base64 transfer structures and functions
+typedef struct {
+    char *ptr;
+    uint8_t bufc;
 } b64_buffer_t;
 
- // How much memory to allocate per buffer
-#define B64_BUFFER_SIZE     (256)
+#define B64_BUFFER_SIZE 1024
 
- // Start buffered memory
-int b64_buf_malloc(b64_buffer_t * buffer);
-
-
-/**
- * Base64 index table.
- */
-
-static const char b64_table[] = {
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-  'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-  'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-  'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-  'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-  'w', 'x', 'y', 'z', '0', '1', '2', '3',
-  '4', '5', '6', '7', '8', '9', '+', '/'
-};
+extern const char b64_table[64];
 
 void start_receiving_transfer(uint32_t length, uint8_t * storage);
-void parse_transfer_message(char * message, uint16_t len) ;
-
-/**
- * Encode `unsigned char *' source with `size_t' size.
- * Returns a `char *' base64 encoded string.
- */
-
+void parse_transfer_message(char * message, uint16_t len);
+int b64_buf_malloc(b64_buffer_t * buf);
 char * b64_encode (const unsigned char *src, b64_buffer_t * encbuf, size_t len);
+unsigned char * b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsize);
 
-
-/**
- * Decode `char *' source with `size_t' size.
- * Returns a `unsigned char *' base64 decoded string + size of decoded string.
- */
-unsigned char *
-b64_decode_ex (const char *, size_t, b64_buffer_t * decbuf, size_t *);
-
-#endif
+#endif // TRANSFER_H

@@ -884,6 +884,7 @@ extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern int pcm_file_load(uint16_t preset_number, char* filename, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern void pcm_unload_preset(uint16_t patch_number);
 extern void pcm_unload_all_presets();
 

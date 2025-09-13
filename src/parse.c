@@ -238,6 +238,59 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 
+// Parser for file PCM load ('zf') command.
+// Format: zf<preset>,<filename>[,<midinote>[,<loopstart>[,<loopend>]]]
+// Examples: zf1024,file.wav,60 or zf1024,file.wav,60,1129,15032 or zf1024,file.wav
+void amy_parse_file_pcm_message(char *message) {
+    char *comma1 = strchr(message, ',');
+    if (comma1 == NULL) {
+        fprintf(stderr, "Invalid zf command format: missing comma after preset number\n");
+        return;
+    }
+    
+    // Parse preset number
+    *comma1 = '\0';
+    uint16_t preset = atoi(message);
+    *comma1 = ',';  // Restore the comma
+    
+    // Parse filename
+    char *filename_start = comma1 + 1;
+    char *comma2 = strchr(filename_start, ',');
+    char filename[256];
+    
+    if (comma2 == NULL) {
+        // No more parameters, just preset and filename
+        strncpy(filename, filename_start, sizeof(filename) - 1);
+        filename[sizeof(filename) - 1] = '\0';
+        int result = pcm_file_load(preset, filename, 60, 0, 0);  // Default midinote=60, no loop
+        if (result != 0) {
+            fprintf(stderr, "Failed to load PCM file: %s\n", filename);
+        }
+        return;
+    }
+    
+    // Parse filename (up to next comma)
+    *comma2 = '\0';
+    strncpy(filename, filename_start, sizeof(filename) - 1);
+    filename[sizeof(filename) - 1] = '\0';
+    *comma2 = ',';  // Restore the comma
+    
+    // Parse remaining parameters
+    char *params_start = comma2 + 1;
+    uint32_t params[3] = {60, 0, 0};  // Default: midinote=60, no loop
+    int num_params = parse_list_uint32_t(params_start, params, 3, 0);
+    
+    // Use parsed parameters
+    uint8_t midinote = (num_params > 0) ? (uint8_t)params[0] : 60;
+    uint32_t loopstart = (num_params > 1) ? params[1] : 0;
+    uint32_t loopend = (num_params > 2) ? params[2] : 0;
+    
+    int result = pcm_file_load(preset, filename, midinote, loopstart, loopend);
+    if (result != 0) {
+        fprintf(stderr, "Failed to load PCM file: %s\n", filename);
+    }
+}
+
 int _next_alpha(char *s) {
     // Return how many chars to skip to get to the next alphabet (command prefix) (or EOS).
     int p = 0;
@@ -296,6 +349,27 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             break;
             /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
             case 'i': amy_parse_synth_layer_message(arg, e); ++pos; break;  // Skip over second cmd letter, if any.
+            /* zf is used for file PCM loading */
+            case 'z': {
+                // Check if this is 'zf' command
+                if (pos + 1 < length && message[pos + 1] == 'f') {
+                    // This is 'zf' command, parse it
+                    char *zf_arg = message + pos + 2;  // Skip 'zf'
+                    amy_parse_file_pcm_message(zf_arg);
+                    ++pos;  // Skip over the 'f' in 'zf'
+                } else {
+                    // This is regular 'z' command
+                    uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
+                    parse_list_uint32_t(arg, sm, 6, 0);
+                    if(sm[1]==0) { // remove preset
+                        pcm_unload_preset(sm[0]);
+                    } else {
+                        int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
+                        start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+                    }
+                }
+                break;
+            }
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atof(arg); break;
             /* j, J available */
@@ -376,17 +450,6 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                   e->eq_h = eq[2];
                 }
                 break;
-            case 'z': {
-                uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
-                parse_list_uint32_t(arg, sm, 6, 0);
-                if(sm[1]==0) { // remove preset
-                    pcm_unload_preset(sm[0]);
-                } else {
-                    int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
-                    start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
-                }
-                break;
-            }
             /* Y,y available */
             /* Z used for end of message */
             case 'Z':
