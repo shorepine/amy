@@ -481,6 +481,8 @@ void release_voice_oscs(int32_t voice) {
             if(osc_to_voice[i]==voice) {
                 //fprintf(stderr, "Already set voice %d osc %d, removing it\n", voices[v], i);
                 AMY_UNSET(osc_to_voice[i]);
+                // Make sure the osc is cleared.
+                reset_osc(i);
             }
         }
         AMY_UNSET(voice_to_base_osc[voice]);
