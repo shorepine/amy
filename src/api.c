@@ -33,6 +33,8 @@ amy_config_t amy_default_config() {
     c.features.default_synths = 1;
     c.features.startup_bleep = 0;
 
+    c.write_samples_fn = NULL;
+
     c.midi = AMY_MIDI_IS_NONE;
     #ifndef AMY_MCU
     c.audio = AMY_AUDIO_IS_MINIAUDIO;
@@ -324,4 +326,25 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
+    amy_hardware_init();
+    amy_global.running = 1;
+    //amy_live_start();
+}
+
+int16_t *amy_update() {
+    // Single function to update buffers.
+    amy_update_tasks();
+    int16_t *block = amy_render_audio();
+    if (amy_global.config.audio == AMY_AUDIO_IS_I2S
+        && amy_global.config.i2s_dout != -1) {
+        amy_i2s_write(
+            (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
+        );
+    }
+    if (amy_global.config.write_samples_fn) {
+        amy_global.config.write_samples_fn(
+            (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
+        );
+    }
+    return block;
 }

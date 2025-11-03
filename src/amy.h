@@ -593,6 +593,9 @@ typedef struct  {
     uint32_t max_synths;
     uint32_t max_memory_patches;
 
+    // alternative audio output function
+    size_t (*write_samples_fn)(const uint8_t *buffer, size_t buffer_size);
+
     // pins for MCU platforms
     int8_t i2s_lrc;
     int8_t i2s_dout;
@@ -748,10 +751,13 @@ void amy_start(amy_config_t);
 void amy_stop();
 void amy_live_start();
 void amy_live_stop();
-int16_t * amy_simple_fill_buffer() ;
-void amy_update();
-int16_t *amy_render_audio();
-void amy_pass_to_i2s(const int16_t *block);
+
+int16_t *amy_update();        // in api.c
+void amy_hardware_init();     // in i2s.c
+void amy_update_tasks();      // in i2s.c
+int16_t *amy_render_audio();  // in i2s.c
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes);  // in i2s.c
+
 amy_config_t amy_default_config();
 void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
