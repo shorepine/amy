@@ -96,7 +96,6 @@ void setup() {
   amy_config.midi_in = 5;
 
   amy_start(amy_config);
-  amy_live_start();
 
   //test_polyphony();
   //test_sequencer();

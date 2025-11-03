@@ -409,14 +409,17 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 
 
 void amy_live_start() {
-    amy_global.running = 1;
-    amy_hardware_init();
+    // Try to avoid doing this more than once.
+    if (!amy_global.running) {
+        amy_hardware_init();
+        amy_global.running = 1;
+    }
 }
 
 
 void amy_live_stop() {
     amy_global.running = 0;
-    // Not sure we do anythign on mcus for stopping amy live
+    // Not sure we do anything on mcus for stopping amy live
 }
 
 
