@@ -13,6 +13,9 @@
 #include <esp_system.h>
 #endif
 
+// Multiply used to apply amplitude to unit waveforms. sample is first arg (<=1), amp is 2nd.
+#define MULA_SS MUL6A_SS
+
 
 /* Dan Ellis libblosca functions */
 const LUT *choose_from_lutset(float period, const LUT *lutset) {
@@ -103,7 +106,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
             sample = b + MUL0_SS(cminusb - next_bit, frac);
 
 #define RENDER_LUT_LOOP_END \
-            SAMPLE value = buf[i] + MUL4_SS(current_amp, sample);     \
+    SAMPLE value = buf[i] + MULA_SS(sample, current_amp);	\
             buf[i] = value;                            \
             if (value < 0) value = -value;             \
             if (value > max_value) max_value = value;  \
@@ -312,7 +315,7 @@ SAMPLE compute_mod_pulse(uint16_t osc) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, F2P(freq / mod_sr));  // cycles per sec / calls per sec = cycles per call
-    return MUL4_SS(sample, F2S(msynth[osc]->amp));
+    return MULA_SS(sample, F2S(msynth[osc]->amp));
 }
 
 
@@ -365,7 +368,7 @@ SAMPLE compute_mod_saw(uint16_t osc, int8_t direction) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, F2P(freq / mod_sr));  // cycles per sec / calls per sec = cycles per call
-    return MUL4_SS(sample, direction * F2S(msynth[osc]->amp));
+    return MULA_SS(sample, direction * F2S(msynth[osc]->amp));
 }
 
 SAMPLE compute_mod_saw_down(uint16_t osc) {
@@ -411,7 +414,7 @@ SAMPLE compute_mod_triangle(uint16_t osc) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, F2P(freq / mod_sr));  // cycles per sec / calls per sec = cycles per call
-    return MUL4_SS(sample, F2S(msynth[osc]->amp));
+    return MULA_SS(sample, F2S(msynth[osc]->amp));
 }
 
 
@@ -433,8 +436,8 @@ SAMPLE render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_le
     }
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
-    SAMPLE amp = MUL4_SS(F2S(msynth[osc]->amp), mod_amp);
-    SAMPLE last_amp = MUL4_SS(F2S(msynth[osc]->last_amp), mod_amp);
+    SAMPLE amp = MUL8_SS(F2S(msynth[osc]->amp), mod_amp);
+    SAMPLE last_amp = MUL8_SS(F2S(msynth[osc]->last_amp), mod_amp);
     SAMPLE max_value;
     if (feedback_level > 0 && mod)
         synth[osc]->phase = render_lut_fm_fb(buf, synth[osc]->phase, step,
@@ -495,7 +498,7 @@ SAMPLE compute_mod_sine(uint16_t osc) {
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, F2P(freq / mod_sr));  // cycles per sec / calls per sec = cycles per call
-    return MUL4_SS(sample, F2S(msynth[osc]->amp));
+    return MULA_SS(sample, F2S(msynth[osc]->amp));
 }
 
 void sine_mod_trigger(uint16_t osc) {
@@ -550,7 +553,7 @@ SAMPLE render_noise(SAMPLE *buf, uint16_t osc) {
     SAMPLE last_white = synth[osc]->last_two[0];
     SAMPLE last_last_white = synth[osc]->last_two[1];
     for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
-        SAMPLE white = MUL4_SS(amy_get_random(), amp);
+        SAMPLE white = MULA_SS(amy_get_random(), amp);
         // Two-zero LPF to make the noise a little more pink, closer to Juno noise.
         SAMPLE value = white + last_white + last_white + last_last_white;
         last_last_white = last_white;
@@ -573,7 +576,7 @@ SAMPLE compute_mod_noise(uint16_t osc) {
     synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, F2P(fstep));  // cycles per sec / calls per sec = cycles per call
     if (fstep > 1.0f || synth[osc]->phase < starting_phase) {
         // phase wrapped, take new sample.
-        synth[osc]->last_two[0] = MUL4_SS(amy_get_random(), amp);
+        synth[osc]->last_two[0] = MULA_SS(amy_get_random(), amp);
     }
     //printf("mod_noise: time %lld fstep %f samp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, fstep, S2F(synth[osc]->last_two[0]));
     return synth[osc]->last_two[0];
