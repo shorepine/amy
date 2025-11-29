@@ -1682,13 +1682,12 @@ int16_t * amy_fill_buffer() {
             // soft clipping.
             int positive = 1;
             if (fsample < 0) {
-		positive = 0;
-		// avoid fabs()
-		fsample = -fsample;
-	    }
+		        positive = 0;
+	            // avoid fabs()
+                fsample = -fsample;
+	        }
 
-            int32_t uintval;
-	    uintval = S2L(fsample);
+            int32_t uintval = S2L(fsample);
             if (uintval >= FIRST_NONLIN) {
                 if (uintval >= FIRST_HARDCLIP) {
                     uintval = SAMPLE_MAX;
