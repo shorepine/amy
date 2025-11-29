@@ -106,7 +106,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
             sample = b + MUL0_SS(cminusb - next_bit, frac);
 
 #define RENDER_LUT_LOOP_END \
-    SAMPLE value = buf[i] + MULA_SS(sample, current_amp);	\
+            SAMPLE value = buf[i] + MULA_SS(sample, current_amp);	\
             buf[i] = value;                            \
             if (value < 0) value = -value;             \
             if (value > max_value) max_value = value;  \
