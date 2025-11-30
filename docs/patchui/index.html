@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Prophet-style Synth UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --panel-bg: #141414;
+      --panel-border: #333;
+      --wood: #5b3a22;
+      --wood-dark: #3c2616;
+      --accent: #f4d36c;
+      --text-main: #f3f3f3;
+      --text-muted: #a0a0a0;
+      --knob-bg: #2b2b2b;
+      --knob-border: #555;
+      --knob-indicator: #f4d36c;
+      --switch-off: #222;
+      --switch-on: #f4d36c;
+      --key-white-width: 32px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #333 0, #111 50%, #000 100%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        sans-serif;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .synth-wrapper {
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    .synth-chassis {
+      background: linear-gradient(135deg, var(--wood), var(--wood-dark));
+      padding: 16px;
+      border-radius: 14px;
+      box-shadow:
+        0 16px 35px rgba(0, 0, 0, 0.8),
+        0 0 0 2px #000;
+    }
+
+    .synth-panel {
+      background: var(--panel-bg);
+      border-radius: 10px;
+      padding: 16px 20px 12px;
+      border: 1px solid var(--panel-border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .synth-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #222;
+    }
+
+    .synth-title {
+      font-size: 22px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .synth-brand {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .synth-main {
+      display: grid;
+      grid-template-columns: 1.4fr 1.4fr 1.2fr 0.9fr;
+      gap: 18px;
+    }
+
+    .section {
+      border-right: 1px solid #262626;
+      padding-right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section:last-child {
+      border-right: none;
+      padding-right: 0;
+    }
+
+    .section-title {
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    .section-subgrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px 8px;
+    }
+
+    .module {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .module-label {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: center;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* Knobs */
+
+    .knob-wrapper {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .knob {
+      position: relative;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #555 0, #222 50%, #000 100%);
+      border: 1px solid var(--knob-border);
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        inset 0 1px 1px rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(-135deg); /* starting position */
+      transition: box-shadow 0.1s ease-out, transform 0.1s ease-out;
+    }
+
+    .knob::before {
+      content: "";
+      position: absolute;
+      width: 2px;
+      height: 11px;
+      background: var(--knob-indicator);
+      border-radius: 999px;
+      top: 4px;
+    }
+
+    .knob-value {
+      display: none; /* purely JS; you can reveal for debugging */
+    }
+
+    .knob:hover {
+      box-shadow:
+        0 0 0 1px var(--accent),
+        0 3px 6px rgba(0, 0, 0, 0.8),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    }
+
+
+    /* Switches */
+
+    .switch {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px;
+      background: #111;
+      border: 1px solid #444;
+      cursor: pointer;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+    }
+
+    .switch-option {
+      padding: 2px 5px;
+      border-radius: 999px;
+      color: var(--text-muted);
+      min-width: 18px;
+      text-align: center;
+    }
+
+    .switch-option.active {
+      background: var(--switch-on);
+      color: #201a08;
+      font-weight: 600;
+    }
+
+    /* Keyboard strip */
+
+    .keyboard-strip {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #222;
+    }
+
+    .keyboard-label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .keyboard {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      gap: 2px;
+      padding: 6px 10px;
+      background: #111;
+      border-radius: 6px;
+      border: 1px solid #333;
+      width: 100%;
+    }
+
+    .key-white {
+      width: var(--key-white-width);
+      height: 72px;
+      background: linear-gradient(to bottom, #fafafa, #d5d5d5);
+      border-radius: 0 0 3px 3px;
+      border: 1px solid #b5b5b5;
+      box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+    }
+
+    .key-white:active {
+      transform: translateY(1px);
+      background: #e0e0e0;
+    }
+
+    .key-black {
+      position: absolute;
+      width: 14px;
+      height: 34px;
+      background: linear-gradient(to bottom, #444, #050505);
+      border-radius: 0 0 3px 3px;
+      border: 1px solid #111;
+      box-shadow: 0 2px 3px rgba(0, 0, 0, 0.9);
+      transform: translateX(-50%);
+    }
+
+    .key-black:active {
+      transform: translate(-50%, 1px);
+      background: #222;
+    }
+
+    .keyboard-keys {
+      position: relative;
+      display: flex;
+      gap: 2px;
+      justify-content: center;
+    }
+
+    .keyboard-keys .key-white:nth-child(1)  { /* C */ }
+    .keyboard-keys .key-white:nth-child(2)  { /* D */ }
+    .keyboard-keys .key-white:nth-child(3)  { /* E */ }
+    .keyboard-keys .key-white:nth-child(4)  { /* F */ }
+    .keyboard-keys .key-white:nth-child(5)  { /* G */ }
+    .keyboard-keys .key-white:nth-child(6)  { /* A */ }
+    .keyboard-keys .key-white:nth-child(7)  { /* B */ }
+
+    /* positions of black keys over whites */
+    .kb-black-1 { left: calc(var(--key-white-width) * 1 - var(--key-white-width) * 0.3); } /* C# */
+    .kb-black-2 { left: calc(var(--key-white-width) * 2 - var(--key-white-width) * 0.3); } /* D# */
+    .kb-black-3 { left: calc(var(--key-white-width) * 4 - var(--key-white-width) * 0.3); } /* F# */
+    .kb-black-4 { left: calc(var(--key-white-width) * 5 - var(--key-white-width) * 0.3); } /* G# */
+    .kb-black-5 { left: calc(var(--key-white-width) * 6 - var(--key-white-width) * 0.3); } /* A# */
+
+    @media (max-width: 900px) {
+      .synth-main {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .section {
+        border-right: none;
+        border-bottom: 1px solid #262626;
+        padding-right: 0;
+        padding-bottom: 10px;
+      }
+      .section:last-child {
+        border-bottom: none;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .synth-main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="synth-wrapper">
+    <div class="synth-chassis">
+      <div class="synth-panel">
+        <header class="synth-header">
+          <div class="synth-title">AMY</div>
+          <div class="synth-brand">Polyphonic Synthesizer</div>
+        </header>
+
+        <main class="synth-main">
+          <!-- OSCILLATORS -->
+          <section class="section">
+            <div class="section-title">Oscillator A</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_a_freq" data-min="0" data-max="127" data-value="64"></div>
+                </div>
+                <div class="module-label">Freq</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_a_fine" data-min="0" data-max="127" data-value="64"></div>
+                </div>
+                <div class="module-label">Fine</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_a_shape" data-min="0" data-max="127" data-value="32"></div>
+                </div>
+                <div class="module-label">Shape</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_a_pw" data-min="0" data-max="127" data-value="80"></div>
+                </div>
+                <div class="module-label">Pulse Width</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_a_mix" data-min="0" data-max="127" data-value="100"></div>
+                </div>
+                <div class="module-label">Level</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="osc_a_wave">
+                  <span class="switch-option active" data-value="saw">Saw</span>
+                  <span class="switch-option" data-value="pulse">Pulse</span>
+                </div>
+                <div class="module-label">Wave</div>
+              </div>
+            </div>
+
+            <div class="section-title" style="margin-top:6px;">Oscillator B</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_b_freq" data-min="0" data-max="127" data-value="64"></div>
+                </div>
+                <div class="module-label">Freq</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_b_detune" data-min="0" data-max="127" data-value="72"></div>
+                </div>
+                <div class="module-label">Detune</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_b_shape" data-min="0" data-max="127" data-value="32"></div>
+                </div>
+                <div class="module-label">Shape</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_b_pw" data-min="0" data-max="127" data-value="80"></div>
+                </div>
+                <div class="module-label">Pulse Width</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="osc_b_mix" data-min="0" data-max="127" data-value="100"></div>
+                </div>
+                <div class="module-label">Level</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="osc_b_sync">
+                  <span class="switch-option active" data-value="off">Off</span>
+                  <span class="switch-option" data-value="on">Sync</span>
+                </div>
+                <div class="module-label">Sync</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- FILTER -->
+          <section class="section">
+            <div class="section-title">Filter</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_cutoff" data-min="0" data-max="127" data-value="96"></div>
+                </div>
+                <div class="module-label">Cutoff</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_resonance" data-min="0" data-max="127" data-value="32"></div>
+                </div>
+                <div class="module-label">Resonance</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_env_amt" data-min="0" data-max="127" data-value="64"></div>
+                </div>
+                <div class="module-label">Env Amt</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_attack" data-min="0" data-max="127" data-value="10"></div>
+                </div>
+                <div class="module-label">Attack</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_decay" data-min="0" data-max="127" data-value="50"></div>
+                </div>
+                <div class="module-label">Decay</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_sustain" data-min="0" data-max="127" data-value="90"></div>
+                </div>
+                <div class="module-label">Sustain</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="filter_release" data-min="0" data-max="127" data-value="40"></div>
+                </div>
+                <div class="module-label">Release</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="filter_kbd">
+                  <span class="switch-option active" data-value="off">Off</span>
+                  <span class="switch-option" data-value="on">Kbd</span>
+                </div>
+                <div class="module-label">Key Track</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- AMP ENV + MOD -->
+          <section class="section">
+            <div class="section-title">Amp Envelope</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="amp_attack" data-min="0" data-max="127" data-value="5"></div>
+                </div>
+                <div class="module-label">Attack</div>
+              </div>
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="amp_decay" data-min="0" data-max="127" data-value="40"></div>
+                </div>
+                <div class="module-label">Decay</div>
+              </div>
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="amp_sustain" data-min="0" data-max="127" data-value="90"></div>
+                </div>
+                <div class="module-label">Sustain</div>
+              </div>
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="amp_release" data-min="0" data-max="127" data-value="50"></div>
+                </div>
+                <div class="module-label">Release</div>
+              </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 6px;">LFO</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="lfo_rate" data-min="0" data-max="127" data-value="55"></div>
+                </div>
+                <div class="module-label">Rate</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="lfo_amt" data-min="0" data-max="127" data-value="40"></div>
+                </div>
+                <div class="module-label">Amount</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="lfo_shape">
+                  <span class="switch-option active" data-value="tri">Tri</span>
+                  <span class="switch-option" data-value="sq">Sq</span>
+                </div>
+                <div class="module-label">Wave</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- MASTER / GLOBAL -->
+          <section class="section">
+            <div class="section-title">Master</div>
+            <div class="section-subgrid">
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="master_volume" data-min="0" data-max="127" data-value="110"></div>
+                </div>
+                <div class="module-label">Volume</div>
+              </div>
+
+              <div class="module">
+                <div class="knob-wrapper">
+                  <div class="knob" data-param="master_glide" data-min="0" data-max="127" data-value="20"></div>
+                </div>
+                <div class="module-label">Glide</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="unison">
+                  <span class="switch-option active" data-value="off">Poly</span>
+                  <span class="switch-option" data-value="on">Unison</span>
+                </div>
+                <div class="module-label">Mode</div>
+              </div>
+
+              <div class="module">
+                <div class="switch" data-param="preset">
+                  <span class="switch-option active" data-value="prog">Prog</span>
+                  <span class="switch-option" data-value="man">Manual</span>
+                </div>
+                <div class="module-label">Preset</div>
+              </div>
+
+              <div class="module">
+                <button
+                  type="button"
+                  style="
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.12em;
+                    padding: 4px 10px;
+                    border-radius: 999px;
+                    border: 1px solid var(--accent);
+                    background: #111;
+                    color: var(--accent);
+                    cursor: pointer;
+                  "
+                  data-param="panic"
+                >
+                  Panic
+                </button>
+                <div class="module-label">All Notes Off</div>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <!-- Simple keyboard strip -->
+        <div class="keyboard-strip">
+          <div class="keyboard-label">Keyboard</div>
+          <div class="keyboard">
+            <div class="keyboard-keys">
+              <div class="key-white" data-note="C4"></div>
+              <div class="key-white" data-note="D4"></div>
+              <div class="key-white" data-note="E4"></div>
+              <div class="key-white" data-note="F4"></div>
+              <div class="key-white" data-note="G4"></div>
+              <div class="key-white" data-note="A4"></div>
+              <div class="key-white" data-note="B4"></div>
+
+              <button class="key-black kb-black-1" data-note="C#4"></button>
+              <button class="key-black kb-black-2" data-note="D#4"></button>
+              <button class="key-black kb-black-3" data-note="F#4"></button>
+              <button class="key-black kb-black-4" data-note="G#4"></button>
+              <button class="key-black kb-black-5" data-note="A#4"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Knob logic: click+drag vertical to turn the knob
+    function valueToAngle(value, min, max) {
+      const t = (value - min) / (max - min);
+      const minDeg = -135;
+      const maxDeg = 135;
+      return minDeg + t * (maxDeg - minDeg);
+    }
+
+    (function initKnobs() {
+      const SENSITIVITY = 0.4; // smaller = slower knob
+
+      document.querySelectorAll(".knob").forEach((knob) => {
+        const min = Number(knob.dataset.min ?? 0);
+        const max = Number(knob.dataset.max ?? 127);
+        let value = Number(knob.dataset.value ?? (min + max) / 2);
+
+        function render() {
+          if (value < min) value = min;
+          if (value > max) value = max;
+          knob.dataset.value = String(value);
+          const angle = valueToAngle(value, min, max);
+          knob.style.transform = `rotate(${angle}deg)`;
+        }
+
+        render();
+
+        knob.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const startY = e.clientY;
+          const startValue = value;
+
+          function onMouseMove(ev) {
+            const dy = startY - ev.clientY; // drag up = increase
+            const delta = dy * SENSITIVITY;
+            value = startValue + delta;
+            render();
+
+            console.log("param", knob.dataset.param, "=", value);
+            // TODO: hook into your synth engine here
+          }
+
+          function onMouseUp() {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+          }
+
+          window.addEventListener("mousemove", onMouseMove);
+          window.addEventListener("mouseup", onMouseUp);
+        });
+      });
+    })();
+
+    // Toggle switches
+    document.querySelectorAll(".switch").forEach((sw) => {
+      sw.addEventListener("click", (e) => {
+        const opt = e.target.closest(".switch-option");
+        if (!opt) return;
+
+        sw.querySelectorAll(".switch-option").forEach((o) =>
+          o.classList.remove("active")
+        );
+        opt.classList.add("active");
+
+        console.log("param", sw.dataset.param, "=", opt.dataset.value);
+        // TODO: hook into your synth engine here
+      });
+    });
+
+    // Keyboard logging (placeholder)
+    document
+      .querySelectorAll(".key-white, .key-black")
+      .forEach((key) => {
+        key.addEventListener("mousedown", () => {
+          console.log("note-on", key.dataset.note);
+          // TODO: trigger note-on
+        });
+        key.addEventListener("mouseup", () => {
+          console.log("note-off", key.dataset.note);
+          // TODO: trigger note-off
+        });
+        key.addEventListener("mouseleave", (e) => {
+          if (e.buttons & 1) {
+            console.log("note-off", key.dataset.note);
+          }
+        });
+      });
+
+    // Panic button
+    document.querySelectorAll("[data-param='panic']").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        console.log("PANIC: all notes off");
+        // TODO: send all-notes-off to your synth engine
+      });
+    });
+  </script>
+</body>
+</html>
