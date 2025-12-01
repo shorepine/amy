@@ -747,6 +747,7 @@ void hold_and_modify(uint16_t osc) ;
 void amy_execute_delta();
 void amy_execute_deltas();
 int16_t * amy_fill_buffer();
+int16_t * amy_simple_fill_buffer();  // excute_deltas + render + fill_buffer
 uint32_t ms_to_samples(uint32_t ms) ;
 
 

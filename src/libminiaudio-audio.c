@@ -125,7 +125,7 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer
-            int16_t * buf = amy_fill_buffer();
+            int16_t * buf = amy_simple_fill_buffer();
             // Maybe pass to amy_update.
             last_audio_buffer = buf;
             // reset the input pointer for future input data
@@ -213,7 +213,7 @@ amy_err_t miniaudio_init() {
     deviceConfig.pUserData         = _custom;
 
     // Force miniaudio's callback to be the same size as AMY. This helps us not loop too many fill_buffer calls
-    deviceConfig.periodSizeInFrames=AMY_BLOCK_SIZE;
+    deviceConfig.periodSizeInFrames = AMY_BLOCK_SIZE;
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
@@ -226,7 +226,7 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
-
+    
     return AMY_OK;
 }
 
