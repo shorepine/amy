@@ -29,7 +29,7 @@ extern SAMPLE ** fbl;
 
 int16_t * leftover_buf;
 uint16_t leftover_samples = 0;
-pthread_t amy_live_thread;
+//pthread_t amy_live_thread;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -118,8 +118,10 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     short int *peek = (short *)pInput;
     // We lag a AMY block behind input here because our frame size is never a multiple of AMY block size
     for(uint16_t frame=0;frame<frame_count;frame++) {
-        for(uint8_t c=0;c<AMY_NCHANS;c++) {
-            amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
+        if (peek != NULL) {
+            for(uint8_t c=0;c<AMY_NCHANS;c++) {
+                amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
+            }
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer

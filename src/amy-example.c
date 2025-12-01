@@ -60,6 +60,7 @@ int main(int argc, char ** argv) {
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
+    amy_config.i2s_din = 0; // fake, to indicate has_audio_in
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
     

@@ -51,7 +51,7 @@ SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c src/parse.c 
 	src/libminiaudio-audio.c src/instrument.c src/amy_midi.c src/api.c src/midi_mappings.c
 
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES)) 
- 
+
 HEADERS = $(wildcard src/*.h)
 HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 
