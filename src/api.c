@@ -29,7 +29,6 @@ amy_config_t amy_default_config() {
     c.features.chorus = 1;
     c.features.partials = 1;
     c.features.custom = 1;
-    c.features.audio_in = 1;
     c.features.default_synths = 1;
     c.features.startup_bleep = 0;
 
@@ -72,8 +71,8 @@ amy_config_t amy_default_config() {
     c.playback_device_id = -1;
 
     c.i2s_lrc = -1;
-    c.i2s_dout = -1;
-    c.i2s_din = -1;
+    c.i2s_dout = -1;   // -1 implies no I2S
+    c.i2s_din = -1;    // -1 implies no AUDIO_IN
     c.i2s_bclk = -1;
     c.i2s_mclk = -1;
     c.i2s_mclk_mult = 256;  // MCLK = mclk_mult * Fs.
@@ -313,9 +312,10 @@ void amy_bleep_synth(uint32_t start) {
     amy_add_event(&e);
 }
 
+extern void *miniaudio_run(void *vargp);
+
 void amy_start(amy_config_t c) {
     global_init(c);
-    run_midi();
     amy_profiles_init();
     sequencer_start();
     oscs_init();
@@ -327,16 +327,20 @@ void amy_start(amy_config_t c) {
             amy_bleep(0);  // bleep using raw oscs.
     }
     amy_hardware_init();
+    run_midi();  // Must be after hardware_init in case F_CPU is modified on RP2040 Arduino.
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+    // This is a WASM/libminiaudio setup, we still need live_start.
+    pthread_t amy_live_thread;
+    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+#endif
     amy_global.running = 1;
-    //amy_live_start();
 }
 
 int16_t *amy_update() {
     // Single function to update buffers.
     amy_update_tasks();
     int16_t *block = amy_render_audio();
-    if (amy_global.config.audio == AMY_AUDIO_IS_I2S
-        && amy_global.config.i2s_dout != -1) {
+    if (AMY_HAS_I2S) {
         amy_i2s_write(
             (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
         );

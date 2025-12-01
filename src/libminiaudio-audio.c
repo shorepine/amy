@@ -49,8 +49,27 @@ void main_loop__em()
 }
 #endif
 
-void amy_update() {
-    // does nothing on miniaudio
+// Semaphore for passing most recent audio buffer to amy_update.
+// It's the pointer that's volatile, not the data it points to.
+int16_t *volatile last_audio_buffer = NULL;
+
+void amy_update_tasks() {
+}
+
+void amy_hardware_init() {
+}
+
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
+    return 0;
+}
+
+int16_t *amy_render_audio() {
+    // For miniaudio, we just return a semaphore buffer.
+    while (last_audio_buffer == NULL)
+        ;
+    int16_t *buf = last_audio_buffer;
+    last_audio_buffer = NULL;
+    return buf;
 }
 
 void amy_print_devices() {
@@ -104,7 +123,9 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer
-            int16_t * buf = amy_simple_fill_buffer();
+            int16_t * buf = amy_fill_buffer();
+            // Maybe pass to amy_update.
+            last_audio_buffer = buf;
             // reset the input pointer for future input data
             in_ptr = 0;
             // copy this output to a ring buffer
@@ -218,23 +239,24 @@ void *miniaudio_run(void *vargp) {
 
 #ifdef __EMSCRIPTEN__
 void amy_live_start_web_audioin() {
-    amy_global.config.features.audio_in = 1;
+    //amy_global.config.features.audio_in = 1;
+    amy_global.config.i2s_din = 0;  // Fake, this is how we indicate we have AUDIO_IN
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
-    amy_global.config.features.audio_in = 0;
+    amy_global.config.i2s_din = -1;  // This is how we indicate no AUDIO_IN
     emscripten_cancel_main_loop();
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 #endif
-void amy_live_start() {
-    // kick off a thread running miniaudio_run
-    amy_global.running = 1;
-    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
-}
+//void amy_live_start() {
+//    // kick off a thread running miniaudio_run
+//    amy_global.running = 1;
+//    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+//}
 
 
 void amy_live_stop() {

@@ -322,8 +322,7 @@ int8_t esp_get_uart(int8_t index) {
     return -1;
 }
 
-void run_midi_task() {
-    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
+void esp_init_midi(void) {
     uart_config_t uart_config = {
         .baud_rate = 31250,
         .data_bits = UART_DATA_8_BITS,
@@ -352,21 +351,31 @@ void run_midi_task() {
     };
 
     uart_intr_config(uart_num, &uart_intr);
+}
 
+void esp_poll_midi(void) {
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     uint8_t data[MAX_MIDI_BYTES_TO_PARSE];
-    size_t length = 0;
+    int length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, 1/portTICK_PERIOD_MS);
+    if(length > 0) {
+        convert_midi_bytes_to_messages(data,length,0);
+    }
+}
+
+void run_midi_task() {
+
     while(1) {
-        length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, 1/portTICK_PERIOD_MS);
-        if(length > 0) {
-            convert_midi_bytes_to_messages(data,length,0);
-        }
+        esp_poll_midi();
     } // end loop forever
 }
 
 void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     if(amy_global.config.midi & AMY_MIDI_IS_UART) {
-        xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+        esp_init_midi();
+        if (amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) {
+            xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+        }  // otherwise esp_poll_midi is called from amy_update_tasks()
     }
 }
 

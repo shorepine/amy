@@ -63,7 +63,6 @@ int main(int argc, char ** argv) {
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
     
-    amy_live_start();
     //example_fm(0);
     //example_voice_chord(0,0);
     example_synth_chord(0, /* patch */ 0);
@@ -85,8 +84,6 @@ int main(int argc, char ** argv) {
     }
 
     //show_debug(99);
-
-    amy_live_stop();
 
     amy_stop();
 

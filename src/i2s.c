@@ -153,6 +153,10 @@ void esp_render_task( void * pvParameters) {
 #endif
 extern output_sample_type * amy_in_block;
 
+// Place where render thread leaves address of samples.
+// Set by esp_fill_audio_buffer_task, cleared when returned by amy_render_audio (if used).
+int16_t *volatile last_audio_buffer = NULL;
+
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
     while(1) {
@@ -184,7 +188,55 @@ void esp_fill_audio_buffer_task() {
 
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
-        if (amy_global.config.i2s_dout != -1) {
+        if (AMY_HAS_I2S) {
+            amy_i2s_write((uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+        }
+        last_audio_buffer = block;
+    }
+}
+
+// init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
+void amy_hardware_init() {
+    // Start i2s
+    if (AMY_HAS_I2S) {
+        esp32_setup_i2s();
+    }
+    if (amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) {
+        // Create the second core rendering task
+        xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
+        // And the fill audio buffer thread, combines, does volume & filters
+        xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
+    }
+}
+
+extern void esp_poll_midi(void);
+
+void amy_update_tasks() {
+    if ((amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) == 0) {
+        amy_execute_deltas();
+        esp_poll_midi();
+    } else{
+        // Rendering is happening on separate thread, nothing to do.
+    }
+}
+
+int16_t *amy_render_audio() {
+    int16_t *buf = NULL;
+    if ((amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) == 0) {
+        amy_render(0, AMY_OSCS, 0);
+        buf = amy_fill_buffer();
+    } else {
+        // Wait for esp_fill_audio_buffer_task thread to give us something.
+        while( (buf = last_audio_buffer) == NULL)
+            ;
+        // Clear the last_audio_buffer semaphore so we will wait for the next render next time.
+        last_audio_buffer = NULL;
+    }
+    return buf;
+}
+
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
+    // does nothing on esp
             size_t written = 0;
 
 #ifdef I2S_32BIT // including AMYBOARD
@@ -201,34 +253,6 @@ void esp_fill_audio_buffer_task() {
                 fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
              }
         }
-    }
-}
-
-// init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
-void amy_hardware_init() {
-    // Start i2s
-    if (amy_global.config.i2s_dout != -1) {
-        esp32_setup_i2s();
-    }
-
-    // Create the second core rendering task
-    xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
-
-    // And the fill audio buffer thread, combines, does volume & filters
-    xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
-}
-
-void amy_update_tasks() {
-    // does nothing on esp
-}
-
-int16_t *amy_render_audio() {
-    // does nothing on esp
-    return NULL;
-}
-
-size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
-    // does nothing on esp
     return 1;
 }
 
@@ -263,36 +287,34 @@ queue_t call_queue;
 queue_t results_queue;
 
 
-int32_t render_other_core(int32_t data) {
-    amy_render(AMY_OSCS/2, AMY_OSCS, 1);
-    return AMY_OK;
-}
-
 extern void on_pico_uart_rx();
 
-
 void amy_update_tasks() {
-    //if (ap->free_list == NULL) {
     amy_execute_deltas();
     if(amy_global.config.midi & AMY_MIDI_IS_UART) on_pico_uart_rx();
 #ifdef TUD_USB_GADGET
     if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) on_pico_uart_rx();
 #endif
-    //}
+}
+
+#define USE_SECOND_CORE
+
+int32_t render_other_core(int32_t data) {
+    amy_render(AMY_OSCS/2, AMY_OSCS, 1);
+    return AMY_OK;
 }
 
 int16_t *amy_render_audio() {
-    //if (ap->free_list != NULL) {
-#define USE_SECOND_CORE
 #ifdef USE_SECOND_CORE
-    int32_t res;
-    queue_entry_t entry = {render_other_core, AMY_OK};
-    queue_add_blocking(&call_queue, &entry);
-    amy_render(0, AMY_OSCS/2, 0);
-    queue_remove_blocking(&results_queue, &res);
-#else
-    amy_render(0, AMY_OSCS, 0);
+    if (amy_global.config.hardware & AMY_HARDWARE_MULTICORE) {
+        int32_t res;
+        queue_entry_t entry = {render_other_core, AMY_OK};
+        queue_add_blocking(&call_queue, &entry);
+        amy_render(0, AMY_OSCS/2, 0);
+        queue_remove_blocking(&results_queue, &res);
+    } else
 #endif
+        amy_render(0, AMY_OSCS, 0);
     int16_t *block = amy_fill_buffer();
     return block;
 }
@@ -350,16 +372,17 @@ void core1_main() {
 }
 
 void amy_hardware_init() {
-    if (amy_global.config.i2s_dout != -1) {
+    if (AMY_HAS_I2S) {
         pico_setup_i2s(&amy_global.config);
     }
-
 #ifdef USE_SECOND_CORE
-    queue_init(&call_queue, sizeof(queue_entry_t), 2);
-    queue_init(&results_queue, sizeof(int32_t), 2);
-    uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
-    multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
-    sleep_ms(500);
+    if (amy_global.config.hardware & AMY_HARDWARE_MULTICORE) {
+        queue_init(&call_queue, sizeof(queue_entry_t), 2);
+        queue_init(&results_queue, sizeof(int32_t), 2);
+        uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+        multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+        sleep_ms(500);
+    }
 #endif
 }
 
@@ -373,7 +396,7 @@ extern size_t teensy_i2s_write(const uint8_t *buffer, size_t nbytes);
 extern int16_t teensy_get_serial_byte();
 
 void amy_hardware_init() {
-    if (amy_global.config.i2s_dout != -1) {
+    if (AMY_HAS_I2S) {
         teensy_setup_i2s();
     }
 }
@@ -406,21 +429,6 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 //...
 
 #endif
-
-
-void amy_live_start() {
-    // Try to avoid doing this more than once.
-    if (!amy_global.running) {
-        amy_hardware_init();
-        amy_global.running = 1;
-    }
-}
-
-
-void amy_live_stop() {
-    amy_global.running = 0;
-    // Not sure we do anything on mcus for stopping amy live
-}
 
 
 #endif

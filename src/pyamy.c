@@ -66,7 +66,8 @@ static PyObject * config_wrapper(PyObject *self, PyObject *args) {
 }
 
 static PyObject * render_wrapper(PyObject *self, PyObject *args) {
-    int16_t * result = amy_simple_fill_buffer();
+    //int16_t * result = amy_simple_fill_buffer();
+    int16_t * result = amy_update();
     // Create a python list of ints (they are signed shorts that come back)
     uint16_t bs = AMY_BLOCK_SIZE;
     if(AMY_NCHANS == 2) {
