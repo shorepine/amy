@@ -705,6 +705,7 @@ extern struct synthinfo** synth;
 extern struct mod_synthinfo** msynth;
 extern struct state amy_global; 
 
+extern output_sample_type * amy_out_block;
 extern output_sample_type * amy_in_block;
 extern output_sample_type * amy_external_in_block;
 
@@ -771,7 +772,8 @@ amy_config_t amy_default_config();
 void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
-void amy_get_input_buffer(output_sample_type * samples);
+int amy_get_output_buffer(output_sample_type * samples);
+int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);
 extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
 extern float (*amy_external_coef_hook)(uint16_t);

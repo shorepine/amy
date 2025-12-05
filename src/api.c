@@ -32,6 +32,9 @@ amy_config_t amy_default_config() {
     c.features.default_synths = 1;
     c.features.startup_bleep = 0;
 
+    // Use all hardware features by default.
+    c.hardware = AMY_HARDWARE_MULTICORE | AMY_HARDWARE_MULTITHREAD;
+
     c.write_samples_fn = NULL;
 
     c.midi = AMY_MIDI_IS_NONE;
@@ -158,9 +161,18 @@ void amy_clear_event(amy_event *e) {
 }
 
 
-// get AUDIO_IN0 and AUDIO_IN1
-void amy_get_input_buffer(output_sample_type * samples) {
+// get last-written output, returns number of bytes written.
+int amy_get_output_buffer(output_sample_type * samples) {
+    if (amy_out_block == NULL) return 0;
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_out_block[i];
+    amy_out_block = NULL;
+    return AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type);
+}
+
+// get AUDIO_IN0 and AUDIO_IN1, returns number of bytes written.
+int amy_get_input_buffer(output_sample_type * samples) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_in_block[i];
+    return AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type);
 }
 
 // set AUDIO_EXT0 and AUDIO_EXT1
@@ -319,6 +331,8 @@ void amy_start(amy_config_t c) {
     amy_profiles_init();
     sequencer_start();
     oscs_init();
+    amy_hardware_init();
+    run_midi();  // Must be after hardware_init in case F_CPU is modified on RP2040 Arduino.
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
     if(AMY_HAS_STARTUP_BLEEP) {
         if(AMY_HAS_DEFAULT_SYNTHS)
@@ -326,8 +340,6 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
-    amy_hardware_init();
-    run_midi();  // Must be after hardware_init in case F_CPU is modified on RP2040 Arduino.
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
     // This is a WASM/libminiaudio setup, we still need live_start.
     pthread_t amy_live_thread;

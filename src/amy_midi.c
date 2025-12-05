@@ -331,6 +331,7 @@ void esp_init_midi(void) {
     };
 
     // Configure UART parameters
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(uart_num, amy_global.config.midi_out, amy_global.config.midi_in, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
 

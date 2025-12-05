@@ -156,6 +156,7 @@ extern output_sample_type * amy_in_block;
 // Place where render thread leaves address of samples.
 // Set by esp_fill_audio_buffer_task, cleared when returned by amy_render_audio (if used).
 int16_t *volatile last_audio_buffer = NULL;
+// (see also amy_get_output_buffer, I should choose only one of these)
 
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
@@ -236,23 +237,21 @@ int16_t *amy_render_audio() {
 }
 
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
-    // does nothing on esp
-            size_t written = 0;
-
+    size_t written = 0;
+    int16_t *block = (int16_t *)buffer;
+    
 #ifdef I2S_32BIT // including AMYBOARD
-            // Convert to 32 bits
-	    for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
-	        block32[i] = ((int32_t)block[i]) << 16;
-            i2s_channel_write(tx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
+    // Convert to 32 bits
+    for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
+        block32[i] = ((int32_t)block[i]) << 16;
+    i2s_channel_write(tx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
 #else  // 16 bit I2S
-            i2s_channel_write(tx_handle, block, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
-
+    i2s_channel_write(tx_handle, block, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE, &written, portMAX_DELAY);
 #endif
 
-             if(written != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
-                fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
-             }
-        }
+    if(written != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
+        fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
+    }
     return 1;
 }
 
