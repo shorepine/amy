@@ -215,12 +215,6 @@ void amy_add_event(amy_event *e) {
 }
 
 
-
-void amy_stop() {
-    oscs_deinit();
-}
-
-
 #ifdef __EMSCRIPTEN__
 void amy_start_web() {
     // a shim for web AMY, as it's annoying to build structs in js
@@ -324,7 +318,8 @@ void amy_bleep_synth(uint32_t start) {
     amy_add_event(&e);
 }
 
-extern void *miniaudio_run(void *vargp);
+extern void miniaudio_start();
+extern void miniaudio_stop();
 
 void amy_start(amy_config_t c) {
     global_init(c);
@@ -341,12 +336,17 @@ void amy_start(amy_config_t c) {
             amy_bleep(0);  // bleep using raw oscs.
     }
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
-    // This is a WASM/libminiaudio setup, we still need live_start.
-    pthread_t amy_live_thread;
-    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+    miniaudio_start();
 #endif
-    amy_global.running = 1;
 }
+
+void amy_stop() {
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+    miniaudio_stop();
+#endif
+    oscs_deinit();
+}
+
 
 int16_t *amy_update() {
     // Single function to update buffers.
@@ -364,3 +364,4 @@ int16_t *amy_update() {
     }
     return block;
 }
+

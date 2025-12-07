@@ -32,10 +32,10 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
-    amy_live_stop();
-    return Py_None;
-}
+//static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
+//    amy_live_stop();
+//    return Py_None;
+//}
 
 static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
@@ -101,8 +101,8 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
     {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
-    {"live", live_wrapper, METH_VARARGS, "Live AMY"},
-    {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
+    //{"live", live_wrapper, METH_VARARGS, "Live AMY"},
+    //{"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
     {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},

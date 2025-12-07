@@ -230,14 +230,32 @@ amy_err_t miniaudio_init() {
     return AMY_OK;
 }
 
+void miniaudio_deinit(void) {
+    ma_device_uninit(&device);
+    free(leftover_buf);
+}
+
+
 void *miniaudio_run(void *vargp) {
-    miniaudio_init();
-    
     while(amy_global.running) {
         sleep(1);
     }
     return NULL;
 }
+
+void miniaudio_start(void) {
+    // This is a WASM/libminiaudio setup, we still need live_start.
+    miniaudio_init();    
+    amy_global.running = 1;
+    pthread_t amy_live_thread;
+    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+}
+
+void miniaudio_stop(void) {
+    amy_global.running = 0;   // Causes miniaudio_run thread to exit.
+    miniaudio_deinit();
+}
+
 
 #ifdef __EMSCRIPTEN__
 void amy_live_start_web_audioin() {
@@ -261,9 +279,9 @@ void amy_live_start_web() {
 //}
 
 
-void amy_live_stop() {
-    amy_global.running = 0;
-    ma_device_uninit(&device);
-    free(leftover_buf);
-}
+//void amy_live_stop() {
+//    amy_global.running = 0;
+//    ma_device_uninit(&device);
+//    free(leftover_buf);
+//}
 #endif

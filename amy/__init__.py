@@ -5,7 +5,7 @@ import collections
 import time
 try:
     import c_amy as _amy  # Import the C module
-    live = _amy.live
+    #live = _amy.live
 except ImportError:
     # C module is not required, so pass
     pass
