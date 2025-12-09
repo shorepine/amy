@@ -208,7 +208,7 @@ void parse_sysex() {
             amy_add_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-    	   amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
+           amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
     }
 }
@@ -239,7 +239,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 current_midi_message[0] = byte;
                 if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
                     byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-		    amy_event_midi_message_received(current_midi_message, 1, 0, time);
+            amy_event_midi_message_received(current_midi_message, 1, 0, time);
                     if(usb) i = len+1; // exit the loop if usb
                 }  else if(byte == 0xF0) { // sysex start 
                     // if that's there we then assume everything is an AMY message until 0xF7
@@ -321,7 +321,19 @@ int8_t esp_get_uart(int8_t index) {
     if(index==2) return UART_NUM_2;
     return -1;
 }
+#ifdef AMYBOARD
+#include "tusb.h"
+#include "class/midi/midi.h"
+#include "class/midi/midi_device.h"
 
+void check_tusb_midi() {
+    while ( tud_midi_available() ) {
+        uint8_t packet[4];
+        tud_midi_packet_read(packet);
+        convert_midi_bytes_to_messages(packet+1, 3, 1);
+    }
+}
+#endif
 void run_midi_task() {
     const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     uart_config_t uart_config = {
@@ -360,6 +372,9 @@ void run_midi_task() {
         if(length > 0) {
             convert_midi_bytes_to_messages(data,length,0);
         }
+        #ifdef AMYBOARD
+        check_tusb_midi();
+        #endif
     } // end loop forever
 }
 
@@ -369,6 +384,9 @@ void run_midi() {
         xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
     }
 }
+
+
+
 
 #endif
 
