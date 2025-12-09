@@ -322,6 +322,7 @@ int8_t esp_get_uart(int8_t index) {
     return -1;
 }
 #ifdef AMYBOARD
+#define TUD_USB_GADGET
 #include "tusb.h"
 #include "class/midi/midi.h"
 #include "class/midi/midi_device.h"
@@ -463,9 +464,13 @@ void run_midi() {
 
 void midi_out(uint8_t * bytes, uint16_t len) {
 #if defined TUD_USB_GADGET
-    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) tud_midi_stream_write(0, bytes, len);
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+        tud_midi_stream_write(0, bytes, len);
+    }
 #elif defined ESP_PLATFORM
-    if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
+    }
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
     if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_blocking(rp_get_uart(amy_global.config.midi_uart), bytes, len);
 #else
