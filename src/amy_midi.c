@@ -463,11 +463,16 @@ void run_midi() {
 #endif
 
 void midi_out(uint8_t * bytes, uint16_t len) {
+
+// Is there USB gadget midi? Send it
 #if defined TUD_USB_GADGET
     if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
         tud_midi_stream_write(0, bytes, len);
     }
-#elif defined ESP_PLATFORM
+#endif
+
+// Also do UART midi on supported platforms
+#if defined ESP_PLATFORM
     if(amy_global.config.midi & AMY_MIDI_IS_UART) {
         uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
     }
