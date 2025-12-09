@@ -207,6 +207,11 @@ void parse_sysex() {
             sysex_buffer[sysex_len] = 0;
             amy_add_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
+        } else if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x46) {
+            sysex_buffer[sysex_len] = 0;
+            if(amy_external_sysex_transfer_hook != NULL) {
+                amy_external_sysex_transfer_hook(sysex_buffer, sysex_len);
+            }
         } else {
            amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
