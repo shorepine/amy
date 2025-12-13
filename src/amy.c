@@ -209,7 +209,9 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
 	    }
 	    if (!success) {
 		fprintf(stderr, "unable to alloc echo of %d ms\n", (int)max_delay_ms);
-		echo_delay_lines[0] = echo_delay_lines[1] = NULL;
+		for (int c = 0; c < AMY_NCHANS; ++c) {
+		    echo_delay_lines[c] = NULL;
+		}
 		return;
 	    }
             amy_global.echo.max_delay_samples = max_delay_samples;
@@ -218,7 +220,9 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
         // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.
         if (delay_samples > amy_global.echo.max_delay_samples - 1) delay_samples = amy_global.echo.max_delay_samples - 1;
         for (int c = 0; c < AMY_NCHANS; ++c) {
-            echo_delay_lines[c]->fixed_delay = delay_samples;
+			if (echo_delay_lines[c] != NULL) {
+                echo_delay_lines[c]->fixed_delay = delay_samples;
+			}
         }
     }
     amy_global.echo.level = F2S(level);
