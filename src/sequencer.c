@@ -202,21 +202,26 @@ void _sequencer_start() {
 #elif defined _POSIX_THREADS
 #include <pthread.h>
 
+static volatile bool sequencer_thread_should_exit = false;
+
 // posix: threads
 void * sequencer_thread(void *vargs) {
     // Loop forever, checking for time and sleeping
-    while(1) {
+    while(!sequencer_thread_should_exit) {
         sequencer_check_and_fill();            
         // 500000ns = 500us = 0.5ms
         nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
     }
+    return NULL;
 }
 pthread_t sequencer_thread_id;
 void _sequencer_start() {
+    sequencer_thread_should_exit = false;
     pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
 }
 void _sequencer_stop() {
-    pthread_cancel(sequencer_thread_id);
+    //pthread_cancel(sequencer_thread_id);
+    sequencer_thread_should_exit = true;
 }
 
 #elif defined AMY_DAISY

@@ -90,6 +90,9 @@ int main(int argc, char ** argv) {
 
     amy_stop();
 
+    // Make sure libminiaudio has time to clean up.
+    sleep(2);
+
     return 0;
 }
 

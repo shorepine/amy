@@ -95,6 +95,9 @@ timing: amy-module
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
+valgrind: amy-example
+	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
+
 docs/amy.js: $(TARGET)
 	 emcc $(SOURCES) src/amy_bindings.cpp $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 

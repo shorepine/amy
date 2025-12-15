@@ -151,8 +151,8 @@ struct synthinfo ** synth;
 struct mod_synthinfo ** msynth;
 
 // Two mixing blocks, one per core of rendering
-SAMPLE ** fbl;
-SAMPLE ** per_osc_fb; 
+SAMPLE *fbl[AMY_MAX_CORES];
+SAMPLE *per_osc_fb[AMY_MAX_CORES];
 SAMPLE core_max[AMY_MAX_CORES];
 
 // Audio input blocks. Filled by the audio implementation before rendering.
@@ -845,9 +845,6 @@ int8_t oscs_init() {
     deltas_pool_init();
     amy_deltas_reset();
 
-    fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
-    per_osc_fb = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
-
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
         fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_fbl);
@@ -936,8 +933,7 @@ void oscs_deinit() {
         free(fbl[core]);
         free(per_osc_fb[core]);
     }
-    free(fbl);
-    free(deltas);
+    deltas_pool_free();
     // Include chorus osc (osc=AMY_OSCS)
     for (int i = 0; i < AMY_OSCS + 1; ++i) free_osc(i);
     free(amy_external_in_block);
