@@ -6,14 +6,6 @@
 // Optional sequencer hook that's called every tick
 extern void (*amy_external_sequencer_hook)(uint32_t);
 
-#ifdef ESP_PLATFORM
-#include "esp_timer.h"
-esp_timer_handle_t periodic_timer;
-#else
-#include <pthread.h>
-#endif
-
-
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -31,6 +23,10 @@ struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
 int32_t max_sequences = 0;
 int32_t highest_tag = -1;
 
+// Declared per-platform below.
+void _sequencer_start();
+void _sequencer_stop();
+
 void sequencer_init(int max_sequencer_tags) {
     max_sequences = max_sequencer_tags;
     sequences = (struct sequence_info_t *)malloc_caps(max_sequences * sizeof(struct sequence_info_t),
@@ -40,11 +36,10 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].tick = 0;
         sequences[i].period = 0;
     }
-}
-
-void sequencer_free() {
-    if (sequences != NULL) free(sequences);
-    max_sequences = 0;
+    // We are read to go.
+    //sequencer_start();
+    sequencer_recompute();
+    _sequencer_start();
 }
 
 void sequencer_reset() {
@@ -58,6 +53,13 @@ void sequencer_reset() {
         }
     }
     highest_tag = -1;
+}
+
+void sequencer_deinit() {
+    _sequencer_stop();
+    sequencer_reset();
+    if (sequences != NULL) free(sequences);
+    max_sequences = 0;
 }
 
 void sequencer_debug() {
@@ -156,11 +158,14 @@ void sequencer_check_and_fill() {
 
 #ifdef ESP_PLATFORM
 // ESP: do it with hardware timer
+#include "esp_timer.h"
+esp_timer_handle_t periodic_timer = NULL;
+
 static void sequencer_timer_callback(void* arg) {
     sequencer_check_and_fill();
 }
 
-void run_sequencer() {
+void _sequencer_start() {
     const esp_timer_create_args_t periodic_timer_args = {
             .callback = &sequencer_timer_callback,
             //.dispatch_method = ESP_TIMER_ISR,
@@ -169,6 +174,14 @@ void run_sequencer() {
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
     // 500us = 0.5ms
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
+}
+
+void _sequencer_stop() {
+    if (periodic_timer) {
+        ESP_ERRIR_CHECK(esp_timer_stop(periodic_timer));
+        ESP_ERROR_CHECK(esp_timer_delete(periodic_timer));
+        periodic_timer = NULL;
+    }
 }
 
 #elif defined(PICO_RP2350) || defined(PICO_RP2040)
@@ -182,39 +195,51 @@ static bool sequencer_timer_callback(repeating_timer_t *rt) {
     return true;
 }
 
-void run_sequencer() {
+void _sequencer_start() {
     add_repeating_timer_us(-500, sequencer_timer_callback, NULL, &pico_sequencer_timer);
 }
 
 #elif defined _POSIX_THREADS
+#include <pthread.h>
+
+static volatile bool sequencer_thread_should_exit = false;
+
 // posix: threads
 void * sequencer_thread(void *vargs) {
     // Loop forever, checking for time and sleeping
-    while(1) {
+    while(!sequencer_thread_should_exit) {
         sequencer_check_and_fill();            
         // 500000ns = 500us = 0.5ms
         nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
     }
+    return NULL;
 }
-void run_sequencer() {
-    pthread_t sequencer_thread_id;
+pthread_t sequencer_thread_id;
+void _sequencer_start() {
+    sequencer_thread_should_exit = false;
     pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
+}
+void _sequencer_stop() {
+    //pthread_cancel(sequencer_thread_id);
+    sequencer_thread_should_exit = true;
 }
 
 #elif defined AMY_DAISY
-void run_sequencer() {
+void _sequencer_start() {
     // Set up in DaisyMain.cc
+}
+void _sequencer_stop() {
+    // Not supported on Daisy.
 }
 
 #else
 
-void run_sequencer() {
+void _sequencer_start() {
+    fprintf(stderr, "No sequencer support for this chip / platform\n");
+}
+void _sequencer_stop() {
     fprintf(stderr, "No sequencer support for this chip / platform\n");
 }
 
 #endif
 
-void sequencer_start() {
-    sequencer_recompute();
-    run_sequencer();
-}
