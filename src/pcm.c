@@ -49,6 +49,9 @@ memorypcm_preset_t * memorypreset_for_preset_number(uint16_t preset_number) {
 void pcm_init() {
     memorypcm_ll_start = NULL;
 }
+void pcm_deinit() {
+    pcm_unload_all_presets();
+}
 
 // How many bits used for fractional part of PCM table index.
 #define PCM_INDEX_FRAC_BITS 8

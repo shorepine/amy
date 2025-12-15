@@ -3,7 +3,7 @@
 #include "amy.h"
 #include <assert.h>
 
-struct custom_oscillator* custom_osc;
+struct custom_oscillator* custom_osc = NULL;
 
 void amy_set_custom(struct custom_oscillator* custom) {
     assert(custom_osc == NULL);
@@ -13,6 +13,12 @@ void amy_set_custom(struct custom_oscillator* custom) {
 void custom_init() {
     if (custom_osc != NULL) {
         custom_osc->init();
+    }
+}
+
+void custom_deinit() {
+    if (custom_osc != NULL) {
+        custom_osc->deinit();
     }
 }
 
