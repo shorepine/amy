@@ -12,10 +12,16 @@
 #include <stdint.h>
 #include "amy.h"
 
+
+#define MAX_OPEN_FILES 64
+#define HANDLE_INVALID 0
+
 typedef struct b64_buffer {
     char * ptr;
     int bufc;
 } b64_buffer_t;
+
+void transfer_init();
 
  // How much memory to allocate per buffer
 #define B64_BUFFER_SIZE     (256)

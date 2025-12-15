@@ -10,6 +10,8 @@
 
 // This is for any in-memory PCM samples.
 typedef struct {
+    uint8_t channels;
+    char filename[MAX_FILENAME_LEN]; // if 0 / NULL this uses sample_ram
     int16_t * sample_ram;
     uint32_t length;
     uint32_t loopstart;

@@ -37,6 +37,8 @@ extern const uint16_t pcm_samples;
 #define AMY_MCU
 #endif
 
+#define MAX_FILENAME_LEN 127
+
 
 // Set block size and SR. We try for 256/44100, but some platforms don't let us:
 #ifdef AMY_DAISY
@@ -205,8 +207,11 @@ enum coefs{
 #define AUDIO_EXT0 14
 #define AUDIO_EXT1 15
 #define AMY_MIDI 16
-#define CUSTOM 17
-#define WAVE_OFF 18
+#define PCM_LEFT 17
+#define PCM_RIGHT 18
+#define PCM_MIX 7 // same as PCM
+#define CUSTOM 19
+#define WAVE_OFF 20
 
 // synth[].status values
 #define SYNTH_OFF 0

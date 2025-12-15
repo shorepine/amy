@@ -7,6 +7,97 @@
 #include <stdio.h>
 #include <stdint.h>
 
+// per platform file reading / writing
+// posix (linux, mac)
+// micropython / littlefs - tulip & amybard
+// (later) arduino / SPIFFS / SD
+// if yours isnt' here, you just write your own amy_external_fopen_hook etc
+
+
+// mac / linux / generic posix 
+
+#if defined(_POSIX_VERSION) 
+
+// Map from FILE * to a uint32_t handle to pass to AMY
+
+static FILE *g_files[MAX_OPEN_FILES]; // index 1..MAX_OPEN_FILES-1 used
+
+static uint32_t alloc_handle(FILE *f) {
+  for (uint32_t i = 1; i < MAX_OPEN_FILES; i++) {
+    if (g_files[i] == NULL) {
+      g_files[i] = f;
+      return i;
+    }
+  }
+  return HANDLE_INVALID; // table full
+}
+
+static FILE *lookup_handle(uint32_t h) {
+  if (h == 0 || h >= MAX_OPEN_FILES) return NULL;
+  return g_files[h];
+}
+
+static void free_handle(uint32_t h) {
+  if (h == 0 || h >= MAX_OPEN_FILES) return;
+  g_files[h] = NULL;
+}
+
+
+// These should map to 
+// uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
+// uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+// uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+// void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
+
+uint32_t external_fopen_hook(char * filename, char *mode) {
+  FILE *f = fopen(filename, mode);
+  if (!f) {
+    return HANDLE_INVALID;
+  }
+  uint32_t h = alloc_handle(f);
+  if (h == HANDLE_INVALID) {
+    fclose(f);
+    return HANDLE_INVALID;
+  }
+  return h;
+}
+
+uint32_t external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
+  FILE *f = lookup_handle(h);
+  if (!f) {
+    return 0;
+  }
+  uint32_t r = fread(buf, 1, n, f);
+  return r;
+}
+
+uint32_t external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
+  FILE *f = lookup_handle(h);
+  if (!f) {
+    return 0;
+  }
+  uint32_t w = fwrite(buf, 1, n, f);
+  return w;
+}
+
+void external_fclose_hook(uint32_t h) {
+  FILE *f = lookup_handle(h);
+  if (!f) {
+    return -1;
+  }
+  fclose(f);
+  free_handle(h);
+}
+
+#elif (defined TULIP) or (defined AMYBOARD) 
+
+// Use the stuff from `tulip_helpers.c` here
+
+
+
+#endif
+
+
 
 // We keep one decbuf around and reuse it during transfer
 b64_buffer_t decbuf;
@@ -202,4 +293,14 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
   }
 
   return (unsigned char*) decbuf->ptr;
+}
+
+
+void transfer_init() {
+#if defined(_POSIX_VERSION) || defined(TULIP) || defined(AMYBOARD)
+  amy_external_fopen_hook = external_fopen_hook;
+  amy_external_fread_hook = external_fread_hook;
+  amy_external_fwrite_hook = external_fwrite_hook;
+  amy_external_fclose_hook = external_fclose_hook;
+  #endif
 }
