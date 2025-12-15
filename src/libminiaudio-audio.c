@@ -240,6 +240,7 @@ void amy_live_start() {
 void amy_live_stop() {
     amy_global.running = 0;
     ma_device_uninit(&device);
+    ma_context_uninit(&context);
     free(leftover_buf);
 }
 #endif
