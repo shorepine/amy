@@ -56,42 +56,44 @@ int main(int argc, char ** argv) {
     }
     amy_external_render_hook = render;
 
-    amy_config_t amy_config = amy_default_config();
-    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
-    amy_config.playback_device_id = playback_device_id;
-    amy_config.capture_device_id = capture_device_id;
-    amy_config.features.default_synths = 0;
-    amy_start(amy_config);
-    
-    amy_live_start();
-    //example_fm(0);
-    //example_voice_chord(0,0);
-    example_synth_chord(0, /* patch */ 0);
-    //example_sustain_pedal(0, /* patch */ 256);
-    //example_sequencer_drums(0);
-    //example_patch_from_events();
+    for(int tries = 0; tries < 2; ++tries) {
+	amy_config_t amy_config = amy_default_config();
+	amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+	amy_config.playback_device_id = playback_device_id;
+	amy_config.capture_device_id = capture_device_id;
+	amy_config.features.default_synths = 0;
+	amy_start(amy_config);
 
-    // Check that trying to program a non-user patch doesn't crash
-    amy_event e = amy_default_event();
-    e.patch_number = 25;
-    e.osc = 0;
-    e.wave = SINE;
-    amy_add_event(&e);
+	amy_live_start();
+	//example_fm(0);
+	//example_voice_chord(0,0);
+	example_synth_chord(0, /* patch */ 0);
+	//example_sustain_pedal(0, /* patch */ 256);
+	//example_sequencer_drums(0);
+	//example_patch_from_events();
 
-    // Now just spin for 15s
-    uint32_t start = amy_sysclock();
-    while(amy_sysclock() - start < 5000) {
-        usleep(THREAD_USLEEP);
+	// Check that trying to program a non-user patch doesn't crash
+	amy_event e = amy_default_event();
+	e.patch_number = 25;
+	e.osc = 0;
+	e.wave = SINE;
+	amy_add_event(&e);
+
+	// Now just spin for 15s
+	uint32_t start = amy_sysclock();
+	while(amy_sysclock() - start < 5000) {
+	    usleep(THREAD_USLEEP);
+	}
+
+	//show_debug(99);
+
+	amy_live_stop();
+
+	amy_stop();
+
+	// Make sure libminiaudio has time to clean up.
+	sleep(2);
     }
-
-    //show_debug(99);
-
-    amy_live_stop();
-
-    amy_stop();
-
-    // Make sure libminiaudio has time to clean up.
-    sleep(2);
 
     return 0;
 }
