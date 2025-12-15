@@ -930,21 +930,21 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
-    free(block);
-    free(fbl[0]);
-    free(per_osc_fb[0]);
-    #ifdef AMY_DUALCORE 
-        free(fbl[1]);
-        free(per_osc_fb[1]);
-    #endif
-    free(fbl);
-    // Include chorus osc (osc=AMY_OSCS)
-    for (int i = 0; i < AMY_OSCS + 1; ++i) free_osc(i);
-    free(synth);
-    free(msynth);
-    free(deltas);
     dealloc_chorus_delay_lines();
     dealloc_echo_delay_lines();
+    for(int core = 0; core < AMY_CORES; ++core) {
+        free(fbl[core]);
+        free(per_osc_fb[core]);
+    }
+    free(fbl);
+    free(deltas);
+    // Include chorus osc (osc=AMY_OSCS)
+    for (int i = 0; i < AMY_OSCS + 1; ++i) free_osc(i);
+    free(amy_external_in_block);
+    free(amy_in_block);
+    free(block);
+    free(msynth);
+    free(synth);
     if(AMY_HAS_CUSTOM)  custom_deinit();
     if(pcm_samples)  pcm_deinit();
     sequencer_deinit();
