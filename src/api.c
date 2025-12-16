@@ -25,7 +25,7 @@ void (*amy_external_sequencer_hook)(uint32_t) = NULL;
 // Hooks for file reading / writing / opening if your AMY host supports that
 uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
 uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
-uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t ** bytes, uint32_t len) = NULL;
+uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
 

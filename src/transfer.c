@@ -47,6 +47,7 @@ static void free_handle(uint32_t h) {
 // uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
 // uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 // uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+
 // void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
 uint32_t external_fopen_hook(char * filename, char *mode) {
@@ -67,7 +68,7 @@ uint32_t external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
   if (!f) {
     return 0;
   }
-  uint32_t r = fread(buf, 1, n, f);
+  uint32_t r = fread(buf, 1, len, f);
   return r;
 }
 
@@ -82,11 +83,10 @@ uint32_t external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
 
 void external_fclose_hook(uint32_t h) {
   FILE *f = lookup_handle(h);
-  if (!f) {
-    return -1;
+  if (f) {
+    fclose(f);
+    free_handle(h);
   }
-  fclose(f);
-  free_handle(h);
 }
 
 #elif (defined TULIP) or (defined AMYBOARD) 

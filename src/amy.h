@@ -768,6 +768,11 @@ extern float (*amy_external_coef_hook)(uint16_t);
 extern void (*amy_external_block_done_hook)(void);
 extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 extern void (*amy_external_sequencer_hook)(uint32_t);
+// Hooks for file reading / writing / opening if your AMY host supports that
+extern uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) ;
+extern uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len);
+extern uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+extern void (*amy_external_fclose_hook)(uint32_t fptr);
 
 
 #ifdef __EMSCRIPTEN__
