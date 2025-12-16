@@ -243,7 +243,7 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the usual z message (pcm_Load)
         uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
-        parse_list_uint32_t(arg, sm, 6, 0);
+        parse_list_uint32_t(message, sm, 6, 0);
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
