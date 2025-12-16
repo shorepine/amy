@@ -238,6 +238,41 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 
+// Parser for transfer-layer ('z') prefix.
+void amy_parse_transfer_layer_message(char *message, amy_event *e) {
+    if (message[0] >= '0' && message[0] <= '9') {
+        // It's just the usual z message (pcm_Load)
+        uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
+        parse_list_uint32_t(arg, sm, 6, 0);
+        if(sm[1]==0) { // remove preset
+            pcm_unload_preset(sm[0]);
+        } else {
+            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
+            start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+        }
+        return;
+    }
+    char cmd = message[0];
+    message++;
+    if (cmd == 'T')  {
+        // transfer
+    }
+    else if (cmd == 'F') {
+        // pcm sample is on disk
+
+    }
+    else if (cmd == 'S') {
+        // sample from bus
+
+    }
+    else if (cmd == 'O') {
+        // stop sampling
+
+    }
+    else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
+}
+
+
 int _next_alpha(char *s) {
     // Return how many chars to skip to get to the next alphabet (command prefix) (or EOS).
     int p = 0;
@@ -377,15 +412,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                 }
                 break;
             case 'z': {
-                uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
-                parse_list_uint32_t(arg, sm, 6, 0);
-                if(sm[1]==0) { // remove preset
-                    pcm_unload_preset(sm[0]);
-                } else {
-                    int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
-                    start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
-                }
-                break;
+                amy_parse_transfer_layer_message(arg, e); ++pos; break;  // Skip over second cmd letter, if any.
             }
             /* Y,y available */
             /* Z used for end of message */
