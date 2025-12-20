@@ -160,7 +160,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         if (AMY_IS_SET(synth[osc]->midi_note)) {
             logfreq -= logfreq_for_midi_note(preset->midinote);
         }
-        float playback_freq = freq_of_logfreq(PCM_AMY_LOG2_SAMPLE_RATE + logfreq);
+        float playback_freq = freq_of_logfreq(preset->log2sr + logfreq);
         if (preset->file_handle != 0) { // file
             is_file_flag = 1;
             float frames_per_output = playback_freq / (float)AMY_SAMPLE_RATE;
@@ -305,7 +305,7 @@ int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote
     memory_preset->sample_ram = malloc_caps(buffer_frames * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
     new_preset_pointer->preset = memory_preset;
-    fprintf(stderr, "read file %s frames %d channels %d preset %d handle %d\n", filename, total_frames, info.channels, preset_number, handle);
+    //fprintf(stderr, "read file %s frames %d channels %d preset %d handle %d\n", filename, total_frames, info.channels, preset_number, handle);
     return 1;
 }
 
@@ -353,13 +353,12 @@ void pcm_unload_preset(uint16_t preset_number) {
     memorypcm_ll_t **preset_pointer = &memorypcm_ll_start;
     while(*preset_pointer != NULL) {
         if((*preset_pointer)->preset_number == preset_number) {
-	    memorypcm_ll_t *next = (*preset_pointer)->next;
-	    //fprintf(stderr, "unload_preset: unloading %d\n", (*preset_pointer)->preset_number);
+            memorypcm_ll_t *next = (*preset_pointer)->next;
             // free the memory we allocated
             free((*preset_pointer));
-	    // close up the list
-	    *preset_pointer = next;
-	    return;
+            // close up the list
+            *preset_pointer = next;
+            return;
         } else {
             preset_pointer = &(*preset_pointer)->next;
         }

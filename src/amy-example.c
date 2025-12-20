@@ -70,7 +70,7 @@ int main(int argc, char ** argv) {
     e.wave = PCM_MIX;
     e.preset = 1024;
     e.velocity=1;
-    e.midi_note = 72;
+    e.midi_note = 60;
     e.osc = 14;
     amy_add_event(&e);
 
