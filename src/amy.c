@@ -1485,11 +1485,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
             if(synth[osc]->filter_type != FILTER_NONE) {
-		//fprintf(stderr, "time %.3f osc %d filter_type %d\n",
-		//	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
-		//	osc, synth[osc]->filter_type);
+                //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
+                //	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+                //	osc, synth[osc]->filter_type);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
-	    }
+	        }
             uint8_t handled = 0;
             if(amy_external_render_hook!=NULL) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
@@ -1501,7 +1501,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             // only mix the audio in if the external hook did not handle it
             if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc]->last_pan, msynth[osc]->pan);
             if (max_val > max_max) max_max = max_val;
-        }
+        } // end if audible
     }
     core_max[core] = max_max;
 

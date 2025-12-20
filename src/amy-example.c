@@ -64,18 +64,16 @@ int main(int argc, char ** argv) {
     amy_start(amy_config);
     
     amy_live_start();
-    amy_add_message("zF1024,G1.wav");
+    amy_add_message("zF1024,sleepwalk_mono.wav,60");
 
     amy_event e = amy_default_event();
     e.wave = PCM_MIX;
     e.preset = 1024;
     e.velocity=1;
-    e.midi_note = 60;
+    e.midi_note = 72;
     e.osc = 14;
     amy_add_event(&e);
 
-
-    amy_add_event(&e);
     //example_fm(0);
     //example_voice_chord(0,0);
     //example_synth_chord(0, /* patch */ 0);
@@ -86,7 +84,7 @@ int main(int argc, char ** argv) {
 
     // Now just spin for 15s
     uint32_t start = amy_sysclock();
-    while(amy_sysclock() - start < 5000) {
+    while(amy_sysclock() - start < 30000) {
         usleep(THREAD_USLEEP);
     }
 

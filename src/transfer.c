@@ -399,10 +399,9 @@ int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes) 
     }
     return 0;
 }
-
 uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, uint16_t bits_per_sample,
-                                                                    uint32_t *bytes_remaining, int16_t *dest, uint32_t max_frames) {
-    if (dest == NULL || bytes_remaining == NULL || channels == 0 || channels > 2 || bits_per_sample != 16) {
+        uint32_t *bytes_remaining, int16_t *dest, uint32_t max_frames) {
+    if (dest == NULL || bytes_remaining == 0 || channels == 0 || channels > 2 || bits_per_sample != 16) {
         return 0;
     }
     uint32_t bytes_per_frame = channels * 2;
