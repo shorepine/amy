@@ -1047,7 +1047,10 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(NOTE_SOURCE, note_source)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-    if (d->param == PRESET) synth[d->osc]->preset = (uint16_t)d->data.i;
+    if (d->param == PRESET) {
+        synth[d->osc]->preset = (uint16_t)d->data.i;
+        fprintf(stderr, "setting preset osc %d to %d\n", d->osc, synth[d->osc]->preset);
+    }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) synth[d->osc]->trigger_phase = F2P(d->data.f);
 

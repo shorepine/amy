@@ -23,6 +23,16 @@ typedef struct b64_buffer {
 
 void transfer_init();
 
+typedef struct {
+    uint16_t channels;
+    uint16_t bits_per_sample;
+    uint32_t sample_rate;
+} wave_info_t;
+
+int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes);
+uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, uint16_t bits_per_sample,
+                                  uint32_t *bytes_remaining, int16_t *dest, uint32_t max_frames);
+
  // How much memory to allocate per buffer
 #define B64_BUFFER_SIZE     (256)
 

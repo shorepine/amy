@@ -1,6 +1,7 @@
 // pcm.c
 
 #include "amy.h"
+#include "transfer.h"
 
 #ifdef AMY_DAISY
 #define malloc_caps(a, b) qspi_malloc(a)
@@ -12,6 +13,10 @@
 typedef struct {
     uint8_t channels;
     char filename[MAX_FILENAME_LEN]; // if 0 / NULL this uses sample_ram
+    uint32_t file_handle;
+    uint8_t file_parsed;
+    uint16_t file_bits_per_sample;
+    uint32_t file_bytes_remaining;
     int16_t * sample_ram;
     uint32_t length;
     uint32_t loopstart;
@@ -35,11 +40,11 @@ memorypcm_ll_t * memorypcm_ll_start;
 
 
 memorypcm_preset_t * memorypreset_for_preset_number(uint16_t preset_number) {
-    // run through the LL looking for the preset
+    // run through the LL looking for the preset -- can be either memory or sample
     memorypcm_ll_t *preset = memorypcm_ll_start;
     while(preset != NULL) {
         if(preset->preset_number == preset_number) {
-            if(preset->preset->sample_ram != NULL) {
+            if(preset->preset->sample_ram != NULL || preset->preset->file_handle > 0) {
                 return preset->preset;
             }
         }
@@ -59,6 +64,7 @@ void pcm_init() {
 
 
 void pcm_note_on(uint16_t osc) {
+    fprintf(stderr, "note on osc %d preset %d\n", osc, synth[osc]->preset);
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t *preset = memorypreset_for_preset_number(synth[osc]->preset);
         if(preset == NULL) {
@@ -68,6 +74,7 @@ void pcm_note_on(uint16_t osc) {
         synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
         msynth[osc]->feedback = synth[osc]->feedback;
+
     }
 }
 
@@ -121,9 +128,34 @@ memorypcm_preset_t get_preset_for_preset_number(uint16_t preset_number) {
     return preset;
 }
 
+uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p) {
+    if (preset_p->sample_ram == NULL) {
+        return 0;
+    }
+    uint32_t frames_needed = AMY_BLOCK_SIZE;
+    if (preset_p->length > 0 && preset_p->length < frames_needed) {
+        frames_needed = preset_p->length;
+    }
+    uint32_t frames_read = wave_read_pcm_frames_s16(
+        preset_p->file_handle,
+        preset_p->channels,
+        preset_p->file_bits_per_sample,
+        &preset_p->file_bytes_remaining,
+        preset_p->sample_ram,
+        frames_needed);
+    return frames_read;
+}
+
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
+    fprintf(stderr, "r1 osc %d preset %d\n", osc, synth[osc]->preset);
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t preset = get_preset_for_preset_number(synth[osc]->preset);
+        fprintf(stderr, "osc %d preset %d handle is %d\n", osc, synth[osc]->preset, preset.file_handle);
+        if (preset.file_handle != 0) { // file 
+            uint32_t t = fill_sample_from_file(&preset);
+            fprintf(stderr, "read %d samples\n", t);
+        }
+        
         // Presets can be > 32768 samples long.
         // We need s16.15 fixed-point indexing.
         float logfreq = msynth[osc]->logfreq;
@@ -193,6 +225,66 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
 }
 
 
+int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote,
+                  uint32_t loopstart, uint32_t loopend) {
+    pcm_unload_preset(preset_number);
+    fprintf(stderr, "loading file %s\n", filename);
+    if (filename == NULL || filename[0] == '\0') {
+        return 0;
+    }
+    if (amy_external_fopen_hook == NULL || amy_external_fclose_hook == NULL) {
+        return 0;
+    }
+    uint32_t handle = amy_external_fopen_hook((char *)filename, "rb");
+    if (handle == 0) {
+        return 0;
+    }
+    wave_info_t info = {0};
+    uint32_t data_bytes = 0;
+    if (!wave_parse_header(handle, &info, &data_bytes)) {
+        amy_external_fclose_hook(handle);
+        return 0;
+    }
+    uint32_t total_frames = 0;
+    if (info.channels > 0) {
+        total_frames = data_bytes / (info.channels * 2);
+    }
+    uint32_t buffer_frames = AMY_BLOCK_SIZE;
+    memorypcm_ll_t *new_preset_pointer = malloc_caps(
+        sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + buffer_frames * sizeof(int16_t),
+        amy_global.config.ram_caps_sample);
+    if (new_preset_pointer == NULL) {
+        fprintf(stderr, "No RAM left for sample load\n");
+        return 0;
+    }
+    new_preset_pointer->next = memorypcm_ll_start;
+    memorypcm_ll_start = new_preset_pointer;
+    new_preset_pointer->preset_number = preset_number;
+    memorypcm_preset_t *memory_preset =
+        (memorypcm_preset_t *)(((uint8_t *)new_preset_pointer) + sizeof(memorypcm_ll_t));
+    strncpy(memory_preset->filename, filename, MAX_FILENAME_LEN - 1);
+    memory_preset->filename[MAX_FILENAME_LEN - 1] = '\0';
+    memory_preset->channels = info.channels;
+    memory_preset->samplerate = info.sample_rate;
+    memory_preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
+    memory_preset->midinote = midinote;
+    memory_preset->loopstart = loopstart;
+    memory_preset->length = total_frames;
+    if (loopend == 0 && total_frames > 0) {
+        memory_preset->loopend = total_frames - 1;
+    } else {
+        memory_preset->loopend = loopend;
+    }
+    memory_preset->file_parsed = 1;
+    memory_preset->file_bits_per_sample = info.bits_per_sample;
+    memory_preset->file_bytes_remaining = 0;
+    memory_preset->file_handle = handle;
+    memory_preset->sample_ram = NULL;
+    new_preset_pointer->preset = memory_preset;
+    fprintf(stderr, "read file %s frames %d preset %d handle %d\n", filename, total_frames, preset_number, handle);
+    return 1;
+}
+
 
 // load mono samples (let python parse wave files) into preset # 
 // set loopstart, loopend, midinote, samplerate (and log2sr)
@@ -216,6 +308,11 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->midinote = midinote;
     memory_preset->loopstart = loopstart;
     memory_preset->length = length;
+    memory_preset->channels = 1;
+    memory_preset->file_parsed = 0;
+    memory_preset->file_bits_per_sample = 0;
+    memory_preset->file_bytes_remaining = 0;
+    memory_preset->file_handle = 0;
     memory_preset->sample_ram = (int16_t *)(((uint8_t *)memory_preset) + sizeof(memorypcm_preset_t));
     if(loopend == 0) {  // loop whole sample
         memory_preset->loopend = memory_preset->length-1;

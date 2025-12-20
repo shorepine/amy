@@ -96,6 +96,74 @@ PARSE_LIST(uint16_t)
 PARSE_LIST(int32_t)
 PARSE_LIST(int16_t)
 
+static uint32_t parse_uint32_token(const char *start, size_t len) {
+    while (len > 0 && *start == ' ') {
+        start++;
+        len--;
+    }
+    if (len == 0) {
+        return 0;
+    }
+    char tmp[32];
+    size_t n = len < sizeof(tmp) - 1 ? len : sizeof(tmp) - 1;
+    memcpy(tmp, start, n);
+    tmp[n] = '\0';
+    return (uint32_t)atoi(tmp);
+}
+
+static void parse_list_file_params(char *message, uint32_t *preset, char *filename,
+                                   size_t filename_len, uint32_t *midinote,
+                                   uint32_t *loopstart, uint32_t *loopend) {
+    *preset = 0;
+    *midinote = 0;
+    *loopstart = 0;
+    *loopend = 0;
+    if (filename_len > 0) {
+        filename[0] = '\0';
+    }
+    char *p = message;
+    char *comma = strchr(p, ',');
+    size_t token_len = comma ? (size_t)(comma - p) : strlen(p);
+    *preset = parse_uint32_token(p, token_len);
+    if (comma == NULL) {
+        return;
+    }
+    p = comma + 1;
+    comma = strchr(p, ',');
+    token_len = comma ? (size_t)(comma - p) : strlen(p);
+    while (token_len > 0 && *p == ' ') {
+        p++;
+        token_len--;
+    }
+    while (token_len > 0 && p[token_len - 1] == ' ') {
+        token_len--;
+    }
+    if (filename_len > 0) {
+        size_t copy_len = token_len < filename_len - 1 ? token_len : filename_len - 1;
+        memcpy(filename, p, copy_len);
+        filename[copy_len] = '\0';
+    }
+    if (comma == NULL) {
+        return;
+    }
+    p = comma + 1;
+    comma = strchr(p, ',');
+    token_len = comma ? (size_t)(comma - p) : strlen(p);
+    *midinote = parse_uint32_token(p, token_len);
+    if (comma == NULL) {
+        return;
+    }
+    p = comma + 1;
+    comma = strchr(p, ',');
+    token_len = comma ? (size_t)(comma - p) : strlen(p);
+    *loopstart = parse_uint32_token(p, token_len);
+    if (comma == NULL) {
+        return;
+    }
+    p = comma + 1;
+    token_len = strlen(p);
+    *loopend = parse_uint32_token(p, token_len);
+}
 
 
 void copy_param_list_substring(char *dest, const char *src) {
@@ -241,7 +309,8 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
 // Parser for transfer-layer ('z') prefix.
 void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
-        // It's just the usual z message (pcm_Load)
+        // z: Signal to start loading sample. 
+        // Params: preset number, length(frames), samplerate, num_channels, midinote, loopstart, loopend. 
         uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
         parse_list_uint32_t(message, sm, 6, 0);
         if(sm[1]==0) { // remove preset
@@ -255,19 +324,30 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     char cmd = message[0];
     message++;
     if (cmd == 'T')  {
-        // transfer
+        // zT: Signal to start loading file. 
+        //Params: File size, Destination name, reboot=[0],1 if you want to reboot the device after completing.    
     }
     else if (cmd == 'F') {
-        // pcm sample is on disk
-
+        // zF: setup PCM preset from WAV filename on disk. 
+        // Params: Preset number, filename, midi note, loop start, loopend
+        uint32_t preset = 0;
+        uint32_t midinote = 0;
+        uint32_t loopstart = 0;
+        uint32_t loopend = 0;
+        char filename[MAX_FILENAME_LEN];
+        parse_list_file_params(message, &preset, filename, sizeof(filename),
+                               &midinote, &loopstart, &loopend);
+        if (filename[0] != '\0') {
+            pcm_load_file(preset, filename, (uint8_t)midinote, loopstart, loopend);
+        }
     }
     else if (cmd == 'S') {
-        // sample from bus
-
+        // zS: sample from BUS[0] to a memorypcm patch. 
+        // Params: Preset number,  bus, max length in frames,midinote,loopstart,loopend
     }
     else if (cmd == 'O') {
-        // stop sampling
-
+        //zO: stop sampling from any bus
+        //Params: none
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
 }
