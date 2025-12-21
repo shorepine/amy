@@ -54,6 +54,30 @@ memorypcm_preset_t * memorypreset_for_preset_number(uint16_t preset_number) {
     return NULL;
 }
 
+// Get either memory preset or baked in preset for preset number
+memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
+    // Get the memory preset. If we can't find it, it's a ROM preset. So copy params in from ROM preset
+    memorypcm_preset_t * preset_p = memorypreset_for_preset_number(preset_number);
+    if(preset_p == NULL) {
+        static memorypcm_preset_t preset;
+        memset(&preset, 0, sizeof(preset));
+        const pcm_map_t cpreset =  pcm_map[preset_number];
+        preset.sample_ram = (int16_t*)pcm + cpreset.offset;
+        preset.length = cpreset.length;
+        preset.loopstart = cpreset.loopstart;
+        preset.loopend = cpreset.loopend;
+        preset.midinote = cpreset.midinote;
+        preset.samplerate = PCM_AMY_SAMPLE_RATE;
+        preset.log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
+        preset.rom = 1;
+        return &preset;
+    } else {
+        return preset_p;
+    }
+    return NULL;
+}
+
+
 void pcm_init() {
     memorypcm_ll_start = NULL;
 }
@@ -68,7 +92,7 @@ void pcm_init() {
 
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
-        memorypcm_preset_t *preset = memorypreset_for_preset_number(synth[osc]->preset);
+        memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
         if(preset->rom) {
             // baked-in PCM - don't overrun.
             if(synth[osc]->preset >= pcm_samples) synth[osc]->preset = 0;
@@ -106,28 +130,6 @@ void pcm_note_off(uint16_t osc) {
     }
 }
 
-// Get either memory preset or baked in preset for preset number
-memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
-    // Get the memory preset. If we can't find it, it's a ROM preset. So copy params in from ROM preset
-    memorypcm_preset_t * preset_p = memorypreset_for_preset_number(preset_number);
-    if(preset_p == NULL) {
-        static memorypcm_preset_t preset;
-        memset(&preset, 0, sizeof(preset));
-        const pcm_map_t cpreset =  pcm_map[preset_number];
-        preset.sample_ram = (int16_t*)pcm + cpreset.offset;
-        preset.length = cpreset.length;
-        preset.loopstart = cpreset.loopstart;
-        preset.loopend = cpreset.loopend;
-        preset.midinote = cpreset.midinote;
-        preset.samplerate = PCM_AMY_SAMPLE_RATE;
-        preset.log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
-        preset.rom = 1;
-        return &preset;
-    } else {
-        return preset_p;
-    }
-    return NULL;
-}
 
 uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_needed) {
     uint32_t bytes_per_frame = preset_p->channels * (preset_p->file_bits_per_sample / 8);
@@ -171,7 +173,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             }
             //fprintf(stderr, "render_pcm: osc %d preset %d filling file sample buffer: frames_needed=%d bytes_remaining=%d playback_freq=%f\n",
             //        osc, synth[osc]->preset, frames_needed, preset->file_bytes_remaining, playback_freq);
-            uint32_t t = fill_sample_from_file(preset, frames_needed);
+            fill_sample_from_file(preset, frames_needed);
         }
 
         SAMPLE max_value = 0;

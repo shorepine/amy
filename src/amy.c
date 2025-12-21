@@ -368,6 +368,9 @@ int8_t global_init(amy_config_t c) {
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length = 0;
     amy_global.transfer_stored = 0;
+    amy_global.transfer_file_handle = 0;
+    amy_global.transfer_reboot = 0;
+    amy_global.transfer_filename[0] = '\0';
     amy_global.debug_flag = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;

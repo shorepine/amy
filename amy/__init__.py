@@ -127,15 +127,16 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
-    ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
-    ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
-    ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
+    ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
+    ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'), ('bp0', 'AL'), 
+    ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), 
+    ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
+    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
-    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'),  # 'i' is prefix for some two-letter synth-level codes.
-    ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
+    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), 
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
@@ -331,6 +332,25 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         send_raw(message.decode('ascii'))
         last_f = last_f + 188
     print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, n_frames*2, n_frames, midinote))
+
+def disk_sample(wavfilename, preset=0, midinote=60, loopstart=0, loopend=0):
+    s = "%d,%s,%d,%d,%d,%d" % (preset, wavfilename, midinote, loopstart, loopend)
+    send(disk_sample=s)
+    print("Instructed AMY to load sample from disk. Preset #%d" % (wavfilename, preset))
+
+def transfer_file(filename, reboot=False):
+    file_size = os.path.getsize(filename)
+    s = "%d,%s,%d" % (filename, file_size, int(reboot))
+    send(transfer_file=s)
+    # Now generate the base64 encoded segments, 188 bytes at a time
+    # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
+    w = open(filename, 'rb')
+    for i in range(ceil(file_size/188)):
+        file_bytes = w.read(188)
+        message = b64(file_bytes)
+        send_raw(message.decode('ascii'))
+    w.close()
+    print("Instructed AMY to receive file '%s' over wire protocol. Reboot after transfer: %s" % (filename, str(reboot)))
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil

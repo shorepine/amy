@@ -672,6 +672,9 @@ struct state {
     uint8_t * transfer_storage;
     uint32_t transfer_length;
     uint32_t transfer_stored;
+    uint32_t transfer_file_handle;
+    uint32_t transfer_reboot;
+    char transfer_filename[MAX_FILENAME_LEN];
 
     // Sequencer
     uint32_t sequencer_tick_count;
@@ -773,6 +776,7 @@ extern uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) ;
 extern uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len);
 extern uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
 extern void (*amy_external_fclose_hook)(uint32_t fptr);
+extern void (*amy_external_file_transfer_done_hook)(const char *filename, uint32_t reboot);
 
 
 #ifdef __EMSCRIPTEN__
@@ -947,4 +951,3 @@ extern int32_t delta_num_free();  // The size of the remaining pool.
 extern int peek_stack(char *tag);
 
 #endif
-

@@ -6,6 +6,7 @@
 #include "transfer.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 // per platform file reading / writing
 // posix (linux, mac)
@@ -16,7 +17,7 @@
 
 // mac / linux / generic posix 
 
-#if defined(_POSIX_VERSION) 
+#if defined(__unix__) || defined(__APPLE__) || defined(_POSIX_VERSION)
 
 // Map from FILE * to a uint32_t handle to pass to AMY
 
@@ -98,34 +99,83 @@ b64_buffer_t decbuf;
 
 // signals to AMY that i'm now receiving a transfer of length (bytes!) into allocated storage
 void start_receiving_transfer(uint32_t length, uint8_t * storage) {
-        amy_global.transfer_flag = 1;
-        amy_global.transfer_storage = storage;
-        amy_global.transfer_length = length;
-        amy_global.transfer_stored = 0;
-        b64_buf_malloc(&decbuf);
+    amy_global.transfer_flag = 1;
+    amy_global.transfer_storage = storage;
+    amy_global.transfer_length = length;
+    amy_global.transfer_stored = 0;
+    amy_global.transfer_file_handle = 0;
+    amy_global.transfer_reboot = 0;
+    amy_global.transfer_filename[0] = '\0';
+    b64_buf_malloc(&decbuf);
+}
+
+// signals to AMY that i'm now receiving a file transfer of length (bytes!) to filename
+void start_receiving_file_transfer(uint32_t length, const char *filename, uint32_t reboot) {
+    if (filename == NULL || filename[0] == '\0') {
+        return;
+    }
+    if (amy_external_fopen_hook == NULL || amy_external_fwrite_hook == NULL || amy_external_fclose_hook == NULL) {
+        fprintf(stderr, "file transfer hooks not enabled on platform\n");
+        return;
+    }
+    uint32_t handle = amy_external_fopen_hook((char *)filename, "wb");
+    if (handle == HANDLE_INVALID) {
+        fprintf(stderr, "could not open file for transfer: %s\n", filename);
+        return;
+    }
+    amy_global.transfer_flag = 2;
+    amy_global.transfer_storage = NULL;
+    amy_global.transfer_length = length;
+    amy_global.transfer_stored = 0;
+    amy_global.transfer_file_handle = handle;
+    amy_global.transfer_reboot = reboot;
+    strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
+    amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
+    b64_buf_malloc(&decbuf);
 }
 
 // takes a wire message and adds it to storage after decoding it. stops transfer when it's done
 void parse_transfer_message(char * message, uint16_t len) {
-        size_t decoded = 0;
-        uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
-        for(uint16_t i=0;i<decoded;i++) {
-                amy_global.transfer_storage[amy_global.transfer_stored++] = block[i];
+    size_t decoded = 0;
+    uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
+    if (amy_global.transfer_flag == 2) {
+        if (amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
+            uint32_t wrote = amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
+            amy_global.transfer_stored += wrote;
         }
-        if(amy_global.transfer_stored>=amy_global.transfer_length) { // we're done
-                amy_global.transfer_flag = 0;
-                free(decbuf.ptr);
+    } else {
+        for (uint16_t i = 0; i < decoded; i++) {
+            amy_global.transfer_storage[amy_global.transfer_stored++] = block[i];
         }
+    }
+    if (amy_global.transfer_stored >= amy_global.transfer_length) { // we're done
+        if (amy_global.transfer_flag == 2) {
+            if (amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
+                amy_external_fclose_hook(amy_global.transfer_file_handle);
+            }
+            if (amy_global.transfer_filename[0] != '\0') {
+                if (amy_external_file_transfer_done_hook != NULL) {
+                    amy_external_file_transfer_done_hook(amy_global.transfer_filename,
+                                                         amy_global.transfer_reboot);
+                }
+            }
+            amy_global.transfer_file_handle = 0;
+            amy_global.transfer_reboot = 0;
+            amy_global.transfer_filename[0] = '\0';
+        }
+        amy_global.transfer_flag = 0;
+        free(decbuf.ptr);
+    }
 }
 
 int b64_buf_malloc(b64_buffer_t * buf)
 {
-        buf->ptr = malloc(B64_BUFFER_SIZE);
-        if(!buf->ptr) return -1;
+    buf->ptr = malloc(B64_BUFFER_SIZE);
+    if (!buf->ptr) return -1;
 
-        buf->bufc = 1;
+    buf->bufc = 1;
 
-        return 0;
+    return 0;
 }
 
 // We don't do encoding in AMY, we rely on python for that, but we'll leave it here if you want it in C
@@ -256,13 +306,13 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 
         // translate remainder
         for (j = 0; j < 4; ++j) {
-                // find translation char in `b64_table'
-                for (l = 0; l < 64; ++l) {
-                    if (tmp[j] == b64_table[l]) {
-                        tmp[j] = l;
-                        break;
-                    }
+            // find translation char in `b64_table'
+            for (l = 0; l < 64; ++l) {
+                if (tmp[j] == b64_table[l]) {
+                    tmp[j] = l;
+                    break;
                 }
+            }
         }
 
         // decode remainder
@@ -296,7 +346,7 @@ void transfer_init() {
     amy_external_fread_hook = external_fread_hook;
     amy_external_fwrite_hook = external_fwrite_hook;
     amy_external_fclose_hook = external_fclose_hook;
-    #endif
+#endif
 }
 
 static uint16_t read_u16_le(const uint8_t *buf) {
