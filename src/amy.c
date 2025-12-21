@@ -81,9 +81,8 @@ void amy_profiles_print() {}
 #include "clipping_lookup_table.h"
 
 // Final output delay lines.
-delay_line_t **chorus_delay_lines; 
-delay_line_t **echo_delay_lines; 
-SAMPLE *echo_delays[AMY_MAX_CHANNELS];
+delay_line_t *chorus_delay_lines[AMY_MAX_CHANNELS] = {NULL, NULL};
+delay_line_t *echo_delay_lines[AMY_MAX_CHANNELS] = {NULL, NULL};
 SAMPLE *delay_mod = NULL;
 
 
@@ -152,8 +151,8 @@ struct synthinfo ** synth;
 struct mod_synthinfo ** msynth;
 
 // Two mixing blocks, one per core of rendering
-SAMPLE ** fbl;
-SAMPLE ** per_osc_fb; 
+SAMPLE *fbl[AMY_MAX_CORES];
+SAMPLE *per_osc_fb[AMY_MAX_CORES];
 SAMPLE core_max[AMY_MAX_CORES];
 
 // Audio input blocks. Filled by the audio implementation before rendering.
@@ -184,6 +183,32 @@ output_sample_type * block;
 #endif
 
 
+void dealloc_echo_delay_lines(void) {
+    for (int c = AMY_NCHANS - 1; c >= 0; --c) {
+        if (echo_delay_lines[c]) free_delay_line(echo_delay_lines[c]);
+        echo_delay_lines[c] = NULL;
+    }
+}
+
+bool alloc_echo_delay_lines(uint32_t max_delay_samples) {
+    bool success = true;
+    for (int c = 0; c < AMY_NCHANS; ++c) {
+        delay_line_t *delay_line = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
+        if (delay_line) {
+            echo_delay_lines[c] = delay_line;
+        } else {
+            success = false;
+            break;
+        }
+    }
+    if (!success) {
+        fprintf(stderr, "unable to alloc echo of %d samples\n", (int)max_delay_samples);
+        dealloc_echo_delay_lines();
+        return false;
+    }
+    return true;
+}
+
 uint32_t enclosing_power_of_2(uint32_t n) {
     uint32_t result = 1;
     while (result < n)  result <<= 1;
@@ -195,23 +220,9 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
     //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
     if (level > 0) {
         if (echo_delay_lines[0] == NULL) {
-	    bool success = true;
-	    // Delay line len must be power of 2.
+            // Delay line len must be power of 2.
             uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
-            for (int c = 0; c < AMY_NCHANS; ++c) {
-                delay_line_t *delay_line = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
-		if (delay_line) {
-		    echo_delay_lines[c] = delay_line;
-		} else {
-		    success = false;
-		    break;
-		}
-	    }
-	    if (!success) {
-		fprintf(stderr, "unable to alloc echo of %d ms\n", (int)max_delay_ms);
-		echo_delay_lines[0] = echo_delay_lines[1] = NULL;
-		return;
-	    }
+            if (!alloc_echo_delay_lines(max_delay_samples)) return;
             amy_global.echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
@@ -232,11 +243,14 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
     //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
 }
 
-void dealloc_echo_delay_lines(void) {
-    for (int c = AMY_NCHANS - 1; c >= 0; --c)
-        if (echo_delay_lines[c]) free_delay_line(echo_delay_lines[c]);
+void dealloc_chorus_delay_lines(void) {
+    for(int c = AMY_NCHANS - 1; c >= 0; --c) {
+        if (chorus_delay_lines[c]) free_delay_line(chorus_delay_lines[c]);
+        chorus_delay_lines[c] = NULL;
+    }
+    free(delay_mod);
+    delay_mod = NULL;
 }
-
 
 void alloc_chorus_delay_lines(void) {
     delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
@@ -249,21 +263,11 @@ void alloc_chorus_delay_lines(void) {
 	    success = false;
 	    break;
 	}
-	if (!success) {
-	    fprintf(stderr, "unable to alloc chorus of %d samples\n", (int)DELAY_LINE_LEN);
-	    chorus_delay_lines[0] = chorus_delay_lines[1] = NULL;
-	    return;
-	}
     }
-}
-
-void dealloc_chorus_delay_lines(void) {
-    for(int c = AMY_NCHANS - 1; c >= 0; --c) {
-        if (chorus_delay_lines[c]) free_delay_line(chorus_delay_lines[c]);
-        chorus_delay_lines[c] = NULL;
+    if (!success) {
+        fprintf(stderr, "unable to alloc chorus of %d samples\n", (int)DELAY_LINE_LEN);
+        dealloc_chorus_delay_lines();
     }
-    free(delay_mod);
-    delay_mod = NULL;
 }
 
 void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
@@ -696,7 +700,7 @@ void amy_reset_oscs() {
     srand48(517730);
     // We reset oscs by freeing them.
     // Include chorus osc (osc=AMY_OSCS)
-    for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);  // include chorus osc.
+    for(uint16_t i=0;i<AMY_OSCS+1;i++) free_osc(i);
     //for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
@@ -829,13 +833,8 @@ int8_t oscs_init() {
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
     sequencer_init(amy_global.config.max_sequencer_tags);
-
-    if(pcm_samples) {
-        pcm_init();
-    }
-    if(AMY_HAS_CUSTOM) {
-        custom_init();
-    }
+    if(pcm_samples)  pcm_init();
+    if(AMY_HAS_CUSTOM)  custom_init();
     // synth and msynth are now pointers to arrays of pointers to dynamically-allocated synth structures.
     synth = (struct synthinfo **) malloc_caps(sizeof(struct synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     bzero(synth, sizeof(struct synthinfo *) * (AMY_OSCS+1));
@@ -849,9 +848,6 @@ int8_t oscs_init() {
     deltas_pool_init();
     amy_deltas_reset();
 
-    fbl = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
-    per_osc_fb = (SAMPLE**) malloc_caps(sizeof(SAMPLE*) * AMY_CORES, amy_global.config.ram_caps_fbl); // one per core, just core 0 used off esp32
-
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
         fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_fbl);
@@ -861,17 +857,6 @@ int8_t oscs_init() {
                 fbl[core][AMY_BLOCK_SIZE*c + i] = 0;
             }
         }
-    }
-    // we only alloc delay lines if the chorus is turned on.
-    if (chorus_delay_lines == NULL)
-        chorus_delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
-    if(AMY_HAS_CHORUS > 0) {
-        for (int c = 0; c < AMY_NCHANS; ++c)  chorus_delay_lines[c] = NULL;
-    }
-    if (echo_delay_lines == NULL)
-        echo_delay_lines = (delay_line_t **)malloc(sizeof(delay_line_t *) * AMY_NCHANS);
-    if(AMY_HAS_ECHO > 0) {
-        for (int c = 0; c < AMY_NCHANS; ++c)  echo_delay_lines[c] = NULL;
     }
 
     // Set the optional inputs to 0
@@ -945,23 +930,29 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
-    free(block);
-    free(fbl[0]);
-    free(per_osc_fb[0]);
-    #ifdef AMY_DUALCORE 
-        free(fbl[1]);
-        free(per_osc_fb[1]);
-    #endif
-    free(fbl);
-    for (int i = 0; i < AMY_OSCS; ++i) free_osc(i);
-    free(synth);
-    free(msynth);
-    free(deltas);
-    if(amy_global.config.ks_oscs > 0)
-        ks_deinit();
-    filters_deinit();
     dealloc_chorus_delay_lines();
     dealloc_echo_delay_lines();
+    for(int core = 0; core < AMY_CORES; ++core) {
+        free(fbl[core]);
+        free(per_osc_fb[core]);
+    }
+    deltas_pool_free();
+    // Include chorus osc (osc=AMY_OSCS)
+    for (int i = 0; i < AMY_OSCS + 1; ++i) free_osc(i);
+    free(amy_external_in_block);
+    free(amy_in_block);
+    free(block);
+    free(msynth);
+    free(synth);
+    if(AMY_HAS_CUSTOM)  custom_deinit();
+    if(pcm_samples)  pcm_deinit();
+    sequencer_deinit();
+    instruments_deinit();
+    patches_deinit();
+    algo_deinit();
+    filters_deinit();
+    if(amy_global.config.ks_oscs > 0)
+        ks_deinit();
 }
 
 

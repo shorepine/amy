@@ -570,6 +570,10 @@ void beeper_init(void) {
     //printf("Beeper init\n");
 }
 
+void beeper_deinit(void) {
+    //printf("Beeper deinit\n");
+}
+
 void beeper_note_on(uint16_t osc, float freq) {
     saw_down_note_on(osc, freq);
 }
@@ -592,6 +596,7 @@ SAMPLE beeper_compute_mod(uint16_t osc) {
 
 struct custom_oscillator beeper = {
     beeper_init,
+    beeper_deinit,
     beeper_note_on,
     beeper_note_off,
     beeper_mod_trigger,

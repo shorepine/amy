@@ -1,0 +1,32 @@
+{
+   libpulse_common
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   obj:/usr/lib/aarch64-linux-gnu/pulseaudio/libpulsecommon-16.1.so
+   ...
+}
+{
+   miniaudio_run
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:miniaudio_run
+   ...
+}
+{
+   dlopen_catch_exception
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_dl_catch_exception
+   ...
+}
+{
+   pthread_create
+   Memcheck:Leak
+   match-leak-kinds: possible
+   ...
+   fun:pthread_create@@GLIBC_2.34
+   ...
+}

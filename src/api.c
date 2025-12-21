@@ -212,11 +212,6 @@ void amy_add_event(amy_event *e) {
 
 
 
-void amy_stop() {
-    oscs_deinit();
-}
-
-
 #ifdef __EMSCRIPTEN__
 void amy_start_web() {
     // a shim for web AMY, as it's annoying to build structs in js
@@ -324,7 +319,6 @@ void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
     amy_profiles_init();
-    sequencer_start();
     transfer_init();
     oscs_init();
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
@@ -334,4 +328,8 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
+}
+
+void amy_stop() {
+    oscs_deinit();
 }

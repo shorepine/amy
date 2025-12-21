@@ -101,11 +101,15 @@ int main(int argc, char ** argv) {
         usleep(THREAD_USLEEP);
     }
 
-    //show_debug(99);
+	//show_debug(99);
 
-    amy_live_stop();
+	amy_live_stop();
 
-    amy_stop();
+	amy_stop();
+
+	// Make sure libminiaudio has time to clean up.
+	sleep(2);
+    }
 
     return 0;
 }

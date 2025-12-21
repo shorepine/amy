@@ -15,7 +15,7 @@ uint16_t next_user_patch_index = 0;
 uint8_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
-void patches_free() {
+void patches_deinit() {
     if (memory_patch) free(memory_patch);
     memory_patch = NULL;
     memory_patch_deltas = NULL;
