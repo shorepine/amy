@@ -303,7 +303,7 @@ amy.send(wave=amy.PCM,vel=1,preset=35,feedback=1) # nice violin
 
 ### Sampler (aka Memory PCM)
 
-You can also load your own samples into AMY at runtime or directly play samples from a disk (if your host / MCU has disk access). We support sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
+You can also load your own samples into AMY memory at runtime by sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
 
 ```python
 amy.load_sample("G1.wav", preset=3)
@@ -322,14 +322,14 @@ Under the hood, if AMY receives a `load_sample` message (with preset number and 
 
 ### WAV file playback
 
-AMY support playing WAV files directly with pitching and looping, if your host of MCU has file support. We provide this for POSIX platforms (Mac, Linux) and see [Hooks](api.hd#Hooks) to build your own `fopen`, `fread` etc on other platforms like Arduino or Micropython. You can set an oscillator to play a channel of the file with `disk_sample`, e.g.
+AMY support playing WAV files directly with pitching and looping, if your host of MCU has file support. You can use this when the WAV files are bigger than available memory. We provide file reading hooks for POSIX platforms (Mac, Linux) and see [Hooks](api.md#Hooks) to build your own `fopen`, `fread` etc on other platforms like Arduino or Micropython. You can set an oscillator to play a channel of the file with `disk_sample`, e.g.
 
 ```python
 amy.disk_sample("G1.wav", preset=1024, midinote=31)
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=60, vel=1) # plays sample from disk
 ```
 
-Note that you can only play one instance of the file per **preset**. (We keep one file handle open per preset.) If you want to play multiple copies of a WAV file at once (for instance, a polyphonic sampler), you should make multiple `preset`s:
+Note that you can only play one instance of the file per **preset**. (We keep one file handle open per `disk_sample` preset.) If you want to play multiple copies of a WAV file at once (for instance, a polyphonic sampler), you should make multiple `preset`s:
 
 ```python
 amy.disk_sample("G1.wav", preset=1024, midinote=31)
@@ -341,7 +341,9 @@ amy.send(osc=0, wave=amy.PCM_LEFT, preset=1025, pan=0, note=72, vel=1)
 
 ### Channels
 
-We support loading 1 or 2 channel WAV for `load_sample` and `disk_sample`. For `disk_sample`, channels are decoded from the WAV file metadata on disk. For `load_sample`, you should set the channels you're sending over. Each oscillator in AMY is mono, but you can hint it which channel of PCM to play back with `wave=PCM_LEFT` or `PCM_RIGHT`. `PCM` or `PCM_MIX` will average each channel if it was a two channel source. To play back stereo, set up two channels and use AMY's `pan`:
+We support loading 1 or 2 channel WAV for `load_sample` and `disk_sample`. For `disk_sample`, channels are decoded from the WAV file metadata on disk. For `load_sample`, you should set the channels you're sending over. 
+
+Each oscillator in AMY is mono, but you can hint it which channel of PCM to play back with `wave=PCM_LEFT` or `PCM_RIGHT`. `PCM` or `PCM_MIX` will average each channel if it was a two channel source. To play back stereo, set up two channels and use AMY's `pan`:
 
 ```python
 amy.disk_sample("G1.wav", preset=1024, midinote=31)
@@ -352,7 +354,7 @@ amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1025, pan=1, note=60, vel=1)
 
 ### Sampling
 
-AMY can also sample directly into a PCM buffer from a `bus`. A bus in AMY is a work in progress but for now we support two stereo buses: `bus=1` is the final AMY output and `bus=2` is just `AUDIO_IN0` and `AUDIO_IN1`. To start sampling to a PCM preset, use `start_sampling`:
+AMY can also sample directly into a PCM buffer from a `bus`. [A bus in AMY is a work in progress](https://github.com/shorepine/amy/issues/114) but for now we support two stereo buses: `bus=1` is the final AMY output and `bus=2` is just `AUDIO_IN0` and `AUDIO_IN1`. To start sampling to a PCM preset, use `start_sample`:
 
 ```python
 amy.start_sample(preset=1024, bus=0, max_frames=44100) 
