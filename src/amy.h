@@ -59,6 +59,16 @@ extern const uint16_t pcm_samples;
 
 #define PCM_AMY_SAMPLE_RATE 22050
 
+// Transfer types.
+#define AMY_TRANSFER_TYPE_NONE 0
+#define AMY_TRANSFER_TYPE_AUDIO 1
+#define AMY_TRANSFER_TYPE_FILE 2
+#define AMY_TRANSFER_TYPE_SAMPLE 3
+
+
+#define AMY_BUS_OUTPUT 1
+#define AMY_BUS_AUDIO_IN 2
+
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
 
@@ -897,7 +907,7 @@ extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
-extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();

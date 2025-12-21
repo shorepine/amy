@@ -1,5 +1,7 @@
 import sys
 import os
+import random
+import string
 
 import numpy as np
 import scipy.io.wavfile as wav
@@ -829,6 +831,53 @@ class TestBreakpointsRealloc(AmyTest):
     amy.send(time=0, osc=0, wave=amy.SINE, bp0='100,1,100,0,100,1,100,0,100,1,100,0,100,1,100,0')
     amy.send(time=100, osc=0, note=60, vel=1)
     amy.send(time=900, osc=0, vel=0)
+
+
+class TestFileTransfer(AmyTest):
+
+  def test(self):
+    _amy.stop()
+    _amy.start_no_default()
+    temp_file = 'amy_transfer_test_tmp.txt'
+    transfer_file = temp_file + '.transfer'
+    if os.path.exists(temp_file):
+      os.remove(temp_file)
+    if os.path.exists(transfer_file):
+      os.remove(transfer_file)
+    payload = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2048))
+    try:
+      with open(temp_file, 'w') as f:
+        f.write(payload)
+      amy.transfer_file(temp_file, transfer_file, False)
+      amy.render(0.1)
+      if not os.path.exists(transfer_file):
+        raise AssertionError('transfer file not created')
+      with open(transfer_file, 'r') as f:
+        transferred = f.read()
+      if transferred != payload:
+        raise AssertionError('transfer file contents mismatch')
+      print('TestFileTransfer: ok')
+    finally:
+      if os.path.exists(temp_file):
+        os.remove(temp_file)
+      if os.path.exists(transfer_file):
+        os.remove(transfer_file)
+
+
+class TestDiskSample(AmyTest):
+
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+    amy.send(time=200, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=45)
+    amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=69)
+
+class TestDiskSampleStereo(AmyTest):
+
+  def run(self):
+    amy.disk_sample('sounds/sleepwalk.wav', preset=1024, midinote=60)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=2, note=60)
+    amy.send(time=50, osc=1, preset=1024, wave=amy.PCM_RIGHT, pan=1, vel=2, note=60)
 
 
 

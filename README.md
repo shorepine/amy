@@ -26,7 +26,7 @@ AMY supports
  * MIDI input support and synthesizer voice management, including voice stealing, controllers and per-channel multi-timbral operation
  * A strong Juno-6 style analog synthesizer
  * An operator / algorithm-based frequency modulation (FM) synth, modeled after the DX-7
- * PCM sampler, reading from a baked-in buffer of percussive and misc samples, or by loading samples with looping and base midi note
+ * PCM sampler, reading from a baked-in buffer of percussive and misc samples, or by loading samples into RAM, or playing from files on disk directly, with loop points and base midi note
  * karplus-strong string with adjustable feedback 
  * An arbitrary number of band-limited oscillators, each with adjustable frequency, pan, phase, amplitude:
    * pulse (+ adjustable duty cycle), sine, saw (up and down), triangle, noise 
@@ -41,6 +41,7 @@ AMY supports
  * A front end for DX7 and Juno-6 SYSEX patches and conversion setup commands 
  * Built-in event clock and pattern sequencer, using hardware real time timers on microcontrollers
  * Multi-core (including microcontrollers) for rendering if available
+ * File transfer to the host 
 
 The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/amy/fm.py) that can convert any DX7 patch into an AMY patch.
 

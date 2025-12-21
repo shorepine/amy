@@ -331,26 +331,27 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         message = b64(frames_bytes)
         send_raw(message.decode('ascii'))
         last_f = last_f + 188
-    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, n_frames*2, n_frames, midinote))
 
 def disk_sample(wavfilename, preset=0, midinote=60, loopstart=0, loopend=0):
-    s = "%d,%s,%d,%d,%d,%d" % (preset, wavfilename, midinote, loopstart, loopend)
+    s = "%d,%s,%d,%d,%d" % (preset, wavfilename, midinote, loopstart, loopend)
     send(disk_sample=s)
-    print("Instructed AMY to load sample from disk. Preset #%d" % (wavfilename, preset))
 
-def transfer_file(filename, reboot=False):
-    file_size = os.path.getsize(filename)
-    s = "%d,%s,%d" % (filename, file_size, int(reboot))
+def transfer_file(source_filename, dest_filename=None, reboot=False):
+    import os
+    from math import ceil
+    if(dest_filename is None):
+        filename = source_filename
+    file_size = os.path.getsize(source_filename)
+    s = "%d,%s,%d" % (file_size, dest_filename, int(reboot))
     send(transfer_file=s)
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
-    w = open(filename, 'rb')
+    w = open(source_filename, 'rb')
     for i in range(ceil(file_size/188)):
         file_bytes = w.read(188)
         message = b64(file_bytes)
         send_raw(message.decode('ascii'))
     w.close()
-    print("Instructed AMY to receive file '%s' over wire protocol. Reboot after transfer: %s" % (filename, str(reboot)))
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil

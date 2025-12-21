@@ -347,13 +347,13 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
 void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // z: Signal to start loading sample. 
-        // Params: preset number, length(frames), samplerate, num_channels, midinote, loopstart, loopend. 
+        // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
         uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
         parse_list_uint32_t(message, sm, 6, 0);
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
-            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
+            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, sm[3], sm[4], sm[5]);
             start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
         }
         return;
@@ -386,12 +386,16 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
         }
     }
     else if (cmd == 'S') {
-        // zS: sample from BUS[0] to a memorypcm patch. 
+        // zS: sample from BUS[1] to a memorypcm patch. 
         // Params: Preset number,  bus, max length in frames,midinote,loopstart,loopend
+        uint32_t sm[6]; // preset, bus, max frames, midinote, loop_start, loopend
+        parse_list_uint32_t(message, sm, 6, 0);
+        int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, sm[3], sm[4], sm[5]);
+        start_receiving_sample(sm[2], sm[1], ram);
     }
     else if (cmd == 'O') {
         //zO: stop sampling from any bus
-        //Params: none
+        stop_receiving_sample();
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
 }
@@ -417,7 +421,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
     uint16_t pos = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
-    if(amy_global.transfer_flag) {
+    if (amy_global.transfer_flag != AMY_TRANSFER_TYPE_NONE) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return;
@@ -536,7 +540,13 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                 }
                 break;
             case 'z': {
-                amy_parse_transfer_layer_message(arg, e); ++pos; break;  // Skip over second cmd letter, if any.
+                amy_parse_transfer_layer_message(arg, e);
+                if (arg[0] == 'F' || arg[0] == 'T') {
+                    pos = length - 1;  // Consume rest to avoid parsing filename as commands.
+                } else {
+                    ++pos;  // Skip over second cmd letter, if any.
+                }
+                break;
             }
             /* Y,y available */
             /* Z used for end of message */

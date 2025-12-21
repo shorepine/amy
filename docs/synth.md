@@ -18,8 +18,7 @@
   * [FM & ALGO type](#fm---algo-type)
   * [Build-your-own Partials](#build-your-own-partials)
   * [Interpolated partials](#interpolated-partials)
-  * [PCM](#pcm)
-  * [Sampler (aka Memory PCM)](#sampler--aka-memory-pcm-)
+  * [PCM and Sampler](#pcm-and-sampler)
 
 
 ## Oscillators, voices, patches and synths
@@ -283,7 +282,7 @@ Note that the default `bp0` amplitude envelope of the `BYO_PARTIALS` osc is a ga
 Please see our [piano voice documentation](https://shorepine.github.io/amy/piano.html) for more on the `INTERP_PARTIALS` type. 
 
 
-## PCM
+## PCM and Sampler
 
 AMY comes with a set of 67 drum-like and instrument PCM samples to use as well, as they are normally hard to render with additive, subtractive or FM synthesis. You can use the type `PCM` and preset numbers 0-66 to explore them. Their native pitch is used if you don't give a frequency or note parameter. You can update the baked-in PCM sample bank using `amy_headers.py`. 
 
@@ -302,9 +301,9 @@ amy.send(vel=0) # note off
 amy.send(wave=amy.PCM,vel=1,preset=35,feedback=1) # nice violin
 ```
 
-## Sampler (aka Memory PCM)
+### Sampler (aka Memory PCM)
 
-You can also load your own samples into AMY at runtime. We support sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
+You can also load your own samples into AMY at runtime or directly play samples from a disk (if your host / MCU has disk access). We support sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
 
 ```python
 amy.load_sample("G1.wav", preset=3)
@@ -313,12 +312,56 @@ amy.send(osc=0, wave=amy.PCM, preset=3, vel=1) # plays the sample
 
 You can use any preset number. If it overlaps with an existing PCM baked in number, it will play the memory sample instead of the baked in sample until you `unload_sample` the preset.
 
-If the WAV file has sampler metadata like loop points or base MIDI note, we use that in AMY. You can set it directly as well using `loopstart`, `loopend`, `midinote` or `length` in the `load_sample` call. To unload a sample:
+If the WAV file has sampler metadata like loop points or base MIDI note, we use that in AMY. You can set it directly as well using `loopstart`, `loopend`, `channels`, `midinote` or `length` in the `load_sample` call. To unload a sample:
 
 ```python
 amy.unload_sample(3) # unloads the RAM for preset 3
 ```
 
 Under the hood, if AMY receives a `load_sample` message (with preset number and nonzero length), it will then pause all other message parsing until it has received `length` amount of base64 encoded bytes over the wire protocol. Each individual message must be base64 encoded. Since AMY's maximum message length is 255 bytes, there is logic in `load_sample` in `amy.py`  to split the sample data into 188 byte chunks, which generates 252 bytes of base64 text. Please see `amy.load_sample` if you wish to load samples on other platforms.
+
+### WAV file playback
+
+AMY support playing WAV files directly with pitching and looping, if your host of MCU has file support. We provide this for POSIX platforms (Mac, Linux) and see [Hooks](api.hd#Hooks) to build your own `fopen`, `fread` etc on other platforms like Arduino or Micropython. You can set an oscillator to play a channel of the file with `disk_sample`, e.g.
+
+```python
+amy.disk_sample("G1.wav", preset=1024, midinote=31)
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=60, vel=1) # plays sample from disk
+```
+
+Note that you can only play one instance of the file per **preset**. (We keep one file handle open per preset.) If you want to play multiple copies of a WAV file at once (for instance, a polyphonic sampler), you should make multiple `preset`s:
+
+```python
+amy.disk_sample("G1.wav", preset=1024, midinote=31)
+amy.disk_sample("G1.wav", preset=1025, midinote=31)
+amy.disk_sample("G1.wav", preset=1026, midinote=31)
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=60, vel=1) # plays sample from disk
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1025, pan=0, note=72, vel=1) 
+```
+
+### Channels
+
+We support loading 1 or 2 channel WAV for `load_sample` and `disk_sample`. For `disk_sample`, channels are decoded from the WAV file metadata on disk. For `load_sample`, you should set the channels you're sending over. Each oscillator in AMY is mono, but you can hint it which channel of PCM to play back with `wave=PCM_LEFT` or `PCM_RIGHT`. `PCM` or `PCM_MIX` will average each channel if it was a two channel source. To play back stereo, set up two channels and use AMY's `pan`:
+
+```python
+amy.disk_sample("G1.wav", preset=1024, midinote=31)
+amy.disk_sample("G1.wav", preset=1025, midinote=31)
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=60, vel=1) 
+amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1025, pan=1, note=60, vel=1) 
+```
+
+### Sampling
+
+AMY can also sample directly into a PCM buffer from a `bus`. A bus in AMY is a work in progress but for now we support two stereo buses: `bus=1` is the final AMY output and `bus=2` is just `AUDIO_IN0` and `AUDIO_IN1`. To start sampling to a PCM preset, use `start_sampling`:
+
+```python
+amy.start_sample(preset=1024, bus=0, max_frames=44100) 
+amy.stop_sample() # stop all sampling
+amy.start_sample(preset=1024, bus=1, max_frames=11025, midinote=60) # set base midi note, looping, too
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, note=72, vel=1) # play back AUDIO_IN sample an octave higher
+```
+
+
+
 
 

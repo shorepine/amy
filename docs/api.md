@@ -120,6 +120,16 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 
 // Called every sequencer tick
 void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+
+// Hooks for file reading / writing / opening if your AMY host supports that 
+// We provide this for POSIX platforms (mac, linux, etc) 
+uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
+uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
+
+// Called when a file transfer is done (used in Micropython platforms to unpack or reboot)
+void (*amy_external_file_transfer_done_hook)(const char *filename, uint32_t reboot) = NULL;
 ```
 
 
@@ -153,7 +163,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
-| `w`    | `wave` | `wave` | uint 0-16 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, CUSTOM, OFF]. default: 0/SINE |
+| `w`    | `wave` | `wave` | uint 0-20 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, AUDIO_EXT0, AUDIO_EXT1, AMY_MIDI, PCM_LEFT, PCM_RIGHT, CUSTOM, OFF]. default: 0/SINE |
 | `S`    | `reset_osc`| `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock (immediately, ignoring `time`). RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `A`    | `bp0` | `bp0`    | string      | Envelope Generator 0's comma-separated breakpoint pairs of time(ms) and level, e.g. `100,0.5,50,0.25,200,0`. The last pair triggers on note off (release) |
 | `B`    | `bp1` | `bp1`    | string      | Breakpoints for Envelope Generator 1. See bp0 |
@@ -200,7 +210,9 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `t`    | `time` | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `V`    | `volume`| `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
-| `z`    | **TODO**| `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(samples), samplerate, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
+| `z`    | **TODO**| `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(frames), samplerate, channels, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
+| `zF`   | **TODO**| `disk_sample` | uint,string,uint,uint,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote, loopstart, loopend. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
+| `zT`   | **TODO**| `transfer_file` | uint,string,uint | Transfer a file to the host. Params: file size, destination filename, reboot host after done (0/1). See `hooks` for writing files on host disk. |
+| `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from bus. Params: preset number,  bus, max length in frames, midinote, loopstart, loopend. bus = 1 is AMY mixed output. bus = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
+| `zO`   | **TODO**| `stop_sample` | none | Stop sampling. Does nothing if no sampling active.  | 
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
-
-

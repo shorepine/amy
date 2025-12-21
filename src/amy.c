@@ -364,7 +364,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
     amy_global.hpf_state = 0; 
-    amy_global.transfer_flag = 0;
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length = 0;
     amy_global.transfer_stored = 0;
@@ -1722,6 +1722,23 @@ int16_t * amy_fill_buffer() {
             } else {
                 block[(AMY_NCHANS * i) + c] = sample;
             }
+        }
+    }
+
+    // Handle sampling after block is rendered
+    if(amy_global.transfer_flag==AMY_TRANSFER_TYPE_SAMPLE) {
+        if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
+            // copy block[] to amy_global.transfer_storage
+            memcpy(amy_global.transfer_storage+amy_global.transfer_stored, block, 
+                AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+        } else if(amy_global.transfer_file_handle==AMY_BUS_AUDIO_IN) {
+            // copy audio input buffer to storage
+            memcpy(amy_global.transfer_storage+amy_global.transfer_stored, amy_in_block, 
+                AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+        }
+        amy_global.transfer_stored += AMY_BLOCK_SIZE;
+        if(amy_global.transfer_stored >= amy_global.transfer_length) {   
+            amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
         }
     }
     amy_global.total_blocks++;

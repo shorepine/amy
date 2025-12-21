@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string.h>
 
+
+
 // per platform file reading / writing
 // posix (linux, mac)
 // micropython / littlefs - tulip & amybard
@@ -99,7 +101,7 @@ b64_buffer_t decbuf;
 
 // signals to AMY that i'm now receiving a transfer of length (bytes!) into allocated storage
 void start_receiving_transfer(uint32_t length, uint8_t * storage) {
-    amy_global.transfer_flag = 1;
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_AUDIO;
     amy_global.transfer_storage = storage;
     amy_global.transfer_length = length;
     amy_global.transfer_stored = 0;
@@ -107,6 +109,23 @@ void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     amy_global.transfer_reboot = 0;
     amy_global.transfer_filename[0] = '\0';
     b64_buf_malloc(&decbuf);
+}
+
+void start_receiving_sample(uint32_t frames, uint8_t bus, uint8_t *storage) {
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_SAMPLE;
+    amy_global.transfer_storage = storage;
+    amy_global.transfer_length = frames;
+    amy_global.transfer_stored = 0;
+    amy_global.transfer_file_handle = bus; // use file handle to store bus number
+    amy_global.transfer_reboot = 0;
+    amy_global.transfer_filename[0] = '\0';
+}
+
+void stop_receiving_sample() {
+    amy_global.transfer_file_handle = 0;
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
+    amy_global.transfer_stored = 0;
+    amy_global.transfer_length = 0;
 }
 
 // signals to AMY that i'm now receiving a file transfer of length (bytes!) to filename
@@ -123,7 +142,7 @@ void start_receiving_file_transfer(uint32_t length, const char *filename, uint32
         fprintf(stderr, "could not open file for transfer: %s\n", filename);
         return;
     }
-    amy_global.transfer_flag = 2;
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_FILE;
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length = length;
     amy_global.transfer_stored = 0;
@@ -138,7 +157,7 @@ void start_receiving_file_transfer(uint32_t length, const char *filename, uint32
 void parse_transfer_message(char * message, uint16_t len) {
     size_t decoded = 0;
     uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
-    if (amy_global.transfer_flag == 2) {
+    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
         if (amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
             uint32_t wrote = amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
             amy_global.transfer_stored += wrote;
@@ -149,21 +168,19 @@ void parse_transfer_message(char * message, uint16_t len) {
         }
     }
     if (amy_global.transfer_stored >= amy_global.transfer_length) { // we're done
-        if (amy_global.transfer_flag == 2) {
+        if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
             if (amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
                 amy_external_fclose_hook(amy_global.transfer_file_handle);
             }
-            if (amy_global.transfer_filename[0] != '\0') {
-                if (amy_external_file_transfer_done_hook != NULL) {
-                    amy_external_file_transfer_done_hook(amy_global.transfer_filename,
-                                                         amy_global.transfer_reboot);
-                }
+            if (amy_external_file_transfer_done_hook != NULL) {
+                amy_external_file_transfer_done_hook(amy_global.transfer_filename,
+                                                    amy_global.transfer_reboot);
             }
             amy_global.transfer_file_handle = 0;
             amy_global.transfer_reboot = 0;
             amy_global.transfer_filename[0] = '\0';
         }
-        amy_global.transfer_flag = 0;
+        amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
         free(decbuf.ptr);
     }
 }
@@ -487,9 +504,8 @@ uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, uint16_t b
         }
     } else {
         for (uint32_t i = 0; i < frames_to_read; i++) {
-            int16_t left = (int16_t)read_u16_le(raw_buf + i * 4);
-            int16_t right = (int16_t)read_u16_le(raw_buf + i * 4 + 2);
-            dest[i] = (int16_t)(((int32_t)left + (int32_t)right) / 2);
+            dest[i * 2] = (int16_t)read_u16_le(raw_buf + i * 4);
+            dest[i * 2 + 1] = (int16_t)read_u16_le(raw_buf + i * 4 + 2);
         }
     }
     return frames_to_read;
