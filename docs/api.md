@@ -214,5 +214,5 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint,uint,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote, loopstart, loopend. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
 | `zT`   | **TODO**| `transfer_file` | uint,string,uint | Transfer a file to the host. Params: file size, destination filename, reboot host after done (0/1). See `hooks` for writing files on host disk. |
 | `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from bus. Params: preset number,  bus, max length in frames, midinote, loopstart, loopend. bus = 1 is AMY mixed output. bus = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
-| `zO`   | **TODO**| `stop_sample` | none | Stop sampling. Does nothing if no sampling active.  | 
+| `zO`   | **TODO**| `stop_sample` | uint | Stop sampling. Does nothing if no sampling active. param ignored. | 
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |

@@ -137,6 +137,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
     ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), 
+    ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
@@ -315,6 +316,13 @@ except ImportError:
     import ubinascii
     def b64(b):
         return ubinascii.b2a_base64(b)[:-1]
+
+def start_sample(preset=0, bus=1,  max_frames=0, midinote=60, loopstart=0, loopend=0):
+    s = "%d,%d,%d,%d,%d,%d" % (preset, bus, max_frames, midinote, loopstart, loopend)
+    send(start_sample=s)
+
+def stop_sample():
+    send(stop_sample=1)
 
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename

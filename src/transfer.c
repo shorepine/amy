@@ -119,6 +119,7 @@ void start_receiving_sample(uint32_t frames, uint8_t bus, uint8_t *storage) {
     amy_global.transfer_file_handle = bus; // use file handle to store bus number
     amy_global.transfer_reboot = 0;
     amy_global.transfer_filename[0] = '\0';
+    fprintf(stderr, "start receiving sample to bus %d length %d\n", bus, frames);
 }
 
 void stop_receiving_sample() {
