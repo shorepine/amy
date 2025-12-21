@@ -865,20 +865,33 @@ class TestFileTransfer(AmyTest):
 
 
 class TestDiskSample(AmyTest):
-
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
-    amy.send(time=200, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=45)
-    amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=69)
 
 class TestDiskSampleStereo(AmyTest):
 
   def run(self):
     amy.disk_sample('sounds/sleepwalk.wav', preset=1024, midinote=60)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=2, note=60)
-    amy.send(time=50, osc=1, preset=1024, wave=amy.PCM_RIGHT, pan=1, vel=2, note=60)
+    amy.disk_sample('sounds/sleepwalk.wav', preset=1025, midinote=60)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
+    amy.send(time=50, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
 
+class TestSample(AmyTest):
+  def run(self):
+    amy.start_sample(preset=1024,bus=1,max_frames=22050, midinote=60)
+    amy.send(time=0, synth=1, num_voices=4, patch=20)
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    # notes off
+    amy.send(time=400, synth=1, note=48, vel=0)
+    amy.send(time=400, synth=1, note=60, vel=0)
+    amy.send(time=400, synth=1, note=63, vel=0)
+
+    # play a pitched up version
+    amy.send(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
+    amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
 
 
 def main(argv):

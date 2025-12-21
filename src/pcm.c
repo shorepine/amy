@@ -89,6 +89,7 @@ void pcm_note_on(uint16_t osc) {
             // baked-in PCM - don't overrun.
             if(synth[osc]->preset >= pcm_samples) synth[osc]->preset = 0;
         }
+        
         synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
         msynth[osc]->feedback = synth[osc]->feedback;
@@ -204,8 +205,6 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, step);
             base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
             if(base_index >= preset->length) { // end
-                //fprintf(stderr, "render_pcm: osc %d preset %d reached end at i=%d base_index=%d length=%d\n",
-                //       osc, synth[osc]->preset, i, base_index, preset->length);
                 synth[osc]->status = SYNTH_OFF;// is this right?
                 sample = 0;
             } else {
@@ -225,11 +224,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         }
         //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
         //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
-        if(!is_file_flag) { 
-            return max_value; 
-        } else { 
-            return 1; 
-        }
+        return 1; // i don't believe we ever need to detect silence in a sample. it will shut itself off at the end.
     }
     return 0;
 }

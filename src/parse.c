@@ -421,7 +421,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
     uint16_t pos = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop 
-    if (amy_global.transfer_flag != AMY_TRANSFER_TYPE_NONE) {
+    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return;
