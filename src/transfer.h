@@ -58,7 +58,7 @@ static const char b64_table[] = {
 void start_receiving_transfer(uint32_t length, uint8_t * storage);
 void start_receiving_file_transfer(uint32_t length, const char *filename, uint32_t reboot);
 void parse_transfer_message(char * message, uint16_t len) ;
-void start_receiving_sample(uint32_t frames, uint8_t bus, uint8_t *storage);
+void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage);
 void stop_receiving_sample();
 
 

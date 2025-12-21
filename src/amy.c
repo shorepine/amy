@@ -978,7 +978,11 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     case SAW_UP: saw_up_note_on(osc, initial_freq); break;
     case TRIANGLE: triangle_note_on(osc, initial_freq); break;
     case PULSE: pulse_note_on(osc, initial_freq); break;
-    case PCM: pcm_note_on(osc); break;
+    case PCM:
+    case PCM_LEFT:
+    case PCM_RIGHT:
+        pcm_note_on(osc);
+        break;
     case ALGO: algo_note_on(osc, initial_freq); break;
     case NOISE: noise_note_on(osc); break;
     case AUDIO_IN0: audio_in_note_on(osc, 0); break;
@@ -1213,7 +1217,11 @@ void play_delta(struct delta *d) {
 			case SAW_UP: saw_down_mod_trigger(mod_osc); break;
 			case TRIANGLE: triangle_mod_trigger(mod_osc); break;
 			case PULSE: pulse_mod_trigger(mod_osc); break;
-			case PCM: pcm_mod_trigger(mod_osc); break;
+            case PCM:
+            case PCM_LEFT:
+            case PCM_RIGHT:
+                pcm_mod_trigger(mod_osc);
+                break;
 			case CUSTOM: custom_mod_trigger(mod_osc); break;
 			}
 		    }
@@ -1228,7 +1236,11 @@ void play_delta(struct delta *d) {
 		switch(synth[osc]->wave) {
 		case KS: ks_note_off(osc); break;
 		case ALGO:  algo_note_off(osc); break;
-		case PCM: pcm_note_off(osc); break;
+        case PCM:
+        case PCM_LEFT:
+        case PCM_RIGHT:
+            pcm_note_off(osc);
+            break;
 		case AMY_MIDI: amy_send_midi_note_off(osc); break;
 		case CUSTOM: custom_note_off(osc); break;
 		case BYO_PARTIALS:
@@ -1430,7 +1442,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 }
             }
             if(pcm_samples)
-                if(synth[osc]->wave == PCM) max_val = render_pcm(buf, osc);
+                if (AMY_WAVE_IS_PCM(synth[osc]->wave)) max_val = render_pcm(buf, osc);
             if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS) {
                 if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
@@ -1727,14 +1739,15 @@ int16_t * amy_fill_buffer() {
 
     // Handle sampling after block is rendered
     if(amy_global.transfer_flag==AMY_TRANSFER_TYPE_SAMPLE) {
+        uint32_t bytes_per_frame = AMY_NCHANS * sizeof(int16_t);
+        uint32_t byte_offset = amy_global.transfer_stored * bytes_per_frame;
+        uint32_t bytes_to_copy = AMY_BLOCK_SIZE * bytes_per_frame;
         if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
-            memcpy(amy_global.transfer_storage+amy_global.transfer_stored, block, 
-                AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+            memcpy(amy_global.transfer_storage + byte_offset, block, bytes_to_copy);
         } else if(amy_global.transfer_file_handle==AMY_BUS_AUDIO_IN) {
             // copy audio input buffer to storage
-            memcpy(amy_global.transfer_storage+amy_global.transfer_stored, amy_in_block, 
-                AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+            memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
         }
         amy_global.transfer_stored += AMY_BLOCK_SIZE;
         if(amy_global.transfer_stored >= amy_global.transfer_length) {   

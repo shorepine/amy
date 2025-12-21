@@ -111,9 +111,9 @@ void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     b64_buf_malloc(&decbuf);
 }
 
-void start_receiving_sample(uint32_t frames, uint8_t bus, uint8_t *storage) {
+void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_SAMPLE;
-    amy_global.transfer_storage = storage;
+    amy_global.transfer_storage = (uint8_t *)storage;
     amy_global.transfer_length = frames;
     amy_global.transfer_stored = 0;
     amy_global.transfer_file_handle = bus; // use file handle to store bus number

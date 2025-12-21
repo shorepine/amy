@@ -222,6 +222,7 @@ enum coefs{
 #define PCM_MIX 7 // same as PCM
 #define CUSTOM 19
 #define WAVE_OFF 20
+#define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
 // synth[].status values
 #define SYNTH_OFF 0

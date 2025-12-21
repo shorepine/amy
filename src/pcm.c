@@ -316,7 +316,7 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     // if preset was already a memorypcm, we need to unload it
     pcm_unload_preset(preset_number); // this is a no-op if preset doesn't exist or is a const pcm
     // now alloc a new LL entry and preset (the old LL entry is removed with pcm_unload_preset)
-    memorypcm_ll_t *new_preset_pointer = malloc_caps(sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + length * sizeof(int16_t),
+    memorypcm_ll_t *new_preset_pointer = malloc_caps(sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + length * channels * sizeof(int16_t),
 						     amy_global.config.ram_caps_sample);
     if(new_preset_pointer  == NULL) {
         fprintf(stderr, "No RAM left for sample load\n");

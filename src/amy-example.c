@@ -64,18 +64,28 @@ int main(int argc, char ** argv) {
     amy_start(amy_config);
     
     amy_live_start();
-    //amy_add_message("zF1024,sleepwalk_mono.wav,60");
+    amy_add_message("zF1024,sounds/sleepwalk.wav,60");
+    amy_add_message("zF1025,sounds/sleepwalk.wav,60");
 
     
     amy_event e = amy_default_event();
-    e.wave = PCM_MIX;
-    e.preset = 1;
-
-    //e.preset = 1024;
+    e.wave = PCM_LEFT;
+    e.preset = 1024;
     e.velocity=1;
+    e.pan_coefs[0] = 0;
     e.midi_note = 60;
     e.osc = 14;
     amy_add_event(&e);
+
+    e.wave = PCM_RIGHT;
+    e.preset = 1025;
+    e.velocity=1;
+    e.pan_coefs[0] = 1;
+    e.midi_note = 60;
+    e.osc = 15;
+    amy_add_event(&e);
+
+    
 
     //example_fm(0);
     //example_voice_chord(0,0);
