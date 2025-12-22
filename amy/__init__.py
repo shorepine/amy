@@ -344,13 +344,13 @@ def disk_sample(wavfilename, preset=0, midinote=60):
     s = "%d,%s,%d" % (preset, wavfilename, midinote)
     send(disk_sample=s)
 
-def transfer_file(source_filename, dest_filename=None, reboot=False):
+def transfer_file(source_filename, dest_filename=None):
     import os
     from math import ceil
     if(dest_filename is None):
-        filename = source_filename
+        dest_filename = source_filename
     file_size = os.path.getsize(source_filename)
-    s = "%d,%s,%d" % (file_size, dest_filename, int(reboot))
+    s = "%s,%d" % (dest_filename, file_size)
     send(transfer_file=s)
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.

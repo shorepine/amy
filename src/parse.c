@@ -149,23 +149,15 @@ static void parse_list_file_params(char *message, uint32_t *preset, char *filena
     *midinote = parse_uint32_token(p, token_len);
 }
 
-static void parse_list_file_transfer_params(char *message, uint32_t *file_size, char *filename,
-                                            size_t filename_len, uint32_t *reboot) {
+static void parse_list_file_transfer_params(char *message, char *filename, size_t filename_len,
+                                            uint32_t *file_size) {
     *file_size = 0;
-    *reboot = 0;
     if (filename_len > 0) {
         filename[0] = '\0';
     }
     char *p = message;
     char *comma = strchr(p, ',');
     size_t token_len = comma ? (size_t)(comma - p) : strlen(p);
-    *file_size = parse_uint32_token(p, token_len);
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    comma = strchr(p, ',');
-    token_len = comma ? (size_t)(comma - p) : strlen(p);
     while (token_len > 0 && *p == ' ') {
         p++;
         token_len--;
@@ -182,8 +174,9 @@ static void parse_list_file_transfer_params(char *message, uint32_t *file_size, 
         return;
     }
     p = comma + 1;
-    token_len = strlen(p);
-    *reboot = parse_uint32_token(p, token_len);
+    comma = strchr(p, ',');
+    token_len = comma ? (size_t)(comma - p) : strlen(p);
+    *file_size = parse_uint32_token(p, token_len);
 }
 
 
@@ -346,13 +339,12 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     message++;
     if (cmd == 'T')  {
         // zT: Signal to start loading file. 
-        //Params: File size, Destination name, reboot=[0],1 if you want to reboot the device after completing.    
+        //Params: Destination name, file size.
         uint32_t file_size = 0;
-        uint32_t reboot = 0;
         char filename[MAX_FILENAME_LEN];
-        parse_list_file_transfer_params(message, &file_size, filename, sizeof(filename), &reboot);
+        parse_list_file_transfer_params(message, filename, sizeof(filename), &file_size);
         if (filename[0] != '\0') {
-            start_receiving_file_transfer(file_size, filename, reboot);
+            start_receiving_file_transfer(file_size, filename);
         }
     }
     else if (cmd == 'F') {

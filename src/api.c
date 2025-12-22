@@ -27,7 +27,7 @@ uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
 uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
-void (*amy_external_file_transfer_done_hook)(const char *filename, uint32_t reboot) = NULL;
+void (*amy_external_file_transfer_done_hook)(const char *filename) = NULL;
 
 
 

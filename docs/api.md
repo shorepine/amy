@@ -128,8 +128,8 @@ uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t le
 uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
-// Called when a file transfer is done (used in Micropython platforms to unpack or reboot)
-void (*amy_external_file_transfer_done_hook)(const char *filename, uint32_t reboot) = NULL;
+// Called when a file transfer is done (used in Micropython platforms to unpack)
+void (*amy_external_file_transfer_done_hook)(const char *filename) = NULL;
 ```
 
 
@@ -219,4 +219,4 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `V`    | `volume`| `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
-| `zT`   | **TODO**| `transfer_file` | uint,string,uint | Transfer a file to the host. Params: file size, destination filename, reboot host after done (0/1). See `hooks` for writing files on host disk. |
+| `zT`   | **TODO**| `transfer_file` | string,uint | Transfer a file to the host. Params: destination filename, file size. See `hooks` for writing files on host disk. |

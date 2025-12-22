@@ -106,7 +106,6 @@ void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     amy_global.transfer_length = length;
     amy_global.transfer_stored = 0;
     amy_global.transfer_file_handle = 0;
-    amy_global.transfer_reboot = 0;
     amy_global.transfer_filename[0] = '\0';
     b64_buf_malloc(&decbuf);
 }
@@ -117,7 +116,6 @@ void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage) {
     amy_global.transfer_length = frames;
     amy_global.transfer_stored = 0;
     amy_global.transfer_file_handle = bus; // use file handle to store bus number
-    amy_global.transfer_reboot = 0;
     amy_global.transfer_filename[0] = '\0';
 }
 
@@ -129,7 +127,7 @@ void stop_receiving_sample() {
 }
 
 // signals to AMY that i'm now receiving a file transfer of length (bytes!) to filename
-void start_receiving_file_transfer(uint32_t length, const char *filename, uint32_t reboot) {
+void start_receiving_file_transfer(uint32_t length, const char *filename) {
     if (filename == NULL || filename[0] == '\0') {
         return;
     }
@@ -147,7 +145,6 @@ void start_receiving_file_transfer(uint32_t length, const char *filename, uint32
     amy_global.transfer_length = length;
     amy_global.transfer_stored = 0;
     amy_global.transfer_file_handle = handle;
-    amy_global.transfer_reboot = reboot;
     strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
     amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
     b64_buf_malloc(&decbuf);
@@ -173,11 +170,9 @@ void parse_transfer_message(char * message, uint16_t len) {
                 amy_external_fclose_hook(amy_global.transfer_file_handle);
             }
             if (amy_external_file_transfer_done_hook != NULL) {
-                amy_external_file_transfer_done_hook(amy_global.transfer_filename,
-                                                    amy_global.transfer_reboot);
+                amy_external_file_transfer_done_hook(amy_global.transfer_filename); 
             }
             amy_global.transfer_file_handle = 0;
-            amy_global.transfer_reboot = 0;
             amy_global.transfer_filename[0] = '\0';
         }
         amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;

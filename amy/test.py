@@ -848,7 +848,7 @@ class TestFileTransfer(AmyTest):
     try:
       with open(temp_file, 'w') as f:
         f.write(payload)
-      amy.transfer_file(temp_file, transfer_file, False)
+      amy.transfer_file(temp_file, transfer_file)
       amy.render(0.1)
       if not os.path.exists(transfer_file):
         raise AssertionError('transfer file not created')
