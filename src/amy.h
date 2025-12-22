@@ -65,6 +65,13 @@ extern const uint16_t pcm_samples;
 #define AMY_TRANSFER_TYPE_FILE 2
 #define AMY_TRANSFER_TYPE_SAMPLE 3
 
+#define AMY_PCM_TYPE_ROM 0
+#define AMY_PCM_TYPE_FILE 1
+#define AMY_PCM_TYPE_MEMORY 2
+
+// File-streaming buffer size multiplier (in blocks).
+#define PCM_FILE_BUFFER_MULT 8
+
 
 #define AMY_BUS_OUTPUT 1
 #define AMY_BUS_AUDIO_IN 2
@@ -913,7 +920,7 @@ extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
-extern int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote);
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
 

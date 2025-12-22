@@ -11,6 +11,7 @@
 
 // This is for any in-memory PCM samples.
 typedef struct {
+    char filename[MAX_FILENAME_LEN];
     uint8_t channels;
     uint16_t bits_per_sample;
     uint32_t file_handle;
@@ -23,7 +24,7 @@ typedef struct {
     uint8_t midinote;
     uint32_t samplerate;
     float log2sr;
-    uint8_t rom;
+    uint8_t type;
 } memorypcm_preset_t;
 
 // linked list of memorypcm presets
@@ -64,7 +65,7 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
     rompreset.midinote = cpreset.midinote;
     rompreset.samplerate = PCM_AMY_SAMPLE_RATE;
     rompreset.log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
-    rompreset.rom = 1;
+    rompreset.type = AMY_PCM_TYPE_ROM;
     rompreset.channels = 1;
     return &rompreset;
 }
@@ -81,14 +82,42 @@ void pcm_deinit() {
 #define PCM_INDEX_FRAC_BITS 8
 // The number of bits used to hold the table index.
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
-// File-streaming buffer size multiplier (in blocks).
-#define PCM_FILE_BUFFER_MULT 8
 
+static void fclose_if_file(memorypcm_preset_t *preset) {
+    if (preset == NULL) {
+        return;
+    }
+    if (preset->type == AMY_PCM_TYPE_FILE &&
+        preset->file_handle != 0 &&
+        amy_external_fclose_hook != NULL) {
+        amy_external_fclose_hook(preset->file_handle);
+        preset->file_handle = 0;
+    }
+}
 
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
-        if(preset->rom) {
+        if (preset->type == AMY_PCM_TYPE_FILE) {
+            fclose_if_file(preset);
+            if (amy_external_fopen_hook != NULL && amy_external_fclose_hook != NULL) {
+                uint32_t handle = amy_external_fopen_hook(preset->filename, "rb");
+                if (handle != 0) {
+                    wave_info_t info = {0};
+                    uint32_t data_bytes = 0;
+                    if (wave_parse_header(handle, &info, &data_bytes)) {
+                        preset->file_handle = handle;
+                        preset->channels = info.channels;
+                        preset->bits_per_sample = info.bits_per_sample;
+                        preset->samplerate = info.sample_rate;
+                        preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
+                        preset->file_bytes_remaining = data_bytes;
+                    } else {
+                        amy_external_fclose_hook(handle);
+                    }
+                }
+            }
+        } else if (preset->type == AMY_PCM_TYPE_ROM) {
             // baked-in PCM - don't overrun.
             if(synth[osc]->preset >= pcm_samples) synth[osc]->preset = 0;
         }
@@ -133,7 +162,6 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
     if (frames_available > 0 && frames_needed > frames_available) {
         frames_needed = frames_available;
     }
-    //fprintf(stderr, "fill_sample_from_file: handle %d bytes_remaining %d frames_needed %d\n", preset_p->file_handle, preset_p->file_bytes_remaining, frames_needed);
     uint32_t frames_read = wave_read_pcm_frames_s16(
         preset_p->file_handle,
         preset_p->channels,
@@ -145,7 +173,6 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
 }
 
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
-    uint8_t is_file_flag = 0;
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t * preset = get_preset_for_preset_number(synth[osc]->preset);
         float logfreq = msynth[osc]->logfreq;
@@ -154,26 +181,27 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             logfreq -= logfreq_for_midi_note(preset->midinote);
         }
         float playback_freq = freq_of_logfreq(preset->log2sr + logfreq);
-        if (preset->file_handle != 0) { // file
-            is_file_flag = 1;
+        uint32_t sample_length = preset->length;
+        if (preset->type == AMY_PCM_TYPE_FILE) {
             float frames_per_output = playback_freq / (float)AMY_SAMPLE_RATE;
             uint32_t frames_needed = (uint32_t)ceilf(frames_per_output * AMY_BLOCK_SIZE) + 1;
             uint32_t max_frames = AMY_BLOCK_SIZE * PCM_FILE_BUFFER_MULT;
             if (frames_needed > max_frames) {
                 frames_needed = max_frames;
             }
-            //fprintf(stderr, "render_pcm: osc %d preset %d filling file sample buffer: frames_needed=%d bytes_remaining=%d playback_freq=%f\n",
-            //        osc, synth[osc]->preset, frames_needed, preset->file_bytes_remaining, playback_freq);
-            fill_sample_from_file(preset, frames_needed);
+            sample_length = fill_sample_from_file(preset, frames_needed);
+            if(sample_length != frames_needed) {
+                // reached end of file
+                fclose_if_file(preset);
+                synth[osc]->status = SYNTH_OFF;
+            }
+            synth[osc]->phase = 0;
         }
 
-        SAMPLE max_value = 0;
         SAMPLE amp = F2S(msynth[osc]->amp);
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
         const LUTSAMPLE* table = preset->sample_ram;
-        if(is_file_flag)synth[osc]->phase = 0; // always from start for file samples
         uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-        //fprintf(stderr, "render_pcm: time=%.3f preset=%d base_index=%d length=%d loopstart=%d loopend=%d fb=%f is_unset_note_off %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, synth[osc]->preset, base_index, preset->length, preset->loopstart, preset->loopend, msynth[osc]->feedback, AMY_IS_UNSET(synth[osc]->note_off_clock));
         for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
             SAMPLE frac = S_FRAC_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
             LUTSAMPLE b = 0;
@@ -184,15 +212,15 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 uint32_t next_offset = next_index * 2;
                 if (synth[osc]->wave == PCM_LEFT) {
                     b = table[base_offset];
-                    c = (next_index < preset->length) ? table[next_offset] : b;
+                    c = (next_index < sample_length) ? table[next_offset] : b;
                 } else if (synth[osc]->wave == PCM_RIGHT) {
                     b = table[base_offset + 1];
-                    c = (next_index < preset->length) ? table[next_offset + 1] : b;
-                } else { // PCM_MIX
+                    c = (next_index < sample_length) ? table[next_offset + 1] : b;
+                } else { // PCM or PCM_MIX
                     LUTSAMPLE bl = table[base_offset];
                     LUTSAMPLE br = table[base_offset + 1];
                     b = (LUTSAMPLE)(((int32_t)bl + (int32_t)br) / 2);
-                    if (next_index < preset->length) {
+                    if (next_index < sample_length) {
                         LUTSAMPLE cl = table[next_offset];
                         LUTSAMPLE cr = table[next_offset + 1];
                         c = (LUTSAMPLE)(((int32_t)cl + (int32_t)cr) / 2);
@@ -202,28 +230,30 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 }
             } else {
                 b = table[base_index];
-                c = (next_index < preset->length) ? table[next_index] : b;
+                c = (next_index < sample_length) ? table[next_index] : b;
             }
             SAMPLE sample = L2S(b) + MUL0_SS(L2S(c - b), frac);
             synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, step);
             base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-            if(base_index >= preset->length) { // end
-                synth[osc]->status = SYNTH_OFF;// is this right?
-                sample = 0;
-            } else {
-                if(msynth[osc]->feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
-                    if(base_index >= preset->loopend) { // loopend
-                        // back to loopstart
-                        int32_t loop_len = preset->loopend - preset->loopstart;
-                        synth[osc]->phase -= F2P(loop_len / (float)(1 << PCM_INDEX_BITS));
-                        base_index -= loop_len;
+
+            if(preset->type != AMY_PCM_TYPE_FILE) {
+                // For non-file samples, we have to check for end of sample/looping.
+                if(base_index >= sample_length) { // end
+                    synth[osc]->status = SYNTH_OFF;// is this right?
+                    sample = 0;
+                } else {
+                    if(msynth[osc]->feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
+                        if(base_index >= preset->loopend) { // loopend
+                            // back to loopstart
+                            int32_t loop_len = preset->loopend - preset->loopstart;
+                            synth[osc]->phase -= F2P(loop_len / (float)(1 << PCM_INDEX_BITS));
+                            base_index -= loop_len;
+                        }
                     }
                 }
             }
             SAMPLE value = buf[i] + MUL4_SS(amp, sample);
-            buf[i] = value;
-            if (value < 0) value = -value;
-            if (value > max_value) max_value = value;        
+            buf[i] = value;   
         }
         //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
         //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
@@ -244,8 +274,7 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
 }
 
 
-int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote,
-                  uint32_t loopstart, uint32_t loopend) {
+int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote) {
     pcm_unload_preset(preset_number);
     if (filename == NULL || filename[0] == '\0') {
         return 0;
@@ -283,25 +312,25 @@ int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote
     new_preset_pointer->preset_number = preset_number;
     memorypcm_preset_t *memory_preset =
         (memorypcm_preset_t *)(((uint8_t *)new_preset_pointer) + sizeof(memorypcm_ll_t));
+    strncpy(memory_preset->filename, filename, MAX_FILENAME_LEN - 1);
+    memory_preset->filename[MAX_FILENAME_LEN - 1] = '\0';
     memory_preset->channels = info.channels;
     memory_preset->samplerate = info.sample_rate;
     memory_preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
     memory_preset->midinote = midinote;
-    memory_preset->loopstart = loopstart;
     memory_preset->length = total_frames;
-    if (loopend == 0 && total_frames > 0) {
-        memory_preset->loopend = total_frames - 1;
-    } else {
-        memory_preset->loopend = loopend;
-    }
     memory_preset->file_parsed = 1;
-    memory_preset->rom = 0;
+    memory_preset->type = AMY_PCM_TYPE_FILE;
     memory_preset->bits_per_sample = info.bits_per_sample;
     memory_preset->file_bytes_remaining = total_frames * info.channels * (info.bits_per_sample / 8);
     memory_preset->file_handle = handle;
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
     new_preset_pointer->preset = memory_preset;
+    if (amy_external_fclose_hook != NULL) {
+        amy_external_fclose_hook(handle);
+        memory_preset->file_handle = 0;
+    }
     //fprintf(stderr, "read file %s frames %d channels %d preset %d handle %d\n", filename, total_frames, info.channels, preset_number, handle);
     return 1;
 }
@@ -330,11 +359,12 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->loopstart = loopstart;
     memory_preset->length = length;
     memory_preset->channels = channels;
+    memory_preset->filename[0] = '\0';
     memory_preset->file_parsed = 0;
     memory_preset->bits_per_sample = 16;
     memory_preset->file_bytes_remaining = 0;
     memory_preset->file_handle = 0;
-    memory_preset->rom = 0;
+    memory_preset->type = AMY_PCM_TYPE_MEMORY;
     memory_preset->sample_ram = (int16_t *)(((uint8_t *)memory_preset) + sizeof(memorypcm_preset_t));
     if(loopend == 0) {  // loop whole sample
         memory_preset->loopend = memory_preset->length-1;
@@ -351,6 +381,7 @@ void pcm_unload_preset(uint16_t preset_number) {
     while(*preset_pointer != NULL) {
         if((*preset_pointer)->preset_number == preset_number) {
             memorypcm_ll_t *next = (*preset_pointer)->next;
+            fclose_if_file((*preset_pointer)->preset);
             // free the memory we allocated
             free((*preset_pointer));
             // close up the list
@@ -367,7 +398,7 @@ void pcm_unload_all_presets() {
     memorypcm_ll_t *preset_pointer = memorypcm_ll_start;
     while(preset_pointer != NULL) {
         memorypcm_ll_t *next_pointer = preset_pointer->next;
-	//fprintf(stderr, "unload_all_presets: unloading %d\n", preset_pointer->preset_number);
+        fclose_if_file(preset_pointer->preset);
         free(preset_pointer);
         // Go to the next one
         preset_pointer = next_pointer;

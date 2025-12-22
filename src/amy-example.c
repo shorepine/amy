@@ -109,7 +109,6 @@ int main(int argc, char ** argv) {
 
 	// Make sure libminiaudio has time to clean up.
 	sleep(2);
-    }
 
     return 0;
 }

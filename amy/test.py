@@ -869,6 +869,12 @@ class TestDiskSample(AmyTest):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
+class TestRestartFileSample(AmyTest):
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=60)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=72)
+    amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
+
 class TestDiskSampleStereo(AmyTest):
 
   def run(self):
@@ -926,7 +932,9 @@ def main(argv):
     #TestVoiceStealing().test()
     #TestSustainPedal().test()
     #TestPatchFromEvents().test()
-    TestVoiceStealDecay().test()
+    #TestVoiceStealDecay().test()
+    TestRestartFileSample().test()
+    #TestDiskSample().test()
 
   amy.send(debug=0)
   print("tests done.")

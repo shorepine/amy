@@ -112,12 +112,9 @@ static uint32_t parse_uint32_token(const char *start, size_t len) {
 }
 
 static void parse_list_file_params(char *message, uint32_t *preset, char *filename,
-                                   size_t filename_len, uint32_t *midinote,
-                                   uint32_t *loopstart, uint32_t *loopend) {
+                                   size_t filename_len, uint32_t *midinote) {
     *preset = 0;
     *midinote = 0;
-    *loopstart = 0;
-    *loopend = 0;
     if (filename_len > 0) {
         filename[0] = '\0';
     }
@@ -150,19 +147,6 @@ static void parse_list_file_params(char *message, uint32_t *preset, char *filena
     comma = strchr(p, ',');
     token_len = comma ? (size_t)(comma - p) : strlen(p);
     *midinote = parse_uint32_token(p, token_len);
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    comma = strchr(p, ',');
-    token_len = comma ? (size_t)(comma - p) : strlen(p);
-    *loopstart = parse_uint32_token(p, token_len);
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    token_len = strlen(p);
-    *loopend = parse_uint32_token(p, token_len);
 }
 
 static void parse_list_file_transfer_params(char *message, uint32_t *file_size, char *filename,
@@ -373,16 +357,14 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
     }
     else if (cmd == 'F') {
         // zF: setup PCM preset from WAV filename on disk. 
-        // Params: Preset number, filename, midi note, loop start, loopend
+        // Params: Preset number, filename, midi note
         uint32_t preset = 0;
         uint32_t midinote = 0;
-        uint32_t loopstart = 0;
-        uint32_t loopend = 0;
         char filename[MAX_FILENAME_LEN];
         parse_list_file_params(message, &preset, filename, sizeof(filename),
-                               &midinote, &loopstart, &loopend);
+                               &midinote);
         if (filename[0] != '\0') {
-            pcm_load_file(preset, filename, (uint8_t)midinote, loopstart, loopend);
+            pcm_load_file(preset, filename, (uint8_t)midinote);
         }
     }
     else if (cmd == 'S') {

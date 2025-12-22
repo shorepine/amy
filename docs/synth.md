@@ -322,7 +322,7 @@ Under the hood, if AMY receives a `load_sample` message (with preset number and 
 
 ### WAV file playback
 
-AMY support playing WAV files directly with pitching and looping, if your host of MCU has file support. You can use this when the WAV files are bigger than available memory. We provide file reading hooks for POSIX platforms (Mac, Linux) and see [Hooks](api.md#Hooks) to build your own `fopen`, `fread` etc on other platforms like Arduino or Micropython. You can set an oscillator to play a channel of the file with `disk_sample`, e.g.
+AMY support playing WAV files directly with pitching (but not looping!) if your host of MCU has file support. You can use this when the WAV files are bigger than available memory. We provide file reading hooks for POSIX platforms (Mac, Linux) and see [Hooks](api.md#Hooks) to build your own `fopen`, `fread` etc on other platforms like Arduino or Micropython. You can set an oscillator to play a channel of the file with `disk_sample`, e.g.
 
 ```python
 amy.disk_sample("G1.wav", preset=1024, midinote=31)

@@ -483,7 +483,7 @@ uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, uint16_t b
     if (frames_to_read == 0) {
         return 0;
     }
-    uint8_t raw_buf[(AMY_BLOCK_SIZE + 1) * 4];
+    uint8_t raw_buf[(AMY_BLOCK_SIZE * PCM_FILE_BUFFER_MULT + 1) * 4];
     if (max_bytes > sizeof(raw_buf)) {
         max_bytes = sizeof(raw_buf) - (sizeof(raw_buf) % bytes_per_frame);
         frames_to_read = max_bytes / bytes_per_frame;

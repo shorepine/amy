@@ -340,8 +340,8 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         send_raw(message.decode('ascii'))
         last_f = last_f + 188
 
-def disk_sample(wavfilename, preset=0, midinote=60, loopstart=0, loopend=0):
-    s = "%d,%s,%d,%d,%d" % (preset, wavfilename, midinote, loopstart, loopend)
+def disk_sample(wavfilename, preset=0, midinote=60):
+    s = "%d,%s,%d" % (preset, wavfilename, midinote)
     send(disk_sample=s)
 
 def transfer_file(source_filename, dest_filename=None, reboot=False):
