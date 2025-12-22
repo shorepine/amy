@@ -868,10 +868,10 @@ class TestRestartFileSample(AmyTest):
 class TestDiskSampleStereo(AmyTest):
 
   def run(self):
-    amy.disk_sample('sounds/sleepwalk.wav', preset=1024, midinote=60)
-    amy.disk_sample('sounds/sleepwalk.wav', preset=1025, midinote=60)
+    amy.disk_sample('sounds/220_440_stereo.wav', preset=1024, midinote=60)
+    amy.disk_sample('sounds/220_440_stereo.wav', preset=1025, midinote=60)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
-    amy.send(time=50, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
+    amy.send(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
 
 class TestSample(AmyTest):
   def run(self):
