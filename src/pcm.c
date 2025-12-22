@@ -11,7 +11,7 @@
 
 // This is for any in-memory PCM samples.
 typedef struct {
-    uint8_t type;
+    uint8_t type; 
     char filename[MAX_FILENAME_LEN];
     uint8_t channels;
     uint32_t file_handle;

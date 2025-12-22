@@ -923,8 +923,9 @@ def main(argv):
     #TestSustainPedal().test()
     #TestPatchFromEvents().test()
     #TestVoiceStealDecay().test()
-    TestRestartFileSample().test()
+    #TestRestartFileSample().test()
     #TestDiskSample().test()
+    TestFileTransfer().test()
 
   amy.send(debug=0)
   print("tests done.")

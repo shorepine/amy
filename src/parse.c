@@ -96,87 +96,59 @@ PARSE_LIST(uint16_t)
 PARSE_LIST(int32_t)
 PARSE_LIST(int16_t)
 
-static uint32_t parse_uint32_token(const char *start, size_t len) {
-    while (len > 0 && *start == ' ') {
-        start++;
-        len--;
+
+char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_len) {
+    // Copy a string while trimming leading and trailing spaces.
+    const char *s = src;
+    char *d = dest;
+    size_t d_writ = 0;
+    size_t s_read = 0;
+    size_t trimmed_src_len = src_len;
+    // scan for spaces at end
+    while(trimmed_src_len > 0 && isspace(src[trimmed_src_len - 1])) --trimmed_src_len;
+    // skip over leading spaces
+    while(s_read < trimmed_src_len && isspace(*s)) {
+        ++s;
+        ++s_read;
     }
-    if (len == 0) {
-        return 0;
+    while(s_read < trimmed_src_len && d_writ < (dest_len - 1)) {
+        *d++ = *s++;
+        ++s_read;
+        ++d_writ;
     }
-    char tmp[32];
-    size_t n = len < sizeof(tmp) - 1 ? len : sizeof(tmp) - 1;
-    memcpy(tmp, start, n);
-    tmp[n] = '\0';
-    return (uint32_t)atoi(tmp);
+    *d = '\0'; // terminator.
+    return (char*) (src + src_len);
 }
 
-static void parse_list_file_params(char *message, uint32_t *preset, char *filename,
-                                   size_t filename_len, uint32_t *midinote) {
-    *preset = 0;
-    *midinote = 0;
+uint16_t parse_list_file_params(char *message, uint32_t *preset, char *filename, size_t filename_len, uint32_t *midinote) {
+    // Returns number of characters of message that are consumed.
     if (filename_len > 0) {
-        filename[0] = '\0';
+        filename[0] = '\0'; 
     }
-    char *p = message;
-    char *comma = strchr(p, ',');
-    size_t token_len = comma ? (size_t)(comma - p) : strlen(p);
-    *preset = parse_uint32_token(p, token_len);
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    comma = strchr(p, ',');
-    token_len = comma ? (size_t)(comma - p) : strlen(p);
-    while (token_len > 0 && *p == ' ') {
-        p++;
-        token_len--;
-    }
-    while (token_len > 0 && p[token_len - 1] == ' ') {
-        token_len--;
-    }
-    if (filename_len > 0) {
-        size_t copy_len = token_len < filename_len - 1 ? token_len : filename_len - 1;
-        memcpy(filename, p, copy_len);
-        filename[copy_len] = '\0';
-    }
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    comma = strchr(p, ',');
-    token_len = comma ? (size_t)(comma - p) : strlen(p);
-    *midinote = parse_uint32_token(p, token_len);
+    char *m = message;
+    *preset = strtol(m, &m, 0);
+    if (*m != ',') return m - message;
+    ++m;
+    m = copy_with_trim(filename, filename_len, m, strchrnul(m, ',') - m);
+    if (*m != ',') return m - message;
+    ++m;
+    *midinote = strtol(m, &m, 0);
+    return m - message;
 }
 
-static void parse_list_file_transfer_params(char *message, char *filename, size_t filename_len,
+
+uint16_t parse_list_file_transfer_params(char *message, char *filename, size_t filename_len,
                                             uint32_t *file_size) {
     *file_size = 0;
     if (filename_len > 0) {
         filename[0] = '\0';
     }
-    char *p = message;
-    char *comma = strchr(p, ',');
-    size_t token_len = comma ? (size_t)(comma - p) : strlen(p);
-    while (token_len > 0 && *p == ' ') {
-        p++;
-        token_len--;
-    }
-    while (token_len > 0 && p[token_len - 1] == ' ') {
-        token_len--;
-    }
-    if (filename_len > 0) {
-        size_t copy_len = token_len < filename_len - 1 ? token_len : filename_len - 1;
-        memcpy(filename, p, copy_len);
-        filename[copy_len] = '\0';
-    }
-    if (comma == NULL) {
-        return;
-    }
-    p = comma + 1;
-    comma = strchr(p, ',');
-    token_len = comma ? (size_t)(comma - p) : strlen(p);
-    *file_size = parse_uint32_token(p, token_len);
+    char *m = message;
+    m = copy_with_trim(filename, filename_len, m, strchrnul(m, ',') - m);
+    if (*m != ',') return m - message;
+    ++m;
+    *file_size = strtol(m, &m, 0);
+    return m-message;
 }
 
 
@@ -320,8 +292,8 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
 
-// Parser for transfer-layer ('z') prefix.
-void amy_parse_transfer_layer_message(char *message, amy_event *e) {
+// Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
+uint16_t amy_parse_transfer_layer_message(char *message) {
     if (message[0] >= '0' && message[0] <= '9') {
         // z: Signal to start loading sample. 
         // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
@@ -333,7 +305,7 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
             int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, sm[3], sm[4], sm[5]);
             start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
         }
-        return;
+        return 0;
     }
     char cmd = message[0];
     message++;
@@ -342,10 +314,11 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
         //Params: Destination name, file size.
         uint32_t file_size = 0;
         char filename[MAX_FILENAME_LEN];
-        parse_list_file_transfer_params(message, filename, sizeof(filename), &file_size);
+        uint16_t len = parse_list_file_transfer_params(message, filename, sizeof(filename), &file_size);
         if (filename[0] != '\0') {
             start_receiving_file_transfer(file_size, filename);
         }
+        return len;
     }
     else if (cmd == 'F') {
         // zF: setup PCM preset from WAV filename on disk. 
@@ -353,11 +326,12 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
         uint32_t preset = 0;
         uint32_t midinote = 0;
         char filename[MAX_FILENAME_LEN];
-        parse_list_file_params(message, &preset, filename, sizeof(filename),
+        uint16_t len = parse_list_file_params(message, &preset, filename, sizeof(filename),
                                &midinote);
         if (filename[0] != '\0') {
             pcm_load_file(preset, filename, (uint8_t)midinote);
         }
+        return len;
     }
     else if (cmd == 'S') {
         // zS: sample from BUS[1] to a memorypcm patch. 
@@ -366,12 +340,15 @@ void amy_parse_transfer_layer_message(char *message, amy_event *e) {
         parse_list_uint32_t(message, sm, 6, 0);
         int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, sm[3], sm[4], sm[5]);
         start_receiving_sample(sm[2], sm[1], ram);
+        return 1;
     }
     else if (cmd == 'O') {
         //zO: stop sampling from any bus
         stop_receiving_sample();
+        return 1;
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
+    return 0;
 }
 
 
@@ -514,12 +491,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                 }
                 break;
             case 'z': {
-                amy_parse_transfer_layer_message(arg, e);
-                if (arg[0] == 'F' || arg[0] == 'T') {
-                    pos = length - 1;  // Consume rest to avoid parsing filename as commands.
-                } else {
-                    ++pos;  // Skip over second cmd letter, if any.
-                }
+                pos += amy_parse_transfer_layer_message(arg);
                 break;
             }
             /* Y,y available */
