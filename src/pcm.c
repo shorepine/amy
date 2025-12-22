@@ -11,9 +11,9 @@
 
 // This is for any in-memory PCM samples.
 typedef struct {
+    uint8_t type;
     char filename[MAX_FILENAME_LEN];
     uint8_t channels;
-    uint16_t bits_per_sample;
     uint32_t file_handle;
     uint32_t file_bytes_remaining;
     int16_t * sample_ram;
@@ -23,7 +23,6 @@ typedef struct {
     uint8_t midinote;
     uint32_t samplerate;
     float log2sr;
-    uint8_t type;
 } memorypcm_preset_t;
 
 // linked list of memorypcm presets
@@ -107,7 +106,6 @@ void pcm_note_on(uint16_t osc) {
                     if (wave_parse_header(handle, &info, &data_bytes)) {
                         preset->file_handle = handle;
                         preset->channels = info.channels;
-                        preset->bits_per_sample = info.bits_per_sample;
                         preset->samplerate = info.sample_rate;
                         preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
                         preset->file_bytes_remaining = data_bytes;
@@ -153,7 +151,7 @@ void pcm_note_off(uint16_t osc) {
 
 
 uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_needed) {
-    uint32_t bytes_per_frame = preset_p->channels * (preset_p->bits_per_sample / 8);
+    uint32_t bytes_per_frame = preset_p->channels * 2;
     uint32_t frames_available = 0;
     if (bytes_per_frame > 0) {
         frames_available = preset_p->file_bytes_remaining / bytes_per_frame;
@@ -164,7 +162,6 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
     uint32_t frames_read = wave_read_pcm_frames_s16(
         preset_p->file_handle,
         preset_p->channels,
-        preset_p->bits_per_sample,
         &preset_p->file_bytes_remaining,
         preset_p->sample_ram,
         frames_needed);
@@ -319,8 +316,7 @@ int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote
     memory_preset->midinote = midinote;
     memory_preset->length = total_frames;
     memory_preset->type = AMY_PCM_TYPE_FILE;
-    memory_preset->bits_per_sample = info.bits_per_sample;
-    memory_preset->file_bytes_remaining = total_frames * info.channels * (info.bits_per_sample / 8);
+    memory_preset->file_bytes_remaining = total_frames * info.channels * 2;
     memory_preset->file_handle = handle;
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
@@ -358,7 +354,6 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->length = length;
     memory_preset->channels = channels;
     memory_preset->filename[0] = '\0';
-    memory_preset->bits_per_sample = 16;
     memory_preset->file_bytes_remaining = 0;
     memory_preset->file_handle = 0;
     memory_preset->type = AMY_PCM_TYPE_MEMORY;

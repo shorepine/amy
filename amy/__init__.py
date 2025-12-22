@@ -136,7 +136,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
-    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), 
+    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]

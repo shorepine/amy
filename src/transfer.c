@@ -427,8 +427,7 @@ int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes) 
             uint16_t audio_format = read_u16_le(fmt_chunk);
             tmp_info.channels = read_u16_le(fmt_chunk + 2);
             tmp_info.sample_rate = read_u32_le(fmt_chunk + 4);
-            tmp_info.bits_per_sample = read_u16_le(fmt_chunk + 14);
-            if (audio_format != 1 || tmp_info.channels == 0 || tmp_info.channels > 2 || tmp_info.bits_per_sample != 16) {
+            if (audio_format != 1 || tmp_info.channels == 0 || tmp_info.channels > 2) {
                 return 0;
             }
             if (!skip_bytes(handle, chunk_size - sizeof(fmt_chunk))) {
@@ -461,9 +460,9 @@ int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes) 
     }
     return 0;
 }
-uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, uint16_t bits_per_sample,
+uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels, 
         uint32_t *bytes_remaining, int16_t *dest, uint32_t max_frames) {
-    if (dest == NULL || bytes_remaining == 0 || channels == 0 || channels > 2 || bits_per_sample != 16) {
+    if (dest == NULL || bytes_remaining == 0 || channels == 0 || channels > 2) {
         return 0;
     }
     uint32_t bytes_per_frame = channels * 2;
