@@ -15,7 +15,6 @@ typedef struct {
     uint8_t channels;
     uint16_t bits_per_sample;
     uint32_t file_handle;
-    uint8_t file_parsed;
     uint32_t file_bytes_remaining;
     int16_t * sample_ram;
     uint32_t length;
@@ -319,7 +318,6 @@ int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote
     memory_preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
     memory_preset->midinote = midinote;
     memory_preset->length = total_frames;
-    memory_preset->file_parsed = 1;
     memory_preset->type = AMY_PCM_TYPE_FILE;
     memory_preset->bits_per_sample = info.bits_per_sample;
     memory_preset->file_bytes_remaining = total_frames * info.channels * (info.bits_per_sample / 8);
@@ -360,7 +358,6 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->length = length;
     memory_preset->channels = channels;
     memory_preset->filename[0] = '\0';
-    memory_preset->file_parsed = 0;
     memory_preset->bits_per_sample = 16;
     memory_preset->file_bytes_remaining = 0;
     memory_preset->file_handle = 0;

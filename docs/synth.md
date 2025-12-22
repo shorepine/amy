@@ -354,13 +354,14 @@ amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1025, pan=1, note=60, vel=1)
 
 ### Sampling
 
-AMY can also sample directly into a PCM buffer from a `bus`. [A bus in AMY is a work in progress](https://github.com/shorepine/amy/issues/114) but for now we support two stereo buses: `bus=1` is the final AMY output and `bus=2` is just `AUDIO_IN0` and `AUDIO_IN1`. To start sampling to a PCM preset, use `start_sample`:
+AMY can also sample directly into a PCM memory buffer from a `bus`. [A bus in AMY is a work in progress](https://github.com/shorepine/amy/issues/114) but for now we support two stereo buses: `bus=1` is the final AMY output and `bus=2` is just `AUDIO_IN0` and `AUDIO_IN1`. To start sampling to a PCM preset, use `start_sample`:
 
 ```python
-amy.start_sample(preset=1024, bus=0, max_frames=44100) 
-amy.stop_sample() # stop all sampling
+amy.start_sample(preset=1024, bus=0, max_frames=44100)  # sample for one second
+amy.stop_sample() # stop all sampling, not needed if using max_frames
 amy.start_sample(preset=1024, bus=1, max_frames=11025, midinote=60) # set base midi note, looping, too
-amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, note=72, vel=1) # play back AUDIO_IN sample an octave higher
+amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
+amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
 
 
