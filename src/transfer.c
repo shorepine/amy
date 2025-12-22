@@ -53,7 +53,7 @@ static void free_handle(uint32_t h) {
 
 // void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
-uint32_t external_fopen_hook(char * filename, char *mode) {
+uint32_t posix_external_fopen_hook(char * filename, char *mode) {
     FILE *f = fopen(filename, mode);
     if (!f) {
         return HANDLE_INVALID;
@@ -66,7 +66,7 @@ uint32_t external_fopen_hook(char * filename, char *mode) {
     return h;
 }
 
-uint32_t external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
+uint32_t posix_external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
     FILE *f = lookup_handle(h);
     if (!f) {
         return 0;
@@ -75,7 +75,7 @@ uint32_t external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
     return r;
 }
 
-uint32_t external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
+uint32_t posix_external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
     FILE *f = lookup_handle(h);
     if (!f) {
         return 0;
@@ -84,7 +84,7 @@ uint32_t external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
     return w;
 }
 
-void external_fclose_hook(uint32_t h) {
+void posix_external_fclose_hook(uint32_t h) {
     FILE *f = lookup_handle(h);
     if (f) {
         fclose(f);
@@ -353,11 +353,11 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 
 
 void transfer_init() {
-#if defined(_POSIX_VERSION) || defined(TULIP) || defined(AMYBOARD)
-    amy_external_fopen_hook = external_fopen_hook;
-    amy_external_fread_hook = external_fread_hook;
-    amy_external_fwrite_hook = external_fwrite_hook;
-    amy_external_fclose_hook = external_fclose_hook;
+#if defined(_POSIX_VERSION) 
+    amy_external_fopen_hook = posix_external_fopen_hook;
+    amy_external_fread_hook = posix_external_fread_hook;
+    amy_external_fwrite_hook = posix_external_fwrite_hook;
+    amy_external_fclose_hook = posix_external_fclose_hook;
 #endif
 }
 
