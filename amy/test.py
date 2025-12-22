@@ -2,6 +2,7 @@ import sys
 import os
 import random
 import string
+import tempfile
 
 import numpy as np
 import scipy.io.wavfile as wav
@@ -838,30 +839,19 @@ class TestFileTransfer(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start_no_default()
-    temp_file = 'amy_transfer_test_tmp.txt'
-    transfer_file = temp_file + '.transfer'
-    if os.path.exists(temp_file):
-      os.remove(temp_file)
-    if os.path.exists(transfer_file):
-      os.remove(transfer_file)
     payload = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2048))
-    try:
-      with open(temp_file, 'w') as f:
+    with tempfile.NamedTemporaryFile(mode='w', delete=True) as f:
+      with tempfile.NamedTemporaryFile(mode='w+', delete=True) as g:
         f.write(payload)
-      amy.transfer_file(temp_file, transfer_file)
-      amy.render(0.1)
-      if not os.path.exists(transfer_file):
-        raise AssertionError('transfer file not created')
-      with open(transfer_file, 'r') as f:
-        transferred = f.read()
-      if transferred != payload:
-        raise AssertionError('transfer file contents mismatch')
-      print('TestFileTransfer: ok')
-    finally:
-      if os.path.exists(temp_file):
-        os.remove(temp_file)
-      if os.path.exists(transfer_file):
-        os.remove(transfer_file)
+        f.flush()
+        os.fsync(f.fileno())
+        amy.transfer_file(f.name, g.name)
+        amy.render(0.1)
+        g.seek(0)
+        transferred = g.read()
+        if transferred != payload:
+          raise AssertionError('transfer file contents mismatch')
+        print('TestFileTransfer: ok')
 
 
 class TestDiskSample(AmyTest):
