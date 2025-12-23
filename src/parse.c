@@ -105,9 +105,11 @@ char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_le
     size_t s_read = 0;
     size_t trimmed_src_len = src_len;
     // scan for spaces at end
-    while(trimmed_src_len > 0 && isspace(src[trimmed_src_len - 1])) --trimmed_src_len;
+    while (trimmed_src_len > 0 && isspace((unsigned char)src[trimmed_src_len - 1])) {
+        --trimmed_src_len;
+    }
     // skip over leading spaces
-    while(s_read < trimmed_src_len && isspace(*s)) {
+    while (s_read < trimmed_src_len && isspace((unsigned char)*s)) {
         ++s;
         ++s_read;
     }
