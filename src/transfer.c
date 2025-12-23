@@ -103,8 +103,8 @@ b64_buffer_t decbuf;
 void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_AUDIO;
     amy_global.transfer_storage = storage;
-    amy_global.transfer_length = length;
-    amy_global.transfer_stored = 0;
+    amy_global.transfer_length_bytes = length;
+    amy_global.transfer_stored_bytes = 0;
     amy_global.transfer_file_handle = 0;
     amy_global.transfer_filename[0] = '\0';
     b64_buf_malloc(&decbuf);
@@ -113,8 +113,8 @@ void start_receiving_transfer(uint32_t length, uint8_t * storage) {
 void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_SAMPLE;
     amy_global.transfer_storage = (uint8_t *)storage;
-    amy_global.transfer_length = frames;
-    amy_global.transfer_stored = 0;
+    amy_global.transfer_length_bytes = frames*sizeof(int16_t)*AMY_NCHANS;
+    amy_global.transfer_stored_bytes = 0;
     amy_global.transfer_file_handle = bus; // use file handle to store bus number
     amy_global.transfer_filename[0] = '\0';
 }
@@ -122,8 +122,8 @@ void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage) {
 void stop_receiving_sample() {
     amy_global.transfer_file_handle = 0;
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
-    amy_global.transfer_stored = 0;
-    amy_global.transfer_length = 0;
+    amy_global.transfer_stored_bytes = 0;
+    amy_global.transfer_length_bytes = 0;
 }
 
 // signals to AMY that i'm now receiving a file transfer of length (bytes!) to filename
@@ -142,8 +142,8 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     }
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_FILE;
     amy_global.transfer_storage = NULL;
-    amy_global.transfer_length = length;
-    amy_global.transfer_stored = 0;
+    amy_global.transfer_length_bytes = length;
+    amy_global.transfer_stored_bytes = 0; 
     amy_global.transfer_file_handle = handle;
     strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
     amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
@@ -157,14 +157,14 @@ void parse_transfer_message(char * message, uint16_t len) {
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
         if (amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
             uint32_t wrote = amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
-            amy_global.transfer_stored += wrote;
+            amy_global.transfer_stored_bytes += wrote;
         }
     } else {
         for (uint16_t i = 0; i < decoded; i++) {
-            amy_global.transfer_storage[amy_global.transfer_stored++] = block[i];
+            amy_global.transfer_storage[amy_global.transfer_stored_bytes++] = block[i];
         }
     }
-    if (amy_global.transfer_stored >= amy_global.transfer_length) { // we're done
+    if (amy_global.transfer_stored_bytes >= amy_global.transfer_length_bytes) { // we're done
         if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
             if (amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
                 amy_external_fclose_hook(amy_global.transfer_file_handle);

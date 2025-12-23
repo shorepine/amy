@@ -370,8 +370,8 @@ int8_t global_init(amy_config_t c) {
     amy_global.hpf_state = 0; 
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
     amy_global.transfer_storage = NULL;
-    amy_global.transfer_length = 0;
-    amy_global.transfer_stored = 0;
+    amy_global.transfer_length_bytes = 0;
+    amy_global.transfer_stored_bytes = 0;
     amy_global.transfer_file_handle = 0;
     amy_global.transfer_filename[0] = '\0';
     amy_global.debug_flag = 0;
@@ -1730,7 +1730,7 @@ int16_t * amy_fill_buffer() {
     // Handle sampling after block is rendered
     if(amy_global.transfer_flag==AMY_TRANSFER_TYPE_SAMPLE) {
         uint32_t bytes_per_frame = AMY_NCHANS * sizeof(int16_t);
-        uint32_t byte_offset = amy_global.transfer_stored * bytes_per_frame;
+        uint32_t byte_offset = amy_global.transfer_stored_bytes;
         uint32_t bytes_to_copy = AMY_BLOCK_SIZE * bytes_per_frame;
         if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
@@ -1739,8 +1739,8 @@ int16_t * amy_fill_buffer() {
             // copy audio input buffer to storage
             memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
         }
-        amy_global.transfer_stored += AMY_BLOCK_SIZE;
-        if(amy_global.transfer_stored >= amy_global.transfer_length) {   
+        amy_global.transfer_stored_bytes += AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t);
+        if(amy_global.transfer_stored_bytes >= amy_global.transfer_length_bytes) {   
             amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
         }
     }
