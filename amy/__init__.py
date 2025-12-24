@@ -211,6 +211,27 @@ def send_raw(m):
         _amy.send_wire(m)
     if(log): mess.append(m)
 
+def amy_sysex_write(message):
+    import mido
+    outputs = mido.get_output_names()
+    target_name = None
+    for name in outputs:
+        if 'AMYboard' in name:
+            target_name = name
+            break
+    if target_name is None:
+        raise RuntimeError('AMYboard MIDI output not found')
+    if isinstance(message, str):
+        payload = message.encode('ascii')
+    elif isinstance(message, bytes):
+        payload = message
+    else:
+        payload = bytes(message)
+    data = [0x00, 0x03, 0x45] + list(payload)
+    with mido.open_output(target_name) as out:
+        m = mido.Message('sysex', data=data)
+        out.send(m)
+
 def log_patch():
     global mess, log
     # start recording a patch
