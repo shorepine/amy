@@ -307,6 +307,29 @@ def unload_sample(patch=0):
     send(load_sample=s)
     print("Patch %d unloaded from RAM" % (patch))
 
+# For AMYBoard and other AMYs that can get messages over MIDI sysex
+# AMYboard is the name of the default AMYboard USB over MIDI device. 
+# If you're using another MIDI device, set output_name to it 
+# Use this like amy.override_send = sysex_write
+def sysex_write(message, output_name='AMYboard'):
+    import mido
+    outputs = mido.get_output_names()
+    target_name = None
+    for name in outputs:
+        if output_name in name:
+            target_name = name
+            break
+    if target_name is None:
+        print("Could not find %s MIDI")
+    if isinstance(message, str):
+        payload = message.encode('ascii')
+    elif isinstance(message, bytes):
+        payload = message
+    # AMY sysex message
+    data = [0x00, 0x03, 0x45] + list(payload)
+    with midi.open_output(target_name) as out:
+        m = mido.Message('sysex', data=data)
+        out.send(m)
 
 try:
     import base64
