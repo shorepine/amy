@@ -105,9 +105,11 @@ char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_le
     size_t s_read = 0;
     size_t trimmed_src_len = src_len;
     // scan for spaces at end
-    while(trimmed_src_len > 0 && isspace(src[trimmed_src_len - 1])) --trimmed_src_len;
+    while (trimmed_src_len > 0 && isspace((unsigned char)src[trimmed_src_len - 1])) {
+        --trimmed_src_len;
+    }
     // skip over leading spaces
-    while(s_read < trimmed_src_len && isspace(*s)) {
+    while (s_read < trimmed_src_len && isspace((unsigned char)*s)) {
         ++s;
         ++s_read;
     }
@@ -120,6 +122,14 @@ char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_le
     return (char*) (src + src_len);
 }
 
+static const char *strchrnul_local(const char *s, int c) {
+    const char *found = strchr(s, c);
+    if (found != NULL) {
+        return found;
+    }
+    return s + strlen(s);
+}
+
 uint16_t parse_list_file_params(char *message, uint32_t *preset, char *filename, size_t filename_len, uint32_t *midinote) {
     // Returns number of characters of message that are consumed.
     if (filename_len > 0) {
@@ -129,7 +139,7 @@ uint16_t parse_list_file_params(char *message, uint32_t *preset, char *filename,
     *preset = strtol(m, &m, 0);
     if (*m != ',') return m - message;
     ++m;
-    m = copy_with_trim(filename, filename_len, m, strchrnul(m, ',') - m);
+    m = copy_with_trim(filename, filename_len, m, strchrnul_local(m, ',') - m);
     if (*m != ',') return m - message;
     ++m;
     *midinote = strtol(m, &m, 0);
@@ -144,7 +154,7 @@ uint16_t parse_list_file_transfer_params(char *message, char *filename, size_t f
         filename[0] = '\0';
     }
     char *m = message;
-    m = copy_with_trim(filename, filename_len, m, strchrnul(m, ',') - m);
+    m = copy_with_trim(filename, filename_len, m, strchrnul_local(m, ',') - m);
     if (*m != ',') return m - message;
     ++m;
     *file_size = strtol(m, &m, 0);

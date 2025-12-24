@@ -688,8 +688,8 @@ struct state {
     // Transfer
     uint8_t transfer_flag;
     uint8_t * transfer_storage;
-    uint32_t transfer_length;
-    uint32_t transfer_stored;
+    uint32_t transfer_length_bytes;
+    uint32_t transfer_stored_bytes;
     uint32_t transfer_file_handle;
     char transfer_filename[MAX_FILENAME_LEN];
 
