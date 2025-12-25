@@ -128,14 +128,16 @@ void stop_receiving_sample() {
 
 // signals to AMY that i'm now receiving a file transfer of length (bytes!) to filename
 void start_receiving_file_transfer(uint32_t length, const char *filename) {
+
     if (filename == NULL || filename[0] == '\0') {
         return;
     }
     if (amy_external_fopen_hook == NULL || amy_external_fwrite_hook == NULL || amy_external_fclose_hook == NULL) {
+
         fprintf(stderr, "file transfer hooks not enabled on platform\n");
         return;
     }
-    uint32_t handle = amy_external_fopen_hook((char *)filename, "wb");
+        uint32_t handle = amy_external_fopen_hook((char *)filename, "wb");
     if (handle == HANDLE_INVALID) {
         fprintf(stderr, "could not open file for transfer: %s\n", filename);
         return;
