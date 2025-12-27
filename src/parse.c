@@ -304,6 +304,7 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
 
 // Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
 uint16_t amy_parse_transfer_layer_message(char *message) {
+
     if (message[0] >= '0' && message[0] <= '9') {
         // z: Signal to start loading sample. 
         // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
@@ -380,7 +381,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
     peek_stack("parse_message");
     char cmd = '\0';
     uint16_t pos = 0;
-
+    
     // Check if we're in a transfer block, if so, parse it and leave this loop 
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
         parse_transfer_message(message, length);

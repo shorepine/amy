@@ -18,6 +18,7 @@ extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
+
 // This is for baked in samples that come with AMY. The header file written by `amy/headers.py` writes this.
 typedef struct {
     uint32_t offset;
@@ -38,6 +39,7 @@ extern const uint16_t pcm_samples;
 #endif
 
 #define MAX_FILENAME_LEN 127
+
 
 
 // Set block size and SR. We try for 256/44100, but some platforms don't let us:
