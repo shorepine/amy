@@ -240,7 +240,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, b
 struct instrument_info **instruments = NULL;
 int max_instruments = 0;
 
-void instruments_free() {
+void instruments_deinit() {
     if (instruments != NULL)  {
         instruments_reset();
         free(instruments);

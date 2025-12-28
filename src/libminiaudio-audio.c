@@ -279,9 +279,10 @@ void amy_live_start_web() {
 //}
 
 
-//void amy_live_stop() {
-//    amy_global.running = 0;
-//    ma_device_uninit(&device);
-//    free(leftover_buf);
-//}
+void amy_live_stop() {
+    amy_global.running = 0;
+    ma_device_uninit(&device);
+    ma_context_uninit(&context);
+    free(leftover_buf);
+}
 #endif

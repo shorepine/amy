@@ -80,15 +80,20 @@ int main(int argc, char ** argv) {
     e.wave = SINE;
     amy_add_event(&e);
 
-    // Now just spin for 15s
+    // Now just spin for a whilw
     uint32_t start = amy_sysclock();
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
 
     //show_debug(99);
-
+    
+    amy_live_stop();
+    
     amy_stop();
+
+    // Make sure libminiaudio has time to clean up.
+    sleep(2);
 
     return 0;
 }

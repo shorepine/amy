@@ -139,7 +139,7 @@ typedef int32_t s16_15; // s16.15 general
 // Convert a LUTSAMPLE (s.15) to a SAMPLE (s8.23)
 #define L2S(l) (((int32_t)(l)) << (S_FRAC_BITS - L_FRAC_BITS))
 // L is also the format used in the final output.
-#define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))
+#define S2L(s) ((s) >> (S_FRAC_BITS - L_FRAC_BITS))  // s >> 8
 // Scale an integer into a SAMPLE, where integer is a numerator and 2**B is denominator.
 #define AMY_I2S(I, B) ((I) << (S_FRAC_BITS - (B)))
 // Regard SAMPLE as index into B-bit table, return integer (floor) index, strip sign bit.
@@ -184,6 +184,10 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values when the result will always be [-16.0, 16.0).
 #define MUL4_SS(a, b)  FXMUL_TEMPLATE(a, b, 10, 9, S_FRAC_BITS)  // 10+9 = 19, so result is >>4, leaving 4 bits integer part.
+
+// Multiply two SAMPLE values when the result will always be [-64.0, 64.0).
+// Assume first arg is an unscaled sample and second is an amplitude which can be much larger.
+#define MUL6A_SS(a, b)  FXMUL_TEMPLATE(a, b, 8, 13, S_FRAC_BITS)  // 10+9 = 19, so result is >>4, leaving 4 bits integer part.
 
 // Multiply two SAMPLE values and allow result to occupy full [-256, 256) range
 #define MUL8_SS(a, b)  FXMUL_TEMPLATE(a, b, 12, 11, S_FRAC_BITS)  // 12+11 = 23, so no more shift on result.

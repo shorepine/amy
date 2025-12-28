@@ -324,7 +324,6 @@ extern void miniaudio_stop();
 void amy_start(amy_config_t c) {
     global_init(c);
     amy_profiles_init();
-    sequencer_start();
     oscs_init();
     amy_hardware_init();
     run_midi();  // Must be after hardware_init in case F_CPU is modified on RP2040 Arduino.
@@ -364,4 +363,3 @@ int16_t *amy_update() {
     }
     return block;
 }
-

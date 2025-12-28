@@ -208,7 +208,7 @@ void parse_sysex() {
             amy_add_message((char*)(sysex_buffer+3));
             sysex_len = 0; // handled
         } else {
-    	   amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
+           amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
         }
     }
 }
@@ -239,7 +239,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 current_midi_message[0] = byte;
                 if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
                     byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-		    amy_event_midi_message_received(current_midi_message, 1, 0, time);
+            amy_event_midi_message_received(current_midi_message, 1, 0, time);
                     if(usb) i = len+1; // exit the loop if usb
                 }  else if(byte == 0xF0) { // sysex start 
                     // if that's there we then assume everything is an AMY message until 0xF7
@@ -321,6 +321,20 @@ int8_t esp_get_uart(int8_t index) {
     if(index==2) return UART_NUM_2;
     return -1;
 }
+#ifdef AMYBOARD
+#define TUD_USB_GADGET
+#include "tusb.h"
+#include "class/midi/midi.h"
+#include "class/midi/midi_device.h"
+
+void check_tusb_midi() {
+    while ( tud_midi_available() ) {
+        uint8_t packet[4];
+        tud_midi_packet_read(packet);
+        convert_midi_bytes_to_messages(packet+1, 3, 1);
+    }
+}
+#endif
 
 void esp_init_midi(void) {
     uart_config_t uart_config = {
@@ -367,6 +381,9 @@ void run_midi_task() {
 
     while(1) {
         esp_poll_midi();
+        #ifdef AMYBOARD
+        check_tusb_midi();
+        #endif
     } // end loop forever
 }
 
@@ -379,6 +396,9 @@ void run_midi() {
         }  // otherwise esp_poll_midi is called from amy_update_tasks()
     }
 }
+
+
+
 
 #endif
 
@@ -421,14 +441,6 @@ void run_midi() {
 
 }
 
-void check_tusb_midi() {
-    while ( tud_midi_available() ) {
-        uint8_t packet[4];
-        tud_midi_packet_read(packet);
-        convert_midi_bytes_to_messages(packet+1, 3, 1);
-    }
-}
-
 #endif
 
 #ifdef __IMXRT1062__
@@ -454,10 +466,19 @@ void run_midi() {
 #endif
 
 void midi_out(uint8_t * bytes, uint16_t len) {
+
+// Is there USB gadget midi? Send it
 #if defined TUD_USB_GADGET
-    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) tud_midi_stream_write(0, bytes, len);
-#elif defined ESP_PLATFORM
-    if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+        tud_midi_stream_write(0, bytes, len);
+    }
+#endif
+
+// Also do UART midi on supported platforms
+#if defined ESP_PLATFORM
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        uart_write_bytes(esp_get_uart(amy_global.config.midi_uart), bytes, len);
+    }
 #elif (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
     if(amy_global.config.midi & AMY_MIDI_IS_UART) uart_write_blocking(rp_get_uart(amy_global.config.midi_uart), bytes, len);
 #else

@@ -691,6 +691,7 @@ struct state {
 // custom oscillator
 struct custom_oscillator {
     void (*init)(void);
+    void (*deinit)(void);
     void (*note_on)(uint16_t osc, float freq);
     void (*note_off)(uint16_t osc);
     void (*mod_trigger)(uint16_t osc);
@@ -742,6 +743,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
 void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void patches_init(int max_memory_patches);
+void patches_deinit();
 int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algo_source(char* message, int16_t *vals);
 void hold_and_modify(uint16_t osc) ;
@@ -807,7 +809,9 @@ extern void ks_deinit();
 extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
+extern void pcm_deinit();
 extern void custom_init();
+extern void custom_deinit();
 
 void my_srand48(uint32_t seedval);
 
@@ -845,7 +849,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
 extern void instruments_init(int num_instruments);
-extern void instruments_free();
+extern void instruments_deinit();
 extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
 extern void instrument_release(int instrument_number);
