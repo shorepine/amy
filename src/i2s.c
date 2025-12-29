@@ -197,12 +197,12 @@ void esp_fill_audio_buffer_task() {
 }
 
 // init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
-void amy_hardware_init() {
+void amy_platform_init() {
     // Start i2s
     if (AMY_HAS_I2S) {
         esp32_setup_i2s();
     }
-    if (amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) {
+    if (amy_global.config.platform.multithread) {
         // Create the second core rendering task
         xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
         // And the fill audio buffer thread, combines, does volume & filters
@@ -213,7 +213,7 @@ void amy_hardware_init() {
 extern void esp_poll_midi(void);
 
 void amy_update_tasks() {
-    if ((amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) == 0) {
+    if (!amy_global.config.platform.multithread) {
         amy_execute_deltas();
         esp_poll_midi();
     } else{
@@ -223,7 +223,7 @@ void amy_update_tasks() {
 
 int16_t *amy_render_audio() {
     int16_t *buf = NULL;
-    if ((amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) == 0) {
+    if (!amy_global.config.platform.multithread) {
         amy_render(0, AMY_OSCS, 0);
         buf = amy_fill_buffer();
     } else {
@@ -305,7 +305,7 @@ int32_t render_other_core(int32_t data) {
 
 int16_t *amy_render_audio() {
 #ifdef USE_SECOND_CORE
-    if (amy_global.config.hardware & AMY_HARDWARE_MULTICORE) {
+    if (amy_global.config.platform.multicore) {
         int32_t res;
         queue_entry_t entry = {render_other_core, AMY_OK};
         queue_add_blocking(&call_queue, &entry);
@@ -370,12 +370,12 @@ void core1_main() {
     }
 }
 
-void amy_hardware_init() {
+void amy_platform_init() {
     if (AMY_HAS_I2S) {
         pico_setup_i2s(&amy_global.config);
     }
 #ifdef USE_SECOND_CORE
-    if (amy_global.config.hardware & AMY_HARDWARE_MULTICORE) {
+    if (amy_global.config.platform.multicore) {
         queue_init(&call_queue, sizeof(queue_entry_t), 2);
         queue_init(&results_queue, sizeof(int32_t), 2);
         uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
@@ -394,7 +394,7 @@ extern size_t teensy_i2s_write(const uint8_t *buffer, size_t nbytes);
 
 extern int16_t teensy_get_serial_byte();
 
-void amy_hardware_init() {
+void amy_platform_init() {
     if (AMY_HAS_I2S) {
         teensy_setup_i2s();
     }

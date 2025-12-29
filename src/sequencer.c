@@ -178,7 +178,7 @@ void _sequencer_start() {
 
 void _sequencer_stop() {
     if (periodic_timer) {
-        ESP_ERRIR_CHECK(esp_timer_stop(periodic_timer));
+        ESP_ERROR_CHECK(esp_timer_stop(periodic_timer));
         ESP_ERROR_CHECK(esp_timer_delete(periodic_timer));
         periodic_timer = NULL;
     }

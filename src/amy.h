@@ -571,13 +571,6 @@ typedef struct delay_line {
 #define AMY_MIDI_IS_MACOS 0x04
 #define AMY_MIDI_IS_WEBMIDI 0x08
 
-// Values for config.hardware
-#define AMY_HARDWARE_NONE 0x00
-// Use secondary cores if available.
-#define AMY_HARDWARE_MULTICORE 0x01
-// Use multitasking (e.g. RTOS threads) if available.
-#define AMY_HARDWARE_MULTITHREAD 0x02
-
 
 typedef struct  {
     struct {
@@ -590,9 +583,13 @@ typedef struct  {
         uint8_t custom : 1;
         uint8_t startup_bleep : 1;
     } features;
+    struct {
+        uint8_t multicore : 1;  // Use secondary cores if available.
+        uint8_t multithread : 1;  // Use multitasking (e.g. RTOS threads) if available.
+    } platform;
+    // midi and audio are potentially bitmasks indicating data routing.
     uint8_t midi;
     uint8_t audio;
-    uint32_t hardware;
 
     // variables
     uint16_t max_oscs;
@@ -766,7 +763,7 @@ void amy_stop();
 //void amy_live_stop();
 
 int16_t *amy_update();        // in api.c
-void amy_hardware_init();     // in i2s.c
+void amy_platform_init();     // in i2s.c
 void amy_update_tasks();      // in i2s.c
 int16_t *amy_render_audio();  // in i2s.c
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes);  // in i2s.c

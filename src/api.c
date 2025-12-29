@@ -32,8 +32,9 @@ amy_config_t amy_default_config() {
     c.features.default_synths = 1;
     c.features.startup_bleep = 0;
 
-    // Use all hardware features by default.
-    c.hardware = AMY_HARDWARE_MULTICORE | AMY_HARDWARE_MULTITHREAD;
+    // Use all platform features by default.
+    c.platform.multicore = 1;
+    c.platform.multithread = 1;
 
     c.write_samples_fn = NULL;
 
@@ -325,8 +326,8 @@ void amy_start(amy_config_t c) {
     global_init(c);
     amy_profiles_init();
     oscs_init();
-    amy_hardware_init();
-    run_midi();  // Must be after hardware_init in case F_CPU is modified on RP2040 Arduino.
+    amy_platform_init();
+    run_midi();  // Must be after platform_init in case F_CPU is modified on RP2040 Arduino.
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
     if(AMY_HAS_STARTUP_BLEEP) {
         if(AMY_HAS_DEFAULT_SYNTHS)

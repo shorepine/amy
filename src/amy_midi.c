@@ -391,7 +391,7 @@ void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
     if(amy_global.config.midi & AMY_MIDI_IS_UART) {
         esp_init_midi();
-        if (amy_global.config.hardware & AMY_HARDWARE_MULTITHREAD) {
+        if (amy_global.config.platform.multithread) {
             xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
         }  // otherwise esp_poll_midi is called from amy_update_tasks()
     }

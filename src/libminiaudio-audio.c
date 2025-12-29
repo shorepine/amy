@@ -56,7 +56,7 @@ int16_t *volatile last_audio_buffer = NULL;
 void amy_update_tasks() {
 }
 
-void amy_hardware_init() {
+void amy_platform_init() {
 }
 
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
