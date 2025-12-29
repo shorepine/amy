@@ -327,7 +327,7 @@ def sysex_write(message, output_name='AMYboard'):
         payload = message
     # AMY sysex message
     data = [0x00, 0x03, 0x45] + list(payload)
-    with midi.open_output(target_name) as out:
+    with mido.open_output(target_name) as out:
         m = mido.Message('sysex', data=data)
         out.send(m)
 
