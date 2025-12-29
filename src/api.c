@@ -74,8 +74,8 @@ amy_config_t amy_default_config() {
     c.playback_device_id = -1;
 
     c.i2s_lrc = -1;
-    c.i2s_dout = -1;   // -1 implies no I2S
-    c.i2s_din = -1;    // -1 implies no AUDIO_IN
+    c.i2s_dout = -1;
+    c.i2s_din = -1;
     c.i2s_bclk = -1;
     c.i2s_mclk = -1;
     c.i2s_mclk_mult = 256;  // MCLK = mclk_mult * Fs.

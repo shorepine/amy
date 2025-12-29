@@ -79,8 +79,8 @@ extern const uint16_t pcm_samples;
 
 #define AMY_HAS_STARTUP_BLEEP (amy_global.config.features.startup_bleep)
 #define AMY_HAS_REVERB (amy_global.config.features.reverb)
-#define AMY_HAS_AUDIO_IN (amy_global.config.i2s_din != -1)
-#define AMY_HAS_I2S (amy_global.config.i2s_dout != -1)
+#define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
+#define AMY_HAS_I2S (amy_global.config.audio == AMY_AUDIO_IS_I2S)
 #define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
 #define AMY_HAS_CHORUS (amy_global.config.features.chorus)
 #define AMY_HAS_ECHO (amy_global.config.features.echo)
@@ -584,6 +584,7 @@ typedef struct  {
         uint8_t chorus : 1;
         uint8_t reverb : 1;
         uint8_t echo : 1;
+        uint8_t audio_in : 1;
         uint8_t default_synths : 1;
         uint8_t partials : 1;
         uint8_t custom : 1;
@@ -606,8 +607,8 @@ typedef struct  {
 
     // pins for MCU platforms
     int8_t i2s_lrc;
-    int8_t i2s_dout;  // -1 == no I2S
-    int8_t i2s_din;   // -1 == no AUDIO_IN
+    int8_t i2s_dout;
+    int8_t i2s_din;
     int8_t i2s_bclk;
     int8_t i2s_mclk;
     uint16_t i2s_mclk_mult;
@@ -761,8 +762,8 @@ void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
-void amy_live_start();
-void amy_live_stop();
+//void amy_live_start();
+//void amy_live_stop();
 
 int16_t *amy_update();        // in api.c
 void amy_hardware_init();     // in i2s.c

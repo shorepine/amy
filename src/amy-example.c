@@ -58,12 +58,13 @@ int main(int argc, char ** argv) {
 
     amy_config_t amy_config = amy_default_config();
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // We need audio_in for miniaudio to run??
     amy_config.playback_device_id = playback_device_id;
     fprintf(stderr, "playback_device_id=%d\n", playback_device_id);
     amy_config.capture_device_id = capture_device_id;
-    amy_config.i2s_din = 0; // fake, to indicate has_audio_in
-    amy_config.i2s_dout = 0; // fake, to indicate has_audio_out
     amy_config.features.default_synths = 0;
+
+    for (int tries = 0; tries < 2; ++tries) {
     amy_start(amy_config);
     
     //example_fm(0);
@@ -88,12 +89,12 @@ int main(int argc, char ** argv) {
 
     //show_debug(99);
     
-    amy_live_stop();
-    
     amy_stop();
 
     // Make sure libminiaudio has time to clean up.
     sleep(2);
+
+    }
 
     return 0;
 }
