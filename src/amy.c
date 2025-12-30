@@ -361,6 +361,7 @@ int peek_stack(char *tag)  { return 0; }
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
+    amy_global.i2s_is_in_background = 0;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;

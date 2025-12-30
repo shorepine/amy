@@ -655,6 +655,7 @@ typedef struct echo_config {
 struct state {
     amy_config_t config;
     uint8_t running;
+    uint8_t i2s_is_in_background;  // Flag not to handle I2S in amy_update.
     float volume;
     float pitch_bend;
     // State of fixed dc-blocking HPF
