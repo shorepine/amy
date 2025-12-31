@@ -691,8 +691,8 @@ struct state {
     uint8_t transfer_flag;
     uint8_t * transfer_storage;
     uint32_t transfer_length_bytes;
-    uint32_t transfer_stored_bytes;
-    uint32_t transfer_file_handle;
+    uint32_t transfer_stored_bytes; // using this for midi note before file load
+    uint32_t transfer_file_handle; // using this for preset number before file load 
     char transfer_filename[MAX_FILENAME_LEN];
 
     // Sequencer
@@ -796,6 +796,7 @@ extern void (*amy_external_sequencer_hook)(uint32_t);
 extern uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) ;
 extern uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len);
 extern uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+extern void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
 extern void (*amy_external_fclose_hook)(uint32_t fptr);
 extern void (*amy_external_file_transfer_done_hook)(const char *filename);
 
@@ -921,7 +922,7 @@ extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
-extern int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote);
+extern int pcm_load_file();
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
 
@@ -949,8 +950,8 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #endif
 #define AMY_RENDER_TASK_COREID (0)
 #define AMY_FILL_BUFFER_TASK_COREID (1)
-#define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
-#define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024)
+#define AMY_RENDER_TASK_STACK_SIZE (12 * 1024) // 8
+#define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024) // 16
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
 #define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"

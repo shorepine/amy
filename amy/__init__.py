@@ -330,6 +330,9 @@ def sysex_write(message, output_name='AMYboard'):
     with mido.open_output(target_name) as out:
         m = mido.Message('sysex', data=data)
         out.send(m)
+    # This sleep is because there's not really a buffer per-se for SYSEX over CDC
+    time.sleep(0.01)
+
 
 try:
     import base64
@@ -375,6 +378,7 @@ def transfer_file(source_filename, dest_filename=None):
     file_size = os.path.getsize(source_filename)
     s = "%s,%d" % (dest_filename, file_size)
     send(transfer_file=s)
+    
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
     w = open(source_filename, 'rb')

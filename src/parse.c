@@ -3,6 +3,9 @@
 
 #include "amy.h"
 #include <ctype.h>  // for isalpha().
+#if defined(TULIP) || defined(AMYBOARD)
+#include "py/runtime.h"
+#endif
 
 float atoff(const char *s) {
     // Returns float value corresponding to parseable prefix of s.
@@ -284,6 +287,10 @@ void parse_coef_message(char *message, float *coefs) {
         coefs[i] = AMY_UNSET_VALUE(coefs[0]);
 }
 
+#if defined(TULIP) || defined(AMYBOARD)
+extern const mp_obj_fun_builtin_var_t tulip_pcm_load_file_obj;
+#endif
+
 // Parser for synth-layer ('i') prefix.
 void amy_parse_synth_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
@@ -340,7 +347,16 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         uint16_t len = parse_list_file_params(message, &preset, filename, sizeof(filename),
                                &midinote);
         if (filename[0] != '\0') {
-            pcm_load_file(preset, filename, (uint8_t)midinote);
+            amy_global.transfer_stored_bytes = midinote;
+            strncpy(amy_global.transfer_filename, filename, MAX_FILENAME_LEN);
+            amy_global.transfer_file_handle = preset;
+            // For tulip/amyboard we have to load the PCM file from the MP "task"
+            #if (defined AMYBOARD) || (defined TULIP)
+                mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_pcm_load_file_obj), mp_const_none);
+            #else
+                pcm_load_file(preset, filename, (uint8_t)midinote);
+            #endif
+
         }
         return len;
     }

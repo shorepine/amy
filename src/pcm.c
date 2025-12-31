@@ -97,21 +97,19 @@ void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
         if (preset->type == AMY_PCM_TYPE_FILE) {
-            fclose_if_file(preset);
-            if (amy_external_fopen_hook != NULL && amy_external_fclose_hook != NULL) {
-                uint32_t handle = amy_external_fopen_hook(preset->filename, "rb");
-                if (handle != 0) {
-                    wave_info_t info = {0};
-                    uint32_t data_bytes = 0;
-                    if (wave_parse_header(handle, &info, &data_bytes)) {
-                        preset->file_handle = handle;
-                        preset->channels = info.channels;
-                        preset->samplerate = info.sample_rate;
-                        preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
-                        preset->file_bytes_remaining = data_bytes;
-                    } else {
-                        amy_external_fclose_hook(handle);
-                    }
+            if (preset->file_handle != 0) {
+                wave_info_t info = {0};
+                uint32_t data_bytes = 0;
+                //fprintf(stderr, "fseek 0 handle %ld\n", preset->file_handle);
+                amy_external_fseek_hook(preset->file_handle, 0);
+                if (wave_parse_header(preset->file_handle, &info, &data_bytes)) {
+                    //fprintf(stderr, "parsed %ld bytes\n", data_bytes);
+                    preset->channels = info.channels;
+                    preset->samplerate = info.sample_rate;
+                    preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
+                    preset->file_bytes_remaining = data_bytes;
+                } else {
+                    amy_external_fclose_hook(preset->file_handle);
                 }
             }
         } else if (preset->type == AMY_PCM_TYPE_ROM) {
@@ -151,6 +149,7 @@ void pcm_note_off(uint16_t osc) {
 
 
 uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_needed) {
+    //fprintf(stderr, "fsff %ld frames\n", frames_needed);
     uint32_t bytes_per_frame = preset_p->channels * 2;
     uint32_t frames_available = 0;
     if (bytes_per_frame > 0) {
@@ -188,7 +187,6 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             sample_length = fill_sample_from_file(preset, frames_needed);
             if(sample_length != frames_needed) {
                 // reached end of file
-                fclose_if_file(preset);
                 synth[osc]->status = SYNTH_OFF;
             }
             synth[osc]->phase = 0;
@@ -270,7 +268,12 @@ SAMPLE compute_mod_pcm(uint16_t osc) {
 }
 
 
-int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote) {
+int pcm_load_file() {
+    // We pass the inputs to this as aliases in the amy_global structure. This is to not destroy the MP heap for amy->AMYboard
+    uint8_t midinote = amy_global.transfer_stored_bytes;
+    uint16_t preset_number = amy_global.transfer_file_handle;
+    char * filename = amy_global.transfer_filename;
+
     pcm_unload_preset(preset_number);
     if (filename == NULL || filename[0] == '\0') {
         return 0;
@@ -321,11 +324,7 @@ int pcm_load_file(uint16_t preset_number, const char *filename, uint8_t midinote
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
     new_preset_pointer->preset = memory_preset;
-    if (amy_external_fclose_hook != NULL) {
-        amy_external_fclose_hook(handle);
-        memory_preset->file_handle = 0;
-    }
-    //fprintf(stderr, "read file %s frames %d channels %d preset %d handle %d\n", filename, total_frames, info.channels, preset_number, handle);
+    //fprintf(stderr, "read file %s frames %ld channels %d preset %d handle %ld\n", filename, total_frames, info.channels, preset_number, handle);
     return 1;
 }
 

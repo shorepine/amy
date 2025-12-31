@@ -75,6 +75,14 @@ uint32_t posix_external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
     return r;
 }
 
+void posix_external_fseek_hook(uint32_t h, uint32_t pos) {
+    FILE *f = lookup_handle(h);
+    if (!f) {
+        return;
+    }
+    fseek(f, pos, SEEK_SET);
+}
+
 uint32_t posix_external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
     FILE *f = lookup_handle(h);
     if (!f) {
@@ -360,6 +368,7 @@ void transfer_init() {
     amy_external_fread_hook = posix_external_fread_hook;
     amy_external_fwrite_hook = posix_external_fwrite_hook;
     amy_external_fclose_hook = posix_external_fclose_hook;
+    amy_external_fseek_hook = posix_external_fseek_hook;
 #endif
 }
 
