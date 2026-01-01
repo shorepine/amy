@@ -81,7 +81,7 @@ int main(int argc, char ** argv) {
     e.wave = SINE;
     amy_add_event(&e);
 
-    // Now just spin for a whilw
+    // Now just spin for a while
     uint32_t start = amy_sysclock();
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
