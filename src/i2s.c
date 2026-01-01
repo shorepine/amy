@@ -208,7 +208,9 @@ void amy_platform_init() {
         // And the fill audio buffer thread, combines, does volume & filters
         xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
 	// Let amy_update know we have I2S covered.
-	amy_global.i2s_is_in_background = 1;
+        if (AMY_HAS_I2S) {
+            amy_global.i2s_is_in_background = 1;
+        }
     }
 }
 
