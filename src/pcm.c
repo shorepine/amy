@@ -169,6 +169,7 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
 
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
+        SAMPLE max_value = 0;
         memorypcm_preset_t * preset = get_preset_for_preset_number(synth[osc]->preset);
         float logfreq = msynth[osc]->logfreq;
         // If osc[midi_note] is set, shift the freq by the preset's default base_note.
@@ -248,10 +249,13 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             }
             SAMPLE value = buf[i] + MUL4_SS(amp, sample);
             buf[i] = value;   
+            if (value < 0) value = -value;
+            if (value > max_value) max_value = value;  
         }
         //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
         //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
-        return 1; // i don't believe we ever need to detect silence in a sample. it will shut itself off at the end.
+        return max_value; 
+        // i don't believe we ever need to detect silence in a sample. it will shut itself off at the end.
     }
     return 0;
 }

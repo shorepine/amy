@@ -354,7 +354,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             #if (defined AMYBOARD) || (defined TULIP)
                 mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_pcm_load_file_obj), mp_const_none);
             #else
-                pcm_load_file(preset, filename, (uint8_t)midinote);
+                pcm_load_file();
             #endif
 
         }
