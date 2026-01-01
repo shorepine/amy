@@ -2,6 +2,9 @@
 // i deal with parsing and receiving midi on many platforms
 
 #include "amy.h"
+#if defined(TULIP) || defined(AMYBOARD)
+#include "py/runtime.h"
+#endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -196,8 +199,9 @@ void midi_clock_received() {
 */
 
 uint16_t sysex_len = 0;
-
-
+#if defined(TULIP) || defined(AMYBOARD)
+extern const mp_obj_fun_builtin_var_t tulip_amy_send_sysex_obj;
+#endif
 uint8_t * sysex_buffer;
 void parse_sysex() {
     uint32_t time = AMY_UNSET_VALUE(time);
@@ -205,7 +209,14 @@ void parse_sysex() {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
             sysex_buffer[sysex_len] = 0;
-            amy_add_message((char*)(sysex_buffer+3));
+            // For Micropython hosted systems, we run MIDI on a separate "thread" (task)
+            // than MP, so just calling amy_send_message here can fail if it needs to access
+            // underlying MP resources. So we schedule it to run in the MP main loop instead.
+            #if defined(TULIP) || defined(AMYBOARD)
+            mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_amy_send_sysex_obj), mp_const_none);
+            #else
+            amy_add_message((char*)sysex_buffer+3);
+            #endif
             sysex_len = 0; // handled
         } else {
            amy_event_midi_message_received(sysex_buffer, sysex_len, 1, time);
@@ -239,7 +250,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 current_midi_message[0] = byte;
                 if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
                     byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-            amy_event_midi_message_received(current_midi_message, 1, 0, time);
+                    amy_event_midi_message_received(current_midi_message, 1, 0, time);
                     if(usb) i = len+1; // exit the loop if usb
                 }  else if(byte == 0xF0) { // sysex start 
                     // if that's there we then assume everything is an AMY message until 0xF7

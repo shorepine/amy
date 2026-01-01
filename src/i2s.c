@@ -86,7 +86,6 @@ amy_err_t esp32_setup_i2s(void) {
 
 #else
 // AMYBOARD i2s setup, which is weird
-#warning AMYBOARD
 amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_SLAVE);  // ************* I2S_ROLE_SLAVE - needs external I2S clock input.
     i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);

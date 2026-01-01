@@ -372,10 +372,12 @@ int8_t global_init(amy_config_t c) {
     amy_global.eq[1] = F2S(1.0f);
     amy_global.eq[2] = F2S(1.0f);
     amy_global.hpf_state = 0; 
-    amy_global.transfer_flag = 0;
+    amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
     amy_global.transfer_storage = NULL;
-    amy_global.transfer_length = 0;
-    amy_global.transfer_stored = 0;
+    amy_global.transfer_length_bytes = 0;
+    amy_global.transfer_stored_bytes = 0;
+    amy_global.transfer_file_handle = 0;
+    amy_global.transfer_filename[0] = '\0';
     amy_global.debug_flag = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
@@ -682,6 +684,7 @@ void reset_osc(uint16_t i ) {
     synth[i]->last_filt_norm_bits = 0;
     synth[i]->algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i]->algo_source[j]);
+    synth[i]->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
         // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
         for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
@@ -971,7 +974,11 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     case SAW_UP: saw_up_note_on(osc, initial_freq); break;
     case TRIANGLE: triangle_note_on(osc, initial_freq); break;
     case PULSE: pulse_note_on(osc, initial_freq); break;
-    case PCM: pcm_note_on(osc); break;
+    case PCM:
+    case PCM_LEFT:
+    case PCM_RIGHT:
+        pcm_note_on(osc);
+        break;
     case ALGO: algo_note_on(osc, initial_freq); break;
     case NOISE: noise_note_on(osc); break;
     case AUDIO_IN0: audio_in_note_on(osc, 0); break;
@@ -1043,7 +1050,9 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(NOTE_SOURCE, note_source)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-    if (d->param == PRESET) synth[d->osc]->preset = (uint16_t)d->data.i;
+    if (d->param == PRESET) {
+        synth[d->osc]->preset = (uint16_t)d->data.i;
+    }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) synth[d->osc]->trigger_phase = F2P(d->data.f);
 
@@ -1204,7 +1213,11 @@ void play_delta(struct delta *d) {
 			case SAW_UP: saw_down_mod_trigger(mod_osc); break;
 			case TRIANGLE: triangle_mod_trigger(mod_osc); break;
 			case PULSE: pulse_mod_trigger(mod_osc); break;
-			case PCM: pcm_mod_trigger(mod_osc); break;
+            case PCM:
+            case PCM_LEFT:
+            case PCM_RIGHT:
+                pcm_mod_trigger(mod_osc);
+                break;
 			case CUSTOM: custom_mod_trigger(mod_osc); break;
 			}
 		    }
@@ -1219,7 +1232,11 @@ void play_delta(struct delta *d) {
 		switch(synth[osc]->wave) {
 		case KS: ks_note_off(osc); break;
 		case ALGO:  algo_note_off(osc); break;
-		case PCM: pcm_note_off(osc); break;
+        case PCM:
+        case PCM_LEFT:
+        case PCM_RIGHT:
+            pcm_note_off(osc);
+            break;
 		case AMY_MIDI: amy_send_midi_note_off(osc); break;
 		case CUSTOM: custom_note_off(osc); break;
 		case BYO_PARTIALS:
@@ -1421,7 +1438,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 }
             }
             if(pcm_samples)
-                if(synth[osc]->wave == PCM) max_val = render_pcm(buf, osc);
+                if (AMY_WAVE_IS_PCM(synth[osc]->wave)) max_val = render_pcm(buf, osc);
             if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS) {
                 if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
@@ -1448,7 +1465,9 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if (max_val > 0) {
                 AMY_UNSET(synth[osc]->zero_amp_clock);
             } else {
-                if ( (amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                if ( synth[osc]->terminate_on_silence
+                     && ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock)
+                         >= MIN_ZERO_AMP_TIME_SAMPS)) {
                     //printf("h&m: time %f osc %d OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, osc);
                     // Oscillator has fallen silent, stop executing it.
                     synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
@@ -1478,11 +1497,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
             if(synth[osc]->filter_type != FILTER_NONE) {
-		//fprintf(stderr, "time %.3f osc %d filter_type %d\n",
-		//	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
-		//	osc, synth[osc]->filter_type);
+                //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
+                //	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+                //	osc, synth[osc]->filter_type);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
-	    }
+	        }
             uint8_t handled = 0;
             if(amy_external_render_hook!=NULL) {
                 handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
@@ -1494,7 +1513,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             // only mix the audio in if the external hook did not handle it
             if(!handled) mix_with_pan(fbl[core], per_osc_fb[core], msynth[osc]->last_pan, msynth[osc]->pan);
             if (max_val > max_max) max_max = max_val;
-        }
+        } // end if audible
     }
     core_max[core] = max_max;
 
@@ -1713,6 +1732,24 @@ int16_t * amy_fill_buffer() {
             } else {
                 block[(AMY_NCHANS * i) + c] = sample;
             }
+        }
+    }
+
+    // Handle sampling after block is rendered
+    if(amy_global.transfer_flag==AMY_TRANSFER_TYPE_SAMPLE) {
+        uint32_t bytes_per_frame = AMY_NCHANS * sizeof(int16_t);
+        uint32_t byte_offset = amy_global.transfer_stored_bytes;
+        uint32_t bytes_to_copy = AMY_BLOCK_SIZE * bytes_per_frame;
+        if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
+            // copy block[] to amy_global.transfer_storage
+            memcpy(amy_global.transfer_storage + byte_offset, block, bytes_to_copy);
+        } else if(amy_global.transfer_file_handle==AMY_BUS_AUDIO_IN) {
+            // copy audio input buffer to storage
+            memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
+        }
+        amy_global.transfer_stored_bytes += AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t);
+        if(amy_global.transfer_stored_bytes >= amy_global.transfer_length_bytes) {   
+            amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
         }
     }
     amy_global.total_blocks++;
