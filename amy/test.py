@@ -902,7 +902,7 @@ def main(argv):
     # Override location of reference files.
     AmyTest.ref_dir = argv[1]
 
-  do_all_tests = False
+  do_all_tests = True
 
   if do_all_tests:
     for testClass in AmyTest.__subclasses__():

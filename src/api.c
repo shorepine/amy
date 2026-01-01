@@ -39,7 +39,7 @@ amy_config_t amy_default_config() {
     c.features.chorus = 1;
     c.features.partials = 1;
     c.features.custom = 1;
-    c.features.default_synths = 1;
+    c.features.default_synths = 0;
     c.features.startup_bleep = 0;
 
     // Use all platform features by default.
@@ -49,11 +49,8 @@ amy_config_t amy_default_config() {
     c.write_samples_fn = NULL;
 
     c.midi = AMY_MIDI_IS_NONE;
-    #ifndef AMY_MCU
-    c.audio = AMY_AUDIO_IS_MINIAUDIO;
-    #else
-    c.audio = AMY_AUDIO_IS_I2S;
-    #endif
+    c.audio = AMY_AUDIO_IS_NONE;
+    c.features.audio_in = 0;
     c.ks_oscs = 1;
 
     c.max_oscs = 180;
@@ -347,7 +344,8 @@ void amy_start(amy_config_t c) {
             amy_bleep(0);  // bleep using raw oscs.
     }
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
-    miniaudio_start();
+    if (c.audio == AMY_AUDIO_IS_MINIAUDIO)
+        miniaudio_start();
 #endif
 }
 

@@ -172,6 +172,9 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     
+    //fprintf(stderr, "miniaudio_init: had_audio_in %d play device %d capture device %d\n",
+    //        AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
+
     if(AMY_HAS_AUDIO_IN) {
         if (amy_global.config.playback_device_id >= (int32_t)playbackCount || amy_global.config.capture_device_id >= (int32_t)captureCount) {
             printf("invalid device\n");

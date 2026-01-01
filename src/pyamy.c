@@ -19,17 +19,23 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 
 
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
+    amy_config_t amy_config = amy_global.config;
     amy_stop();
-    amy_config_t amy_config = amy_default_config();
-    int arg1 = -1; int arg2 = -1;
-    if(PyTuple_Size(args) == 2) {
+    int arg1 = -1;
+    int arg2 = -1;
+    int default_synths = amy_config.features.default_synths;
+    if(PyTuple_Size(args) == 1) {
+        PyArg_ParseTuple(args, "i", &arg1);
+    } else if(PyTuple_Size(args) == 2) {
         PyArg_ParseTuple(args, "ii", &arg1, &arg2);
-        amy_config.playback_device_id = arg1;
-        amy_config.capture_device_id = arg2;
-    } else {
-        amy_config.playback_device_id = -1;
-        amy_config.capture_device_id = -1;
+    } else if(PyTuple_Size(args) == 3) {
+        PyArg_ParseTuple(args, "iii", &arg1, &arg2, &default_synths);
     }
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // At the moment, miniaudio is only working if it does input too.
+    amy_config.playback_device_id = arg1;
+    amy_config.capture_device_id = arg2;
+    amy_config.features.default_synths = default_synths;
     //amy_live_start();
     amy_start(amy_config); // initializes amy 
     return Py_None;
@@ -47,6 +53,7 @@ static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
     amy_config_t amy_config = amy_default_config();
+    amy_config.features.default_synths = 1;
     amy_start(amy_config); // initializes amy 
     return Py_None;
 }
@@ -126,6 +133,7 @@ static struct PyModuleDef c_amyDef =
 PyMODINIT_FUNC PyInit_c_amy(void)
 {   
     amy_config_t amy_config = amy_default_config();
+    amy_config.features.default_synths = 0;
     amy_start(amy_config);
     return PyModule_Create(&c_amyDef);
 }
