@@ -512,6 +512,7 @@ struct synthinfo {
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
+    uint8_t terminate_on_silence;  // Do we enable the auto-termination of silent oscs?  Usually yes, not for PCM.
 
     uint32_t render_clock;
     uint32_t note_on_clock;

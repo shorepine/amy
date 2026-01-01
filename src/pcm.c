@@ -121,6 +121,8 @@ void pcm_note_on(uint16_t osc) {
         // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
         msynth[osc]->feedback = synth[osc]->feedback;
 
+        // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.
+        synth[osc]->terminate_on_silence = 0;
     }
 }
 

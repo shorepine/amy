@@ -680,6 +680,7 @@ void reset_osc(uint16_t i ) {
     synth[i]->last_filt_norm_bits = 0;
     synth[i]->algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i]->algo_source[j]);
+    synth[i]->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
         // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
         for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
@@ -1459,7 +1460,9 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if (max_val > 0) {
                 AMY_UNSET(synth[osc]->zero_amp_clock);
             } else {
-                if ( (amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
+                if ( synth[osc]->terminate_on_silence
+                     && ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock)
+                         >= MIN_ZERO_AMP_TIME_SAMPS)) {
                     //printf("h&m: time %f osc %d OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, osc);
                     // Oscillator has fallen silent, stop executing it.
                     synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...

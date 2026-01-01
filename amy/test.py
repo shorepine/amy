@@ -859,6 +859,11 @@ class TestDiskSample(AmyTest):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
+class TestDiskSampleWithSilentGap(AmyTest):
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3 with gap.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=63)
+
 class TestRestartFileSample(AmyTest):
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=60)
