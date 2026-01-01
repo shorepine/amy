@@ -18,6 +18,7 @@ extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
+
 // This is for baked in samples that come with AMY. The header file written by `amy/headers.py` writes this.
 typedef struct {
     uint32_t offset;
@@ -36,6 +37,9 @@ extern const uint16_t pcm_samples;
 #if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #define AMY_MCU
 #endif
+
+#define MAX_FILENAME_LEN 127
+
 
 
 // Set block size and SR. We try for 256/44100, but some platforms don't let us:
@@ -56,6 +60,23 @@ extern const uint16_t pcm_samples;
 #endif
 
 #define PCM_AMY_SAMPLE_RATE 22050
+
+// Transfer types.
+#define AMY_TRANSFER_TYPE_NONE 0
+#define AMY_TRANSFER_TYPE_AUDIO 1
+#define AMY_TRANSFER_TYPE_FILE 2
+#define AMY_TRANSFER_TYPE_SAMPLE 3
+
+#define AMY_PCM_TYPE_ROM 0
+#define AMY_PCM_TYPE_FILE 1
+#define AMY_PCM_TYPE_MEMORY 2
+
+// File-streaming buffer size multiplier (in blocks).
+#define PCM_FILE_BUFFER_MULT 8
+
+
+#define AMY_BUS_OUTPUT 1
+#define AMY_BUS_AUDIO_IN 2
 
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
@@ -205,8 +226,12 @@ enum coefs{
 #define AUDIO_EXT0 14
 #define AUDIO_EXT1 15
 #define AMY_MIDI 16
-#define CUSTOM 17
-#define WAVE_OFF 18
+#define PCM_LEFT 17
+#define PCM_RIGHT 18
+#define PCM_MIX 7 // same as PCM
+#define CUSTOM 19
+#define WAVE_OFF 20
+#define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
 // synth[].status values
 #define SYNTH_OFF 0
@@ -487,6 +512,7 @@ struct synthinfo {
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
+    uint8_t terminate_on_silence;  // Do we enable the auto-termination of silent oscs?  Usually yes, not for PCM.
 
     uint32_t render_clock;
     uint32_t note_on_clock;
@@ -665,8 +691,10 @@ struct state {
     // Transfer
     uint8_t transfer_flag;
     uint8_t * transfer_storage;
-    uint32_t transfer_length;
-    uint32_t transfer_stored;
+    uint32_t transfer_length_bytes;
+    uint32_t transfer_stored_bytes; // using this for midi note before file load
+    uint32_t transfer_file_handle; // using this for preset number before file load 
+    char transfer_filename[MAX_FILENAME_LEN];
 
     // Sequencer
     uint32_t sequencer_tick_count;
@@ -765,6 +793,13 @@ extern float (*amy_external_coef_hook)(uint16_t);
 extern void (*amy_external_block_done_hook)(void);
 extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
 extern void (*amy_external_sequencer_hook)(uint32_t);
+// Hooks for file reading / writing / opening if your AMY host supports that
+extern uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) ;
+extern uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len);
+extern uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+extern void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
+extern void (*amy_external_fclose_hook)(uint32_t fptr);
+extern void (*amy_external_file_transfer_done_hook)(const char *filename);
 
 
 #ifdef __EMSCRIPTEN__
@@ -887,8 +922,9 @@ extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
-extern int16_t * pcm_load(uint16_t patch, uint32_t length, uint32_t samplerate, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
-extern void pcm_unload_preset(uint16_t patch_number);
+extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern int pcm_load_file();
+extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
 
 // filters
@@ -915,8 +951,8 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #endif
 #define AMY_RENDER_TASK_COREID (0)
 #define AMY_FILL_BUFFER_TASK_COREID (1)
-#define AMY_RENDER_TASK_STACK_SIZE (8 * 1024)
-#define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024)
+#define AMY_RENDER_TASK_STACK_SIZE (12 * 1024) // 8
+#define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024) // 16
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
 #define AMY_FILL_BUFFER_TASK_NAME "amy_fb_task"
 #include "esp_err.h"
@@ -940,5 +976,3 @@ extern int32_t delta_num_free();  // The size of the remaining pool.
 extern int peek_stack(char *tag);
 
 #endif
-
-

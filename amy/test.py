@@ -1,5 +1,8 @@
 import sys
 import os
+import random
+import string
+import tempfile
 
 import numpy as np
 import scipy.io.wavfile as wav
@@ -831,6 +834,66 @@ class TestBreakpointsRealloc(AmyTest):
     amy.send(time=900, osc=0, vel=0)
 
 
+class TestFileTransfer(AmyTest):
+
+  def test(self):
+    _amy.stop()
+    _amy.start_no_default()
+    payload = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2048))
+    with tempfile.NamedTemporaryFile(mode='w', delete=True) as f:
+      with tempfile.NamedTemporaryFile(mode='w+', delete=True) as g:
+        f.write(payload)
+        f.flush()
+        os.fsync(f.fileno())
+        amy.transfer_file(f.name, g.name)
+        amy.render(0.1)
+        g.seek(0)
+        transferred = g.read()
+        if transferred != payload:
+          raise AssertionError('transfer file contents mismatch')
+        print('TestFileTransfer: ok')
+
+
+class TestDiskSample(AmyTest):
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+
+class TestDiskSampleWithSilentGap(AmyTest):
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3 with gap.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=63)
+
+class TestRestartFileSample(AmyTest):
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=60)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=72)
+    amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
+
+class TestDiskSampleStereo(AmyTest):
+
+  def run(self):
+    amy.disk_sample('sounds/220_440_stereo.wav', preset=1024, midinote=60)
+    amy.disk_sample('sounds/220_440_stereo.wav', preset=1025, midinote=60)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
+    amy.send(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
+
+class TestSample(AmyTest):
+  def run(self):
+    amy.start_sample(preset=1024,bus=1,max_frames=22050, midinote=60)
+    amy.send(time=0, synth=1, num_voices=4, patch=20)
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    # notes off
+    amy.send(time=400, synth=1, note=48, vel=0)
+    amy.send(time=400, synth=1, note=60, vel=0)
+    amy.send(time=400, synth=1, note=63, vel=0)
+
+    # play a pitched up version
+    amy.send(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
+    amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
+
 
 def main(argv):
   if len(argv) > 1:
@@ -864,7 +927,10 @@ def main(argv):
     #TestVoiceStealing().test()
     #TestSustainPedal().test()
     #TestPatchFromEvents().test()
-    TestVoiceStealDecay().test()
+    #TestVoiceStealDecay().test()
+    #TestRestartFileSample().test()
+    #TestDiskSample().test()
+    TestFileTransfer().test()
 
   amy.send(debug=0)
   print("tests done.")

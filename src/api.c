@@ -6,7 +6,8 @@
 //////////////////////
 // Hooks
 
-// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
+// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. 
+// return 1 if this oscillator should be silent
 uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
 
 // Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
@@ -20,6 +21,15 @@ void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_s
 
 // Called every sequencer tick
 void (*amy_external_sequencer_hook)(uint32_t) = NULL;
+
+// Hooks for file reading / writing / opening if your AMY host supports that
+uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
+uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
+void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos) = NULL;
+void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
+void (*amy_external_file_transfer_done_hook)(const char *filename) = NULL;
+
 
 
 amy_config_t amy_default_config() {
@@ -48,7 +58,7 @@ amy_config_t amy_default_config() {
     c.max_memory_patches = 32;
 
     // caps
-#if defined(TULIP) || defined(AMYBOARD) // || defined(ESP_PLATFORM)
+    #if defined(TULIP) || defined(AMYBOARD) // || defined(ESP_PLATFORM)
     c.ram_caps_events = MALLOC_CAP_SPIRAM;
     c.ram_caps_synth = MALLOC_CAP_SPIRAM;
     c.ram_caps_block = MALLOC_CAP_DEFAULT;
@@ -310,6 +320,7 @@ void amy_start(amy_config_t c) {
     global_init(c);
     run_midi();
     amy_profiles_init();
+    transfer_init();
     oscs_init();
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
     if(AMY_HAS_STARTUP_BLEEP) {

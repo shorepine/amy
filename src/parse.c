@@ -3,6 +3,9 @@
 
 #include "amy.h"
 #include <ctype.h>  // for isalpha().
+#if defined(TULIP) || defined(AMYBOARD)
+#include "py/runtime.h"
+#endif
 
 float atoff(const char *s) {
     // Returns float value corresponding to parseable prefix of s.
@@ -96,6 +99,70 @@ PARSE_LIST(uint16_t)
 PARSE_LIST(int32_t)
 PARSE_LIST(int16_t)
 
+
+char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_len) {
+    // Copy a string while trimming leading and trailing spaces.
+    const char *s = src;
+    char *d = dest;
+    size_t d_writ = 0;
+    size_t s_read = 0;
+    size_t trimmed_src_len = src_len;
+    // scan for spaces at end
+    while (trimmed_src_len > 0 && isspace((unsigned char)src[trimmed_src_len - 1])) {
+        --trimmed_src_len;
+    }
+    // skip over leading spaces
+    while (s_read < trimmed_src_len && isspace((unsigned char)*s)) {
+        ++s;
+        ++s_read;
+    }
+    while(s_read < trimmed_src_len && d_writ < (dest_len - 1)) {
+        *d++ = *s++;
+        ++s_read;
+        ++d_writ;
+    }
+    *d = '\0'; // terminator.
+    return (char*) (src + src_len);
+}
+
+static const char *strchrnul_local(const char *s, int c) {
+    const char *found = strchr(s, c);
+    if (found != NULL) {
+        return found;
+    }
+    return s + strlen(s);
+}
+
+uint16_t parse_list_file_params(char *message, uint32_t *preset, char *filename, size_t filename_len, uint32_t *midinote) {
+    // Returns number of characters of message that are consumed.
+    if (filename_len > 0) {
+        filename[0] = '\0'; 
+    }
+    char *m = message;
+    *preset = strtol(m, &m, 0);
+    if (*m != ',') return m - message;
+    ++m;
+    m = copy_with_trim(filename, filename_len, m, strchrnul_local(m, ',') - m);
+    if (*m != ',') return m - message;
+    ++m;
+    *midinote = strtol(m, &m, 0);
+    return m - message;
+}
+
+
+uint16_t parse_list_file_transfer_params(char *message, char *filename, size_t filename_len,
+                                            uint32_t *file_size) {
+    *file_size = 0;
+    if (filename_len > 0) {
+        filename[0] = '\0';
+    }
+    char *m = message;
+    m = copy_with_trim(filename, filename_len, m, strchrnul_local(m, ',') - m);
+    if (*m != ',') return m - message;
+    ++m;
+    *file_size = strtol(m, &m, 0);
+    return m-message;
+}
 
 
 void copy_param_list_substring(char *dest, const char *src) {
@@ -220,6 +287,10 @@ void parse_coef_message(char *message, float *coefs) {
         coefs[i] = AMY_UNSET_VALUE(coefs[0]);
 }
 
+#if defined(TULIP) || defined(AMYBOARD)
+extern const mp_obj_fun_builtin_var_t tulip_pcm_load_file_obj;
+#endif
+
 // Parser for synth-layer ('i') prefix.
 void amy_parse_synth_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
@@ -237,6 +308,76 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
 }
+
+// Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
+uint16_t amy_parse_transfer_layer_message(char *message) {
+
+    if (message[0] >= '0' && message[0] <= '9') {
+        // z: Signal to start loading sample. 
+        // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
+        uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
+        parse_list_uint32_t(message, sm, 6, 0);
+        if(sm[1]==0) { // remove preset
+            pcm_unload_preset(sm[0]);
+        } else {
+            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, sm[3], sm[4], sm[5]);
+            start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+        }
+        return 0;
+    }
+    char cmd = message[0];
+    message++;
+    if (cmd == 'T')  {
+        // zT: Signal to start loading file. 
+        //Params: Destination name, file size.
+        uint32_t file_size = 0;
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = parse_list_file_transfer_params(message, filename, sizeof(filename), &file_size);
+        if (filename[0] != '\0') {
+            start_receiving_file_transfer(file_size, filename);
+        }
+        return len;
+    }
+    else if (cmd == 'F') {
+        // zF: setup PCM preset from WAV filename on disk. 
+        // Params: Preset number, filename, midi note
+        uint32_t preset = 0;
+        uint32_t midinote = 0;
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = parse_list_file_params(message, &preset, filename, sizeof(filename),
+                               &midinote);
+        if (filename[0] != '\0') {
+            amy_global.transfer_stored_bytes = midinote;
+            strncpy(amy_global.transfer_filename, filename, MAX_FILENAME_LEN);
+            amy_global.transfer_file_handle = preset;
+            // For tulip/amyboard we have to load the PCM file from the MP "task"
+            #if (defined AMYBOARD) || (defined TULIP)
+                mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_pcm_load_file_obj), mp_const_none);
+            #else
+                pcm_load_file();
+            #endif
+
+        }
+        return len;
+    }
+    else if (cmd == 'S') {
+        // zS: sample from BUS[1] to a memorypcm patch. 
+        // Params: Preset number,  bus, max length in frames,midinote,loopstart,loopend
+        uint32_t sm[6]; // preset, bus, max frames, midinote, loop_start, loopend
+        parse_list_uint32_t(message, sm, 6, 0);
+        int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, sm[3], sm[4], sm[5]);
+        start_receiving_sample(sm[2], sm[1], ram);
+        return 1;
+    }
+    else if (cmd == 'O') {
+        //zO: stop sampling from any bus
+        stop_receiving_sample();
+        return 1;
+    }
+    else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
+    return 0;
+}
+
 
 int _next_alpha(char *s) {
     // Return how many chars to skip to get to the next alphabet (command prefix) (or EOS).
@@ -256,9 +397,9 @@ void amy_parse_message(char * message, int length, amy_event *e) {
     peek_stack("parse_message");
     char cmd = '\0';
     uint16_t pos = 0;
-
+    
     // Check if we're in a transfer block, if so, parse it and leave this loop 
-    if(amy_global.transfer_flag) {
+    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return;
@@ -377,14 +518,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
                 }
                 break;
             case 'z': {
-                uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
-                parse_list_uint32_t(arg, sm, 6, 0);
-                if(sm[1]==0) { // remove preset
-                    pcm_unload_preset(sm[0]);
-                } else {
-                    int16_t * ram = pcm_load(sm[0], sm[1], sm[2], sm[3],sm[4], sm[5]);
-                    start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
-                }
+                pos += amy_parse_transfer_layer_message(arg);
                 break;
             }
             /* Y,y available */
