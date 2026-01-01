@@ -94,6 +94,9 @@ static void fclose_if_file(memorypcm_preset_t *preset) {
 }
 
 void pcm_note_on(uint16_t osc) {
+    //fprintf(stderr, "pcm_note_on: time %.3f osc %d preset %d\n",
+    //        (float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+    //        osc, synth[osc]->preset);
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
         if (preset->type == AMY_PCM_TYPE_FILE) {
@@ -170,96 +173,107 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
 }
 
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
-    if(AMY_IS_SET(synth[osc]->preset)) {
-        SAMPLE max_value = 0;
-        memorypcm_preset_t * preset = get_preset_for_preset_number(synth[osc]->preset);
-        float logfreq = msynth[osc]->logfreq;
-        // If osc[midi_note] is set, shift the freq by the preset's default base_note.
-        if (AMY_IS_SET(synth[osc]->midi_note)) {
-            logfreq -= logfreq_for_midi_note(preset->midinote);
-        }
-        float playback_freq = freq_of_logfreq(preset->log2sr + logfreq);
-        uint32_t sample_length = preset->length;
-        if (preset->type == AMY_PCM_TYPE_FILE) {
-            float frames_per_output = playback_freq / (float)AMY_SAMPLE_RATE;
-            uint32_t frames_needed = (uint32_t)ceilf(frames_per_output * AMY_BLOCK_SIZE) + 1;
-            uint32_t max_frames = AMY_BLOCK_SIZE * PCM_FILE_BUFFER_MULT;
-            if (frames_needed > max_frames) {
-                frames_needed = max_frames;
-            }
-            sample_length = fill_sample_from_file(preset, frames_needed);
-            if(sample_length != frames_needed) {
-                // reached end of file
-                synth[osc]->status = SYNTH_OFF;
-            }
-            synth[osc]->phase = 0;
-        }
-
-        SAMPLE amp = F2S(msynth[osc]->amp);
-        PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
-        const LUTSAMPLE* table = preset->sample_ram;
-        uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-        for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
-            SAMPLE frac = S_FRAC_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-            LUTSAMPLE b = 0;
-            LUTSAMPLE c = 0;
-            uint32_t next_index = base_index + 1;
-            if (preset->channels == 2) {
-                uint32_t base_offset = base_index * 2;
-                uint32_t next_offset = next_index * 2;
-                if (synth[osc]->wave == PCM_LEFT) {
-                    b = table[base_offset];
-                    c = (next_index < sample_length) ? table[next_offset] : b;
-                } else if (synth[osc]->wave == PCM_RIGHT) {
-                    b = table[base_offset + 1];
-                    c = (next_index < sample_length) ? table[next_offset + 1] : b;
-                } else { // PCM or PCM_MIX
-                    LUTSAMPLE bl = table[base_offset];
-                    LUTSAMPLE br = table[base_offset + 1];
-                    b = (LUTSAMPLE)(((int32_t)bl + (int32_t)br) / 2);
-                    if (next_index < sample_length) {
-                        LUTSAMPLE cl = table[next_offset];
-                        LUTSAMPLE cr = table[next_offset + 1];
-                        c = (LUTSAMPLE)(((int32_t)cl + (int32_t)cr) / 2);
-                    } else {
-                        c = b;
-                    }
-                }
-            } else {
-                b = table[base_index];
-                c = (next_index < sample_length) ? table[next_index] : b;
-            }
-            SAMPLE sample = L2S(b) + MUL0_SS(L2S(c - b), frac);
-            synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, step);
-            base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-
-            if(preset->type != AMY_PCM_TYPE_FILE) {
-                // For non-file samples, we have to check for end of sample/looping.
-                if(base_index >= sample_length) { // end
-                    synth[osc]->status = SYNTH_OFF;// is this right?
-                    sample = 0;
-                } else {
-                    if(msynth[osc]->feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
-                        if(base_index >= preset->loopend) { // loopend
-                            // back to loopstart
-                            int32_t loop_len = preset->loopend - preset->loopstart;
-                            synth[osc]->phase -= F2P(loop_len / (float)(1 << PCM_INDEX_BITS));
-                            base_index -= loop_len;
-                        }
-                    }
-                }
-            }
-            SAMPLE value = buf[i] + MUL4_SS(amp, sample);
-            buf[i] = value;   
-            if (value < 0) value = -value;
-            if (value > max_value) max_value = value;  
-        }
-        //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
-        //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
-        return max_value; 
-        // i don't believe we ever need to detect silence in a sample. it will shut itself off at the end.
+    if(AMY_IS_UNSET(synth[osc]->preset)) {
+        fprintf(stderr, "%.3f: render_pcm called on osc %d: preset is not set\n",
+                (float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+                osc);
+        return 0;
     }
-    return 0;
+
+
+    SAMPLE max_value = 0;
+    memorypcm_preset_t * preset = get_preset_for_preset_number(synth[osc]->preset);
+    float logfreq = msynth[osc]->logfreq;
+    // If osc[midi_note] is set, shift the freq by the preset's default base_note.
+    if (AMY_IS_SET(synth[osc]->midi_note)) {
+        logfreq -= logfreq_for_midi_note(preset->midinote);
+    }
+    float playback_freq = freq_of_logfreq(preset->log2sr + logfreq);
+    uint32_t sample_length = preset->length;
+    if (preset->type == AMY_PCM_TYPE_FILE) {
+        float frames_per_output = playback_freq / (float)AMY_SAMPLE_RATE;
+        uint32_t frames_needed = (uint32_t)ceilf(frames_per_output * AMY_BLOCK_SIZE) + 1;
+        uint32_t max_frames = AMY_BLOCK_SIZE * PCM_FILE_BUFFER_MULT;
+        if (frames_needed > max_frames) {
+            frames_needed = max_frames;
+        }
+        sample_length = fill_sample_from_file(preset, frames_needed);
+        if(sample_length != frames_needed) {
+            // reached end of file
+            synth[osc]->status = SYNTH_OFF;
+        }
+        synth[osc]->phase = 0;
+    }
+
+    SAMPLE sample, value;
+    SAMPLE amp = F2S(msynth[osc]->amp);
+    PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
+
+    const LUTSAMPLE* table = preset->sample_ram;
+    uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+    for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
+        SAMPLE frac = S_FRAC_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+        LUTSAMPLE b = 0;
+        LUTSAMPLE c = 0;
+        uint32_t next_index = base_index + 1;
+        if (preset->channels == 2) {
+            uint32_t base_offset = base_index * 2;
+            uint32_t next_offset = next_index * 2;
+            if (synth[osc]->wave == PCM_LEFT) {
+                b = table[base_offset];
+                c = (next_index < sample_length) ? table[next_offset] : b;
+            } else if (synth[osc]->wave == PCM_RIGHT) {
+                b = table[base_offset + 1];
+                c = (next_index < sample_length) ? table[next_offset + 1] : b;
+            } else { // PCM or PCM_MIX
+                LUTSAMPLE bl = table[base_offset];
+                LUTSAMPLE br = table[base_offset + 1];
+                b = (LUTSAMPLE)(((int32_t)bl + (int32_t)br) / 2);
+                if (next_index < sample_length) {
+                    LUTSAMPLE cl = table[next_offset];
+                    LUTSAMPLE cr = table[next_offset + 1];
+                    c = (LUTSAMPLE)(((int32_t)cl + (int32_t)cr) / 2);
+                } else {
+                    c = b;
+                }
+            }
+        } else {
+            b = table[base_index];
+            c = (next_index < sample_length) ? table[next_index] : b;
+        }
+        /* SAMPLE */ sample = L2S(b) + MUL0_SS(L2S(c - b), frac);
+        synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, step);
+        base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+
+        if(preset->type != AMY_PCM_TYPE_FILE) {
+            // For non-file samples, we have to check for end of sample/looping.
+            if(base_index >= sample_length) { // end
+                synth[osc]->status = SYNTH_OFF;// is this right?
+                sample = 0;
+            } else {
+                if(msynth[osc]->feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
+                    if(base_index >= preset->loopend) { // loopend
+                        // back to loopstart
+                        int32_t loop_len = preset->loopend - preset->loopstart;
+                        synth[osc]->phase -= F2P(loop_len / (float)(1 << PCM_INDEX_BITS));
+                        base_index -= loop_len;
+                    }
+                }
+            }
+        }
+        /* SAMPLE */ value = buf[i] + MUL4_SS(amp, sample);
+        buf[i] = value;   
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;  
+    }
+    //if (synth[osc]->preset == 2)
+        //fprintf(stderr, "%.3f: render_pcm: osc %d preset %d phase %d sample %.3f amp %.3f value %.3f\n",
+        //    (float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+        //    osc, synth[osc]->preset, synth[osc]->phase, S2F(sample), S2F(amp), S2F(value));
+
+    //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
+    //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
+    return max_value; 
 }
 
 

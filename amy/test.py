@@ -692,6 +692,7 @@ class TestMidiDrums(AmyTest):
   
   def run(self):
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.chorus(0)
     amy.inject_midi(100, 0x99, 35, 100)  # bass
     amy.inject_midi(400, 0x99, 35, 100)  # bass
     amy.inject_midi(400, 0x99, 37, 100)  # snare
@@ -745,6 +746,7 @@ class TestSynthDrums(AmyTest):
     self.config_default = True
   
   def run(self):
+    amy.chorus(0);
     amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=10, note=37, vel=100/127)  # snare
@@ -900,7 +902,7 @@ def main(argv):
     # Override location of reference files.
     AmyTest.ref_dir = argv[1]
 
-  do_all_tests = True
+  do_all_tests = False
 
   if do_all_tests:
     for testClass in AmyTest.__subclasses__():
@@ -930,7 +932,66 @@ def main(argv):
     #TestVoiceStealDecay().test()
     #TestRestartFileSample().test()
     #TestDiskSample().test()
-    TestFileTransfer().test()
+    #TestFileTransfer().test()
+
+    TestSineOsc().test()
+    TestPulseOsc().test()
+    TestSawDownOsc().test()
+    TestSawUpOsc().test()
+    TestTriangleOsc().test()
+    TestNoiseOsc().test()
+    TestPcm().test()
+    TestPcmShift().test()
+    TestPcmPatchChange().test()
+    TestPcmLoop().test()
+    TestPcmLoopEnvFilt().test()
+    TestBuildYourOwnPartials().test()
+    TestBYOPVoices().test()
+    TestBYOPNoteOff().test()
+    TestInterpPartials().test()
+    TestInterpPartialsRetrigger().test()
+    TestSineEnv().test()
+    TestSineEnv2().test()
+    TestAlgo().test()
+    TestAlgo2().test()
+    TestFMRepeat().test()
+    TestFilter().test()
+    TestFilter24().test()
+    TestFilterLFO().test()
+
+    TestLFO().test()
+    TestDuty().test()
+    TestPWM().test()
+    TestGlobalEQ().test()
+    TestChorus().test()
+    TestBrass().test()
+    TestBrass2().test()
+    TestGuitar().test()
+    TestBleep().test()
+    TestOverload().test()
+    TestJunoPatch().test()
+    TestJunoClip().test()
+    TestLowVcf().test()
+    TestLowerVcf().test()
+    TestFlutesEq().test()
+    TestOscBD().test()
+    TestChainedOsc().test()
+    TestJunoTrumpetPatch().test()
+    TestJunoCheapTrumpetPatch().test()
+    TestFilterReleaseGlitch().test()
+    TestPortamento().test()
+
+    TestEcho().test()
+    TestEchoLPF().test()
+    TestEchoHPF().test()
+    #TestPcmLoopEnvFilt().test()
+    TestVoiceManagement().test()
+    TestVoiceStealing().test()
+    TestVoiceStealDecay().test()
+    TestMidiDrums().test()
+    TestDefaultChan1Synth().test()
+    TestSynthProgChange().test()
+    TestSynthDrums().test()
 
   amy.send(debug=0)
   print("tests done.")

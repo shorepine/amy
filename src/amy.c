@@ -1322,6 +1322,11 @@ void hold_and_modify(uint16_t osc) {
     }
     msynth[osc]->last_logfreq = msynth[osc]->logfreq;
     float filter_logfreq = combine_controls(ctrl_inputs, synth[osc]->filter_logfreq_coefs);
+    //if(synth[osc]->filter_type != FILTER_NONE)
+    //    fprintf(stderr, "time %.3f osc %d filter_logfreq %.3f\n",
+    //            amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc,
+    //            filter_logfreq);
+            
     #define MIN_FILTER_LOGFREQ -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
     if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
     if (AMY_IS_SET(msynth[osc]->last_filter_logfreq)) {
@@ -1438,7 +1443,12 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 }
             }
             if(pcm_samples)
-                if (AMY_WAVE_IS_PCM(synth[osc]->wave)) max_val = render_pcm(buf, osc);
+                if (AMY_WAVE_IS_PCM(synth[osc]->wave)) {
+                    max_val = render_pcm(buf, osc);
+                    //if (synth[osc]->preset == 2) {
+                    //    fprintf(stderr, "buf[0]=%.3f\n", S2F(buf[0]));
+                    //}
+                }
             if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
             if(AMY_HAS_PARTIALS) {
                 if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
@@ -1497,9 +1507,9 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
             if(synth[osc]->filter_type != FILTER_NONE) {
-                //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
-                //	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
-                //	osc, synth[osc]->filter_type);
+                //fprintf(stderr, "time %.3f osc %d filter_type %d msynth->filter_logfreq %.3f\n",
+                // 	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+                // 	osc, synth[osc]->filter_type, msynth[osc]->filter_logfreq);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
 	        }
             uint8_t handled = 0;
