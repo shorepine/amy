@@ -127,15 +127,17 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), ('feedback', 'bF'), ('time', 'tI'),
-    ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
-    ('bp0', 'AL'), ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), ('mod_source', 'LI'), 
-    ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'), ('algo_source', 'OL'), ('load_sample', 'zL'),
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
+    ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
+    ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'), ('bp0', 'AL'), 
+    ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), 
+    ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
+    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
-    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'),  # 'i' is prefix for some two-letter synth-level codes.
-    ('preset', 'pI'), ('num_partials', 'pI'), # Note alaising.
+    ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
+    ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
@@ -305,6 +307,32 @@ def unload_sample(patch=0):
     send(load_sample=s)
     print("Patch %d unloaded from RAM" % (patch))
 
+# For AMYBoard and other AMYs that can get messages over MIDI sysex
+# AMYboard is the name of the default AMYboard USB over MIDI device. 
+# If you're using another MIDI device, set output_name to it 
+# Use this like amy.override_send = sysex_write
+def sysex_write(message, output_name='AMYboard'):
+    import mido
+    outputs = mido.get_output_names()
+    target_name = None
+    for name in outputs:
+        if output_name in name:
+            target_name = name
+            break
+    if target_name is None:
+        print("Could not find %s MIDI")
+    if isinstance(message, str):
+        payload = message.encode('ascii')
+    elif isinstance(message, bytes):
+        payload = message
+    # AMY sysex message
+    data = [0x00, 0x03, 0x45] + list(payload)
+    with mido.open_output(target_name) as out:
+        m = mido.Message('sysex', data=data)
+        out.send(m)
+    # This sleep is because there's not really a buffer per-se for SYSEX over CDC
+    time.sleep(0.01)
+
 
 try:
     import base64
@@ -314,6 +342,13 @@ except ImportError:
     import ubinascii
     def b64(b):
         return ubinascii.b2a_base64(b)[:-1]
+
+def start_sample(preset=0, bus=1,  max_frames=0, midinote=60, loopstart=0, loopend=0):
+    s = "%d,%d,%d,%d,%d,%d" % (preset, bus, max_frames, midinote, loopstart, loopend)
+    send(start_sample=s)
+
+def stop_sample():
+    send(stop_sample=1)
 
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
@@ -330,7 +365,28 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         message = b64(frames_bytes)
         send_raw(message.decode('ascii'))
         last_f = last_f + 188
-    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, n_frames*2, n_frames, midinote))
+
+def disk_sample(wavfilename, preset=0, midinote=60):
+    s = "%d,%s,%d" % (preset, wavfilename, midinote)
+    send(disk_sample=s)
+
+def transfer_file(source_filename, dest_filename=None):
+    import os
+    from math import ceil
+    if(dest_filename is None):
+        dest_filename = source_filename
+    file_size = os.path.getsize(source_filename)
+    s = "%s,%d" % (dest_filename, file_size)
+    send(transfer_file=s)
+    
+    # Now generate the base64 encoded segments, 188 bytes at a time
+    # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
+    w = open(source_filename, 'rb')
+    for i in range(ceil(file_size/188)):
+        file_bytes = w.read(188)
+        message = b64(file_bytes)
+        send_raw(message.decode('ascii'))
+    w.close()
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
     from math import ceil

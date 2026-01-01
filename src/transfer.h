@@ -12,10 +12,25 @@
 #include <stdint.h>
 #include "amy.h"
 
+
+#define MAX_OPEN_FILES 64
+#define HANDLE_INVALID 0
+
 typedef struct b64_buffer {
     char * ptr;
     int bufc;
 } b64_buffer_t;
+
+void transfer_init();
+
+typedef struct {
+    uint16_t channels;
+    uint32_t sample_rate;
+} wave_info_t;
+
+int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes);
+uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels,
+                                  uint32_t *bytes_remaining, int16_t *dest, uint32_t max_frames);
 
  // How much memory to allocate per buffer
 #define B64_BUFFER_SIZE     (256)
@@ -40,7 +55,12 @@ static const char b64_table[] = {
 };
 
 void start_receiving_transfer(uint32_t length, uint8_t * storage);
+void start_receiving_file_transfer(uint32_t length, const char *filename);
 void parse_transfer_message(char * message, uint16_t len) ;
+void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage);
+void stop_receiving_sample();
+
+
 
 /**
  * Encode `unsigned char *' source with `size_t' size.
