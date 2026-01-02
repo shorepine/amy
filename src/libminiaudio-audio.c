@@ -59,6 +59,9 @@ void amy_update_tasks() {
 void amy_platform_init() {
 }
 
+void amy_platform_deinit() {
+}
+
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
     return 0;
 }

@@ -18,8 +18,8 @@ AudioConnection          patchCord4(queue_l, 0, i2s1, 0);
 
 
 
-int16_t * samples_l;
-int16_t * samples_r;
+int16_t * samples_l = NULL;
+int16_t * samples_r = NULL;
 
 extern "C" {
 
@@ -46,13 +46,23 @@ extern "C" {
 			SPSS_NAME
 	};
 	void teensy_setup_i2s() {
-		samples_l = (int16_t*)malloc(sizeof(int16_t)*AMY_BLOCK_SIZE);
+            if (samples_l == NULL) {
+                samples_l = (int16_t*)malloc(sizeof(int16_t)*AMY_BLOCK_SIZE);
 		samples_r = (int16_t*)malloc(sizeof(int16_t)*AMY_BLOCK_SIZE);
 		AudioMemory(16);
 		queue_l.setMaxBuffers(4);
 		queue_r.setMaxBuffers(4);
+            }
 
 	}
+        void teensy_teardown_i2s() {
+            if (samples_l != NULL) {
+                free(samples_l);
+                free(samples_r);
+                samples_l = NULL;
+                samples_r = NULL;
+            }
+        }
 
         size_t teensy_i2s_write(const uint8_t *buffer, size_t nbytes) {
             int16_t *samples = (int16_t *)buffer;

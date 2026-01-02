@@ -124,6 +124,10 @@ void pico_setup_i2s(amy_config_t *config) {
     i2s.begin();
 }
 
+void pico_teardown_i2s(amy_config_t *config) {
+    i2s.end();
+}
+
 static int32_t buffer32[AMY_BLOCK_SIZE * AMY_NCHANS];
 
 void pico_i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples, int nframes) {
@@ -158,6 +162,12 @@ extern "C" {
         }
         //usb_midi.setStringDescriptor("AMY Synthesizer");
 
+#endif
+    }
+
+    void pico_teardown_midi() {
+#ifdef USE_TUSB
+        // There's no TinUSBDevice.end(), so just leave it initialized.
 #endif
     }
 

@@ -202,7 +202,7 @@ uint16_t sysex_len = 0;
 #if defined(TULIP) || defined(AMYBOARD)
 extern const mp_obj_fun_builtin_var_t tulip_amy_send_sysex_obj;
 #endif
-uint8_t * sysex_buffer;
+uint8_t * sysex_buffer = NULL;
 void parse_sysex() {
     uint32_t time = AMY_UNSET_VALUE(time);
     if(sysex_len>3) {
@@ -309,6 +309,9 @@ void run_midi() {
     // do nothing, this is all done with callbacks
 }
 
+void stop_midi() {
+}
+
 void midi_out(uint8_t * bytes, uint16_t len) {
     EM_ASM(
             if(midiOutputDevice != null) {
@@ -357,26 +360,42 @@ void esp_init_midi(void) {
 
     // Configure UART parameters
     const int uart_num = esp_get_uart(amy_global.config.midi_uart);
-    ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(uart_num, amy_global.config.midi_out, amy_global.config.midi_in, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
+    if (!uart_is_driver_installed(uart_num)) {
+        ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+        ESP_ERROR_CHECK(uart_set_pin(uart_num, amy_global.config.midi_out, amy_global.config.midi_in, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
 
-    const int uart_buffer_size = (MAX_MIDI_BYTES_TO_PARSE);
-    // Install UART driver using an event queue here
-    ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size,  0, 0, NULL, 0));
+        const int uart_buffer_size = (MAX_MIDI_BYTES_TO_PARSE);
+        // Install UART driver using an event queue here
+        ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size,  0, 0, NULL, 0));
 
-    uart_intr_config_t uart_intr = {
-          .intr_enable_mask = UART_RXFIFO_FULL_INT_ENA_M
-                              | UART_RXFIFO_TOUT_INT_ENA_M
-                              | UART_FRM_ERR_INT_ENA_M
-                              | UART_RXFIFO_OVF_INT_ENA_M
-                              | UART_BRK_DET_INT_ENA_M
-                              | UART_PARITY_ERR_INT_ENA_M,
-          .rxfifo_full_thresh = 1,
-          .rx_timeout_thresh = 0,
-          .txfifo_empty_intr_thresh = 10
-    };
+        uart_intr_config_t uart_intr = {
+            .intr_enable_mask = UART_RXFIFO_FULL_INT_ENA_M
+            | UART_RXFIFO_TOUT_INT_ENA_M
+            | UART_FRM_ERR_INT_ENA_M
+            | UART_RXFIFO_OVF_INT_ENA_M
+            | UART_BRK_DET_INT_ENA_M
+            | UART_PARITY_ERR_INT_ENA_M,
+            .rxfifo_full_thresh = 1,
+            .rx_timeout_thresh = 0,
+            .txfifo_empty_intr_thresh = 10
+        };
 
-    uart_intr_config(uart_num, &uart_intr);
+        uart_intr_config(uart_num, &uart_intr);
+    }
+}
+
+void esp_deinit_midi(void) {
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
+    if (uart_is_driver_installed(uart_num)) {
+        uart_intr_config_t uart_intr = {
+            .intr_enable_mask = 0,
+            .rxfifo_full_thresh = 1,
+            .rx_timeout_thresh = 0,
+            .txfifo_empty_intr_thresh = 10
+        };
+        uart_intr_config(uart_num, &uart_intr);
+        uart_driver_delete(uart_num);
+    }
 }
 
 void esp_poll_midi(void) {
@@ -399,13 +418,26 @@ void run_midi_task() {
 }
 
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
-        esp_init_midi();
-        if (amy_global.config.platform.multithread) {
-            xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
-        }  // otherwise esp_poll_midi is called from amy_update_tasks()
+    if (sysex_buffer == NULL) {
+        sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+            esp_init_midi();
+            if (amy_global.config.platform.multithread) {
+                xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+            }  // otherwise esp_poll_midi is called from amy_update_tasks()
+        }
     }
+}
+
+void stop_midi() {
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        if (amy_global.config.platform.multithread) {
+            vTaskDelete(midi_handle);
+        }
+        esp_deinit_midi();
+    }
+    free(sysex_buffer);
+    sysex_buffer = NULL;
 }
 
 
@@ -436,20 +468,35 @@ void on_pico_uart_rx() {
 }
 
 extern void pico_setup_midi();
+extern void pico_teardown_midi();
 
 void run_midi() {
-    sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
-        uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
-        gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
-        gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_in));
-        uart_set_hw_flow(rp_get_uart(amy_global.config.midi_uart), false, false);
-        uart_set_format(rp_get_uart(amy_global.config.midi_uart), 8, 1, UART_PARITY_NONE);
-        uart_set_fifo_enabled(rp_get_uart(amy_global.config.midi_uart), true);
-    } else if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
-        pico_setup_midi();
+    if (sysex_buffer == NULL) {
+        sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+            uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
+            gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
+            gpio_set_function(amy_global.config.midi_in, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_in));
+            uart_set_hw_flow(rp_get_uart(amy_global.config.midi_uart), false, false);
+            uart_set_format(rp_get_uart(amy_global.config.midi_uart), 8, 1, UART_PARITY_NONE);
+            uart_set_fifo_enabled(rp_get_uart(amy_global.config.midi_uart), true);
+        } else if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+            pico_setup_midi();
+        }
     }
+}
 
+void stop_midi() {
+    if (sysex_buffer) {
+        if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+            uart_set_fifo_enabled(rp_get_uart(amy_global.config.midi_uart), false);
+            uart_deinit(rp_get_uart(amy_global.config.midi_uart));
+        } else if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+            pico_teardown_midi();
+        }
+        free(sysex_buffer);
+        sysex_buffer = NULL;
+    }
 }
 
 #endif
