@@ -229,18 +229,21 @@ void amy_add_event(amy_event *e) {
 
 #ifdef __EMSCRIPTEN__
 void amy_start_web() {
+    fprintf(stderr, "starting amy web\n");
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
-    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.default_synths = 1;
+    amy_config.features.startup_bleep = 1;
+    fprintf(stderr, "starting2 amy web\n");
     amy_start(amy_config);
+    fprintf(stderr, "started amy web\n");
 }
 
 void amy_start_web_no_synths() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
-    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
 }
@@ -347,7 +350,7 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(__EMSCRIPTEN__)
     miniaudio_start();
 #endif
 }
