@@ -16,7 +16,6 @@ int main(int argc, char ** argv) {
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     //amy_config.playback_device_id = -1;
     //amy_config.capture_device_id = -1;
-    amy_config.features.audio_in = 1; // Needed to make libminiaudio work?
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
 

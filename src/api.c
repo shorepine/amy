@@ -50,11 +50,7 @@ amy_config_t amy_default_config() {
     c.write_samples_fn = NULL;
 
     c.midi = AMY_MIDI_IS_NONE;
-    #ifndef AMY_MCU
-    c.audio = AMY_AUDIO_IS_MINIAUDIO;
-    #else
-    c.audio = AMY_AUDIO_IS_I2S;
-    #endif
+    c.audio = AMY_AUDIO_IS_NONE;
     c.ks_oscs = 1;
 
     c.max_oscs = 180;
@@ -348,13 +344,15 @@ void amy_start(amy_config_t c) {
             amy_bleep(0);  // bleep using raw oscs.
     }
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(__EMSCRIPTEN__)
-    miniaudio_start();
+    if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
+        miniaudio_start();
 #endif
 }
 
 void amy_stop() {
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
-    miniaudio_stop();
+    if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
+        miniaudio_stop();
 #endif
     oscs_deinit();
 }
