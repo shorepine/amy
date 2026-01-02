@@ -40,6 +40,7 @@ amy_config_t amy_default_config() {
     c.features.partials = 1;
     c.features.custom = 1;
     c.features.default_synths = 1;
+    c.features.audio_in = 0;
     c.features.startup_bleep = 0;
 
     // Use all platform features by default.

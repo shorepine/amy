@@ -62,7 +62,7 @@ int main(int argc, char ** argv) {
     amy_config.playback_device_id = playback_device_id;
     fprintf(stderr, "playback_device_id=%d\n", playback_device_id);
     amy_config.capture_device_id = capture_device_id;
-    amy_config.features.default_synths = 0;
+    amy_config.features.default_synths = 1;
 
     for (int tries = 0; tries < 2; ++tries) {
     amy_start(amy_config);

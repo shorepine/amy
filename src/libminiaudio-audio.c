@@ -163,6 +163,9 @@ ma_uint32 captureCount;
 amy_err_t miniaudio_init() {
     leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_fbl);
 
+    fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
+            AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
+
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
         printf("Failed to setup context for device list.\n");
         exit(1);
@@ -271,17 +274,6 @@ void amy_live_start_web() {
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
-#endif
-//void amy_live_start() {
-//    // kick off a thread running miniaudio_run
-//    amy_global.running = 1;
-//    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
-//}
+#endif  // __EMSCRIPTEN__
 
-
-//void amy_live_stop() {
-//    amy_global.running = 0;
-//    ma_device_uninit(&device);
-//    ma_context_uninit(&context);
-//}
-#endif
+#endif  // Not ESP_PLATFORM or PICO_ON_DEVICE or ARDUINO

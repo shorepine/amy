@@ -788,8 +788,6 @@ void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
-//void amy_live_start();
-//void amy_live_stop();
 
 int16_t *amy_update();        // in api.c
 void amy_platform_init();     // in i2s.c

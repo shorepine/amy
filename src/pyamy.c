@@ -30,15 +30,11 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args) {
         amy_config.playback_device_id = -1;
         amy_config.capture_device_id = -1;
     }
-    //amy_live_start();
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // Needed to make miniaudio run
     amy_start(amy_config); // initializes amy 
     return Py_None;
 }
-
-//static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
-//    amy_live_stop();
-//    return Py_None;
-//}
 
 static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
@@ -70,7 +66,6 @@ static PyObject * config_wrapper(PyObject *self, PyObject *args) {
 
 static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     int16_t * result = amy_simple_fill_buffer();
-    //int16_t * result = amy_update();
     // Create a python list of ints (they are signed shorts that come back)
     uint16_t bs = AMY_BLOCK_SIZE;
     if(AMY_NCHANS == 2) {
@@ -105,7 +100,6 @@ static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
     {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
-    //{"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
     {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},

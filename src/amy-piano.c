@@ -16,12 +16,9 @@ int main(int argc, char ** argv) {
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     //amy_config.playback_device_id = -1;
     //amy_config.capture_device_id = -1;
-    amy_config.i2s_din = 0; // fake, to indicate has_audio_in.  Critical to miniaudio running
-    //amy_config.i2s_dout = 0; // fake, to indicate has_audio_out
+    amy_config.features.audio_in = 1; // Needed to make libminiaudio work?
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
-
-    //amy_live_start();
 
 	amy_add_message("S16384Z");
 	amy_add_message("t0V5Z");
