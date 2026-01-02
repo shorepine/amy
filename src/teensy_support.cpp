@@ -54,13 +54,15 @@ extern "C" {
 
 	}
 
-	void teensy_i2s_send(int16_t * samples) {
-	    for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
+        size_t teensy_i2s_write(const uint8_t *buffer, size_t nbytes) {
+            int16_t *samples = (int16_t *)buffer;
+            for(int16_t i=0;i<AMY_BLOCK_SIZE;i++) {
     		samples_l[i] = samples[i*2];
 			samples_r[i] = samples[i*2+1];
 		 }  
 		queue_l.play(samples_l, AMY_BLOCK_SIZE);
 		queue_r.play(samples_r, AMY_BLOCK_SIZE);
+            return nbytes;
 	}
 
 	void teensy_start_midi() {

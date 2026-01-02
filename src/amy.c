@@ -155,6 +155,9 @@ SAMPLE *fbl[AMY_MAX_CORES];
 SAMPLE *per_osc_fb[AMY_MAX_CORES];
 SAMPLE core_max[AMY_MAX_CORES];
 
+// Public pointer to recently-emitted waveform block.  No sync for the moment.  Cleared to NULL when read by amy_get_output_buffer.
+output_sample_type * amy_out_block;
+output_sample_type * amy_out_block_copy;
 // Audio input blocks. Filled by the audio implementation before rendering.
 // For live audio input from a codec, AUDIO_IN0 / 1
 output_sample_type * amy_in_block;
@@ -358,6 +361,7 @@ int peek_stack(char *tag)  { return 0; }
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
+    amy_global.i2s_is_in_background = 0;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
     amy_global.volume = 1.0f;
@@ -840,6 +844,7 @@ int8_t oscs_init() {
     bzero(synth, sizeof(struct synthinfo *) * (AMY_OSCS+1));
     msynth = (struct mod_synthinfo **) malloc_caps(sizeof(struct mod_synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
+    amy_out_block_copy = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
     amy_in_block = (output_sample_type*)malloc_caps(sizeof(output_sample_type)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_block);
     amy_external_in_block = (output_sample_type*)malloc_caps(sizeof(output_sample_type)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_block);
     // set all oscillators to their default values
@@ -1750,6 +1755,7 @@ int16_t * amy_fill_buffer() {
     amy_global.total_blocks++;
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
+    amy_out_block = block;
     return block;
 }
 

@@ -14,10 +14,11 @@ void delay_ms(uint32_t ms) {
 int main(int argc, char ** argv) {
     amy_config_t amy_config = amy_default_config();
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    //amy_config.playback_device_id = -1;
+    //amy_config.capture_device_id = -1;
+    amy_config.features.audio_in = 1; // Needed to make libminiaudio work?
     amy_config.features.default_synths = 0;
     amy_start(amy_config);
-    
-    amy_live_start();
 
 	amy_add_message("S16384Z");
 	amy_add_message("t0V5Z");
@@ -182,8 +183,6 @@ int main(int argc, char ** argv) {
     }
 
     show_debug(99);
-
-    amy_live_stop();
 
     return 0;
 }

@@ -46,10 +46,11 @@ int main(int argc, char ** argv) {
 
     amy_config_t amy_config = amy_default_config();
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // We need audio_in for miniaudio to run??
+    amy_config.features.default_synths = 0;
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
     amy_start(amy_config);
-    amy_live_start();
 
     while (1) {
         char input[1024];
@@ -72,8 +73,6 @@ int main(int argc, char ** argv) {
         }
     }
     
-    amy_live_stop();
-
     return 0;
 }
 #endif

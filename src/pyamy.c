@@ -19,21 +19,20 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 
 
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
+    amy_stop();
+    amy_config_t amy_config = amy_global.config;
     int arg1 = -1; int arg2 = -1;
     if(PyTuple_Size(args) == 2) {
         PyArg_ParseTuple(args, "ii", &arg1, &arg2);
-        amy_global.config.playback_device_id = arg1;
-        amy_global.config.capture_device_id = arg2;
+        amy_config.playback_device_id = arg1;
+        amy_config.capture_device_id = arg2;
     } else {
-        amy_global.config.playback_device_id = -1;
-        amy_global.config.capture_device_id = -1;
+        amy_config.playback_device_id = -1;
+        amy_config.capture_device_id = -1;
     }
-    amy_live_start();
-    return Py_None;
-}
-
-static PyObject * pause_wrapper(PyObject *self, PyObject *args) {
-    amy_live_stop();
+    amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // Needed to make miniaudio run
+    amy_start(amy_config); // initializes amy 
     return Py_None;
 }
 
@@ -43,14 +42,12 @@ static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
 }
 
 static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
+    int default_synths = 0;
+    if(PyTuple_Size(args) == 1) {
+        PyArg_ParseTuple(args, "i", &default_synths);
+    }
     amy_config_t amy_config = amy_default_config();
-    amy_start(amy_config); // initializes amy 
-    return Py_None;
-}
-
-static PyObject * amystart_no_default_wrapper(PyObject *self, PyObject *args) {
-    amy_config_t amy_config = amy_default_config();
-    amy_config.features.default_synths = 0;
+    amy_config.features.default_synths = default_synths;
     amy_start(amy_config); // initializes amy 
     return Py_None;
 }
@@ -101,8 +98,6 @@ static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
     {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
     {"live", live_wrapper, METH_VARARGS, "Live AMY"},
-    {"pause", pause_wrapper, METH_VARARGS, "Pause AMY"},
-    {"start_no_default", amystart_no_default_wrapper, METH_VARARGS, "Start AMY"},
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},

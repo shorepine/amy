@@ -101,6 +101,7 @@ extern const uint16_t pcm_samples;
 #define AMY_HAS_STARTUP_BLEEP (amy_global.config.features.startup_bleep)
 #define AMY_HAS_REVERB (amy_global.config.features.reverb)
 #define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
+#define AMY_HAS_I2S (amy_global.config.audio == AMY_AUDIO_IS_I2S)
 #define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
 #define AMY_HAS_CHORUS (amy_global.config.features.chorus)
 #define AMY_HAS_ECHO (amy_global.config.features.echo)
@@ -608,7 +609,12 @@ typedef struct  {
         uint8_t custom : 1;
         uint8_t startup_bleep : 1;
     } features;
-    uint8_t midi;    
+    struct {
+        uint8_t multicore : 1;  // Use secondary cores if available.
+        uint8_t multithread : 1;  // Use multitasking (e.g. RTOS threads) if available.
+    } platform;
+    // midi and audio are potentially bitmasks indicating data routing.
+    uint8_t midi;
     uint8_t audio;
 
     // variables
@@ -618,6 +624,9 @@ typedef struct  {
     uint32_t max_voices;
     uint32_t max_synths;
     uint32_t max_memory_patches;
+
+    // alternative audio output function
+    size_t (*write_samples_fn)(const uint8_t *buffer, size_t buffer_size);
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -672,6 +681,7 @@ typedef struct echo_config {
 struct state {
     amy_config_t config;
     uint8_t running;
+    uint8_t i2s_is_in_background;  // Flag not to handle I2S in amy_update.
     float volume;
     float pitch_bend;
     // State of fixed dc-blocking HPF
@@ -723,6 +733,7 @@ extern struct synthinfo** synth;
 extern struct mod_synthinfo** msynth;
 extern struct state amy_global; 
 
+extern output_sample_type * amy_out_block;
 extern output_sample_type * amy_in_block;
 extern output_sample_type * amy_external_in_block;
 
@@ -766,6 +777,7 @@ void hold_and_modify(uint16_t osc) ;
 void amy_execute_delta();
 void amy_execute_deltas();
 int16_t * amy_fill_buffer();
+int16_t * amy_simple_fill_buffer();  // excute_deltas + render + fill_buffer
 uint32_t ms_to_samples(uint32_t ms) ;
 
 
@@ -776,17 +788,19 @@ void amy_add_event(amy_event *e);
 void amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
-void amy_live_start();
-void amy_live_stop();
-int16_t * amy_simple_fill_buffer() ;
-void amy_update();
-int16_t *amy_render_audio();
-void amy_pass_to_i2s(const int16_t *block);
+
+int16_t *amy_update();        // in api.c
+void amy_platform_init();     // in i2s.c
+void amy_update_tasks();      // in i2s.c
+int16_t *amy_render_audio();  // in i2s.c
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes);  // in i2s.c
+
 amy_config_t amy_default_config();
 void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
-void amy_get_input_buffer(output_sample_type * samples);
+int amy_get_output_buffer(output_sample_type * samples);
+int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);
 extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
 extern float (*amy_external_coef_hook)(uint16_t);

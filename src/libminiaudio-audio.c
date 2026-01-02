@@ -29,7 +29,7 @@ extern SAMPLE ** fbl;
 
 int16_t * leftover_buf;
 uint16_t leftover_samples = 0;
-pthread_t amy_live_thread;
+//pthread_t amy_live_thread;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -49,8 +49,27 @@ void main_loop__em()
 }
 #endif
 
-void amy_update() {
-    // does nothing on miniaudio
+// Semaphore for passing most recent audio buffer to amy_update.
+// It's the pointer that's volatile, not the data it points to.
+int16_t *volatile last_audio_buffer = NULL;
+
+void amy_update_tasks() {
+}
+
+void amy_platform_init() {
+}
+
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
+    return 0;
+}
+
+int16_t *amy_render_audio() {
+    // For miniaudio, we just return a semaphore buffer.
+    while (last_audio_buffer == NULL)
+        ;
+    int16_t *buf = last_audio_buffer;
+    last_audio_buffer = NULL;
+    return buf;
 }
 
 void amy_print_devices() {
@@ -99,12 +118,16 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
     short int *peek = (short *)pInput;
     // We lag a AMY block behind input here because our frame size is never a multiple of AMY block size
     for(uint16_t frame=0;frame<frame_count;frame++) {
-        for(uint8_t c=0;c<AMY_NCHANS;c++) {
-            amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
+        if (peek != NULL) {
+            for(uint8_t c=0;c<AMY_NCHANS;c++) {
+                amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
+            }
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer
             int16_t * buf = amy_simple_fill_buffer();
+            // Maybe pass to amy_update.
+            last_audio_buffer = buf;
             // reset the input pointer for future input data
             in_ptr = 0;
             // copy this output to a ring buffer
@@ -139,6 +162,9 @@ ma_uint32 captureCount;
 
 amy_err_t miniaudio_init() {
     leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_fbl);
+
+    //fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
+    //        AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
 
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
         printf("Failed to setup context for device list.\n");
@@ -190,7 +216,7 @@ amy_err_t miniaudio_init() {
     deviceConfig.pUserData         = _custom;
 
     // Force miniaudio's callback to be the same size as AMY. This helps us not loop too many fill_buffer calls
-    deviceConfig.periodSizeInFrames=AMY_BLOCK_SIZE;
+    deviceConfig.periodSizeInFrames = AMY_BLOCK_SIZE;
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
@@ -203,18 +229,37 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
-
+    
     return AMY_OK;
 }
 
+void miniaudio_deinit(void) {
+    ma_device_uninit(&device);
+    ma_context_uninit(&context);
+    free(leftover_buf);
+}
+
+
 void *miniaudio_run(void *vargp) {
-    miniaudio_init();
-    
     while(amy_global.running) {
         sleep(1);
     }
     return NULL;
 }
+
+void miniaudio_start(void) {
+    // This is a WASM/libminiaudio setup, we still need live_start.
+    miniaudio_init();    
+    amy_global.running = 1;
+    pthread_t amy_live_thread;
+    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
+}
+
+void miniaudio_stop(void) {
+    amy_global.running = 0;   // Causes miniaudio_run thread to exit.
+    miniaudio_deinit();
+}
+
 
 #ifdef __EMSCRIPTEN__
 void amy_live_start_web_audioin() {
@@ -229,18 +274,6 @@ void amy_live_start_web() {
     miniaudio_init();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
-#endif
-void amy_live_start() {
-    // kick off a thread running miniaudio_run
-    amy_global.running = 1;
-    pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
-}
+#endif  // __EMSCRIPTEN__
 
-
-void amy_live_stop() {
-    amy_global.running = 0;
-    ma_device_uninit(&device);
-    ma_context_uninit(&context);
-    free(leftover_buf);
-}
-#endif
+#endif  // Not ESP_PLATFORM or PICO_ON_DEVICE or ARDUINO

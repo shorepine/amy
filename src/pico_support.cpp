@@ -62,8 +62,8 @@ extern "C" {
   #define PLL_PD1 4
   #define PLL_PD2 2
 #elif F_CPU == 150000000
-// bootup tone works, MIDI doesn't work.  LRCK is 44.1 kHz.  MCLK is sync'd
-  #warning "MIDI doesn't work for F_CPU == 150 MHz.  Use 133 or 176 instead."
+// works as long as CPU clock is modified *before* MIDI UART is initialized.  LRCK is 44.1 kHz.  MCLK is sync'd
+// If MIDI UART is initialized *before* sys_set_clock_pll in pico_setup_i2s, baud rates are wrong and MIDI doesn't work.
   #define F_CPU_MOD_KHZ 158000
   #define F_SAMP 44084
   #define VCO_FREQ 948000000

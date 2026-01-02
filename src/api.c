@@ -39,9 +39,15 @@ amy_config_t amy_default_config() {
     c.features.chorus = 1;
     c.features.partials = 1;
     c.features.custom = 1;
-    c.features.audio_in = 1;
-    c.features.default_synths = 1;
+    c.features.default_synths = 0;
+    c.features.audio_in = 0;
     c.features.startup_bleep = 0;
+
+    // Use all platform features by default.
+    c.platform.multicore = 1;
+    c.platform.multithread = 1;
+
+    c.write_samples_fn = NULL;
 
     c.midi = AMY_MIDI_IS_NONE;
     #ifndef AMY_MCU
@@ -167,9 +173,18 @@ void amy_clear_event(amy_event *e) {
 }
 
 
-// get AUDIO_IN0 and AUDIO_IN1
-void amy_get_input_buffer(output_sample_type * samples) {
+// get last-written output, returns number of bytes written.
+int amy_get_output_buffer(output_sample_type * samples) {
+    if (amy_out_block == NULL) return 0;
+    for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_out_block[i];
+    amy_out_block = NULL;
+    return AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type);
+}
+
+// get AUDIO_IN0 and AUDIO_IN1, returns number of bytes written.
+int amy_get_input_buffer(output_sample_type * samples) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_in_block[i];
+    return AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type);
 }
 
 // set AUDIO_EXT0 and AUDIO_EXT1
@@ -210,7 +225,6 @@ void amy_add_event(amy_event *e) {
         amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
-
 
 
 #ifdef __EMSCRIPTEN__
@@ -316,12 +330,16 @@ void amy_bleep_synth(uint32_t start) {
     amy_add_event(&e);
 }
 
+extern void miniaudio_start();
+extern void miniaudio_stop();
+
 void amy_start(amy_config_t c) {
     global_init(c);
-    run_midi();
     amy_profiles_init();
     transfer_init();
     oscs_init();
+    amy_platform_init();
+    run_midi();  // Must be after platform_init in case F_CPU is modified on RP2040 Arduino.
     if(AMY_HAS_DEFAULT_SYNTHS) amy_default_synths();
     if(AMY_HAS_STARTUP_BLEEP) {
         if(AMY_HAS_DEFAULT_SYNTHS)
@@ -329,8 +347,32 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+    miniaudio_start();
+#endif
 }
 
 void amy_stop() {
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+    miniaudio_stop();
+#endif
     oscs_deinit();
+}
+
+
+int16_t *amy_update() {
+    // Single function to update buffers.
+    amy_update_tasks();
+    int16_t *block = amy_render_audio();
+    if (AMY_HAS_I2S && !amy_global.i2s_is_in_background) {
+        amy_i2s_write(
+            (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
+        );
+    }
+    if (amy_global.config.write_samples_fn) {
+        amy_global.config.write_samples_fn(
+            (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
+        );
+    }
+    return block;
 }

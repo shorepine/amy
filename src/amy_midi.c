@@ -346,8 +346,8 @@ void check_tusb_midi() {
     }
 }
 #endif
-void run_midi_task() {
-    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
+
+void esp_init_midi(void) {
     uart_config_t uart_config = {
         .baud_rate = 31250,
         .data_bits = UART_DATA_8_BITS,
@@ -356,6 +356,7 @@ void run_midi_task() {
     };
 
     // Configure UART parameters
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(uart_num, amy_global.config.midi_out, amy_global.config.midi_in, UART_PIN_NO_CHANGE , UART_PIN_NO_CHANGE ));
 
@@ -376,14 +377,21 @@ void run_midi_task() {
     };
 
     uart_intr_config(uart_num, &uart_intr);
+}
 
+void esp_poll_midi(void) {
+    const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     uint8_t data[MAX_MIDI_BYTES_TO_PARSE];
-    size_t length = 0;
+    int length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, 1/portTICK_PERIOD_MS);
+    if(length > 0) {
+        convert_midi_bytes_to_messages(data,length,0);
+    }
+}
+
+void run_midi_task() {
+
     while(1) {
-        length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, 1/portTICK_PERIOD_MS);
-        if(length > 0) {
-            convert_midi_bytes_to_messages(data,length,0);
-        }
+        esp_poll_midi();
         #ifdef AMYBOARD
         check_tusb_midi();
         #endif
@@ -392,7 +400,12 @@ void run_midi_task() {
 
 void run_midi() {
     sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-    xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
+        esp_init_midi();
+        if (amy_global.config.platform.multithread) {
+            xTaskCreatePinnedToCore(run_midi_task, MIDI_TASK_NAME, (MIDI_TASK_STACK_SIZE) / sizeof(StackType_t), NULL, MIDI_TASK_PRIORITY, &midi_handle, MIDI_TASK_COREID);
+        }  // otherwise esp_poll_midi is called from amy_update_tasks()
+    }
 }
 
 
@@ -437,14 +450,6 @@ void run_midi() {
         pico_setup_midi();
     }
 
-}
-
-void check_tusb_midi() {
-    while ( tud_midi_available() ) {
-        uint8_t packet[4];
-        tud_midi_packet_read(packet);
-        convert_midi_bytes_to_messages(packet+1, 3, 1);
-    }
 }
 
 #endif

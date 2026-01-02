@@ -58,57 +58,43 @@ int main(int argc, char ** argv) {
 
     amy_config_t amy_config = amy_default_config();
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    amy_config.features.audio_in = 1;  // We need audio_in for miniaudio to run??
     amy_config.playback_device_id = playback_device_id;
+    fprintf(stderr, "playback_device_id=%d\n", playback_device_id);
     amy_config.capture_device_id = capture_device_id;
-    amy_config.features.default_synths = 0;
+    amy_config.features.default_synths = 1;
+
+    for (int tries = 0; tries < 2; ++tries) {
     amy_start(amy_config);
     
-    amy_live_start();
-    amy_add_message("zF1024,sounds/sleepwalk.wav,60");
-    amy_add_message("zF1025,sounds/sleepwalk.wav,60");
-
-    
-    amy_event e = amy_default_event();
-    e.wave = PCM_LEFT;
-    e.preset = 1024;
-    e.velocity=1;
-    e.pan_coefs[0] = 0;
-    e.midi_note = 60;
-    e.osc = 14;
-    amy_add_event(&e);
-
-    e.wave = PCM_RIGHT;
-    e.preset = 1025;
-    e.velocity=1;
-    e.pan_coefs[0] = 1;
-    e.midi_note = 60;
-    e.osc = 15;
-    amy_add_event(&e);
-
-    
-
     //example_fm(0);
     //example_voice_chord(0,0);
-    //example_synth_chord(0, /* patch */ 0);
+    example_synth_chord(0, /* patch */ 0);
     //example_sustain_pedal(0, /* patch */ 256);
     //example_sequencer_drums(0);
     //example_patch_from_events();
 
+    // Check that trying to program a non-user patch doesn't crash
+    amy_event e = amy_default_event();
+    e.patch_number = 25;
+    e.osc = 0;
+    e.wave = SINE;
+    amy_add_event(&e);
 
-    // Now just spin for 15s
+    // Now just spin for a while
     uint32_t start = amy_sysclock();
-    while(amy_sysclock() - start < 30000) {
+    while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
 
-	//show_debug(99);
+    //show_debug(99);
+    
+    amy_stop();
 
-	amy_live_stop();
+    // Make sure libminiaudio has time to clean up.
+    sleep(2);
 
-	amy_stop();
-
-	// Make sure libminiaudio has time to clean up.
-	sleep(2);
+    }
 
     return 0;
 }

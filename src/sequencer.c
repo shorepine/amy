@@ -199,6 +199,10 @@ void _sequencer_start() {
     add_repeating_timer_us(-500, sequencer_timer_callback, NULL, &pico_sequencer_timer);
 }
 
+void _sequencer_stop() {
+    cancel_repeating_timer(&pico_sequencer_timer);
+}
+
 #elif defined _POSIX_THREADS
 #include <pthread.h>
 
