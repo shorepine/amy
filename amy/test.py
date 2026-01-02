@@ -37,15 +37,12 @@ class AmyTest:
   test_dir = './tests/tst'
 
   def __init__(self):
-    self.config_default = False
+    self.default_synths = False
 
   def test(self):
     name = self.__class__.__name__
     _amy.stop()
-    if self.config_default:
-      _amy.start()
-    else:
-      _amy.start_no_default()
+    _amy.start(1 if self.default_synths else 0)
     self.run()
     
     samples = amy.render(1.0)
@@ -640,7 +637,7 @@ class TestVoiceStealing(AmyTest):
 
   def __init__(self):
     super().__init__()
-    self.config_default = True
+    self.default_synths = True
   
   def run(self):
     # Default juno synth.
@@ -688,7 +685,7 @@ class TestMidiDrums(AmyTest):
 
   def __init__(self):
     super().__init__()
-    self.config_default = True
+    self.default_synths = True
   
   def run(self):
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
@@ -704,7 +701,7 @@ class TestDefaultChan1Synth(AmyTest):
 
   def __init__(self):
     super().__init__()
-    self.config_default = True
+    self.default_synths = True
 
   def run(self):
     amy.send(time=100, synth=1, note=60, vel=1)
@@ -722,7 +719,7 @@ class TestSynthProgChange(AmyTest):
 
   def __init__(self):
     super().__init__()
-    self.config_default = True
+    self.default_synths = True
 
   def run(self):
     # DX7 first patch, uses 9 oscs/voice, num_voices is inherited from previous init.
@@ -742,7 +739,7 @@ class TestSynthDrums(AmyTest):
 
   def __init__(self):
     super().__init__()
-    self.config_default = True
+    self.default_synths = True
   
   def run(self):
     amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
@@ -799,7 +796,7 @@ class TestPatchFromEvents(AmyTest):
   """Test defining a patch from events with patch_number."""
   def __init__(self):
     super().__init__()
-    self.config_default = True   # So that the patch space is already partly populated.
+    self.default_synths = True   # So that the patch space is already partly populated.
 
   def run(self):
     amy.send(time=0, patch=1039, reset=amy.RESET_PATCH)
@@ -838,7 +835,7 @@ class TestFileTransfer(AmyTest):
 
   def test(self):
     _amy.stop()
-    _amy.start_no_default()
+    _amy.start(0)
     payload = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(2048))
     with tempfile.NamedTemporaryFile(mode='w', delete=True) as f:
       with tempfile.NamedTemporaryFile(mode='w+', delete=True) as g:

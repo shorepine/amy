@@ -39,7 +39,7 @@ amy_config_t amy_default_config() {
     c.features.chorus = 1;
     c.features.partials = 1;
     c.features.custom = 1;
-    c.features.default_synths = 1;
+    c.features.default_synths = 0;
     c.features.audio_in = 0;
     c.features.startup_bleep = 0;
 

@@ -4,7 +4,7 @@ AMY is on the Arduino Libraries repository. Simply search for "AMY" in the Libra
 
 <img src="https://github.com/shorepine/amy/raw/main/docs/arduino1.png" width="400"/>
 
-We recommend always using the latest released version (now `1.1.0`) in the Arduino Library Manager. 
+We recommend always using the latest released version (now `1.1.4`) in the Arduino Library Manager. 
 
 However, if you are directed to a bleeding edge release of AMY, you can simply copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`. (Make sure you delete whatever you already had in `libraries/amy`.)
 
@@ -18,7 +18,6 @@ void setup() {
   amy_config_t amy_config = amy_default_config();
   // set your pins, etc -- see the AMY_MIDI_Synth example
   amy_start(amy_config);
-  amy_live_start(); // if you want us to handle sending audio
 }
 
 void loop() {
@@ -29,7 +28,7 @@ void loop() {
 
 AMY in Arduino handles MIDI input and output as well as I2S and USB (where supported) audio. You do not need to set up an I2S interface, just the pins in `amy_config`.
 
-(For experts: if you're rendering AMY audio to your own audio hardware, you can omit the call to `amy_live_start()` and call our [`amy_simple_fill_buffer()` API](api.md) in `loop()` instead. This gives you a buffer of stereo 16-bit short integers to send out to whatever interface you set up.)
+(For experts: if you're rendering AMY audio to your own audio hardware, you can set `amy_config.audio = AMY_AUDIO_IS_NONE` before calling `amy_start()`, then use the return value from `amy_update()` as a pointer to the next block of `AMY_BLOCK_SIZE` 16 bit stereo sample frames, to send out to whatever interface you set up.)
 
 [Please see our latest matrix of supported features per chip/board.](https://github.com/shorepine/amy/issues/354)
 

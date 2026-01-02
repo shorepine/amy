@@ -47,20 +47,16 @@ uint32_t amy_sysclock();
 
 Start and stop AMY:
 ```c
-amy_stop();
-
 // Emscripten web start
 amy_start_web();
 amy_start_web_no_synths();
 
-// Start AMY with a config
+// Start AMY with a config.  If c.audio is set, will attempt to start live audio
 amy_start(amy_config_t c);
 
-// Start playing audio in real time
-amy_live_start();
+// Stop AMY including any live audio output
+amy_stop();
 
-// Stop playing audio
-amy_live_stop();
 ```
 
 Default MIDI handlers:
@@ -82,14 +78,17 @@ amy_start(amy_config);
 | ------  | ------ | --------  |  --------                              |
 | `features.chorus` | `0=off, 1=on` | On | If chorus is enabled (uses RAM) |
 | `features.reverb` | `0=off, 1=on` | On | If reverb is enabled (uses RAM) |
-| `features.echo` | `0=off, 1=on` |On | If echo is enabled (uses RAM) |
-| `features.audio_in` | `0=off, 1=on` | On | If audio_in gets processed via the audio interface |
-| `features.default_synths` | `0=off, 1=on` | On| If AMY boots with Juno-6 on `synth` 1 and GM drums on `synth` 10 |
+| `features.echo` | `0=off, 1=on` | On | If echo is enabled (uses RAM) |
 | `features.partials` | `0=off, 1=on` | On | If partials are enabled |
 | `features.custom` | `0=off, 1=on` | On | If custom C oscillators are enabled |
-| `features.startup_bleep` | `0=off, 1=on` | On | If AMY plays a startup sound on boot |
+| `features.audio_in` | `0=off, 1=on` | Off | If audio_in gets processed via the audio interface. Must be 1 for AUDIO_IS_MINIAUDIO |
+| `features.default_synths` | `0=off, 1=on` | Off| If AMY boots with Juno-6 on `synth` 1 and GM drums on `synth` 10 |
+| `features.startup_bleep` | `0=off, 1=on` | Off | If AMY plays a startup sound on boot |
+| `platform.multicore | `0=off, 1=on` | On | Attempts to use 2nd core if available |
+| `platform.multithread | `0=off, 1=on` | On | Attempts to multithreading if available (ESP/RTOS) |
 | `midi` | `AMY_MIDI_IS_NONE`, `AMY_MIDI_IS_UART`, `AMY_MIDI_IS_USB_GADGET`, `AMY_MIDI_IS_WEBMIDI` | `AMY_MIDI_IS_NONE` | Which MIDI interface(s) are active |
 | `audio` | `AMY_AUDIO_IS_NONE`, `AMY_AUDIO_IS_I2S`, `AMY_AUDIO_IS_USB_GADGET`, `AMY_AUDIO_IS_MINIAUDIO`| I2S or miniaudio | Which audio interface(s) are active |
+| `write_samples_fn` | fn ptr | `NULL` | If provided, `amy_update` will call this with each new block of samples | 
 | `max_oscs` | Int | 180 | How many oscillators to support |
 | `max_sequencer_tags` | Int | 256 | How many sequencer items to handle |
 | `max_voices` | Int | 64 | How many voices |

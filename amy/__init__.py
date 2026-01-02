@@ -292,9 +292,9 @@ def render(seconds):
         frames.append( np.array(_amy.render_to_list())/32768.0 )
     return np.hstack(frames).reshape((-1, AMY_NCHANS))
 
-def restart():
+def restart(default_synths=0):
     _amy.stop()
-    _amy.start()
+    _amy.start(default_synths)
 
 def inject_midi(a, b, c, d=None):
     if d is None:

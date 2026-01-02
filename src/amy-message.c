@@ -51,7 +51,6 @@ int main(int argc, char ** argv) {
     amy_config.playback_device_id = playback_device_id;
     amy_config.capture_device_id = capture_device_id;
     amy_start(amy_config);
-    //amy_live_start();
 
     while (1) {
         char input[1024];
@@ -74,8 +73,6 @@ int main(int argc, char ** argv) {
         }
     }
     
-    //amy_live_stop();
-
     return 0;
 }
 #endif

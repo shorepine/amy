@@ -184,8 +184,6 @@ int main(int argc, char ** argv) {
 
     show_debug(99);
 
-    //amy_live_stop();
-
     return 0;
 }
 
