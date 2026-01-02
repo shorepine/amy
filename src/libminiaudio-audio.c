@@ -122,6 +122,11 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
             for(uint8_t c=0;c<AMY_NCHANS;c++) {
                 amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
             }
+        } else {
+            // no audio in, so fill it with 0s
+            for(uint8_t c=0;c<AMY_NCHANS;c++) {
+                amy_in_block[in_ptr++] = 0;
+            }
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer
@@ -229,7 +234,6 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
-    
     return AMY_OK;
 }
 
@@ -265,14 +269,19 @@ void miniaudio_stop(void) {
 void amy_live_start_web_audioin() {
     amy_global.config.features.audio_in = 1;
     emscripten_cancel_main_loop();
-    miniaudio_init();
+    miniaudio_start();
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
     amy_global.config.features.audio_in = 0;
     emscripten_cancel_main_loop();
-    miniaudio_init();
+    miniaudio_start();
     emscripten_set_main_loop(main_loop__em, 0, 0);
+}
+void amy_live_stop() {
+    amy_global.running = 0;
+    emscripten_cancel_main_loop();
+    miniaudio_deinit();
 }
 #endif  // __EMSCRIPTEN__
 
