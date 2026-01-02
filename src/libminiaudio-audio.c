@@ -122,6 +122,11 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
             for(uint8_t c=0;c<AMY_NCHANS;c++) {
                 amy_in_block[in_ptr++] = peek[AMY_NCHANS * frame + c];
             }
+        } else {
+            // no audio in, so fill it with 0s
+            for(uint8_t c=0;c<AMY_NCHANS;c++) {
+                amy_in_block[in_ptr++] = 0;
+            }
         }
         if(in_ptr == (AMY_BLOCK_SIZE*AMY_NCHANS)) { // we have a block of input ready
             // render and copy into output ring buffer
@@ -163,8 +168,8 @@ ma_uint32 captureCount;
 amy_err_t miniaudio_init() {
     leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_fbl);
 
-    fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
-            AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
+    //fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
+    //        AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
 
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
         printf("Failed to setup context for device list.\n");
@@ -229,7 +234,6 @@ amy_err_t miniaudio_init() {
         exit(1);
     }
     for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
-    fprintf(stderr, "miniaudio_init done\n");
     return AMY_OK;
 }
 
@@ -269,7 +273,6 @@ void amy_live_start_web_audioin() {
     emscripten_set_main_loop(main_loop__em, 0, 0);
 }
 void amy_live_start_web() {
-    fprintf(stderr, "amy_live_start_web\n");  
     amy_global.config.features.audio_in = 0;
     emscripten_cancel_main_loop();
     miniaudio_start();

@@ -59,7 +59,7 @@ async function amy_js_start() {
   await start_midi();	
   await sleep_ms(200);
   // Start the audio worklet (miniaudio)
-  if(1) { //amy_audioin_toggle) {
+  if (amy_audioin_toggle) {
       await amy_live_start_web_audioin();
   } else {
       await amy_live_start_web();    

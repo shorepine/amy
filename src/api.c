@@ -229,15 +229,12 @@ void amy_add_event(amy_event *e) {
 
 #ifdef __EMSCRIPTEN__
 void amy_start_web() {
-    fprintf(stderr, "starting amy web\n");
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 1;
     amy_config.features.startup_bleep = 1;
-    fprintf(stderr, "starting2 amy web\n");
     amy_start(amy_config);
-    fprintf(stderr, "started amy web\n");
 }
 
 void amy_start_web_no_synths() {
