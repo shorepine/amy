@@ -354,6 +354,8 @@ void amy_stop() {
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_stop();
 #endif
+    stop_midi();
+    amy_platform_deinit();
     oscs_deinit();
 }
 

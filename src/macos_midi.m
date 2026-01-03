@@ -34,9 +34,10 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 }
 
+int midi_macos_should_exit = false;
 
 void* run_midi_macos(void*argp){
-    sysex_buffer = malloc(MAX_SYSEX_BYTES);
+    //sysex_buffer = malloc(MAX_SYSEX_BYTES);
 
     if (@available(macOS 11, *))  {
         @autoreleasepool {
@@ -107,8 +108,15 @@ void* run_midi_macos(void*argp){
 }
 
 void run_midi() {
-    pthread_t midi_thread_id;
-    pthread_create(&midi_thread_id, NULL, run_midi_macos, NULL);
+    if (sysex_buffer == NULL) {  // has not been started yet.
+        sysex_buffer = malloc(MAX_SYSEX_BYTES);
+        pthread_t midi_thread_id;
+        pthread_create(&midi_thread_id, NULL, run_midi_macos, NULL);
+    }
+}
+
+void stop_midi() {
+     // Normally, we'd have to remove all the sources and timers from the CFRunLoop, but we'll fudge it.
 }
 
 #endif

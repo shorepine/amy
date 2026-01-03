@@ -133,6 +133,13 @@ amy_err_t esp32_setup_i2s(void) {
     return AMY_OK;
 }
 
+amy_err_t esp32_teardown_i2s(void) {
+    i2s_channel_disable(tx_handle);
+    if(AMY_HAS_AUDIO_IN) i2s_channel_disable(rx_handle);
+    i2s_del_channel(tx_handle);
+    if(AMY_HAS_AUDIO_IN) i2s_del_channel(rx_handle);
+    return AMY_OK;
+}
 #endif
 
 // Render the second core
@@ -161,7 +168,7 @@ int16_t *volatile last_audio_buffer = NULL;
 void esp_fill_audio_buffer_task() {
     while(1) {
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
-        if(AMY_HAS_AUDIO_IN) {
+        if(AMY_HAS_I2S && AMY_HAS_AUDIO_IN) {
             size_t read = 0;
 #ifdef I2S_32BIT
             i2s_channel_read(rx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int32_t), &read, portMAX_DELAY);
@@ -185,7 +192,6 @@ void esp_fill_audio_buffer_task() {
 
         // Write to i2s
         output_sample_type *block = amy_fill_buffer();
-
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
         if (AMY_HAS_I2S) {
@@ -210,6 +216,16 @@ void amy_platform_init() {
         if (AMY_HAS_I2S) {
             amy_global.i2s_is_in_background = 1;
         }
+    }
+}
+
+void amy_platform_deinit() {
+    if (AMY_HAS_I2S) {
+        esp32_teardown_i2s();
+    }
+    if (amy_global.config.platform.multithread) {
+        vTaskDelete(amy_render_handle);
+        vTaskDelete(amy_fill_buffer_handle);
     }
 }
 
@@ -270,6 +286,7 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 
 // Provided by pico_support.cpp
 extern void pico_setup_i2s(amy_config_t *config);
+extern void pico_teardown_i2s(amy_config_t *config);
 extern void pico_i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples, int nframes);
 
 struct audio_buffer_pool *ap;
@@ -288,6 +305,10 @@ typedef struct
 queue_t call_queue;
 queue_t results_queue;
 
+volatile bool core1_running = true;
+// This is the ram allocated for the core1 stack.
+// It's also the flag that core1 task is running, if non-NULL.
+uint32_t * core1_separate_stack_address = NULL;
 
 extern void on_pico_uart_rx();
 
@@ -365,7 +386,7 @@ struct audio_buffer_pool *init_audio() {
 }
 
 void core1_main() {
-    while (1) {
+    while (core1_running) {
         queue_entry_t entry;
         queue_remove_blocking(&call_queue, &entry);
         int32_t result = entry.func(entry.data);
@@ -379,13 +400,32 @@ void amy_platform_init() {
     }
 #ifdef USE_SECOND_CORE
     if (amy_global.config.platform.multicore) {
-        queue_init(&call_queue, sizeof(queue_entry_t), 2);
-        queue_init(&results_queue, sizeof(int32_t), 2);
-        uint32_t * core1_separate_stack_address = (uint32_t*)malloc(0x2000);
-        multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
-        sleep_ms(500);
+        if (core1_separate_stack_address == NULL) {  // Task is not already running.
+            core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+            queue_init(&call_queue, sizeof(queue_entry_t), 2);
+            queue_init(&results_queue, sizeof(int32_t), 2);
+            core1_running = true;
+            multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+            sleep_ms(500);
+        }
     }
 #endif
+}
+
+void amy_platform_deinit() {
+#ifdef USE_SECOND_CORE
+    if (amy_global.config.platform.multicore) {
+        if (core1_separate_stack_address) {  // Task is actually running.
+            core1_running = false;  // signal the core1 task to exit.
+            sleep_ms(100);  // time for it to exit
+            queue_free(&results_queue);
+            queue_free(&call_queue);
+            free(core1_separate_stack_address);
+            core1_separate_stack_address = NULL;
+        }
+    }
+#endif
+    pico_teardown_i2s(&amy_global.config);
 }
 
 
@@ -393,6 +433,7 @@ void amy_platform_init() {
 
 
 extern void teensy_setup_i2s();
+extern void teensy_teardown_i2s();
 extern size_t teensy_i2s_write(const uint8_t *buffer, size_t nbytes);
 
 extern int16_t teensy_get_serial_byte();
@@ -400,6 +441,12 @@ extern int16_t teensy_get_serial_byte();
 void amy_platform_init() {
     if (AMY_HAS_I2S) {
         teensy_setup_i2s();
+    }
+}
+
+void amy_platform_deinit() {
+    if (AMY_HAS_I2S) {
+        teensy_teardown_i2s();
     }
 }
 
