@@ -155,16 +155,17 @@ SAMPLE *fbl[AMY_MAX_CORES];
 SAMPLE *per_osc_fb[AMY_MAX_CORES];
 SAMPLE core_max[AMY_MAX_CORES];
 
-// Public pointer to recently-emitted waveform block.  No sync for the moment.  Cleared to NULL when read by amy_get_output_buffer.
-output_sample_type * amy_out_block;
-output_sample_type * amy_out_block_copy;
+// Public pointer to recently-emitted waveform block.
+output_sample_type * amy_out_block = NULL;
 // Audio input blocks. Filled by the audio implementation before rendering.
 // For live audio input from a codec, AUDIO_IN0 / 1
 output_sample_type * amy_in_block;
 // For generated audio streams, AUDIO_EXT0 / 1
 output_sample_type * amy_external_in_block;
-// block -- what gets sent to the dac -- -32768...32767 (int16 le)
-output_sample_type * block;
+// output_block -- what gets sent to the dac -- -32768...32767 (int16 le)
+output_sample_type * output_block_0;
+output_sample_type * output_block_1;
+output_sample_type * output_block;
 
 
 
@@ -843,8 +844,9 @@ int8_t oscs_init() {
     synth = (struct synthinfo **) malloc_caps(sizeof(struct synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
     bzero(synth, sizeof(struct synthinfo *) * (AMY_OSCS+1));
     msynth = (struct mod_synthinfo **) malloc_caps(sizeof(struct mod_synthinfo *) * (AMY_OSCS+1), amy_global.config.ram_caps_synth);
-    block = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
-    amy_out_block_copy = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
+    output_block_0 = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
+    output_block_1 = (output_sample_type *) malloc_caps(sizeof(output_sample_type) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_block);
+    output_block = output_block_0;
     amy_in_block = (output_sample_type*)malloc_caps(sizeof(output_sample_type)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_block);
     amy_external_in_block = (output_sample_type*)malloc_caps(sizeof(output_sample_type)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_block);
     // set all oscillators to their default values
@@ -946,7 +948,8 @@ void oscs_deinit() {
     for (int i = 0; i < AMY_OSCS + 1; ++i) free_osc(i);
     free(amy_external_in_block);
     free(amy_in_block);
-    free(block);
+    free(output_block_1);
+    free(output_block_0);
     free(msynth);
     free(synth);
     if(AMY_HAS_CUSTOM)  custom_deinit();
@@ -1172,7 +1175,9 @@ void play_delta(struct delta *d) {
 	    uint16_t osc = d->osc;
 	    while(AMY_IS_SET(osc)) {
 		synth[osc]->velocity = d->data.f;
-		if (AMY_IS_SET(synth[osc]->chained_osc) || synth[osc]->amp_coefs[COEF_VEL] == 0 || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH) {
+		if (AMY_IS_SET(synth[osc]->chained_osc)
+                    || synth[osc]->amp_coefs[COEF_VEL] == 0
+                    || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH) {
 		    synth[osc]->status = SYNTH_AUDIBLE;
 		    // an osc came in with a note on.
 		    // start the bp clock
@@ -1630,6 +1635,11 @@ int16_t * amy_fill_buffer() {
     #else
     amy_block_processed();
     #endif
+
+    // Double-buffer the output block.
+    if (output_block == output_block_0)  output_block = output_block_1;
+    else output_block = output_block_0;
+
     // mix results from both cores.
     SAMPLE max_val = core_max[0];
     #ifdef AMY_DUALCORE
@@ -1725,12 +1735,12 @@ int16_t * amy_fill_buffer() {
             if(AMY_NCHANS == 1) {
                 #ifdef ESP_PLATFORM
                     // esp32's i2s driver has this bug
-                    block[i ^ 0x01] = sample;
+                    output_block[i ^ 0x01] = sample;
                 #else
-                    block[i] = sample;
+                    output_block[i] = sample;
                 #endif
             } else {
-                block[(AMY_NCHANS * i) + c] = sample;
+                output_block[(AMY_NCHANS * i) + c] = sample;
             }
         }
     }
@@ -1742,7 +1752,7 @@ int16_t * amy_fill_buffer() {
         uint32_t bytes_to_copy = AMY_BLOCK_SIZE * bytes_per_frame;
         if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
-            memcpy(amy_global.transfer_storage + byte_offset, block, bytes_to_copy);
+            memcpy(amy_global.transfer_storage + byte_offset, output_block, bytes_to_copy);
         } else if(amy_global.transfer_file_handle==AMY_BUS_AUDIO_IN) {
             // copy audio input buffer to storage
             memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
@@ -1755,8 +1765,8 @@ int16_t * amy_fill_buffer() {
     amy_global.total_blocks++;
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
-    amy_out_block = block;
-    return block;
+    amy_out_block = output_block;
+    return output_block;
 }
 
 void amy_reset_sysclock() {

@@ -20,6 +20,7 @@
 
 TaskHandle_t amy_render_handle;
 TaskHandle_t amy_fill_buffer_handle;
+TaskHandle_t amy_update_handle = NULL;
 
 #include "driver/i2s_std.h"
 i2s_chan_handle_t tx_handle;
@@ -133,6 +134,8 @@ amy_err_t esp32_setup_i2s(void) {
     return AMY_OK;
 }
 
+#endif
+
 amy_err_t esp32_teardown_i2s(void) {
     i2s_channel_disable(tx_handle);
     if(AMY_HAS_AUDIO_IN) i2s_channel_disable(rx_handle);
@@ -140,14 +143,17 @@ amy_err_t esp32_teardown_i2s(void) {
     if(AMY_HAS_AUDIO_IN) i2s_del_channel(rx_handle);
     return AMY_OK;
 }
-#endif
 
 // Render the second core
 void esp_render_task( void * pvParameters) {
     while(1) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         amy_render(0, AMY_OSCS/2, 1);
-        xTaskNotifyGive(amy_fill_buffer_handle);
+        // Who we tell we're done depends on the running mode.
+        if (amy_global.config.platform.multithread)
+            xTaskNotifyGive(amy_fill_buffer_handle);
+        else
+            xTaskNotifyGive(amy_update_handle);
     }
 }
 
@@ -167,6 +173,10 @@ int16_t *volatile last_audio_buffer = NULL;
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
     while(1) {
+        // Wait for update sync.
+        if (!AMY_HAS_I2S) {
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        }
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
         if(AMY_HAS_I2S && AMY_HAS_AUDIO_IN) {
             size_t read = 0;
@@ -183,38 +193,53 @@ void esp_fill_audio_buffer_task() {
 	}
         // Get ready to render
         amy_execute_deltas();
-        // Tell the other core to start rendering
-        xTaskNotifyGive(amy_render_handle);
-        // Render me
-        amy_render(AMY_OSCS/2, AMY_OSCS, 0);
-        // Wait for the other core to finish
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        if (amy_global.config.platform.multicore) {
+            // Tell the other core to start rendering
+            xTaskNotifyGive(amy_render_handle);
+            // Render me
+            amy_render(AMY_OSCS/2, AMY_OSCS, 0);
+            // Wait for the other core to finish
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        } else {
+            // We render everything
+            amy_render(0, AMY_OSCS, 0);
+        }
 
         // Write to i2s
         output_sample_type *block = amy_fill_buffer();
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
+        last_audio_buffer = block;
+        xTaskNotifyGive(amy_update_handle);
+
         if (AMY_HAS_I2S) {
             amy_i2s_write((uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
         }
-        last_audio_buffer = block;
     }
 }
 
 // init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
 void amy_platform_init() {
+    amy_update_handle = xTaskGetCurrentTaskHandle();
     // Start i2s
     if (AMY_HAS_I2S) {
         esp32_setup_i2s();
     }
-    if (amy_global.config.platform.multithread) {
+    if (amy_global.config.platform.multicore) {
+        // On ESP, multicore starts a second thread even if multithread is not requested.
         // Create the second core rendering task
         xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
+    }
+    if (amy_global.config.platform.multithread) {
         // And the fill audio buffer thread, combines, does volume & filters
         xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
-	// Let amy_update know we have I2S covered.
+        // Let amy_update know we have I2S covered.
         if (AMY_HAS_I2S) {
             amy_global.i2s_is_in_background = 1;
+        } else {
+            // Without I2S, FABT waits for a notify each loop.  Give it one to get started.
+            xTaskNotifyGive(amy_fill_buffer_handle);
         }
     }
 }
@@ -223,8 +248,10 @@ void amy_platform_deinit() {
     if (AMY_HAS_I2S) {
         esp32_teardown_i2s();
     }
-    if (amy_global.config.platform.multithread) {
+    if (amy_global.config.platform.multicore) {
         vTaskDelete(amy_render_handle);
+    }
+    if (amy_global.config.platform.multithread) {
         vTaskDelete(amy_fill_buffer_handle);
     }
 }
@@ -242,15 +269,30 @@ void amy_update_tasks() {
 
 int16_t *amy_render_audio() {
     int16_t *buf = NULL;
-    if (!amy_global.config.platform.multithread) {
-        amy_render(0, AMY_OSCS, 0);
-        buf = amy_fill_buffer();
+    if (amy_global.config.platform.multithread) {
+        // Wait for esp_fill_audio_buffer_task to indicate a buffer is ready.
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        buf = last_audio_buffer;
+        // Allow the FABT to generate another block
+        if (!AMY_HAS_I2S) {
+            xTaskNotifyGive(amy_fill_buffer_handle);
+        }
     } else {
-        // Wait for esp_fill_audio_buffer_task thread to give us something.
-        while( (buf = last_audio_buffer) == NULL)
-            ;
-        // Clear the last_audio_buffer semaphore so we will wait for the next render next time.
-        last_audio_buffer = NULL;
+        // No multithread, we have to render here.
+        if (amy_global.config.platform.multicore) {
+            // Running multicore without multithread
+            // so we do in fact have a thread rendering on the other core.
+            // Tell the other core to start rendering.
+            xTaskNotifyGive(amy_render_handle);
+            // Render me
+            amy_render(AMY_OSCS/2, AMY_OSCS, 0);
+            // Wait for the other core to finish
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        } else {
+            // We render everything
+            amy_render(0, AMY_OSCS, 0);
+        }
+        buf = amy_fill_buffer();
     }
     return buf;
 }

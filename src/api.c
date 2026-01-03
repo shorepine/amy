@@ -171,9 +171,8 @@ void amy_clear_event(amy_event *e) {
 
 // get last-written output, returns number of bytes written.
 int amy_get_output_buffer(output_sample_type * samples) {
-    if (amy_out_block == NULL) return 0;
+    if (amy_out_block == NULL) return 0;  // amy_fill_buffer has not yet run.
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) samples[i] = amy_out_block[i];
-    amy_out_block = NULL;
     return AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type);
 }
 
