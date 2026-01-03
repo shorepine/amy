@@ -8,7 +8,9 @@
 #include <stdint.h>
 #include <string.h>
 
-
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#endif
 
 // per platform file reading / writing
 // posix (linux, mac)
@@ -24,6 +26,10 @@
 // Map from FILE * to a uint32_t handle to pass to AMY
 
 static FILE *g_files[MAX_OPEN_FILES]; // index 1..MAX_OPEN_FILES-1 used
+#ifdef __EMSCRIPTEN__
+static uint32_t g_em_handle[MAX_OPEN_FILES];
+static uint32_t g_em_pos[MAX_OPEN_FILES];
+#endif
 
 static uint32_t alloc_handle(FILE *f) {
     for (uint32_t i = 1; i < MAX_OPEN_FILES; i++) {
@@ -43,6 +49,10 @@ static FILE *lookup_handle(uint32_t h) {
 static void free_handle(uint32_t h) {
     if (h == 0 || h >= MAX_OPEN_FILES) return;
     g_files[h] = NULL;
+#ifdef __EMSCRIPTEN__
+    g_em_handle[h] = 0;
+    g_em_pos[h] = 0;
+#endif
 }
 
 
@@ -54,6 +64,31 @@ static void free_handle(uint32_t h) {
 // void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
 uint32_t posix_external_fopen_hook(char * filename, char *mode) {
+#ifdef __EMSCRIPTEN__
+    (void)mode;
+    uint32_t js_handle = EM_ASM_INT({
+        if (typeof amy_shared_open === 'function') {
+            return amy_shared_open(UTF8ToString($0));
+        }
+        return 0;
+    }, filename);
+    if (js_handle == 0) {
+        return HANDLE_INVALID;
+    }
+    for (uint32_t i = 1; i < MAX_OPEN_FILES; i++) {
+        if (g_em_handle[i] == 0) {
+            g_em_handle[i] = js_handle;
+            g_em_pos[i] = 0;
+            return i;
+        }
+    }
+    EM_ASM({
+        if (typeof amy_shared_close === 'function') {
+            amy_shared_close($0);
+        }
+    }, js_handle);
+    return HANDLE_INVALID;
+#else
     FILE *f = fopen(filename, mode);
     if (!f) {
         return HANDLE_INVALID;
@@ -64,40 +99,95 @@ uint32_t posix_external_fopen_hook(char * filename, char *mode) {
         return HANDLE_INVALID;
     }
     return h;
+#endif
 }
 
 uint32_t posix_external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
+#ifdef __EMSCRIPTEN__
+    if (h == 0 || h >= MAX_OPEN_FILES) {
+        return 0;
+    }
+    uint32_t js_handle = g_em_handle[h];
+    if (js_handle == 0) {
+        fprintf(stderr, "fread 0\n");
+        return 0;
+    }
+    fprintf(stderr, "fread 1\n");
+    uint32_t pos = g_em_pos[h];
+    fprintf(stderr, "fread 2 pos %d\n", pos);
+    uint32_t r = EM_ASM_INT({
+        if (typeof amy_shared_read === 'function') {
+            console.log("shared_read 0");
+            return amy_shared_read($0, $1, $2, $3);
+        }
+        console.log("shared_read 1");
+        return 0;
+    }, js_handle, pos, buf, len);
+    fprintf(stderr, "freadh 3 r %d\n", r);
+    g_em_pos[h] += r;
+    return r;
+#else
     FILE *f = lookup_handle(h);
     if (!f) {
         return 0;
     }
     uint32_t r = fread(buf, 1, len, f);
     return r;
+#endif
 }
-
 void posix_external_fseek_hook(uint32_t h, uint32_t pos) {
+#ifdef __EMSCRIPTEN__
+    if (h == 0 || h >= MAX_OPEN_FILES) {
+        return;
+    }
+    g_em_pos[h] = pos;
+    return;
+#else
     FILE *f = lookup_handle(h);
     if (!f) {
         return;
     }
     fseek(f, pos, SEEK_SET);
+#endif
 }
 
 uint32_t posix_external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
+#ifdef __EMSCRIPTEN__
+    (void)h;
+    (void)buf;
+    (void)n;
+    return 0;
+#else
     FILE *f = lookup_handle(h);
     if (!f) {
         return 0;
     }
     uint32_t w = fwrite(buf, 1, n, f);
     return w;
+#endif
 }
 
 void posix_external_fclose_hook(uint32_t h) {
+#ifdef __EMSCRIPTEN__
+    if (h == 0 || h >= MAX_OPEN_FILES) {
+        return;
+    }
+    uint32_t js_handle = g_em_handle[h];
+    if (js_handle != 0) {
+        EM_ASM({
+            if (typeof amy_shared_close === 'function') {
+                amy_shared_close($0);
+            }
+        }, js_handle);
+        free_handle(h);
+    }
+#else
     FILE *f = lookup_handle(h);
     if (f) {
         fclose(f);
         free_handle(h);
     }
+#endif
 }
 
 #endif
@@ -363,7 +453,12 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 
 
 void transfer_init() {
-#if defined(_POSIX_VERSION) 
+    #ifdef __EMSCRIPTEN__
+    fprintf(stderr, "transfer init!\n");
+
+    #endif
+
+ #if defined(_POSIX_VERSION) 
     amy_external_fopen_hook = posix_external_fopen_hook;
     amy_external_fread_hook = posix_external_fread_hook;
     amy_external_fwrite_hook = posix_external_fwrite_hook;
@@ -382,12 +477,15 @@ static uint32_t read_u32_le(const uint8_t *buf) {
 }
 
 static int read_exact(uint32_t handle, uint8_t *buf, uint32_t len) {
+    fprintf(stderr, "readexact %d len %d\n", handle, len);
     if (amy_external_fread_hook == NULL) {
         return 0;
     }
+    fprintf(stderr, "readexact1 %d len %d\n", handle, len);
     uint32_t offset = 0;
     while (offset < len) {
         uint32_t got = amy_external_fread_hook(handle, buf + offset, len - offset);
+        fprintf(stderr, "readexact got %d handle %d offset %d len %d\n", got, handle, offset, len);
         if (got == 0) {
             return 0;
         }
@@ -409,16 +507,20 @@ static int skip_bytes(uint32_t handle, uint32_t len) {
 }
 
 int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes) {
+    fprintf(stderr, "wph0\n");
     if (info == NULL || data_bytes == NULL) {
         return 0;
     }
+    fprintf(stderr, "wph1\n");
     uint8_t riff_header[12];
     if (!read_exact(handle, riff_header, sizeof(riff_header))) {
         return 0;
     }
+    fprintf(stderr, "wph2\n");
     if (memcmp(riff_header, "RIFF", 4) != 0 || memcmp(riff_header + 8, "WAVE", 4) != 0) {
         return 0;
     }
+    fprintf(stderr, "wph3\n");
     uint8_t fmt_found = 0;
     wave_info_t tmp_info = {0};
     while (1) {

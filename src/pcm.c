@@ -3,6 +3,10 @@
 #include "amy.h"
 #include "transfer.h"
 
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#endif
+
 #ifdef AMY_DAISY
 #define malloc_caps(a, b) qspi_malloc(a)
 #define free(a) qspi_free(a)
@@ -100,14 +104,15 @@ void pcm_note_on(uint16_t osc) {
             if (preset->file_handle != 0) {
                 wave_info_t info = {0};
                 uint32_t data_bytes = 0;
-                //fprintf(stderr, "fseek 0 handle %ld\n", preset->file_handle);
+                fprintf(stderr, "seeking 0\n");
                 amy_external_fseek_hook(preset->file_handle, 0);
+                fprintf(stderr, "done seeking\n");
                 if (wave_parse_header(preset->file_handle, &info, &data_bytes)) {
-                    //fprintf(stderr, "parsed %ld bytes\n", data_bytes);
                     preset->channels = info.channels;
                     preset->samplerate = info.sample_rate;
                     preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
                     preset->file_bytes_remaining = data_bytes;
+                    fprintf(stderr, "parsed ok\n");
                 } else {
                     amy_external_fclose_hook(preset->file_handle);
                 }
@@ -330,7 +335,7 @@ int pcm_load_file() {
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
     new_preset_pointer->preset = memory_preset;
-    //fprintf(stderr, "read file %s frames %ld channels %d preset %d handle %ld\n", filename, total_frames, info.channels, preset_number, handle);
+    fprintf(stderr, "read file %s frames %ld channels %d preset %d handle %ld\n", filename, total_frames, info.channels, preset_number, handle);
     return 1;
 }
 
