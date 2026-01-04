@@ -367,6 +367,14 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         last_f = last_f + 188
 
 def disk_sample(wavfilename, preset=0, midinote=60):
+    try:
+        from tulip import board
+        if board() == "WEB":
+            # On web, we just use memorypcm as we can't directly accesss FS from amy-web
+            load_sample(wavfilename, preset, midinote)
+            return
+    except ImportError:
+        pass # It's ok, just means we are not under tulip or amyboard web
     s = "%d,%s,%d" % (preset, wavfilename, midinote)
     send(disk_sample=s)
 
