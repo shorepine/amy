@@ -903,6 +903,22 @@ class TestParamsInPatchCmd(AmyTest):
     amy.send(time=400, synth=1, note=60, vel=0)
     amy.send(time=400, synth=1, note=63, vel=0)
 
+class TestHPFBPFHighBaseFreq(AmyTest):
+  def run(self):
+    amy.send(time=0, synth=1, patch=0, num_voices=4, filter_type=amy.FILTER_HPF, filter_freq=1200)
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    #
+    amy.send(time=300, synth=1, patch=0, num_voices=4, filter_type=amy.FILTER_BPF, filter_freq=1200)
+    amy.send(time=350, synth=1, note=48, vel=1)
+    amy.send(time=450, synth=1, note=60, vel=1)
+    amy.send(time=550, synth=1, note=63, vel=1)
+    # notes off
+    amy.send(time=700, synth=1, note=48, vel=0)
+    amy.send(time=700, synth=1, note=60, vel=0)
+    amy.send(time=700, synth=1, note=63, vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
