@@ -891,6 +891,18 @@ class TestSample(AmyTest):
     amy.send(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
     amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
 
+class TestParamsInPatchCmd(AmyTest):
+  def run(self):
+    # Is it possible to *modify* a patch in the same command we install it?
+    amy.send(time=0, synth=1, patch=0, num_voices=4, resonance=6)
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    # notes off
+    amy.send(time=400, synth=1, note=48, vel=0)
+    amy.send(time=400, synth=1, note=60, vel=0)
+    amy.send(time=400, synth=1, note=63, vel=0)
+
 
 def main(argv):
   if len(argv) > 1:
