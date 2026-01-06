@@ -502,9 +502,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
             amy_execute_deltas();
             patches_load_patch(e);
-        } else {
-            patches_event_has_voices(e, queue);
         }
+        // Execute any other commands in this event.
+        patches_event_has_voices(e, queue);
         goto end;
     }
 
