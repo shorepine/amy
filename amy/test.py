@@ -59,8 +59,12 @@ class AmyTest:
 
     except FileNotFoundError:
       message += ' / Unable to read ' + ref_file
+      rms_n = 0
 
-    print(message)
+    # For now, any value above -100.0 dB counts as a failed test
+    test_passed = (rms_n <= -100.0)
+    return test_passed, message
+
 
 class TestSineOsc(AmyTest):
 
@@ -147,7 +151,7 @@ class TestPcmLoop(AmyTest):
 
 
 class TestPcmLoopEnvFilt(AmyTest):
-  # Check that filter, amp-env, and pitch mod apply to PCM
+  """Check that filter, amp-env, and pitch mod apply to PCM."""
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
@@ -157,7 +161,6 @@ class TestPcmLoopEnvFilt(AmyTest):
     amy.send(time=0, osc=0, mod_source=1, freq=',,,,,-0.2')
     amy.send(time=100, osc=0, note=64, vel=5)
     amy.send(time=500, osc=0, vel=0)
-
 
 
 class TestBuildYourOwnPartials(AmyTest):
@@ -173,6 +176,7 @@ class TestBuildYourOwnPartials(AmyTest):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
     amy.send(time=100, osc=0, note=60, vel=0.5)
     amy.send(time=200, osc=0, note=72, vel=1)
+
 
 class TestBYOPVoices(AmyTest):
 
@@ -190,6 +194,7 @@ class TestBYOPVoices(AmyTest):
     amy.send(time=300, voices=2, note=67, vel=1)
     amy.send(time=400, voices=3, note=70, vel=1)
 
+
 class TestBYOPNoteOff(AmyTest):
 
   def run(self):
@@ -203,6 +208,7 @@ class TestBYOPNoteOff(AmyTest):
     amy.send(voices='0,1', bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
     amy.send(time=100, voices=1, note=60, vel=1)
     amy.send(time=700, voices=1, vel=0)
+
 
 class TestInterpPartials(AmyTest):
 
@@ -218,10 +224,10 @@ class TestInterpPartials(AmyTest):
     amy.send(time=550, osc=0, note=72, vel=1)
     amy.send(time=800, osc=0, vel=0)
     
+
 class TestInterpPartialsRetrigger(AmyTest):
 
   def run(self):
-    # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
     num_partials = 20
     amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0)
@@ -276,7 +282,7 @@ class TestAlgo2(AmyTest):
 
 
 class TestFMRepeat(AmyTest):
-  # Douglas reports that the DX7 Marimba sometimes clicks at onset.
+  """Douglas reports that the DX7 Marimba sometimes clicks at onset."""
 
   def run(self):
     amy.send(time=0, voices="0", patch=128+21)
@@ -398,6 +404,7 @@ class TestBrass2(AmyTest):
     amy.send(time=100, osc=0, note=60, vel=1.0)
     amy.send(time=600, osc=0, vel=0)
 
+
 class TestGuitar(AmyTest):
   """Trying to catch the note-off zzzzzip."""
 
@@ -411,6 +418,7 @@ class TestGuitar(AmyTest):
     amy.send(time=500, osc=0, note=60, vel=4.0)
     amy.send(time=550, osc=0, vel=0)
 
+
 class TestBleep(AmyTest):
   """Test the tulip start-up beep."""
 
@@ -419,6 +427,7 @@ class TestBleep(AmyTest):
     amy.send(time=0, osc=0, pan=0.9, vel=1)
     amy.send(time=150, osc=0, pan=0.1, freq=440)
     amy.send(time=300, osc=0, pan=0.5, vel=0)
+
 
 class TestOverload(AmyTest):
   """Run the output very hot to check for clipping."""
@@ -429,6 +438,7 @@ class TestOverload(AmyTest):
     amy.send(time=0, chorus=1)
     amy.send(time=100, note=48, vel=8.0)
     amy.send(time=900, vel=0)
+
 
 class TestJunoPatch(AmyTest):
   """Known Juno patch."""
@@ -445,6 +455,7 @@ class TestJunoPatch(AmyTest):
     amy.send(time=800, synth=1, note=63, vel=0)
     amy.send(time=900, synth=1, note=67, vel=0)
 
+
 class TestJunoClip(AmyTest):
   """Juno patch that clips."""
 
@@ -459,6 +470,7 @@ class TestJunoClip(AmyTest):
     amy.send(time=800, voices="2", vel=0)
     amy.send(time=800, voices="3", vel=0)
 
+
 class TestLowVcf(AmyTest):
   """Weird fxpt warble when hitting fundamental."""
 
@@ -472,6 +484,7 @@ class TestLowVcf(AmyTest):
     amy.send(time=100, osc=0, note=48, vel=3)
     amy.send(time=800, osc=0, vel=0)
 
+
 class TestLowerVcf(AmyTest):
   """Top16 LPF24 has issues with cf below fundamental?"""
 
@@ -484,6 +497,7 @@ class TestLowerVcf(AmyTest):
              bp1='0,1,300,0,1,0')
     amy.send(time=100, osc=0, note=48, vel=3)
     amy.send(time=800, osc=0, vel=0)
+
 
 class TestFlutesEq(AmyTest):
   """VCF leaving almost pure sine + HPF2 -> noise, clicks?"""
@@ -502,6 +516,7 @@ class TestFlutesEq(AmyTest):
     amy.send(time=900, osc=1, vel=0)
     amy.send(time=900, osc=2, vel=0)
 
+
 class TestOscBD(AmyTest):
   """Bass Drum as modulated sine-tone. amy.py:preset(5). """
 
@@ -513,6 +528,7 @@ class TestOscBD(AmyTest):
     amy.send(time=100, osc=0, note=84, vel=1)
     amy.send(time=350, osc=0, note=84, vel=1)
     amy.send(time=600, osc=0, note=84, vel=1)
+
 
 class TestChainedOsc(AmyTest):
   """Two oscillators chained together."""
@@ -529,6 +545,7 @@ class TestChainedOsc(AmyTest):
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=900, osc=0, vel=0)
     #amy.send(time=900, osc=1, vel=0)
+
 
 class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
@@ -794,6 +811,7 @@ class TestSustainPedal(AmyTest):
 
 class TestPatchFromEvents(AmyTest):
   """Test defining a patch from events with patch_number."""
+
   def __init__(self):
     super().__init__()
     self.default_synths = True   # So that the patch space is already partly populated.
@@ -811,6 +829,7 @@ class TestPatchFromEvents(AmyTest):
 
 class TestInvalidPatchNumber(AmyTest):
   """Test for crash with patch number out of range."""
+
   def run(self):
     patch = 25
     amy.send(time=0, patch=patch, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
@@ -847,25 +866,35 @@ class TestFileTransfer(AmyTest):
         g.seek(0)
         transferred = g.read()
         if transferred != payload:
-          raise AssertionError('transfer file contents mismatch')
-        print('TestFileTransfer: ok')
+          is_ok = False
+          message = 'transfer file contents mismatch'
+        else:
+          is_ok = True
+          message = 'TestFileTransfer: ok'
+        return is_ok, message
 
 
 class TestDiskSample(AmyTest):
+
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
+
 class TestDiskSampleWithSilentGap(AmyTest):
+
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3 with gap.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=63)
 
+
 class TestRestartFileSample(AmyTest):
+
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=60)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=72)
     amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
+
 
 class TestDiskSampleStereo(AmyTest):
 
@@ -875,7 +904,9 @@ class TestDiskSampleStereo(AmyTest):
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
     amy.send(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
 
+
 class TestSample(AmyTest):
+
   def run(self):
     amy.start_sample(preset=1024,bus=1,max_frames=22050, midinote=60)
     amy.send(time=0, synth=1, num_voices=4, patch=20)
@@ -891,7 +922,9 @@ class TestSample(AmyTest):
     amy.send(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
     amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
 
+
 class TestParamsInPatchCmd(AmyTest):
+
   def run(self):
     # Is it possible to *modify* a patch in the same command we install it?
     amy.send(time=0, synth=1, patch=0, num_voices=4, resonance=6)
@@ -903,7 +936,9 @@ class TestParamsInPatchCmd(AmyTest):
     amy.send(time=400, synth=1, note=60, vel=0)
     amy.send(time=400, synth=1, note=63, vel=0)
 
+
 class TestHPFHighBaseFreq(AmyTest):
+
   def run(self):
     amy.send(time=0, synth=1, patch=0, num_voices=4)
     amy.send(time=10, synth=1, filter_type=amy.FILTER_HPF, filter_freq=1000)
@@ -917,16 +952,31 @@ class TestHPFHighBaseFreq(AmyTest):
 
 
 def main(argv):
+  if len(argv) > 1 and argv[1] == 'quiet':
+    quiet = True
+    del argv[1]
+  else:
+    quiet = False
+
   if len(argv) > 1:
     # Override location of reference files.
     AmyTest.ref_dir = argv[1]
 
   do_all_tests = True
 
+  oks = []
+  errors = []
+
   if do_all_tests:
     for testClass in AmyTest.__subclasses__():
       test_object = testClass()
-      test_object.test()
+      is_ok, message = test_object.test()
+      if not quiet:
+        print(message)
+      if is_ok:
+        oks.append(message)
+      else:
+        errors.append(message)
   else:
     #TestPcmShift().test()
     #TestChorus().test()
@@ -951,10 +1001,16 @@ def main(argv):
     #TestVoiceStealDecay().test()
     #TestRestartFileSample().test()
     #TestDiskSample().test()
-    TestFileTransfer().test()
+    print(TestFileTransfer().test()[1])
 
-  amy.send(debug=0)
-  print("tests done.")
+  if not quiet:
+    amy.send(debug=0)
+
+  if errors:
+    print(len(oks), "tests pass,", len(errors), "tests failed:")
+    print('\n'.join(errors))
+  else:
+    print(len(oks), "tests pass")
 
 
 if __name__ == "__main__":
