@@ -8,7 +8,7 @@ We recommend always using the latest released version (now `1.1.4`) in the Ardui
 
 However, if you are directed to a bleeding edge release of AMY, you can simply copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`. (Make sure you delete whatever you already had in `libraries/amy`.)
 
-To use AMY in Arduino, just `#include <AMY-Arduino.h>`. You need at a minimum the following code in your sketch, a call to `amy_start`, then `amy_live_start` if you are using our I2S or USB audio code, and then a call to `amy_update()` somewhere in your `loop()`. 
+To use AMY in Arduino, just `#include <AMY-Arduino.h>`. You need at a minimum the following code in your sketch, a call to `amy_start` with some options set in an `amy_config_t`, and then a call to `amy_update()` somewhere in your `loop()`. 
 
 ```c
 #include <AMY-Arduino.h>
