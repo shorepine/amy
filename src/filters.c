@@ -89,6 +89,9 @@ int8_t dsps_biquad_gen_hpf_f32(SAMPLE *coeffs, float f, float qFactor)
     if (qFactor <= 0.0001) {
         qFactor = 0.0001;
     }
+    if (f > 0.45) {
+        f = 0.45;
+    }
     float Fs = 1;
 
     float w0 = 2 * M_PI * f / Fs;
@@ -115,6 +118,9 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
     if (qFactor <= 0.0001) {
         qFactor = 0.0001;
+    }
+    if (f > 0.45) {
+        f = 0.45;
     }
     float Fs = 1;
 
