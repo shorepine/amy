@@ -31,6 +31,7 @@ static uint32_t g_em_handle[MAX_OPEN_FILES];
 static uint32_t g_em_pos[MAX_OPEN_FILES];
 #endif
 
+#ifndef __EMSCRIPTEN__
 static uint32_t alloc_handle(FILE *f) {
     for (uint32_t i = 1; i < MAX_OPEN_FILES; i++) {
         if (g_files[i] == NULL) {
@@ -45,7 +46,7 @@ static FILE *lookup_handle(uint32_t h) {
     if (h == 0 || h >= MAX_OPEN_FILES) return NULL;
     return g_files[h];
 }
-
+#endif
 static void free_handle(uint32_t h) {
     if (h == 0 || h >= MAX_OPEN_FILES) return;
     g_files[h] = NULL;
@@ -454,7 +455,6 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 
 void transfer_init() {
     #ifdef __EMSCRIPTEN__
-    fprintf(stderr, "transfer init!\n");
 
     #endif
 
