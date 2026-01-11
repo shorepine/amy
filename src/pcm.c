@@ -104,15 +104,12 @@ void pcm_note_on(uint16_t osc) {
             if (preset->file_handle != 0) {
                 wave_info_t info = {0};
                 uint32_t data_bytes = 0;
-                fprintf(stderr, "seeking 0\n");
                 amy_external_fseek_hook(preset->file_handle, 0);
-                fprintf(stderr, "done seeking\n");
                 if (wave_parse_header(preset->file_handle, &info, &data_bytes)) {
                     preset->channels = info.channels;
                     preset->samplerate = info.sample_rate;
                     preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
                     preset->file_bytes_remaining = data_bytes;
-                    fprintf(stderr, "parsed ok\n");
                 } else {
                     amy_external_fclose_hook(preset->file_handle);
                 }

@@ -110,21 +110,15 @@ uint32_t posix_external_fread_hook(uint32_t h, uint8_t *buf, uint32_t len) {
     }
     uint32_t js_handle = g_em_handle[h];
     if (js_handle == 0) {
-        fprintf(stderr, "fread 0\n");
         return 0;
     }
-    fprintf(stderr, "fread 1\n");
     uint32_t pos = g_em_pos[h];
-    fprintf(stderr, "fread 2 pos %d\n", pos);
     uint32_t r = EM_ASM_INT({
         if (typeof amy_shared_read === 'function') {
-            console.log("shared_read 0");
             return amy_shared_read($0, $1, $2, $3);
         }
-        console.log("shared_read 1");
         return 0;
     }, js_handle, pos, buf, len);
-    fprintf(stderr, "freadh 3 r %d\n", r);
     g_em_pos[h] += r;
     return r;
 #else
@@ -477,15 +471,12 @@ static uint32_t read_u32_le(const uint8_t *buf) {
 }
 
 static int read_exact(uint32_t handle, uint8_t *buf, uint32_t len) {
-    fprintf(stderr, "readexact %d len %d\n", handle, len);
     if (amy_external_fread_hook == NULL) {
         return 0;
     }
-    fprintf(stderr, "readexact1 %d len %d\n", handle, len);
     uint32_t offset = 0;
     while (offset < len) {
         uint32_t got = amy_external_fread_hook(handle, buf + offset, len - offset);
-        fprintf(stderr, "readexact got %d handle %d offset %d len %d\n", got, handle, offset, len);
         if (got == 0) {
             return 0;
         }
@@ -507,20 +498,16 @@ static int skip_bytes(uint32_t handle, uint32_t len) {
 }
 
 int wave_parse_header(uint32_t handle, wave_info_t *info, uint32_t *data_bytes) {
-    fprintf(stderr, "wph0\n");
     if (info == NULL || data_bytes == NULL) {
         return 0;
     }
-    fprintf(stderr, "wph1\n");
     uint8_t riff_header[12];
     if (!read_exact(handle, riff_header, sizeof(riff_header))) {
         return 0;
     }
-    fprintf(stderr, "wph2\n");
     if (memcmp(riff_header, "RIFF", 4) != 0 || memcmp(riff_header + 8, "WAVE", 4) != 0) {
         return 0;
     }
-    fprintf(stderr, "wph3\n");
     uint8_t fmt_found = 0;
     wave_info_t tmp_info = {0};
     while (1) {
