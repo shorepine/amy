@@ -3,6 +3,10 @@
 #include "amy.h"
 #include "transfer.h"
 
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#endif
+
 #ifdef AMY_DAISY
 #define malloc_caps(a, b) qspi_malloc(a)
 #define free(a) qspi_free(a)
@@ -100,10 +104,8 @@ void pcm_note_on(uint16_t osc) {
             if (preset->file_handle != 0) {
                 wave_info_t info = {0};
                 uint32_t data_bytes = 0;
-                //fprintf(stderr, "fseek 0 handle %ld\n", preset->file_handle);
                 amy_external_fseek_hook(preset->file_handle, 0);
                 if (wave_parse_header(preset->file_handle, &info, &data_bytes)) {
-                    //fprintf(stderr, "parsed %ld bytes\n", data_bytes);
                     preset->channels = info.channels;
                     preset->samplerate = info.sample_rate;
                     preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);

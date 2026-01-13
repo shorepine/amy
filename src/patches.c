@@ -156,6 +156,67 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
+void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
+    // given a patch number (not a string), pull in the patch string, and parse the string like parse_patch_string_to_queue does
+    // but instead of calling amy_process_event or amy_event_to_deltas queue, just save each parsed amy_event to a list of events
+    // we can assume the max number of events is MAX_EVENTS_PER_PATCH = 50 for now
+    const int max_events = 50;
+    char *message = NULL;
+    if (!events) {
+        return;
+    }
+    *events = NULL;
+    if (event_count) {
+        *event_count = 0;
+    }
+
+    if (patch_number < _PATCHES_FIRST_USER_PATCH) {
+        message = (char *)patch_commands[patch_number];
+    } else {
+        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+        if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
+            fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
+                    patch_number, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+            return;
+        }
+        message = memory_patch[patch_index];
+    }
+
+    if (!message) {
+        return;
+    }
+
+    struct amy_event *out = calloc(max_events + 1, sizeof(struct amy_event));
+    if (!out) {
+        return;
+    }
+
+    uint16_t start = 0;
+    int count = 0;
+    uint16_t message_len = (uint16_t)strlen(message);
+    for (uint16_t i = 0; i < message_len + 1; i++) {
+        if (i == message_len || message[i] == 'Z') {
+            if (count >= max_events) {
+                break;
+            }
+            int length = i - start + 1;
+            out[count] = amy_default_event();
+            amy_parse_message(message + start, length, &out[count]);
+            if (out[count].status == EVENT_EMPTY) {
+                out[count].status = EVENT_SCHEDULED;
+            }
+            count++;
+            start = i + 1;
+        }
+    }
+
+    out[count] = amy_default_event();
+    out[count].status = EVENT_EMPTY;
+    if (event_count) {
+        *event_count = (uint16_t)count;
+    }
+    *events = out;
+}
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
