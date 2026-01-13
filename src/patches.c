@@ -507,7 +507,8 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
     return num_voices;
 }
 
-// This is called when i get an event with voices (or an instrument) in it, BUT NOT for a load_patch - that has already been handled.
+// This is called when i get an event with voices (or an instrument) in it.
+// If the event also has synth and patch_number specified (a "load patch"), those are handled before this is called.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(amy_event *e, struct delta **queue) {
     peek_stack("has_voices");
@@ -620,10 +621,6 @@ void patches_load_patch(amy_event *e) {
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
     if (AMY_IS_SET(e->synth)) {
         num_voices = patches_voices_for_load_synth(e, voices, &patch_number);
-        if (num_voices == 0) {
-            // Invalid somehow, ignore event.
-            return;
-        }
     } else if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
     }

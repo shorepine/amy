@@ -21,17 +21,19 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 static PyObject * live_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
     amy_config_t amy_config = amy_global.config;
-    int arg1 = -1; int arg2 = -1;
+    int playback_device = -1;  // Means "system default".
+    int capture_device = -1;
+    amy_config.features.audio_in = 1;
     if(PyTuple_Size(args) == 2) {
-        PyArg_ParseTuple(args, "ii", &arg1, &arg2);
-        amy_config.playback_device_id = arg1;
-        amy_config.capture_device_id = arg2;
-    } else {
-        amy_config.playback_device_id = -1;
-        amy_config.capture_device_id = -1;
+        PyArg_ParseTuple(args, "ii", &playback_device, &capture_device);
+    } else if(PyTuple_Size(args) == 1) {
+        PyArg_ParseTuple(args, "i", &playback_device);
+        // Explicit playback device but no capture device -> open just for playback.
+        amy_config.features.audio_in = 0;
     }
+    amy_config.playback_device_id = playback_device;
+    amy_config.capture_device_id = capture_device;
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
-    amy_config.features.audio_in = 1;  // Needed to make miniaudio run
     amy_start(amy_config); // initializes amy 
     return Py_None;
 }
@@ -46,7 +48,7 @@ static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
     if(PyTuple_Size(args) == 1) {
         PyArg_ParseTuple(args, "i", &default_synths);
     }
-    amy_config_t amy_config = amy_default_config();
+    amy_config_t amy_config = amy_global.config; // amy_default_config();
     amy_config.features.default_synths = default_synths;
     amy_start(amy_config); // initializes amy 
     return Py_None;
@@ -78,7 +80,6 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
 }
 
 static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
-    char *arg1;
 #define MAX_MIDI_ARGS 16
     int data[MAX_MIDI_ARGS];
     uint8_t byte_data[MAX_MIDI_ARGS];
@@ -115,7 +116,9 @@ static struct PyModuleDef c_amyDef =
 };
 
 PyMODINIT_FUNC PyInit_c_amy(void)
-{   
+{
+    // This is the first time it's called, so there's nothing in amy_global.
+    // But for later calls, we copy the existing amy_global.config.
     amy_config_t amy_config = amy_default_config();
     amy_start(amy_config);
     return PyModule_Create(&c_amyDef);

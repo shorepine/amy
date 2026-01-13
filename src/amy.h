@@ -791,6 +791,7 @@ void amy_stop();
 
 int16_t *amy_update();        // in api.c
 void amy_platform_init();     // in i2s.c
+void amy_platform_deinit();   // in i2s.c
 void amy_update_tasks();      // in i2s.c
 int16_t *amy_render_audio();  // in i2s.c
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes);  // in i2s.c

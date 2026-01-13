@@ -44,6 +44,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 #endif
 
 void run_midi();
+void stop_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
 #endif
