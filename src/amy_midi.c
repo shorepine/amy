@@ -511,6 +511,9 @@ void run_midi() {
 
 
 #ifdef __linux__
+void stop_midi() {
+}
+
 void run_midi() {
     //fprintf(stderr, "no MIDI support on linux yet\n");
 }
