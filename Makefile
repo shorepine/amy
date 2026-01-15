@@ -103,7 +103,7 @@ valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
 
 docs/amy.js: $(TARGET)
-	 emcc $(SOURCES) src/amy_bindings.cpp $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 clean:
 	-rm -f src/*.o
