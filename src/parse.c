@@ -87,9 +87,13 @@ float atoff(const char *s) {
         } \
         if (c < stop) { \
             fprintf(stderr, "WARNING: parse__list_##type: More than %d values in \"%s\"\n", \
-                max_num_vals, message); \
-        } \
-        return num_vals_received; \
+            max_num_vals, message); \
+        } else { /* pad to end */       \
+            for (int i = num_vals_received; i < max_num_vals; ++i) {  \
+                *vals++ = skipped_val;  \
+            }                           \
+        }                               \
+        return num_vals_received;       \
     }
 
 
@@ -425,15 +429,12 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             /* g used for Alles for client # */
             case 'H': parse_list_uint32_t(arg, e->sequence, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
-                float reverb_params[4] = {AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness),
-                                          AMY_UNSET_VALUE(amy_global.reverb.liveness), AMY_UNSET_VALUE(amy_global.reverb.liveness)};
+                float reverb_params[4];
                 parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(amy_global.reverb.liveness));
-                // config_reverb doesn't understand UNSET, so copy in the current values.
-                if (AMY_IS_UNSET(reverb_params[0])) reverb_params[0] = S2F(amy_global.reverb.level);
-                if (AMY_IS_UNSET(reverb_params[1])) reverb_params[1] = amy_global.reverb.liveness;
-                if (AMY_IS_UNSET(reverb_params[2])) reverb_params[2] = amy_global.reverb.damping;
-                if (AMY_IS_UNSET(reverb_params[3])) reverb_params[3] = amy_global.reverb.xover_hz;
-                config_reverb(reverb_params[0], reverb_params[1], reverb_params[2], reverb_params[3]);
+                e->reverb_level = reverb_params[0];
+                e->reverb_liveness = reverb_params[1];
+                e->reverb_damping = reverb_params[2];
+                e->reverb_xover_hz = reverb_params[3];
             }
             break;
             /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
@@ -443,14 +444,12 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             /* j, J available */
             // chorus.level 
             case 'k': if(AMY_HAS_CHORUS) {
-                float chorus_params[4] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
+                float chorus_params[4];
                 parse_list_float(arg, chorus_params, 4, AMY_UNSET_FLOAT);
-                // config_chorus doesn't understand UNSET, copy existing values.
-                if (AMY_IS_UNSET(chorus_params[0])) chorus_params[0] = S2F(amy_global.chorus.level);
-                if (AMY_IS_UNSET(chorus_params[1])) chorus_params[1] = (float)amy_global.chorus.max_delay;
-                if (AMY_IS_UNSET(chorus_params[2])) chorus_params[2] = amy_global.chorus.lfo_freq;
-                if (AMY_IS_UNSET(chorus_params[3])) chorus_params[3] = amy_global.chorus.depth;
-                config_chorus(chorus_params[0], (int)chorus_params[1], chorus_params[2], chorus_params[3]);
+                e->chorus_level = chorus_params[0];
+                e->chorus_max_delay = chorus_params[1];
+                e->chorus_lfo_freq = chorus_params[2];
+                e->chorus_depth = chorus_params[3];
             }
             break;
             case 'K': e->patch_number = atoi(arg); break;
@@ -458,14 +457,13 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             case 'L': e->mod_source=atoi(arg); break;
             case 'm': e->portamento_ms=atoi(arg); break;
             case 'M': if (AMY_HAS_ECHO) {
-                float echo_params[5] = {AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT};
+                float echo_params[5];
                 parse_list_float(arg, echo_params, 5, AMY_UNSET_FLOAT);
-                if (AMY_IS_UNSET(echo_params[0])) echo_params[0] = S2F(amy_global.echo.level);
-                if (AMY_IS_UNSET(echo_params[1])) echo_params[1] = (float)amy_global.echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-                if (AMY_IS_UNSET(echo_params[2])) echo_params[2] = (float)amy_global.echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
-                if (AMY_IS_UNSET(echo_params[3])) echo_params[3] = S2F(amy_global.echo.feedback);
-                if (AMY_IS_UNSET(echo_params[4])) echo_params[4] = S2F(amy_global.echo.filter_coef);
-                config_echo(echo_params[0], echo_params[1], echo_params[2], echo_params[3], echo_params[4]);
+                e->echo_level = echo_params[0];
+                e->echo_delay_ms = echo_params[1];
+                e->echo_max_delay_ms = echo_params[2];
+                e->echo_feedback = echo_params[3];
+                e->echo_filter_coef = echo_params[4];
             }
             break;
             case 'n': e->midi_note=atof(arg); break;

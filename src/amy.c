@@ -220,8 +220,15 @@ uint32_t enclosing_power_of_2(uint32_t n) {
 }
 
 void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.echo.level);
+    if (AMY_IS_UNSET(delay_ms)) delay_ms = (amy_global.echo.delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
+    if (AMY_IS_UNSET(max_delay_ms)) max_delay_ms = (amy_global.echo.max_delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
+    if (AMY_IS_UNSET(feedback)) feedback = S2F(amy_global.echo.feedback);
+    if (AMY_IS_UNSET(filter_coef)) filter_coef = S2F(amy_global.echo.filter_coef);
+
     uint32_t delay_samples = (uint32_t)(delay_ms / 1000.f * AMY_SAMPLE_RATE);
     //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
+
     if (level > 0) {
         if (echo_delay_lines[0] == NULL) {
             // Delay line len must be power of 2.
@@ -274,7 +281,11 @@ void alloc_chorus_delay_lines(void) {
     }
 }
 
-void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
+void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.chorus.level);
+    if (AMY_IS_UNSET(max_delay)) max_delay = amy_global.chorus.max_delay;
+    if (AMY_IS_UNSET(lfo_freq)) lfo_freq = amy_global.chorus.lfo_freq;
+    if (AMY_IS_UNSET(depth)) depth = amy_global.chorus.depth;
     //fprintf(stderr, "config_chorus: osc %d level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
     //        CHORUS_MOD_SOURCE, level, max_delay, lfo_freq, depth);
     if (level > 0) {
@@ -308,6 +319,10 @@ void config_chorus(float level, int max_delay, float lfo_freq, float depth) {
 }
 
 void config_reverb(float level, float liveness, float damping, float xover_hz) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.reverb.level);
+    if (AMY_IS_UNSET(liveness)) liveness = amy_global.reverb.liveness;
+    if (AMY_IS_UNSET(damping)) damping = amy_global.reverb.damping;
+    if (AMY_IS_UNSET(xover_hz)) xover_hz = amy_global.reverb.xover_hz;
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
@@ -547,6 +562,19 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_F(eq_l, EQ_L)
     EVENT_TO_DELTA_F(eq_m, EQ_M)
     EVENT_TO_DELTA_F(eq_h, EQ_H)
+    EVENT_TO_DELTA_F(echo_max_delay_ms, ECHO_MAX_DELAY_MS)  // set MAX_DELAY first
+    EVENT_TO_DELTA_F(echo_level, ECHO_LEVEL)
+    EVENT_TO_DELTA_F(echo_delay_ms, ECHO_DELAY_MS)
+    EVENT_TO_DELTA_F(echo_feedback, ECHO_FEEDBACK)
+    EVENT_TO_DELTA_F(echo_filter_coef, ECHO_FILTER_COEF)
+    EVENT_TO_DELTA_F(chorus_max_delay, CHORUS_MAX_DELAY)   // set MAX_DELAY first
+    EVENT_TO_DELTA_F(chorus_level, CHORUS_LEVEL)
+    EVENT_TO_DELTA_F(chorus_lfo_freq, CHORUS_LFO_FREQ)
+    EVENT_TO_DELTA_F(chorus_depth, CHORUS_DEPTH)
+    EVENT_TO_DELTA_F(reverb_level, REVERB_LEVEL)
+    EVENT_TO_DELTA_F(reverb_liveness, REVERB_LIVENESS)
+    EVENT_TO_DELTA_F(reverb_damping, REVERB_DAMPING)
+    EVENT_TO_DELTA_F(reverb_xover_hz, REVERB_XOVER_HZ)
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
@@ -1158,6 +1186,19 @@ void play_delta(struct delta *d) {
     if(d->param == EQ_L) amy_global.eq[0] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_M) amy_global.eq[1] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_H) amy_global.eq[2] = F2S(powf(10, d->data.f / 20.0));
+    if(d->param == ECHO_LEVEL) config_echo(d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_DELAY_MS) config_echo(AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_MAX_DELAY_MS) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_FEEDBACK) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_FILTER_COEF) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == CHORUS_LEVEL) config_chorus(d->data.f, UINT16_MAX, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_MAX_DELAY) config_chorus(AMY_UNSET_FLOAT, AMY_IS_UNSET(d->data.f)?UINT16_MAX : (uint16_t)roundf(d->data.f), AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_LFO_FREQ) config_chorus(AMY_UNSET_FLOAT, UINT16_MAX, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_DEPTH) config_chorus(AMY_UNSET_FLOAT, UINT16_MAX, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == REVERB_LEVEL) config_reverb(d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_LIVENESS) config_reverb(AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_DAMPING) config_reverb(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_XOVER_HZ) config_reverb(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
 
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.
