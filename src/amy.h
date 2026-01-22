@@ -317,8 +317,21 @@ enum params{
     EG0_TYPE, EG1_TYPE,                  // 204, 205
     CLONE_OSC,                           // 206
     RESET_OSC,                           // 207
-    NOTE_SOURCE,                        // 208
-    NO_PARAM                             // 209
+    NOTE_SOURCE,                         // 208
+    ECHO_LEVEL,
+    ECHO_DELAY_MS,
+    ECHO_MAX_DELAY_MS,
+    ECHO_FEEDBACK,
+    ECHO_FILTER_COEF,
+    CHORUS_LEVEL,
+    CHORUS_MAX_DELAY,
+    CHORUS_LFO_FREQ,
+    CHORUS_DEPTH,
+    REVERB_LEVEL,
+    REVERB_LIVENESS,
+    REVERB_DAMPING,
+    REVERB_XOVER_HZ,
+    NO_PARAM                    // 209
 };
 
 ///////////////////////////////////////
@@ -482,6 +495,20 @@ typedef struct amy_event {
     uint8_t status;
     uint8_t note_source;  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
+    // Global effects
+    float echo_level;
+    float echo_delay_ms;
+    float echo_max_delay_ms;
+    float echo_feedback;
+    float echo_filter_coef;
+    float chorus_level;
+    float chorus_max_delay;
+    float chorus_lfo_freq;
+    float chorus_depth;
+    float reverb_level;
+    float reverb_liveness;
+    float reverb_damping;
+    float reverb_xover_hz;
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -755,7 +782,7 @@ float freq_of_logfreq(float logfreq);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
-void config_chorus(float level, int max_delay, float lfo_freq, float depth);
+void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
 void osc_note_on(uint16_t osc, float initial_freq);
 void chorus_note_on(float initial_freq);

@@ -138,9 +138,6 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->filter_type);
     AMY_UNSET(e->chained_osc);
     AMY_UNSET(e->mod_source);
-    AMY_UNSET(e->eq_l);
-    AMY_UNSET(e->eq_m);
-    AMY_UNSET(e->eq_h);
     AMY_UNSET(e->algorithm);
     AMY_UNSET(e->bp_is_set[0]);
     AMY_UNSET(e->bp_is_set[1]);
@@ -166,6 +163,22 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->sequence[SEQUENCE_TICK]);
     AMY_UNSET(e->sequence[SEQUENCE_PERIOD]);
     AMY_UNSET(e->sequence[SEQUENCE_TAG]);
+    AMY_UNSET(e->eq_l);
+    AMY_UNSET(e->eq_m);
+    AMY_UNSET(e->eq_h);
+    AMY_UNSET(e->echo_level);
+    AMY_UNSET(e->echo_delay_ms);
+    AMY_UNSET(e->echo_max_delay_ms);
+    AMY_UNSET(e->echo_feedback);
+    AMY_UNSET(e->echo_filter_coef);
+    AMY_UNSET(e->chorus_level);
+    AMY_UNSET(e->chorus_max_delay);
+    AMY_UNSET(e->chorus_lfo_freq);
+    AMY_UNSET(e->chorus_depth);
+    AMY_UNSET(e->reverb_level);
+    AMY_UNSET(e->reverb_liveness);
+    AMY_UNSET(e->reverb_damping);
+    AMY_UNSET(e->reverb_xover_hz);
 }
 
 
