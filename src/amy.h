@@ -472,6 +472,9 @@ typedef struct amy_event {
     uint16_t mod_source;
     uint8_t algorithm;
     uint8_t filter_type;
+    float eq_l;
+    float eq_m;
+    float eq_h;
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
     // Convert these two at least to vectors of ints, save several hundred bytes
     int16_t algo_source[MAX_ALGO_OPS];
@@ -493,9 +496,6 @@ typedef struct amy_event {
     uint8_t note_source;  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
     // Global effects
-    float eq_l;
-    float eq_m;
-    float eq_h;
     float echo_level;
     float echo_delay_ms;
     float echo_max_delay_ms;
