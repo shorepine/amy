@@ -41,7 +41,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000 
 PYTHON = python3
 
-.PHONY: default all clean amy-module test
+.PHONY: default all clean amy-module test web deploy-web
 
 default: $(TARGET)
 all: default
@@ -102,8 +102,14 @@ timing: amy-module
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
 
-docs/amy.js: $(TARGET)
-	 emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+build/amy.js: $(TARGET)
+	mkdir -p build
+	emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+
+web: build/amy.js
+
+deploy-web: web
+	cp build/amy.* docs/
 
 clean:
 	-rm -f src/*.o
