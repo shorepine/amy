@@ -46,7 +46,8 @@ To play a patch -- for instance the built-in patches emulating Juno and DX7 synt
 amy.send(synth=1, num_voices=4, patch=1)     # 4 voices of Juno patch #1 on synth 1
 amy.send(synth=2, num_voices=4, patch=129)   # 4 voices of DX7 patch #2 on synth 2
 amy.send(synth=1, note=60, vel=1)            # Play note 60 on one of the Juno voices
-amy.send(synth=1, osc=0, filter_freq=8000)   # Open up the filter on the Juno voices (using its first oscillator)
+amy.send(synth=1, osc=0, filter_freq=8000)   # Open up the filter on the Juno voices
+                                             # (Juno patches implement the VCF on osc 0)
 ```
 
 The code in `amy/headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches at compile time by storing alternative wire-protocol setup strings in `patches.h`, or by making user patches at runtime:
