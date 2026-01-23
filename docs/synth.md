@@ -40,7 +40,7 @@ You configure the `voices` in a `synth` by using a `patch`, which is a number re
 
 (Note that when you use voices/synths, you'll need to include the `synth` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillators in each voice of the synth's set -- there's no other way to tell which oscillators are being used by which voices.)
 
-To play a patch -- for instance the built-in patches emulating Juno and DX7 synthesizers and a piano -- you create a synth configured with that patch, then send note events, or parameter moidifications, to the synth. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
+To play a patch -- for instance the built-in patches emulating Juno and DX7 synthesizers and a piano -- you create a synth configured with that patch, then send note events, or parameter moidifications, to the synth. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built-in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
 amy.send(synth=1, num_voices=4, patch=1)     # 4 voices of Juno patch #1 on synth 1
@@ -50,14 +50,14 @@ amy.send(synth=1, osc=0, filter_freq=8000)   # Open up the filter on the Juno vo
                                              # (Juno patches implement the VCF on osc 0)
 ```
 
-The code in `amy/headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches at compile time by storing alternative wire-protocol setup strings in `patches.h`, or by making user patches at runtime:
+The code in `amy/headers.py` generates these patches and bakes them into AMY so they're ready for playback on any device. You can add your own patches at compile time by storing alternative wire-protocol setup strings in `patches.h`, or by making user patches at runtime (see [User patches](#user-patches) below).
 
 ### Synths
 
 A common use-case is to want a pool of voices which are allocated to a series of notes as-needed.  This is accomplished with **synths**.  You associate a synth number with a set of voices by providing the patch number when initializing the synth; the `synth` arg becomes a smart alias for passing note events to one of its voices (or configuration changes to all of them), e.g.
 
 ```python
-amy.send(synth=0, num_voices=3, patch=1)     # 3-voice Juno path #1 on synth 0
+amy.send(synth=0, num_voices=3, patch=1)     # 3-voice Juno patch #1 on synth 0
 # Play three notes simultaneously
 amy.send(synth=0, note=60, vel=1)
 amy.send(synth=0, note=64, vel=1)
@@ -69,11 +69,12 @@ amy.send(synth=0, note=70, vel=0)
 # .. or we can send note-offs to all the currently-active synth voices by sending a note-off with no note.
 amy.send(synth=0, vel=0)
 # Once a synth has been initialized and associated with a set of voices, you can use it alone with patch
-amy.send(synth=0, patch=13)  # Load a different Juno patch, will remain 4-voice.
+amy.send(synth=0, patch=13)  # Load a different Juno patch, it will remain 4-voice.
 # You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
 amy.send(synth=0, num_voices=0)
-# As a special case, you can use synth_flags to set up a MIDI drum synth that will translate note events into PCM presets
-# and patch_string to directly define a patch using a wire-command string.
+# As a special case, you can use `synth_flags` to set up a MIDI drum synth
+# that will translate note events into PCM presets.
+# You can also use  `patch_string` to directly define a patch using a wire-command string.
 amy.send(synth=10, num_voices=3, patch_string='w7f0Z', synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
 ```
