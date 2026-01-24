@@ -256,6 +256,7 @@ void amy_start_web_no_synths() {
 
 // defined in midi_mappings.c
 extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
+extern void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
 
 void amy_default_synths() {
     // Configure several default synthesizers for "out of box" playability.
@@ -359,6 +360,7 @@ void amy_start(amy_config_t c) {
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_start();
 #endif
+    amy_external_midi_input_hook = midi_cc_handler;
 }
 
 void amy_stop() {

@@ -68,6 +68,20 @@ float atoff(const char *s) {
     int16_t:  atoi \
 )
 
+#define PARSE_VAL_TO_SEP(type) \
+    int parse_val_to_sep_##type(char *message, type *val, char sep) {   \
+        int c = 0;                                                      \
+        *val = PARSE_LIST_ATO(*val)(message);                           \
+        c = strspn(message, PARSE_LIST_STRSPN2(*val));                  \
+        if (message[c] == sep) {                                        \
+            return c + 1;                                               \
+        }                                                               \
+        return -1;                                                      \
+    }
+
+PARSE_VAL_TO_SEP(float)
+PARSE_VAL_TO_SEP(int32_t)
+
 #define PARSE_LIST(type) \
     int parse_list_##type(char *message, type *vals, int max_num_vals, type skipped_val) { \
         uint16_t c = 0, last_c; \
@@ -295,12 +309,29 @@ void parse_coef_message(char *message, float *coefs) {
 extern const mp_obj_fun_builtin_var_t tulip_pcm_load_file_obj;
 #endif
 
+int parse_midi_cc_payload(char *message, int32_t *p_cc_code, int32_t *p_is_log, float *p_min_val, float *p_max_val, float *p_offset_val) {
+    int c;
+    char *m = message;
+    if ((c = parse_val_to_sep_int32_t(m, p_cc_code, ',')) < 0)  return -1;
+    m += c;
+    if ((c = parse_val_to_sep_int32_t(m, p_is_log, ',')) < 0)  return -1;
+    m += c;
+    if ((c = parse_val_to_sep_float(m, p_min_val, ',')) < 0)  return -1;
+    m += c;
+    if ((c = parse_val_to_sep_float(m, p_max_val, ',')) < 0)  return -1;
+    m += c;
+    if ((c = parse_val_to_sep_float(m, p_offset_val, ',')) < 0)  return -1;
+    m += c;
+    return m - message;
+}
+
 // Parser for synth-layer ('i') prefix.
-void amy_parse_synth_layer_message(char *message, amy_event *e) {
+int amy_parse_synth_layer_message(char *message, amy_event *e) {
+    int skip_chars = 1;  // default is to skip one extra char.
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the instrument number.
         e->synth = atoi(message);
-        return;
+        return 0;  // no extra skip.
     }
     char cmd = message[0];
     message++;
@@ -310,7 +341,21 @@ void amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
+    else if (cmd == 'c')  {
+        // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
+        int32_t cc_code, is_log;
+        float min_val, max_val, offset_val;
+        skip_chars = parse_midi_cc_payload(message, &cc_code, &is_log, &min_val, &max_val, &offset_val);
+        if (skip_chars < 0) {
+            // payload didn't parse.
+            fprintf(stderr, "synth_layer: midi cc payload didn't parse for %s.\n", message - 1);
+            return 1;  // skip over the 'c'.
+        }
+        midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
+        skip_chars = strlen(message) + 1;
+    }
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
+    return skip_chars;
 }
 
 // Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
@@ -438,7 +483,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             }
             break;
             /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
-            case 'i': amy_parse_synth_layer_message(arg, e); ++pos; break;  // Skip over second cmd letter, if any.
+            case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atof(arg); break;
             /* j, J available */
