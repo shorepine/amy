@@ -960,6 +960,9 @@ void show_debug(uint8_t type) {
         if (type > 4) {
             patches_debug();
         }
+        if (type > 5) {
+            cc_mapping_debug();
+        }
         fprintf(stderr, "\n");
     }
 }

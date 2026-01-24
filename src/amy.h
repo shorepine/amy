@@ -420,7 +420,6 @@ static inline int isnan_c11(float test)
 
 #define AMY_IS_SET(var) !AMY_IS_UNSET(var)
 
-
 // Helpers to identify if param is in a range.
 #define PARAM_IS_COMBO_COEF(param, base)   ((param) >= (base) && (param) < (base) + NUM_COMBO_COEFS)
 #define PARAM_IS_BP_COEF(param)    ((param) >= BP_START && (param) < BP_END)
@@ -862,6 +861,8 @@ extern int parse_int_list_message32(char *message, int32_t *vals, int max_num_va
 extern int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
 extern void reset_osc(uint16_t i );
 
+extern int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
+extern void cc_mapping_debug();
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
