@@ -42,7 +42,7 @@ struct cc_mapping {
 
 struct cc_mapping *cc_mapping_root = NULL;
 
-void cc_mapping_debug(struct cc_mapping *mapping) {
+void cc_mapping_print(struct cc_mapping *mapping) {
     fprintf(stderr, "mapping 0x%lx chan %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
             (unsigned long)mapping, mapping->channel, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
 }
@@ -61,6 +61,15 @@ struct cc_mapping *cc_mapping_init(struct cc_mapping **p_root, int channel, int 
     result->next = *p_root;
     *p_root = result;
     return result;
+}
+
+void cc_mapping_debug(void) {
+    fprintf(stderr, "cc_mapping_debug:\n");
+    struct cc_mapping **p_mapping = &cc_mapping_root;
+    while (*p_mapping != NULL) {
+        cc_mapping_print(*p_mapping);
+        p_mapping = &((*p_mapping)->next);
+    }
 }
 
 void cc_mapping_free(struct cc_mapping **p_mapping) {
@@ -85,8 +94,11 @@ int midi_store_control_code(int channel, int code, int is_log, float min_val, fl
     // Register a MIDI control code and mapping and a wire code template.
     struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
     if (p_mapping) cc_mapping_free(p_mapping);
-    struct cc_mapping *mapping = cc_mapping_init(&cc_mapping_root, channel, code, is_log, min_val, max_val, offset_val, message);
-    cc_mapping_debug(mapping);
+    // store with an empty string removes mapping
+    if (strlen(message)) {
+        /* struct cc_mapping *mapping = */ cc_mapping_init(&cc_mapping_root, channel, code, is_log, min_val, max_val, offset_val, message);
+        //cc_mapping_print(mapping);
+    }
     return 1;
 }
 
@@ -94,11 +106,9 @@ float map_cc_value(struct cc_mapping *mapping, uint8_t value) {
     if (mapping->is_log != 0) {
         return (mapping->min_val + mapping->offset_val)
             * expf(
-                logf(
-                  (mapping->max_val + mapping->offset_val)
-                  / (mapping->min_val + mapping->offset_val)
-                  * (float)value / 127.0f
-                )
+                logf((mapping->max_val + mapping->offset_val)
+                     / (mapping->min_val + mapping->offset_val))
+                * (float)value / 127.0f
               )
             - mapping->offset_val;
     } else {  // Linear.
@@ -115,7 +125,7 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
     const char *s;
     const char *entry_src = src;
     int n_remain = WIRE_COMMAND_LEN - 1;
-    while((s = strchr(src, '%')) != NULL && n_remain > strlen(src)) {
+    while((s = strchr(src, '%')) != NULL && n_remain > (int)strlen(src)) {
         // Copy up to the %.
         int nchars = s - src;
         strncpy(dest, src, nchars);
@@ -125,7 +135,7 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
         ++src;  // skip over the '%'
         dest[0] = '\0';
         if (src[0] == 'v') {
-            sprintf(dest, "%f", value);
+            sprintf(dest, "%.3f", value);
         } else if (src[0] == 'V') {
             sprintf(dest, "%d", (int)value);
         } else if (src[0] == 'i') {
@@ -139,7 +149,7 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
         n_remain -= nchars;
     }
     // Copy anything left in the string.
-    if (n_remain > strlen(src)) strcpy(dest, src);
+    if (n_remain > (int)strlen(src)) strcpy(dest, src);
 }
 
 void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
