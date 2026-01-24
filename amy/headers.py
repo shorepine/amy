@@ -353,6 +353,12 @@ def make_piano_patch():
     #amy.send(osc=20, wave=amy.PARTIAL)  # it's not 20, but it doesn't matter, voice is reallocated by interp_partials.c
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
+def make_amyboard_patch():
+    import amy
+    # sure would be nice to have this in code instead, dan
+    patch_string = 'v0w1L2a,,1.0,1,0f130.81,1,,,,0,1m0A30,1,1355,0.354,232,0Zv0c1G4F126.54,0.677,,,5.024,0R0.93B30,1,1355,0.354,232,0Zv1w2L2a,,1.0,1,0f130.81,1,,,,0,1m0A30,1,1355,0.354,232,0Zv2w4a1,0,0,1f4.0,0,0,0,0,0,0A0,1.0,10000,0Zx0,0,0k0,,0.5,0.5Z'
+    return 3, patch_string # 3 oscs
+
 def make_patches(filename):
     def nothing(message):
         return
@@ -364,7 +370,7 @@ def make_patches(filename):
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 and custom patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
-        f.write("static const char * const patch_commands[257] PROGMEM = {\n")
+        f.write("static const char * const patch_commands[258] PROGMEM = {\n")
         # Do juno
         for i in range(128):
             amy.log_patch()
@@ -386,8 +392,13 @@ def make_patches(filename):
         f.write("\t/* 256: dpwe piano */ \"%s\",\n" % (amy.retrieve_patch()))  
         num_oscs.append(num_osc_piano)
 
+        # do amyboard patch
+        num_osc_amyboard, patch_string  = make_amyboard_patch()
+        f.write("\t/* 257: amyboard default */ \"%s\",\n" % (patch_string))
+        num_oscs.append(num_osc_amyboard)
+
         f.write("};\n")
-        f.write("const uint16_t patch_oscs[257] PROGMEM = {\n")
+        f.write("const uint16_t patch_oscs[258] PROGMEM = {\n")
         for i in num_oscs:
             f.write("%d," % (i))
         f.write("\n};\n#endif\n")

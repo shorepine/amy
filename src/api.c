@@ -234,6 +234,9 @@ void amy_add_event(amy_event *e) {
     }
 }
 
+// defined in midi_mappings.c
+extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
+extern void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
 
 #ifdef __EMSCRIPTEN__
 void amy_start_web() {
@@ -242,6 +245,7 @@ void amy_start_web() {
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 1;
     amy_config.features.startup_bleep = 1;
+    amy_external_midi_input_hook = midi_cc_handler;
     amy_start(amy_config);
 }
 
@@ -250,13 +254,11 @@ void amy_start_web_no_synths() {
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 0;
+    amy_external_midi_input_hook = midi_cc_handler;
     amy_start(amy_config);
 }
 #endif
 
-// defined in midi_mappings.c
-extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
-extern void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
 
 void amy_default_synths() {
     // Configure several default synthesizers for "out of box" playability.

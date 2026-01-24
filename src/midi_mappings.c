@@ -97,7 +97,7 @@ int midi_store_control_code(int channel, int code, int is_log, float min_val, fl
     // store with an empty string removes mapping
     if (strlen(message)) {
         /* struct cc_mapping *mapping = */ cc_mapping_init(&cc_mapping_root, channel, code, is_log, min_val, max_val, offset_val, message);
-        //cc_mapping_print(mapping);
+        //cc_mapping_debug();
     }
     return 1;
 }
@@ -154,14 +154,14 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
 
 void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
     if ((bytes[0] & 0xF0) == 0xB0) {  // CC
-        int channel = bytes[0] & 0x0F;
+        int channel = (bytes[0] & 0x0F) + 1;
         int code = bytes[1];
         struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
         if (p_mapping != NULL) {
             float value = map_cc_value(*p_mapping, bytes[2]);
             char message[WIRE_COMMAND_LEN];
             substitute_cc_special_values(message, (*p_mapping)->message_template, channel, value);
-            fprintf(stderr, "midi_cc_handler: message %s\n", message);
+            //fprintf(stderr, "midi_cc_handler: message %s\n", message);
             amy_add_message(message);
         }
     }
