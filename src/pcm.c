@@ -60,10 +60,26 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
     static memorypcm_preset_t rompreset;
     memset(&rompreset, 0, sizeof(rompreset));
     const pcm_map_t cpreset =  pcm_map[preset_number];
-    rompreset.sample_ram = (int16_t*)pcm + cpreset.offset;
-    rompreset.length = cpreset.length;
+    uint32_t offset = cpreset.offset;
+    uint32_t length = cpreset.length;
+#ifdef PCM_LENGTH
+    if (offset >= PCM_LENGTH) {
+        offset = 0;
+        length = 0;
+    } else if (length > (PCM_LENGTH - offset)) {
+        length = PCM_LENGTH - offset;
+    }
+#endif
+    rompreset.sample_ram = (int16_t*)pcm + offset;
+    rompreset.length = length;
     rompreset.loopstart = cpreset.loopstart;
     rompreset.loopend = cpreset.loopend;
+    if (rompreset.loopstart > rompreset.length) {
+        rompreset.loopstart = 0;
+    }
+    if (rompreset.loopend > rompreset.length) {
+        rompreset.loopend = rompreset.length;
+    }
     rompreset.midinote = cpreset.midinote;
     rompreset.samplerate = PCM_AMY_SAMPLE_RATE;
     rompreset.log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
@@ -196,6 +212,10 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             }
             synth[osc]->phase = 0;
         }
+        if (preset->sample_ram == NULL || sample_length == 0) {
+            synth[osc]->status = SYNTH_OFF;
+            return 0;
+        }
 
         SAMPLE amp = F2S(msynth[osc]->amp);
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
@@ -206,6 +226,13 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             LUTSAMPLE b = 0;
             LUTSAMPLE c = 0;
             uint32_t next_index = base_index + 1;
+            if (base_index >= sample_length) {
+                if (preset->type != AMY_PCM_TYPE_FILE) {
+                    synth[osc]->status = SYNTH_OFF;
+                }
+                buf[i] = 0;
+                continue;
+            }
             if (preset->channels == 2) {
                 uint32_t base_offset = base_index * 2;
                 uint32_t next_offset = next_index * 2;
