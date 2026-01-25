@@ -42,8 +42,10 @@ memorypcm_ll_t * memorypcm_ll_start;
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
 
 
-// Get either memory preset, file preset or baked in preset for preset number
-memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
+// Get either memory preset, file preset or baked in preset for preset number.
+// For ROM presets, fill the caller-provided rom_local and return it.
+memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number,
+                                                  memorypcm_preset_t *rom_local) {
     // Get the memory preset. If we can't find it, it could be a ROM preset. So copy params in from ROM preset
     memorypcm_ll_t *preset = memorypcm_ll_start;
     while(preset != NULL) {
@@ -57,8 +59,10 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
 
     // No memory preset found, so try ROM preset. default to 0 if out of range
     if (preset_number >= pcm_samples) preset_number = 0; 
-    static memorypcm_preset_t rompreset;
-    memset(&rompreset, 0, sizeof(rompreset));
+    if (rom_local == NULL) {
+        return NULL;
+    }
+    memset(rom_local, 0, sizeof(*rom_local));
     const pcm_map_t cpreset =  pcm_map[preset_number];
     uint32_t offset = cpreset.offset;
     uint32_t length = cpreset.length;
@@ -70,22 +74,22 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number) {
         length = PCM_LENGTH - offset;
     }
 #endif
-    rompreset.sample_ram = (int16_t*)pcm + offset;
-    rompreset.length = length;
-    rompreset.loopstart = cpreset.loopstart;
-    rompreset.loopend = cpreset.loopend;
-    if (rompreset.loopstart > rompreset.length) {
-        rompreset.loopstart = 0;
+    rom_local->sample_ram = (int16_t*)pcm + offset;
+    rom_local->length = length;
+    rom_local->loopstart = cpreset.loopstart;
+    rom_local->loopend = cpreset.loopend;
+    if (rom_local->loopstart > rom_local->length) {
+        rom_local->loopstart = 0;
     }
-    if (rompreset.loopend > rompreset.length) {
-        rompreset.loopend = rompreset.length;
+    if (rom_local->loopend > rom_local->length) {
+        rom_local->loopend = rom_local->length;
     }
-    rompreset.midinote = cpreset.midinote;
-    rompreset.samplerate = PCM_AMY_SAMPLE_RATE;
-    rompreset.log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
-    rompreset.type = AMY_PCM_TYPE_ROM;
-    rompreset.channels = 1;
-    return &rompreset;
+    rom_local->midinote = cpreset.midinote;
+    rom_local->samplerate = PCM_AMY_SAMPLE_RATE;
+    rom_local->log2sr = PCM_AMY_LOG2_SAMPLE_RATE;
+    rom_local->type = AMY_PCM_TYPE_ROM;
+    rom_local->channels = 1;
+    return rom_local;
 }
 
 
@@ -115,7 +119,9 @@ static void fclose_if_file(memorypcm_preset_t *preset) {
 
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
-        memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
+        memorypcm_preset_t rom_local;
+        memorypcm_preset_t *preset =
+            get_preset_for_preset_number(synth[osc]->preset, &rom_local);
         if (preset->type == AMY_PCM_TYPE_FILE) {
             if (preset->file_handle != 0) {
                 wave_info_t info = {0};
@@ -152,7 +158,9 @@ void pcm_mod_trigger(uint16_t osc) {
 void pcm_note_off(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         uint32_t length = 0;
-        memorypcm_preset_t *preset = get_preset_for_preset_number(synth[osc]->preset);
+        memorypcm_preset_t rom_local;
+        memorypcm_preset_t *preset =
+            get_preset_for_preset_number(synth[osc]->preset, &rom_local);
         if(preset != NULL) {
             length = preset->length;
         }
@@ -190,7 +198,9 @@ uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_nee
 SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         SAMPLE max_value = 0;
-        memorypcm_preset_t * preset = get_preset_for_preset_number(synth[osc]->preset);
+        memorypcm_preset_t rom_local;
+        memorypcm_preset_t *preset =
+            get_preset_for_preset_number(synth[osc]->preset, &rom_local);
         float logfreq = msynth[osc]->logfreq;
         // If osc[midi_note] is set, shift the freq by the preset's default base_note.
         if (AMY_IS_SET(synth[osc]->midi_note)) {
