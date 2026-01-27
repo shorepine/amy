@@ -1794,6 +1794,10 @@ int16_t * amy_fill_buffer() {
         uint32_t bytes_per_frame = AMY_NCHANS * sizeof(int16_t);
         uint32_t byte_offset = amy_global.transfer_stored_bytes;
         uint32_t bytes_to_copy = AMY_BLOCK_SIZE * bytes_per_frame;
+        // Crop the bytes to copy if this block would exceed the requested length.
+        if(byte_offset + bytes_to_copy >= amy_global.transfer_length_bytes) {
+            bytes_to_copy = amy_global.transfer_length_bytes - byte_offset;
+        }
         if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
             memcpy(amy_global.transfer_storage + byte_offset, output_block, bytes_to_copy);
