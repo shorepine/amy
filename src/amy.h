@@ -811,7 +811,7 @@ uint32_t ms_to_samples(uint32_t ms) ;
 // API
 void amy_add_message(char *message);
 void amy_add_event(amy_event *e);
-void amy_parse_message(char * message, int length, amy_event *e);
+int amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
 

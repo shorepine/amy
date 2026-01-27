@@ -16,6 +16,9 @@ uint8_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
 void patches_deinit() {
+    for (int i = 0; i < max_num_memory_patches; ++i) {
+        if (memory_patch[i]) free(memory_patch[i]);
+    }
     if (memory_patch) free(memory_patch);
     memory_patch = NULL;
     memory_patch_deltas = NULL;
@@ -222,24 +225,19 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
     //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
-    //char sub_message[256];
-    for(uint16_t i=0;i<strlen(message) + 1;i++) {
-        if(i == strlen(message) || message[i] == 'Z') {  // If patch doesn't end in Z, still send up to the the end.
+    while(strlen(message + start)) {
+      amy_event patch_event = amy_default_event();
+      start += amy_parse_message(message + start, strlen(message + start), &patch_event);
+      amy_process_event(&patch_event);
+      patch_event.time = time;
+      if(patch_event.status == EVENT_SCHEDULED) {
+	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
+      }
+    }
             //strncpy(sub_message, message + start, i - start + 1);
             //sub_message[i - start + 1]= 0;
-            int length = i - start + 1;
-            amy_event patch_event = amy_default_event();
             //amy_parse_message(sub_message, strlen(sub_message), &patch_event);
-            amy_parse_message(message + start, length, &patch_event);
-            amy_process_event(&patch_event);
-            patch_event.time = time;
-            if(patch_event.status == EVENT_SCHEDULED) {
-                amy_event_to_deltas_queue(&patch_event, base_osc, queue);
-            }
-            start = i+1;
             //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
-        }
-    }
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
