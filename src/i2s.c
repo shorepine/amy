@@ -150,10 +150,11 @@ void esp_render_task( void * pvParameters) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         amy_render(0, AMY_OSCS/2, 1);
         // Who we tell we're done depends on the running mode.
-        if (amy_global.config.platform.multithread)
+        if (amy_global.config.platform.multithread) {
             xTaskNotifyGive(amy_fill_buffer_handle);
-        else
+        }  else {
             xTaskNotifyGive(amy_update_handle);
+        }
     }
 }
 
@@ -211,7 +212,11 @@ void esp_fill_audio_buffer_task() {
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
         last_audio_buffer = block;
+        
+// TODO : dan needs to look at this part again
+#if !defined(TULIP) && !defined(AMYBOARD)
         xTaskNotifyGive(amy_update_handle);
+#endif
 
         if (AMY_HAS_I2S) {
             amy_i2s_write((uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
