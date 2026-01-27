@@ -225,7 +225,7 @@ static inline SAMPLE ABS(SAMPLE a) {
 static inline int headroom(SAMPLE a) {
     // How many bits bigger can this value get before overflow?
 #ifdef AMY_USE_FIXEDPOINT
-    return __builtin_clz(ABS(a)) - 1;  // -1 for sign bit.
+    return __builtin_clz(ABS(a) | 1) - 1;  // -1 for sign bit.
 #else  // !AMY_USE_FIXEDPOINT
     // How many bits can you shift before this max overflows?
     int bits = 0;
@@ -240,7 +240,7 @@ static inline int headroom(SAMPLE a) {
 static inline int nheadroom16(SAMPLE a) {
     // Headroom with MAX(0, 16 - headroom(a)) precomputed.
 #ifdef AMY_USE_FIXEDPOINT
-    return MAX(0, 16 - (__builtin_clz(ABS(a)) - 1));  // -1 for sign bit.
+    return MAX(0, 16 - (__builtin_clz(ABS(a) | 1) - 1));  // -1 for sign bit.
 #else  // !AMY_USE_FIXEDPOINT
     // How many bits can you shift before this max overflows?
     int bits = 0;

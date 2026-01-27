@@ -28083,7 +28083,7 @@ static ma_result ma_device_stop__alsa(ma_device* pDevice)
     resultPoll = poll((struct pollfd*)pDevice->alsa.pPollDescriptorsCapture, 1, 0);
     if (resultPoll > 0) {
         ma_uint64 t;
-        read(((struct pollfd*)pDevice->alsa.pPollDescriptorsCapture)[0].fd, &t, sizeof(t));
+        (void)!read(((struct pollfd*)pDevice->alsa.pPollDescriptorsCapture)[0].fd, &t, sizeof(t));
     }
     }
 
@@ -28104,7 +28104,7 @@ static ma_result ma_device_stop__alsa(ma_device* pDevice)
     resultPoll = poll((struct pollfd*)pDevice->alsa.pPollDescriptorsPlayback, 1, 0);
     if (resultPoll > 0) {
         ma_uint64 t;
-        read(((struct pollfd*)pDevice->alsa.pPollDescriptorsPlayback)[0].fd, &t, sizeof(t));
+        (void)!read(((struct pollfd*)pDevice->alsa.pPollDescriptorsPlayback)[0].fd, &t, sizeof(t));
     }
 
     }
@@ -57321,7 +57321,7 @@ MA_API ma_result ma_data_source_read_pcm_frames(ma_data_source* pDataSource, voi
 
     /* Keep reading until we've read as many frames as possible. */
     while (totalFramesProcessed < frameCount) {
-        ma_uint64 framesProcessed;
+        ma_uint64 framesProcessed = 0;
         ma_uint64 framesRemaining = frameCount - totalFramesProcessed;
 
         /* We need to resolve the data source that we'll actually be reading from. */

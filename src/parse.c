@@ -443,7 +443,7 @@ int _next_alpha(char *s) {
 
 
 // given a string return a parsed event
-void amy_parse_message(char * message, int length, amy_event *e) {
+int amy_parse_message(char * message, int length, amy_event *e) {
     peek_stack("parse_message");
     char cmd = '\0';
     uint16_t pos = 0;
@@ -452,7 +452,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
-        return;
+        return length;
     }
 
     while(pos < length) {
@@ -568,7 +568,8 @@ void amy_parse_message(char * message, int length, amy_event *e) {
             /* Y,y available */
             /* Z used for end of message */
             case 'Z':
-                break;
+	      ++pos;
+	      goto end;
             default:
                 break;
             }
@@ -578,4 +579,7 @@ void amy_parse_message(char * message, int length, amy_event *e) {
         if (pos > length) fprintf(stderr, "parse string overrun %d %d %s\n", pos, length, message);
         pos += _next_alpha(message + pos);  // Skip over any non-alpha argument to the current command.
     }
+ end:
+    // Return exactly how many characters we used.
+    return pos;
 }
