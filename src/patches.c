@@ -8,7 +8,6 @@
 
 
 uint32_t max_num_memory_patches = 0;
-char **memory_patch = NULL;
 struct delta **memory_patch_deltas = NULL;
 uint16_t *memory_patch_oscs = NULL;
 uint16_t next_user_patch_index = 0;
@@ -16,11 +15,6 @@ uint8_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
 void patches_deinit() {
-    for (int i = 0; i < max_num_memory_patches; ++i) {
-        if (memory_patch[i]) free(memory_patch[i]);
-    }
-    if (memory_patch) free(memory_patch);
-    memory_patch = NULL;
     memory_patch_deltas = NULL;
     memory_patch_oscs = NULL;
     osc_to_voice = NULL;
@@ -30,19 +24,19 @@ void patches_deinit() {
 void patches_init(int max_memory_patches) {
     max_num_memory_patches = max_memory_patches;
     uint8_t *alloc_base = malloc_caps(
-            max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
+            max_num_memory_patches * sizeof(struct delta *)
+	    + sizeof(uint16_t)
             + AMY_OSCS * sizeof(uint8_t)
             + amy_global.config.max_voices * sizeof(uint16_t),
-        amy_global.config.ram_caps_synth
+	    amy_global.config.ram_caps_synth
     );
-    memory_patch = (char **)alloc_base;
-    bzero(memory_patch, max_num_memory_patches * sizeof(char *));
-    memory_patch_deltas = (struct delta **)(alloc_base + max_num_memory_patches * sizeof(char *));
+    memory_patch_deltas = (struct delta **)alloc_base;
     bzero(memory_patch_deltas, max_num_memory_patches * sizeof(struct delta *));
-    memory_patch_oscs = (uint16_t *)(alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *)));
-    osc_to_voice = alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t));
+    memory_patch_oscs = (uint16_t *)(alloc_base + max_num_memory_patches * sizeof(struct delta *));
+    osc_to_voice = alloc_base + max_num_memory_patches * sizeof(struct delta *) + sizeof(uint16_t);
     voice_to_base_osc = (uint16_t *)(alloc_base
-                                     + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
+                                     + max_num_memory_patches * sizeof(struct delta *)
+				     + sizeof(uint16_t)
                                      + AMY_OSCS * sizeof(uint8_t));
     patches_reset();
 }
@@ -54,8 +48,6 @@ void patches_reset_patch(int patch_number) {
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
         return;
     }
-    if (memory_patch[patch_index] != NULL)  free(memory_patch[patch_index]);
-    memory_patch[patch_index] = NULL;
     if (memory_patch_deltas[patch_index] != NULL)  delta_release_list(memory_patch_deltas[patch_index]);
     memory_patch_deltas[patch_index] = NULL;
     memory_patch_oscs[patch_index] = 0;
@@ -92,8 +84,8 @@ void patches_debug() {
     }
     for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
-            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32" patch %s\n",
-                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
+            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32"\n",
+                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]));
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
@@ -159,22 +151,16 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
-    // given a patch number (not a string), pull in the patch string, and parse the string like parse_patch_string_to_queue does
-    // but instead of calling amy_process_event or amy_event_to_deltas queue, just save each parsed amy_event to a list of events
-    // we can assume the max number of events is MAX_EVENTS_PER_PATCH = 50 for now
-    const int max_events = 50;
-    char *message = NULL;
-    if (!events) {
+void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, uint16_t *event_count, void *state) {
+    // Return a sequence of events defining a patch (specified by number).
+    // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
+    if (!event) {
         return;
     }
-    *events = NULL;
-    if (event_count) {
-        *event_count = 0;
-    }
-
+    *event = NULL;
+    struct delta *queue = NULL;
     if (patch_number < _PATCHES_FIRST_USER_PATCH) {
-        message = (char *)patch_commands[patch_number];
+      parse_patch_string_to_queue((char *)patch_commands[patch_number], 0, &queue, 0);
     } else {
         int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
         if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
@@ -182,17 +168,9 @@ void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **even
                     patch_number, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
             return;
         }
-        message = memory_patch[patch_index];
+	queue = memory_patch_deltas[patch_index];
     }
-
-    if (!message) {
-        return;
-    }
-
-    struct amy_event *out = calloc(max_events + 1, sizeof(struct amy_event));
-    if (!out) {
-        return;
-    }
+    /* Loop down the queue emitting events as needed. */
 
     uint16_t start = 0;
     int count = 0;
@@ -224,20 +202,23 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
-    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
+    //fprintf(stderr, "parse_patch_string: message %s\n", message);
     while(strlen(message + start)) {
       amy_event patch_event = amy_default_event();
-      start += amy_parse_message(message + start, strlen(message + start), &patch_event);
+      int num_used = amy_parse_message(message + start, strlen(message + start), &patch_event);
+      //{
+      //  char sub_message[256];
+      //  strncpy(sub_message, message + start, num_used);
+      //  sub_message[num_used]= 0;
+      //  fprintf(stderr, "parse_patch_string: sub_message %s\n", sub_message);
+      //}
+      start += num_used;
       amy_process_event(&patch_event);
       patch_event.time = time;
       if(patch_event.status == EVENT_SCHEDULED) {
 	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
       }
     }
-            //strncpy(sub_message, message + start, i - start + 1);
-            //sub_message[i - start + 1]= 0;
-            //amy_parse_message(sub_message, strlen(sub_message), &patch_event);
-            //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
@@ -246,16 +227,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch, patch_string);
     if (!AMY_IS_SET(e->patch_number)) {
-        // Check for a repeated string
-        for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
-            if (memory_patch_oscs[i] > 0 && memory_patch[i] != NULL)
-                if (strcmp(memory_patch[i], patch_string) == 0) {
-                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
-                    // Actually, we don't need to store it, we already have it.
-                    //fprintf(stderr, "store_patch: using existing patch_number %d for '%s'\n", e->patch_number, patch_string);
-                    return;
-                }
-        }
         // We need to allocate a new number.
         e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
         // next_user_patch_index is updated as needed at the bottom of the function (so it can reflect user-defined numbers too).
@@ -271,10 +242,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // Store the patch as deltas and  find out how many oscs this message uses
     parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->time);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
-    // Store a copy of the patch string
-    if (memory_patch[patch_index] != NULL) { free(memory_patch[patch_index]); }
-    memory_patch[patch_index] = malloc(strlen(patch_string)+1);
-    strcpy(memory_patch[patch_index], patch_string);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
 
@@ -640,11 +607,10 @@ void patches_load_patch(amy_event *e) {
         int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
         num_patch_oscs = memory_patch_oscs[patch_index];
         if(num_patch_oscs > 0){
-            message = memory_patch[patch_index];
             deltas = memory_patch_deltas[patch_index];
         } else {
-            fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
-                    patch_number, num_patch_oscs, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
+            fprintf(stderr, "patch_number %d has %d num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
+                    patch_number, num_patch_oscs, delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
             return;
         }
     }
