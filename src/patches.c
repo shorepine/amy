@@ -151,53 +151,80 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
+#define _CASE_I(PARAM, field) case PARAM: event->field = queue->data.i; break;
+#define _CASE_F(PARAM, field) case PARAM: event->field = queue->data.f; break;
+
+struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
+  // Consume deltas from queue and push into event.  Return pointer to first non-consumed delta.
+  if (queue == NULL) return NULL;
+  uint16_t osc = queue->osc;
+  uint32_t time = queue->time;
+  while(queue != NULL) {
+    if (queue->osc != osc || queue->time != time)  break;  // delta doesn't fit this event.
+    switch (queue->param) {
+      _CASE_I(WAVE, wave);
+      _CASE_I(PRESET, preset);
+      default: break;
+    }
+  }
+  return queue;
+}
+
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
+
+// 2026-01-27: PLAN:
+//  - finish deltas_to_event
+//  - create print_event
+//  - try it out by adding test case to amy_example
+//      int patch_nbumber = 0;
+//      void *state = NULL;
+//      fprintf(stderr, "start delta_num_free = %d\n", delta_num_free);
+//      do {
+//          amy_event event = amy_default_event();
+//          state = event_generator_for_patch_number(patch_number, &event, state);
+//          print_event(&event);
+//      } while (state != NULL);
+//      fprintf(stderr, "end delta_num_free = %d\n", delta_num_free);
+//  - modify JS bindings to use the generator .. (? preserve state)
+
 void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, uint16_t *event_count, void *state) {
     // Return a sequence of events defining a patch (specified by number).
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
-    if (!event) {
-        return;
+    struct delta *queue = (struct delta *)state;
+    if (queue == NULL) {
+      // First call, initialize deltas queue.
+      if (patch_number < _PATCHES_FIRST_USER_PATCH) {
+	// This grabs a new set of deltas from the pool, when are they returned?
+	parse_patch_string_to_queue((char *)patch_commands[patch_number], 0, &queue, 0);
+      } else {
+	  int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+	  if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
+	      fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
+		      patch_number, _PATCHES_FIRST_USER_PATCH,
+		      _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+	      return NULL;
+	  }
+	  queue = memory_patch_deltas[patch_index];
+      }
     }
-    *event = NULL;
-    struct delta *queue = NULL;
-    if (patch_number < _PATCHES_FIRST_USER_PATCH) {
-      parse_patch_string_to_queue((char *)patch_commands[patch_number], 0, &queue, 0);
-    } else {
-        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-        if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
-            fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
-                    patch_number, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
-            return;
-        }
-	queue = memory_patch_deltas[patch_index];
-    }
+    struct delta *queue_on_entry = queue;
     /* Loop down the queue emitting events as needed. */
-
-    uint16_t start = 0;
-    int count = 0;
-    uint16_t message_len = (uint16_t)strlen(message);
-    for (uint16_t i = 0; i < message_len + 1; i++) {
-        if (i == message_len || message[i] == 'Z') {
-            if (count >= max_events) {
-                break;
-            }
-            int length = i - start + 1;
-            out[count] = amy_default_event();
-            amy_parse_message(message + start, length, &out[count]);
-            if (out[count].status == EVENT_EMPTY) {
-                out[count].status = EVENT_SCHEDULED;
-            }
-            count++;
-            start = i + 1;
-        }
+    while (queue != NULL) {
+      queue = deltas_to_event(queue, event);
     }
 
-    out[count] = amy_default_event();
-    out[count].status = EVENT_EMPTY;
-    if (event_count) {
-        *event_count = (uint16_t)count;
+    if (patch_number < _PATCHES_FIRST_USER_PATCH) {
+      // We allocated this queue, take care of releasing deltas we're finished with.
+      while (queue_on_entry != queue) {
+	struct delta *doomed = queue_on_entry;
+	queue_on_entry = doomed->next;
+	delta_release(doomed);
+      }
     }
-    *events = out;
+
+    return (void *)queue;
 }
+
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
@@ -595,7 +622,7 @@ void patches_load_patch(amy_event *e) {
         return;
     }
     // At this point, we have the voices[] array and num_voices set up to be initialized.
-    char *message;
+    char *message = NULL;
     struct delta *deltas = NULL;
     uint16_t num_patch_oscs = 0;
     if(patch_number < _PATCHES_FIRST_USER_PATCH) {
