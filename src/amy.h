@@ -459,7 +459,6 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float phase;
-    float detune;
     float volume;
     float pitch_bend;
     float tempo;
@@ -526,7 +525,6 @@ struct synthinfo {
     float velocity;
     PHASOR trigger_phase;
     PHASOR phase;
-    float detune;
     float step;
     float substep;
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE.

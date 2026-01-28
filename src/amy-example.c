@@ -19,6 +19,9 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
+extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
+extern void print_event(amy_event *e);
+
 int main(int argc, char ** argv) {
     int8_t playback_device_id = -1;
     int8_t capture_device_id = -1;
@@ -66,6 +69,16 @@ int main(int argc, char ** argv) {
     for (int tries = 0; tries < 2; ++tries) {
     amy_start(amy_config);
     
+    int patch_number = 0;
+    void *state = NULL;
+    fprintf(stderr, "start delta_num_free = %d\n", delta_num_free());
+    do {
+        amy_event event = amy_default_event();
+        state = event_generator_for_patch_number(patch_number, &event, state);
+        print_event(&event);
+    } while (state != NULL);
+    fprintf(stderr, "end delta_num_free = %d\n", delta_num_free());
+
     //example_fm(0);
     //example_voice_chord(0,0);
     example_synth_chord(0, /* patch */ 0);
