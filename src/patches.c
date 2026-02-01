@@ -8,7 +8,6 @@
 
 
 uint32_t max_num_memory_patches = 0;
-char **memory_patch = NULL;
 struct delta **memory_patch_deltas = NULL;
 uint16_t *memory_patch_oscs = NULL;
 uint16_t next_user_patch_index = 0;
@@ -16,11 +15,6 @@ uint8_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
 void patches_deinit() {
-    for (int i = 0; i < max_num_memory_patches; ++i) {
-        if (memory_patch[i]) free(memory_patch[i]);
-    }
-    if (memory_patch) free(memory_patch);
-    memory_patch = NULL;
     memory_patch_deltas = NULL;
     memory_patch_oscs = NULL;
     osc_to_voice = NULL;
@@ -30,20 +24,17 @@ void patches_deinit() {
 void patches_init(int max_memory_patches) {
     max_num_memory_patches = max_memory_patches;
     uint8_t *alloc_base = malloc_caps(
-            max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
+            max_num_memory_patches * sizeof(struct delta *)
+	    + max_num_memory_patches * sizeof(uint16_t)
             + AMY_OSCS * sizeof(uint8_t)
             + amy_global.config.max_voices * sizeof(uint16_t),
-        amy_global.config.ram_caps_synth
+	    amy_global.config.ram_caps_synth
     );
-    memory_patch = (char **)alloc_base;
-    bzero(memory_patch, max_num_memory_patches * sizeof(char *));
-    memory_patch_deltas = (struct delta **)(alloc_base + max_num_memory_patches * sizeof(char *));
+    memory_patch_deltas = (struct delta **)alloc_base;
+    memory_patch_oscs = (uint16_t *)(memory_patch_deltas + max_num_memory_patches);
+    osc_to_voice = (uint8_t *)(memory_patch_oscs + max_num_memory_patches);
+    voice_to_base_osc = (uint16_t *)(osc_to_voice + AMY_OSCS);
     bzero(memory_patch_deltas, max_num_memory_patches * sizeof(struct delta *));
-    memory_patch_oscs = (uint16_t *)(alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *)));
-    osc_to_voice = alloc_base + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t));
-    voice_to_base_osc = (uint16_t *)(alloc_base
-                                     + max_num_memory_patches * (sizeof(char *) + sizeof(struct delta *) + sizeof(uint16_t))
-                                     + AMY_OSCS * sizeof(uint8_t));
     patches_reset();
 }
 
@@ -54,8 +45,6 @@ void patches_reset_patch(int patch_number) {
                 patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
         return;
     }
-    if (memory_patch[patch_index] != NULL)  free(memory_patch[patch_index]);
-    memory_patch[patch_index] = NULL;
     if (memory_patch_deltas[patch_index] != NULL)  delta_release_list(memory_patch_deltas[patch_index]);
     memory_patch_deltas[patch_index] = NULL;
     memory_patch_oscs[patch_index] = 0;
@@ -92,8 +81,8 @@ void patches_debug() {
     }
     for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
-            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32" patch %s\n",
-                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]), memory_patch[i]);
+            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32"\n",
+                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]));
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
@@ -159,85 +148,308 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
-    // given a patch number (not a string), pull in the patch string, and parse the string like parse_patch_string_to_queue does
-    // but instead of calling amy_process_event or amy_event_to_deltas queue, just save each parsed amy_event to a list of events
-    // we can assume the max number of events is MAX_EVENTS_PER_PATCH = 50 for now
-    const int max_events = 50;
-    char *message = NULL;
-    if (!events) {
-        return;
+#define _EPRINT_I(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %d ", NAME, e->FIELD);
+#define _EPRINT_F(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %.3f ", NAME, e->FIELD);
+#define _EPRINT_COEF(FIELD, NAME) { \
+    int last_set = -1; \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {    \
+        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
+    }                                              \
+    if (last_set >= 0) { \
+        fprintf(stderr, "%s: ", NAME);            \
+        for (int i = 0; i <= last_set; ++i) { \
+            if (i > 0) fprintf(stderr, ","); \
+            if (AMY_IS_SET(e->FIELD[i])) \
+                fprintf(stderr, "%.3f", e->FIELD[i]); \
+        } \
+        fprintf(stderr, " "); \
+    }     \
+}
+#define _EPRINT_I_SEQ(FIELD, NAME, LEN) {          \
+    int last_set = -1; \
+    for (int i = 0; i < LEN; ++i) {    \
+        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
+    }                                              \
+    if (last_set >= 0) { \
+        fprintf(stderr, "%s: ", NAME);            \
+        for (int i = 0; i < last_set; ++i) { \
+            if (i > 0) fprintf(stderr, ","); \
+            if (AMY_IS_SET(e->FIELD[i])) \
+                fprintf(stderr, "%.d", e->FIELD[i]); \
+        } \
+        fprintf(stderr, " "); \
+    }     \
+}
+
+void print_event(amy_event *e) {
+    fprintf(stderr, "amy_event(time=%d, osc=%d): ", e->time, e->osc);
+    _EPRINT_I(wave, "wave");
+    _EPRINT_I(preset, "preset");
+    _EPRINT_F(midi_note, "midi_note");
+    _EPRINT_I(patch_number, "patch_number");
+    _EPRINT_COEF(amp_coefs, "amp_coefs");
+    _EPRINT_COEF(freq_coefs, "freq_coefs");
+    _EPRINT_COEF(filter_freq_coefs, "filter_freq_coefs");
+    _EPRINT_COEF(duty_coefs, "duty_coefs");
+    _EPRINT_COEF(pan_coefs, "pan_coefs");
+    _EPRINT_F(feedback, "feedback");
+    _EPRINT_F(velocity, "velocity");
+    _EPRINT_F(phase, "phase");
+    _EPRINT_F(volume, "volume");
+    _EPRINT_F(pitch_bend, "pitch_bend");
+    _EPRINT_F(tempo, "tempo");
+    _EPRINT_I(latency_ms, "latency_ms");
+    _EPRINT_F(ratio, "ratio");
+    _EPRINT_F(resonance, "resonance");
+    _EPRINT_I(portamento_ms, "portamento_ms");
+    _EPRINT_I(chained_osc, "chained_osc");
+    _EPRINT_I(mod_source, "mod_source");
+    _EPRINT_I(algorithm, "algorithm");
+    _EPRINT_I(filter_type, "filter_type");
+    _EPRINT_F(eq_l, "eq_l");
+    _EPRINT_F(eq_m, "eq_m");
+    _EPRINT_F(eq_h, "eq_h");
+    _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS);
+    // Convert these two at least to vectors of ints, save several hundred bytes
+    _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS);
+    _EPRINT_I_SEQ(voices, "voices", MAX_VOICES_PER_INSTRUMENT);
+    //_EPRINT_I(bp0, "bp0", MAX_PARAM_LEN);
+    //_EPRINT_I(bp1, "bp1", MAX_PARAM_LEN);
+    if (e->bp0[0]) fprintf(stderr, "bp0: %s ", e->bp0);
+    if (e->bp1[0]) fprintf(stderr, "bp0: %s ", e->bp1);
+    _EPRINT_I_SEQ(eg_type, "eg_type", MAX_BREAKPOINT_SETS);
+    // Instrument-layer values.
+    _EPRINT_I(synth, "synth");
+    _EPRINT_I(synth_flags, "synth_flags");  // Special flags to set when defining instruments.
+    _EPRINT_I(synth_delay_ms, "synth_delay_ms");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
+    _EPRINT_I(to_synth, "to_synth");  // For moving setup between synth numbers.
+    _EPRINT_I(grab_midi_notes, "grab_midi_notes");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
+    _EPRINT_I(pedal, "pedal");  // MIDI pedal value.
+    _EPRINT_I(num_voices, "num_voices");
+    _EPRINT_I_SEQ(sequence, "sequence", 3); // tick, period, tag
+    //
+    //_EPRINT_I(status, "status");
+    _EPRINT_I(note_source, "note_source");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
+    _EPRINT_I(reset_osc, "reset_osc");
+    // Global effects
+    _EPRINT_F(echo_level, "echo_level");
+    _EPRINT_F(echo_delay_ms, "echo_delay_ms");
+    _EPRINT_F(echo_max_delay_ms, "echo_max_delay_ms");
+    _EPRINT_F(echo_feedback, "echo_feedback");
+    _EPRINT_F(echo_filter_coef, "echo_filter_coef");
+    _EPRINT_F(chorus_level, "chorus_level");
+    _EPRINT_F(chorus_max_delay, "chorus_max_delay");
+    _EPRINT_F(chorus_lfo_freq, "chorus_lfo_freq");
+    _EPRINT_F(chorus_depth, "chorus_depth");
+    _EPRINT_F(reverb_level, "reverb_level");
+    _EPRINT_F(reverb_liveness, "reverb_liveness");
+    _EPRINT_F(reverb_damping, "reverb_damping");
+    _EPRINT_F(reverb_xover_hz, "reverb_xover_hz");
+    fprintf(stderr, "\n");
+}
+
+
+#define _CASE_I(FIELD, PARAM) case PARAM: event->FIELD = queue->data.i; break;
+#define _CASE_F(FIELD, PARAM) case PARAM: event->FIELD = queue->data.f; break;
+#define _CASE_LOG(FIELD, PARAM) case PARAM: event->FIELD = exp2f(queue->data.f); break;
+#define _TEST_COEFS(FIELD, PARAM)  \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {                          \
+        if ((int)queue->param == (int)PARAM + i) event->FIELD[i] = queue->data.f; \
+    } \
+// Const freq coef is in Hz, rest are linear.
+#define _TEST_FREQ_COEFS(FIELD, PARAM) \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
+        if ((int)queue->param == (int)PARAM + i) {   \
+            if (i == COEF_CONST)  \
+                event->FIELD[i] = freq_of_logfreq(queue->data.f);   \
+            else \
+                event->FIELD[i] = queue->data.f; \
+        }                                    \
     }
-    *events = NULL;
-    if (event_count) {
-        *event_count = 0;
+
+struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
+  // Consume deltas from queue and push into event.  Return pointer to first non-consumed delta.
+  if (queue == NULL) return NULL;
+  event->osc = queue->osc;
+  event->time = queue->time;
+  uint32_t breakpoint_times[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
+  float breakpoint_values[MAX_BREAKPOINT_SETS][MAX_BREAKPOINTS];
+  for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
+      for (int j = 0; j < MAX_BREAKPOINTS; ++j) {
+          AMY_UNSET(breakpoint_times[i][j]);
+          AMY_UNSET(breakpoint_values[i][j]);
+      }
+  }
+  int highest_breakpoint[MAX_BREAKPOINT_SETS] = {-1, -1};
+  while(queue != NULL) {
+    if (queue->osc != event->osc || queue->time != event->time)  break;  // delta doesn't fit this event.
+    switch (queue->param) {
+      _CASE_I(wave, WAVE)
+      _CASE_I(preset, PRESET)
+      _CASE_F(midi_note, MIDI_NOTE)
+      _CASE_F(feedback, FEEDBACK)
+      _CASE_F(phase, PHASE)
+      _CASE_F(volume, VOLUME)
+      _CASE_F(pitch_bend, PITCH_BEND)
+      _CASE_I(latency_ms, LATENCY)
+      _CASE_F(tempo, TEMPO)
+      _CASE_LOG(ratio, RATIO)
+      _CASE_F(resonance, RESONANCE)
+      _CASE_I(portamento_ms, PORTAMENTO)
+      _CASE_I(chained_osc, CHAINED_OSC)
+      _CASE_I(reset_osc, RESET_OSC)
+      _CASE_I(mod_source, MOD_SOURCE)
+      _CASE_I(note_source, NOTE_SOURCE)
+      _CASE_I(filter_type, FILTER_TYPE)
+      _CASE_I(algorithm, ALGORITHM)
+      _CASE_F(eq_l, EQ_L)
+      _CASE_F(eq_m, EQ_M)
+      _CASE_F(eq_h, EQ_H)
+      _CASE_F(echo_max_delay_ms, ECHO_MAX_DELAY_MS)
+      _CASE_F(echo_level, ECHO_LEVEL)
+      _CASE_F(echo_delay_ms, ECHO_DELAY_MS)
+      _CASE_F(echo_feedback, ECHO_FEEDBACK)
+      _CASE_F(echo_filter_coef, ECHO_FILTER_COEF)
+      _CASE_F(chorus_max_delay, CHORUS_MAX_DELAY)
+      _CASE_F(chorus_level, CHORUS_LEVEL)
+      _CASE_F(chorus_lfo_freq, CHORUS_LFO_FREQ)
+      _CASE_F(chorus_depth, CHORUS_DEPTH)
+      _CASE_F(reverb_level, REVERB_LEVEL)
+      _CASE_F(reverb_liveness, REVERB_LIVENESS)
+      _CASE_F(reverb_damping, REVERB_DAMPING)
+      _CASE_F(reverb_xover_hz, REVERB_XOVER_HZ)
+      _CASE_I(eg_type[0], EG0_TYPE)
+      _CASE_I(eg_type[1], EG1_TYPE)
+      _CASE_F(velocity, VELOCITY)
+    default:  // blocks, not handled by case
+      _TEST_COEFS(amp_coefs, AMP)
+      _TEST_FREQ_COEFS(freq_coefs, FREQ)
+      _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
+      _TEST_COEFS(duty_coefs, DUTY)
+      _TEST_COEFS(pan_coefs, PAN)
+      for (int i = 0; i < MAX_ALGO_OPS; ++i) {
+          if ((int)queue->param == (int)ALGO_SOURCE_START + i)
+              event->algo_source[i] = queue->data.i;
+      }
+      for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
+          for (int j = 0; j < MAX_BREAKPOINTS; ++j) {
+              if ((int)queue->param == (int)BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2)) {
+                  //event->bp[i].time[j] = queue->data.i;
+                  breakpoint_times[i][j] = queue->data.i;
+                  if (j > highest_breakpoint[i]) highest_breakpoint[i] = j;
+              }
+              else if ((int)queue->param == (int)BP_START + (j * 2 + 1) + (i * MAX_BREAKPOINTS * 2)) {
+                  //event->bp[i].value[j] = queue->data.f;
+                  breakpoint_values[i][j] = queue->data.f;
+                  if (j > highest_breakpoint[i]) highest_breakpoint[i] = j;
+              }
+          }
+      }
+      break;
     }
+    queue = queue->next;
+  }
+  char *bp_strings[MAX_BREAKPOINT_SETS] = {event->bp0, event->bp1};
+  for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
+      if (highest_breakpoint[i] >= 0) {
+          char *s = bp_strings[i];
+          for (int j = 0; j < highest_breakpoint[i]; ++j) {
+              if (j > 0) {*s++ = ',';  *s = 0;}
+              if (AMY_IS_SET(breakpoint_times[i][j])) {
+                  sprintf(s, "%d", (int)roundf(breakpoint_times[i][j] / 44.1f));
+                  s += strlen(s);
+              }
+              *s++ = ',';  *s = 0;
+              if (AMY_IS_SET(breakpoint_values[i][j])) {
+                  sprintf(s, "%.3f", breakpoint_values[i][j]);
+                  s += strlen(s);
+              }
+          }
+      }
+  }
+  return queue;
+}
+
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
+
+// 2026-01-27: PLAN:
+//  v finish deltas_to_event
+//  v create print_event
+//  v try it out by adding test case to amy_example
+//  - modify JS bindings to use the generator .. (? preserve state)
+
+
+
+void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state) {
+    // Return a sequence of events defining a patch (specified by number).
+    // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
+    amy_clear_event(event);
+    struct delta *queue = (struct delta *)state;
+    if (queue == NULL) {
+      // First call, initialize deltas queue.
+      if (patch_number < _PATCHES_FIRST_USER_PATCH) {
+	// This grabs a new set of deltas from the pool, when are they returned?
+	parse_patch_string_to_queue((char *)patch_commands[patch_number], 0, &queue, 0);
+      } else {
+	  int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+	  if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
+	      fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
+		      patch_number, _PATCHES_FIRST_USER_PATCH,
+		      _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+	      return NULL;
+	  }
+	  queue = memory_patch_deltas[patch_index];
+      }
+    }
+    struct delta *queue_on_entry = queue;
+    /* Loop down the queue emitting events as needed. */
+    queue = deltas_to_event(queue, event);
 
     if (patch_number < _PATCHES_FIRST_USER_PATCH) {
-        message = (char *)patch_commands[patch_number];
-    } else {
-        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-        if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
-            fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
-                    patch_number, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
-            return;
-        }
-        message = memory_patch[patch_index];
+      // We allocated this queue, take care of releasing deltas we're finished with.
+      while (queue_on_entry != queue) {
+	struct delta *doomed = queue_on_entry;
+	queue_on_entry = doomed->next;
+	delta_release(doomed);
+      }
     }
 
-    if (!message) {
-        return;
-    }
-
-    struct amy_event *out = calloc(max_events + 1, sizeof(struct amy_event));
-    if (!out) {
-        return;
-    }
-
-    uint16_t start = 0;
-    int count = 0;
-    uint16_t message_len = (uint16_t)strlen(message);
-    for (uint16_t i = 0; i < message_len + 1; i++) {
-        if (i == message_len || message[i] == 'Z') {
-            if (count >= max_events) {
-                break;
-            }
-            int length = i - start + 1;
-            out[count] = amy_default_event();
-            amy_parse_message(message + start, length, &out[count]);
-            if (out[count].status == EVENT_EMPTY) {
-                out[count].status = EVENT_SCHEDULED;
-            }
-            count++;
-            start = i + 1;
-        }
-    }
-
-    out[count] = amy_default_event();
-    out[count].status = EVENT_EMPTY;
-    if (event_count) {
-        *event_count = (uint16_t)count;
-    }
-    *events = out;
+    return (void *)queue;
 }
+
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
-    //fprintf(stderr, "load_patch: synth %d voice %d message %s\n", e->synth, voices[v], message);
+    //fprintf(stderr, "parse_patch_string: message %s\n", message);
     while(strlen(message + start)) {
       amy_event patch_event = amy_default_event();
-      start += amy_parse_message(message + start, strlen(message + start), &patch_event);
+      int num_used = amy_parse_message(message + start, strlen(message + start), &patch_event);
+      //{
+      //  char sub_message[256];
+      //  strncpy(sub_message, message + start, num_used);
+      //  sub_message[num_used]= 0;
+      //  fprintf(stderr, "parse_patch_string: sub_message %s\n", sub_message);
+      //}
+      start += num_used;
       amy_process_event(&patch_event);
       patch_event.time = time;
       if(patch_event.status == EVENT_SCHEDULED) {
 	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
       }
     }
-            //strncpy(sub_message, message + start, i - start + 1);
-            //sub_message[i - start + 1]= 0;
-            //amy_parse_message(sub_message, strlen(sub_message), &patch_event);
-            //fprintf(stderr, "load_patch: sub_message %s\n", sub_message);
+}
+#define MAX_EVENTS_FOR_PATCH 64
+void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
+    fprintf(stderr, "parse_patch_number_to_events: patch_number %d\n", patch_number);
+    struct amy_event *out = calloc(MAX_EVENTS_FOR_PATCH + 1, sizeof(struct amy_event));
+    void *state = NULL;
+    uint16_t counter = 0;
+    do {
+        state = event_generator_for_patch_number(patch_number, &out[counter++], state);
+    } while (state != NULL);
+    *events = out;
+    *event_count = counter;
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
@@ -246,16 +458,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch, patch_string);
     if (!AMY_IS_SET(e->patch_number)) {
-        // Check for a repeated string
-        for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
-            if (memory_patch_oscs[i] > 0 && memory_patch[i] != NULL)
-                if (strcmp(memory_patch[i], patch_string) == 0) {
-                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
-                    // Actually, we don't need to store it, we already have it.
-                    //fprintf(stderr, "store_patch: using existing patch_number %d for '%s'\n", e->patch_number, patch_string);
-                    return;
-                }
-        }
         // We need to allocate a new number.
         e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
         // next_user_patch_index is updated as needed at the bottom of the function (so it can reflect user-defined numbers too).
@@ -271,10 +473,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // Store the patch as deltas and  find out how many oscs this message uses
     parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->time);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
-    // Store a copy of the patch string
-    if (memory_patch[patch_index] != NULL) { free(memory_patch[patch_index]); }
-    memory_patch[patch_index] = malloc(strlen(patch_string)+1);
-    strcpy(memory_patch[patch_index], patch_string);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
 
@@ -627,8 +825,9 @@ void patches_load_patch(amy_event *e) {
                 e->synth, patch_number, e->num_voices, e->voices[0]);
         return;
     }
+
     // At this point, we have the voices[] array and num_voices set up to be initialized.
-    char *message;
+    char *message = NULL;
     struct delta *deltas = NULL;
     uint16_t num_patch_oscs = 0;
     if(patch_number < _PATCHES_FIRST_USER_PATCH) {
@@ -640,18 +839,19 @@ void patches_load_patch(amy_event *e) {
         int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
         num_patch_oscs = memory_patch_oscs[patch_index];
         if(num_patch_oscs > 0){
-            message = memory_patch[patch_index];
             deltas = memory_patch_deltas[patch_index];
         } else {
-            fprintf(stderr, "patch_number %d has %d oscs patch %s num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
-                    patch_number, num_patch_oscs, memory_patch[patch_index], delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
+            fprintf(stderr, "patch_number %d has %d num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
+                    patch_number, num_patch_oscs, delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
             return;
         }
     }
+
     for(uint8_t v=0;v<num_voices;v++)  {
         // Release all the oscs of any voices we're re-using before we start re-allocating oscs.
         release_voice_oscs(voices[v]);
     }
+
     for(uint8_t v=0;v<num_voices;v++)  {
         // Find the first osc with num_patch_oscs free oscs.
         uint8_t good = 0;
@@ -704,9 +904,10 @@ void patches_load_patch(amy_event *e) {
             }
         }
         if(!good) {
-            fprintf(stderr, "we are out of oscs for voice %d. not setting this voice\n", voices[v]);
+            fprintf(stderr, "cannot find %d oscs for patch %d for voice %d. not setting this voice\n", num_patch_oscs, patch_number, voices[v]);
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
+
     // Now actually initialize the newly-allocated osc blocks with the patch
     for(uint8_t v = 0; v < num_voices; v++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
@@ -717,10 +918,12 @@ void patches_load_patch(amy_event *e) {
             }
         }
     }
+
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
         instrument_add_new(e->synth, num_voices, voices, patch_number, flags);
     }
+
 }
