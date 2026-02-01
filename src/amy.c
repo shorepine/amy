@@ -497,7 +497,6 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
-
     peek_stack("event_to_deltas");
     // Synth defaults if not set, these are required for the delta struct
     d.time = e->time;

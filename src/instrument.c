@@ -249,7 +249,7 @@ void instruments_deinit() {
 
 void instruments_init(int num_instruments) {
     max_instruments = num_instruments;
-    instruments = (struct instrument_info **)malloc_caps(max_instruments * sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
+    instruments = (struct instrument_info **)malloc_caps(max_instruments * sizeof(struct instrument_info *), amy_global.config.ram_caps_synth);
     for(uint16_t i = 0; i < max_instruments; i++) {
         instruments[i]  = NULL;
     }

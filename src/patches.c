@@ -25,7 +25,7 @@ void patches_init(int max_memory_patches) {
     max_num_memory_patches = max_memory_patches;
     uint8_t *alloc_base = malloc_caps(
             max_num_memory_patches * sizeof(struct delta *)
-	    + sizeof(uint16_t)
+	    + max_num_memory_patches * sizeof(uint16_t)
             + AMY_OSCS * sizeof(uint8_t)
             + amy_global.config.max_voices * sizeof(uint16_t),
 	    amy_global.config.ram_caps_synth
@@ -378,9 +378,12 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
 //  v try it out by adding test case to amy_example
 //  - modify JS bindings to use the generator .. (? preserve state)
 
+
+
 void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state) {
     // Return a sequence of events defining a patch (specified by number).
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
+    amy_clear_event(event);
     struct delta *queue = (struct delta *)state;
     if (queue == NULL) {
       // First call, initialize deltas queue.
@@ -435,6 +438,18 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
 	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
       }
     }
+}
+#define MAX_EVENTS_FOR_PATCH 64
+void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
+    fprintf(stderr, "parse_patch_number_to_events: patch_number %d\n", patch_number);
+    struct amy_event *out = calloc(MAX_EVENTS_FOR_PATCH + 1, sizeof(struct amy_event));
+    void *state = NULL;
+    uint16_t counter = 0;
+    do {
+        state = event_generator_for_patch_number(patch_number, &out[counter++], state);
+    } while (state != NULL);
+    *events = out;
+    *event_count = counter;
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
@@ -810,6 +825,7 @@ void patches_load_patch(amy_event *e) {
                 e->synth, patch_number, e->num_voices, e->voices[0]);
         return;
     }
+
     // At this point, we have the voices[] array and num_voices set up to be initialized.
     char *message = NULL;
     struct delta *deltas = NULL;
@@ -830,10 +846,12 @@ void patches_load_patch(amy_event *e) {
             return;
         }
     }
+
     for(uint8_t v=0;v<num_voices;v++)  {
         // Release all the oscs of any voices we're re-using before we start re-allocating oscs.
         release_voice_oscs(voices[v]);
     }
+
     for(uint8_t v=0;v<num_voices;v++)  {
         // Find the first osc with num_patch_oscs free oscs.
         uint8_t good = 0;
@@ -889,6 +907,7 @@ void patches_load_patch(amy_event *e) {
             fprintf(stderr, "cannot find %d oscs for patch %d for voice %d. not setting this voice\n", num_patch_oscs, patch_number, voices[v]);
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
+
     // Now actually initialize the newly-allocated osc blocks with the patch
     for(uint8_t v = 0; v < num_voices; v++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
@@ -899,10 +918,12 @@ void patches_load_patch(amy_event *e) {
             }
         }
     }
+
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
         instrument_add_new(e->synth, num_voices, voices, patch_number, flags);
     }
+
 }
