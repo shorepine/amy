@@ -91,7 +91,7 @@ void patches_debug() {
         int num_voices = instrument_get_num_voices(i, voices);
         if (num_voices) {
             fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " flags %" PRIu32 " voices",
-                    i, (int32_t)num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
+                    i, (int32_t)num_voices, (int32_t)instrument_get_patch_number(i), instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %" PRIu16, voices[j]);
             fprintf(stderr, "\n");
         }
