@@ -171,6 +171,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 
 void midi_clock_received() {
+    fprintf(stderr, "MIDI realtime: received F8 timing clock\n");
     sequencer_midi_clock_tick();
 }
 
