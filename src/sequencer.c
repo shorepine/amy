@@ -24,7 +24,6 @@ int32_t max_sequences = 0;
 int32_t highest_tag = -1;
 static volatile bool sequencer_running = true;
 static volatile bool sequencer_external_clock = false;
-static uint8_t midi_clock_subtick = 0;
 
 // Declared per-platform below.
 void _sequencer_start();
@@ -126,22 +125,18 @@ void sequencer_midi_start() {
     // MIDI "Start" begins from tick 0 and then advances from F8 clocks.
     sequencer_external_clock = true;
     sequencer_running = true;
-    midi_clock_subtick = 0;
     amy_global.sequencer_tick_count = 0;
 }
 
 void sequencer_midi_stop() {
     sequencer_external_clock = true;
     sequencer_running = false;
-    midi_clock_subtick = 0;
 }
 
 void sequencer_midi_clock_tick() {
-    // MIDI timing clock is 24 PPQ, AMY sequencer runs at 48 PPQ.
     sequencer_external_clock = true;
     if (!sequencer_running) return;
-    midi_clock_subtick ^= 1;
-    if (midi_clock_subtick == 0) {
+    for (uint8_t i = 0; i < AMY_SEQUENCER_PPQ/MIDI_SEQUENCER_PPQ; ++i) { 
         sequencer_process_tick();
     }
 }
