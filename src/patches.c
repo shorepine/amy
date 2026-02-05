@@ -41,8 +41,10 @@ void patches_init(int max_memory_patches) {
 void patches_reset_patch(int patch_number) {
     int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
-        fprintf(stderr, "reset patch number %d is out of range (%d .. %d)\n",
-                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        fprintf(stderr, "reset patch number %" PRId32 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
+                (int32_t)(patch_index + _PATCHES_FIRST_USER_PATCH),
+                (int32_t)_PATCHES_FIRST_USER_PATCH,
+                (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
         return;
     }
     if (memory_patch_deltas[patch_index] != NULL)  delta_release_list(memory_patch_deltas[patch_index]);
@@ -66,30 +68,31 @@ void patches_reset() {
 void patches_debug() {
     for(uint8_t v = 0; v < amy_global.config.max_voices; v++) {
         if (AMY_IS_SET(voice_to_base_osc[v]))
-            fprintf(stderr, "voice %d base osc %d\n", v, voice_to_base_osc[v]);
+            fprintf(stderr, "voice %" PRIu8 " base osc %" PRIu16 "\n", v, voice_to_base_osc[v]);
     }
     fprintf(stderr, "osc_to_voice:\n");
     for(uint16_t i=0;i<AMY_OSCS;) {
         uint16_t j = 0;
-        fprintf(stderr, "%d: ", i);
+        fprintf(stderr, "%" PRIu16 ": ", i);
         for (j=0; j < 16; ++j) {
             if ((i + j) >= AMY_OSCS)  break;
-            fprintf(stderr, "%d ", osc_to_voice[i + j]);
+            fprintf(stderr, "%" PRIu8 " ", osc_to_voice[i + j]);
         }
         i += j;
         fprintf(stderr, "\n");
     }
     for(uint8_t i = 0; i < max_num_memory_patches; i++) {
         if(memory_patch_oscs[i])
-            fprintf(stderr, "memory_patch %d oscs %d #deltas %" PRIi32"\n",
-                    i + _PATCHES_FIRST_USER_PATCH, memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]));
+            fprintf(stderr, "memory_patch %" PRIu16 " oscs %" PRIu16 " #deltas %" PRIi32 "\n",
+                    (uint16_t)(i + _PATCHES_FIRST_USER_PATCH), memory_patch_oscs[i], delta_list_len(memory_patch_deltas[i]));
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
         int num_voices = instrument_get_num_voices(i, voices);
         if (num_voices) {
-            fprintf(stderr, "synth %d num_voices %d patch_num %d flags %" PRIu32" voices", i, num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
-            for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %d", voices[j]);
+            fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " flags %" PRIu32 " voices",
+                    i, (int32_t)num_voices, instrument_get_patch_number(i), instrument_get_flags(i));
+            for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %" PRIu16, voices[j]);
             fprintf(stderr, "\n");
         }
     }
@@ -98,8 +101,10 @@ void patches_debug() {
 struct delta **queue_for_patch_number(int patch_number) {
     int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
-        fprintf(stderr, "queue for patch number %d is out of range (%d .. %d)\n",
-                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        fprintf(stderr, "queue for patch number %" PRId32 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
+                (int32_t)(patch_index + _PATCHES_FIRST_USER_PATCH),
+                (int32_t)_PATCHES_FIRST_USER_PATCH,
+                (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
         return NULL;
     }
     return &memory_patch_deltas[patch_index];
@@ -108,8 +113,10 @@ struct delta **queue_for_patch_number(int patch_number) {
 void update_num_oscs_for_patch_number(int patch_number) {
     int patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
-        fprintf(stderr, "queue for patch number %d is out of range (%d .. %d)\n",
-                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        fprintf(stderr, "queue for patch number %" PRId32 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
+                (int32_t)(patch_index + _PATCHES_FIRST_USER_PATCH),
+                (int32_t)_PATCHES_FIRST_USER_PATCH,
+                (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
         return;
     }
     int num_oscs = 0;
@@ -148,7 +155,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-#define _EPRINT_I(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %d ", NAME, e->FIELD);
+#define _EPRINT_I(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %" PRId32 " ", NAME, (int32_t)e->FIELD);
 #define _EPRINT_F(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %.3f ", NAME, e->FIELD);
 #define _EPRINT_COEF(FIELD, NAME) { \
     int last_set = -1; \
@@ -175,14 +182,14 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         for (int i = 0; i < last_set; ++i) { \
             if (i > 0) fprintf(stderr, ","); \
             if (AMY_IS_SET(e->FIELD[i])) \
-                fprintf(stderr, "%.d", e->FIELD[i]); \
+                fprintf(stderr, "%" PRId32, (int32_t)e->FIELD[i]); \
         } \
         fprintf(stderr, " "); \
     }     \
 }
 
 void print_event(amy_event *e) {
-    fprintf(stderr, "amy_event(time=%d, osc=%d): ", e->time, e->osc);
+    fprintf(stderr, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
     _EPRINT_I(wave, "wave");
     _EPRINT_I(preset, "preset");
     _EPRINT_F(midi_note, "midi_note");
@@ -356,7 +363,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
           for (int j = 0; j < highest_breakpoint[i]; ++j) {
               if (j > 0) {*s++ = ',';  *s = 0;}
               if (AMY_IS_SET(breakpoint_times[i][j])) {
-                  sprintf(s, "%d", (int)roundf(breakpoint_times[i][j] / 44.1f));
+                  sprintf(s, "%" PRId32, (int32_t)roundf(breakpoint_times[i][j] / 44.1f));
                   s += strlen(s);
               }
               *s++ = ',';  *s = 0;
@@ -393,9 +400,9 @@ void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *
       } else {
 	  int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
 	  if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
-	      fprintf(stderr, "patch_number %d is out of range (%d .. %d)\n",
-		      patch_number, _PATCHES_FIRST_USER_PATCH,
-		      _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+		      fprintf(stderr, "patch_number %" PRIu16 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
+			      patch_number, (int32_t)_PATCHES_FIRST_USER_PATCH,
+			      (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
 	      return NULL;
 	  }
 	  queue = memory_patch_deltas[patch_index];
@@ -441,7 +448,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
 }
 #define MAX_EVENTS_FOR_PATCH 64
 void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
-    fprintf(stderr, "parse_patch_number_to_events: patch_number %d\n", patch_number);
+    fprintf(stderr, "parse_patch_number_to_events: patch_number %" PRIu16 "\n", patch_number);
     struct amy_event *out = calloc(MAX_EVENTS_FOR_PATCH + 1, sizeof(struct amy_event));
     void *state = NULL;
     uint16_t counter = 0;
@@ -465,8 +472,10 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     }
     int patch_index = (int)e->patch_number - _PATCHES_FIRST_USER_PATCH;
     if (patch_index < 0 || patch_index >= (int)max_num_memory_patches) {
-        fprintf(stderr, "patch number %d is out of range (%d .. %d)\n",
-                patch_index + _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH, _PATCHES_FIRST_USER_PATCH + (int)max_num_memory_patches);
+        fprintf(stderr, "patch number %" PRId32 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
+                (int32_t)(patch_index + _PATCHES_FIRST_USER_PATCH),
+                (int32_t)_PATCHES_FIRST_USER_PATCH,
+                (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
@@ -594,7 +603,7 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
         // velocity without midi_note is valid for velocity==0 => all-notes-off.
         if (e->velocity != 0) {
             // Attempted a note-on to all voices, suppress.
-            fprintf(stderr, "note-on with no note for synth %d - ignored.\n", e->synth);
+            fprintf(stderr, "note-on with no note for synth %" PRId32 " - ignored.\n", (int32_t)e->synth);
             return 0;
         }
         // All notes off - find out which voices are actually currently active, so we can turn them off.
@@ -639,8 +648,8 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
         // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
         // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
         if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
-            fprintf(stderr, "You specified both synth %d and voices %d...  Synth implies voices, ignoring voices.\n",
-                    e->synth, e->voices[0]);
+            fprintf(stderr, "You specified both synth %" PRId32 " and voices %" PRIu16 "...  Synth implies voices, ignoring voices.\n",
+                    (int32_t)e->synth, e->voices[0]);
         }
         synth_flags = instrument_get_flags(e->synth);
         if (AMY_IS_SET(e->to_synth)) {
@@ -758,8 +767,8 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t 
         // If no patch number is provided, pull from existing instrument.
         int32_t old_patch_number = instrument_get_patch_number(e->synth);
         if (old_patch_number == -1) {
-            fprintf(stderr, "attempting to configure synth %d (%d voices) without patch/patch_number, but no previous patch found\n",
-                    e->synth, e->num_voices);
+            fprintf(stderr, "attempting to configure synth %" PRId32 " (%" PRId32 " voices) without patch/patch_number, but no previous patch found\n",
+                    (int32_t)e->synth, (int32_t)e->num_voices);
             return 0;  // Ignore
         }
         // Otherwise, inherit the existing patch number.
@@ -781,7 +790,8 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t 
                 ++v;
             }
             if (v == amy_global.config.max_voices)  {
-                fprintf(stderr, "ran out of voices allocating %d voices to synth %d for patch %d, ignoring.", e->num_voices, e->synth, *ppatch_number);
+                fprintf(stderr, "ran out of voices allocating %" PRId32 " voices to synth %" PRId32 " for patch %" PRIu16 ", ignoring.",
+                        (int32_t)e->num_voices, (int32_t)e->synth, *ppatch_number);
                 patches_debug();
                 return 0;
             }
@@ -821,8 +831,8 @@ void patches_load_patch(amy_event *e) {
         num_voices = copy_voices(e->voices, voices);
     }
     if (num_voices == 0) {
-        fprintf(stderr, "synth %d patch %d: no voices selected, ignored (e->num_voices %d e->voices [0] %d...)\n",
-                e->synth, patch_number, e->num_voices, e->voices[0]);
+        fprintf(stderr, "synth %" PRId32 " patch %" PRIu16 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
+                (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
         return;
     }
 
@@ -841,8 +851,9 @@ void patches_load_patch(amy_event *e) {
         if(num_patch_oscs > 0){
             deltas = memory_patch_deltas[patch_index];
         } else {
-            fprintf(stderr, "patch_number %d has %d num_deltas %"PRIi32 " (synth %d num_voices %d), ignored\n",
-                    patch_number, num_patch_oscs, delta_list_len(memory_patch_deltas[patch_index]), e->synth, e->num_voices);
+            fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
+                    patch_number, num_patch_oscs, delta_list_len(memory_patch_deltas[patch_index]),
+                    (int32_t)e->synth, (int32_t)e->num_voices);
             return;
         }
     }
@@ -904,7 +915,8 @@ void patches_load_patch(amy_event *e) {
             }
         }
         if(!good) {
-            fprintf(stderr, "cannot find %d oscs for patch %d for voice %d. not setting this voice\n", num_patch_oscs, patch_number, voices[v]);
+            fprintf(stderr, "cannot find %" PRIu16 " oscs for patch %" PRIu16 " for voice %" PRIu16 ". not setting this voice\n",
+                    num_patch_oscs, patch_number, voices[v]);
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
 
