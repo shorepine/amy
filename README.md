@@ -87,7 +87,7 @@ AMY provides a [MIDI mode](docs/midi.md) by default that lets you control many p
 In Python:
 
 ```python
->>> import amy; amy.live()
+>>> import amy; amy.live(default_synths=1)
 >>> # play MIDI notes using system MIDI
 ```
 
@@ -155,5 +155,4 @@ It's good to understand what wire messages are but you don't need to construct t
  * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
  [![shore pine sound systems discord](https://raw.githubusercontent.com/shorepine/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)
-
 
