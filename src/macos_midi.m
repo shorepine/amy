@@ -17,6 +17,30 @@ static void NotifyProc(const MIDINotification *message, void *refCon)
 {
 }
 
+static uint8_t midi_status_len(uint8_t status) {
+    // MIDI realtime/system common lengths.
+    if (status >= 0xF8) return 1;
+    if (status == 0xF6) return 1;
+    if (status == 0xF1 || status == 0xF3) return 2;
+    if (status == 0xF2) return 3;
+    if (status == 0xF4 || status == 0xF5 || status == 0xF9 || status == 0xFD) return 1;
+
+    // Channel voice lengths.
+    switch (status & 0xF0) {
+        case 0x80:
+        case 0x90:
+        case 0xA0:
+        case 0xB0:
+        case 0xE0:
+            return 3;
+        case 0xC0:
+        case 0xD0:
+            return 2;
+        default:
+            return 0;
+    }
+}
+
 
 void midi_out(uint8_t * bytes, uint16_t len) {
     if (@available(macOS 11, *))  {
@@ -78,14 +102,14 @@ void* run_midi_macos(void*argp){
                         if(sysex_status != noErr) { 
                             for(uint32_t j=0 ; j < packet->wordCount; j++) {
                                 const unsigned char *bytes = (unsigned char*)(&packet->words[j]);
-                                if(bytes[3] == 0x20) { //  TODO, non-3 packets, then what? 
-                                    uint8_t data[3];
-                                    data[0] = bytes[2];
-                                    data[1] = bytes[1];
-                                    data[2] = bytes[0];
-                                    convert_midi_bytes_to_messages(data, 3, 1);
-                                } else {
-                                   //printf("bytes[3] was not 0x20\n");
+                                uint8_t mt = bytes[3] >> 4;
+                                // Accept MIDI 1.0 Channel Voice (0x2) and System (0x1) UMP words.
+                                if (mt == 0x1 || mt == 0x2) {
+                                    uint8_t data[3] = { bytes[2], bytes[1], bytes[0] };
+                                    uint8_t len = midi_status_len(data[0]);
+                                    if (len > 0) {
+                                        convert_midi_bytes_to_messages(data, len, 1);
+                                    }
                                 }
                             }
                         }

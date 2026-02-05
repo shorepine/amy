@@ -25,6 +25,14 @@ uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
 
+static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t sysex) {
+    fprintf(stderr, "MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
+    for (uint32_t i = 0; i < len; ++i) {
+        fprintf(stderr, " %02X", data[i]);
+    }
+    fprintf(stderr, "\n");
+}
+
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
@@ -140,8 +148,9 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
 void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
     if(!sysex) {
-        uint8_t status = data[0] & 0xF0;
-        uint8_t channel = data[0] & 0x0F;
+        uint8_t status_byte = data[0];
+        uint8_t status = status_byte & 0xF0;
+        uint8_t channel = status_byte & 0x0F;
         // Do the AMY instrument things here
         if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2], time);
         else if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
@@ -150,6 +159,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
         else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
+        else if(status_byte == 0xFA) sequencer_midi_start();
+        else if(status_byte == 0xFC) sequencer_midi_stop();
     }
 
     // Also send the external hooks if set
@@ -168,7 +179,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 
 void midi_clock_received() {
-    // one day update the AMY sequencer
+    sequencer_midi_clock_tick();
 }
 
 
@@ -230,6 +241,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
     // running status is handled by keeping the status byte around after getting a message.
     // remember that USB midi always comes in groups of 3 here, even if it's just a one byte message
     // so we have USB (and mac IAC) set a usb flag so we know to end the loop once a message is parsed
+
     uint32_t time = AMY_UNSET_VALUE(time);
     for(size_t i=0;i<len;i++) {
 

@@ -84,7 +84,7 @@ amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
 amy-module: amy-example
-	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall; cd ..
+	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall --no-deps; cd ..
 
 test: amy-module
 	${PYTHON} -m amy.test
