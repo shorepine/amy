@@ -2,6 +2,8 @@
 
 #include <Python.h>
 #include <math.h>
+#include <limits.h>
+#include <string.h>
 #include "amy.h"
 #include "amy_midi.h"
 #include "libminiaudio-audio.h"
@@ -18,24 +20,153 @@ static PyObject * send_wrapper(PyObject *self, PyObject *args) {
 }
 
 
-static PyObject * live_wrapper(PyObject *self, PyObject *args) {
+static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value) {
+    long lv = 0;
+    long long llv = 0;
+
+    if (strcmp(key, "chorus") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.chorus = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "reverb") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.reverb = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "echo") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.echo = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "audio_in") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.audio_in = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "default_synths") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.default_synths = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "partials") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.partials = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "custom") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.custom = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "startup_bleep") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        cfg->features.startup_bleep = (lv != 0);
+        return 0;
+    } else if (strcmp(key, "max_oscs") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (lv < 0 || lv > UINT16_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_oscs must be in range [0, 65535]");
+            return -1;
+        }
+        cfg->max_oscs = (uint16_t)lv;
+        return 0;
+    } else if (strcmp(key, "ks_oscs") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (lv < 0 || lv > UINT8_MAX) {
+            PyErr_SetString(PyExc_ValueError, "ks_oscs must be in range [0, 255]");
+            return -1;
+        }
+        cfg->ks_oscs = (uint8_t)lv;
+        return 0;
+    } else if (strcmp(key, "max_sequencer_tags") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_sequencer_tags must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_sequencer_tags = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "max_voices") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_voices must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_voices = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "max_synths") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_synths must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_synths = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "max_memory_patches") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_memory_patches must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_memory_patches = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "capture_device_id") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (lv < INT8_MIN || lv > INT8_MAX) {
+            PyErr_SetString(PyExc_ValueError, "capture_device_id must be in range [-128, 127]");
+            return -1;
+        }
+        cfg->capture_device_id = (int8_t)lv;
+        return 0;
+    } else if (strcmp(key, "playback_device_id") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (lv < INT8_MIN || lv > INT8_MAX) {
+            PyErr_SetString(PyExc_ValueError, "playback_device_id must be in range [-128, 127]");
+            return -1;
+        }
+        cfg->playback_device_id = (int8_t)lv;
+        return 0;
+    }
+
+    PyErr_Format(PyExc_TypeError, "live() got an unexpected keyword argument '%s'", key);
+    return -1;
+}
+
+static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs) {
     amy_stop();
     amy_config_t amy_config = amy_global.config;
-    int playback_device = -1;  // Means "system default".
-    int capture_device = -1;
-    amy_config.features.audio_in = 1;
-    if(PyTuple_Size(args) == 2) {
-        PyArg_ParseTuple(args, "ii", &playback_device, &capture_device);
-    } else if(PyTuple_Size(args) == 1) {
-        PyArg_ParseTuple(args, "i", &playback_device);
-        // Explicit playback device but no capture device -> open just for playback.
-        amy_config.features.audio_in = 0;
+    Py_ssize_t pos = 0;
+    PyObject *key_obj = NULL;
+    PyObject *value_obj = NULL;
+
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "live() no longer accepts positional args; use keyword args like live(playback_device_id=..., capture_device_id=...)");
+        return NULL;
     }
-    amy_config.playback_device_id = playback_device;
-    amy_config.capture_device_id = capture_device;
+
+    amy_config.features.audio_in = 1;
+
+    while (kwargs != NULL && PyDict_Next(kwargs, &pos, &key_obj, &value_obj)) {
+        const char *key = PyUnicode_AsUTF8(key_obj);
+        if (key == NULL) return NULL;
+        if (parse_live_kwarg(&amy_config, key, value_obj) != 0) {
+            return NULL;
+        }
+    }
+
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_start(amy_config); // initializes amy 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
@@ -98,7 +229,7 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
     {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
-    {"live", live_wrapper, METH_VARARGS, "Live AMY"},
+    {"live", (PyCFunction)live_wrapper, METH_VARARGS | METH_KEYWORDS, "Live AMY"},
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
