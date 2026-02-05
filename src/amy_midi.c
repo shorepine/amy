@@ -25,6 +25,14 @@ uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
 
+static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t sysex) {
+    fprintf(stderr, "MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
+    for (uint32_t i = 0; i < len; ++i) {
+        fprintf(stderr, " %02X", data[i]);
+    }
+    fprintf(stderr, "\n");
+}
+
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
@@ -139,6 +147,7 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
 void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
+    debug_print_midi_hex(data, len, sysex);
     if(!sysex) {
         uint8_t status_byte = data[0];
         uint8_t status = status_byte & 0xF0;
