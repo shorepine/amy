@@ -49,5 +49,7 @@ AMY supports MIDI realtime transport for the internal sequencer:
 - `0xFA` (Start): starts sequencer playback from tick 0 in external clock mode.
 - `0xFC` (Stop): stops sequencer playback.
 
-MIDI Timing Clock is 24 PPQ. AMY's sequencer runs at 48 PPQ, so AMY advances one sequencer tick per two MIDI clock pulses.
+MIDI Timing Clock is 24 PPQ. AMY's sequencer runs at 48 PPQ, so AMY advances two sequencer ticks per one MIDI clock pulse.
+
+If you stop the sequencer with MIDI (using `0xFC`) the only way to start the sequencer again is with MIDI `0xFA`. We don't (yet) have AMY controls to stop / start the sequencer. 
 

@@ -147,7 +147,6 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
 
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
 void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
-    debug_print_midi_hex(data, len, sysex);
     if(!sysex) {
         uint8_t status_byte = data[0];
         uint8_t status = status_byte & 0xF0;
@@ -180,7 +179,6 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 
 void midi_clock_received() {
-    fprintf(stderr, "MIDI realtime: received F8 timing clock\n");
     sequencer_midi_clock_tick();
 }
 
@@ -243,6 +241,7 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
     // running status is handled by keeping the status byte around after getting a message.
     // remember that USB midi always comes in groups of 3 here, even if it's just a one byte message
     // so we have USB (and mac IAC) set a usb flag so we know to end the loop once a message is parsed
+
     uint32_t time = AMY_UNSET_VALUE(time);
     for(size_t i=0;i<len;i++) {
 

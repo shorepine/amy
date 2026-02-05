@@ -3,7 +3,7 @@
 #define __SEQUENCERH
 
 #include "amy.h"
-
+#define MIDI_SEQUENCER_PPQ 24  // MIDI clocks per quarter note
 uint32_t sequencer_ticks();
 void sequencer_init(int max_num_sequences);
 void sequencer_deinit();
