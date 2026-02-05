@@ -43,6 +43,11 @@ For example, to send the wire message `v0f440l1` (sine wave, 440Hz, note on) to 
 
 ## Others
 
-**TODO: MIDI 0xF8 Clock**
+AMY supports MIDI realtime transport for the internal sequencer:
 
+- `0xF8` (Timing Clock): advances the sequencer from external clock input.
+- `0xFA` (Start): starts sequencer playback from tick 0 in external clock mode.
+- `0xFC` (Stop): stops sequencer playback.
+
+MIDI Timing Clock is 24 PPQ. AMY's sequencer runs at 48 PPQ, so AMY advances one sequencer tick per two MIDI clock pulses.
 

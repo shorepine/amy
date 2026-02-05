@@ -22,6 +22,9 @@ typedef struct sequence_info_t {
 struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
 int32_t max_sequences = 0;
 int32_t highest_tag = -1;
+static volatile bool sequencer_running = true;
+static volatile bool sequencer_external_clock = false;
+static uint8_t midi_clock_subtick = 0;
 
 // Declared per-platform below.
 void _sequencer_start();
@@ -77,6 +80,72 @@ void sequencer_recompute() {
     amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
 }
 
+static void sequencer_process_tick(void) {
+    amy_global.sequencer_tick_count++;
+    // Scan through LL looking for matches
+    for (int32_t tag = 0; tag <= highest_tag; ++tag) {
+        if (sequences[tag].deltas != NULL) {
+            bool hit = false;
+            bool delete = false;
+            if(sequences[tag].period != 0) { // period set
+                uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
+                if (offset == sequences[tag].tick) hit = true;
+            } else {
+                // Test for absolute tick (no period set)
+                if (sequences[tag].tick == amy_global.sequencer_tick_count) { hit = true; delete = true; }
+            }
+            if(hit) {
+                struct delta *d = sequences[tag].deltas;
+                while(d) {
+                    // assume the d->time is 0 and that's good.
+                    add_delta_to_queue(d, &amy_global.delta_queue);
+                    d = d->next;
+                }
+                // Delete absolute tick addressed sequence entry if sent
+                if(delete) {
+                    delta_release_list(sequences[tag].deltas);
+                    sequences[tag].deltas = NULL;
+                }
+            }
+        }
+    }
+    // call the right hook:
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        if(typeof amy_sequencer_js_hook === 'function') {
+            amy_sequencer_js_hook($0);
+        }
+    }, amy_global.sequencer_tick_count);
+#endif
+    if(amy_external_sequencer_hook!=NULL) {
+        amy_external_sequencer_hook(amy_global.sequencer_tick_count);
+    }
+}
+
+void sequencer_midi_start() {
+    // MIDI "Start" begins from tick 0 and then advances from F8 clocks.
+    sequencer_external_clock = true;
+    sequencer_running = true;
+    midi_clock_subtick = 0;
+    amy_global.sequencer_tick_count = 0;
+}
+
+void sequencer_midi_stop() {
+    sequencer_external_clock = true;
+    sequencer_running = false;
+    midi_clock_subtick = 0;
+}
+
+void sequencer_midi_clock_tick() {
+    // MIDI timing clock is 24 PPQ, AMY sequencer runs at 48 PPQ.
+    sequencer_external_clock = true;
+    if (!sequencer_running) return;
+    midi_clock_subtick ^= 1;
+    if (midi_clock_subtick == 0) {
+        sequencer_process_tick();
+    }
+}
+
 uint8_t sequencer_add_event(amy_event *e) {
     // add this event to the list of sequencer events in the LL.
     // e->sequence is set up.
@@ -109,47 +178,10 @@ uint8_t sequencer_add_event(amy_event *e) {
 
 
 void sequencer_check_and_fill() {
+    if (!sequencer_running || sequencer_external_clock) return;
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
     while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
-        amy_global.sequencer_tick_count++;
-        // Scan through LL looking for matches
-        for (int32_t tag = 0; tag <= highest_tag; ++tag) {
-            if (sequences[tag].deltas != NULL) {
-                bool hit = false;
-                bool delete = false;
-                if(sequences[tag].period != 0) { // period set
-                    uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
-                    if (offset == sequences[tag].tick) hit = true;
-                } else {
-                    // Test for absolute tick (no period set)
-                    if (sequences[tag].tick == amy_global.sequencer_tick_count) { hit = true; delete = true; }
-                }
-                if(hit) {
-                    struct delta *d = sequences[tag].deltas;
-                    while(d) {
-                        // assume the d->time is 0 and that's good.
-                        add_delta_to_queue(d, &amy_global.delta_queue);
-                        d = d->next;
-                    }
-                    // Delete absolute tick addressed sequence entry if sent
-                    if(delete) {
-                        delta_release_list(sequences[tag].deltas);
-                        sequences[tag].deltas = NULL;
-                    }
-                }
-            }
-        }
-        // call the right hook:
-#ifdef __EMSCRIPTEN__
-        EM_ASM({
-            if(typeof amy_sequencer_js_hook === 'function') {
-                amy_sequencer_js_hook($0);
-            }
-        }, amy_global.sequencer_tick_count);
-#endif
-        if(amy_external_sequencer_hook!=NULL) {
-            amy_external_sequencer_hook(amy_global.sequencer_tick_count);
-        }
+        sequencer_process_tick();
         amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + (uint64_t)amy_global.us_per_tick;
     }
 }
@@ -246,4 +278,3 @@ void _sequencer_stop() {
 }
 
 #endif
-
