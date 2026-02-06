@@ -111,8 +111,8 @@ static void fclose_if_file(memorypcm_preset_t *preset) {
     }
     if (preset->type == AMY_PCM_TYPE_FILE &&
         preset->file_handle != 0 &&
-        amy_external_fclose_hook != NULL) {
-        amy_external_fclose_hook(preset->file_handle);
+        amy_global.config.amy_external_fclose_hook != NULL) {
+        amy_global.config.amy_external_fclose_hook(preset->file_handle);
         preset->file_handle = 0;
     }
 }
@@ -126,14 +126,14 @@ void pcm_note_on(uint16_t osc) {
             if (preset->file_handle != 0) {
                 wave_info_t info = {0};
                 uint32_t data_bytes = 0;
-                amy_external_fseek_hook(preset->file_handle, 0);
+                amy_global.config.amy_external_fseek_hook(preset->file_handle, 0);
                 if (wave_parse_header(preset->file_handle, &info, &data_bytes)) {
                     preset->channels = info.channels;
                     preset->samplerate = info.sample_rate;
                     preset->log2sr = log2f((float)info.sample_rate / ZERO_LOGFREQ_IN_HZ);
                     preset->file_bytes_remaining = data_bytes;
                 } else {
-                    amy_external_fclose_hook(preset->file_handle);
+                    amy_global.config.amy_external_fclose_hook(preset->file_handle);
                 }
             }
         } else if (preset->type == AMY_PCM_TYPE_ROM) {
@@ -323,11 +323,11 @@ int pcm_load_file() {
     if (filename == NULL || filename[0] == '\0') {
         return 0;
     }
-    if (amy_external_fopen_hook == NULL || amy_external_fclose_hook == NULL) {
+    if (amy_global.config.amy_external_fopen_hook == NULL || amy_global.config.amy_external_fclose_hook == NULL) {
         fprintf(stderr, "fopen hook not enabled on platform\n");
         return 0;
     }
-    uint32_t handle = amy_external_fopen_hook((char *)filename, "rb");
+    uint32_t handle = amy_global.config.amy_external_fopen_hook((char *)filename, "rb");
     if (handle == 0) {
         fprintf(stderr, "Could not open file %s\n", filename);
         return 0;
@@ -336,7 +336,7 @@ int pcm_load_file() {
     uint32_t data_bytes = 0;
     if (!wave_parse_header(handle, &info, &data_bytes)) {
         fprintf(stderr, "Could not parse WAVE file %s\n", filename);
-        amy_external_fclose_hook(handle);
+        amy_global.config.amy_external_fclose_hook(handle);
         return 0;
     }
     uint32_t total_frames = 0;

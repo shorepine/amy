@@ -68,9 +68,8 @@ int main(int argc, char ** argv) {
                 break; 
         } 
     }
-    amy_external_render_hook = render;
-
     amy_config_t amy_config = amy_default_config();
+    amy_config.amy_external_render_hook = render;
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
     amy_config.playback_device_id = playback_device_id;
     fprintf(stderr, "playback_device_id=%d\n", playback_device_id);

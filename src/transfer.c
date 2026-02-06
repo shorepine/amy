@@ -224,12 +224,12 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     if (filename == NULL || filename[0] == '\0') {
         return;
     }
-    if (amy_external_fopen_hook == NULL || amy_external_fwrite_hook == NULL || amy_external_fclose_hook == NULL) {
+    if (amy_global.config.amy_external_fopen_hook == NULL || amy_global.config.amy_external_fwrite_hook == NULL || amy_global.config.amy_external_fclose_hook == NULL) {
 
         fprintf(stderr, "file transfer hooks not enabled on platform\n");
         return;
     }
-        uint32_t handle = amy_external_fopen_hook((char *)filename, "wb");
+        uint32_t handle = amy_global.config.amy_external_fopen_hook((char *)filename, "wb");
     if (handle == HANDLE_INVALID) {
         fprintf(stderr, "could not open file for transfer: %s\n", filename);
         return;
@@ -249,8 +249,8 @@ void parse_transfer_message(char * message, uint16_t len) {
     size_t decoded = 0;
     uint8_t * block = b64_decode_ex (message, len, &decbuf, &decoded);
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
-        if (amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
-            uint32_t wrote = amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
+        if (amy_global.config.amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
+            uint32_t wrote = amy_global.config.amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
             amy_global.transfer_stored_bytes += wrote;
         }
     } else {
@@ -260,11 +260,11 @@ void parse_transfer_message(char * message, uint16_t len) {
     }
     if (amy_global.transfer_stored_bytes >= amy_global.transfer_length_bytes) { // we're done
         if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE) {
-            if (amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
-                amy_external_fclose_hook(amy_global.transfer_file_handle);
+            if (amy_global.config.amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
+                amy_global.config.amy_external_fclose_hook(amy_global.transfer_file_handle);
             }
-            if (amy_external_file_transfer_done_hook != NULL) {
-                amy_external_file_transfer_done_hook(amy_global.transfer_filename); 
+            if (amy_global.config.amy_external_file_transfer_done_hook != NULL) {
+                amy_global.config.amy_external_file_transfer_done_hook(amy_global.transfer_filename); 
             }
             amy_global.transfer_file_handle = 0;
             amy_global.transfer_filename[0] = '\0';
@@ -452,11 +452,11 @@ void transfer_init() {
     #endif
 
  #if defined(_POSIX_VERSION) 
-    amy_external_fopen_hook = posix_external_fopen_hook;
-    amy_external_fread_hook = posix_external_fread_hook;
-    amy_external_fwrite_hook = posix_external_fwrite_hook;
-    amy_external_fclose_hook = posix_external_fclose_hook;
-    amy_external_fseek_hook = posix_external_fseek_hook;
+    amy_global.config.amy_external_fopen_hook = posix_external_fopen_hook;
+    amy_global.config.amy_external_fread_hook = posix_external_fread_hook;
+    amy_global.config.amy_external_fwrite_hook = posix_external_fwrite_hook;
+    amy_global.config.amy_external_fclose_hook = posix_external_fclose_hook;
+    amy_global.config.amy_external_fseek_hook = posix_external_fseek_hook;
 #endif
 }
 
@@ -470,12 +470,12 @@ static uint32_t read_u32_le(const uint8_t *buf) {
 }
 
 static int read_exact(uint32_t handle, uint8_t *buf, uint32_t len) {
-    if (amy_external_fread_hook == NULL) {
+    if (amy_global.config.amy_external_fread_hook == NULL) {
         return 0;
     }
     uint32_t offset = 0;
     while (offset < len) {
-        uint32_t got = amy_external_fread_hook(handle, buf + offset, len - offset);
+        uint32_t got = amy_global.config.amy_external_fread_hook(handle, buf + offset, len - offset);
         if (got == 0) {
             return 0;
         }
@@ -581,10 +581,10 @@ uint32_t wave_read_pcm_frames_s16(uint32_t handle, uint16_t channels,
         max_bytes = sizeof(raw_buf) - (sizeof(raw_buf) % bytes_per_frame);
         frames_to_read = max_bytes / bytes_per_frame;
     }
-    if (amy_external_fread_hook == NULL) {
+    if (amy_global.config.amy_external_fread_hook == NULL) {
         return 0;
     }
-    uint32_t got = amy_external_fread_hook(handle, raw_buf, max_bytes);
+    uint32_t got = amy_global.config.amy_external_fread_hook(handle, raw_buf, max_bytes);
     got -= got % bytes_per_frame;
     if (got == 0) {
         return 0;
