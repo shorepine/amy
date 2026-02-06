@@ -102,34 +102,32 @@ amy_start(amy_config);
 
 ## Hooks
 
-Optionally called by AMY during rendering:
+Hooks are configured on `amy_config_t` before calling `amy_start`:
 
 ```c
-// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. return 1 if this oscillator should be silent
-uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
-
-// Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
-float (*amy_external_coef_hook)(uint16_t channel) = NULL;
-
-// Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
-void (*amy_external_block_done_hook)(void) = NULL;
-
-// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY -- see midi_mappings.c
-void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
-
-// Called every sequencer tick
-void (*amy_external_sequencer_hook)(uint32_t) = NULL;
-
-// Hooks for file reading / writing / opening if your AMY host supports that 
-// We provide this for POSIX platforms (mac, linux, etc) 
-uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
-uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
-uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
-void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
-
-// Called when a file transfer is done (used in Micropython platforms to unpack)
-void (*amy_external_file_transfer_done_hook)(const char *filename) = NULL;
+amy_config_t amy_config = amy_default_config();
+amy_config.amy_external_midi_input_hook = my_midi_hook;
+amy_config.amy_external_render_hook = my_render_hook;
+amy_start(amy_config);
 ```
+
+Hook fields in `amy_config_t`:
+
+```c
+uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE *buf, uint16_t len);
+float (*amy_external_coef_hook)(uint16_t channel);
+void (*amy_external_block_done_hook)(void);
+void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
+void (*amy_external_sequencer_hook)(uint32_t tick_count);
+uint32_t (*amy_external_fopen_hook)(char *filename, char *mode);
+uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
+void (*amy_external_fclose_hook)(uint32_t fptr);
+void (*amy_external_file_transfer_done_hook)(const char *filename);
+```
+
+All hook fields default to `NULL` in `amy_default_config()`.
 
 
 ## `amy_event` and `amy.send` API:
