@@ -1,11 +1,6 @@
 #include "sequencer.h"
 #include "amy.h"
 
-
-
-// Optional sequencer hook that's called every tick
-extern void (*amy_external_sequencer_hook)(uint32_t);
-
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -116,8 +111,8 @@ static void sequencer_process_tick(void) {
         }
     }, amy_global.sequencer_tick_count);
 #endif
-    if(amy_external_sequencer_hook!=NULL) {
-        amy_external_sequencer_hook(amy_global.sequencer_tick_count);
+    if(amy_global.config.amy_external_sequencer_hook != NULL) {
+        amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
     }
 }
 

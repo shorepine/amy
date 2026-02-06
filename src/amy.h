@@ -652,6 +652,19 @@ typedef struct  {
     // alternative audio output function
     size_t (*write_samples_fn)(const uint8_t *buffer, size_t buffer_size);
 
+    // Optional hooks for host/platform integration.
+    uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE *, uint16_t len);
+    float (*amy_external_coef_hook)(uint16_t channel);
+    void (*amy_external_block_done_hook)(void);
+    void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
+    void (*amy_external_sequencer_hook)(uint32_t tick_count);
+    uint32_t (*amy_external_fopen_hook)(char *filename, char *mode);
+    uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+    uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
+    void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
+    void (*amy_external_fclose_hook)(uint32_t fptr);
+    void (*amy_external_file_transfer_done_hook)(const char *filename);
+
     // pins for MCU platforms
     int8_t i2s_lrc;
     int8_t i2s_dout;
@@ -827,18 +840,6 @@ uint32_t amy_sysclock();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);
-extern uint8_t (*amy_external_render_hook)(uint16_t, SAMPLE*, uint16_t);
-extern float (*amy_external_coef_hook)(uint16_t);
-extern void (*amy_external_block_done_hook)(void);
-extern void (*amy_external_midi_input_hook)(uint8_t *, uint16_t, uint8_t);
-extern void (*amy_external_sequencer_hook)(uint32_t);
-// Hooks for file reading / writing / opening if your AMY host supports that
-extern uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) ;
-extern uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len);
-extern uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
-extern void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
-extern void (*amy_external_fclose_hook)(uint32_t fptr);
-extern void (*amy_external_file_transfer_done_hook)(const char *filename);
 
 
 #ifdef __EMSCRIPTEN__

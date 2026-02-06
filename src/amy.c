@@ -1346,9 +1346,9 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
-    if(amy_external_coef_hook != NULL) {
-        ctrl_inputs[COEF_EXT0] = amy_external_coef_hook(0);
-        ctrl_inputs[COEF_EXT1] = amy_external_coef_hook(1);
+    if(amy_global.config.amy_external_coef_hook != NULL) {
+        ctrl_inputs[COEF_EXT0] = amy_global.config.amy_external_coef_hook(0);
+        ctrl_inputs[COEF_EXT1] = amy_global.config.amy_external_coef_hook(1);
     } else {
         #ifdef __EMSCRIPTEN__
         ctrl_inputs[COEF_EXT0] = amy_web_cv_1;
@@ -1551,8 +1551,8 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
 	        }
             uint8_t handled = 0;
-            if(amy_external_render_hook!=NULL) {
-                handled = amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
+            if(amy_global.config.amy_external_render_hook != NULL) {
+                handled = amy_global.config.amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);
             } else {
                 #ifdef __EMSCRIPTEN__
                 // TODO -- pass the buffer to a JS shim using the new bytes support, we could use this to visualize CV output
@@ -1641,8 +1641,8 @@ void amy_block_processed(void) {
         }
     });
 #else
-    if(amy_external_block_done_hook != NULL) {
-        amy_external_block_done_hook();
+    if(amy_global.config.amy_external_block_done_hook != NULL) {
+        amy_global.config.amy_external_block_done_hook();
     }
 #endif
 }

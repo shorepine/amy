@@ -3,35 +3,6 @@
 
 #include "amy.h"
 
-//////////////////////
-// Hooks
-
-// Optional render hook that's called per oscillator during rendering, used (now) for CV output from oscillators. 
-// return 1 if this oscillator should be silent
-uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE*, uint16_t len ) = NULL;
-
-// Optional external coef setter (meant for CV control of AMY via CtrlCoefs)
-float (*amy_external_coef_hook)(uint16_t channel) = NULL;
-
-// Optional hook that's called after all processing is done for a block, meant for python callback control of AMY
-void (*amy_external_block_done_hook)(void) = NULL;
-
-// Optional hook for a consumer of AMY to access MIDI data coming IN to AMY
-void (*amy_external_midi_input_hook)(uint8_t * bytes, uint16_t len, uint8_t is_sysex) = NULL;
-
-// Called every sequencer tick
-void (*amy_external_sequencer_hook)(uint32_t) = NULL;
-
-// Hooks for file reading / writing / opening if your AMY host supports that
-uint32_t (*amy_external_fopen_hook)(char * filename, char * mode) = NULL;
-uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
-uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
-void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos) = NULL;
-void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
-void (*amy_external_file_transfer_done_hook)(const char *filename) = NULL;
-
-
-
 amy_config_t amy_default_config() {
     amy_config_t c;
     c.features.reverb = 1;
@@ -48,6 +19,17 @@ amy_config_t amy_default_config() {
     c.platform.multithread = 1;
 
     c.write_samples_fn = NULL;
+    c.amy_external_render_hook = NULL;
+    c.amy_external_coef_hook = NULL;
+    c.amy_external_block_done_hook = NULL;
+    c.amy_external_midi_input_hook = NULL;
+    c.amy_external_sequencer_hook = NULL;
+    c.amy_external_fopen_hook = NULL;
+    c.amy_external_fwrite_hook = NULL;
+    c.amy_external_fread_hook = NULL;
+    c.amy_external_fseek_hook = NULL;
+    c.amy_external_fclose_hook = NULL;
+    c.amy_external_file_transfer_done_hook = NULL;
 
     c.midi = AMY_MIDI_IS_NONE;
     c.audio = AMY_AUDIO_IS_NONE;
@@ -245,7 +227,7 @@ void amy_start_web() {
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 1;
     amy_config.features.startup_bleep = 1;
-    amy_external_midi_input_hook = midi_cc_handler;
+    amy_config.amy_external_midi_input_hook = midi_cc_handler;
     amy_start(amy_config);
 }
 
@@ -254,7 +236,7 @@ void amy_start_web_no_synths() {
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 0;
-    amy_external_midi_input_hook = midi_cc_handler;
+    amy_config.amy_external_midi_input_hook = midi_cc_handler;
     amy_start(amy_config);
 }
 #endif
@@ -298,7 +280,7 @@ void amy_default_synths() {
     e.synth = 1;
     amy_add_event(&e);
     // Add some MIDI CCs for the Juno (defined in midi_mappings.c).
-    amy_external_midi_input_hook = juno_filter_midi_handler;
+    amy_global.config.amy_external_midi_input_hook = juno_filter_midi_handler;
 }
 
 // Schedule a bleep now
@@ -362,7 +344,9 @@ void amy_start(amy_config_t c) {
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_start();
 #endif
-    amy_external_midi_input_hook = midi_cc_handler;
+    if (amy_global.config.amy_external_midi_input_hook == NULL) {
+        amy_global.config.amy_external_midi_input_hook = midi_cc_handler;
+    }
 }
 
 void amy_stop() {

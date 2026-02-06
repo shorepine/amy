@@ -164,8 +164,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
     }
 
     // Also send the external hooks if set
-    if(amy_external_midi_input_hook != NULL) {
-        amy_external_midi_input_hook(data, len, sysex);
+    if(amy_global.config.amy_external_midi_input_hook != NULL) {
+        amy_global.config.amy_external_midi_input_hook(data, len, sysex);
     }
 
     // Update web MIDI out hook if set
