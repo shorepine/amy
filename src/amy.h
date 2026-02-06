@@ -170,6 +170,7 @@ extern const uint16_t pcm_samples;
 #define DEFAULT_NUM_BREAKPOINTS 8
 // We need a max on the number of breakpoints to lay out the params enum statically.  Otherwise, it's dynamic.
 #define MAX_BREAKPOINTS 24
+#define MAX_BPS MAX_BREAKPOINTS
 #define MAX_BREAKPOINT_SETS 2
 #define THREAD_USLEEP 500
 #define AMY_BYTES_PER_SAMPLE 2
@@ -477,8 +478,10 @@ typedef struct amy_event {
     // Convert these two at least to vectors of ints, save several hundred bytes
     int16_t algo_source[MAX_ALGO_OPS];
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-    char bp0[MAX_PARAM_LEN];
-    char bp1[MAX_PARAM_LEN];
+    int16_t eg0_times[MAX_BPS];
+    float eg0_values[MAX_BPS];
+    int16_t eg1_times[MAX_BPS];
+    float eg1_values[MAX_BPS];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     // Instrument-layer values.
     uint8_t synth;

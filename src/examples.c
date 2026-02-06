@@ -349,7 +349,9 @@ void example_drums(uint32_t start, int loops) {
     e.filter_freq_coefs[COEF_EG0] = 2.0;  // When env0 is 1.0, filter is shifted up by 2.0 octaves (x4, so 2600.0).
     e.resonance = 5.0;
     e.filter_type = FILTER_LPF;
-    strcpy(e.bp0, "0,1,500,0.2,25,0");
+    e.eg0_times[0] = 0;   e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 500; e.eg0_values[1] = 0.2f;
+    e.eg0_times[2] = 25;  e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
 
@@ -541,7 +543,9 @@ void example_fm(uint32_t start) {
     e.amp_coefs[COEF_CONST] = 1.0f;
     e.amp_coefs[COEF_VEL] = 0;
     e.amp_coefs[COEF_EG0] = 1.0f;
-    strcpy(e.bp0, "0,1,1000,0,0,0");
+    e.eg0_times[0] = 0;    e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 1000; e.eg0_values[1] = 0.0f;
+    e.eg0_times[2] = 0;    e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
     // ALGO control oscillator
@@ -637,7 +641,9 @@ void example_patch_from_events() {
     e.osc = 0;
     e.wave = SAW_DOWN;
     e.chained_osc = 1;
-    strcpy(e.bp0, "0,1,1000,0.1,200,0");
+    e.eg0_times[0] = 0;    e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 1000; e.eg0_values[1] = 0.1f;
+    e.eg0_times[2] = 200;  e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
@@ -646,7 +652,9 @@ void example_patch_from_events() {
     e.osc = 1;
     e.wave = SINE;
     e.freq_coefs[COEF_CONST] = 131.0f;
-    strcpy(e.bp0, "0,1,500,0,200,0");
+    e.eg0_times[0] = 0;   e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 500; e.eg0_values[1] = 0.0f;
+    e.eg0_times[2] = 200; e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
