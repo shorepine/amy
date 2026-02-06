@@ -811,7 +811,6 @@ void free_osc(int osc);
 void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void patches_init(int max_memory_patches);
 void patches_deinit();
-int parse_breakpoint(struct synthinfo * e, char* message, uint8_t bp_set) ;
 void parse_algo_source(char* message, int16_t *vals);
 void hold_and_modify(uint16_t osc) ;
 void amy_execute_delta();
