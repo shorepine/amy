@@ -188,6 +188,25 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }     \
 }
 
+#define _EPRINT_BP(TFIELD, VFIELD, NAME) {          \
+    int last_set = -1;                              \
+    for (int i = 0; i < MAX_BPS; ++i) {             \
+        if (AMY_IS_SET(e->TFIELD[i]) || AMY_IS_SET(e->VFIELD[i])) last_set = i; \
+    }                                                \
+    if (last_set >= 0) {                            \
+        fprintf(stderr, "%s: ", NAME);              \
+        for (int i = 0; i <= last_set; ++i) {       \
+            if (i > 0) fprintf(stderr, ",");        \
+            if (AMY_IS_SET(e->TFIELD[i]))           \
+                fprintf(stderr, "%" PRId32, (int32_t)e->TFIELD[i]); \
+            fprintf(stderr, ",");                   \
+            if (AMY_IS_SET(e->VFIELD[i]))           \
+                fprintf(stderr, "%.3f", e->VFIELD[i]); \
+        }                                            \
+        fprintf(stderr, " ");                       \
+    }                                                \
+}
+
 void print_event(amy_event *e) {
     fprintf(stderr, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
     _EPRINT_I(wave, "wave");
@@ -220,10 +239,8 @@ void print_event(amy_event *e) {
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS);
     _EPRINT_I_SEQ(voices, "voices", MAX_VOICES_PER_INSTRUMENT);
-    //_EPRINT_I(bp0, "bp0", MAX_PARAM_LEN);
-    //_EPRINT_I(bp1, "bp1", MAX_PARAM_LEN);
-    if (e->bp0[0]) fprintf(stderr, "bp0: %s ", e->bp0);
-    if (e->bp1[0]) fprintf(stderr, "bp0: %s ", e->bp1);
+    _EPRINT_BP(eg0_times, eg0_values, "eg0");
+    _EPRINT_BP(eg1_times, eg1_values, "eg1");
     _EPRINT_I_SEQ(eg_type, "eg_type", MAX_BREAKPOINT_SETS);
     // Instrument-layer values.
     _EPRINT_I(synth, "synth");
@@ -356,20 +373,21 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
     }
     queue = queue->next;
   }
-  char *bp_strings[MAX_BREAKPOINT_SETS] = {event->bp0, event->bp1};
+  int16_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {event->eg0_times, event->eg1_times};
+  float *bp_values[MAX_BREAKPOINT_SETS] = {event->eg0_values, event->eg1_values};
   for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
       if (highest_breakpoint[i] >= 0) {
-          char *s = bp_strings[i];
-          for (int j = 0; j < highest_breakpoint[i]; ++j) {
-              if (j > 0) {*s++ = ',';  *s = 0;}
+          event->bp_is_set[i] = 1;
+          for (int j = 0; j <= highest_breakpoint[i]; ++j) {
               if (AMY_IS_SET(breakpoint_times[i][j])) {
-                  sprintf(s, "%" PRId32, (int32_t)roundf(breakpoint_times[i][j] / 44.1f));
-                  s += strlen(s);
+                  float t_ms = ((float)breakpoint_times[i][j]) * 1000.0f / (float)AMY_SAMPLE_RATE;
+                  int32_t t_rounded = (int32_t)roundf(t_ms);
+                  if (t_rounded < 0) t_rounded = 0;
+                  if (t_rounded >= SHRT_MAX) t_rounded = SHRT_MAX - 1;
+                  bp_times_ms[i][j] = (int16_t)t_rounded;
               }
-              *s++ = ',';  *s = 0;
               if (AMY_IS_SET(breakpoint_values[i][j])) {
-                  sprintf(s, "%.3f", breakpoint_values[i][j]);
-                  s += strlen(s);
+                  bp_values[i][j] = breakpoint_values[i][j];
               }
           }
       }

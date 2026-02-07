@@ -133,8 +133,12 @@ void amy_clear_event(amy_event *e) {
     for (int i = 0; i < MAX_VOICES_PER_INSTRUMENT; ++i) {
         AMY_UNSET(e->voices[i]);
     }
-    e->bp0[0] = 0;
-    e->bp1[0] = 0;
+    for (int i = 0; i < MAX_BPS; ++i) {
+        AMY_UNSET(e->eg0_times[i]);
+        AMY_UNSET(e->eg0_values[i]);
+        AMY_UNSET(e->eg1_times[i]);
+        AMY_UNSET(e->eg1_values[i]);
+    }
     AMY_UNSET(e->synth);
     AMY_UNSET(e->synth_flags);
     AMY_UNSET(e->to_synth);

@@ -596,38 +596,35 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         }
     }
 
-
-    char * bps[MAX_BREAKPOINT_SETS] = {e->bp0, e->bp1};
+    int16_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {e->eg0_times, e->eg1_times};
+    float *bp_values[MAX_BREAKPOINT_SETS] = {e->eg0_values, e->eg1_values};
     for (uint8_t i = 0; i < MAX_BREAKPOINT_SETS; i++) {
-        // amy_parse_message sets bp_is_set for anything including an empty string,
-        // but direct calls to amy_add_event can just put a nonempty string into bp0/1.
-        if(AMY_IS_SET(e->bp_is_set[i]) || bps[i][0] != 0) {
-            // TODO(dpwe): Modify parse_breakpoints *not* to need an entire synthinfo, but to work with
-            // vectors of breakpoint times/values.
-            struct synthinfo t;
-            uint32_t breakpoint_times[MAX_BREAKPOINTS];
-            float breakpoint_values[MAX_BREAKPOINTS];
-            t.max_num_breakpoints[i] = MAX_BREAKPOINTS;
-            t.breakpoint_times[i] = (uint32_t *)&breakpoint_times;
-            t.breakpoint_values[i] = (float *)&breakpoint_values;
-            int num_bps = parse_breakpoint(&t, bps[i], i);
+        // amy_parse_message sets bp_is_set for anything including an empty bp string.
+        // Direct API calls can set typed breakpoint arrays without touching bp_is_set.
+        bool bp_arrays_set = AMY_IS_SET(bp_times_ms[i][0]) || AMY_IS_SET(bp_values[i][0]);
+        if(AMY_IS_SET(e->bp_is_set[i]) || bp_arrays_set) {
+            int num_bps = 0;
+            for (int j = 0; j < MAX_BREAKPOINTS; ++j) {
+                if (AMY_IS_SET(bp_times_ms[i][j]) || AMY_IS_SET(bp_values[i][j])) {
+                    num_bps = j + 1;
+                }
+            }
             for(uint8_t j = 0; j < num_bps; j++) {
-                if(AMY_IS_SET(t.breakpoint_times[i][j])) {
+                if(AMY_IS_SET(bp_times_ms[i][j])) {
                     d.param = BP_START + (j * 2) + (i * MAX_BREAKPOINTS * 2);
-                    d.data.i = t.breakpoint_times[i][j];
+                    d.data.i = ms_to_samples((uint32_t)bp_times_ms[i][j]);
                     add_delta_to_queue(&d, queue);
                 }
-                if(AMY_IS_SET(t.breakpoint_values[i][j])) {
+                if(AMY_IS_SET(bp_values[i][j])) {
                     d.param = BP_START + (j * 2 + 1) + (i * MAX_BREAKPOINTS * 2);
-                    d.data.f = t.breakpoint_values[i][j];
+                    d.data.f = bp_values[i][j];
                     add_delta_to_queue(&d, queue);
                 }
-                //fprintf(stderr, "bp %d/%d\n", j, num_bps);
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
             if (num_bps < MAX_BREAKPOINTS) {
                 d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
-                d.data.i = AMY_UNSET_VALUE(t.breakpoint_times[0][0]);
+                d.data.i = AMY_UNSET_VALUE(d.data.i);
                 add_delta_to_queue(&d, queue);
             }
         }

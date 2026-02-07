@@ -109,7 +109,9 @@ int main(int argc, char ** argv) {
     e.freq_coefs[COEF_CONST] = 130.81f;
     e.freq_coefs[COEF_NOTE] = 1.f;
     e.portamento_ms = 0;
-    strcpy(e.bp0, "30,1,1355,0.354,232,0");
+    e.eg0_times[0] = 30;   e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 1355; e.eg0_values[1] = 0.354f;
+    e.eg0_times[2] = 232;  e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
@@ -121,7 +123,9 @@ int main(int argc, char ** argv) {
     e.filter_freq_coefs[COEF_NOTE] = 0.677f;
     e.filter_freq_coefs[COEF_EG1] = 5.024f;
     e.resonance = 0.93f;
-    strcpy(e.bp1, "30,1,1355,0.354,232,0");
+    e.eg1_times[0] = 30;   e.eg1_values[0] = 1.0f;
+    e.eg1_times[1] = 1355; e.eg1_values[1] = 0.354f;
+    e.eg1_times[2] = 232;  e.eg1_values[2] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
@@ -135,7 +139,9 @@ int main(int argc, char ** argv) {
     e.freq_coefs[COEF_CONST] = 130.81f;
     e.freq_coefs[COEF_NOTE] = 1.f;
     e.portamento_ms = 0;
-    strcpy(e.bp0, "30,1,1355,0.354,232,0");
+    e.eg0_times[0] = 30;   e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 1355; e.eg0_values[1] = 0.354f;
+    e.eg0_times[2] = 232;  e.eg0_values[2] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
@@ -148,7 +154,8 @@ int main(int argc, char ** argv) {
     e.amp_coefs[COEF_EG0] = 1.0f;
     e.freq_coefs[COEF_CONST] = 4.0f;
     e.freq_coefs[COEF_NOTE] = 0;
-    strcpy(e.bp0, "0,1,10000,0");
+    e.eg0_times[0] = 0;      e.eg0_values[0] = 1.0f;
+    e.eg0_times[1] = 10000;  e.eg0_values[1] = 0.0f;
     amy_add_event(&e);
 
     e = amy_default_event();
