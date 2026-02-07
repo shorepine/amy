@@ -84,8 +84,8 @@ amy_start(amy_config);
 | `features.audio_in` | `0=off, 1=on` | Off | If audio_in gets processed via the audio interface. Must be 1 for AUDIO_IS_MINIAUDIO |
 | `features.default_synths` | `0=off, 1=on` | Off| If AMY boots with Juno-6 on `synth` 1 and GM drums on `synth` 10 |
 | `features.startup_bleep` | `0=off, 1=on` | Off | If AMY plays a startup sound on boot |
-| `platform.multicore | `0=off, 1=on` | On | Attempts to use 2nd core if available |
-| `platform.multithread | `0=off, 1=on` | On | Attempts to multithreading if available (ESP/RTOS) |
+| `platform.multicore` | `0=off, 1=on` | On | Attempts to use 2nd core if available |
+| `platform.multithread` | `0=off, 1=on` | On | Attempts to multithreading if available (ESP/RTOS) |
 | `midi` | `AMY_MIDI_IS_NONE`, `AMY_MIDI_IS_UART`, `AMY_MIDI_IS_USB_GADGET`, `AMY_MIDI_IS_WEBMIDI` | `AMY_MIDI_IS_NONE` | Which MIDI interface(s) are active |
 | `audio` | `AMY_AUDIO_IS_NONE`, `AMY_AUDIO_IS_I2S`, `AMY_AUDIO_IS_USB_GADGET`, `AMY_AUDIO_IS_MINIAUDIO`| I2S or miniaudio | Which audio interface(s) are active |
 | `write_samples_fn` | fn ptr | `NULL` | If provided, `amy_update` will call this with each new block of samples | 
