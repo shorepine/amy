@@ -24,6 +24,11 @@
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
+static uint8_t external_midi_sync_enabled = 0;
+
+void amy_external_midi_sync(uint8_t enabled) {
+    external_midi_sync_enabled = enabled ? 1 : 0;
+}
 
 static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t sysex) {
     fprintf(stderr, "MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
@@ -159,8 +164,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
         else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
-        else if(status_byte == 0xFA) sequencer_midi_start();
-        else if(status_byte == 0xFC) sequencer_midi_stop();
+        else if(status_byte == 0xFA && external_midi_sync_enabled) sequencer_midi_start();
+        else if(status_byte == 0xFC && external_midi_sync_enabled) sequencer_midi_stop();
     }
 
     // Also send the external hooks if set
@@ -179,7 +184,9 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 
 void midi_clock_received() {
-    sequencer_midi_clock_tick();
+    if (external_midi_sync_enabled) {
+        sequencer_midi_clock_tick();
+    }
 }
 
 
