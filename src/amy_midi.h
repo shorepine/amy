@@ -15,6 +15,7 @@
 void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb);
 void amy_process_single_midi_byte(uint8_t byte, uint8_t from_web_or_usb);
 void amy_external_midi_output(uint8_t * data, uint32_t len);
+void amy_external_midi_sync(uint8_t enabled);
 
 
 #define MAX_MIDI_BYTES_TO_PARSE 1024
