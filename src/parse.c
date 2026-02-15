@@ -1,4 +1,4 @@
-// parse.c 
+// parse.c
 // handle parsing wire strings
 
 #include "amy.h"
@@ -447,8 +447,8 @@ int amy_parse_message(char * message, int length, amy_event *e) {
     peek_stack("parse_message");
     char cmd = '\0';
     uint16_t pos = 0;
-    
-    // Check if we're in a transfer block, if so, parse it and leave this loop 
+
+    // Check if we're in a transfer block, if so, parse it and leave this loop
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
@@ -499,7 +499,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atof(arg); break;
             /* j, J available */
-            // chorus.level 
+            // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
                 float chorus_params[4];
                 parse_list_float(arg, chorus_params, 4, AMY_UNSET_FLOAT);
@@ -595,3 +595,4 @@ int amy_parse_message(char * message, int length, amy_event *e) {
     // Return exactly how many characters we used.
     return pos;
 }
+

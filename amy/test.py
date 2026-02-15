@@ -44,7 +44,7 @@ class AmyTest:
     _amy.stop()
     _amy.start(1 if self.default_synths else 0)
     self.run()
-    
+
     samples = amy.render(1.0)
     amy.write(samples, os.path.join(self.test_dir, name + '.wav'))
     rms_x = dB(rms(samples))
@@ -223,7 +223,7 @@ class TestInterpPartials(AmyTest):
     amy.send(time=300, osc=0, note=67, vel=0.6)
     amy.send(time=550, osc=0, note=72, vel=1)
     amy.send(time=800, osc=0, vel=0)
-    
+
 
 class TestInterpPartialsRetrigger(AmyTest):
 
@@ -327,7 +327,7 @@ class TestLFO(AmyTest):
     amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq='0,1,0,0,0,1')
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
-    
+
 
 class TestDuty(AmyTest):
 
@@ -338,7 +338,7 @@ class TestDuty(AmyTest):
     amy.send(time=300, osc=0, wave=amy.PULSE, duty=0.9)
     amy.send(time=300, note=70, vel=1)
     amy.send(time=400, vel=0)
-    
+
 
 class TestPWM(AmyTest):
 
@@ -347,7 +347,7 @@ class TestPWM(AmyTest):
     amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=1)
     amy.send(time=100, note=70, vel=1)
     amy.send(time=500, vel=0)
-    
+
 
 class TestGlobalEQ(AmyTest):
 
@@ -655,7 +655,7 @@ class TestVoiceStealing(AmyTest):
   def __init__(self):
     super().__init__()
     self.default_synths = True
-  
+
   def run(self):
     # Default juno synth.
     amy.send(time=40, synth=1, note=60, vel=1)
@@ -703,7 +703,7 @@ class TestMidiDrums(AmyTest):
   def __init__(self):
     super().__init__()
     self.default_synths = True
-  
+
   def run(self):
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(100, 0x99, 35, 100)  # bass
@@ -757,7 +757,7 @@ class TestSynthDrums(AmyTest):
   def __init__(self):
     super().__init__()
     self.default_synths = True
-  
+
   def run(self):
     amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
@@ -945,7 +945,7 @@ class TestHPFHighBaseFreq(AmyTest):
     amy.send(time=50, synth=1, note=48, vel=10)
     amy.send(time=150, synth=1, note=60, vel=10)
     amy.send(time=250, synth=1, note=63, vel=10)
-    # notes off 
+    # notes off
     amy.send(time=400, synth=1, note=48, vel=0)
     amy.send(time=400, synth=1, note=60, vel=0)
     amy.send(time=400, synth=1, note=63, vel=0)
@@ -1016,4 +1016,3 @@ def main(argv):
 if __name__ == "__main__":
   main(sys.argv)
 
-  
