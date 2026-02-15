@@ -206,8 +206,14 @@ void amy_add_message(char *message) {
     amy_event e; // = amy_default_event();
     amy_clear_event(&e);
     // Parse the wire string into an event
-    amy_parse_message(message, strlen(message), &e);
-    amy_add_event(&e);
+    int length = strlen(message);
+    char *remains = message;
+    while(length > 0) {
+	int pos = amy_parse_message(remains, length, &e);
+	amy_add_event(&e);
+	remains += pos;
+	length -= pos;
+    }
 }
 
 // given an event play / schedule the event directly (C API)
