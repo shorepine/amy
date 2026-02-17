@@ -687,3 +687,43 @@ void ks_deinit(void) {
     for(int i=0;i<AMY_KS_OSCS;i++) free(ks_buffer[i]);
     free(ks_buffer);
 }
+
+// --------- wavetable ----------
+
+
+void wavetable_note_on(uint16_t osc, float freq) {
+    //fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
+    //float period_samples = (float)AMY_SAMPLE_RATE / freq;
+    //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
+}
+
+#include "wt_braids01.h"  // defines int16_t *BRAIDS01
+
+// Structure of waveeditonlie wavetables.
+const int CYCLES_PER_WAVETABLE = 64;
+const int WAVETABLE_SAMPLES_PER_CYCLE = 256;
+const int WAVETABLE_LOG2_SAMPLES_PER_CYCLE = 8;
+
+SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
+    float freq = freq_of_logfreq(msynth[osc]->logfreq);
+    PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
+    SAMPLE amp = F2S(msynth[osc]->amp);
+    SAMPLE last_amp = F2S(msynth[osc]->last_amp);
+    //fprintf(stderr, "render_wavetable: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
+    SAMPLE max_value;
+    float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, msynth[osc]->duty));  // Don't try to interp beyond end of table.
+    int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
+    interp = interp - table;  // fractional part, normally < 1.0, but == 1.0 for very end of table.
+    LUT wavetable_lut = {BRAIDS01, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
+    wavetable_lut.table += table * WAVETABLE_SAMPLES_PER_CYCLE;
+    // don't update phase in the first call to render_lut, so second call uses the same phase
+    SAMPLE interp_a = F2S(1.0f - interp);
+    SAMPLE interp_b = F2S(interp);
+    // If we used last_duty, we could actually smoothly interpolate the waveshape crossfade too (except across table boundaries).
+    render_lut(buf, synth[osc]->phase, step, SMULR7(last_amp, interp_a), SMULR7(amp, interp_a), &wavetable_lut, &max_value);
+    // Point to next cycle.
+    wavetable_lut.table += WAVETABLE_SAMPLES_PER_CYCLE;
+    synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, SMULR7(last_amp, interp_b), SMULR7(amp, interp_b), &wavetable_lut, &max_value);
+    msynth[osc]->last_amp = msynth[osc]->amp;
+    return max_value;
+}

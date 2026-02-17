@@ -467,7 +467,7 @@ def wavfile_to_h(wavfile, hfile):
     with open(hfile, 'w') as f:
         f.write('// AUTOMATICALLY GENERATED\n')
         f.write(f'// by wavfile_to_h({wavfile=}, {hfile=})\n\n')
-        f.write(f'const size_t {name}_len = {len(wav_data)}\n\n')
+        f.write(f'const size_t {name}_len = {len(wav_data)};\n\n')
         f.write(f'int16_t {name}[] = {{\n')
         chunklen = 16
         for start in range(0, len(wav_data), chunklen):
@@ -475,6 +475,7 @@ def wavfile_to_h(wavfile, hfile):
                 f.write(f'{wav_data[start + item]},')
             f.write('\n')
         f.write('};\n')
+    print("wrote", hfile)
 
 
 """
@@ -546,8 +547,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
 

@@ -1,7 +1,7 @@
 // AUTOMATICALLY GENERATED
 // by wavfile_to_h(wavfile='sounds/BRAIDS01.WAV', hfile='src/wt_braids01.h')
 
-const size_t BRAIDS01_len = 16384
+const size_t BRAIDS01_len = 16384;
 
 int16_t BRAIDS01[] = {
 -5257,-7083,-6068,-5581,-4992,-5231,-5330,-4957,-4573,-4235,-4085,-3790,-3386,-3096,-3000,-2928,
