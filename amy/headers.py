@@ -456,7 +456,28 @@ def make_interp_partials(filename, data_dict):
     print("wrote", filename)
 
 
-""" 
+import scipy.io.wavfile as wav
+import os
+
+def wavfile_to_h(wavfile, hfile):
+    """Read a WAV file, write as an int16_t array in a header file."""
+    with open(wavfile, 'rb') as f:
+        samplerate, wav_data = wav.read(f)
+    name = os.path.splitext(os.path.basename(wavfile))[0]
+    with open(hfile, 'w') as f:
+        f.write('// AUTOMATICALLY GENERATED\n')
+        f.write(f'// by wavfile_to_h({wavfile=}, {hfile=})\n\n')
+        f.write(f'const size_t {name}_len = {len(wav_data)}\n\n')
+        f.write(f'int16_t {name}[] = {{\n')
+        chunklen = 16
+        for start in range(0, len(wav_data), chunklen):
+            for item in range(chunklen):
+                f.write(f'{wav_data[start + item]},')
+            f.write('\n')
+        f.write('};\n')
+
+
+"""
     Generate all the headers except for the partials headers
 """
 def generate_all():
@@ -510,6 +531,13 @@ def generate_all():
     # interp_partials data table
     make_interp_partials("src/interp_partials.h",
                          {'piano': json.load(open("experiments/piano-params.json", "r"))})
+
+    # Wavetable
+    # BRAIDS01.WAV is from the wav-files package available at waveeditonline.com
+    # AFAICT it's one of the wavetable sets from the Mutable Instruments Braids oscillator
+    # https://github.com/pichenettes/eurorack/tree/master/braids
+    wavfile_to_h('sounds/BRAIDS01.WAV', 'src/wt_braids01.h')
+
 
 def main():
     print("Generating all headers needed for AMY...")
