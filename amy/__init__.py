@@ -138,6 +138,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('to_synth', 'itI'),
     ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'), ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
+    ('midi_cc', 'icL'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
