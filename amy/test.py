@@ -951,6 +951,14 @@ class TestHPFHighBaseFreq(AmyTest):
     amy.send(time=400, synth=1, note=63, vel=0)
 
 
+class TestWavetable(AmyTest):
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.WAVETABLE, duty='0,0,0,0,8', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
+    amy.send(time=50, note=50, vel=1)
+    amy.send(time=850, vel=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
