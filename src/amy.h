@@ -231,8 +231,10 @@ enum coefs{
 #define PCM_LEFT 17
 #define PCM_RIGHT 18
 #define PCM_MIX 7 // same as PCM
-#define CUSTOM 19
-#define WAVE_OFF 20
+#define WAVETABLE 19
+#define CUSTOM 20
+#define WAVE_OFF 21
+
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
 // synth[].status values
@@ -884,6 +886,7 @@ SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel);
 
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_wavetable(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
 extern SAMPLE render_pulse(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_saw_down(SAMPLE * buf, uint16_t osc);
@@ -945,6 +948,7 @@ extern SAMPLE compute_mod_pcm(uint16_t osc);
 extern SAMPLE compute_mod_custom(uint16_t osc);
 
 extern void sine_note_on(uint16_t osc, float initial_freq); 
+extern void wavetable_note_on(uint16_t osc, float initial_freq); 
 extern void fm_sine_note_on(uint16_t osc, uint16_t algo_osc); 
 extern void saw_down_note_on(uint16_t osc, float initial_freq); 
 extern void saw_up_note_on(uint16_t osc, float initial_freq); 

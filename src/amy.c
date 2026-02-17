@@ -1018,6 +1018,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     case AMY_MIDI: amy_send_midi_note_on(osc); break;
     case BYO_PARTIALS: if(AMY_HAS_PARTIALS) partials_note_on(osc); break;
     case INTERP_PARTIALS: if(AMY_HAS_PARTIALS) interp_partials_note_on(osc); break;
+    case WAVETABLE: wavetable_note_on(osc, initial_freq); break;
     case CUSTOM: if(AMY_HAS_CUSTOM) custom_note_on(osc, initial_freq); break;
     default: break;
     }
@@ -1472,6 +1473,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc]->wave == PULSE) max_val = render_pulse(buf, osc);
             if(synth[osc]->wave == TRIANGLE) max_val = render_triangle(buf, osc);
             if(synth[osc]->wave == SINE) max_val = render_sine(buf, osc);
+            if(synth[osc]->wave == WAVETABLE) max_val = render_wavetable(buf, osc);
             if(synth[osc]->wave == AUDIO_IN0) max_val = render_audio_in(buf, osc, 0);
             if(synth[osc]->wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
             if(synth[osc]->wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
