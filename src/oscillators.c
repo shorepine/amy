@@ -690,9 +690,9 @@ void ks_deinit(void) {
 
 // --------- wavetable ----------
 
-
+#ifdef AMY_WAVETABLE
 void wavetable_note_on(uint16_t osc, float freq) {
-    //fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
+    fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
     //float period_samples = (float)AMY_SAMPLE_RATE / freq;
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
@@ -727,3 +727,4 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
 }
+#endif

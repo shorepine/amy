@@ -467,6 +467,7 @@ def wavfile_to_h(wavfile, hfile):
     with open(hfile, 'w') as f:
         f.write('// AUTOMATICALLY GENERATED\n')
         f.write(f'// by wavfile_to_h({wavfile=}, {hfile=})\n\n')
+        f.write('#if defined(AMY_WAVETABLE)\n')
         f.write(f'const size_t {name}_len = {len(wav_data)};\n\n')
         f.write(f'int16_t {name}[] = {{\n')
         chunklen = 16
@@ -475,6 +476,7 @@ def wavfile_to_h(wavfile, hfile):
                 f.write(f'{wav_data[start + item]},')
             f.write('\n')
         f.write('};\n')
+        f.write('#endif\n')
     print("wrote", hfile)
 
 

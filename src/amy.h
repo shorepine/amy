@@ -886,7 +886,9 @@ SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel);
 
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
+#ifdef AMY_WAVETABLE
 extern SAMPLE render_wavetable(SAMPLE * buf, uint16_t osc); 
+#endif
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
 extern SAMPLE render_pulse(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_saw_down(SAMPLE * buf, uint16_t osc);
