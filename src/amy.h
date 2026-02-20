@@ -33,6 +33,9 @@ typedef struct {
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
+extern const uint16_t pcm_wavetable_base;
+extern const uint16_t pcm_wavetable_samples;
+extern const uint32_t pcm_wavetable_len;
 
 #if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #define AMY_MCU

@@ -697,14 +697,10 @@ void wavetable_note_on(uint16_t osc, float freq) {
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
 
-#include "wavetable.h"  // defines combined WAVETABLE_* data
-
 // Structure of waveeditonlie wavetables.
 const int CYCLES_PER_WAVETABLE = 64;
 const int WAVETABLE_SAMPLES_PER_CYCLE = 256;
 const int WAVETABLE_LOG2_SAMPLES_PER_CYCLE = 8;
-const int WAVETABLE_SAMPLES_PER_TABLE = 16384;
-const int WAVETABLE_PRESET_BASE = 256;
 
 SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
@@ -716,27 +712,19 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, (CYCLES_PER_WAVETABLE - 1) * msynth[osc]->duty));  // Don't try to interp beyond end of table.  An N-waveform table can be interpolated from 0 to (N-1-eps).
     int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
     interp = interp - table;  // fractional part, normally < 1.0, but == 1.0 for very end of table.
-    int wavetable_index = -1;
-    const int16_t *wavetable_sample_ram = WAVETABLE_data;
-    if (AMY_IS_SET(synth[osc]->preset)) {
-        int preset = (int)synth[osc]->preset;
-        int wavetable_preset_limit = WAVETABLE_PRESET_BASE + (int)WAVETABLE_num_tables;
-        if (preset >= WAVETABLE_PRESET_BASE && preset < wavetable_preset_limit) {
-            wavetable_index = preset - WAVETABLE_PRESET_BASE;
-        } else {
-            uint32_t sample_length = 0;
-            const int16_t *preset_sample_ram =
-                pcm_get_sample_ram_for_preset((uint16_t)preset, &sample_length);
-            if (preset_sample_ram != NULL && sample_length >= WAVETABLE_SAMPLES_PER_TABLE) {
-                wavetable_sample_ram = preset_sample_ram;
-            } else {
-                //fprintf(stderr, "couldn't set WT preset %d because len is only %d\n", preset, sample_length);
-            }
-        }
+    int wavetable_preset = AMY_IS_SET(synth[osc]->preset)
+        ? (int)synth[osc]->preset
+        : (int)pcm_wavetable_base;
+    int wavetable_samples_per_table = (pcm_wavetable_len > 0) ? (int)pcm_wavetable_len : 16384;
+    uint32_t sample_length = 0;
+    const int16_t *wavetable_sample_ram =
+        pcm_get_sample_ram_for_preset((uint16_t)wavetable_preset, &sample_length);
+    if ((wavetable_sample_ram == NULL || sample_length < (uint32_t)wavetable_samples_per_table) &&
+        wavetable_preset != (int)pcm_wavetable_base) {
+        wavetable_sample_ram = pcm_get_sample_ram_for_preset(pcm_wavetable_base, &sample_length);
     }
-    if (wavetable_index >= 0) {
-        int wavetable_offset = wavetable_index * WAVETABLE_SAMPLES_PER_TABLE;
-        wavetable_sample_ram += wavetable_offset;
+    if (wavetable_sample_ram == NULL || sample_length < (uint32_t)wavetable_samples_per_table) {
+        return 0;
     }
     LUT wavetable_lut = {wavetable_sample_ram, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
     wavetable_lut.table += table * WAVETABLE_SAMPLES_PER_CYCLE;
