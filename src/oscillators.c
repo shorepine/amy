@@ -697,7 +697,7 @@ void wavetable_note_on(uint16_t osc, float freq) {
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
 
-#include "wt_braids01.h"  // defines int16_t *BRAIDS01
+#include "wavetable01.h"  // defines int16_t *WAVETABLE_data
 
 // Structure of waveeditonlie wavetables.
 const int CYCLES_PER_WAVETABLE = 64;
@@ -711,10 +711,10 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     //fprintf(stderr, "render_wavetable: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
     SAMPLE max_value;
-    float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, msynth[osc]->duty));  // Don't try to interp beyond end of table.
+    float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, (CYCLES_PER_WAVETABLE - 1) * msynth[osc]->duty));  // Don't try to interp beyond end of table.  An N-waveform table can be interpolated from 0 to (N-1-eps).
     int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
     interp = interp - table;  // fractional part, normally < 1.0, but == 1.0 for very end of table.
-    LUT wavetable_lut = {BRAIDS01, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
+    LUT wavetable_lut = {WAVETABLE_data, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
     wavetable_lut.table += table * WAVETABLE_SAMPLES_PER_CYCLE;
     // don't update phase in the first call to render_lut, so second call uses the same phase
     SAMPLE interp_a = F2S(1.0f - interp);
