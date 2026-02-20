@@ -11,7 +11,7 @@ for i in range(len(sources)):
 os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 
-comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG", "-Wno-unused-but-set-variable", "-Wno-unreachable-code"]
+comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG", "-Wno-unused-but-set-variable", "-Wno-unreachable-code", "-DAMY_WAVETABLE"]
 link_args = ["-L/opt/homebrew/lib","-lpthread"]
 
 if os.uname()[0] == 'Darwin':

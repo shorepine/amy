@@ -25,7 +25,7 @@ ifeq ($(shell uname -m), armv6l)
 LIBS += -ldl  -latomic
 endif
 
-CFLAGS += -O3 -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations 
+CFLAGS += -O3 -Wall -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations -DAMY_WAVETABLE
 #CFLAGS += -DAMY_DEBUG
 # -Wdouble-promotion
 EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
@@ -38,7 +38,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 	  '_amy_start_web', '_amy_start_web_no_synths', '_sequencer_ticks', '_malloc', '_free', '_amy_bleep', '_parse_patch_number_to_events']" \
 -s SUPPORT_LONGJMP=emscripten \
 -s INITIAL_MEMORY=128mb -s TOTAL_STACK=64mb -s ALLOW_MEMORY_GROWTH=1  \
--s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000 
+-s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
 .PHONY: default all clean amy-module test web deploy-web

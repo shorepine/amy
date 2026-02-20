@@ -183,9 +183,19 @@ If you are including AMY in a program, you can set the [hook `void (*amy_externa
 
 ## Core oscillators
 
-We support bandlimited saw, pulse/square and triangle waves, alongside sine and noise. Use the wave parameter: 0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE. Each oscillator can have a frequency (or set by midi note), amplitude and phase (set in 0-1.). You can also set `duty` for the pulse type. We also have a karplus-strong type (KS=6). 
+We support bandlimited saw, pulse/square and triangle waves, alongside sine and noise. Use the wave parameter: 0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE. Each oscillator can have a frequency (or set by midi note), amplitude and phase (set in 0-1.). You can also set `duty` for the pulse type. We also have a karplus-strong type (KS=6), plus `WAVETABLE` when compiled with `AMY_WAVETABLE` that plays back 16,384 sample long wavetable packs, such as those hosted on [waveeditonline.com](http://waveeditonline.com). 
 
 Oscillators will not become audible until a `velocity` over 0 is set for the oscillator. This is a "note on" and will trigger any modulators or envelope generators set for that oscillator. Setting `velocity` to 0 sets a note off, which will stop modulators and also finish the envelopes at their release pair. `velocity` also internally sets `amplitude`, but you can manually set `amplitude` after `velocity` starts a note on.
+
+### WAVETABLE
+
+`WAVETABLE` reads from wavetable presets appended to tiny PCM data at build time (guarded by `#if defined(AMY_WAVETABLE)`).
+
+ - Pick the table with `preset`: `pcm_wavetable_base` to `pcm_wavetable_base + pcm_wavetable_samples - 1`
+ - `duty` controls interpolation position across the 64 waveform cycles within one wavetable preset.
+ - Internally each cycle is 256 samples; full table length is typically 16384 samples.
+ - You can load new wavetables using `load_sample` and use your new preset number. Ensure they are 16,384 samples long. Find more on [waveeditonline.com](http://waveeditonline.com).
+
 
 ## LFOs & modulators
 
@@ -365,7 +375,6 @@ amy.start_sample(preset=1024, bus=1, max_frames=11025, midinote=60) # set base m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
 
 
 

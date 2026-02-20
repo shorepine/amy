@@ -33,6 +33,9 @@ typedef struct {
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
+extern const uint16_t pcm_wavetable_base;
+extern const uint16_t pcm_wavetable_samples;
+extern const uint32_t pcm_wavetable_len;
 
 #if (defined(ESP_PLATFORM) || defined(PICO_ON_DEVICE) || defined(ARDUINO) || defined(__IMXRT1062__) || defined(ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
 #define AMY_MCU
@@ -231,8 +234,10 @@ enum coefs{
 #define PCM_LEFT 17
 #define PCM_RIGHT 18
 #define PCM_MIX 7 // same as PCM
-#define CUSTOM 19
-#define WAVE_OFF 20
+#define WAVETABLE 19
+#define CUSTOM 20
+#define WAVE_OFF 21
+
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
 // synth[].status values
@@ -884,6 +889,9 @@ SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel);
 
 extern SAMPLE render_ks(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_sine(SAMPLE * buf, uint16_t osc); 
+#ifdef AMY_WAVETABLE
+extern SAMPLE render_wavetable(SAMPLE * buf, uint16_t osc); 
+#endif
 extern SAMPLE render_fm_sine(SAMPLE *buf, uint16_t osc, SAMPLE *mod, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE mod_amp);
 extern SAMPLE render_pulse(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_saw_down(SAMPLE * buf, uint16_t osc);
@@ -945,6 +953,7 @@ extern SAMPLE compute_mod_pcm(uint16_t osc);
 extern SAMPLE compute_mod_custom(uint16_t osc);
 
 extern void sine_note_on(uint16_t osc, float initial_freq); 
+extern void wavetable_note_on(uint16_t osc, float initial_freq); 
 extern void fm_sine_note_on(uint16_t osc, uint16_t algo_osc); 
 extern void saw_down_note_on(uint16_t osc, float initial_freq); 
 extern void saw_up_note_on(uint16_t osc, float initial_freq); 
@@ -969,6 +978,7 @@ extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint32_t *length);
 extern int pcm_load_file();
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();

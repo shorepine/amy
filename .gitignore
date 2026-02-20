@@ -4,15 +4,11 @@ amy-message
 tests/tst
 amy-piano
 src/build/
-sounds/HS-TR-808-Drums.sf2
-sounds/MuseScore_General.sf2
 *.DS_Store*
 loris-1.8/
 __pycache__/
 src/dist/
 src/amy.egg-info/
-src/pcm_large.bin
-src/pcm_small.bin
 .python-version
 amy.egg-info/
 build/
