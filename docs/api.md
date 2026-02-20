@@ -161,7 +161,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
-| `w`    | `wave` | `wave` | uint 0-20 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, AUDIO_EXT0, AUDIO_EXT1, AMY_MIDI, PCM_LEFT, PCM_RIGHT, CUSTOM, OFF]. default: 0/SINE |
+| `w`    | `wave` | `wave` | uint 0-20 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, AUDIO_EXT0, AUDIO_EXT1, AMY_MIDI, PCM_LEFT, PCM_RIGHT, WAVETABLE, CUSTOM, OFF]. default: 0/SINE |
 | `S`    | `reset_osc`| `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock (immediately, ignoring `time`). RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `A`    | `eg0_times[]`, `eg0_values[]` | `bp0`    | string (wire) / arrays (`amy_event`)      | Envelope Generator 0 breakpoints as time(ms),value pairs. Wire/Python format remains comma-separated, e.g. `100,0.5,50,0.25,200,0`. In C `amy_event`, use typed arrays (`eg0_times[i]`, `eg0_values[i]`). The last pair is release (triggers on note off). |
 | `B`    | `eg1_times[]`, `eg1_values[]` | `bp1`    | string (wire) / arrays (`amy_event`)      | Envelope Generator 1 breakpoints. Wire/Python format remains comma-separated; in C `amy_event`, use typed arrays (`eg1_times[i]`, `eg1_values[i]`). |
@@ -174,7 +174,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `n`    | `midi_note` | `note` | float, but typ. uint 0-127 | Midi note, sets frequency.  Fractional Midi notes are allowed. |
 | `o`    | `algorithm` | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source[]`| `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
-| `p`    | `preset` | `preset` | int | Which predefined PCM preset patch to use, or number of partials if < 0. (Juno/DX7 patches are different - see `patch_number`). |
+| `p`    | `preset` | `preset` | int | Which predefined PCM preset patch to use, or number of partials if < 0. For `wave=WAVETABLE`, use the wavetable presets appended to tiny PCM (`pcm_wavetable_base` through `pcm_wavetable_base + pcm_wavetable_samples - 1`). (Juno/DX7 patches are different - see `patch_number`). |
 | `P`    | `phase` | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
@@ -201,6 +201,18 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
 | `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from bus. Params: preset number,  bus, max length in frames, midinote, loopstart, loopend. bus = 1 is AMY mixed output. bus = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
 | `zO`   | **TODO**| `stop_sample` | uint | Stop sampling. Does nothing if no sampling active. param ignored. | 
+
+### WAVETABLE wave type
+
+`wave=WAVETABLE` is available when AMY is built with `-DAMY_WAVETABLE`.
+
+- Wavetable samples are baked into `pcm_tiny` and exposed as contiguous PCM presets.
+- The preset range is dynamic at runtime:
+  - start: `pcm_wavetable_base`
+  - count: `pcm_wavetable_samples`
+  - valid presets: `pcm_wavetable_base ... pcm_wavetable_base + pcm_wavetable_samples - 1`
+- Each wavetable preset is expected to be one 64-cycle table (normally `16384` samples total, `256` samples per cycle).
+- `duty` crossfades across the 64 cycles inside the selected wavetable preset.
 
 ### Other
 
