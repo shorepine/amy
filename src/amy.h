@@ -29,7 +29,7 @@ typedef struct {
 } pcm_map_t;
 
 
-// These are overriden for you if you include pcm_X.h {tiny, small, large}
+// Built-in PCM data declarations (provided by src/pcm_tiny.h).
 extern const int16_t pcm[];
 extern const pcm_map_t pcm_map[];
 extern const uint16_t pcm_samples;
