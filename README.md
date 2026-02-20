@@ -27,7 +27,7 @@ AMY supports
  * A strong Juno-6 style analog synthesizer
  * An operator / algorithm-based frequency modulation (FM) synth, modeled after the DX-7
  * PCM sampler, reading from a baked-in buffer of percussive and misc samples, or by loading samples into RAM, or playing from files on disk directly, with loop points and base midi note
- * Optional wavetable oscillator (`wave=WAVETABLE`) built on top of tiny PCM presets when compiled with `AMY_WAVETABLE`
+ * Wavetable oscillator
  * karplus-strong string with adjustable feedback 
  * An arbitrary number of band-limited oscillators, each with adjustable frequency, pan, phase, amplitude:
    * pulse (+ adjustable duty cycle), sine, saw (up and down), triangle, noise 
