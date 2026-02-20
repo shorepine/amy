@@ -1,9 +1,9 @@
 // AUTOMATICALLY GENERATED
-// by wavfile_to_h(wavfile='waveeditonline/wav-files/111.WAV', hfile='src/wavetable01.h')
-
-const char WAVETABLE_source_file[] = "waveeditonline/wav-files/111.WAV";
+// by wavfile_to_h(wavfile='sounds/111.WAV', hfile='src/wavetable01.h')
 
 #if defined(AMY_WAVETABLE)
+const char WAVETABLE_source_file[] = "sounds/111.WAV";
+
 const size_t WAVETABLE_len = 16384;
 
 int16_t WAVETABLE_data[] = {
