@@ -23,7 +23,7 @@ const uint16_t pcm_wavetable_base = PCM_WAVETABLE_BASE;
 const uint16_t pcm_wavetable_samples = PCM_WAVETABLE_SAMPLES;
 const uint32_t pcm_wavetable_len = PCM_WAVETABLE_LEN;
 const pcm_map_t pcm_map[PCM_MAP_ENTRIES] PROGMEM = {
-/* [0] 0 */ {0, 707, 342, 684, 89}, /* 808-MARACA-D */
+    /* [0] 0 */ {0, 707, 342, 684, 89}, /* 808-MARACA-D */
     /* [1] 3 */ {707, 8186, 4282, 7439, 39}, /* 808-KIK 4-D */
     /* [2] 8 */ {8893, 2766, 1377, 2744, 45}, /* 808-SNR 4-D */
     /* [3] 11 */ {11659, 1311, 898, 1288, 52}, /* 808-SNR 7-D */
