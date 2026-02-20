@@ -30,6 +30,7 @@ void amy_external_midi_sync(uint8_t enabled) {
     external_midi_sync_enabled = enabled ? 1 : 0;
 }
 
+#if 0
 static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t sysex) {
     fprintf(stderr, "MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
     for (uint32_t i = 0; i < len; ++i) {
@@ -37,6 +38,7 @@ static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t syse
     }
     fprintf(stderr, "\n");
 }
+#endif
 
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
