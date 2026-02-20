@@ -697,12 +697,14 @@ void wavetable_note_on(uint16_t osc, float freq) {
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
 
-#include "wavetable01.h"  // defines int16_t *WAVETABLE_data
+#include "wavetable.h"  // defines combined WAVETABLE_* data
 
 // Structure of waveeditonlie wavetables.
 const int CYCLES_PER_WAVETABLE = 64;
 const int WAVETABLE_SAMPLES_PER_CYCLE = 256;
 const int WAVETABLE_LOG2_SAMPLES_PER_CYCLE = 8;
+const int WAVETABLE_SAMPLES_PER_TABLE = 16384;
+const int WAVETABLE_PRESET_BASE = 256;
 
 SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
@@ -714,7 +716,13 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, (CYCLES_PER_WAVETABLE - 1) * msynth[osc]->duty));  // Don't try to interp beyond end of table.  An N-waveform table can be interpolated from 0 to (N-1-eps).
     int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
     interp = interp - table;  // fractional part, normally < 1.0, but == 1.0 for very end of table.
-    LUT wavetable_lut = {WAVETABLE_data, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
+    int wavetable_index = 0;
+    if (AMY_IS_SET(synth[osc]->preset) && synth[osc]->preset >= WAVETABLE_PRESET_BASE) {
+        wavetable_index = synth[osc]->preset - WAVETABLE_PRESET_BASE;
+    }
+    wavetable_index = MIN(wavetable_index, (int)WAVETABLE_num_tables - 1);
+    int wavetable_offset = wavetable_index * WAVETABLE_SAMPLES_PER_TABLE;
+    LUT wavetable_lut = {WAVETABLE_data + wavetable_offset, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
     wavetable_lut.table += table * WAVETABLE_SAMPLES_PER_CYCLE;
     // don't update phase in the first call to render_lut, so second call uses the same phase
     SAMPLE interp_a = F2S(1.0f - interp);

@@ -458,6 +458,7 @@ def make_interp_partials(filename, data_dict):
 
 import scipy.io.wavfile as wav
 import os
+import glob
 
 def wavfile_to_h(wavfile, hfile, name=None):
     """Read a WAV file, write as an int16_t array in a header file."""
@@ -476,6 +477,46 @@ def wavfile_to_h(wavfile, hfile, name=None):
         for start in range(0, len(wav_data), chunklen):
             for item in range(chunklen):
                 f.write(f'{wav_data[start + item]},')
+            f.write('\n')
+        f.write('};\n')
+        f.write('#endif\n')
+    print("wrote", hfile)
+
+def wavetables_to_h(wavfiles, hfile, name='WAVETABLE'):
+    """Read multiple WAV files and write one contiguous int16_t array header."""
+    if len(wavfiles) == 0:
+        raise ValueError("No wavetable files provided")
+
+    tables = []
+    table_len = None
+    for wavfile in wavfiles:
+        with open(wavfile, 'rb') as f:
+            samplerate, wav_data = wav.read(f)
+        if getattr(wav_data, "ndim", 1) != 1:
+            raise ValueError(f"{wavfile} is not mono")
+        wav_data = wav_data.astype(np.int16)
+        if table_len is None:
+            table_len = len(wav_data)
+        elif len(wav_data) != table_len:
+            raise ValueError(f"{wavfile} length {len(wav_data)} != {table_len}")
+        tables.append((wavfile, wav_data))
+
+    with open(hfile, 'w') as f:
+        f.write('// AUTOMATICALLY GENERATED\n')
+        f.write(f'// by wavetables_to_h({wavfiles=}, {hfile=})\n\n')
+        f.write('#if defined(AMY_WAVETABLE)\n')
+        f.write(f'const size_t {name}_num_tables = {len(tables)};\n')
+        f.write(f'const size_t {name}_len = {table_len};\n')
+        f.write(f'const size_t {name}_total_len = {len(tables) * table_len};\n')
+        f.write(f'const char* {name}_source_files[] = {{\n')
+        for wavfile, _ in tables:
+            f.write(f'    "{wavfile}",\n')
+        f.write('};\n\n')
+        f.write(f'int16_t {name}_data[] = {{\n')
+        chunklen = 16
+        all_data = np.concatenate([table for _, table in tables])
+        for start in range(0, len(all_data), chunklen):
+            f.write(''.join(f'{sample},' for sample in all_data[start:start + chunklen]))
             f.write('\n')
         f.write('};\n')
         f.write('#endif\n')
@@ -537,8 +578,9 @@ def generate_all():
     make_interp_partials("src/interp_partials.h",
                          {'piano': json.load(open("experiments/piano-params.json", "r"))})
 
-    # Wavetable, file from the wav-files package available at waveeditonline.com
-    wavfile_to_h('sounds/wavetables/111.WAV', 'src/wavetable01.h', 'WAVETABLE')
+    # Wavetables, files from the wav-files package available at waveeditonline.com
+    wavetable_files = sorted(glob.glob('sounds/wavetables/*.WAV'))
+    wavetables_to_h(wavetable_files, 'src/wavetable.h', 'WAVETABLE')
 
 
 def main():
