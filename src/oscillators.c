@@ -692,7 +692,7 @@ void ks_deinit(void) {
 
 #ifdef AMY_WAVETABLE
 void wavetable_note_on(uint16_t osc, float freq) {
-    fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
+    //fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
     //float period_samples = (float)AMY_SAMPLE_RATE / freq;
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
@@ -711,7 +711,7 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
-    //fprintf(stderr, "render_wavetable: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
+    //fprintf(stderr, "render_wavetable: time %f osc %d freq %f last_amp %f amp %f preset %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp), synth[osc]->preset);
     SAMPLE max_value;
     float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, (CYCLES_PER_WAVETABLE - 1) * msynth[osc]->duty));  // Don't try to interp beyond end of table.  An N-waveform table can be interpolated from 0 to (N-1-eps).
     int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
@@ -729,6 +729,8 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
                 pcm_get_sample_ram_for_preset((uint16_t)preset, &sample_length);
             if (preset_sample_ram != NULL && sample_length >= WAVETABLE_SAMPLES_PER_TABLE) {
                 wavetable_sample_ram = preset_sample_ram;
+            } else {
+                //fprintf(stderr, "couldn't set WT preset %d because len is only %d\n", preset, sample_length);
             }
         }
     }
