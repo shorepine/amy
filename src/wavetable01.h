@@ -1,8 +1,8 @@
 // AUTOMATICALLY GENERATED
-// by wavfile_to_h(wavfile='sounds/111.WAV', hfile='src/wavetable01.h')
+// by wavfile_to_h(wavfile='sounds/wavetables/111.WAV', hfile='src/wavetable01.h')
 
 #if defined(AMY_WAVETABLE)
-const char WAVETABLE_source_file[] = "sounds/111.WAV";
+const char WAVETABLE_source_file[] = "sounds/wavetables/111.WAV";
 
 const size_t WAVETABLE_len = 16384;
 

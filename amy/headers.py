@@ -538,7 +538,7 @@ def generate_all():
                          {'piano': json.load(open("experiments/piano-params.json", "r"))})
 
     # Wavetable, file from the wav-files package available at waveeditonline.com
-    wavfile_to_h('sounds/111.WAV', 'src/wavetable01.h', 'WAVETABLE')
+    wavfile_to_h('sounds/wavetables/111.WAV', 'src/wavetable01.h', 'WAVETABLE')
 
 
 def main():
