@@ -92,6 +92,18 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number,
     return rom_local;
 }
 
+const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint32_t *length) {
+    memorypcm_preset_t rom_local;
+    memorypcm_preset_t *preset = get_preset_for_preset_number(preset_number, &rom_local);
+    if (length != NULL) {
+        *length = (preset != NULL) ? preset->length : 0;
+    }
+    if (preset == NULL) {
+        return NULL;
+    }
+    return preset->sample_ram;
+}
+
 
 void pcm_init() {
     memorypcm_ll_start = NULL;

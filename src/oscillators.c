@@ -716,13 +716,27 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float interp = MAX(0, MIN(CYCLES_PER_WAVETABLE - 1, (CYCLES_PER_WAVETABLE - 1) * msynth[osc]->duty));  // Don't try to interp beyond end of table.  An N-waveform table can be interpolated from 0 to (N-1-eps).
     int table = MIN((int)floor(interp), CYCLES_PER_WAVETABLE - 2);  // always need both this wavetable and the next one.
     interp = interp - table;  // fractional part, normally < 1.0, but == 1.0 for very end of table.
-    int wavetable_index = 0;
-    if (AMY_IS_SET(synth[osc]->preset) && synth[osc]->preset >= WAVETABLE_PRESET_BASE) {
-        wavetable_index = synth[osc]->preset - WAVETABLE_PRESET_BASE;
+    int wavetable_index = -1;
+    const int16_t *wavetable_sample_ram = WAVETABLE_data;
+    if (AMY_IS_SET(synth[osc]->preset)) {
+        int preset = (int)synth[osc]->preset;
+        int wavetable_preset_limit = WAVETABLE_PRESET_BASE + (int)WAVETABLE_num_tables;
+        if (preset >= WAVETABLE_PRESET_BASE && preset < wavetable_preset_limit) {
+            wavetable_index = preset - WAVETABLE_PRESET_BASE;
+        } else {
+            uint32_t sample_length = 0;
+            const int16_t *preset_sample_ram =
+                pcm_get_sample_ram_for_preset((uint16_t)preset, &sample_length);
+            if (preset_sample_ram != NULL && sample_length >= WAVETABLE_SAMPLES_PER_TABLE) {
+                wavetable_sample_ram = preset_sample_ram;
+            }
+        }
     }
-    wavetable_index = MIN(wavetable_index, (int)WAVETABLE_num_tables - 1);
-    int wavetable_offset = wavetable_index * WAVETABLE_SAMPLES_PER_TABLE;
-    LUT wavetable_lut = {WAVETABLE_data + wavetable_offset, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
+    if (wavetable_index >= 0) {
+        int wavetable_offset = wavetable_index * WAVETABLE_SAMPLES_PER_TABLE;
+        wavetable_sample_ram += wavetable_offset;
+    }
+    LUT wavetable_lut = {wavetable_sample_ram, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 0, 1.0f};
     wavetable_lut.table += table * WAVETABLE_SAMPLES_PER_CYCLE;
     // don't update phase in the first call to render_lut, so second call uses the same phase
     SAMPLE interp_a = F2S(1.0f - interp);
