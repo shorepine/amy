@@ -912,7 +912,7 @@ extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count);
-extern void print_event(amy_event *e, bool wire_command);
+extern int print_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
 extern void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state);
 

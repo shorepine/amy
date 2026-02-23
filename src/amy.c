@@ -958,7 +958,9 @@ void show_debug(uint8_t type) {
                 amy_event event;
                 do {
                     state = event_generator_for_synth(synth, &event, state);
-                    print_event(&event, false);
+                    char s[MAX_MESSAGE_LEN];
+                    print_event(&event, s, MAX_MESSAGE_LEN, false);
+                    fprintf(stderr, "%s\n", s);
                 } while(state != NULL);
             }
         }
