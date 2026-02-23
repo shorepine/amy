@@ -24,10 +24,10 @@ extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_
 void print_events_for_patch_number(int patch_number) {
     void *state = NULL;
     fprintf(stderr, "start delta_num_free = %d\n", delta_num_free());
+    amy_event event = amy_default_event();
+    char s[MAX_MESSAGE_LEN];
     do {
-        amy_event event = amy_default_event();
         state = event_generator_for_patch_number(patch_number, &event, state);
-        char s[MAX_MESSAGE_LEN];
         print_event(&event, s, MAX_MESSAGE_LEN, false);
         fprintf(stderr, "%s\n", s);
     } while (state != NULL);
@@ -37,14 +37,12 @@ void print_events_for_patch_number(int patch_number) {
 void print_events_for_synth(int synth, bool wirecode) {
     fprintf(stderr, "synth %d:\n", synth);
     void * state = NULL;
-    amy_event event;
+    amy_event event = amy_default_event();
+    char s[MAX_MESSAGE_LEN];
     do {
         state = event_generator_for_synth(synth, &event, state);
-        if (state != NULL) {
-            char s[MAX_MESSAGE_LEN];
-            print_event(&event, s, MAX_MESSAGE_LEN, wirecode);
-            fprintf(stderr, "%s\n", s);
-        }
+        print_event(&event, s, MAX_MESSAGE_LEN, wirecode);
+        fprintf(stderr, "%s\n", s);
     } while(state != NULL);
 }
 

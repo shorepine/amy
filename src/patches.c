@@ -552,25 +552,31 @@ void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
 void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
-    amy_clear_event(event);
     // Find oscs for synth.
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     int num_voices = instrument_get_num_voices(synth, voices);
-    if (num_voices < 1)  return NULL;  // instrument not allocated.
+    if (num_voices < 1) {
+        fprintf(stderr, "event_generator_for_synth: synth %d has no voices.\n", synth);
+        return NULL;  // instrument not allocated.
+    }
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = 0;
     while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
     // The "state" indicates which osc within the voice we're going to report for.
-    int64_t current_osc = (int64_t)state;
+    int current_osc = (int64_t)state;
     //fprintf(stderr, "ev_gen_for_synth(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
-    if (current_osc == num_oscs) return NULL;  // we've done all the oscs, indicate we're done.
-
+    if (current_osc == num_oscs) {
+        fprintf(stderr, "event_generator_for_synth: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
+        return NULL;  // State is asking for an osc beyond available oscs, shouldn't happen.
+    }
+    amy_clear_event(event);
     set_event_for_osc(base_osc + current_osc, base_osc, event);
     // Set the osc number relative to the synth
     event->osc = current_osc;
 
     ++current_osc;
+    if (current_osc == num_oscs) current_osc = 0;  // Indicate this is the final event.
     return (void *)current_osc;
 }
 
