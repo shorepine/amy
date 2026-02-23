@@ -19,8 +19,6 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
-extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
-
 void print_events_for_patch_number(int patch_number) {
     void *state = NULL;
     fprintf(stderr, "start delta_num_free = %d\n", delta_num_free());

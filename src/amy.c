@@ -953,15 +953,17 @@ void show_debug(uint8_t type) {
         }
         if (type > 6) {
             for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
-                fprintf(stderr, "synth %d:\n", synth);
-                void * state = NULL;
-                amy_event event;
-                do {
-                    state = event_generator_for_synth(synth, &event, state);
+                if (instrument_number_exists(synth, "debug")) {
+                    fprintf(stderr, "synth %d:\n", synth);
+                    void * state = NULL;
+                    amy_event event = amy_default_event();
                     char s[MAX_MESSAGE_LEN];
-                    print_event(&event, s, MAX_MESSAGE_LEN, false);
-                    fprintf(stderr, "%s\n", s);
-                } while(state != NULL);
+                    do {
+                        state = event_generator_for_synth(synth, &event, state);
+                        print_event(&event, s, MAX_MESSAGE_LEN, false);
+                        fprintf(stderr, "%s\n", s);
+                    } while(state != NULL);
+                }
             }
         }
         fprintf(stderr, "\n");

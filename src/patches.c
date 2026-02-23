@@ -577,7 +577,7 @@ void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *st
 
     ++current_osc;
     if (current_osc == num_oscs) current_osc = 0;  // Indicate this is the final event.
-    return (void *)current_osc;
+    return (void *)((int64_t)current_osc);
 }
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {

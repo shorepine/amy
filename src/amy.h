@@ -459,7 +459,7 @@ typedef struct amy_event {
     uint16_t patch_number;  // event only
     float amp_coefs[NUM_COMBO_COEFS];
     float freq_coefs[NUM_COMBO_COEFS];  // synth is log
-    float filter_freq_coefs[NUM_COMBO_COEFS];  // syht is log
+    float filter_freq_coefs[NUM_COMBO_COEFS];  // synth is log
     float duty_coefs[NUM_COMBO_COEFS];
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
@@ -932,6 +932,7 @@ extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
+extern bool instrument_number_exists(int instrument_number, char *tag);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
