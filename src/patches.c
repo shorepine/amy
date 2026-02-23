@@ -295,7 +295,7 @@ int print_event(amy_event *e, char *s, size_t len, bool wirecode) {
     if (wirecode) { sprintf(s, "Z"); s += strlen(s); }
     // sprintf(s, "\n"); s += strlen(s);
 
-    assert( (s - s_entry) < len);  // if we corrupted memory, at least we'll abort.
+    assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
     return s - s_entry;
 }
 
@@ -596,17 +596,10 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
       }
     }
 }
-#define MAX_EVENTS_FOR_PATCH 64
-void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
-    fprintf(stderr, "parse_patch_number_to_events: patch_number %" PRIu16 "\n", patch_number);
-    struct amy_event *out = calloc(MAX_EVENTS_FOR_PATCH + 1, sizeof(struct amy_event));
-    void *state = NULL;
-    uint16_t counter = 0;
-    do {
-        state = event_generator_for_patch_number(patch_number, &out[counter++], state);
-    } while (state != NULL);
-    *events = out;
-    *event_count = counter;
+
+// So emscripten knows how big to make this struct.
+int size_of_amy_event(void) {
+    return sizeof(amy_event);
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
