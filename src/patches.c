@@ -227,8 +227,8 @@ int print_event(amy_event *e, char *s, size_t len, bool wirecode) {
         sprintf(s, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
         s += strlen(s);
     } else {
-        if (AMY_IS_SET(e->time)) { sprintf(s, "t%d", e->time); s += strlen(s); }
-        sprintf(s, "v%d", e->osc);
+        if (AMY_IS_SET(e->time)) { sprintf(s, "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
+        sprintf(s, "v%" PRIu16, (int16_t)e->osc);
         s += strlen(s);
     }
     _EPRINT_I(wave, "wave", "w");
