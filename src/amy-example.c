@@ -20,7 +20,6 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
 }
 
 extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
-extern void print_event(amy_event *e);
 
 void print_events_for_patch_number(int patch_number) {
     void *state = NULL;
@@ -28,10 +27,22 @@ void print_events_for_patch_number(int patch_number) {
     do {
         amy_event event = amy_default_event();
         state = event_generator_for_patch_number(patch_number, &event, state);
-        print_event(&event);
+        print_event(&event, false);
     } while (state != NULL);
     fprintf(stderr, "end delta_num_free = %d\n", delta_num_free());
 }
+
+void print_events_for_synth(int synth, bool wirecode) {
+    fprintf(stderr, "synth %d:\n", synth);
+    void * state = NULL;
+    amy_event event;
+    do {
+        state = event_generator_for_synth(synth, &event, state);
+        if (state != NULL)
+            print_event(&event, wirecode);
+    } while(state != NULL);
+}
+
 
 int main(int argc, char ** argv) {
     int8_t playback_device_id = -1;
@@ -169,7 +180,9 @@ int main(int argc, char ** argv) {
     amy_add_event(&e);
 
     print_events_for_patch_number(patch_number);    
-    
+
+    print_events_for_synth(/* synth */ 1, /* wirecode */ true);
+
     
     // Now just spin for a while
     uint32_t start = amy_sysclock();
