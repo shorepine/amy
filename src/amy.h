@@ -911,7 +911,7 @@ extern void patches_load_patch(amy_event *e);
 extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
-extern int print_event(amy_event *e, char *s, size_t len, bool wirecode);
+extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
 extern void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state);
 extern int size_of_amy_event(void);

@@ -26,7 +26,7 @@ void print_events_for_patch_number(int patch_number) {
     char s[MAX_MESSAGE_LEN];
     do {
         state = event_generator_for_patch_number(patch_number, &event, state);
-        print_event(&event, s, MAX_MESSAGE_LEN, false);
+        sprint_event(&event, s, MAX_MESSAGE_LEN, false);
         fprintf(stderr, "%s\n", s);
     } while (state != NULL);
     fprintf(stderr, "end delta_num_free = %d\n", delta_num_free());
@@ -39,7 +39,7 @@ void print_events_for_synth(int synth, bool wirecode) {
     char s[MAX_MESSAGE_LEN];
     do {
         state = event_generator_for_synth(synth, &event, state);
-        print_event(&event, s, MAX_MESSAGE_LEN, wirecode);
+        sprint_event(&event, s, MAX_MESSAGE_LEN, wirecode);
         fprintf(stderr, "%s\n", s);
     } while(state != NULL);
 }

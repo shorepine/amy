@@ -960,7 +960,7 @@ void show_debug(uint8_t type) {
                     char s[MAX_MESSAGE_LEN];
                     do {
                         state = event_generator_for_synth(synth, &event, state);
-                        print_event(&event, s, MAX_MESSAGE_LEN, false);
+                        sprint_event(&event, s, MAX_MESSAGE_LEN, false);
                         fprintf(stderr, "%s\n", s);
                     } while(state != NULL);
                 }

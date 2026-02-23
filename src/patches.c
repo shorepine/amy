@@ -4,7 +4,7 @@
 #include "amy.h"
 #include "patches.h"
 
-#include <assert.h>   // for buffer overruns in print_event.
+#include <assert.h>   // for buffer overruns in sprint_event.
 
 #define _PATCHES_FIRST_USER_PATCH 1024
 
@@ -218,7 +218,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }                                                \
 }
 
-int print_event(amy_event *e, char *s, size_t len, bool wirecode) {
+int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Convert an event into a string, either human-readable or wirecode.
     // s must be allocated.  len tells us how big it is.
     // Return is how many chrs written to s.  Will abort if it overruns.
