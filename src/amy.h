@@ -451,34 +451,34 @@ struct delta {
 
 // API accessible events, are converted to delta types for the synth to play back 
 typedef struct amy_event {
-    uint32_t time;
+    uint32_t time;  // event only
     uint16_t osc;
     uint16_t wave;
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
-    uint16_t patch_number;
+    uint16_t patch_number;  // event only
     float amp_coefs[NUM_COMBO_COEFS];
-    float freq_coefs[NUM_COMBO_COEFS];
-    float filter_freq_coefs[NUM_COMBO_COEFS];
+    float freq_coefs[NUM_COMBO_COEFS];  // synth is log
+    float filter_freq_coefs[NUM_COMBO_COEFS];  // synth is log
     float duty_coefs[NUM_COMBO_COEFS];
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
     float velocity;
     float phase;
-    float volume;
-    float pitch_bend;
-    float tempo;
-    uint16_t latency_ms;
-    float ratio;
+    float volume;  // event_only
+    float pitch_bend;  // event_only
+    float tempo;  // event_only
+    uint16_t latency_ms;  // event_only
+    float ratio;  // synth is log
     float resonance;
-    uint16_t portamento_ms;
+    uint16_t portamento_ms;  // synth is alpha
     uint16_t chained_osc;
     uint16_t mod_source;
     uint8_t algorithm;
     uint8_t filter_type;
-    float eq_l;
-    float eq_m;
-    float eq_h;
+    float eq_l;  // not in synth
+    float eq_m;  // not in synth
+    float eq_h;  // not in synth
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
     // Convert these two at least to vectors of ints, save several hundred bytes
     int16_t algo_source[MAX_ALGO_OPS];
@@ -529,13 +529,13 @@ struct synthinfo {
     float duty_coefs[NUM_COMBO_COEFS];
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    uint8_t status;
+    uint8_t status;  // not in event
     float velocity;
-    PHASOR trigger_phase;
+    PHASOR trigger_phase;  // not in event
     PHASOR phase;
-    float step;
-    float substep;
-    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE.
+    float step;  // not in event
+    float substep;  // not in event
+    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     float logratio;
     float resonance;
     float portamento_alpha;
@@ -545,13 +545,14 @@ struct synthinfo {
     uint8_t filter_type;
     // algo_source remains int16 because users can add -1 to indicate no osc 
     int16_t algo_source[MAX_ALGO_OPS];
-    uint8_t terminate_on_silence;  // Do we enable the auto-termination of silent oscs?  Usually yes, not for PCM.
-
+    uint8_t terminate_on_silence;  // Do we enable the auto-termination of silent oscs?  Usually yes, not for PCM. not in event.
+    // Rum-time state, not in event
     uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
+    // Back to params
     uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) was [MAX_BREAKPOINTS] now dynamically sized.
     float *breakpoint_values[MAX_BREAKPOINT_SETS];  // was [MAX_BREAKPOINTS] now dynamically sized.
     uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
@@ -562,9 +563,6 @@ struct synthinfo {
     SAMPLE hpf_state[2];
     // Selected lookup table and size.
     const LUT *lut;
-    float eq_l;
-    float eq_m;
-    float eq_h;
     // For ALGO feedback ops
     SAMPLE last_two[2];
     // For filters.  Need 2x because LPF24 uses two instances of filter.
@@ -797,6 +795,8 @@ float logfreq_for_midi_note(float midi_note);
 float midi_note_for_logfreq(float logfreq);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
+float portamento_ms_to_alpha(uint16_t portamento_ms);
+uint16_t alpha_to_portamento_ms(float alpha);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
@@ -865,6 +865,7 @@ void amy_reset_sysclock();
 
 extern int parse_int_list_message32(char *message, int32_t *vals, int max_num_vals, int32_t skipped_val);
 extern int parse_int_list_message16(char *message, int16_t *vals, int max_num_vals, int16_t skipped_val);
+extern void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth);
 extern void reset_osc(uint16_t i );
 
 extern int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
@@ -910,7 +911,10 @@ extern void patches_load_patch(amy_event *e);
 extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
-extern void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count);
+extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
+extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
+extern void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state);
+extern int size_of_amy_event(void);
 
 extern struct delta **queue_for_patch_number(int patch_number);
 extern void update_num_oscs_for_patch_number(int patch_number);
@@ -928,6 +932,7 @@ extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
+extern bool instrument_number_exists(int instrument_number, char *tag);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);

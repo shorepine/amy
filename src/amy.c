@@ -634,82 +634,86 @@ end:
 }
 
 
-void reset_osc(uint16_t i ) {
-    if (synth[i] == NULL) return;
-    // set all the synth state to defaults
-    synth[i]->osc = i; // self-reference to make updating oscs easier
-    synth[i]->wave = SINE;
-    msynth[i]->last_duty = 0.5f;
-    AMY_UNSET(synth[i]->preset);
-    AMY_UNSET(synth[i]->midi_note);
+void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
+    // set synth state to defaults given a pointer
+    psynth->wave = SINE;
+    AMY_UNSET(psynth->preset);
+    AMY_UNSET(psynth->midi_note);
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i]->amp_coefs[j] = 0;
-    synth[i]->amp_coefs[COEF_CONST] = 1.0f;  // Mostly a no-op, but partials_note_on used to want this?
-    synth[i]->amp_coefs[COEF_VEL] = 1.0f;
-    synth[i]->amp_coefs[COEF_EG0] = 1.0f;
-    msynth[i]->amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
-    msynth[i]->last_amp = 0;
+        psynth->amp_coefs[j] = 0;
+    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Mostly a no-op, but partials_note_on used to want this?
+    psynth->amp_coefs[COEF_VEL] = 1.0f;
+    psynth->amp_coefs[COEF_EG0] = 1.0f;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i]->logfreq_coefs[j] = 0;
-    synth[i]->logfreq_coefs[COEF_NOTE] = 1.0;
-    synth[i]->logfreq_coefs[COEF_BEND] = 1.0;
-    msynth[i]->logfreq = 0;
+        psynth->logfreq_coefs[j] = 0;
+    psynth->logfreq_coefs[COEF_NOTE] = 1.0;
+    psynth->logfreq_coefs[COEF_BEND] = 1.0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i]->filter_logfreq_coefs[j] = 0;
-    msynth[i]->filter_logfreq = 0;
-    AMY_UNSET(msynth[i]->last_filter_logfreq);
+        psynth->filter_logfreq_coefs[j] = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i]->duty_coefs[j] = 0;
-    synth[i]->duty_coefs[COEF_CONST] = 0.5f;
-    msynth[i]->duty = 0.5f;
+        psynth->duty_coefs[j] = 0;
+    psynth->duty_coefs[COEF_CONST] = 0.5f;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        synth[i]->pan_coefs[j] = 0;
-    synth[i]->pan_coefs[COEF_CONST] = 0.5f;
-    msynth[i]->pan = 0.5f;
-    synth[i]->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
-    msynth[i]->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
-    synth[i]->phase = F2P(0);
-    AMY_UNSET(synth[i]->trigger_phase);
-    synth[i]->eq_l = 0;
-    synth[i]->eq_m = 0;
-    synth[i]->eq_h = 0;
-    AMY_UNSET(synth[i]->logratio);
-    synth[i]->resonance = 0.7f;
-    msynth[i]->resonance = 0.7f;
-    synth[i]->portamento_alpha = 0;
-    synth[i]->velocity = 0;
-    synth[i]->step = 0;
-    AMY_UNSET(synth[i]->note_source);
-    synth[i]->mod_value = F2S(0);
-    synth[i]->substep = 0;
-    synth[i]->status = SYNTH_OFF;
-    AMY_UNSET(synth[i]->chained_osc);
-    AMY_UNSET(synth[i]->mod_source);
-    AMY_UNSET(synth[i]->render_clock);
-    AMY_UNSET(synth[i]->note_on_clock);
-    synth[i]->note_off_clock = 0;  // Used to check that last event seen by note was off.
-    AMY_UNSET(synth[i]->zero_amp_clock);
-    AMY_UNSET(synth[i]->mod_value_clock);
-    synth[i]->filter_type = FILTER_NONE;
-    synth[i]->hpf_state[0] = 0;
-    synth[i]->hpf_state[1] = 0;
-    for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) synth[i]->filter_delay[j] = 0;
-    synth[i]->last_filt_norm_bits = 0;
-    synth[i]->algorithm = 0;
-    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(synth[i]->algo_source[j]);
-    synth[i]->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
+        psynth->pan_coefs[j] = 0;
+    psynth->pan_coefs[COEF_CONST] = 0.5f;
+    psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
+    psynth->phase = F2P(0);
+    AMY_UNSET(psynth->trigger_phase);
+    AMY_UNSET(psynth->logratio);
+    psynth->resonance = 0.7f;
+    psynth->portamento_alpha = 0;
+    psynth->velocity = 0;
+    psynth->step = 0;
+    AMY_UNSET(psynth->note_source);
+    psynth->mod_value = F2S(0);
+    psynth->substep = 0;
+    psynth->status = SYNTH_OFF;
+    AMY_UNSET(psynth->chained_osc);
+    AMY_UNSET(psynth->mod_source);
+    AMY_UNSET(psynth->render_clock);
+    AMY_UNSET(psynth->note_on_clock);
+    psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
+    AMY_UNSET(psynth->zero_amp_clock);
+    AMY_UNSET(psynth->mod_value_clock);
+    psynth->filter_type = FILTER_NONE;
+    psynth->hpf_state[0] = 0;
+    psynth->hpf_state[1] = 0;
+    for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
+    psynth->last_filt_norm_bits = 0;
+    psynth->algorithm = 0;
+    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(psynth->algo_source[j]);
+    psynth->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
         // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
-        for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
-            AMY_UNSET(synth[i]->breakpoint_times[j][k]);
-            AMY_UNSET(synth[i]->breakpoint_values[j][k]);
+        for(uint8_t k=0;k<psynth->max_num_breakpoints[j];k++) {
+            AMY_UNSET(psynth->breakpoint_times[j][k]);
+            AMY_UNSET(psynth->breakpoint_values[j][k]);
         }
-        synth[i]->eg_type[j] = ENVELOPE_NORMAL;
+        psynth->eg_type[j] = ENVELOPE_NORMAL;
     }
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { synth[i]->last_scale[j] = 0; }
-    synth[i]->last_two[0] = 0;
-    synth[i]->last_two[1] = 0;
-    synth[i]->lut = NULL;
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
+    psynth->last_two[0] = 0;
+    psynth->last_two[1] = 0;
+    psynth->lut = NULL;
+    if (pmsynth != NULL) {
+        pmsynth->last_duty = 0.5f;
+        pmsynth->amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
+        pmsynth->last_amp = 0;
+        pmsynth->logfreq = 0;
+        pmsynth->filter_logfreq = 0;
+        AMY_UNSET(pmsynth->last_filter_logfreq);
+        pmsynth->duty = 0.5f;
+        pmsynth->pan = 0.5f;
+        pmsynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
+        pmsynth->resonance = 0.7f;
+    }
+}
+
+void reset_osc(uint16_t i ) {
+    // set all the synth state to defaults
+    if (synth[i] == NULL) return;
+    reset_osc_by_pointer(synth[i], msynth[i]);
+    synth[i]->osc = i; // self-reference to make updating oscs easier
 }
 
 void amy_reset_oscs() {
@@ -947,6 +951,21 @@ void show_debug(uint8_t type) {
         if (type > 5) {
             cc_mapping_debug();
         }
+        if (type > 6) {
+            for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
+                if (instrument_number_exists(synth, "debug")) {
+                    fprintf(stderr, "synth %d:\n", synth);
+                    void * state = NULL;
+                    amy_event event = amy_default_event();
+                    char s[MAX_MESSAGE_LEN];
+                    do {
+                        state = event_generator_for_synth(synth, &event, state);
+                        sprint_event(&event, s, MAX_MESSAGE_LEN, false);
+                        fprintf(stderr, "%s\n", s);
+                    } while(state != NULL);
+                }
+            }
+        }
         fprintf(stderr, "\n");
     }
 }
@@ -1031,6 +1050,10 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
 
 float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
+}
+
+uint16_t alpha_to_portamento_ms(float alpha) {
+    return (int)roundf(1000.0f * AMY_BLOCK_SIZE / AMY_SAMPLE_RATE / (1.0f - alpha)) - 1;
 }
 
 #define DELTA_TO_SYNTH_I(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc]->FIELD = d->data.i;

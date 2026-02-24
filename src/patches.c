@@ -4,6 +4,8 @@
 #include "amy.h"
 #include "patches.h"
 
+#include <assert.h>   // for buffer overruns in sprint_event.
+
 #define _PATCHES_FIRST_USER_PATCH 1024
 
 
@@ -155,121 +157,146 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-#define _EPRINT_I(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %" PRId32 " ", NAME, (int32_t)e->FIELD);
-#define _EPRINT_F(FIELD, NAME) if (AMY_IS_SET(e->FIELD)) fprintf(stderr, "%s: %.3f ", NAME, e->FIELD);
-#define _EPRINT_COEF(FIELD, NAME) { \
+#define _EPRINT_I(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { sprintf(s, "%s%" PRId32, wirecode ? WIRECODE : " " NAME ": ", (int32_t)e->FIELD); s += strlen(s); }
+#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { sprintf(s, "%s%.3f", wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
+#define _EPRINT_COEF(FIELD, NAME, WIRECODE) {            \
     int last_set = -1; \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {    \
         if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
     }                                              \
     if (last_set >= 0) { \
-        fprintf(stderr, "%s: ", NAME);            \
+        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");        \
+        s += strlen(s);  \
         for (int i = 0; i <= last_set; ++i) { \
-            if (i > 0) fprintf(stderr, ","); \
-            if (AMY_IS_SET(e->FIELD[i])) \
-                fprintf(stderr, "%.3f", e->FIELD[i]); \
+            if (i > 0) { sprintf(s, ","); s += strlen(s); }      \
+            if (AMY_IS_SET(e->FIELD[i])) {        \
+                sprintf(s, "%.3f", e->FIELD[i]); \
+                s += strlen(s);  \
+            }   \
         } \
-        fprintf(stderr, " "); \
     }     \
 }
-#define _EPRINT_I_SEQ(FIELD, NAME, LEN) {          \
+#define _EPRINT_I_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
     int last_set = -1; \
     for (int i = 0; i < LEN; ++i) {    \
         if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
     }                                              \
     if (last_set >= 0) { \
-        fprintf(stderr, "%s: ", NAME);            \
+        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        s += strlen(s);  \
         for (int i = 0; i < last_set; ++i) { \
-            if (i > 0) fprintf(stderr, ","); \
-            if (AMY_IS_SET(e->FIELD[i])) \
-                fprintf(stderr, "%" PRId32, (int32_t)e->FIELD[i]); \
+            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (AMY_IS_SET(e->FIELD[i])) { \
+                sprintf(s, "%" PRId32, (int32_t)e->FIELD[i]); \
+                s += strlen(s); \
+            } \
         } \
-        fprintf(stderr, " "); \
     }     \
 }
 
-#define _EPRINT_BP(TFIELD, VFIELD, NAME) {          \
+#define _EPRINT_BP(TFIELD, VFIELD, NAME, WIRECODE) {         \
     int last_set = -1;                              \
     for (int i = 0; i < MAX_BPS; ++i) {             \
         if (AMY_IS_SET(e->TFIELD[i]) || AMY_IS_SET(e->VFIELD[i])) last_set = i; \
     }                                                \
     if (last_set >= 0) {                            \
-        fprintf(stderr, "%s: ", NAME);              \
+        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");        \
+        s += strlen(s);   \
         for (int i = 0; i <= last_set; ++i) {       \
-            if (i > 0) fprintf(stderr, ",");        \
-            if (AMY_IS_SET(e->TFIELD[i]))           \
-                fprintf(stderr, "%" PRId32, (int32_t)e->TFIELD[i]); \
-            fprintf(stderr, ",");                   \
-            if (AMY_IS_SET(e->VFIELD[i]))           \
-                fprintf(stderr, "%.3f", e->VFIELD[i]); \
+            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (AMY_IS_SET(e->TFIELD[i])) {                        \
+                sprintf(s, "%" PRId32, (int32_t)e->TFIELD[i]); \
+                s += strlen(s);  \
+            }    \
+            sprintf(s, ",");                   \
+            s += strlen(s);    \
+            if (AMY_IS_SET(e->VFIELD[i])) {       \
+                sprintf(s, "%.3f", e->VFIELD[i]); \
+                s += strlen(s);  \
+            }  \
         }                                            \
-        fprintf(stderr, " ");                       \
     }                                                \
 }
 
-void print_event(amy_event *e) {
-    fprintf(stderr, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
-    _EPRINT_I(wave, "wave");
-    _EPRINT_I(preset, "preset");
-    _EPRINT_F(midi_note, "midi_note");
-    _EPRINT_I(patch_number, "patch_number");
-    _EPRINT_COEF(amp_coefs, "amp_coefs");
-    _EPRINT_COEF(freq_coefs, "freq_coefs");
-    _EPRINT_COEF(filter_freq_coefs, "filter_freq_coefs");
-    _EPRINT_COEF(duty_coefs, "duty_coefs");
-    _EPRINT_COEF(pan_coefs, "pan_coefs");
-    _EPRINT_F(feedback, "feedback");
-    _EPRINT_F(velocity, "velocity");
-    _EPRINT_F(phase, "phase");
-    _EPRINT_F(volume, "volume");
-    _EPRINT_F(pitch_bend, "pitch_bend");
-    _EPRINT_F(tempo, "tempo");
-    _EPRINT_I(latency_ms, "latency_ms");
-    _EPRINT_F(ratio, "ratio");
-    _EPRINT_F(resonance, "resonance");
-    _EPRINT_I(portamento_ms, "portamento_ms");
-    _EPRINT_I(chained_osc, "chained_osc");
-    _EPRINT_I(mod_source, "mod_source");
-    _EPRINT_I(algorithm, "algorithm");
-    _EPRINT_I(filter_type, "filter_type");
-    _EPRINT_F(eq_l, "eq_l");
-    _EPRINT_F(eq_m, "eq_m");
-    _EPRINT_F(eq_h, "eq_h");
-    _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS);
+int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
+    // Convert an event into a string, either human-readable or wirecode.
+    // s must be allocated.  len tells us how big it is.
+    // Return is how many chrs written to s.  Will abort if it overruns.
+    char *s_entry = s;
+    if (!wirecode) {
+        sprintf(s, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
+        s += strlen(s);
+    } else {
+        if (AMY_IS_SET(e->time)) { sprintf(s, "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
+        sprintf(s, "v%" PRIu16, (int16_t)e->osc);
+        s += strlen(s);
+    }
+    _EPRINT_I(wave, "wave", "w");
+    _EPRINT_I(preset, "preset", "p");
+    _EPRINT_F(midi_note, "midi_note", "n");
+    _EPRINT_I(patch_number, "patch_number", "K");
+    _EPRINT_COEF(amp_coefs, "amp_coefs", "a");
+    _EPRINT_COEF(freq_coefs, "freq_coefs", "f");
+    _EPRINT_COEF(filter_freq_coefs, "filter_freq_coefs", "F");
+    _EPRINT_COEF(duty_coefs, "duty_coefs", "d");
+    _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
+    _EPRINT_F(feedback, "feedback", "b");
+    _EPRINT_F(velocity, "velocity", "l");
+    _EPRINT_F(phase, "phase", "P");
+    _EPRINT_F(volume, "volume", "V");  // NOT osc-dep
+    _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
+    _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
+    _EPRINT_I(latency_ms, "latency_ms", "N");  // NOT osc-dep
+    _EPRINT_F(ratio, "ratio", "I");
+    _EPRINT_F(resonance, "resonance", "R");
+    _EPRINT_I(portamento_ms, "portamento_ms", "m");
+    _EPRINT_I(chained_osc, "chained_osc", "c");
+    _EPRINT_I(mod_source, "mod_source", "L");
+    _EPRINT_I(algorithm, "algorithm", "o");
+    _EPRINT_I(filter_type, "filter_type", "G");
+    _EPRINT_F(eq_l, "eq_l", "x");  // NOT osc-dep
+    _EPRINT_F(eq_m, "eq_m", "x,");  // NOT osc-dep
+    _EPRINT_F(eq_h, "eq_h", "x,,");  // NOT osc-dep
+    _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
-    _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS);
-    _EPRINT_I_SEQ(voices, "voices", MAX_VOICES_PER_INSTRUMENT);
-    _EPRINT_BP(eg0_times, eg0_values, "eg0");
-    _EPRINT_BP(eg1_times, eg1_values, "eg1");
-    _EPRINT_I_SEQ(eg_type, "eg_type", MAX_BREAKPOINT_SETS);
+    _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
+    _EPRINT_I_SEQ(voices, "voices", MAX_VOICES_PER_INSTRUMENT, "r");
+    _EPRINT_BP(eg0_times, eg0_values, "eg0", "A");
+    _EPRINT_BP(eg1_times, eg1_values, "eg1", "B");
+    _EPRINT_I(eg_type[0], "eg_type[0]", "T");
+    _EPRINT_I(eg_type[1], "eg_type[1]", "X");
     // Instrument-layer values.
-    _EPRINT_I(synth, "synth");
-    _EPRINT_I(synth_flags, "synth_flags");  // Special flags to set when defining instruments.
-    _EPRINT_I(synth_delay_ms, "synth_delay_ms");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
-    _EPRINT_I(to_synth, "to_synth");  // For moving setup between synth numbers.
-    _EPRINT_I(grab_midi_notes, "grab_midi_notes");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
-    _EPRINT_I(pedal, "pedal");  // MIDI pedal value.
-    _EPRINT_I(num_voices, "num_voices");
-    _EPRINT_I_SEQ(sequence, "sequence", 3); // tick, period, tag
+    _EPRINT_I(synth, "synth", "i");
+    _EPRINT_I(synth_flags, "synth_flags", "if");  // Special flags to set when defining instruments.
+    _EPRINT_I(synth_delay_ms, "synth_delay_ms", "id");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
+    _EPRINT_I(to_synth, "to_synth", "it");  // For moving setup between synth numbers.
+    _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
+    _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
+    _EPRINT_I(num_voices, "num_voices", "iv");
+    _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
-    _EPRINT_I(note_source, "note_source");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
-    _EPRINT_I(reset_osc, "reset_osc");
+    _EPRINT_I(note_source, "note_source", "??");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
+    _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
-    _EPRINT_F(echo_level, "echo_level");
-    _EPRINT_F(echo_delay_ms, "echo_delay_ms");
-    _EPRINT_F(echo_max_delay_ms, "echo_max_delay_ms");
-    _EPRINT_F(echo_feedback, "echo_feedback");
-    _EPRINT_F(echo_filter_coef, "echo_filter_coef");
-    _EPRINT_F(chorus_level, "chorus_level");
-    _EPRINT_F(chorus_max_delay, "chorus_max_delay");
-    _EPRINT_F(chorus_lfo_freq, "chorus_lfo_freq");
-    _EPRINT_F(chorus_depth, "chorus_depth");
-    _EPRINT_F(reverb_level, "reverb_level");
-    _EPRINT_F(reverb_liveness, "reverb_liveness");
-    _EPRINT_F(reverb_damping, "reverb_damping");
-    _EPRINT_F(reverb_xover_hz, "reverb_xover_hz");
-    fprintf(stderr, "\n");
+    _EPRINT_F(echo_level, "echo_level", "M");
+    _EPRINT_F(echo_delay_ms, "echo_delay_ms", "M,");
+    _EPRINT_F(echo_max_delay_ms, "echo_max_delay_ms", "M,,");
+    _EPRINT_F(echo_feedback, "echo_feedback", "M,,,");
+    _EPRINT_F(echo_filter_coef, "echo_filter_coef", "M,,,,");
+    _EPRINT_F(chorus_level, "chorus_level", "k");
+    _EPRINT_F(chorus_max_delay, "chorus_max_delay", "k,");
+    _EPRINT_F(chorus_lfo_freq, "chorus_lfo_freq", "k,,");
+    _EPRINT_F(chorus_depth, "chorus_depth", "k,,,");
+    _EPRINT_F(reverb_level, "reverb_level", "h");
+    _EPRINT_F(reverb_liveness, "reverb_liveness", "h,");
+    _EPRINT_F(reverb_damping, "reverb_damping", "h,,");
+    _EPRINT_F(reverb_xover_hz, "reverb_xover_hz", "h,,,");
+    if (wirecode) { sprintf(s, "Z"); s += strlen(s); }
+    // sprintf(s, "\n"); s += strlen(s);
+
+    assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
+    return s - s_entry;
 }
 
 
@@ -397,14 +424,6 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
 
-// 2026-01-27: PLAN:
-//  v finish deltas_to_event
-//  v create print_event
-//  v try it out by adding test case to amy_example
-//  - modify JS bindings to use the generator .. (? preserve state)
-
-
-
 void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state) {
     // Return a sequence of events defining a patch (specified by number).
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
@@ -442,6 +461,125 @@ void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *
     return (void *)queue;
 }
 
+#define EVENT_FROM_OSC(FIELD)  \
+    if (synth[osc]->FIELD != empty_synth.FIELD)  \
+        event->FIELD = synth[osc]->FIELD;
+
+#define EVENT_FROM_OSC_BASEOSC(FIELD)  \
+    if (synth[osc]->FIELD != empty_synth.FIELD)  \
+        event->FIELD = synth[osc]->FIELD - baseosc;
+
+#define EVENT_FROM_OSC_MAPPED(SYNTH_FIELD, EVENT_FIELD, MAP_FN)        \
+    if (synth[osc]->SYNTH_FIELD != empty_synth.SYNTH_FIELD)            \
+        event->EVENT_FIELD = MAP_FN(synth[osc]->SYNTH_FIELD);
+
+#define EVENT_FROM_OSC_ARRAY(FIELD, NUM_ELS)                           \
+    for (int i = 0; i < NUM_ELS; ++i) {                                \
+        if (synth[osc]->FIELD[i] != empty_synth.FIELD[i])              \
+            event->FIELD[i] = synth[osc]->FIELD[i];                    \
+    }
+
+#define EVENT_FROM_OSC_ARRAY_BASEOSC(FIELD, NUM_ELS)                   \
+    for (int i = 0; i < NUM_ELS; ++i) {                                \
+        if (synth[osc]->FIELD[i] != empty_synth.FIELD[i])              \
+            event->FIELD[i] = synth[osc]->FIELD[i] - baseosc;          \
+    }
+
+#define EVENT_FROM_OSC_ARRAY2(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)       \
+    for (int i = 0; i < NUM_ELS; ++i) {                                \
+        if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i])  \
+            event->EVENT_FIELD[i] = synth[osc]->SYNTH_FIELD[i];        \
+    }
+
+#define EVENT_FROM_OSC_ARRAY_T(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
+    for (int i = 0; i < NUM_ELS; ++i) {                                \
+        if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i])  \
+            event->EVENT_FIELD[i] = roundf((1000.0f * synth[osc]->SYNTH_FIELD[i]) / 44100.0f); \
+    }
+
+#define EVENT_FROM_OSC_ARRAY_FREQ(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
+    for (int i = 0; i < NUM_ELS; ++i) {                                   \
+        if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i]) {   \
+            if (i == COEF_CONST)                                          \
+                event->EVENT_FIELD[i] = freq_of_logfreq(synth[osc]->SYNTH_FIELD[i]); \
+            else                                                          \
+                event->EVENT_FIELD[i] = synth[osc]->SYNTH_FIELD[i];       \
+        }                                                                 \
+    }
+
+void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
+    // Set fields in the event to configure the osc away from default.
+    // We assume event has already been cleared.
+    // We do not set the osc field of the event.
+    // Generate the reference "empty synth".
+    struct synthinfo empty_synth;
+    // We need to have space for the breakpoints.
+    uint32_t times[MAX_BREAKPOINT_SETS * DEFAULT_NUM_BREAKPOINTS];
+    float values[MAX_BREAKPOINT_SETS * DEFAULT_NUM_BREAKPOINTS];
+    for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
+        empty_synth.max_num_breakpoints[i] = DEFAULT_NUM_BREAKPOINTS;
+        empty_synth.breakpoint_times[i] = times + i * DEFAULT_NUM_BREAKPOINTS;
+        empty_synth.breakpoint_values[i] = values + i * DEFAULT_NUM_BREAKPOINTS;
+    }
+    reset_osc_by_pointer(&empty_synth, /* msynth */ NULL);
+    // Go through parameter fields picking out the ones that are nondefault.
+    EVENT_FROM_OSC(wave);
+    EVENT_FROM_OSC(preset);
+    EVENT_FROM_OSC(midi_note);
+    EVENT_FROM_OSC_ARRAY(amp_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC_ARRAY_FREQ(logfreq_coefs, freq_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC_ARRAY_FREQ(filter_logfreq_coefs, filter_freq_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC_ARRAY(duty_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC_ARRAY(pan_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC(feedback);
+    EVENT_FROM_OSC(velocity);
+    EVENT_FROM_OSC(phase);
+    EVENT_FROM_OSC_MAPPED(logratio, ratio, exp2f);
+    EVENT_FROM_OSC(resonance);
+    EVENT_FROM_OSC_MAPPED(portamento_alpha, portamento_ms, alpha_to_portamento_ms);
+    EVENT_FROM_OSC_BASEOSC(chained_osc);
+    EVENT_FROM_OSC_BASEOSC(mod_source);
+    EVENT_FROM_OSC(algorithm);
+    EVENT_FROM_OSC(filter_type);
+    EVENT_FROM_OSC_ARRAY_BASEOSC(algo_source, MAX_ALGO_OPS);
+    EVENT_FROM_OSC_ARRAY_T(breakpoint_times[0], eg0_times, synth[osc]->max_num_breakpoints[0]);
+    EVENT_FROM_OSC_ARRAY2(breakpoint_values[0], eg0_values, synth[osc]->max_num_breakpoints[0]);
+    EVENT_FROM_OSC_ARRAY_T(breakpoint_times[1], eg1_times, synth[osc]->max_num_breakpoints[1]);
+    EVENT_FROM_OSC_ARRAY2(breakpoint_values[1], eg1_values, synth[osc]->max_num_breakpoints[1]);
+    EVENT_FROM_OSC_ARRAY(eg_type, MAX_BREAKPOINT_SETS);
+}
+
+void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state) {
+    // Return a sequence of events defining a synth.
+    // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
+    // Find oscs for synth.
+    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+    int num_voices = instrument_get_num_voices(synth, voices);
+    if (num_voices < 1) {
+        fprintf(stderr, "event_generator_for_synth: synth %d has no voices.\n", synth);
+        return NULL;  // instrument not allocated.
+    }
+    uint16_t voice = voices[0];
+    uint16_t base_osc = voice_to_base_osc[voice];
+    int num_oscs = 0;
+    while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
+    // The "state" indicates which osc within the voice we're going to report for.
+    int current_osc = (int64_t)state;
+    //fprintf(stderr, "ev_gen_for_synth(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
+    if (current_osc == num_oscs) {
+        fprintf(stderr, "event_generator_for_synth: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
+        return NULL;  // State is asking for an osc beyond available oscs, shouldn't happen.
+    }
+    amy_clear_event(event);
+    set_event_for_osc(base_osc + current_osc, base_osc, event);
+    // Set the osc number relative to the synth
+    event->osc = current_osc;
+
+    ++current_osc;
+    if (current_osc == num_oscs) current_osc = 0;  // Indicate this is the final event.
+    return (void *)((int64_t)current_osc);
+}
+
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
@@ -464,17 +602,10 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
       }
     }
 }
-#define MAX_EVENTS_FOR_PATCH 64
-void parse_patch_number_to_events(uint16_t patch_number, struct amy_event **events, uint16_t *event_count) {
-    fprintf(stderr, "parse_patch_number_to_events: patch_number %" PRIu16 "\n", patch_number);
-    struct amy_event *out = calloc(MAX_EVENTS_FOR_PATCH + 1, sizeof(struct amy_event));
-    void *state = NULL;
-    uint16_t counter = 0;
-    do {
-        state = event_generator_for_patch_number(patch_number, &out[counter++], state);
-    } while (state != NULL);
-    *events = out;
-    *event_count = counter;
+
+// So emscripten knows how big to make this struct.
+int size_of_amy_event(void) {
+    return sizeof(amy_event);
 }
 
 void patches_store_patch(amy_event *e, char * patch_string) {
