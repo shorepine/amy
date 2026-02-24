@@ -20,22 +20,20 @@
 //   - LilyGO T-Display-S3 + PCM5102A DAC + Arturia Minilab 25
 
 extern "C" {
-    void amy_process_single_midi_byte(uint8_t byte, uint8_t from_usb);
+    void convert_midi_bytes_to_messages(uint8_t *data, size_t len, uint8_t usb);
 }
 
 USBConnection usbMidi;
 
 // Bridge: forward USB-MIDI event packets into AMY's MIDI parser.
 // USB-MIDI packets are 4 bytes: [CIN+Cable, MIDI0, MIDI1, MIDI2].
-// We skip byte 0 (Cable/CIN) and feed bytes 1-3 with the USB flag,
-// which tells AMY to process them as a complete 3-byte group.
+// We pass bytes 1-3 as a group with the USB flag so AMY's parser can
+// exit early after completing the message, skipping padded bytes on
+// short messages (e.g. Program Change, Channel Pressure).
 void onUsbMidiData(void* ctx, const uint8_t* data, size_t length) {
     for (size_t i = 0; i + 4 <= length; i += 4) {
-        uint8_t cin = data[i] & 0x0F;
-        if (cin == 0x00) continue;  // Skip empty packets
-        amy_process_single_midi_byte(data[i + 1], 1);
-        amy_process_single_midi_byte(data[i + 2], 1);
-        amy_process_single_midi_byte(data[i + 3], 1);
+        if ((data[i] & 0x0F) == 0x00) continue;  // Skip empty packets
+        convert_midi_bytes_to_messages((uint8_t*)(data + i + 1), 3, 1);
     }
 }
 
