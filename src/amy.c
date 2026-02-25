@@ -393,13 +393,13 @@ int8_t global_init(amy_config_t c) {
     amy_global.reverb.damping = REVERB_DEFAULT_DAMPING;
     amy_global.reverb.xover_hz = REVERB_DEFAULT_XOVER_HZ;
 
-    amy_global.chorus.level = CHORUS_DEFAULT_LEVEL;
+    amy_global.chorus.level = F2S(CHORUS_DEFAULT_LEVEL);
     amy_global.chorus.max_delay =  CHORUS_DEFAULT_MAX_DELAY;
     amy_global.chorus.lfo_freq = CHORUS_DEFAULT_LFO_FREQ;
     amy_global.chorus.depth = CHORUS_DEFAULT_MOD_DEPTH;
 
     amy_global.echo.level = F2S(ECHO_DEFAULT_LEVEL);
-    amy_global.echo.delay_samples = (uint32_t)(ECHO_DEFAULT_DELAY_MS * 1000.f / AMY_SAMPLE_RATE);
+    amy_global.echo.delay_samples = (uint32_t)(ECHO_DEFAULT_DELAY_MS / 1000.f * AMY_SAMPLE_RATE);
     amy_global.echo.max_delay_samples = 65536;
     amy_global.echo.feedback = F2S(ECHO_DEFAULT_FEEDBACK);
     amy_global.echo.filter_coef = ECHO_DEFAULT_FILTER_COEF;
