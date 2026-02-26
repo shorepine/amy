@@ -93,7 +93,7 @@ int main(int argc, char ** argv) {
         
     //example_fm(0);
     //example_voice_chord(0,0);
-    example_synth_chord(0, /* patch */ 0);
+    example_synth_chord(0, /* patch */ 1);
     //example_sustain_pedal(0, /* patch */ 256);
     //example_sequencer_drums(0);
     //example_patch_from_events();
@@ -103,6 +103,11 @@ int main(int argc, char ** argv) {
     e.patch_number = 25;
     e.osc = 0;
     e.wave = SINE;
+    amy_add_event(&e);
+
+    // Change the global volume.
+    e = amy_default_event();
+    e.volume = 2.0f;
     amy_add_event(&e);
 
     // Reading back a stored patch
@@ -180,9 +185,8 @@ int main(int argc, char ** argv) {
     e.chorus_depth = 0.5f;
     amy_add_event(&e);
 
-    print_events_for_patch_number(patch_number);    
 
-    print_events_for_synth(/* synth */ 1, /* wirecode */ true);
+    print_events_for_patch_number(patch_number);
 
     
     // Now just spin for a while
@@ -190,6 +194,8 @@ int main(int argc, char ** argv) {
     while(amy_sysclock() - start < 5000) {
         usleep(THREAD_USLEEP);
     }
+
+    print_events_for_synth(/* synth */ 0, /* wirecode */ true);
 
     //show_debug(99);
     

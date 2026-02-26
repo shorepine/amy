@@ -218,6 +218,29 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }                                                \
 }
 
+#define _EPRINT_VALS_5(VAL1, VAL2, VAL3, VAL4, VAL5, NAME, WIRECODE)  {      \
+        float vals[] = {VAL1, VAL2, VAL3, VAL4, VAL5}; \
+        int n_vals = sizeof(vals) / sizeof(float); \
+        int last_one = -1; \
+        for (int i = 0; i < n_vals; ++i) { \
+            if (AMY_IS_SET(vals[i])) last_one = i; \
+        } \
+        if (last_one >= 0) { \
+            sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": "); \
+            s += strlen(s); \
+            for (int j = 0; j <= last_one; ++j) {  \
+                if (AMY_IS_SET(vals[j])) { \
+                    sprintf(s, "%.3f", vals[j]);   \
+                    s += strlen(s); \
+                } \
+                if (j < last_one) { \
+                    sprintf(s, ","); \
+                    s += strlen(s); \
+                } \
+            } \
+        } \
+    }
+
 int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Convert an event into a string, either human-readable or wirecode.
     // s must be allocated.  len tells us how big it is.
@@ -228,8 +251,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         s += strlen(s);
     } else {
         if (AMY_IS_SET(e->time)) { sprintf(s, "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
-        sprintf(s, "v%" PRIu16, (int16_t)e->osc);
-        s += strlen(s);
+        if (AMY_IS_SET(e->osc)) { sprintf(s, "v%" PRIu16, (int16_t)e->osc); s += strlen(s); }
     }
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
@@ -254,9 +276,6 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(mod_source, "mod_source", "L");
     _EPRINT_I(algorithm, "algorithm", "o");
     _EPRINT_I(filter_type, "filter_type", "G");
-    _EPRINT_F(eq_l, "eq_l", "x");  // NOT osc-dep
-    _EPRINT_F(eq_m, "eq_m", "x,");  // NOT osc-dep
-    _EPRINT_F(eq_h, "eq_h", "x,,");  // NOT osc-dep
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
@@ -279,21 +298,12 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(note_source, "note_source", "??");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
-    _EPRINT_F(echo_level, "echo_level", "M");
-    _EPRINT_F(echo_delay_ms, "echo_delay_ms", "M,");
-    _EPRINT_F(echo_max_delay_ms, "echo_max_delay_ms", "M,,");
-    _EPRINT_F(echo_feedback, "echo_feedback", "M,,,");
-    _EPRINT_F(echo_filter_coef, "echo_filter_coef", "M,,,,");
-    _EPRINT_F(chorus_level, "chorus_level", "k");
-    _EPRINT_F(chorus_max_delay, "chorus_max_delay", "k,");
-    _EPRINT_F(chorus_lfo_freq, "chorus_lfo_freq", "k,,");
-    _EPRINT_F(chorus_depth, "chorus_depth", "k,,,");
-    _EPRINT_F(reverb_level, "reverb_level", "h");
-    _EPRINT_F(reverb_liveness, "reverb_liveness", "h,");
-    _EPRINT_F(reverb_damping, "reverb_damping", "h,,");
-    _EPRINT_F(reverb_xover_hz, "reverb_xover_hz", "h,,,");
+    _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
+    _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
+    _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
+    _EPRINT_VALS_5(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT, "reverb_{level,live,damp,xover}", "h");
+
     if (wirecode) { sprintf(s, "Z"); s += strlen(s); }
-    // sprintf(s, "\n"); s += strlen(s);
 
     assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
     return s - s_entry;
@@ -549,6 +559,44 @@ void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
     EVENT_FROM_OSC_ARRAY(eg_type, MAX_BREAKPOINT_SETS);
 }
 
+float lin_to_db(float lin) {
+    return 20.0f * log10f(lin);
+}
+
+#define SET_EVENT_FIELD_IF_STATE(DOMAIN, DOMAIN_C, PARAM, PARAM_C)       \
+    if (state->DOMAIN.PARAM != DOMAIN_C ## _DEFAULT_ ## PARAM_C) event->DOMAIN ## _  ## PARAM = state->DOMAIN.PARAM;
+#define SET_EVENT_FIELD_IF_STATE_F2S(DOMAIN, DOMAIN_C, PARAM, PARAM_C)   \
+    if (state->DOMAIN.PARAM != F2S(DOMAIN_C ## _DEFAULT_ ## PARAM_C)) event->DOMAIN ## _  ## PARAM = S2F(state->DOMAIN.PARAM);
+
+void set_event_for_global_fx(amy_event *event, struct state *state) {
+    // These are comparing against the default values set up in amy.c:global_init()
+    // Volume
+    if (state->volume != 1.0f) event->volume = state->volume;
+    // EQ
+    if (state->eq[0] != F2S(1.0f)) event->eq_l = lin_to_db(S2F(state->eq[0]));
+    if (state->eq[1] != F2S(1.0f)) event->eq_m = lin_to_db(S2F(state->eq[1]));
+    if (state->eq[2] != F2S(1.0f)) event->eq_h = lin_to_db(S2F(state->eq[2]));
+    // Reverb
+    SET_EVENT_FIELD_IF_STATE_F2S(reverb, REVERB, level, LEVEL);
+    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, liveness, LIVENESS);
+    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, damping, DAMPING);
+    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, xover_hz, XOVER_HZ);
+    // Chorus
+    SET_EVENT_FIELD_IF_STATE_F2S(chorus, CHORUS, level, LEVEL);
+    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, max_delay, MAX_DELAY);
+    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, lfo_freq, LFO_FREQ);
+    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, depth, MOD_DEPTH);
+    // Echo
+    SET_EVENT_FIELD_IF_STATE_F2S(echo, ECHO, level, LEVEL);
+    if (state->echo.delay_samples != (uint32_t)(ECHO_DEFAULT_DELAY_MS / 1000.f * AMY_SAMPLE_RATE))
+        event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    if (state->echo.max_delay_samples != 65536)
+        event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    SET_EVENT_FIELD_IF_STATE(echo, ECHO, feedback, FEEDBACK);
+    SET_EVENT_FIELD_IF_STATE(echo, ECHO, filter_coef, FILTER_COEF);
+}
+
+
 void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
@@ -566,17 +614,22 @@ void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *st
     // The "state" indicates which osc within the voice we're going to report for.
     int current_osc = (int64_t)state;
     //fprintf(stderr, "ev_gen_for_synth(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
-    if (current_osc == num_oscs) {
+    if (current_osc > num_oscs) {
         fprintf(stderr, "event_generator_for_synth: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
         return NULL;  // State is asking for an osc beyond available oscs, shouldn't happen.
     }
     amy_clear_event(event);
-    set_event_for_osc(base_osc + current_osc, base_osc, event);
-    // Set the osc number relative to the synth
-    event->osc = current_osc;
+    if (current_osc < num_oscs) {
+        set_event_for_osc(base_osc + current_osc, base_osc, event);
+        // Set the osc number relative to the synth
+        event->osc = current_osc;
+    } else {
+        // final event, when state == num_oscs, contains the global settings (volume, eq, chorus, echo, reverb).
+        set_event_for_global_fx(event, &amy_global);
+    }
 
     ++current_osc;
-    if (current_osc == num_oscs) current_osc = 0;  // Indicate this is the final event.
+    if (current_osc == num_oscs + 1) current_osc = 0;  // Indicate this is the final event.
     return (void *)((int64_t)current_osc);
 }
 
