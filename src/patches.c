@@ -434,7 +434,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
 
-void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state) {
+void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state) {
     // Return a sequence of events defining a patch (specified by number).
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
     amy_clear_event(event);
@@ -597,14 +597,14 @@ void set_event_for_global_fx(amy_event *event, struct state *state) {
 }
 
 
-void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state) {
+void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
     // Find oscs for synth.
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     int num_voices = instrument_get_num_voices(synth, voices);
     if (num_voices < 1) {
-        fprintf(stderr, "event_generator_for_synth: synth %d has no voices.\n", synth);
+        fprintf(stderr, "yield_synth_events: synth %d has no voices.\n", synth);
         return NULL;  // instrument not allocated.
     }
     uint16_t voice = voices[0];
@@ -613,9 +613,9 @@ void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *st
     while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
     // The "state" indicates which osc within the voice we're going to report for.
     int current_osc = (int64_t)state;
-    //fprintf(stderr, "ev_gen_for_synth(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
+    //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
     if (current_osc > num_oscs) {
-        fprintf(stderr, "event_generator_for_synth: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
+        fprintf(stderr, "yield_synth_events: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
         return NULL;  // State is asking for an osc beyond available oscs, shouldn't happen.
     }
     amy_clear_event(event);
@@ -632,6 +632,16 @@ void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *st
     if (current_osc == num_oscs + 1) current_osc = 0;  // Indicate this is the final event.
     return (void *)((int64_t)current_osc);
 }
+
+
+void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state) {
+    // Generator to return multiple wirecode strings to reconfigure a synth.
+    amy_event event = amy_default_event();
+    state = yield_synth_events(synth, &event, state);
+    sprint_event(&event, s, len, /* wirecode= */ true);
+    return state;
+}
+
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
     // Work though the patch string and send to voices.

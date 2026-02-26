@@ -225,6 +225,23 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
+    char s[MAX_MESSAGE_LEN];
+    void *state = NULL;
+    int synth;
+    if(PyTuple_Size(args) != 1 || !PyArg_ParseTuple(args, "i", &synth)) {
+        return NULL;
+    }
+    PyObject* list_obj = PyList_New(0);
+    do {
+        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, state);
+        int slen = strlen(s);
+        if (slen)
+            PyList_Append(list_obj, PyUnicode_FromString(s));
+    } while (state != NULL);
+    return list_obj;
+}
+
 
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
@@ -234,6 +251,7 @@ static PyMethodDef c_amyMethods[] = {
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
+    {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
     { NULL, NULL, 0, NULL }
 };
 
