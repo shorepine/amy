@@ -503,3 +503,37 @@ def echo(level=None, delay_ms=None, max_delay_ms=None, feedback=None, filter_coe
         echo_filter_coef = str(filter_coef)
     echo_arg = '%s,%s,%s,%s,%s' % (echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef)
     send(echo=echo_arg)
+
+"""
+    Reading back synth configuration
+"""
+def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6):
+    if patch_num is not None and dest_synth is not None:
+        raise ValueError("At most one of patch_num and dest_synth can be specified")
+    commands = _amy.get_synth_commands(synth)
+
+    def len_digit_prefix(s):
+        len = 0
+        while s[len] in '0123456789':
+            len += 1
+        return len
+
+    # Scan for number of oscs
+    num_oscs = 0
+    for command in commands:
+        if command[0] == 'v':
+            osc_num = int(command[1: 1 + len_digit_prefix(command[1:])])
+            if num_oscs < osc_num + 1:
+                num_oscs = osc_num + 1
+    # Build total command string including prefix depending on use.
+    prefix = ""
+    prologue = []
+    if patch_num:
+        # Start by resetting the patch.
+        prologue = ["S%dk%dZ" % (RESET_PATCH, patch_num)]
+        prefix = "K%d" % patch_num
+    if dest_synth:
+        # Prepend command to reset the synth.
+        prologue = ["i%div0Z" % dest_synth, "i%div%duv%dZ" % (dest_synth, num_voices, num_oscs - 1)]
+        prefix = "i%d" % dest_synth
+    return "\n".join(prologue + [prefix + command for command in commands])
