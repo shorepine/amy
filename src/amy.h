@@ -515,7 +515,7 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
-    int oscs_per_voice;  // Used when initializing a synth without a patch.
+    uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
