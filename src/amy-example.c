@@ -44,6 +44,16 @@ void print_events_for_synth(int synth, bool wirecode) {
     } while(state != NULL);
 }
 
+void print_events_for_synth_2(int synth, bool wirecode) {
+    fprintf(stderr, "pefs2: synth %d:\n", synth);
+    void * state = NULL;
+    char s[MAX_MESSAGE_LEN];
+    do {
+        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, state);
+        fprintf(stderr, "%s\n", s);
+    } while(state != NULL);
+}
+
 
 int main(int argc, char ** argv) {
     int8_t playback_device_id = -1;
@@ -196,6 +206,7 @@ int main(int argc, char ** argv) {
     }
 
     print_events_for_synth(/* synth */ 0, /* wirecode */ true);
+    print_events_for_synth_2(/* synth */ 0, /* wirecode */ true);
 
     //show_debug(99);
     

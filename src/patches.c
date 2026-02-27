@@ -205,7 +205,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         for (int i = 0; i <= last_set; ++i) {       \
             if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->TFIELD[i])) {                        \
-                sprintf(s, "%" PRId32, (int32_t)e->TFIELD[i]); \
+                sprintf(s, "%" PRIu32, e->TFIELD[i]); \
                 s += strlen(s);  \
             }    \
             sprintf(s, ",");                   \
@@ -411,7 +411,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
     }
     queue = queue->next;
   }
-  int16_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {event->eg0_times, event->eg1_times};
+  uint32_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {event->eg0_times, event->eg1_times};
   float *bp_values[MAX_BREAKPOINT_SETS] = {event->eg0_values, event->eg1_values};
   for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
       if (highest_breakpoint[i] >= 0) {
@@ -505,7 +505,7 @@ void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *s
 #define EVENT_FROM_OSC_ARRAY_T(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
     for (int i = 0; i < NUM_ELS; ++i) {                                \
         if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i])  \
-            event->EVENT_FIELD[i] = roundf((1000.0f * synth[osc]->SYNTH_FIELD[i]) / 44100.0f); \
+            event->EVENT_FIELD[i] = lroundf(((float)synth[osc]->SYNTH_FIELD[i]) / 44.1f); \
     }
 
 #define EVENT_FROM_OSC_ARRAY_FREQ(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
@@ -606,7 +606,7 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     int num_voices = instrument_get_num_voices(synth, voices);
     if (num_voices < 1) {
-        fprintf(stderr, "yield_synth_events: synth %d has no voices.\n", synth);
+        fprintf(stderr, "yield_synth_events: synth %" PRId32" has no voices.\n", (int32_t)synth);
         return NULL;  // instrument not allocated.
     }
     uint16_t voice = voices[0];

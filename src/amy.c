@@ -584,7 +584,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         }
     }
 
-    int16_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {e->eg0_times, e->eg1_times};
+    uint32_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {e->eg0_times, e->eg1_times};
     float *bp_values[MAX_BREAKPOINT_SETS] = {e->eg0_values, e->eg1_values};
     for (uint8_t i = 0; i < MAX_BREAKPOINT_SETS; i++) {
         // amy_parse_message sets bp_is_set for anything including an empty bp string.
