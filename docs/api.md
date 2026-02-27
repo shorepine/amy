@@ -149,6 +149,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `id`   | `synth_delay_ms` | `synth_delay` | uint | Delay (in ms) applied to synth note-ons.  Gives time for decay of 'stolen' notes. |
 | `it`   | `to_synth` |  `to_synth` | 0-31 | New synth number, when changing the number (MIDI channel for n=1..16) of an entire synth. |
 | `iv`   | `num_voices` | `num_voices` | int | The number of voices to allocate when defining a synth, alternative to directly specifying voice numbers with `voices=`.  Only valid with `synth=X, patch[_number]=Y`. |
+| `in`   | `oscs_per_voice`  | `oscs_per_voice`  | >0  | Reserve this many oscs for each voice.  Needed when initializing a synth (or voice) withouth an initial patch. |
 | `im`   | `grab_midi_notes` | `grab_midi_notes` | 0/1 | Use `amy.send(synth=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
 | `ip`   | `pedal` | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
 | `K`    | `patch_number` | `patch` | uint 0-X | Apply a saved or user patch to a specified synth or voice. |

@@ -515,6 +515,7 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
+    int oscs_per_voice;  // Used when initializing a synth without a patch.
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -928,7 +929,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();
-extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags);
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
@@ -938,6 +939,7 @@ extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
+extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);

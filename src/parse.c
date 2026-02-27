@@ -341,6 +341,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
+    else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
         int32_t cc_code, is_log;

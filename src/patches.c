@@ -256,6 +256,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
     _EPRINT_F(midi_note, "midi_note", "n");
+    _EPRINT_F(velocity, "velocity", "l");
     _EPRINT_I(patch_number, "patch_number", "K");
     _EPRINT_COEF(amp_coefs, "amp_coefs", "a");
     _EPRINT_COEF(freq_coefs, "freq_coefs", "f");
@@ -263,7 +264,6 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(duty_coefs, "duty_coefs", "d");
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
-    _EPRINT_F(velocity, "velocity", "l");
     _EPRINT_F(phase, "phase", "P");
     _EPRINT_F(volume, "volume", "V");  // NOT osc-dep
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
@@ -292,6 +292,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
     _EPRINT_I(num_voices, "num_voices", "iv");
+    _EPRINT_I(oscs_per_voice, "oscs_per_voice", "in");
     _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
@@ -535,14 +536,15 @@ void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
     // Go through parameter fields picking out the ones that are nondefault.
     EVENT_FROM_OSC(wave);
     EVENT_FROM_OSC(preset);
-    EVENT_FROM_OSC(midi_note);
+    // Note and velocity are special for "note on" events, don't reflect them in config.
+    //EVENT_FROM_OSC(midi_note);
+    //EVENT_FROM_OSC(velocity);
     EVENT_FROM_OSC_ARRAY(amp_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY_FREQ(logfreq_coefs, freq_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY_FREQ(filter_logfreq_coefs, filter_freq_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY(duty_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY(pan_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC(feedback);
-    EVENT_FROM_OSC(velocity);
     EVENT_FROM_OSC(phase);
     EVENT_FROM_OSC_MAPPED(logratio, ratio, exp2f);
     EVENT_FROM_OSC(resonance);
@@ -970,22 +972,10 @@ void release_voice_oscs(int32_t voice) {
 
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
 
-
-uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t *ppatch_number) {
+uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     // When load_patch specifies a synth, convert that into voices.
     // e->synth is assumed to be set.
     int num_voices = 0;
-    if (AMY_IS_UNSET(e->patch_number)) {
-        // If no patch number is provided, pull from existing instrument.
-        int32_t old_patch_number = instrument_get_patch_number(e->synth);
-        if (old_patch_number == -1) {
-            fprintf(stderr, "attempting to configure synth %" PRId32 " (%" PRId32 " voices) without patch/patch_number, but no previous patch found\n",
-                    (int32_t)e->synth, (int32_t)e->num_voices);
-            return 0;  // Ignore
-        }
-        // Otherwise, inherit the existing patch number.
-        *ppatch_number = old_patch_number;
-    }
     // If the instrument is alread initialized, copy the voice numbers.
     num_voices = instrument_get_num_voices(e->synth, voices);
     if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
@@ -1002,8 +992,8 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t 
                 ++v;
             }
             if (v == amy_global.config.max_voices)  {
-                fprintf(stderr, "ran out of voices allocating %" PRId32 " voices to synth %" PRId32 " for patch %" PRIu16 ", ignoring.",
-                        (int32_t)e->num_voices, (int32_t)e->synth, *ppatch_number);
+                fprintf(stderr, "ran out of voices allocating %" PRId32 " voices to synth %" PRId32 ", ignoring.",
+                        (int32_t)e->num_voices, (int32_t)e->synth);
                 patches_debug();
                 return 0;
             }
@@ -1029,42 +1019,56 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[], uint16_t 
 
 
 void patches_load_patch(amy_event *e) {
-    // Given an event with a patch/patch_number AND a voices/instrument spec in it.
+    // Given an event with a synth (instrument) or voice spec, set up a synth.
+    // Common case is to call with a patch to load, but can also have just
+    // a oscs_per_voice value.
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
-    // This means to set/reset the voices and load the messages from ROM and set them.
+    // This means to set/reset the voices and load the messages (from ROM or memory) and set them.
     peek_stack("load_patch");
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
+    uint16_t oscs_per_voice = 0;
     uint16_t patch_number = e->patch_number;
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
     if (AMY_IS_SET(e->synth)) {
-        num_voices = patches_voices_for_load_synth(e, voices, &patch_number);
+        if (AMY_IS_UNSET(e->patch_number))
+            patch_number = instrument_get_patch_number(e->synth);
+        num_voices = patches_voices_for_load_synth(e, voices);
     } else if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
     }
     if (num_voices == 0) {
-        fprintf(stderr, "synth %" PRId32 " patch %" PRIu16 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
-                (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
+        if (AMY_IS_UNSET(e->num_voices)) {
+            // Print a warning unless we deliberately set the voices to zero to release the synth.
+            fprintf(stderr, "synth %" PRId32 " patch %" PRIu16 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
+                    (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
+        }
         return;
     }
 
     // At this point, we have the voices[] array and num_voices set up to be initialized.
     char *message = NULL;
     struct delta *deltas = NULL;
-    uint16_t num_patch_oscs = 0;
-    if(patch_number < _PATCHES_FIRST_USER_PATCH) {
+    // Figure out the #oscs per voice, setup message or deltas if available.
+    if (AMY_IS_SET(e->oscs_per_voice)) {
+        oscs_per_voice = e->oscs_per_voice;
+        if (AMY_IS_SET(e->patch_number)) {
+            fprintf(stderr, "WARN: synth %" PRId32 ": oscs_per_voice %" PRIu16 " made me ignore patch number %" PRIu16 "\n",
+                    (int32_t)e->synth, e->oscs_per_voice, patch_number);
+        }
+    } else if(patch_number < _PATCHES_FIRST_USER_PATCH) {
         // Built-in patch
         message = (char*)patch_commands[patch_number];
-        num_patch_oscs = patch_oscs[patch_number];
+        oscs_per_voice = patch_oscs[patch_number];
     } else {
         // User-defined patch
         int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-        num_patch_oscs = memory_patch_oscs[patch_index];
-        if(num_patch_oscs > 0){
+        oscs_per_voice = memory_patch_oscs[patch_index];
+        if(oscs_per_voice > 0){
             deltas = memory_patch_deltas[patch_index];
         } else {
             fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
-                    patch_number, num_patch_oscs, delta_list_len(memory_patch_deltas[patch_index]),
+                    patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
                     (int32_t)e->synth, (int32_t)e->num_voices);
             return;
         }
@@ -1076,7 +1080,7 @@ void patches_load_patch(amy_event *e) {
     }
 
     for(uint8_t v=0;v<num_voices;v++)  {
-        // Find the first osc with num_patch_oscs free oscs.
+        // Find the first osc with oscs_per_voice free oscs.
         uint8_t good = 0;
 
         uint16_t osc_start = (AMY_OSCS/2);
@@ -1091,16 +1095,16 @@ void patches_load_patch(amy_event *e) {
         for(uint16_t i=0;i<AMY_OSCS;i++) {
             uint16_t osc = (osc_start + i) % AMY_OSCS;
             if(AMY_IS_UNSET(osc_to_voice[osc])) {
-                // Are there num_voices x num_patch_oscs free oscs after this one?
+                // Are there num_voices x oscs_per_voice free oscs after this one?
                 good = 1;
-                for(uint16_t j=0; j < num_patch_oscs; j++) {
+                for(uint16_t j=0; j < oscs_per_voice; j++) {
                     good = good & (AMY_IS_UNSET(osc_to_voice[osc + j]));
                 }
                 if(good) {
                     //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[patch_number], osc, voices[v]);
                     //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
                     voice_to_base_osc[voices[v]] = osc; 
-                    for(uint16_t j=0; j < num_patch_oscs; j++) {
+                    for(uint16_t j=0; j < oscs_per_voice; j++) {
                         //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
                         osc_to_voice[osc+j] = voices[v];
                         //reset_osc(osc+j);
@@ -1128,7 +1132,7 @@ void patches_load_patch(amy_event *e) {
         }
         if(!good) {
             fprintf(stderr, "cannot find %" PRIu16 " oscs for patch %" PRIu16 " for voice %" PRIu16 ". not setting this voice\n",
-                    num_patch_oscs, patch_number, voices[v]);
+                    oscs_per_voice, patch_number, voices[v]);
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
 
@@ -1137,9 +1141,10 @@ void patches_load_patch(amy_event *e) {
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
             if (deltas) {
                 add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
-            } else {
+            } else if (message) {
                 parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
             }
+            // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
         }
     }
 
@@ -1147,7 +1152,7 @@ void patches_load_patch(amy_event *e) {
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
-        instrument_add_new(e->synth, num_voices, voices, patch_number, flags);
+        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, flags);
     }
 
 }

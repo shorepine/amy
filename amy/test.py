@@ -959,6 +959,28 @@ class TestWavetable(AmyTest):
     amy.send(time=850, vel=0)
 
 
+class TestCopyingSynthConfig(AmyTest):
+  """Duplicates TestJunoPatch, but after copying synth 1 to synth 3."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.render(1)  # Let the system config commands play out, else get_synth_commands won't find anything
+    commands = amy.get_synth_commands(synth=1, dest_synth=3, num_voices=4, time=0)
+    #print(commands)
+    amy.send_raw(commands)
+    amy.send(time=1050, synth=3, note=48, vel=1)
+    amy.send(time=1150, synth=3, note=60, vel=1)
+    amy.send(time=1250, synth=3, note=63, vel=1)
+    amy.send(time=1350, synth=3, note=67, vel=1)
+    amy.send(time=1600, synth=3, note=48, vel=0)
+    amy.send(time=1700, synth=3, note=60, vel=0)
+    amy.send(time=1800, synth=3, note=63, vel=0)
+    amy.send(time=1900, synth=3, note=67, vel=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
