@@ -3,6 +3,8 @@
 
 #include "amy.h"
 
+#include <assert.h>   // for buffer overruns in midi_fetch_control_code_command.
+
 void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
     // An example of adding a handler for MIDI CCs.  Can't really build this in because it depends on your synth/patch config, controllers, wishes...
     // Here, we use MIDI CC 70 to modify the Juno VCF center freq, and 71 for resonance.
@@ -80,6 +82,17 @@ void cc_mapping_free(struct cc_mapping **p_mapping) {
     free(doomed);
 }
 
+void midi_mappings_init(void) {
+    cc_mapping_root = NULL;
+}
+
+void midi_mappings_deinit(void) {
+    struct cc_mapping **p_mapping = &cc_mapping_root;
+    while (*p_mapping != NULL) {
+        cc_mapping_free(p_mapping);
+    }
+}
+
 struct cc_mapping **cc_mapping_find(int channel, int code) {
     // Retrieve the mapping associated with a midi channel + code, if any.
     struct cc_mapping **p_mapping = &cc_mapping_root;
@@ -100,6 +113,17 @@ int midi_store_control_code(int channel, int code, int is_log, float min_val, fl
         //cc_mapping_debug();
     }
     return 1;
+}
+
+bool midi_fetch_control_code_command(int channel, int code, char *s, size_t len) {
+    struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
+    //fprintf(stderr, "midi_fetch_control_code chan %d code %d mapping 0x%llx\n", channel, code, (uint64_t)p_mapping);
+    if (p_mapping == NULL)
+        return false;
+    // Format the control code - ic<C>,<L>,<N>,<X>,<O>,<CODE>
+    sprintf(s, "ic%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
+    assert(strlen(s) < len);
+    return true;
 }
 
 float map_cc_value(struct cc_mapping *mapping, uint8_t value) {

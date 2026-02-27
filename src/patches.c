@@ -304,7 +304,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
     _EPRINT_VALS_5(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT, "reverb_{level,live,damp,xover}", "h");
 
-    if (wirecode) { sprintf(s, "Z"); s += strlen(s); }
+    if (wirecode && (s - s_entry) > 0) { sprintf(s, "Z"); s += strlen(s); }
 
     assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
     return s - s_entry;
@@ -614,34 +614,52 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     int num_oscs = 0;
     while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
     // The "state" indicates which osc within the voice we're going to report for.
-    int current_osc = (int64_t)state;
-    //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d current_osc=%d\n", synth, voice, num_oscs, (int)current_osc);
-    if (current_osc > num_oscs) {
-        fprintf(stderr, "yield_synth_events: requested osc %d for synth %d with %d oscs.\n", current_osc, synth, num_oscs);
-        return NULL;  // State is asking for an osc beyond available oscs, shouldn't happen.
-    }
+    int state_val = (int64_t)state;
+    //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", synth, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
-    if (current_osc < num_oscs) {
-        set_event_for_osc(base_osc + current_osc, base_osc, event);
+    if (state_val < num_oscs) {
+        set_event_for_osc(base_osc + state_val, base_osc, event);
         // Set the osc number relative to the synth
-        event->osc = current_osc;
-    } else {
+        event->osc = state_val;
+    } else if (state_val == num_oscs) {
         // final event, when state == num_oscs, contains the global settings (volume, eq, chorus, echo, reverb).
         set_event_for_global_fx(event, &amy_global);
     }
-
-    ++current_osc;
-    if (current_osc == num_oscs + 1) current_osc = 0;  // Indicate this is the final event.
-    return (void *)((int64_t)current_osc);
+    ++state_val;
+    if (state_val == num_oscs + 1) state_val = 0;  // Indicate this is the final event.
+    return (void *)((int64_t)state_val);
 }
 
-
+#define STATE_START_OF_MIDI 1024
 void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
-    amy_event event = amy_default_event();
-    state = yield_synth_events(synth, &event, state);
-    sprint_event(&event, s, len, /* wirecode= */ true);
-    return state;
+    int state_val = (int64_t)state;
+    //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", synth, state_val);
+    s[0] = '\0';  // By default, return an empty string.
+    if (state_val < STATE_START_OF_MIDI) {
+        amy_event event = amy_default_event();
+        state_val = (int64_t)yield_synth_events(synth, &event, (void *)(int64_t)state_val);
+        sprint_event(&event, s, len, /* wirecode= */ true);
+        if (state_val == 0) {
+            // Push the state machine on to the MIDI codes
+            state_val = STATE_START_OF_MIDI;
+        }
+    } else {
+        // MIDI CC part
+        bool found = false;
+        for (int next_midi_code = state_val - STATE_START_OF_MIDI; next_midi_code < 128; ++next_midi_code) {
+            if (midi_fetch_control_code_command(synth, next_midi_code, s, len) == true) {
+                state_val = STATE_START_OF_MIDI + next_midi_code + 1;
+                found = true;
+                break;
+            }
+        }
+        if (found == false) {
+            // We hit the bottom of the MIDI CCs
+            state_val = 0;  // Will terminate the yield cycle.
+        }
+    }
+    return (void *)(int64_t)state_val;
 }
 
 

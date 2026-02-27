@@ -741,6 +741,9 @@ void amy_reset_oscs() {
     instruments_reset();
     // Reset memorypcm
     pcm_unload_all_presets();
+    // Reset midi_mappings.
+    midi_mappings_deinit();
+    midi_mappings_init();
 }
 
 
@@ -871,6 +874,8 @@ int8_t oscs_init() {
     deltas_pool_init();
     amy_deltas_reset();
 
+    midi_mappings_init();
+
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
         fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_fbl);
@@ -971,6 +976,7 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
+    midi_mappings_deinit();
     dealloc_chorus_delay_lines();
     dealloc_echo_delay_lines();
     for(int core = 0; core < AMY_CORES; ++core) {
