@@ -93,6 +93,17 @@ void midi_mappings_deinit(void) {
     }
 }
 
+void midi_clear_channel_mappings(int channel) {
+    struct cc_mapping **p_mapping = &cc_mapping_root;
+    while (*p_mapping != NULL) {
+        if ((*p_mapping)->channel == channel) {
+            cc_mapping_free(p_mapping);
+        } else {
+            p_mapping = &((*p_mapping)->next);
+        }
+    }
+}
+
 struct cc_mapping **cc_mapping_find(int channel, int code) {
     // Retrieve the mapping associated with a midi channel + code, if any.
     struct cc_mapping **p_mapping = &cc_mapping_root;

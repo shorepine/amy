@@ -874,6 +874,7 @@ extern bool midi_fetch_control_code_command(int channel, int code, char *s, size
 extern void cc_mapping_debug();
 extern void midi_mappings_init();
 extern void midi_mappings_deinit();
+extern void midi_clear_channel_mappings(int channel);
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
