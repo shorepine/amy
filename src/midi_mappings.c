@@ -116,10 +116,15 @@ struct cc_mapping **cc_mapping_find(int channel, int code) {
 
 int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message) {
     // Register a MIDI control code and mapping and a wire code template.
+    // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
+    size_t mlen = strlen(message);
+    while (mlen > 0 && message[mlen - 1] == 'Z') {
+        message[--mlen] = '\0';
+    }
     struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
     if (p_mapping) cc_mapping_free(p_mapping);
     // store with an empty string removes mapping
-    if (strlen(message)) {
+    if (mlen) {
         /* struct cc_mapping *mapping = */ cc_mapping_init(&cc_mapping_root, channel, code, is_log, min_val, max_val, offset_val, message);
         //cc_mapping_debug();
     }
