@@ -621,7 +621,7 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     int num_oscs = 0;
     while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
     // The "state" indicates which osc within the voice we're going to report for.
-    int state_val = (int64_t)state;
+    int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", synth, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
     if (state_val < num_oscs) {
@@ -634,18 +634,18 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     }
     ++state_val;
     if (state_val == num_oscs + 1) state_val = 0;  // Indicate this is the final event.
-    return (void *)((int64_t)state_val);
+    return (void *)((intptr_t)state_val);
 }
 
 #define STATE_START_OF_MIDI 1024
 void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
-    int state_val = (int64_t)state;
+    int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", synth, state_val);
     s[0] = '\0';  // By default, return an empty string.
     if (state_val < STATE_START_OF_MIDI) {
         amy_event event = amy_default_event();
-        state_val = (int64_t)yield_synth_events(synth, &event, (void *)(int64_t)state_val);
+        state_val = (intptr_t)yield_synth_events(synth, &event, (void *)(intptr_t)state_val);
         sprint_event(&event, s, len, /* wirecode= */ true);
         if (state_val == 0) {
             // Push the state machine on to the MIDI codes
@@ -666,7 +666,7 @@ void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state) {
             state_val = 0;  // Will terminate the yield cycle.
         }
     }
-    return (void *)(int64_t)state_val;
+    return (void *)(intptr_t)state_val;
 }
 
 
