@@ -1024,6 +1024,8 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
             instrument_release(e->synth);
             // Delete the instrument number so we don't forward the 'rest' of the event to it.
             AMY_UNSET(e->synth);
+            // Clear all the midi control code mappings.
+            midi_clear_channel_mappings(e->synth);
             return 0;
         }
     }
@@ -1049,7 +1051,6 @@ void patches_load_patch(amy_event *e) {
     uint16_t patch_number = e->patch_number;
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
     if (AMY_IS_SET(e->synth)) {
-        midi_clear_channel_mappings(e->synth);
         if (AMY_IS_UNSET(e->patch_number))
             patch_number = instrument_get_patch_number(e->synth);
         num_voices = patches_voices_for_load_synth(e, voices);
