@@ -707,7 +707,7 @@ typedef struct reverb_state {
 
 typedef struct chorus_config {
     SAMPLE level;     // How much of the delayed signal to mix in to the output, typ F2S(0.5).
-    int max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
+    int32_t max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
     float lfo_freq;
     float depth;
 } chorus_config_t;
