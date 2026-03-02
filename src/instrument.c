@@ -99,7 +99,8 @@ struct instrument_info {
     struct voice_fifo *released_voices;
     struct voice_fifo *active_voices;
     uint8_t num_voices;
-    uint16_t patch_number;  // What patch this instrument is currently set to.
+    uint8_t oscs_per_voice; // How many oscs each voice uses.  Stored for convenience.
+    uint16_t patch_number;  // What patch this instrument is currently set to.  Stored for convenience.
     int16_t bank_number;    // Optional top-7-bit word of Program, set by MIDI CC 0 (-1 if not set).
     uint32_t flags;         // Bitmask of special instrument properties (for MIDI Drums translation).
     // AMY "voice" index for each of the num_voices allocated voices.
@@ -115,8 +116,8 @@ struct instrument_info {
 };
 
 void instrument_debug(struct instrument_info *instrument) {
-    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
-            (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->bank_number, instrument->flags,
+    fprintf(stderr, "**instrument 0x%lx num_voices %d patch %d oscs %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
+            (unsigned long)instrument, instrument->num_voices, instrument->patch_number, instrument->oscs_per_voice, instrument->bank_number, instrument->flags,
             instrument->noteon_delay_ms, instrument->in_sustain, instrument->grab_midi_notes);
     for (int i = 0; i < instrument->num_voices; ++i)
         fprintf(stderr, "voice %d amy_voice %d note_per_voice %d pending_release %d\n",
@@ -131,7 +132,7 @@ void instrument_debug(struct instrument_info *instrument) {
 // Defined in amy.h because patches.c needs to know it.
 //#define _INSTRUMENT_NO_VOICE 255
 
-struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint32_t flags) {
+struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     if (num_voices <= 0 || num_voices > MAX_VOICES_PER_INSTRUMENT) {
         fprintf(stderr, "num_voices %d not within 1 .. MAX_VOICES_PER_INSTRUMENT %d\n", num_voices, MAX_VOICES_PER_INSTRUMENT);
@@ -140,6 +141,7 @@ struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, ui
     }
     instrument->num_voices = num_voices;
     instrument->patch_number = patch_number;
+    instrument->oscs_per_voice = oscs_per_voice;
     instrument->bank_number = -1;
     instrument->flags = flags;
     instrument->noteon_delay_ms = 0;
@@ -283,12 +285,12 @@ bool instrument_number_exists(int instrument_number, char *tag) {
     return false;
 }
 
-void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags) {
+void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags) {
     if (!instrument_number_ok(instrument_number, "add_new")) return;
     if(instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
     }
-    instruments[instrument_number] = instrument_init(num_voices, amy_voices, patch_number, flags);
+    instruments[instrument_number] = instrument_init(num_voices, amy_voices, patch_number, oscs_per_voice, flags);
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
@@ -368,6 +370,12 @@ int instrument_get_patch_number(int instrument_number) {
     if (!instrument_number_exists(instrument_number, "get_patch")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
     return instrument->patch_number;
+}
+
+int instrument_get_oscs_per_voice(int instrument_number) {
+    if (!instrument_number_exists(instrument_number, "get_patch")) return -1;
+    struct instrument_info *instrument = instruments[instrument_number];
+    return instrument->oscs_per_voice;
 }
 
 uint32_t instrument_get_flags(int instrument_number) {

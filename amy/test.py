@@ -959,6 +959,53 @@ class TestWavetable(AmyTest):
     amy.send(time=850, vel=0)
 
 
+class TestCopyingSynthConfig(AmyTest):
+  """Duplicates TestJunoPatch, but after copying synth 1 to synth 3."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.render(1)  # Let the system config commands play out, else get_synth_commands won't find anything
+    commands = amy.get_synth_commands(synth=1, dest_synth=3, num_voices=4, time=0)
+    #print(commands)
+    amy.send_raw(commands)
+    amy.send(time=1050, synth=3, note=48, vel=1)
+    amy.send(time=1150, synth=3, note=60, vel=1)
+    amy.send(time=1250, synth=3, note=63, vel=1)
+    amy.send(time=1350, synth=3, note=67, vel=1)
+    amy.send(time=1600, synth=3, note=48, vel=0)
+    amy.send(time=1700, synth=3, note=60, vel=0)
+    amy.send(time=1800, synth=3, note=63, vel=0)
+    amy.send(time=1900, synth=3, note=67, vel=0)
+
+
+class TestGetSynthCommandsGetsMidiCcs(AmyTest):
+
+  def test(self):
+    _amy.stop()
+    _amy.start(0)
+    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=440)
+    amy.send_raw('i1ic5,0,0,10,0,hello')
+    amy.send_raw('i1ic10,1,1,100,1,i%id%v')
+    amy.render(1)  # Let the events execute.
+    commands = amy.get_synth_commands(1)
+    expected = """v0f110.000c1Z
+v1w3f440.000Z
+ic5,0,0.000,10.000,0.000,helloZ
+ic10,1,1.000,100.000,1.000,i%id%vZ"""
+    if commands != expected:
+      is_ok = False
+      message = 'TestGetSynthCommandsGetsMidiCcs: get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+    else:
+      is_ok = True
+      message = 'TestGetSynthCommandsGetsMidiCcs : ok'
+    return is_ok, message
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True

@@ -483,9 +483,9 @@ typedef struct amy_event {
     // Convert these two at least to vectors of ints, save several hundred bytes
     int16_t algo_source[MAX_ALGO_OPS];
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-    int16_t eg0_times[MAX_BPS];
+    uint32_t eg0_times[MAX_BPS];
     float eg0_values[MAX_BPS];
-    int16_t eg1_times[MAX_BPS];
+    uint32_t eg1_times[MAX_BPS];
     float eg1_values[MAX_BPS];
     uint8_t eg_type[MAX_BREAKPOINT_SETS];
     // Instrument-layer values.
@@ -515,6 +515,7 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
+    uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -869,7 +870,11 @@ extern void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo 
 extern void reset_osc(uint16_t i );
 
 extern int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
+extern bool midi_fetch_control_code_command(int channel, int code, char *s, size_t len);
 extern void cc_mapping_debug();
+extern void midi_mappings_init();
+extern void midi_mappings_deinit();
+extern void midi_clear_channel_mappings(int channel);
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
@@ -912,8 +917,9 @@ extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
-extern void *event_generator_for_patch_number(uint16_t patch_number, struct amy_event *event, void *state);
-extern void *event_generator_for_synth(uint8_t synth, struct amy_event *event, void *state);
+extern void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state);
+extern void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state);
+extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state);
 extern int size_of_amy_event(void);
 
 extern struct delta **queue_for_patch_number(int patch_number);
@@ -927,7 +933,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();
-extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint32_t flags);
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags);
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
@@ -937,6 +943,7 @@ extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
 extern int instrument_get_patch_number(int instrument_number);
+extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);

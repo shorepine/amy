@@ -35,7 +35,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s EXPORTED_RUNTIME_METHODS="['cwrap','ccall', 'HEAPU8']" \
 -s EXPORTED_FUNCTIONS="['_amy_add_message', '_amy_add_event', '_amy_reset_sysclock', '_amy_sysclock', '_amy_process_single_midi_byte', \
 	 '_amy_live_stop', '_amy_get_input_buffer', '_amy_set_external_input_buffer', '_amy_live_start_web', '_amy_live_start_web_audioin',\
-	  '_amy_start_web', '_amy_start_web_no_synths', '_sequencer_ticks', '_malloc', '_free', '_amy_bleep', '_event_generator_for_patch_number', '_size_of_amy_event']" \
+	  '_amy_start_web', '_amy_start_web_no_synths', '_sequencer_ticks', '_malloc', '_free', '_amy_bleep', '_yield_patch_events', '_size_of_amy_event', '_yield_synth_commands']" \
 -s SUPPORT_LONGJMP=emscripten \
 -s INITIAL_MEMORY=128mb -s TOTAL_STACK=64mb -s ALLOW_MEMORY_GROWTH=1  \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000

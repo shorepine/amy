@@ -165,6 +165,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->reverb_liveness);
     AMY_UNSET(e->reverb_damping);
     AMY_UNSET(e->reverb_xover_hz);
+    AMY_UNSET(e->oscs_per_voice);
 }
 
 
@@ -204,11 +205,11 @@ uint32_t amy_sysclock() {
 void amy_add_message(char *message) {
     peek_stack("add_message");
     amy_event e; // = amy_default_event();
-    amy_clear_event(&e);
     // Parse the wire string into an event
     int length = strlen(message);
     char *remains = message;
     while(length > 0) {
+        amy_clear_event(&e);
 	int pos = amy_parse_message(remains, length, &e);
 	amy_add_event(&e);
 	remains += pos;

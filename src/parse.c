@@ -196,12 +196,12 @@ void copy_param_list_substring(char *dest, const char *src) {
 
 float int_db_to_float_lin(uint32_t db);
 
-static int16_t clamp_bp_time_ms_to_i16(uint32_t t_ms) {
-    if (t_ms >= (uint32_t)SHRT_MAX) return (int16_t)(SHRT_MAX - 1);
-    return (int16_t)t_ms;
-}
+//static int16_t clamp_bp_time_ms_to_i16(uint32_t t_ms) {
+//    if (t_ms >= (uint32_t)SHRT_MAX) return (int16_t)(SHRT_MAX - 1);
+//    return (int16_t)t_ms;
+//}
 
-static int parse_breakpoint_event_core_float_lin(char* message, int16_t *times_ms, float *values) {
+static int parse_breakpoint_event_core_float_lin(char* message, uint32_t *times_ms, float *values) {
     float vals[2 * MAX_BREAKPOINTS];
     int num_vals = parse_list_float(message, vals, 2 * MAX_BREAKPOINTS,
                                     AMY_UNSET_VALUE(vals[0]));
@@ -212,7 +212,7 @@ static int parse_breakpoint_event_core_float_lin(char* message, int16_t *times_m
             if (AMY_IS_SET(vals[i])) {
                 int32_t t_ms = (int32_t)vals[i];
                 if (t_ms < 0) t_ms = 0;
-                times_ms[bp_index] = clamp_bp_time_ms_to_i16((uint32_t)t_ms);
+                times_ms[bp_index] = (uint32_t)t_ms;  // clamp_bp_time_ms_to_i16((uint32_t)t_ms);
             } else {
                 AMY_UNSET(times_ms[bp_index]);
             }
@@ -223,7 +223,7 @@ static int parse_breakpoint_event_core_float_lin(char* message, int16_t *times_m
     return num_vals;
 }
 
-static int parse_breakpoint_event_core_int_db(char* message, int16_t *times_ms, float *values) {
+static int parse_breakpoint_event_core_int_db(char* message, uint32_t *times_ms, float *values) {
     uint32_t vals[2 * MAX_BREAKPOINTS];
     int num_vals = parse_list_uint32_t(message, vals, 2 * MAX_BREAKPOINTS,
                                        AMY_UNSET_VALUE(vals[0]));
@@ -232,7 +232,7 @@ static int parse_breakpoint_event_core_int_db(char* message, int16_t *times_ms, 
         if (bp_index >= MAX_BREAKPOINTS) break;
         if ((i % 2) == 0) {
             if (AMY_IS_SET(vals[i])) {
-                times_ms[bp_index] = clamp_bp_time_ms_to_i16(vals[i]);
+                times_ms[bp_index] = vals[i];  // clamp_bp_time_ms_to_i16(vals[i]);
             } else {
                 AMY_UNSET(times_ms[bp_index]);
             }
@@ -243,7 +243,7 @@ static int parse_breakpoint_event_core_int_db(char* message, int16_t *times_ms, 
     return num_vals;
 }
 
-static void parse_event_breakpoints(char *message, int16_t *times_ms, float *values) {
+static void parse_event_breakpoints(char *message, uint32_t *times_ms, float *values) {
     int num_vals = 0;
     for (int i = 0; i < MAX_BREAKPOINTS; ++i) {
         AMY_UNSET(times_ms[i]);
@@ -341,6 +341,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
+    else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
         int32_t cc_code, is_log;

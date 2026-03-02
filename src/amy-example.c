@@ -25,7 +25,7 @@ void print_events_for_patch_number(int patch_number) {
     amy_event event = amy_default_event();
     char s[MAX_MESSAGE_LEN];
     do {
-        state = event_generator_for_patch_number(patch_number, &event, state);
+        state = yield_patch_events(patch_number, &event, state);
         sprint_event(&event, s, MAX_MESSAGE_LEN, false);
         fprintf(stderr, "%s\n", s);
     } while (state != NULL);
@@ -38,8 +38,18 @@ void print_events_for_synth(int synth, bool wirecode) {
     amy_event event = amy_default_event();
     char s[MAX_MESSAGE_LEN];
     do {
-        state = event_generator_for_synth(synth, &event, state);
+        state = yield_synth_events(synth, &event, state);
         sprint_event(&event, s, MAX_MESSAGE_LEN, wirecode);
+        fprintf(stderr, "%s\n", s);
+    } while(state != NULL);
+}
+
+void print_events_for_synth_2(int synth, bool wirecode) {
+    fprintf(stderr, "pefs2: synth %d:\n", synth);
+    void * state = NULL;
+    char s[MAX_MESSAGE_LEN];
+    do {
+        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, state);
         fprintf(stderr, "%s\n", s);
     } while(state != NULL);
 }
@@ -196,6 +206,7 @@ int main(int argc, char ** argv) {
     }
 
     print_events_for_synth(/* synth */ 0, /* wirecode */ true);
+    print_events_for_synth_2(/* synth */ 0, /* wirecode */ true);
 
     //show_debug(99);
     

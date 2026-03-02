@@ -584,7 +584,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         }
     }
 
-    int16_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {e->eg0_times, e->eg1_times};
+    uint32_t *bp_times_ms[MAX_BREAKPOINT_SETS] = {e->eg0_times, e->eg1_times};
     float *bp_values[MAX_BREAKPOINT_SETS] = {e->eg0_values, e->eg1_values};
     for (uint8_t i = 0; i < MAX_BREAKPOINT_SETS; i++) {
         // amy_parse_message sets bp_is_set for anything including an empty bp string.
@@ -741,6 +741,9 @@ void amy_reset_oscs() {
     instruments_reset();
     // Reset memorypcm
     pcm_unload_all_presets();
+    // Reset midi_mappings.
+    midi_mappings_deinit();
+    midi_mappings_init();
 }
 
 
@@ -871,6 +874,8 @@ int8_t oscs_init() {
     deltas_pool_init();
     amy_deltas_reset();
 
+    midi_mappings_init();
+
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
         fbl[core]= (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_fbl);
@@ -959,7 +964,7 @@ void show_debug(uint8_t type) {
                     amy_event event = amy_default_event();
                     char s[MAX_MESSAGE_LEN];
                     do {
-                        state = event_generator_for_synth(synth, &event, state);
+                        state = yield_synth_events(synth, &event, state);
                         sprint_event(&event, s, MAX_MESSAGE_LEN, false);
                         fprintf(stderr, "%s\n", s);
                     } while(state != NULL);
@@ -971,6 +976,7 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
+    midi_mappings_deinit();
     dealloc_chorus_delay_lines();
     dealloc_echo_delay_lines();
     for(int core = 0; core < AMY_CORES; ++core) {
