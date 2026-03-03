@@ -1071,6 +1071,18 @@ void patches_load_patch(amy_event *e) {
                     (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
         }
         return;
+    } else {
+        // Reset every osc belonging to each voice so stale state doesn't persist
+        // before we reallocate and reinitialize them below.
+        for (uint8_t v = 0; v < num_voices; v++) {
+            if (AMY_IS_SET(voice_to_base_osc[voices[v]])) {
+                uint16_t base = voice_to_base_osc[voices[v]];
+                for (uint16_t j = 0; j < AMY_OSCS - base; j++) {
+                    if (osc_to_voice[base + j] != voices[v]) break;
+                    reset_osc(base + j);
+                }
+            }
+        }
     }
 
     // At this point, we have the voices[] array and num_voices set up to be initialized.
