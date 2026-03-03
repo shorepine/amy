@@ -344,6 +344,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
+        // ic255 clears all MIDI CC mappings for this synth.
         int32_t cc_code, is_log;
         float min_val, max_val, offset_val;
         skip_chars = parse_midi_cc_payload(message, &cc_code, &is_log, &min_val, &max_val, &offset_val);
@@ -352,7 +353,11 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
             fprintf(stderr, "synth_layer: midi cc payload didn't parse for %s.\n", message - 1);
             return 1;  // skip over the 'c'.
         }
-        midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
+        if (cc_code == 255) {
+            midi_clear_channel_mappings(e->synth);
+        } else {
+            midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
+        }
         skip_chars = strlen(message) + 1;
     }
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
