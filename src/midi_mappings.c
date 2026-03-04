@@ -114,6 +114,17 @@ struct cc_mapping **cc_mapping_find(int channel, int code) {
     return NULL;
 }
 
+int midi_clear_control_code(int channel, int code) {
+    if (code == 255) {
+        // Magic value means clear all MIDI CCs for this channel
+        midi_clear_channel_mappings(channel);
+        return 1;
+    }
+    struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
+    if (p_mapping) { cc_mapping_free(p_mapping); return 1; }
+    return 0;  // nothing found.
+}
+
 int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message) {
     // Register a MIDI control code and mapping and a wire code template.
     // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
