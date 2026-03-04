@@ -870,6 +870,7 @@ extern void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo 
 extern void reset_osc(uint16_t i );
 
 extern int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
+extern int midi_clear_control_code(int channel, int code);
 extern bool midi_fetch_control_code_command(int channel, int code, char *s, size_t len);
 extern void cc_mapping_debug();
 extern void midi_mappings_init();

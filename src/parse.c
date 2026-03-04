@@ -68,20 +68,6 @@ float atoff(const char *s) {
     int16_t:  atoi \
 )
 
-#define PARSE_VAL_TO_SEP(type) \
-    int parse_val_to_sep_##type(char *message, type *val, char sep) {   \
-        int c = 0;                                                      \
-        *val = PARSE_LIST_ATO(*val)(message);                           \
-        c = strspn(message, PARSE_LIST_STRSPN2(*val));                  \
-        if (message[c] == sep) {                                        \
-            return c + 1;                                               \
-        }                                                               \
-        return -1;                                                      \
-    }
-
-PARSE_VAL_TO_SEP(float)
-PARSE_VAL_TO_SEP(int32_t)
-
 #define PARSE_LIST(type) \
     int parse_list_##type(char *message, type *vals, int max_num_vals, type skipped_val) { \
         uint16_t c = 0, last_c; \
@@ -117,6 +103,17 @@ PARSE_LIST(uint16_t)
 PARSE_LIST(int32_t)
 PARSE_LIST(int16_t)
 
+
+#define PARSE_VAL(type) \
+    int parse_val_##type(char *message, type *val) {             \
+        int c = 0;                                                      \
+        *val = PARSE_LIST_ATO(*val)(message);                           \
+        c = strspn(message, PARSE_LIST_STRSPN2(*val));                  \
+        return c; \
+    }
+
+PARSE_VAL(float)
+PARSE_VAL(int32_t)
 
 char *copy_with_trim(char *dest, size_t dest_len, const char *src, size_t src_len) {
     // Copy a string while trimming leading and trailing spaces.
@@ -310,18 +307,17 @@ extern const mp_obj_fun_builtin_var_t tulip_pcm_load_file_obj;
 #endif
 
 int parse_midi_cc_payload(char *message, int32_t *p_cc_code, int32_t *p_is_log, float *p_min_val, float *p_max_val, float *p_offset_val) {
-    int c;
     char *m = message;
-    if ((c = parse_val_to_sep_int32_t(m, p_cc_code, ',')) < 0)  return -1;
-    m += c;
-    if ((c = parse_val_to_sep_int32_t(m, p_is_log, ',')) < 0)  return -1;
-    m += c;
-    if ((c = parse_val_to_sep_float(m, p_min_val, ',')) < 0)  return -1;
-    m += c;
-    if ((c = parse_val_to_sep_float(m, p_max_val, ',')) < 0)  return -1;
-    m += c;
-    if ((c = parse_val_to_sep_float(m, p_offset_val, ',')) < 0)  return -1;
-    m += c;
+    m += parse_val_int32_t(m, p_cc_code);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_int32_t(m, p_is_log);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_min_val);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_max_val);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_offset_val);
+ end:
     return m - message;
 }
 
@@ -345,20 +341,24 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
         // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
-        if (atoi(message) == 255) {
-            midi_clear_channel_mappings(e->synth);
-            skip_chars = strlen(message) + 1;
-        } else {
-            int32_t cc_code, is_log;
-            float min_val, max_val, offset_val;
-            skip_chars = parse_midi_cc_payload(message, &cc_code, &is_log, &min_val, &max_val, &offset_val);
-            if (skip_chars < 0) {
+        int32_t cc_code, is_log;
+        float min_val, max_val, offset_val;
+        AMY_UNSET(cc_code);
+        AMY_UNSET(is_log);
+        skip_chars = parse_midi_cc_payload(message, &cc_code, &is_log, &min_val, &max_val, &offset_val);
+        if (*(message + skip_chars) != ',') {
+            if (AMY_IS_UNSET(cc_code) || AMY_IS_SET(is_log)) {
+                // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
                 fprintf(stderr, "synth_layer: midi cc payload didn't parse for %s.\n", message - 1);
-                return 1;  // skip over the 'c'.
+                return skip_chars;  // maybe the rest will parse?
             }
-            midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
-            skip_chars = strlen(message) + 1;
+            // Else we got an incomplete message with a valid CC code - clear it
+            midi_clear_control_code(e->synth, cc_code);  // (handles 255 as special case).
+            return skip_chars;
         }
+        ++skip_chars;  // step over the "," before the wire string template.
+        midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
+        skip_chars = strlen(message) + 1;
     }
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
     return skip_chars;

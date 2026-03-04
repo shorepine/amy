@@ -1006,6 +1006,57 @@ ic10,1,1.000,100.000,1.000,i%id%vZ"""
     return is_ok, message
 
 
+class TestClearMidiCCs(AmyTest):
+  """Test that ic255 clears the MIDI CC settings."""
+
+  def test(self):
+    _amy.stop()
+    _amy.start(0)
+    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=440)
+    amy.send_raw('i1ic5,0,0,10,0,hello')
+    amy.send_raw('i1ic10,1,1,100,1,i%id%v')
+    # Test that you can have other commands after the ic255 too.
+    amy.send_raw('i1ic255v0f999')
+    amy.render(1)  # Let the events execute.
+    commands = amy.get_synth_commands(1)
+    expected = """v0f999.000c1Z
+v1w3f440.000Z"""
+    if commands != expected:
+      is_ok = False
+      message = 'TestClearMidiCcs : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+    else:
+      is_ok = True
+      message = 'TestClearMidiCcs : ok'
+    return is_ok, message
+
+class TestClearOneMidiCC(AmyTest):
+  """Test that ic5 with no further args clears that MIDI CC."""
+
+  def test(self):
+    _amy.stop()
+    _amy.start(0)
+    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=440)
+    amy.send_raw('i1ic5,0,0,10,0,hello')
+    amy.send_raw('i1ic10,1,1,100,1,i%id%v')
+    amy.send_raw('i1ic5v0f999')
+    amy.render(1)  # Let the events execute.
+    commands = amy.get_synth_commands(1)
+    expected = """v0f999.000c1Z
+v1w3f440.000Z
+ic10,1,1.000,100.000,1.000,i%id%vZ"""
+    if commands != expected:
+      is_ok = False
+      message = 'TestClearOneMidiCC : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+    else:
+      is_ok = True
+      message = 'TestClearOneMidiCC : ok'
+    return is_ok, message
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
