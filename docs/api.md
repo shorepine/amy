@@ -66,12 +66,11 @@ void amy_enable_juno_filter_midi_handler(); // assigns the Juno-6 MIDI CC handle
 
 ## JavaScript API
 
-AMY provides a high-level JavaScript API (`amy_send`) that mirrors the Python `amy.send()` interface. It is auto-generated from the same source of truth (`amy/__init__.py` and `amy/constants.py`) so parameter names are always identical to Python.
-
-Include the generated script in your page (after `amy.js` and `amy_connector.js`):
+AMY provides a high-level JavaScript API (`amy_send`) that mirrors the Python `amy.send()` interface. It is auto-generated from the same source of truth (`amy/__init__.py` and `amy/constants.py`) so parameter names are always identical to Python. The connector and API are bundled into `amy.js`, so you only need two includes:
 
 ```html
-<script src="amy_api.generated.js"></script>
+<script src="enable-threads.js"></script>
+<script src="amy.js"></script>
 ```
 
 ### `amy_send(params)`
@@ -113,10 +112,10 @@ AMY.ALGO         // 8
 
 ### Regenerating
 
-After changing `amy/__init__.py` or `amy/constants.py`, regenerate the JS API:
+The JS API is generated during `make web` and bundled into `docs/amy.js` by `make deploy-web`. To regenerate after changing `amy/__init__.py` or `amy/constants.py`:
 
 ```bash
-python3 scripts/gen_amy_js_api.py
+make deploy-web
 ```
 
 ### Try it live

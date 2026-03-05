@@ -106,10 +106,15 @@ build/amy.js: $(TARGET)
 	mkdir -p build
 	emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
-web: build/amy.js
+build/amy_api.generated.js: scripts/gen_amy_js_api.py amy/__init__.py src/patches.h
+	mkdir -p build
+	$(PYTHON) scripts/gen_amy_js_api.py
+
+web: build/amy.js build/amy_api.generated.js
 
 deploy-web: web
-	cp build/amy.* docs/
+	cat build/amy.js src/amy_connector.js build/amy_api.generated.js > docs/amy.js
+	cp build/amy.wasm build/amy.aw.js build/amy.ww.js docs/
 
 clean:
 	-rm -f src/*.o

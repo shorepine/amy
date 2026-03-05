@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 AMY_INIT = ROOT / "amy" / "__init__.py"
 AMY_CONSTANTS = ROOT / "amy" / "constants.py"
-OUTPUT = ROOT / "docs" / "amy_api.generated.js"
+OUTPUT = ROOT / "build" / "amy_api.generated.js"
 
 
 def extract_kw_map_list(source: str):
@@ -210,7 +210,7 @@ def generate_js(kw_map_list, coef_fields, constants=None):
       if (typeof amy_add_message === "function") {
         amy_add_message(msg);
       } else {
-        console.warn("amy_send: no AMY message handler found (is amy_connector.js loaded?)");
+        console.warn("amy_send: no AMY message handler found (is amy.js loaded?)");
       }
       return msg;
     }
