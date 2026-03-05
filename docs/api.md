@@ -4,7 +4,7 @@ This page collects the current API for [AMY](https://github.com/shorepine/amy).
 
 [**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
 
-## C / Arduino / Javascript API
+## C / Arduino API
 
 Parsing, creating and adding events to AMY:
 
@@ -63,6 +63,65 @@ Default MIDI handlers:
 ```c
 void amy_enable_juno_filter_midi_handler(); // assigns the Juno-6 MIDI CC handler
 ```
+
+## JavaScript API
+
+AMY provides a high-level JavaScript API (`amy_send`) that mirrors the Python `amy.send()` interface. It is auto-generated from the same source of truth (`amy/__init__.py` and `amy/constants.py`) so parameter names are always identical to Python.
+
+Include the generated script in your page (after `amy.js` and `amy_connector.js`):
+
+```html
+<script src="amy_api.generated.js"></script>
+```
+
+### `amy_send(params)`
+
+Build and send an AMY wire message from a JS object. Parameter names and types are the same as Python `amy.send()`.
+
+```js
+// Play a sine wave at 440 Hz
+amy_send({osc: 0, wave: AMY.SINE, freq: 440, vel: 1})
+
+// Load a Juno-6 patch
+amy_send({patch: 0, synth: 1, num_voices: 6})
+amy_send({synth: 1, vel: 1, note: 60})
+
+// FM synthesis with CtrlCoef dict
+amy_send({osc: 0, amp: {const: 1, vel: 0, eg0: 2}, bp0: '0,0,5000,1,0,0'})
+```
+
+### `amy_message(params)`
+
+Like `amy_send` but returns the wire string without sending it. Useful for debugging or building messages to send later.
+
+```js
+amy_message({osc: 0, wave: AMY.SINE, freq: 440})  // => "v0w0f440Z"
+```
+
+### `AMY` constants
+
+All constants from `amy/constants.py` are available on the global `AMY` object:
+
+```js
+AMY.SINE         // 0
+AMY.SAW_DOWN     // 2
+AMY.PULSE        // 1
+AMY.FILTER_LPF   // 1
+AMY.ALGO         // 8
+// ... all constants from amy/constants.py
+```
+
+### Regenerating
+
+After changing `amy/__init__.py` or `amy/constants.py`, regenerate the JS API:
+
+```bash
+python3 scripts/gen_amy_js_api.py
+```
+
+### Try it live
+
+[**AMY JavaScript REPL**](https://shorepine.github.io/amy/repl.html) — write and run `amy_send()` commands in your browser.
 
 ## `amy_config_t`
 
@@ -130,9 +189,14 @@ void (*amy_external_file_transfer_done_hook)(const char *filename);
 All hook fields default to `NULL` in `amy_default_config()`.
 
 
-## `amy_event` and `amy.send` API:
+## `amy_event`, `amy.send`, and `amy_send` API:
 
-**NOTE:** as of now, a few `amy_event` methods are not availble to C, only using the wire code (or `amy.send()` in Python.)
+AMY parameters can be set via three interfaces:
+- **C**: Set fields on `amy_event` structs
+- **Python**: `amy.send(param=value, ...)`
+- **JavaScript**: `amy_send({param: value, ...})`
+
+Python and JavaScript use identical parameter names (shown in the **Python / JS** column below). A few parameters are not yet available via C `amy_event` (marked **TODO**).
 
 Please see [AMY synthesizer details](synth.md) for more explanation on the synthesizer parameters.
 
@@ -141,7 +205,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 
 ### `synth`s and `voice`s:
 
-| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `i`    | `synth` | `synth`  | 0-31  | Define a set of voices for voice management. |
 | `ic`   | **TODO** | `midi_cc`  | C,L,N,X,O,CMD | MIDI Control Code command for this synth (1-16).  `C`=MIDI CC (0-127), `L`=log mapping (0/1), `N`=min val, `X`=max val, `O`=offset, `CMD`=wire command to execute, where `%i` is replaced by the channel number and `%v` is replaced by the value after min/max/offset/log mapping.  See [#524](https://github.com/shorepine/amy/issues/524) |
@@ -159,7 +223,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 
 ### Oscillator control
 
-| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `w`    | `wave` | `wave` | uint 0-21 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, AUDIO_EXT0, AUDIO_EXT1, AMY_MIDI, PCM_LEFT, PCM_RIGHT, WAVETABLE, CUSTOM, OFF]. default: 0/SINE |
@@ -176,6 +240,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 | `o`    | `algorithm` | `algorithm` | uint 1-32 | DX7 FM algorithm to use for ALGO type |
 | `O`    | `algo_source[]`| `algo_source` | string | Which oscillators to use for the FM algorithm. list of six (starting with op 6), use empty for not used, e.g 0,1,2 or 0,1,2,,, |
 | `p`    | `preset` | `preset` | int | Which predefined PCM or wavetable preset patch to use, or number of partials if < 0. For `wave=WAVETABLE`, use the wavetable presets appended to PCM. (Juno/DX7 patches are different - see `patch_number`). |
+| `p`    | `preset` | `num_partials` | int | Alias for `preset`. Must be used with `wave=BYO_PARTIALS`. Cannot be combined with `preset` in the same message. |
 | `P`    | `phase` | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0 |
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
@@ -186,7 +251,7 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 
 These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 
-| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `Q`    | `pan_coefs[]` | `pan`   | float[,float...] | Panning index ControlCoefficients (for stereo output), 0.0=left, 1.0=right. default 0.5. |
 | `a`    | `amp_coefs[]` | `amp`    | float[,float...]  | Control the amplitude of a note; a set of ControlCoefficients. Default is 0,0,1,1  (i.e. the amplitude comes from the note velocity multiplied by by Envelope Generator 0.) |
@@ -196,7 +261,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 
 ### PCM sampling
 
-| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `z`    | **TODO**| `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(frames), samplerate, channels, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
@@ -217,7 +282,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 
 ### Other
 
-| Wire code   | C/JS `amy_event` | Python `amy.send`   | Type-range  | Notes                                 |
+| Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `H`    | `sequence[3]` | `sequence` | int,int,int | Tick offset, period, tag for sequencing | 
 | `h`    | `reverb_level, reverb_liveness, reverb_damping, reverb_xover_hz` | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix; liveness controls decay time, 1 = longest, default 0.85; damping is extra decay of high frequencies, default 0.5; xover is damping crossover frequency, default 3000 Hz. |
@@ -229,5 +294,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `t`    | `time` | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
 | `V`    | `volume`| `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
+| `g`    | `client` | `client` | uint | Client number for Alles distributed synthesis. |
+| `W`    | `external_channel` | `external_channel` | uint | External channel routing (used by Tulip for CV output). |
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
 | `zT`   | **TODO**| `transfer_file` | string,uint | Transfer a file to the host. Params: destination filename, file size. See `hooks` for writing files on host disk. |
