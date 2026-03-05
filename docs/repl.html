@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMY JavaScript REPL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/codemirror.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/theme/monokai.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.3/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/webmidi@latest/dist/iife/webmidi.iife.js"></script>
+    <script type="text/javascript" src="enable-threads.js"></script>
+    <script type="text/javascript" src="amy.js"></script>
+    <script type="text/javascript" src="amy_connector.js"></script>
+    <script type="text/javascript" src="amy_api.generated.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #fff; margin-bottom: 4px; }
+        h1 a { color: #7eb8da; text-decoration: none; }
+        h1 a:hover { text-decoration: underline; }
+        .subtitle { color: #999; margin-bottom: 20px; font-size: 0.95em; }
+        .start-banner { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 16px; margin-bottom: 20px; text-align: center; cursor: pointer; }
+        .start-banner:hover { background: #1a2744; }
+        .start-banner.started { background: #0a3d0a; border-color: #1a6b1a; cursor: default; }
+        .editor-block { margin-bottom: 16px; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; overflow: hidden; }
+        .editor-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; background: #0f3460; }
+        .editor-title { font-size: 0.85em; color: #7eb8da; font-weight: 500; }
+        .editor-buttons { display: flex; gap: 6px; }
+        .editor-buttons button { border: none; border-radius: 4px; padding: 4px 12px; font-size: 0.85em; cursor: pointer; font-weight: 500; }
+        .btn-play { background: #28a745; color: #fff; }
+        .btn-play:hover { background: #218838; }
+        .btn-stop { background: #dc3545; color: #fff; }
+        .btn-stop:hover { background: #c82333; }
+        .CodeMirror { font-size: 14px; line-height: 1.5; }
+        .output-area { font-family: monospace; font-size: 13px; padding: 8px 12px; background: #0d1117; color: #8b949e; border-top: 1px solid #0f3460; white-space: pre-wrap; max-height: 120px; overflow-y: auto; display: none; }
+        .output-area.has-content { display: block; }
+        .output-area .error { color: #f85149; }
+        .output-area .wire { color: #58a6ff; }
+        .api-hint { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.85em; color: #8b949e; }
+        .api-hint code { color: #7ee787; background: #0d1117; padding: 2px 5px; border-radius: 3px; }
+        a { color: #7eb8da; }
+        .example-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .example-pill { background: #16213e; border: 1px solid #0f3460; border-radius: 20px; padding: 6px 16px; font-size: 0.85em; color: #7eb8da; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+        .example-pill:hover { background: #1a2744; border-color: #7eb8da; }
+        .example-pill.active { background: #0f3460; border-color: #7eb8da; }
+        .section-label { color: #7eb8da; font-size: 0.9em; font-weight: 600; margin: 20px 0 8px; }
+        .midi-panel { display: flex; gap: 12px; margin-bottom: 16px; }
+        .midi-panel select { background: #16213e; color: #7eb8da; border: 1px solid #0f3460; border-radius: 6px; padding: 4px 8px; font-size: 0.8em; max-width: 280px; }
+        .midi-panel select:focus { outline: none; border-color: #7eb8da; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1><a href="https://github.com/shorepine/amy">AMY</a> JavaScript REPL</h1>
+    <p class="subtitle">Write JavaScript using <code>amy_send()</code> to control AMY synthesis in your browser. <a href="index.html">Back to examples</a></p>
+
+    <div class="start-banner" id="start-banner" onclick="startAudio()">
+        Click here to start audio
+    </div>
+
+    <form name="amyboard_settings">
+        <div class="midi-panel">
+            <div style="display:flex;align-items:center;">
+                <input type="checkbox" id="amy_audioin" onclick="toggle_audioin();" style="margin-right:6px;">
+                <label for="amy_audioin" style="font-size:0.8em;color:#7eb8da;cursor:pointer;">Audio input</label>
+            </div>
+            <div id="midi-input-panel">
+                <select onchange="setup_midi_devices()" name="midi_input">
+                    <option selected>[MIDI input: not available]</option>
+                </select>
+            </div>
+            <div id="midi-output-panel">
+                <select onchange="setup_midi_devices()" name="midi_output">
+                    <option selected>[MIDI output: not available]</option>
+                </select>
+            </div>
+        </div>
+    </form>
+
+    <div class="api-hint">
+        <strong>Quick reference:</strong>
+        <code>amy_send({osc: 0, wave: AMY.SINE, freq: 440, vel: 1})</code> &mdash;
+        See the <a href="https://github.com/shorepine/amy/blob/main/docs/api.md#javascript-api">JS API docs</a> and <a href="https://github.com/shorepine/amy/blob/main/docs/api.md#amy_event-amysend-and-amy_send-api">parameter reference</a>.
+    </div>
+
+    <div class="editor-block" id="scratch">
+        <div class="editor-header">
+            <span class="editor-title">Scratch pad</span>
+            <div class="editor-buttons">
+                <button class="btn-play" onclick="runEditor('scratch')">&#9654; Play</button>
+                <button class="btn-stop" onclick="resetAMY()">Reset</button>
+            </div>
+        </div>
+        <textarea id="scratch-code">// Play a sine wave
+amy_send({osc: 0, wave: AMY.SINE, freq: 440, vel: 1})
+</textarea>
+        <div class="output-area" id="scratch-output"></div>
+    </div>
+
+    <p class="section-label">Load an example into the scratch pad</p>
+    <div class="example-pills" id="example-pills"></div>
+
+</div>
+
+<script>
+// Example definitions
+var examples = [
+    {
+        title: "Synth patches",
+        code: "// Load a Juno-6 patch and play a note\namy_send({patch: 4, synth: 1, num_voices: 6})\namy_send({synth: 1, vel: 1, note: 50})"
+    },
+    {
+        title: "Sine waves",
+        code: "// Multiple sine waves scheduled over time\nfor (var i = 0; i < 16; i++) {\n    amy_send({osc: i, wave: AMY.SINE, freq: 110 + i * 80, vel: (16 - i) / 32.0, time: i * 500})\n}"
+    },
+    {
+        title: "Filtered saw",
+        code: "// Classic analog filter sweep using an envelope generator\namy_send({osc: 0, wave: AMY.SAW_DOWN, resonance: 5, filter_type: AMY.FILTER_LPF})\namy_send({osc: 0, filter_freq: '50,0,0,0,1', bp1: '0,6.0,1000,3.0,200,0'})\namy_send({osc: 0, vel: 1, note: 40})"
+    },
+    {
+        title: "FM synthesis",
+        code: "// FM synthesis with two operators \u2014 modulator fades in over 5 seconds\namy_send({osc: 2, wave: AMY.SINE, ratio: 0.2, amp: {const: 1, vel: 0, eg0: 2}, bp0: '0,0,5000,1,0,0'})\namy_send({osc: 1, wave: AMY.SINE, ratio: 1, amp: {const: 1, vel: 0, eg0: 0}})\namy_send({osc: 0, wave: AMY.ALGO, algorithm: 1, algo_source: ',,,,2,1'})\namy_send({osc: 0, note: 60, vel: 1})"
+    },
+    {
+        title: "Drum sequencer",
+        code: "// Simple drum pattern using the AMY sequencer\namy_send({osc: 0, vel: 1, wave: AMY.PCM, preset: 0, sequence: ',24,1'})  // hi-hat every 8th note\namy_send({osc: 1, vel: 1, wave: AMY.PCM, preset: 1, sequence: ',48,2'})  // kick every quarter note"
+    },
+    {
+        title: "Juno-6 chord",
+        code: "// Play a chord using a Juno-6 patch with filter tweak\namy_send({patch: 0, synth: 1, num_voices: 6})\namy_send({synth: 1, vel: 1, note: 48})\namy_send({synth: 1, vel: 1, note: 55})\namy_send({synth: 1, vel: 1, note: 60})\namy_send({synth: 1, vel: 1, note: 64})\namy_send({synth: 1, filter_freq: [800], resonance: 2.5})"
+    }
+];
+
+// Build example pills
+var pillsContainer = document.getElementById('example-pills');
+examples.forEach(function(ex, idx) {
+    var pill = document.createElement('span');
+    pill.className = 'example-pill';
+    pill.textContent = ex.title;
+    pill.onclick = function() {
+        // Update active state
+        document.querySelectorAll('.example-pill').forEach(function(p) { p.classList.remove('active'); });
+        pill.classList.add('active');
+        // Load into scratch pad
+        editor.setValue(ex.code);
+        clearOutput('scratch');
+    };
+    pillsContainer.appendChild(pill);
+});
+
+// Initialize scratch pad editor (15 lines tall)
+var editor = CodeMirror.fromTextArea(document.getElementById('scratch-code'), {
+    mode: 'javascript',
+    theme: 'monokai',
+    lineNumbers: true,
+    viewportMargin: Infinity,
+    tabSize: 2,
+    indentWithTabs: false
+});
+editor.setSize(null, 15 * 1.5 + 'em');
+
+function startAudio() {
+    if (amy_started) return;
+    amy_js_start();
+    var banner = document.getElementById('start-banner');
+    banner.textContent = 'Audio started';
+    banner.classList.add('started');
+}
+
+function showOutput(blockId, text, cls) {
+    var el = document.getElementById(blockId + '-output');
+    var span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = text + '\n';
+    el.appendChild(span);
+    el.classList.add('has-content');
+    el.scrollTop = el.scrollHeight;
+}
+
+function clearOutput(blockId) {
+    var el = document.getElementById(blockId + '-output');
+    el.innerHTML = '';
+    el.classList.remove('has-content');
+}
+
+function runEditor() {
+    if (!amy_started) startAudio();
+    clearOutput('scratch');
+
+    // Reset the sysclock so time-based scheduling starts from 0
+    if (typeof amy_reset_sysclock === 'function') {
+        amy_reset_sysclock();
+    }
+
+    var code = editor.getValue();
+
+    // Wrap amy_send to capture wire messages for display
+    var origSend = window.amy_send;
+    var capturedMessages = [];
+    window.amy_send = function(params) {
+        var msg = origSend(params);
+        capturedMessages.push(msg);
+        return msg;
+    };
+
+    try {
+        var result = new Function(code)();
+        if (capturedMessages.length > 0) {
+            showOutput('scratch', 'Wire: ' + capturedMessages.join(' | '), 'wire');
+        }
+        if (result !== undefined) {
+            showOutput('scratch', String(result));
+        }
+    } catch (e) {
+        showOutput('scratch', 'Error: ' + e.message, 'error');
+    } finally {
+        window.amy_send = origSend;
+    }
+}
+
+function resetAMY() {
+    if (typeof amy_add_message === 'function') {
+        // RESET_SEQUENCER (4096) + RESET_ALL_OSCS (8192) must be sent separately
+        // from RESET_SYNTHS (262144) because the parser unsets reset_osc after
+        // handling RESET_SYNTHS immediately, dropping the event-based flags.
+        amy_add_message('S' + (4096 + 8192) + 'Z');
+        amy_add_message('S' + 262144 + 'Z');
+    }
+}
+
+// Start audio on first click/keydown anywhere
+document.body.addEventListener('click', startAudio, {once: true});
+document.body.addEventListener('keydown', startAudio, {once: true});
+</script>
+
+</body>
+</html>
