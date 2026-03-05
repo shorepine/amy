@@ -532,12 +532,8 @@ void run_midi() {
 
 
 #ifdef __linux__
-void stop_midi() {
-}
-
-void run_midi() {
-    //fprintf(stderr, "no MIDI support on linux yet\n");
-}
+extern void stop_midi();
+extern void run_midi();
 #endif
 
 #ifdef AMY_DAISY
@@ -547,6 +543,9 @@ void run_midi() {
 }
 #endif
 
+#ifdef __linux__
+extern void midi_out(uint8_t * bytes, uint16_t len);
+#else
 void midi_out(uint8_t * bytes, uint16_t len) {
 
 // Is there USB gadget midi? Send it
@@ -569,5 +568,6 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 #endif
 
 }
+#endif
 
 #endif // check for macos desktop 

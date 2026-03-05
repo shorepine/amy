@@ -1,6 +1,6 @@
 # Makefile for AMY , including an example
 
-TARGET = amy-example amy-message amy-piano
+TARGET = amy-example amy-message amy-piano amy-synth
 LIBS =  -lm  -pthread
 
 UNAME_S := $(shell uname -s)
@@ -13,6 +13,10 @@ ifeq ($(UNAME_S),Darwin)
 	CC = clang
 else
 	CC = gcc
+ifeq ($(UNAME_S),Linux)
+	SOURCES += src/linux_midi.c
+	LIBS += -lasound
+endif
 endif
 
 
@@ -76,6 +80,8 @@ src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 amy-example: $(OBJECTS) src/amy-example.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-example.o -Wall $(LIBS) -o $@
 
+amy-synth: $(OBJECTS) src/amy-synth.o
+	$(CC) $(CFLAGS) $(OBJECTS) src/amy-synth.o -Wall $(LIBS) -o $@
 
 amy-piano: $(OBJECTS) src/amy-piano.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-piano.o -Wall $(LIBS) -o $@
