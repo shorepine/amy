@@ -1035,8 +1035,8 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
             midi_clear_channel_mappings(e->synth);
             return 0;
         }
+        //fprintf(stderr, "Allocated %d voices to instrument %d\n", num_voices, e->synth);
     }
-    //fprintf(stderr, "Allocated %d voices to instrument %d patch %d\n", num_voices, e->synth, *ppatch_number);
     //for (int i = 0; i < num_voices; ++i) {
     //    fprintf(stderr, "%d; ", voices[i]);
     //}
@@ -1056,7 +1056,7 @@ void patches_load_patch(amy_event *e) {
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
     uint16_t patch_number = e->patch_number;
-    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d\n", e->synth, e->patch_number, e->num_voices);
+    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
     if (AMY_IS_SET(e->synth)) {
         if (AMY_IS_UNSET(e->patch_number))
             patch_number = instrument_get_patch_number(e->synth);

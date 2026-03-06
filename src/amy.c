@@ -501,7 +501,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
     if (AMY_IS_SET(e->voices[0]) || AMY_IS_SET(e->synth)) {
-        if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices)) {
+        if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices) || AMY_IS_SET(e->oscs_per_voice)) {
             amy_execute_deltas();
             patches_load_patch(e);
         }

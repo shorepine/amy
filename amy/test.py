@@ -952,9 +952,10 @@ class TestHPFHighBaseFreq(AmyTest):
 
 
 class TestWavetable(AmyTest):
+  """Simple exercise of the wavetable oscillator, using default wavetable."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.WAVETABLE, duty='0,0,0,0,8', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
+    amy.send(time=0, osc=0, wave=amy.WAVETABLE, preset=0, duty='0.25,0,0,0,0.5', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
     amy.send(time=50, note=50, vel=1)
     amy.send(time=850, vel=0)
 
@@ -1055,6 +1056,16 @@ ic10,1,1.000,100.000,1.000,i%id%vZ"""
       is_ok = True
       message = 'TestClearOneMidiCC : ok'
     return is_ok, message
+
+
+class TestResetOscs(AmyTest):
+  """Test that setting the number of oscs per voice resets the oscs."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=0, num_voices=4)
+    amy.send(time=10, synth=1, oscs_per_voice=5)  # Should cause oscs to reset.
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=400, synth=1, note=48, vel=0)
 
 
 def main(argv):
