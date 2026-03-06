@@ -534,7 +534,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'o': e->algorithm=atoi(arg); break;
             case 'O': parse_algo_source(arg, e->algo_source); break;
             case 'p': e->preset=atoi(arg); break;
-            case 'P': e->phase=atoff(arg); break;
+            case 'P': e->trigger_phase=atoff(arg); break;
             /* q unused */
             case 'Q': parse_coef_message(arg, e->pan_coefs); break;
             case 'r': parse_voices(arg, e->voices); break;

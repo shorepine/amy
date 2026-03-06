@@ -101,7 +101,7 @@ void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     synth[osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
     synth[osc]->status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
     if (AMY_IS_SET(synth[osc]->trigger_phase))
-        synth[osc]->phase = synth[osc]->trigger_phase;
+        synth[osc]->phase = F2P(synth[osc]->trigger_phase);
     if(synth[osc]->wave==SINE) fm_sine_note_on(osc, algo_osc);
 }
 

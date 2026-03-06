@@ -464,7 +464,7 @@ typedef struct amy_event {
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
     float velocity;
-    float phase;
+    float trigger_phase;
     float volume;  // event_only
     float pitch_bend;  // event_only
     float tempo;  // event_only
@@ -532,8 +532,8 @@ struct synthinfo {
     float feedback;
     uint8_t status;  // not in event
     float velocity;
-    PHASOR trigger_phase;  // not in event
-    PHASOR phase;
+    float trigger_phase;
+    PHASOR phase;  // not in event
     float step;  // not in event
     float substep;  // not in event
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event

@@ -99,7 +99,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->preset);
     AMY_UNSET(e->wave);
     AMY_UNSET(e->patch_number);
-    AMY_UNSET(e->phase);
+    AMY_UNSET(e->trigger_phase);
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);

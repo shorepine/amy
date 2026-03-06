@@ -532,7 +532,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_COEFS(duty_coefs, DUTY)
     EVENT_TO_DELTA_COEFS(pan_coefs, PAN)
     EVENT_TO_DELTA_F(feedback, FEEDBACK)
-    EVENT_TO_DELTA_F(phase, PHASE)
+    EVENT_TO_DELTA_F(trigger_phase, PHASE)
     EVENT_TO_DELTA_F(volume, VOLUME)
     EVENT_TO_DELTA_F(pitch_bend, PITCH_BEND)
     EVENT_TO_DELTA_I(latency_ms, LATENCY)
@@ -1104,7 +1104,7 @@ void play_delta(struct delta *d) {
         synth[d->osc]->preset = (uint16_t)d->data.i;
     }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
-    if (d->param == PHASE) synth[d->osc]->trigger_phase = F2P(d->data.f);
+    if (d->param == PHASE) synth[d->osc]->trigger_phase = d->data.f;
 
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)
@@ -1248,7 +1248,7 @@ void play_delta(struct delta *d) {
 		    // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
 		    // But if a trigger_phase is set, use that.
 		    if (AMY_IS_SET(synth[osc]->trigger_phase))
-			synth[osc]->phase = synth[osc]->trigger_phase;
+			synth[osc]->phase = F2P(synth[osc]->trigger_phase);
 
 		    // restart the waveforms
 		    // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
@@ -1269,7 +1269,7 @@ void play_delta(struct delta *d) {
 		    uint16_t mod_osc = synth[osc]->mod_source;
 		    if(AMY_IS_SET(mod_osc)) {
 			if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
-			    synth[mod_osc]->phase = synth[mod_osc]->trigger_phase;
+			    synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
 
 			synth[mod_osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.
 			switch(synth[mod_osc]->wave) {
