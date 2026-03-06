@@ -264,7 +264,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(duty_coefs, "duty_coefs", "d");
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
-    _EPRINT_F(phase, "phase", "P");
+    _EPRINT_F(trigger_phase, "phase", "P");
     _EPRINT_F(volume, "volume", "V");  // NOT osc-dep
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
     _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
@@ -350,7 +350,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(preset, PRESET)
       _CASE_F(midi_note, MIDI_NOTE)
       _CASE_F(feedback, FEEDBACK)
-      _CASE_F(phase, PHASE)
+      _CASE_F(trigger_phase, PHASE)
       _CASE_F(volume, VOLUME)
       _CASE_F(pitch_bend, PITCH_BEND)
       _CASE_I(latency_ms, LATENCY)
@@ -545,7 +545,7 @@ void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
     EVENT_FROM_OSC_ARRAY(duty_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY(pan_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC(feedback);
-    EVENT_FROM_OSC(phase);
+    EVENT_FROM_OSC(trigger_phase);
     EVENT_FROM_OSC_MAPPED(logratio, ratio, exp2f);
     EVENT_FROM_OSC(resonance);
     EVENT_FROM_OSC_MAPPED(portamento_alpha, portamento_ms, alpha_to_portamento_ms);
