@@ -355,7 +355,7 @@ queue_t results_queue;
 volatile bool core1_running = true;
 // This is the ram allocated for the core1 stack.
 // It's also the flag that core1 task is running, if non-NULL.
-uint32_t * core1_separate_stack_address = NULL;
+uint32_t * my_core1_separate_stack_address = NULL;
 
 extern void on_pico_uart_rx();
 
@@ -447,12 +447,12 @@ void amy_platform_init() {
     }
 #ifdef USE_SECOND_CORE
     if (amy_global.config.platform.multicore) {
-        if (core1_separate_stack_address == NULL) {  // Task is not already running.
-            core1_separate_stack_address = (uint32_t*)malloc(0x2000);
+        if (my_core1_separate_stack_address == NULL) {  // Task is not already running.
+            my_core1_separate_stack_address = (uint32_t*)malloc(0x2000);
             queue_init(&call_queue, sizeof(queue_entry_t), 2);
             queue_init(&results_queue, sizeof(int32_t), 2);
             core1_running = true;
-            multicore_launch_core1_with_stack(core1_main, core1_separate_stack_address, 0x2000);
+            multicore_launch_core1_with_stack(core1_main, my_core1_separate_stack_address, 0x2000);
             sleep_ms(500);
         }
     }
@@ -462,13 +462,13 @@ void amy_platform_init() {
 void amy_platform_deinit() {
 #ifdef USE_SECOND_CORE
     if (amy_global.config.platform.multicore) {
-        if (core1_separate_stack_address) {  // Task is actually running.
+        if (my_core1_separate_stack_address) {  // Task is actually running.
             core1_running = false;  // signal the core1 task to exit.
             sleep_ms(100);  // time for it to exit
             queue_free(&results_queue);
             queue_free(&call_queue);
-            free(core1_separate_stack_address);
-            core1_separate_stack_address = NULL;
+            free(my_core1_separate_stack_address);
+            my_core1_separate_stack_address = NULL;
         }
     }
 #endif

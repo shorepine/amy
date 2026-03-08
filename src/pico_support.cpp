@@ -11,6 +11,7 @@ I2S i2s(INPUT_PULLUP);
 
 extern "C" {
     void pico_setup_i2s(amy_config_t *config);
+    void pico_teardown_i2s(amy_config_t *config);
     void pico_i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples, int nframes);
 }
 
