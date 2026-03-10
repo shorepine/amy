@@ -223,6 +223,10 @@ uint16_t sysex_len = 0;
 extern const mp_obj_fun_builtin_var_t tulip_amy_send_sysex_obj;
 #endif
 uint8_t * sysex_buffer = NULL;
+// Snapshot of sysex payload for deferred MicroPython processing.
+// parse_sysex() copies here before scheduling so the MIDI task can
+// safely reuse sysex_buffer for the next incoming message.
+char * sysex_message_copy = NULL;
 void parse_sysex() {
     uint32_t time = AMY_UNSET_VALUE(time);
     if(sysex_len>3) {
@@ -232,7 +236,14 @@ void parse_sysex() {
             // For Micropython hosted systems, we run MIDI on a separate "thread" (task)
             // than MP, so just calling amy_send_message here can fail if it needs to access
             // underlying MP resources. So we schedule it to run in the MP main loop instead.
+            // We copy the payload into sysex_message_copy first because sysex_buffer is
+            // shared and the MIDI task may overwrite it before the callback runs.
             #if defined(TULIP) || defined(AMYBOARD)
+            if(sysex_message_copy) {
+                uint16_t payload_len = sysex_len - 3;
+                memcpy(sysex_message_copy, (char*)sysex_buffer + 3, payload_len);
+                sysex_message_copy[payload_len] = '\0';
+            }
             mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_amy_send_sysex_obj), mp_const_none);
             #else
             amy_add_message((char*)sysex_buffer+3);
@@ -441,6 +452,7 @@ void run_midi_task() {
 void run_midi() {
     if (sysex_buffer == NULL) {
         sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        sysex_message_copy = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             esp_init_midi();
             if (amy_global.config.platform.multithread) {
@@ -459,6 +471,8 @@ void stop_midi() {
     }
     free(sysex_buffer);
     sysex_buffer = NULL;
+    free(sysex_message_copy);
+    sysex_message_copy = NULL;
 }
 
 
@@ -494,6 +508,7 @@ extern void pico_teardown_midi();
 void run_midi() {
     if (sysex_buffer == NULL) {
         sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        sysex_message_copy = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
             gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
@@ -517,6 +532,8 @@ void stop_midi() {
         }
         free(sysex_buffer);
         sysex_buffer = NULL;
+        free(sysex_message_copy);
+        sysex_message_copy = NULL;
     }
 }
 
