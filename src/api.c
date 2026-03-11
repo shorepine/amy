@@ -42,7 +42,7 @@ amy_config_t amy_default_config() {
     c.max_memory_patches = 32;
 
     // caps
-    #if defined(TULIP) || defined(AMYBOARD) // || defined(ESP_PLATFORM)
+    #if defined(TULIP) || defined(AMYBOARD) || defined(AMYBOARD_ARDUINO)
     c.ram_caps_events = MALLOC_CAP_SPIRAM;
     c.ram_caps_synth = MALLOC_CAP_SPIRAM;
     c.ram_caps_block = MALLOC_CAP_DEFAULT;
@@ -73,12 +73,26 @@ amy_config_t amy_default_config() {
     c.midi_in = -1;
     c.midi_uart = -1; 
 
+    #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
+    // Set default pins 
+    c.features.audio_in = 1;
+    c.audio = AMY_AUDIO_IS_I2S;
+    c.midi = AMY_MIDI_IS_UART | AMY_MIDI_IS_USB_GADGET;
+    c.i2s_lrc = 2;
+    c.i2s_bclk = 8;
+    c.i2s_dout = 6;
+    c.i2s_din = 9;
+    c.i2s_mclk = 3;
+    c.midi_out = 14; // TYPE A. User can set type B with 15 
+    c.midi_in = 21;
+    #endif
+
     #ifdef ESP_PLATFORM
-    c.midi_uart = 1;
+    c.midi_uart = 1; // This is MIDI UART _number_, like index
     #endif
 
     #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
-    c.midi_uart = 1;
+    c.midi_uart = 1; // This is MIDI UART _number_, like index
     #endif
 
     return c;
@@ -338,6 +352,14 @@ extern void miniaudio_start();
 extern void miniaudio_stop();
 
 void amy_start(amy_config_t c) {
+    // First, override pins set for AMYboard -- don't let users change I2S pins 
+    #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
+    c.i2s_lrc = 2;
+    c.i2s_bclk = 8;
+    c.i2s_dout = 6;
+    c.i2s_din = 9;
+    c.i2s_mclk = 3;
+    #endif
     global_init(c);
     amy_profiles_init();
     transfer_init();

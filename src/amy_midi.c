@@ -367,7 +367,7 @@ int8_t esp_get_uart(int8_t index) {
     if(index==2) return UART_NUM_2;
     return -1;
 }
-#ifdef AMYBOARD
+#if defined (AMYBOARD) || defined(AMYBOARD_ARDUINO)
 #define TUD_USB_GADGET
 #include "tusb.h"
 #include "class/midi/midi.h"
@@ -443,7 +443,7 @@ void run_midi_task() {
 
     while(1) {
         esp_poll_midi();
-        #ifdef AMYBOARD
+        #if defined (AMYBOARD) || defined(AMYBOARD_ARDUINO)
         check_tusb_midi();
         #endif
     } // end loop forever
