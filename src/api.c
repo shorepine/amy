@@ -42,7 +42,7 @@ amy_config_t amy_default_config() {
     c.max_memory_patches = 32;
 
     // caps
-    #if defined(TULIP) || defined(AMYBOARD) // || defined(ESP_PLATFORM)
+    #if defined(TULIP) || defined(AMYBOARD) || defined(AMYBOARD_ARDUINO)
     c.ram_caps_events = MALLOC_CAP_SPIRAM;
     c.ram_caps_synth = MALLOC_CAP_SPIRAM;
     c.ram_caps_block = MALLOC_CAP_DEFAULT;
@@ -73,12 +73,26 @@ amy_config_t amy_default_config() {
     c.midi_in = -1;
     c.midi_uart = -1; 
 
+    #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
+    // Set default pins 
+    c.features.audio_in = 1;
+    c.audio = AMY_AUDIO_IS_I2S;
+    c.midi = AMY_MIDI_IS_UART | AMY_MIDI_IS_USB_GADGET;
+    c.i2s_lrc = AMYBOARD_LRC;
+    c.i2s_bclk = AMYBOARD_BCLK;
+    c.i2s_dout = AMYBOARD_DOUT;
+    c.i2s_din = AMYBOARD_DIN;
+    c.i2s_mclk = AMYBOARD_MCLK;
+    c.midi_out = AMYBOARD_MIDI_OUT_TYPE_A; // TYPE A. User can set type B with 15 
+    c.midi_in = AMYBOARD_MIDI_IN;
+    #endif
+
     #ifdef ESP_PLATFORM
-    c.midi_uart = 1;
+    c.midi_uart = 1; // This is MIDI UART _number_, like index
     #endif
 
     #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
-    c.midi_uart = 1;
+    c.midi_uart = 1; // This is MIDI UART _number_, like index
     #endif
 
     return c;

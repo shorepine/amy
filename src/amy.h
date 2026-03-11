@@ -628,6 +628,15 @@ typedef struct delay_line {
 #define AMY_MIDI_IS_MACOS 0x04
 #define AMY_MIDI_IS_WEBMIDI 0x08
 
+// AMYboard pins
+#define AMYBOARD_LRC 2
+#define AMYBOARD_BCLK 8
+#define AMYBOARD_DOUT 6
+#define AMYBOARD_DIN 9
+#define AMYBOARD_MCLK 3
+#define AMYBOARD_MIDI_OUT_TYPE_A 14
+#define AMYBOARD_MIDI_OUT_TYPE_B 15
+#define AMYBOARD_MIDI_IN 21
 
 typedef struct  {
     struct {

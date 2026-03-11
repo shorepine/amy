@@ -27,8 +27,7 @@ i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
 
 
-#ifndef AMYBOARD
-#warning NOT_AMYBOARD
+#if !defined(AMYBOARD) && !defined(AMYBOARD_ARDUINO)
 // default ESP setup i2s
 amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
@@ -86,7 +85,7 @@ amy_err_t esp32_setup_i2s(void) {
 }
 
 #else
-// AMYBOARD i2s setup, which is weird
+// AMYBOARD or AMYBOARD_ARDUINO i2s setup, which uses two audio codecs, for audio in and SPDIF
 amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_SLAVE);  // ************* I2S_ROLE_SLAVE - needs external I2S clock input.
     i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
@@ -214,7 +213,7 @@ void esp_fill_audio_buffer_task() {
         last_audio_buffer = block;
         
 // TODO : dan needs to look at this part again
-#if !defined(TULIP) && !defined(AMYBOARD)
+#if !defined(TULIP) && !defined(AMYBOARD) && !defined(AMYBOARD_ARDUINO)
         xTaskNotifyGive(amy_update_handle);
 #endif
 
