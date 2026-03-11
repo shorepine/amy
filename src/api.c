@@ -352,14 +352,6 @@ extern void miniaudio_start();
 extern void miniaudio_stop();
 
 void amy_start(amy_config_t c) {
-    // First, override pins set for AMYboard -- don't let users change I2S pins 
-    #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
-    c.i2s_lrc = AMYBOARD_LRC;
-    c.i2s_bclk = AMYBOARD_BCLK;
-    c.i2s_dout = AMYBOARD_DOUT;
-    c.i2s_din = AMYBOARD_DIN;
-    c.i2s_mclk = AMYBOARD_MCLK;
-    #endif
     global_init(c);
     amy_profiles_init();
     transfer_init();
