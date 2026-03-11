@@ -1,9 +1,48 @@
-// usb.c 
+// usb.c
 // tinyusb stuff
 
-#ifdef AMY_MCU
+#include "amy.h"
+
+#if defined AMY_MCU
 
 #define CONFIG_TOTAL_LEN_MIDI  (TUD_CONFIG_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_CDC_DESC_LEN)
+
+// For AMYBOARD_ARDUINO, provide defaults for MicroPython-originated macros
+#ifdef AMYBOARD_ARDUINO
+
+#ifndef MICROPY_HW_USB_VID
+#define MICROPY_HW_USB_VID (0xCAF0)
+#endif
+#ifndef MICROPY_HW_USB_PID
+#define MICROPY_HW_USB_PID (0x0001)
+#endif
+#ifndef MICROPY_HW_USB_DESC_STR_MAX
+#define MICROPY_HW_USB_DESC_STR_MAX (32)
+#endif
+#ifndef MICROPY_HW_USB_MANUFACTURER_STRING
+#define MICROPY_HW_USB_MANUFACTURER_STRING "AMYboard"
+#endif
+#ifndef MICROPY_HW_USB_PRODUCT_FS_STRING
+#define MICROPY_HW_USB_PRODUCT_FS_STRING "AMYboard"
+#endif
+#ifndef MICROPY_HW_USB_CDC_INTERFACE_STRING
+#define MICROPY_HW_USB_CDC_INTERFACE_STRING "AMYboard"
+#endif
+#ifndef MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE
+#define MICROPY_HW_ENABLE_USB_RUNTIME_DEVICE (0)
+#endif
+
+#ifndef MICROPY_HW_USB_MSC_INTERFACE_STRING
+#define MICROPY_HW_USB_MSC_INTERFACE_STRING "AMYboard"
+#endif
+
+#define USBD_STR_MANUF  (0x01)
+#define USBD_STR_PRODUCT (0x02)
+#define USBD_STR_SERIAL (0x03)
+#define USBD_STR_CDC    (0x04)
+#define USBD_STR_MSC    (0x05)
+
+#endif // AMYBOARD_ARDUINO
 
 #include "usb.h"
 #include "tusb.h"
@@ -128,5 +167,63 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     return desc_wstr;
 }
 
+
+#ifdef AMYBOARD_ARDUINO
+
+#include "esp_mac.h"
+#include "esp32-hal-tinyusb.h"
+
+// Override Arduino's weak descriptor callbacks with amy's MIDI+CDC descriptors
+uint8_t const *tud_descriptor_device_cb(void) {
+    return (uint8_t const *)&amy_usbd_builtin_desc_dev;
+}
+
+uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
+    (void)index;
+    return amy_usbd_builtin_desc_cfg;
+}
+
+// Provide serial number from ESP32 MAC address
+void amy_usbd_port_get_serial_number(char *buf) {
+    uint8_t mac[8];
+    esp_efuse_mac_get_default(mac);
+    amy_usbd_hex_str(buf, mac, sizeof(mac));
+}
+
+void amy_usbd_hex_str(char *out_str, const uint8_t *bytes, size_t bytes_len) {
+    for (size_t i = 0; i < bytes_len; i++) {
+        uint8_t b = bytes[i];
+        uint8_t hi = b >> 4;
+        uint8_t lo = b & 0x0F;
+        out_str[i * 2] = hi < 10 ? '0' + hi : 'A' + hi - 10;
+        out_str[i * 2 + 1] = lo < 10 ? '0' + lo : 'A' + lo - 10;
+    }
+    out_str[bytes_len * 2] = '\0';
+}
+
+void amy_arduino_usb_setup(void) {
+    // Use Arduino's tinyusb_init which handles USB PHY setup, tusb_init(),
+    // and creates the TinyUSB device task. Our non-weak descriptor callbacks
+    // above ensure the host sees amy's MIDI+CDC descriptors.
+    tinyusb_device_config_t cfg = {
+        .vid = MICROPY_HW_USB_VID,
+        .pid = MICROPY_HW_USB_PID,
+        .product_name = MICROPY_HW_USB_PRODUCT_FS_STRING,
+        .manufacturer_name = MICROPY_HW_USB_MANUFACTURER_STRING,
+        .serial_number = "",
+        .fw_version = 0x0100,
+        .usb_version = 0x0200,
+        .usb_class = TUSB_CLASS_MISC,
+        .usb_subclass = MISC_SUBCLASS_COMMON,
+        .usb_protocol = MISC_PROTOCOL_IAD,
+        .usb_attributes = TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP,
+        .usb_power_ma = 100,
+        .webusb_enabled = false,
+        .webusb_url = "",
+    };
+    tinyusb_init(&cfg);
+}
+
+#endif // AMYBOARD_ARDUINO
 
 #endif // AMY_MCU
