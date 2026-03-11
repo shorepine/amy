@@ -78,13 +78,13 @@ amy_config_t amy_default_config() {
     c.features.audio_in = 1;
     c.audio = AMY_AUDIO_IS_I2S;
     c.midi = AMY_MIDI_IS_UART | AMY_MIDI_IS_USB_GADGET;
-    c.i2s_lrc = 2;
-    c.i2s_bclk = 8;
-    c.i2s_dout = 6;
-    c.i2s_din = 9;
-    c.i2s_mclk = 3;
-    c.midi_out = 14; // TYPE A. User can set type B with 15 
-    c.midi_in = 21;
+    c.i2s_lrc = AMYBOARD_LRC;
+    c.i2s_bclk = AMYBOARD_BCLK;
+    c.i2s_dout = AMYBOARD_DOUT;
+    c.i2s_din = AMYBOARD_DIN;
+    c.i2s_mclk = AMYBOARD_MCLK;
+    c.midi_out = AMYBOARD_MIDI_OUT_TYPE_A; // TYPE A. User can set type B with 15 
+    c.midi_in = AMYBOARD_MIDI_IN;
     #endif
 
     #ifdef ESP_PLATFORM
@@ -354,11 +354,11 @@ extern void miniaudio_stop();
 void amy_start(amy_config_t c) {
     // First, override pins set for AMYboard -- don't let users change I2S pins 
     #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
-    c.i2s_lrc = 2;
-    c.i2s_bclk = 8;
-    c.i2s_dout = 6;
-    c.i2s_din = 9;
-    c.i2s_mclk = 3;
+    c.i2s_lrc = AMYBOARD_LRC;
+    c.i2s_bclk = AMYBOARD_BCLK;
+    c.i2s_dout = AMYBOARD_DOUT;
+    c.i2s_din = AMYBOARD_DIN;
+    c.i2s_mclk = AMYBOARD_MCLK;
     #endif
     global_init(c);
     amy_profiles_init();
