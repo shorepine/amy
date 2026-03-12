@@ -996,6 +996,7 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
     commands = amy.get_synth_commands(1)
     expected = """v0f110.000c1Z
 v1w3f440.000Z
+V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic5,0,0.000,10.000,0.000,helloZ
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
     if commands != expected:
@@ -1023,7 +1024,8 @@ class TestClearMidiCCs(AmyTest):
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """v0f999.000c1Z
-v1w3f440.000Z"""
+v1w3f440.000Z
+V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
     if commands != expected:
       is_ok = False
       message = 'TestClearMidiCcs : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
@@ -1048,6 +1050,7 @@ class TestClearOneMidiCC(AmyTest):
     commands = amy.get_synth_commands(1)
     expected = """v0f999.000c1Z
 v1w3f440.000Z
+V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
     if commands != expected:
       is_ok = False
