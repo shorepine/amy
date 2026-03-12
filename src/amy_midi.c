@@ -372,6 +372,9 @@ int8_t esp_get_uart(int8_t index) {
 #include "tusb.h"
 #include "class/midi/midi.h"
 #include "class/midi/midi_device.h"
+#ifdef AMYBOARD_ARDUINO
+#include "usb.h"
+#endif
 
 void check_tusb_midi() {
     while ( tud_midi_available() ) {
@@ -453,6 +456,12 @@ void run_midi() {
     if (sysex_buffer == NULL) {
         sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
         sysex_message_copy = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        #if defined(AMYBOARD_ARDUINO)
+        // Initialize TinyUSB with amy's MIDI+CDC descriptors before starting MIDI polling
+        if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+            amy_arduino_usb_setup();
+        }
+        #endif
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             esp_init_midi();
             if (amy_global.config.platform.multithread) {

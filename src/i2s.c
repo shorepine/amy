@@ -23,6 +23,9 @@ TaskHandle_t amy_fill_buffer_handle;
 TaskHandle_t amy_update_handle = NULL;
 
 #include "driver/i2s_std.h"
+#ifdef AMYBOARD_ARDUINO
+#include "driver/i2c.h"
+#endif
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
 
@@ -130,6 +133,55 @@ amy_err_t esp32_setup_i2s(void) {
     /* Before writing data, start the TX channel first */
     i2s_channel_enable(tx_handle);
     i2s_channel_enable(rx_handle);
+
+#ifdef AMYBOARD_ARDUINO
+    // Initialize PCM9211 SPDIF transceiver via I2C.
+    // On the MicroPython AMYBOARD path this is done in Python (amyboard.py).
+    {
+        #define PCM9211_I2C_ADDR   0x40
+        #define PCM9211_I2C_SDA    17
+        #define PCM9211_I2C_SCL    18
+        #define PCM9211_I2C_FREQ   400000
+
+        i2c_config_t i2c_conf = {
+            .mode = I2C_MODE_MASTER,
+            .sda_io_num = PCM9211_I2C_SDA,
+            .scl_io_num = PCM9211_I2C_SCL,
+            .sda_pullup_en = GPIO_PULLUP_ENABLE,
+            .scl_pullup_en = GPIO_PULLUP_ENABLE,
+            .master.clk_speed = PCM9211_I2C_FREQ,
+        };
+        i2c_param_config(I2C_NUM_0, &i2c_conf);
+        i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
+
+        static const uint8_t pcm9211_regs[][2] = {
+            { 0x40, 0x33 },  // Power down ADC, DIR, DIT, OSC
+            { 0x40, 0xC0 },  // Normal operation for all
+            { 0x34, 0x00 },  // Initialize DIR - biphase amps on, input from RXIN0
+            { 0x26, 0x01 },  // Main Out is DIR/ADC if no DIR sync
+            { 0x6B, 0x00 },  // Main output pins are DIR/ADC AUTO
+            { 0x30, 0x04 },  // PLL sends 512fs as SCK
+            { 0x31, 0x0A },  // XTI SCK as 512fs too
+            { 0x60, 0x44 },  // DIT sends SPDIF from AUXIN1 through MPO0
+            { 0x78, 0x3D },  // MPO0 = TXOUT, MPO1 = VOUT
+            { 0x6F, 0x40 },  // MPIO_A = CLKST / MPIO_B = AUXIN2 / MPIO_C = AUXIN1
+        };
+
+        for (int i = 0; i < sizeof(pcm9211_regs) / sizeof(pcm9211_regs[0]); i++) {
+            uint8_t buf[2] = { pcm9211_regs[i][0], pcm9211_regs[i][1] };
+            esp_err_t ret = i2c_master_write_to_device(
+                I2C_NUM_0, PCM9211_I2C_ADDR, buf, 2, pdMS_TO_TICKS(100));
+            if (ret != ESP_OK) {
+                fprintf(stderr, "PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
+                    buf[0], buf[1], esp_err_to_name(ret));
+            }
+        }
+
+        // Tear down the I2C driver so Arduino Wire can use bus 0 later
+        i2c_driver_delete(I2C_NUM_0);
+    }
+#endif // AMYBOARD_ARDUINO
+
     return AMY_OK;
 }
 
@@ -212,8 +264,10 @@ void esp_fill_audio_buffer_task() {
 
         last_audio_buffer = block;
         
-// TODO : dan needs to look at this part again
-#if !defined(TULIP) && !defined(AMYBOARD) && !defined(AMYBOARD_ARDUINO)
+// Notify amy_update() that a block is ready (so it can return from amy_render_audio).
+// TULIP & AMYBOARD (MicroPython) don't call amy_update(), so skip the notify.
+// AMYBOARD_ARDUINO needs it because Arduino sketches call amy_update() in loop().
+#if !defined(TULIP) && !defined(AMYBOARD)
         xTaskNotifyGive(amy_update_handle);
 #endif
 
