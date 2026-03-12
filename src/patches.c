@@ -568,41 +568,37 @@ float lin_to_db(float lin) {
 // Guard against passing sentinel/UNSET values through to events.
 // AMY_IS_SET catches type-specific sentinels (NaN for float, INT_MAX for int32, etc.)
 // isfinite catches NaN and infinity on the float side.
-#define SET_EVENT_FIELD_IF_STATE(DOMAIN, DOMAIN_C, PARAM, PARAM_C)       \
+#define SET_EVENT_FIELD_IF_STATE(DOMAIN, PARAM)       \
     if (AMY_IS_SET(state->DOMAIN.PARAM) && isfinite((float)state->DOMAIN.PARAM) \
-        && state->DOMAIN.PARAM != DOMAIN_C ## _DEFAULT_ ## PARAM_C) \
         event->DOMAIN ## _  ## PARAM = state->DOMAIN.PARAM;
-#define SET_EVENT_FIELD_IF_STATE_F2S(DOMAIN, DOMAIN_C, PARAM, PARAM_C)   \
+#define SET_EVENT_FIELD_IF_STATE_F2S(DOMAIN, PARAM)   \
     if (AMY_IS_SET(state->DOMAIN.PARAM) && isfinite(S2F(state->DOMAIN.PARAM)) \
-        && state->DOMAIN.PARAM != F2S(DOMAIN_C ## _DEFAULT_ ## PARAM_C)) \
         event->DOMAIN ## _  ## PARAM = S2F(state->DOMAIN.PARAM);
 
 void set_event_for_global_fx(amy_event *event, struct state *state) {
-    // These are comparing against the default values set up in amy.c:global_init()
     // Volume
-    if (state->volume != 1.0f) event->volume = state->volume;
+    event->volume = state->volume;
     // EQ
-    if (state->eq[0] != F2S(1.0f)) event->eq_l = lin_to_db(S2F(state->eq[0]));
-    if (state->eq[1] != F2S(1.0f)) event->eq_m = lin_to_db(S2F(state->eq[1]));
-    if (state->eq[2] != F2S(1.0f)) event->eq_h = lin_to_db(S2F(state->eq[2]));
+    event->eq_l = lin_to_db(S2F(state->eq[0]));
+    event->eq_m = lin_to_db(S2F(state->eq[1]));
+    event->eq_h = lin_to_db(S2F(state->eq[2]));
     // Reverb
-    SET_EVENT_FIELD_IF_STATE_F2S(reverb, REVERB, level, LEVEL);
-    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, liveness, LIVENESS);
-    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, damping, DAMPING);
-    SET_EVENT_FIELD_IF_STATE(reverb, REVERB, xover_hz, XOVER_HZ);
+    SET_EVENT_FIELD_IF_STATE_F2S(reverb, level);
+    SET_EVENT_FIELD_IF_STATE(reverb, liveness);
+    SET_EVENT_FIELD_IF_STATE(reverb, damping);
+    SET_EVENT_FIELD_IF_STATE(reverb, xover_hz);
     // Chorus
-    SET_EVENT_FIELD_IF_STATE_F2S(chorus, CHORUS, level, LEVEL);
-    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, max_delay, MAX_DELAY);
-    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, lfo_freq, LFO_FREQ);
-    SET_EVENT_FIELD_IF_STATE(chorus, CHORUS, depth, MOD_DEPTH);
+    SET_EVENT_FIELD_IF_STATE_F2S(chorus level);
+    SET_EVENT_FIELD_IF_STATE(chorus, max_delay);
+    SET_EVENT_FIELD_IF_STATE(chorus, lfo_freq);
+    SET_EVENT_FIELD_IF_STATE(chorus, depth);
     // Echo
-    SET_EVENT_FIELD_IF_STATE_F2S(echo, ECHO, level, LEVEL);
-    if (state->echo.delay_samples != (uint32_t)(ECHO_DEFAULT_DELAY_MS / 1000.f * AMY_SAMPLE_RATE))
-        event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    SET_EVENT_FIELD_IF_STATE_F2S(echo, level);
+    event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
     if (state->echo.max_delay_samples != 65536)
         event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    SET_EVENT_FIELD_IF_STATE_F2S(echo, ECHO, feedback, FEEDBACK);
-    SET_EVENT_FIELD_IF_STATE_F2S(echo, ECHO, filter_coef, FILTER_COEF);
+    SET_EVENT_FIELD_IF_STATE_F2S(echo, feedback);
+    SET_EVENT_FIELD_IF_STATE_F2S(echo, filter_coef);
 }
 
 
