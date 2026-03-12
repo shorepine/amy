@@ -267,7 +267,7 @@ var AMY_KW_PRIORITY = {
   patch_string: 55
 };
 
-var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod", "bend"];
+var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod", "bend", "ext0", "ext1"];
 
 // --- type handlers (mirror Python's str_of_int, trunc, parse_list_or_comma_string, parse_ctrl_coefs) ---
 

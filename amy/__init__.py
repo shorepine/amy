@@ -68,10 +68,10 @@ def parse_ctrl_coefs(coefs):
 
     ControlCoefficients determine how amplitude, frequency, filter frequency, PWM duty, and pan
     are calculated from underlying parameters on the fly.  For each control input, they specify
-    seven coefficients which are multiplied by (0) a constant value of 1, (1) the log-frequency from
+    nine coefficients which are multiplied by (0) a constant value of 1, (1) the log-frequency from
     the note-on command, (2) the velocity from the note-on command, (3) Envelope Generator 0's value,
-    (4) Envelope Generator 1's value, (5) the modulating osicllator input, and (6) the global pitch
-    bend value.  The sum of these scaled values is used as the control input. (Amplitude is a special
+    (4) Envelope Generator 1's value, (5) the modulating oscillator input, (6) the global pitch
+    bend value, (7) external input 0, and (8) external input 1.  The sum of these scaled values is used as the control input. (Amplitude is a special
     case where the individual values are *multiplied* rather than added, and values whose coefficients
     are zero are skipped).
 
@@ -84,7 +84,7 @@ def parse_ctrl_coefs(coefs):
      * A scalar numeric value: freq=440
      * A list of values in the format accepted by the wire protocol: freq=',,,,0.01'.
      * A Python list of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 7 values, the remainder are treated as None (analogous to the wire-protocol string).
-     * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', and 'bend'.
+     * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend', 'ext0', and 'ext1'.
     """
     # Pass through ready-formed strings, and convert single values to single value strings
     if isinstance(coefs, str):
@@ -92,7 +92,7 @@ def parse_ctrl_coefs(coefs):
     if isinstance(coefs, int) or isinstance(coefs, float):
         return trunc(coefs)
     # Convert a dict into a list of values.
-    dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend']
+    dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend', 'ext0', 'ext1']
     if isinstance(coefs, dict):
         coef_list = [None] * len(dict_fields)
         for key, value in coefs.items():
