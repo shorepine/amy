@@ -565,18 +565,6 @@ float lin_to_db(float lin) {
     return 20.0f * log10f(lin);
 }
 
-// Guard against passing sentinel/UNSET values through to events.
-// AMY_IS_SET catches type-specific sentinels (NaN for float, INT_MAX for int32, etc.)
-// isfinite catches NaN and infinity on the float side.
-#define SET_EVENT_FIELD_IF_STATE(DOMAIN, DOMAIN_C, PARAM, PARAM_C)       \
-    if (AMY_IS_SET(state->DOMAIN.PARAM) && isfinite((float)state->DOMAIN.PARAM) \
-        && state->DOMAIN.PARAM != DOMAIN_C ## _DEFAULT_ ## PARAM_C) \
-        event->DOMAIN ## _  ## PARAM = state->DOMAIN.PARAM;
-#define SET_EVENT_FIELD_IF_STATE_F2S(DOMAIN, DOMAIN_C, PARAM, PARAM_C)   \
-    if (AMY_IS_SET(state->DOMAIN.PARAM) && isfinite(S2F(state->DOMAIN.PARAM)) \
-        && state->DOMAIN.PARAM != F2S(DOMAIN_C ## _DEFAULT_ ## PARAM_C)) \
-        event->DOMAIN ## _  ## PARAM = S2F(state->DOMAIN.PARAM);
-
 void set_event_for_global_fx(amy_event *event, struct state *state) {
     // Always emit all FX fields so saved patches are fully self-describing.
     // Volume
@@ -598,7 +586,8 @@ void set_event_for_global_fx(amy_event *event, struct state *state) {
     // Echo
     event->echo_level = S2F(state->echo.level);
     event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    if (state->echo.max_delay_samples != 65536)
+        event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
     event->echo_feedback = S2F(state->echo.feedback);
     event->echo_filter_coef = S2F(state->echo.filter_coef);
 }
