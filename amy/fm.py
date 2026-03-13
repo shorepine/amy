@@ -215,69 +215,73 @@ class AMYPatch:
         pitchbp = "%d,%s,%d,%s,%d,%s,%d,%s,%d,%s" % (
             pitch_times[0], t(pitch_levels[0]), pitch_times[1], t(pitch_levels[1]),
             pitch_times[2], t(pitch_levels[2]), pitch_times[3], t(pitch_levels[3]),
-            pitch_times[4], t(pitch_levels[4]))
+            pitch_times[4], t(pitch_levels[4])
+        )
         # Set up each operator.
         last_release_time = 0
         last_release_value = 0
-        for i, osc in enumerate(self.oscs):
+        # Oscs: 0 is algo, 1 is pitch LFO, 2 is amp LFO, 3-8 are ops 1-6
+        main_osc = 0
+        lfo_osc = 1
+        # The osc of op0 (they go up from here)
+        op0_osc = 2
+        for op_num_from_0, osc in enumerate(self.oscs):
+            osc_num = op0_osc + op_num_from_0
             amp_levels, amp_times = osc.amp_levels, osc.amp_times
             oscbp = "%d,%s,%d,%s,%d,%s,%d,%s,%d,%s" % (
                 amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
                 amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
-                amp_times[4], t(amp_levels[4]))
+                amp_times[4], t(amp_levels[4])
+            )
             oscbpfmt = "%d,%s/%d,%s/%d,%s/%d,%s/%d,%s" % (
                 amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
                 amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
-                amp_times[4], t(amp_levels[4]))
+                amp_times[4], t(amp_levels[4])
+            )
             if(amp_times[4] > last_release_time):
                 last_release_time = amp_times[4]
                 last_release_value = amp_levels[4]
             #print("osc %d (op %d) freq %.6f ratio %d env %s amp %.6f amp_mod %d" % \
-            #      (i+1, osc.op_num, osc.frequency, osc.freq_is_ratio, oscbpfmt,
+            #      (osc_num, osc.op_num_from_0, osc.frequency, osc.freq_is_ratio, oscbpfmt,
             #       osc.op_amp, osc.ampmodsens))
 
             # Make them all in cosine phase, to be like DX7.  Important for slow oscs
-            args = {"osc": i + 1,
+            args = {"osc": osc_num,
                     "bp0": oscbp, "phase": 0.25}
             if osc.freq_is_ratio:
                 args["ratio"] = t(osc.frequency)
             else:
                 args["freq"] = t(osc.frequency)
-            # TODO: we ignore intensity of amp mod sens, just on/off
-            args.update({"mod_source": 7, "amp": "%s,0,0,1,0,%d" % (t(osc.op_amp), osc.ampmodsens > 0)})
+            # TODO: we xignore intensity of amp mod sens, just on/off
+            args.update({"mod_source": lfo_osc, "amp": "%s,0,0,1,0,%s" % (t(osc.op_amp), t(self.amp_lfo_amp * (osc.ampmodsens > 0)))})
 
             # We are _NOT_ updating operators with pitch bp, per dan tuesday 7/5 morning (but not monday 7/4 morning)
             #args.update({"bp1": pitchbp})
 
             amy.send(**args)
 
-        # Set up the amp LFO 
-        #print("osc 7 amp lfo wave %d freq %f amp %f" % (
-        #    self.lfo_waveform, self.lfo_freq, self.amp_lfo_amp))
-        amy.send(osc=7, wave=self.lfo_waveform, freq=t(self.lfo_freq),
-                   amp=t(self.amp_lfo_amp), phase=0.25)
-
-        # and the pitch one
-        #print("osc 8 pitch lfo wave %d freq %f amp %f" % (
-        #    self.lfo_waveform, self.lfo_freq, self.pitch_lfo_amp))
-        amy.send(osc=8, wave=self.lfo_waveform, freq=t(self.lfo_freq),
-                   amp=t(self.pitch_lfo_amp), phase=0.25)
+        # Set up the LFO x
+        #print("osc %d amp lfo wave %d freq %f amp %f" % (
+        #    lfo_osc, self.lfo_waveform, self.lfo_freq, 1)
+        amy.send(osc=lfo_osc, wave=self.lfo_waveform, freq=t(self.lfo_freq),
+                 amp=1, phase=0.25)
 
         #print("not used: lfo delay %d " % self.lfo_delay)
 
         #ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
         #print("osc 0 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
         #    self.algo, self.feedback, pitchbp, ampbp))
-        amy.send(osc=0, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
-                   algo_source="1,2,3,4,5,6",
-                   #bp0=ampbp,
-                   #bp1=pitchbp,
-                   #freq="0,1,0,0,1,1",
-                   bp0=pitchbp,
-                   # bp1 is now ununsed.
-                   amp="1,0,1,0,0,0",  # Turn off EG0 for amp
-                   freq="0,1,0,1,0,1",  # Turn on EG0 for freq
-                   mod_source=8)
+        amy.send(osc=main_osc, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
+                 algo_source=",".join(str(o) for o in range(op0_osc, op0_osc + 6)),
+                 #bp0=ampbp,
+                 #bp1=pitchbp,
+                 #freq="0,1,0,0,1,1",
+                 bp0=pitchbp,
+                 # bp1 is now ununsed.
+                 amp="1,0,1,0,0,0",  # Turn off EG0 for amp
+                 freq="0,1,0,1,0,%s" % t(self.pitch_lfo_amp),  # Turn on EG0 and LFO for freq
+                 mod_source=lfo_osc)
+
 def dx7level_to_linear(dx7level):
     """Map the dx7 0..99 levels to linear amplitude."""
     return 2 ** ((dx7level - 99) / 8)

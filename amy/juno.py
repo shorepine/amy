@@ -314,18 +314,18 @@ class JunoPatch:
     Send amy.send(osc=0, note=50, vel=1) afterwards."""
     #amy.reset()
     # base_osc is pulse/PWM
-    # base_osc + 1 is SAW
-    # base_osc + 2 is SUBOCTAVE
-    # base_osc + 3 is NOISE
-    # base_osc + 4 is LFO
+    # base_osc + 1 is LFO  (AMYboard standard)
+    # base_osc + 2 is SAW
+    # base_osc + 3 is SUBOCTAVE
+    # base_osc + 4 is NOISE
     #   env0 is VCA
     #   env1 is VCF
     # These are the canonical oscs (to add to amy.send(synth=..)).
     self.pwm_osc = 0
-    self.saw_osc = 1
-    self.sub_osc = 2
-    self.nse_osc = 3
-    self.lfo_osc = 4
+    self.saw_osc = 2
+    self.sub_osc = 3
+    self.nse_osc = 4
+    self.lfo_osc = 1
     self.voice_oscs = [
       self.pwm_osc, self.saw_osc, self.sub_osc, self.nse_osc
     ]
