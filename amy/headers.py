@@ -404,9 +404,16 @@ def make_piano_patch():
 
 def make_amyboard_patch():
     import amy
-    # sure would be nice to have this in code instead, dan
-    patch_string = 'v0w1L2a,,1.0,1,0f130.81,1,,,,0,1m0A30,1,1355,0.354,232,0Zv0c1G4F126.54,0.677,,,5.024,0R0.93B30,1,1355,0.354,232,0Zv1w2L2a,,1.0,1,0f130.81,1,,,,0,1m0A30,1,1355,0.354,232,0Zv2w4a1,0,0,1f4.0,0,0,0,0,0,0A0,1.0,10000,0Zx0,0,0k0,,0.5,0.5Z'
-    return 3, patch_string # 3 oscs
+    lfo_osc = 1
+    osc_a = 0
+    osc_b = 2
+    message = amy.message(osc=osc_a, wave=amy.PULSE, mod_source=lfo_osc, amp={'vel': 1.0, 'eg0': 1, 'eg1': 0}, freq={'const': 130.81}, portamento=0, bp0='30,1,1355,0.354,232,0')
+    message += amy.message(osc=osc_a, chained_osc=osc_b, filter_type=amy.FILTER_LPF24, filter_freq={'const': 126.54, 'note': 0.677, 'eg1': 5.024},
+                           resonance=0.93, bp1='30,1,1355,0,3354,232,0')
+    message += amy.message(osc=osc_b, wave=amy.SAW_DOWN, mod_source=lfo_osc, amp={'vel': 1.0, 'eg0': 1, 'eg1': 0}, freq={'const': 130.81}, portamento=0, bp0='30,1,1355,0.354,232,0')
+    message += amy.message(osc=lfo_osc, wave=amy.TRIANGLE, amp={'vel': 0}, freq={'const': 4.0, 'note': 0, 'bend': 0}, bp0='0,1.0,10000,0')
+    message += amy.message(eq=[0, 0, 0], chorus='0,,0.5,0.5')
+    return 3, message # 3 oscs
 
 def make_patches(filename):
     def nothing(message):
@@ -433,7 +440,7 @@ def make_patches(filename):
             p = fm.AMYPatch.from_dx7(fm.DX7Patch.from_patch_number(i))
             p.send_to_AMY(reset=False)
             f.write("\t/* %d: DX7 %s */ \"%s\",\n" % (i+128, p.name, amy.retrieve_patch()))  
-            num_oscs.append(9)
+            num_oscs.append(8)
 
         # do piano
         amy.log_patch()
