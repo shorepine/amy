@@ -265,15 +265,19 @@ class AMYPatch:
 
         #print("not used: lfo delay %d " % self.lfo_delay)
 
-        ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
+        #ampbp = "0,1,%d,%f" % (last_release_time, last_release_value)
         #print("osc 0 (main)  algo %d feedback %f pitchenv %s ampenv %s" % (
         #    self.algo, self.feedback, pitchbp, ampbp))
         amy.send(osc=0, wave=amy.ALGO, algorithm=self.algo, feedback=t(self.feedback),
                    algo_source="1,2,3,4,5,6",
-                   bp0=ampbp,
-                   bp1=pitchbp,
-                   freq="0,1,0,0,1,1", mod_source=8)
-
+                   #bp0=ampbp,
+                   #bp1=pitchbp,
+                   #freq="0,1,0,0,1,1",
+                   bp0=pitchbp,
+                   # bp1 is now ununsed.
+                   amp="1,0,1,0,0,0",  # Turn off EG0 for amp
+                   freq="0,1,0,1,0,1",  # Turn on EG0 for freq
+                   mod_source=8)
 def dx7level_to_linear(dx7level):
     """Map the dx7 0..99 levels to linear amplitude."""
     return 2 ** ((dx7level - 99) / 8)
