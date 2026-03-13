@@ -276,8 +276,9 @@ class TestAlgo(AmyTest):
 class TestAlgo2(AmyTest):
 
   def run(self):
+    amy.send(time=0, volume=0.5)  # To counteract vel=2 without rewriting ref.
     amy.send(time=0, voices="0", patch=128+24)
-    amy.send(time=100, voices="0", note=58, vel=1)
+    amy.send(time=100, voices="0", note=58, vel=2)
     amy.send(time=500, voices="0", vel=0)
 
 
