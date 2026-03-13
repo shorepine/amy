@@ -53,7 +53,7 @@ func _ready():
     amy.send({"osc": 0, "vel": 0})
 
     # Use a patch (preset instrument)
-    amy.send({"osc": 2, "patch": 1, "note": 48, "vel": 0.8})
+    amy.send({"synth": 1, "patch": 1, "note": 48, "vel": 0.8})
 
     # Or use wire protocol directly
     amy.send_raw("v3w0f880l0.5")
