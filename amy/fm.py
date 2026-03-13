@@ -273,9 +273,10 @@ class AMYPatch:
                    #bp0=ampbp,
                    #bp1=pitchbp,
                    #freq="0,1,0,0,1,1",
+                   bp0=pitchbp,
+                   # bp1 is now ununsed.
                    amp="1,0,1,0,0,0",  # Turn off EG0 for amp
                    freq="0,1,0,1,0,1",  # Turn on EG0 for freq
-                   bp0=pitchbp,
                    mod_source=8)
 def dx7level_to_linear(dx7level):
     """Map the dx7 0..99 levels to linear amplitude."""
