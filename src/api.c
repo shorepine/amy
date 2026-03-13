@@ -348,8 +348,10 @@ void amy_bleep_synth(uint32_t start) {
     amy_add_event(&e);
 }
 
+#ifndef AMY_NO_MINIAUDIO
 extern void miniaudio_start();
 extern void miniaudio_stop();
+#endif
 
 void amy_start(amy_config_t c) {
     global_init(c);
@@ -365,7 +367,7 @@ void amy_start(amy_config_t c) {
         else
             amy_bleep(0);  // bleep using raw oscs.
     }
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(__EMSCRIPTEN__)
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(__EMSCRIPTEN__) && !defined(AMY_NO_MINIAUDIO)
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_start();
 #endif
@@ -375,7 +377,7 @@ void amy_start(amy_config_t c) {
 }
 
 void amy_stop() {
-#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO)
+#if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(AMY_NO_MINIAUDIO)
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_stop();
 #endif
