@@ -505,7 +505,7 @@ void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *s
 #define EVENT_FROM_OSC_ARRAY_T(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
     for (int i = 0; i < NUM_ELS; ++i) {                                \
         if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i])  \
-            event->EVENT_FIELD[i] = lroundf(((float)synth[osc]->SYNTH_FIELD[i]) / 44.1f); \
+            event->EVENT_FIELD[i] = lroundf(((float)synth[osc]->SYNTH_FIELD[i]) / (AMY_SAMPLE_RATE / 1000.0f)); \
     }
 
 #define EVENT_FROM_OSC_ARRAY_FREQ(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)      \
