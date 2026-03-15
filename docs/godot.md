@@ -126,9 +126,35 @@ AMY works on web exports. The native GDExtension isn't used on web — instead, 
    - Set **Custom HTML Shell** to `res://export/custom_shell.html`
    - Set **Exclude Filter** to `addons/amy/bin/*,addons/amy/src/*,addons/amy/amy_src/*,addons/amy/web/*,addons/amy/SConstruct,addons/amy/install.gd,addons/amy/amy.gdextension` (exclude native libraries and build files, but keep `amy.gd`)
 
-3. **Export as usual** — the HTML shell includes AMY's WASM automatically.
+3. **Export to a separate folder** (e.g. `dist/` inside your project):
+   - Click **Export Project** and save the `.html` file into a new folder (e.g. `dist/YourGame.html`)
+   - Godot will place all its export files there automatically
 
-4. **Serve with a web server** (e.g. `python3 -m http.server`). The included `enable-threads.js` service worker handles the required COOP/COEP headers for AudioWorklet support. The first page load may auto-reload once.
+4. **Copy AMY's web audio files** into the export folder:
+   ```bash
+   cp -r web_audio/ dist/web_audio/
+   cp enable-threads.js dist/
+   ```
+
+5. **Deploy** — upload the contents of `dist/` to your web server. The folder should contain:
+   ```
+   YourGame.html                       # main page
+   YourGame.js                         # Godot engine
+   YourGame.wasm                       # Godot WASM binary
+   YourGame.pck                        # packed game assets
+   YourGame.audio.worklet.js           # Godot audio worklet
+   YourGame.audio.position.worklet.js  # Godot audio position worklet
+   enable-threads.js                   # COOP/COEP service worker
+   web_audio/                          # AMY audio engine
+     amy.js
+     amy.wasm
+     amy.aw.js
+     amy.ww.js
+     godot_amy_bridge.js
+     enable-threads.js
+   ```
+
+6. **Serve with a web server** (e.g. `python3 -m http.server`). The included `enable-threads.js` service worker handles the required COOP/COEP headers for AudioWorklet support. The first page load may auto-reload once.
 
 ## How It Works
 
