@@ -409,7 +409,7 @@ def make_amyboard_patch():
     osc_b = 2
     message = amy.message(osc=osc_a, wave=amy.PULSE, mod_source=lfo_osc, amp={'vel': 1.0, 'eg0': 1, 'eg1': 0}, freq={'const': 130.81}, portamento=0, bp0='30,1,1355,0.354,232,0')
     message += amy.message(osc=osc_a, chained_osc=osc_b, filter_type=amy.FILTER_LPF24, filter_freq={'const': 126.54, 'note': 0.677, 'eg1': 5.024},
-                           resonance=0.93, bp1='30,1,1355,0,3354,232,0')
+                           resonance=0.93, bp1='30,1,1355,0.354,232,0')
     message += amy.message(osc=osc_b, wave=amy.SAW_DOWN, mod_source=lfo_osc, amp={'vel': 1.0, 'eg0': 1, 'eg1': 0}, freq={'const': 130.81}, portamento=0, bp0='30,1,1355,0.354,232,0')
     message += amy.message(osc=lfo_osc, wave=amy.TRIANGLE, amp={'vel': 0}, freq={'const': 4.0, 'note': 0, 'bend': 0}, bp0='0,1.0,10000,0')
     message += amy.message(eq=[0, 0, 0], chorus='0,,0.5,0.5')
