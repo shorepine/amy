@@ -184,7 +184,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     if (last_set >= 0) { \
         sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");       \
         s += strlen(s);  \
-        for (int i = 0; i < last_set; ++i) { \
+        for (int i = 0; i <= last_set; ++i) { \
             if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->FIELD[i])) { \
                 sprintf(s, "%" PRId32, (int32_t)e->FIELD[i]); \
