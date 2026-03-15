@@ -1007,7 +1007,7 @@ cat > "${ADDON_DIR}/install.gd" << 'INSTALLEOF'
 extends EditorScript
 ## AMY Synthesizer Addon - Web Export Setup
 ##
-## Run this script once (via Script > Run) to copy web export files
+## Run this script once (via File > Run) to copy web export files
 ## to the correct locations in your project.
 ##
 ## It copies:
@@ -1052,7 +1052,7 @@ func _run() -> void:
 	print("")
 	print("Next steps:")
 	print("  1. In Export dialog, set Custom HTML Shell to: res://export/custom_shell.html")
-	print("  2. Set Exclude Filter to: addons/amy/*")
+	print("  2. Set Exclude Filter to: addons/amy/bin/*,addons/amy/src/*,addons/amy/amy_src/*,addons/amy/web/*,addons/amy/SConstruct,addons/amy/install.gd,addons/amy/amy.gdextension")
 	print("  3. Export for Web as usual!")
 	print("")
 

@@ -220,11 +220,13 @@ def generate_js(kw_map_list, coef_fields, constants=None):
     // Constants from amy/constants.py (mirrors amy.SINE, amy.FILTER_LPF, etc.)
     var AMY = %CONSTANTS%;
 
-    window.amy_message = amy_message;
-    window.amy_send = amy_send;
-    window.AMY = AMY;
-    window.AMY_KW_MAP = AMY_KW_MAP;
-    window.AMY_COEF_FIELDS = AMY_COEF_FIELDS;
+    if (typeof globalThis !== "undefined") {
+      globalThis.amy_message = amy_message;
+      globalThis.amy_send = amy_send;
+      globalThis.AMY = AMY;
+      globalThis.AMY_KW_MAP = AMY_KW_MAP;
+      globalThis.AMY_COEF_FIELDS = AMY_COEF_FIELDS;
+    }
 
     })();
     """)

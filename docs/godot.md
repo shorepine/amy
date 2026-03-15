@@ -118,13 +118,13 @@ AMY works on web exports. The native GDExtension isn't used on web — instead, 
 
 1. **Run the install script** in the Godot editor:
    - Open `addons/amy/install.gd` in the Script Editor
-   - Run it via **Script > Run** (or `Ctrl/Cmd+Shift+X`)
+   - Run it via **File > Run** (or `Ctrl/Cmd+Shift+X`)
    - This copies web audio files to the right locations
 
 2. **Configure the web export preset**:
    - Open **Project > Export > Web**
    - Set **Custom HTML Shell** to `res://export/custom_shell.html`
-   - Set **Exclude Filter** to `addons/amy/*` (the native library isn't needed on web)
+   - Set **Exclude Filter** to `addons/amy/bin/*,addons/amy/src/*,addons/amy/amy_src/*,addons/amy/web/*,addons/amy/SConstruct,addons/amy/install.gd,addons/amy/amy.gdextension` (exclude native libraries and build files, but keep `amy.gd`)
 
 3. **Export as usual** — the HTML shell includes AMY's WASM automatically.
 
