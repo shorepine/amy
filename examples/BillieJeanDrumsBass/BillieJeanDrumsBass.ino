@@ -9,12 +9,16 @@ void setup() {
   // Install the default_synths on synths (MIDI chans) 1, 2, and 10 (this is the default).
   amy_config.features.default_synths = 1;
 
+  // If running an AMYboard, we set these parameters for you automatically. 
+  // For your own boards, set the pins and features you want.
+  #ifndef AMYBOARD_ARDUINO
   amy_config.audio = AMY_AUDIO_IS_I2S;
   // Pins for i2s board
   amy_config.i2s_bclk = 8;
   amy_config.i2s_lrc = 9;
   amy_config.i2s_dout = 10;
-
+  #endif
+  
   amy_start(amy_config);
 
   // Set up synth 2 as monophonic bass
