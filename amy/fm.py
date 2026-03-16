@@ -197,12 +197,30 @@ class AMYPatch:
         result.feedback = 0.00125 * (2 ** dx7_patch.feedback)
         result.lfo_freq = lfo_speed_to_hz(dx7_patch.lfospeed)
         result.lfo_delay = dx7_patch.lfodelay
-        result.lfo_pitchmoddepth = dx7_patch.lfopitchmoddepth
+        #result.lfo_pitchmoddepth = dx7_patch.lfopitchmoddepth
         result.lfo_ampmoddepth = dx7_patch.lfoampmoddepth
         result.lfo_waveform = lfo_wave(dx7_patch.lfowaveform)
         result.amp_lfo_amp = dx7level_to_linear(result.lfo_ampmoddepth)
-        result.pitch_lfo_amp = dx7level_to_linear(result.lfo_pitchmoddepth)
-
+        # With pitchmodsens at max (7), and PMD at max (99), the pitch mod is +/- 1 octave (24 semis range)
+        # PMS 7 / PMD 50 is 12 semis range
+        # PMS 7 / PMD 25 is 6 semis
+        # PMS 7 / PMD 12 is 2 semis
+        # PMS 7 / PMD 6 is 1 semi  .. really does look linear.
+        # PMS 6 / PMD 99 is 14 semis range
+        # PMS 5 / PMD 99 is ~8.5 semis
+        # PMS 4 / PMD 99 is ~5.5 semis range
+        # PMS 3 / PMD 99 is ~3.5
+        # PMS 2 / PMD 99 is ~2 semi
+        # PMS 1 / PMD 99 is ~1.5 semi
+        # PMS 0 is no semi
+        # Finally, matching K128 by ear, PMS 3/PDM 05 should give pitch_lfo_amp about 0.008.
+        # So total range is about 1.7 ^ (PMS - 1) * (PMD / 99) semis
+        # So scaling from +/-1 LFO to octaves is pow(1.7, (PMS - 1)) * (PMD / 99) / 12
+        # 0.6 is a fudge factor.  Seems way too large for small values of PMD, so maybe PMD is exp-lin or smt
+        result.pitch_lfo_amp = (
+            0 if dx7_patch.pitchmodsens == 0
+            else 0.6 * (1.7 ** (dx7_patch.pitchmodsens - 1)) * dx7_patch.lfopitchmoddepth / 1188.0
+        )
         result.name = dx7_patch.name
         return result
     
