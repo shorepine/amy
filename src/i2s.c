@@ -551,7 +551,7 @@ void amy_platform_deinit() {
 }
 
 void amy_update_tasks() {
-    if(amy_config.global.midi & AMY_MIDI_IS_UART) {
+    if(amy_global.config.midi & AMY_MIDI_IS_UART) {
         // do midi in here
         uint8_t bytes[1];
         int t;
@@ -570,7 +570,7 @@ int16_t *amy_render_audio() {
 }
 
 size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
-    return teensy_i2s_send(buffer, nbytes);
+    return teensy_i2s_write(buffer, nbytes);
 }
 
 #else
