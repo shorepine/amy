@@ -9,9 +9,11 @@ AudioOutputPT8211           i2s1;
 //AudioOutputI2S unused;
 AudioPlayQueue           queue_l;
 AudioPlayQueue           queue_r;
-AudioOutputUSB           usb_out;    
+#if defined(USB_AUDIO) || defined(USB_MIDI_AUDIO_SERIAL) || defined(USB_MIDI16_AUDIO_SERIAL)
+AudioOutputUSB           usb_out;
 AudioConnection          patchCord1(queue_r, 0, usb_out, 1);
 AudioConnection          patchCord2(queue_l, 0, usb_out, 0);
+#endif
 AudioConnection          patchCord3(queue_r, 0, i2s1, 1);
 AudioConnection          patchCord4(queue_l, 0, i2s1, 0);
 
