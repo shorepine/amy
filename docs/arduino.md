@@ -72,6 +72,10 @@ Here's an example of a PCM1808 and PCM5101 working together to provide audio in 
 
 ## Per-board notes
 
+### AMYboard
+
+Our built-for-AMY board [AMYboard](https://amyboard.com) should just work out of the box. You can find AMYboard in the Boards list of the espressif arduino-esp32 package. See the specific [AMYboard Arduino details](https://github.com/shorepine/tulipcc/blob/main/docs/amyboard/arduino.md) for more information. 
+
 ### ESP32, ESP32-S3, ESP32-P4
 
 Tested: Arduino IDE 2.3.6 (mac) + arduino-esp32 3.2.0
