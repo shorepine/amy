@@ -61,8 +61,9 @@ class AmyTest:
       message += ' / Unable to read ' + ref_file
       rms_n = 0
 
-    # For now, any value above -100.0 dB counts as a failed test
-    test_passed = (rms_n <= -100.0)
+    # For now, any value above this threshold counts as a failed test
+    threshold = float(os.environ.get('AMY_TEST_THRESHOLD_DB', '-100.0'))
+    test_passed = (rms_n <= threshold)
     return test_passed, message
 
 
@@ -1139,6 +1140,7 @@ def main(argv):
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
     print('\n'.join(errors))
+    sys.exit(1)
   else:
     print(len(oks), "tests pass")
 
