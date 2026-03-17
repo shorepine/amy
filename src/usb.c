@@ -3,7 +3,7 @@
 
 #include "amy.h"
 
-#if defined AMY_MCU
+#if defined(AMY_MCU) && (!defined(ARDUINO) || defined(AMYBOARD_ARDUINO))
 
 #define CONFIG_TOTAL_LEN_MIDI  (TUD_CONFIG_DESC_LEN + TUD_MIDI_DESC_LEN + TUD_CDC_DESC_LEN)
 
