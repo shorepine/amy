@@ -4,7 +4,7 @@ AMY is on the Arduino Libraries repository. Simply search for "AMY" in the Libra
 
 <img src="https://github.com/shorepine/amy/raw/main/docs/arduino1.png" width="400"/>
 
-We recommend always using the latest released version (now `1.1.4`) in the Arduino Library Manager. 
+We recommend always using the latest released version in the Arduino Library Manager. 
 
 However, if you are directed to a bleeding edge release of AMY, you can simply copy this repository to your `Arduino/libraries` folder as `Arduino/libraries/amy`. (Make sure you delete whatever you already had in `libraries/amy`.)
 
