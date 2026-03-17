@@ -1,0 +1,47 @@
+name: Arduino CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "ESP32-S3"
+            fqbn: "esp32:esp32:esp32s3"
+            platforms: |
+              - name: esp32:esp32
+                source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          - name: "RP2040 (Pico)"
+            fqbn: "rp2040:rp2040:rpipico"
+            platforms: |
+              - name: rp2040:rp2040
+                source-url: https://github.com/earlephilhower/arduino-pico/releases/download/4.5.3/package_rp2040_index.json
+          - name: "RP2350 (Pico 2)"
+            fqbn: "rp2040:rp2040:rpipico2"
+            platforms: |
+              - name: rp2040:rp2040
+                source-url: https://github.com/earlephilhower/arduino-pico/releases/download/4.5.3/package_rp2040_index.json
+          - name: "Teensy 4.1"
+            fqbn: "teensy:avr:teensy41"
+            platforms: |
+              - name: teensy:avr
+                source-url: https://www.pjrc.com/teensy/package_teensy_index.json
+
+    name: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/compile-sketches@v1
+        with:
+          fqbn: ${{ matrix.fqbn }}
+          platforms: ${{ matrix.platforms }}
+          sketch-paths: |
+            - examples/BillieJeanDrums
+          enable-deltas-report: false
