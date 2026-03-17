@@ -280,7 +280,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 b = table[base_index];
                 c = (next_index < sample_length) ? table[next_index] : b;
             }
-            SAMPLE sample = L2S(b) + MUL0_SS(L2S(c - b), frac);
+            SAMPLE sample = L2S(b) + MUL4_SS(L2S(c - b), frac);
             synth[osc]->phase = P_WRAPPED_SUM(synth[osc]->phase, step);
             base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
 
