@@ -1,7 +1,7 @@
 // usb.h
 // tinyusb stuff
 
-#ifdef AMY_MCU
+#if defined(AMY_MCU) && (!defined(ARDUINO) || defined(AMYBOARD_ARDUINO))
 
 #include "class/audio/audio.h"
 #include "class/midi/midi.h"
