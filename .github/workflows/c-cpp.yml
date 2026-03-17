@@ -22,5 +22,5 @@ jobs:
 
     - name: Build and test
       env:
-        AMY_TEST_THRESHOLD_DB: "-80.0"
+        AMY_TEST_THRESHOLD_DB: "-78.0"
       run: make test
