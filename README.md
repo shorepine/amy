@@ -1,12 +1,24 @@
 # AMY - A high-performance fixed-point Music synthesizer librarY for microcontrollers
 
-AMY is a fast, small and accurate music synthesizer library written in C with Python and Arduino bindings that deals with combinations of many oscillators very well. It can easily be embedded into almost any program, architecture or microcontroller. We've run AMY on [the web](https://shorepine.github.io/amy/), Mac, Linux, ESP32, ESP32S3 and ESP32P4, Teensy 3.6, Teensy 4.1, the Raspberry Pi, the Playdate, Pi Pico RP2040, the Pi Pico 2 RP2350, iOS devices, the Electro-Smith Daisy (ARM Cortex M7), and [Godot](docs/godot.md), and more to come. is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many oscillators as you want. 
+AMY is a fast and small music synthesizer library written in C with Python, Javascript, GDScript and Arduino bindings. It can easily be embedded into almost any program, architecture or microcontroller. 
 
-It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a [very good synthesized piano](https://shorepine.github.io/amy/piano.html), a sampler (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. 
+It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a [very good synthesized piano](https://shorepine.github.io/amy/piano.html), a sampler or wavetable synth (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. AMY supports MIDI internally and can manage synthesizer note messages for you, including voice stealing and assigning controller changes. 
 
-AMY now supports MIDI internally and can manage synthesizer note messages for you, including voice stealing and controller changes. 
+We've run AMY on:
+ * [the web](https://shorepine.github.io/amy/)
+ * Mac and Linux, and small Linux devices like the Raspberry Pi
+ * ESP32, ESP32S3 and ESP32P4
+ * Teensy 3.6, Teensy 4.1
+ * Playdate
+ * Pi Pico RP2040, the Pi Pico 2 RP2350
+ * iOS devices
+ * Electro-Smith Daisy (ARM Cortex M7)
+ * [Godot](docs/godot.md)
+ * And certainly much more
 
-AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/shorepine/alles), as well as the [Tulip Creative Computer](https://github.com/shorepine/tulipcc). Let us know if you use AMY for your own projects and we'll add it here!
+AMY is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many oscillators as you want. 
+
+AMY powers the multi-speaker mesh synthesizer [Alles](https://github.com/shorepine/alles), as well as the [Tulip Creative Computer](https:/tulip.computer). Let us know if you use AMY for your own projects and we'll add it here!
 
 AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Brian Whitman](https://notes.variogram.com), and would love your contributions.
 
@@ -19,7 +31,6 @@ AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Bria
  * [**AMY Synthesizer Details**](docs/synth.md)
  * [**AMY's MIDI specification**](docs/midi.md)
  * [**AMY in Arduino Getting Started**](docs/arduino.md)
- * [**AMY in Godot**](docs/godot.md)
  * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
 AMY supports
