@@ -554,6 +554,9 @@ extern void teensy_start_midi();
 void run_midi() {
     if(amy_global.config.midi & AMY_MIDI_IS_UART) teensy_start_midi();
 }
+
+void stop_midi() {
+}
 #endif
 
 
