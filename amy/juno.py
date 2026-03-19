@@ -7,6 +7,8 @@ import json
 import math
 import time
 
+from . import constants
+
 try:
   math.exp2(1)
   def exp2(x):
@@ -206,8 +208,6 @@ class JunoPatch:
   dirty_params = set()
   # Flag to defer param updates.
   defer_param_updates = False
-  # Cache for sub-osc freq_coefs.
-  sub_freq = '440'
   # List of the 5 basic oscs that need cloning.
   oscs_to_clone = set()
   # Amy synth
@@ -296,7 +296,7 @@ class JunoPatch:
 
   def base_freq(self):
     # Only one of stop_{16,8,4} should be set.
-    base_freq = 261.63  # The mid note
+    base_freq = constants.ZERO_LOGFREQ_IN_HZ # 261.63  # The mid note
     if self.stop_16:
       base_freq /= 2
     elif self.stop_4:
@@ -391,10 +391,18 @@ class JunoPatch:
 
   def update_vcf(self):
     vcf_env_polarity = -1.0 if self.vcf_neg else 1.0
+    vcf_kbd_level = to_level(self.vcf_kbd)
+    vcf_freq_hz = to_filter_freq(self.vcf_freq)
+    # The Juno VCF kbd value is 0 for C4 (MIDI 60), but our scale has 0 at A4 (MIDI 69)
+    # So when the filter freq depends on kbd contribution, it will be wrong.
+    # We want log2(uncooked vcf_freq_hz) + vcf_kbd_level * (midi_note - 60) / 12
+    # to equal log2(cooked vcf_freq_hz) + vcf_kbd_level * (midi_note - 69) / 12
+    # So, cooked / uncooked) = exp2(vcf_kbd_level * 9 / 12)
+    vcf_freq_hz *= (2.0 ** (0.75 * vcf_kbd_level))
     self.amy_send(osc=self.pwm_osc, resonance=to_resonance(self.vcf_res),
                   filter_freq='%s,%s,,%s,,%s' % (
-                    ffmt(to_filter_freq(self.vcf_freq)),
-                    ffmt(to_level(self.vcf_kbd)),
+                    ffmt(vcf_freq_hz),
+                    ffmt(vcf_kbd_level),
                     ffmt(11 * vcf_env_polarity * to_level(self.vcf_env)),
                     ffmt(1.25 * to_level(self.vcf_lfo))))
 

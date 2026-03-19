@@ -415,7 +415,7 @@ float logfreq_of_freq(float freq) {
     // logfreq is defined as log_2(freq / 8.18 Hz)
     //if (freq==0) return ZERO_HZ_LOG_VAL;
     // Actually, special-case zero to mean middle C, for convenience.
-    if (freq==0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ == 261.63.
+    if (freq==0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ).
     return log2f(freq / ZERO_LOGFREQ_IN_HZ);
 }
 
@@ -1387,7 +1387,6 @@ void hold_and_modify(uint16_t osc) {
     }
     msynth[osc]->last_logfreq = msynth[osc]->logfreq;
     float filter_logfreq = combine_controls(ctrl_inputs, synth[osc]->filter_logfreq_coefs);
-    #define MIN_FILTER_LOGFREQ -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
     if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
     if (AMY_IS_SET(msynth[osc]->last_filter_logfreq)) {
         #define MAX_DELTA_FILTER_LOGFREQ_DOWN 2.0
