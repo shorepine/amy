@@ -110,7 +110,11 @@ build/amy_api.generated.js: scripts/gen_amy_js_api.py amy/__init__.py src/patche
 	mkdir -p build
 	$(PYTHON) scripts/gen_amy_js_api.py
 
-web: build/amy.js build/amy_api.generated.js
+build/patches.generated.js: scripts/gen_patches_js.py src/patches.h
+	mkdir -p build
+	$(PYTHON) scripts/gen_patches_js.py
+
+web: build/amy.js build/amy_api.generated.js build/patches.generated.js
 
 deploy-web: web
 	cat build/amy.js src/amy_connector.js build/amy_api.generated.js > docs/amy.js
