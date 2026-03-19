@@ -93,7 +93,7 @@ So you can do:
 >>> import amy; amy.live()  # Not needed on Tulip.
 >>> amy.send(patch=1024, reset=amy.RESET_PATCH)
 >>> amy.send(patch=1024, osc=1, wave=amy.SINE, freq=0.25, phase=0.5, amp=0.5)  # "Pitch sigh" modulator.
->>> amy.send(patch=1024, osc=0, wave=amy.SINE, freq='261.63,1,0,0,0,1', bp0='0,1,500,0,0,0', mod_source=1)  # decaying sine modulated by sigh.
+>>> amy.send(patch=1024, osc=0, wave=amy.SINE, freq='440,1,0,0,0,1', bp0='0,1,500,0,0,0', mod_source=1)  # decaying sine modulated by sigh.
 >>> amy.send(synth=0, num_voices=1, patch=1024)
 >>> amy.send(synth=0, vel=2, note=50)
 ```
@@ -126,9 +126,9 @@ Because entering lists of commas is error prone, you can also specify control co
 
 You can use the same EG to control several things at once.  For example, we could include `freq=',,,,0.333'`, which says to modify the note frequency from the same EG1 as is controlling the filter frequency, but scaled down by 1/3rd so the initial decay is over 1 octave, not 3.  Give it a go!
 
-The note frequency is scaled relative to a zero-point of middle C (MIDI note 60, 261.63 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='261.63,1'`.  Setting it to `freq='523.26,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='261.3,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=60` would still give middle C, `note=72` (C5) would make the oscillator run at F#4, and `note=84` (C6) would be required to get C5 from the oscillator.
+The note frequency is scaled relative to a zero-point of middle A (MIDI note 69, 440 Hz), so to make the oscillator faithfully track the `note` parameter to the note-on event, you would use something like `freq='440,1'`.  Setting it to `freq='880,1'` would make the oscillator always be one octave higher than the `note` MIDI number.  Setting `freq='440,0.5'` would make the oscillator track the `note` parameter at half an octave per unit, so while `note=69` would still give middle A, `note=81` (A5) would make the oscillator run at D#5, and `note=93` (A6) would be required to get A5 from the oscillator.
 
-The default set of ControlCoefficients for `freq` is `'261.63,1,0,0,0,0,1'`, i.e. a base of middle C, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 261.63 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 261.63, so `freq='0,1,0,0,0,0,1'` also yields the default behavior.  `amp` also has a set of defaults: `amp='0,0,1,1,0,0,0'`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it has not been set up).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, an offset of 1.0 is added to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around unity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
+The default set of ControlCoefficients for `freq` is `'440,1,0,0,0,0,1'`, i.e. a base of middle A, tracking the MIDI note, plus pitch bend (at unit-per-octave).  Because 440 is such an important value, as a special case, setting the first `freq` value to zero is magically rewritten as 440, so `freq='0,1,0,0,0,0,1'` also yields the default behavior.  `amp` also has a set of defaults: `amp='0,0,1,1,0,0,0'`, i.e. tracking note-on velocity plus modulation by EG0 (which just tracks the note-on status if it has not been set up).  `amp` is a little special because the individual components are *multiplied* together, instead of added together, for any control inputs with nonzero coefficients.  Finally, an offset of 1.0 is added to the coefficient-scaled LFO modulator and pitch bend inputs before multiplying them into the amplitude, to allow small variations around unity e.g. for tremolo.  These defaults are set up in [`src/amy.c:reset_osc()`](https://github.com/shorepine/amy/blob/b1ed189b01e6b908bc19f18a4e0a85761d739807/src/amy.c#L551).
 
 We also have LFOs, which are implemented as one oscillator modulating another (instead of sending its waveform to the output). You set up the low-frequency oscillator, then have it control a parameter of another audible oscillator. Let's make the classic 8-bit duty cycle pulse wave modulation, a favorite:
 
@@ -272,9 +272,9 @@ You can also explicitly control partials in "build-your-own partials" mode, acce
 num_partials = 8
 amy.send(osc=0, wave=amy.BYO_PARTIALS, num_partials=num_partials)
 for i in range(1, num_partials + 1):
-    # Set up each partial as the corresponding harmonic of 261.63
+    # Set up each partial as the corresponding harmonic of 440.0
     # with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N.
-    amy.send(osc=i, wave=amy.PARTIAL, freq=261.63 * i,
+    amy.send(osc=i, wave=amy.PARTIAL, freq=440.0 * i,
              bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
 amy.send(osc=0, note=60, vel=1)
 ```
