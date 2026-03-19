@@ -7,6 +7,8 @@ import json
 import math
 import time
 
+from . import constants
+
 try:
   math.exp2(1)
   def exp2(x):
@@ -296,7 +298,7 @@ class JunoPatch:
 
   def base_freq(self):
     # Only one of stop_{16,8,4} should be set.
-    base_freq = 261.63  # The mid note
+    base_freq = constants.ZERO_LOGFREQ_IN_HZ # 261.63  # The mid note
     if self.stop_16:
       base_freq /= 2
     elif self.stop_4:
