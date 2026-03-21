@@ -706,6 +706,20 @@ class TestVoiceStealDecay(AmyTest):
     amy.send(time=900, synth=0, vel=0)  # All notes off
 
 
+class TestVoiceStealClick(AmyTest):
+  """There are still clicks on voice stealing and it's not cool."""
+
+  def run(self):
+    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=1)
+    amy.send(time=0, synth=0, osc=0, wave=amy.SINE, bp0='0,0,100,1,200,0.5,200,0') #, phase=0)
+    # Send first chords
+    amy.send(time=100, synth=0, note=60, vel=10)
+    # Send second chords
+    amy.send(time=500, synth=0, note=60, vel=10)
+    # Notes off
+    amy.send(time=800, synth=0, vel=0)
+
+
 class TestMidiDrums(AmyTest):
   """Test MIDI drums on channel 10 via injection."""
 
@@ -1141,7 +1155,8 @@ def main(argv):
     #TestVoiceStealDecay().test()
     #TestRestartFileSample().test()
     #TestDiskSample().test()
-    print(TestFileTransfer().test()[1])
+    #print(TestFileTransfer().test()[1])
+    TestVoiceStealClick().test()
 
   if not quiet:
     amy.send(debug=0)

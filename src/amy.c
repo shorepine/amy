@@ -1409,7 +1409,7 @@ void hold_and_modify(uint16_t osc) {
         msynth[osc]->amp = new_amp;
     } else {
         // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
-        if (new_amp > 0) {
+        if (new_amp > msynth[osc]->last_amp) {   // was > 0
             msynth[osc]->last_amp = new_amp;
         }
         // Advance the envelopes to the beginning of the next frame.
