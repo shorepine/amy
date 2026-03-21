@@ -938,7 +938,7 @@ class TestParamsInPatchCmd(AmyTest):
 
   def run(self):
     # Is it possible to *modify* a patch in the same command we install it?
-    amy.send(time=0, synth=1, patch=0, num_voices=4, resonance=6)
+    amy.send(time=0, synth=1, patch=0, num_voices=4, resonance=4)
     amy.send(time=50, synth=1, note=48, vel=1)
     amy.send(time=150, synth=1, note=60, vel=1)
     amy.send(time=250, synth=1, note=63, vel=1)
