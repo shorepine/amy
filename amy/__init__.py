@@ -3,18 +3,22 @@ from .constants import *
 from . import examples
 import collections
 import time
+def _get_synth_commands_stub(synth):
+    return []
+
+_get_synth_commands = _get_synth_commands_stub
 try:
     import c_amy as _amy  # Import the C module
     live = _amy.live
     _get_synth_commands = _amy.get_synth_commands
-except ImportError:
+except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
     try:
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
-    except ImportError:
-        pass  # punt.
+    except (ImportError, AttributeError):
+        pass  # Not available (e.g. web build); _get_synth_commands returns []
 
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
