@@ -6,10 +6,15 @@ import time
 try:
     import c_amy as _amy  # Import the C module
     live = _amy.live
+    _get_synth_commands = _amy.get_synth_commands
 except ImportError:
-    # C module is not required, so pass
-    pass
-
+    # C module is not required? not available?
+    # I'm guessing this might mean we're on Micropython?
+    try:
+        import tulip
+        _get_synth_commands = tulip.amy_get_synth_commands
+    except ImportError:
+        pass  # punt.
 
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
@@ -511,7 +516,7 @@ def echo(level=None, delay_ms=None, max_delay_ms=None, feedback=None, filter_coe
 def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, time=None):
     if patch_num is not None and dest_synth is not None:
         raise ValueError("At most one of patch_num and dest_synth can be specified")
-    commands = _amy.get_synth_commands(synth)
+    commands = _get_synth_commands(synth)
 
     def len_digit_prefix(s):
         len = 0
