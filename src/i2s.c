@@ -17,10 +17,44 @@
 ///////////////////////////////////////////////////////////////
 // ESP32, S3, P4 (maybe others)
 
-
-TaskHandle_t amy_render_handle;
-TaskHandle_t amy_fill_buffer_handle;
-TaskHandle_t amy_update_handle = NULL;
+// A note on RTOS synchronization:
+// For maximumum flexibility, AMY offers two flags:
+//  - config.platform.multicore - whether to use a second core, if avaliable.
+//  - config.platform.multithread - whether to use RTOS multithreading, if avaliable.
+// (ESP32 is the only platform where we've tried RTOS, so it's the only context where multithread matters).
+// When using RTOS threads (tasks), synchronization is handled by xTaskNotifyGive(task_handle) / ulTaskNotifyTake():
+// A service task waits to be notified by calling ulTaskNotifyTake(); that call does not specify where that
+// notification comes from.  Another task calls xTaskNotifyGive() naming the particular task to be notified,
+// which then releases the ulTaskNotifyTake() in that task.
+// We use this mechanism as follows:
+//   * esp_render_task (the task that runs on the second core):
+//      - Waits for notification (from main fill_audio thread)
+//      - renders half the oscs
+//      - notifies either fill_buffer (multithread) or amy_update (single thread) when done.
+//      - loop
+//   * esp_fill_audio_buffer_task (launched as one parallel task):
+//      - if not using I2S, waits for notification (from amy_update task)
+//      - read I2S input (if used)
+//      - execute AMY command updates (deltas)
+//      - Notify esp_render_task
+//      - render the other half of oscs
+//      - Wait for notification (indicating that esp_render_task is done)
+//      - call amy_fill_buffer (to combine the rendered oscs into output samples)
+//      - Notify amy_update_handle that the new block is ready
+//      - If I2S enabled, write samples to I2S.
+//      - loop
+//   * ESP's amy_platform_init
+//      - if multicore, launch esp_render_task
+//      - if multithread, launch esp_fill_audio_buffer_task
+//      - if not I2S, Notify fill_buffer to get it started
+//   * ESP's amy_render_audio
+//      - If multithread, wait for Notification (from fill_audio_buffer)
+//      - If not I2S, Notify fill_buffer
+//      - If not multithread
+//        - If multicore, Notify amy_render_handle to get task on second core to render
+//          - wait for Notification indicating esp_render_task is done
+//        - else render all oscs
+//        - call amy_fill_buffer
 
 #include "driver/i2s_std.h"
 #ifdef AMYBOARD_ARDUINO
@@ -196,17 +230,43 @@ amy_err_t esp32_teardown_i2s(void) {
     return AMY_OK;
 }
 
+
+/////////////////////////////////////
+// ESP mulithread/multicore rendering
+
+TaskHandle_t amy_render_handle;
+TaskHandle_t amy_fill_buffer_handle;
+
+// Task to notify when amy_update is waiting for a completed buffer
+TaskHandle_t amy_update_handle = NULL;
+
+// Who esp_render_task tells that it is done.
+TaskHandle_t amy_render_task_done_handle = NULL;
+
 // Render the second core
 void esp_render_task( void * pvParameters) {
     while(1) {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_render_on_cores
         amy_render(0, AMY_OSCS/2, 1);
-        // Who we tell we're done depends on the running mode.
-        if (amy_global.config.platform.multithread) {
-            xTaskNotifyGive(amy_fill_buffer_handle);
-        }  else {
-            xTaskNotifyGive(amy_update_handle);
-        }
+        // Tell (someone) we're done.
+        xTaskNotifyGive(amy_render_task_done_handle);  // to esp_render_on_cores
+    }
+}
+
+void esp_render_on_cores() {
+    // Call amy_render on all the oscs, using multicore if available.
+    if (amy_global.config.platform.multicore) {
+        // Tell the esp_render_task to inform *us* when it's done.
+        amy_render_task_done_handle = xTaskGetCurrentTaskHandle();
+        // Tell the other core to start rendering.
+        xTaskNotifyGive(amy_render_handle);  // to esp_render_task
+        // Render me
+        amy_render(AMY_OSCS/2, AMY_OSCS, 0);
+        // Wait for the other core to finish
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_render_task
+    } else {
+        // We render everything on this core.
+        amy_render(0, AMY_OSCS, 0);
     }
 }
 
@@ -223,66 +283,64 @@ extern output_sample_type * amy_in_block;
 int16_t *volatile last_audio_buffer = NULL;
 // (see also amy_get_output_buffer, I should choose only one of these)
 
+void esp_read_i2s_input() {
+    // Read a block of i2s input.  Separated to isolate noise from different i2s formats.
+    size_t read = 0;
+#ifdef I2S_32BIT
+    i2s_channel_read(rx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int32_t), &read, portMAX_DELAY);
+    for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
+        amy_in_block[i] = (block32[i] >> 16);
+#else
+    i2s_channel_read(rx_handle, amy_in_block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type), &read, portMAX_DELAY);
+#endif
+    if(read != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
+        fprintf(stderr,"i2s input underrun: %d vs %d\n", read, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
+    }
+}
+
 // Make AMY's FABT run forever , as a FreeRTOS task 
 void esp_fill_audio_buffer_task() {
     while(1) {
-        // Wait for update sync.
-        if (!AMY_HAS_I2S) {
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        }
         AMY_PROFILE_START(AMY_ESP_FILL_BUFFER)
         if(AMY_HAS_I2S && AMY_HAS_AUDIO_IN) {
-            size_t read = 0;
-#ifdef I2S_32BIT
-            i2s_channel_read(rx_handle, block32, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int32_t), &read, portMAX_DELAY);
-            for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)
-                amy_in_block[i] = (block32[i] >> 16);
-#else
-	    i2s_channel_read(rx_handle, amy_in_block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type), &read, portMAX_DELAY);
-#endif
-	    if(read != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
-		fprintf(stderr,"i2s input underrun: %d vs %d\n", read, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
-	    }
+            esp_read_i2s_input();
 	}
         // Get ready to render
         amy_execute_deltas();
 
-        if (amy_global.config.platform.multicore) {
-            // Tell the other core to start rendering
-            xTaskNotifyGive(amy_render_handle);
-            // Render me
-            amy_render(AMY_OSCS/2, AMY_OSCS, 0);
-            // Wait for the other core to finish
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        } else {
-            // We render everything
-            amy_render(0, AMY_OSCS, 0);
-        }
-
+        // Render on whichever cores we have available.
+        esp_render_on_cores();
+        
         // Write to i2s
         output_sample_type *block = amy_fill_buffer();
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
         last_audio_buffer = block;
         
-// Notify amy_update() that a block is ready (so it can return from amy_render_audio).
-// TULIP & AMYBOARD (MicroPython) don't call amy_update(), so skip the notify.
-// AMYBOARD_ARDUINO needs it because Arduino sketches call amy_update() in loop().
-#if !defined(TULIP) && !defined(AMYBOARD)
-        xTaskNotifyGive(amy_update_handle);
-#endif
+        // Notify amy_update() that a block is ready (so it can return from amy_render_audio).
+        if (amy_update_handle)
+            xTaskNotifyGive(amy_update_handle);  // to amy_render_audio
 
         if (AMY_HAS_I2S) {
             amy_i2s_write((uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+        } else {
+            // Wait for update sync.
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from amy_render_audio:!AMY_HAS_I2S
         }
     }
 }
 
 // init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
 void amy_platform_init() {
+    // If we're running amy_update, this should be the task we need to return to.
+    // However, if we're not using amy_update (e.g., Tulip/AMYboard native), we don't
+    // want to do this - the un-handled xTaskNotifyGives cause Tulip to crash when it
+    // turns on WiFi.
+#ifdef ARDUINO
     amy_update_handle = xTaskGetCurrentTaskHandle();
-    // Start i2s
+#endif
     if (AMY_HAS_I2S) {
+        // Start i2s
         esp32_setup_i2s();
     }
     if (amy_global.config.platform.multicore) {
@@ -291,14 +349,11 @@ void amy_platform_init() {
         xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
     }
     if (amy_global.config.platform.multithread) {
-        // And the fill audio buffer thread, combines, does volume & filters
+        // Create the fill audio buffer thread, combines, does volume & filters
         xTaskCreatePinnedToCore(&esp_fill_audio_buffer_task, AMY_FILL_BUFFER_TASK_NAME, AMY_FILL_BUFFER_TASK_STACK_SIZE, NULL, AMY_FILL_BUFFER_TASK_PRIORITY, &amy_fill_buffer_handle, AMY_FILL_BUFFER_TASK_COREID);
         // Let amy_update know we have I2S covered.
         if (AMY_HAS_I2S) {
             amy_global.i2s_is_in_background = 1;
-        } else {
-            // Without I2S, FABT waits for a notify each loop.  Give it one to get started.
-            xTaskNotifyGive(amy_fill_buffer_handle);
         }
     }
 }
@@ -327,30 +382,19 @@ void amy_update_tasks() {
 }
 
 int16_t *amy_render_audio() {
+    // Called by api.amy_update() to render the audio.  Not used for non-Arduino.
     int16_t *buf = NULL;
     if (amy_global.config.platform.multithread) {
         // Wait for esp_fill_audio_buffer_task to indicate a buffer is ready.
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_fill_audio_buffer_task
         buf = last_audio_buffer;
         // Allow the FABT to generate another block
         if (!AMY_HAS_I2S) {
-            xTaskNotifyGive(amy_fill_buffer_handle);
+            xTaskNotifyGive(amy_fill_buffer_handle);  // to esp_fill_audio_buffer_task:!AMY_HAS_I2S
         }
     } else {
         // No multithread, we have to render here.
-        if (amy_global.config.platform.multicore) {
-            // Running multicore without multithread
-            // so we do in fact have a thread rendering on the other core.
-            // Tell the other core to start rendering.
-            xTaskNotifyGive(amy_render_handle);
-            // Render me
-            amy_render(AMY_OSCS/2, AMY_OSCS, 0);
-            // Wait for the other core to finish
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        } else {
-            // We render everything
-            amy_render(0, AMY_OSCS, 0);
-        }
+        esp_render_on_cores();
         buf = amy_fill_buffer();
     }
     return buf;
