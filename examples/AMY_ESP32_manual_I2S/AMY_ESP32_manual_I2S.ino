@@ -10,13 +10,20 @@
 
 // If we're not USE_AMY_FOR_I2S, should we install our I2S output function using config.write_samples_fn?
 // Otherwise, we'll just get a pointer to samples from amy_update() and pass them on ourselves.
-#define USE_WRITE_SAMPLES_FN
+// (Ignored if USE_AMY_FOR_I2S is defined).
+//#define USE_WRITE_SAMPLES_FN
 
 // Do we want a background task to do rendering?  It's slightly more efficient under RTOS
-#define USE_MULTITHREAD 1
+#define USE_MULTITHREAD
 
 // Do we want to split rendering between two cores?  This works with or without MULTITHREAD.
-#define USE_MULTICORE 1
+#define USE_MULTICORE
+
+// Here's how many simultaneous patch-1 voices I can get before dropouts on AMYBOARD:
+//  USE_MULTITHREAD, USE_MULTICORE    9
+//                   USE_MULTICORE    6
+//  USE_MULTITHREAD                   6
+//               (neither)            4
 
 // For convenience, we'll reuse AMY's ESP32 I2S setup and write functions.
 extern "C" {
@@ -74,34 +81,57 @@ void setup() {
   amy_config.features.startup_bleep = 1;
   amy_config.features.default_synths = 0;
 
-  // On ESP32/RTOS, multithread runs audio rendering on its own thread.
-  amy_config.platform.multithread = USE_MULTITHREAD;
-  // On ESP32/RTOS, multicore will run a second rendering thread on core 1 even if multithread = 0.
-  amy_config.platform.multicore = USE_MULTICORE;
+  // On RTOS, multithread runs audio rendering on its own thread.
+#ifdef USE_MULTITHREAD
+  amy_config.platform.multithread = 1;
+#else
+  amy_config.platform.multithread = 0;
+#endif
+  // On ESP32, multicore will run a second rendering thread on core 1 even if multithread = 0.
+#ifdef USE_MULTICORE
+  amy_config.platform.multicore = 1;
+#else
+  amy_config.platform.multicore = 0;
+#endif
 
 #ifdef USE_AMY_FOR_I2S
   amy_config.audio = AMY_AUDIO_IS_I2S;
+  #warning "Using AMY I2S"
 #else
   amy_config.audio = AMY_AUDIO_IS_NONE;
 #endif
   amy_config.features.audio_in = 0;
   // Pins for i2s board.
   // Because we're using AMY's setup_i2s, this also configures if !USE_AMY_FOR_I2S.
+#ifdef AMYBOARD_ARDUINO
+  // These are the actual pins used on AMYboard.
+  amy_config.i2s_mclk = 3;
+  amy_config.i2s_bclk = 8;
+  amy_config.i2s_lrc = 2;
+  amy_config.i2s_dout = 6;
+#else 
   amy_config.i2s_mclk = 7;
   amy_config.i2s_bclk = 8;
   amy_config.i2s_lrc = 9;
   amy_config.i2s_dout = 10;
+#endif
 
   // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
   amy_config.midi = AMY_MIDI_IS_UART;
   // Pins for UART MIDI
+#ifdef AMYBOARD_ARDUINO
+  amy_config.midi_out = 14;
+  amy_config.midi_in = 21;
+#else
   amy_config.midi_out = 4;
   amy_config.midi_in = 5;
+#endif
 
 #ifndef USE_AMY_FOR_I2S
   #ifdef USE_WRITE_SAMPLES_FN
   // amy_update() will automatically pass the new samples to this fn, if provided.
   amy_config.write_samples_fn = amy_i2s_write;
+  #warning "Using write_samples_fn"
   #endif
 #endif
 
@@ -129,6 +159,7 @@ void loop() {
 #ifndef USE_AMY_FOR_I2S
   #ifndef USE_WRITE_SAMPLES_FN
   amy_i2s_write((const uint8_t *)buf, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+  #warning "Sending I2S explicitly in loop()"
   #endif
 #endif
 
