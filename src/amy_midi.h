@@ -7,7 +7,13 @@
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
 #include "esp_task.h"
-#else
+#endif
+
+#ifdef __linux__
+#include <alsa/asoundlib.h>
+#endif
+
+#ifdef MACOS
 // virtualmidi Cocoa stubs
 #endif
 #define MIDI_SLOTS 4
@@ -49,6 +55,9 @@ void run_midi();
 void stop_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
+#endif
+#ifdef __linux__
+void *run_midi_linux(void *vargp);
 #endif
 
 void check_tusb_midi();
