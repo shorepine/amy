@@ -197,7 +197,7 @@ amy_err_t esp32_setup_i2s(void) {
             { 0x30, 0x04 },  // PLL sends 512fs as SCK
             { 0x31, 0x0A },  // XTI SCK as 512fs too
             { 0x60, 0x44 },  // DIT sends SPDIF from AUXIN1 through MPO0
-            { 0x61, 0x20 },  // DIT expects SCK at 512 fs
+            { 0x61, 0x20 },  // DIT SCK ratio = 512fs (must match PLL config in 0x30/0x31)
             { 0x78, 0x3D },  // MPO0 = TXOUT, MPO1 = VOUT
             { 0x6F, 0x40 },  // MPIO_A = CLKST / MPIO_B = AUXIN2 / MPIO_C = AUXIN1
         };
