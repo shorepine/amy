@@ -1244,7 +1244,7 @@ void play_delta(struct delta *d) {
 		    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; //esp_timer_get_time() / 1000;
 
 		    // if there was a filter active for this voice, reset it
-		    if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
+		    //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
 		    // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
 		    // But if a trigger_phase is set, use that.
 		    if (AMY_IS_SET(synth[osc]->trigger_phase))

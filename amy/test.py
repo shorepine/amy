@@ -711,7 +711,9 @@ class TestVoiceStealClick(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=1)
-    amy.send(time=0, synth=0, osc=0, wave=amy.SINE, bp0='0,0,100,1,200,0.5,200,0') #, phase=0)
+    amy.send(time=0, synth=0, osc=0, wave=amy.SINE, bp0='0,0,100,1,200,0.8,500,0')
+    # It's the filter being reset that's hurting us?
+    amy.send(time=0, synth=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='8000,0,0,0,0,0')
     # Send first chords
     amy.send(time=100, synth=0, note=60, vel=10)
     # Send second chords
