@@ -59,6 +59,40 @@ func _ready():
     amy.send_raw("v3w0f880l0.5")
 ```
 
+### 4. Configure AMY (optional)
+
+Set config properties on the `Amy` node **before** adding it to the tree:
+
+```gdscript
+var amy: Amy
+
+func _ready():
+    amy = Amy.new()
+    amy.startup_bleep = false
+    amy.reverb = false
+    amy.echo = false
+    amy.max_oscs = 64
+    amy.default_synths = true
+    add_child(amy)  # config is applied when AMY starts in _ready()
+```
+
+**Available config properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `chorus` | bool | `true` | Enable chorus effect |
+| `reverb` | bool | `true` | Enable reverb effect |
+| `echo` | bool | `true` | Enable echo/delay effect |
+| `default_synths` | bool | `false` | Load default GM synth patches on startup |
+| `partials` | bool | `true` | Enable partial synthesis |
+| `custom` | bool | `true` | Enable custom oscillator type |
+| `startup_bleep` | bool | `false` | Play a short bleep on startup |
+| `audio_in` | bool | `false` | Enable audio input |
+| `max_oscs` | int | `180` | Maximum number of oscillators |
+| `max_voices` | int | `64` | Maximum number of voices |
+| `max_synths` | int | `64` | Maximum number of synths |
+
+These properties are also visible in the Godot inspector when you use `Amy` as a scene node.
 
 ## Web Export
 
