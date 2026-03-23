@@ -57,9 +57,14 @@ amy_sources = [
 # Add AMY include path
 env.Append(CPPPATH=[amy_src_path])
 
-# AMY compile flags - suppress warnings from AMY's C code
-env.Append(CFLAGS=["-Wno-unused-parameter", "-Wno-sign-compare", "-Wno-missing-field-initializers"])
+# AMY compile flags
 env.Append(CCFLAGS=["-DAMY_WAVETABLE", "-DAMY_NO_MINIAUDIO"])
+
+# Suppress warnings from AMY's C code (GCC/Clang vs MSVC)
+if env.get("is_msvc", False) or env["CC"] == "cl":
+    env.Append(CFLAGS=["/wd4244", "/wd4267", "/wd4996", "/wd4100"])
+else:
+    env.Append(CFLAGS=["-Wno-unused-parameter", "-Wno-sign-compare", "-Wno-missing-field-initializers"])
 
 # On macOS, we need some frameworks for threading
 if sys.platform == "darwin":
