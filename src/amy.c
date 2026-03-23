@@ -1540,6 +1540,10 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
                     // .. but force it to start at zero phase next time.
                     synth[osc]->phase = 0;
+                    //reset_filter(osc);
+                    // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
+                    msynth[osc]->filter_logfreq = 0;
+                    msynth[osc]->resonance = 0.7f;
                 }
             }
         } else if (max_val == 0) {
