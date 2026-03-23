@@ -721,6 +721,25 @@ class TestVoiceStealClick(AmyTest):
     # Notes off
     amy.send(time=800, synth=0, vel=0)
 
+class TestOwBassClick(AmyTest):
+  """Hearing clicks on OwBass??."""
+
+  def run(self):
+    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=3)
+    # Ow Bass reproduced by hand on AMYboard Editor.
+    amy.send(time=10, synth=0, osc=0, wave=amy.PULSE, amp=',,0.551', freq=220, filter_freq='20,1,,,5.443', duty=0.697,
+             resonance=4.381, chained_osc=2, mod_source=1, filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0')
+    amy.send(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
+    amy.send(time=10, synth=0, osc=2, wave=amy.SAW_UP, amp=',,0.551', freq='110', mod_source=1, bp0='13,1,0,1,16,0')
+    amy.send(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')
+    # Rapid repeated notes.
+    amy.send(time=100, synth=0, note=48, vel=1)
+    amy.send(time=250, synth=0, note=48, vel=0)
+    amy.send(time=350, synth=0, note=48, vel=1)
+    amy.send(time=500, synth=0, note=48, vel=0)
+    amy.send(time=600, synth=0, note=48, vel=1)
+    amy.send(time=750, synth=0, note=48, vel=0)
+
 
 class TestMidiDrums(AmyTest):
   """Test MIDI drums on channel 10 via injection."""
@@ -1158,7 +1177,8 @@ def main(argv):
     #TestRestartFileSample().test()
     #TestDiskSample().test()
     #print(TestFileTransfer().test()[1])
-    TestVoiceStealClick().test()
+    #TestVoiceStealClick().test()
+    TestOwBassClick().test()
 
   if not quiet:
     amy.send(debug=0)
