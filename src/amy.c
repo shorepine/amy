@@ -676,8 +676,6 @@ void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynt
     AMY_UNSET(psynth->zero_amp_clock);
     AMY_UNSET(psynth->mod_value_clock);
     psynth->filter_type = FILTER_NONE;
-    psynth->hpf_state[0] = 0;
-    psynth->hpf_state[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
     psynth->algorithm = 0;

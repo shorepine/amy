@@ -561,8 +561,6 @@ struct synthinfo {
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // actual length of breakpoint_times/breakpoint values
   
-    // State variable for the dc-removal filter.
-    SAMPLE hpf_state[2];
     // Selected lookup table and size.
     const LUT *lut;
     // For ALGO feedback ops
