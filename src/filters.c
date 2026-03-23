@@ -773,7 +773,6 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     const int normbits = 0;  // defeat BFP
 #endif
     //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc]->last_filt_norm_bits, filtnormbits, normbits);
-    //block_norm(&synth[osc]->hpf_state[0], 2, normbits - synth[osc]->last_filt_norm_bits);
     if(synth[osc]->filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
         max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
@@ -790,7 +789,6 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     //dsps_biquad_f32_ansi_commuted(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay);
     //block_denorm(synth[osc]->filter_delay, 2 * FILT_NUM_DELAYS, normbits);
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
-    // hpf_buf(block, &synth[osc]->hpf_state[0]); *** NOW NORMBITS IS IN THE WRONG PLACE
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
     return max_val;
@@ -803,7 +801,6 @@ void reset_filter(uint16_t osc) {
     // the LPF *and* the dc-blocking HPF at the same time.
     for(int i = 0; i < 2 * FILT_NUM_DELAYS; ++i) synth[osc]->filter_delay[i] = 0;
     synth[osc]->last_filt_norm_bits = 0;
-    synth[osc]->hpf_state[0] = 0; synth[osc]->hpf_state[1] = 0;
 }
 
 
