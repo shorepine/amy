@@ -6,9 +6,15 @@ On native platforms, AMY runs as a C library via GDExtension and routes audio th
 
 ## Quick Start
 
-### 1. Build the addon
+### Option A: Pre-built addon (recommended)
 
-Clone AMY and [godot-cpp](https://github.com/godotengine/godot-cpp), then run the setup script:
+Download the latest `amy-godot-addon.zip` from the [Releases page](https://github.com/shorepine/amy/releases). Extract it into your Godot project root so you have `addons/amy/` in your project. That's it — no build tools needed.
+
+The pre-built addon includes native libraries for macOS, Linux, and Windows, plus web export support.
+
+### Option B: Build from source
+
+If you need to build from source (e.g. for a platform not included in the release, or to use the latest code):
 
 ```bash
 git clone https://github.com/shorepine/amy.git
