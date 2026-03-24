@@ -126,8 +126,8 @@ AMY works on web exports. The native GDExtension isn't used on web — instead, 
 
 4. **Copy AMY's web audio files** into the export folder:
    ```bash
-   cp -r web_audio/ dist/web_audio/
-   cp enable-threads.js dist/
+   cp -r addons/amy/web/ dist/web_audio/
+   cp addons/amy/web/enable-threads.js dist/
    ```
 
 5. **Deploy** — upload the contents of `dist/` to your web server. The folder should contain:
