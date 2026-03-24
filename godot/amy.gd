@@ -129,6 +129,11 @@ func _init_native() -> void:
 	_started = true
 
 func _init_web() -> void:
+	# Pass config to JS bridge before AMY starts
+	var ds := "true" if default_synths else "false"
+	var sb := "true" if startup_bleep else "false"
+	JavaScriptBridge.eval("godot_amy_configure(%s, %s)" % [ds, sb])
+
 	for i in range(100):
 		var ready: Variant = JavaScriptBridge.eval("godot_amy_is_ready()", true)
 		if ready:
