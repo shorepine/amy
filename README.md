@@ -6,7 +6,7 @@ It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthe
 
 We've run AMY on:
  * [the web](https://shorepine.github.io/amy/)
- * Mac and Linux, and small Linux devices like the Raspberry Pi
+ * Mac, Linux, and [Windows](windows/README.md), and small Linux devices like the Raspberry Pi
  * ESP32, ESP32S3 and ESP32P4
  * Teensy 3.6, Teensy 4.1
  * Playdate
@@ -166,6 +166,7 @@ It's good to understand what wire messages are but you don't need to construct t
  * [**AMY's MIDI specification**](docs/midi.md)
  * [**AMY in Arduino Getting Started**](docs/arduino.md)
  * [**AMY in Godot**](docs/godot.md)
+ * [**AMY on Windows**](windows/README.md)
  * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
  [![shore pine sound systems discord](https://raw.githubusercontent.com/shorepine/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)

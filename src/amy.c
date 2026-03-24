@@ -48,6 +48,17 @@ uint64_t profile_start_us = 0;
 int64_t amy_get_us() { return esp_timer_get_time(); }
 #elif defined PICO_ON_DEVICE
 int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+int64_t amy_get_us() {
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (int64_t)(count.QuadPart * 1000000LL / freq.QuadPart);
+}
 #else
 #include <sys/time.h>
 int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_sec*(uint64_t)1000000+tv.tv_usec; }
@@ -89,10 +100,21 @@ void amy_release_lock() {
 void amy_init_lock() {
 }
 
-#elif defined _POSIX_THREADS
-pthread_mutex_t amy_queue_lock; 
+#elif defined _WIN32
+CRITICAL_SECTION amy_queue_lock;
 void amy_grab_lock() {
-    pthread_mutex_lock(&amy_queue_lock); 
+    EnterCriticalSection(&amy_queue_lock);
+}
+void amy_release_lock() {
+    LeaveCriticalSection(&amy_queue_lock);
+}
+void amy_init_lock() {
+    InitializeCriticalSection(&amy_queue_lock);
+}
+#elif defined _POSIX_THREADS
+pthread_mutex_t amy_queue_lock;
+void amy_grab_lock() {
+    pthread_mutex_lock(&amy_queue_lock);
 }
 void amy_release_lock() {
     pthread_mutex_unlock(&amy_queue_lock);
