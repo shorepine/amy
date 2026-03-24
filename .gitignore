@@ -13,17 +13,12 @@ src/amy.egg-info/
 amy.egg-info/
 build/
 
-# Godot GDExtension build artifacts
-godot/bin/
-godot/.sconsign*
-godot/.scon*
 
 # Prerequisites
 *.d
 
 # Object files
 *.o
-*.os
 *.ko
 *.obj
 *.elf
