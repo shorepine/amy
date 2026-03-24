@@ -20,10 +20,6 @@ jobs:
             runner: ubuntu-22.04
             platform: linux
             arch: x86_64
-          - name: Windows
-            runner: windows-latest
-            platform: windows
-            arch: x86_64
 
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.name }}
@@ -86,7 +82,6 @@ jobs:
           # Copy compiled binaries from all platforms
           cp -r collected-bins/bin-macos/* addons/amy/bin/
           cp -r collected-bins/bin-linux/* addons/amy/bin/
-          cp -r collected-bins/bin-windows/* addons/amy/bin/
 
           # Copy GDExtension config and scripts
           cp godot/amy.gdextension addons/amy/
