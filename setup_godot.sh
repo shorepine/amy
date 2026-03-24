@@ -423,6 +423,8 @@ void midi_out(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
 void midi_local(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
 void run_midi(void) {}
 void stop_midi(void) {}
+void amy_send_midi_note_on(uint16_t osc) { (void)osc; }
+void amy_send_midi_note_off(uint16_t osc) { (void)osc; }
 void *run_midi_macos(void *vargp) { (void)vargp; return (void *)0; }
 void check_tusb_midi(void) {}
 void init_tusb_midi(void) {}
