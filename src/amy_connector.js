@@ -48,7 +48,14 @@ amyModule().then(async function(am) {
   amy_process_single_midi_byte = am.cwrap(
     'amy_process_single_midi_byte', null, ['number, number']
   );
-  amy_start_web();
+  // If Godot bridge is present, let it control startup with config.
+  // Otherwise start with defaults (standalone REPL mode).
+  if (typeof window !== 'undefined' && window._amy_godot_bridge) {
+    window._amy_godot_start_web = amy_start_web;
+    window._amy_godot_start_web_no_synths = amy_start_web_no_synths;
+  } else {
+    amy_start_web();
+  }
   amy_module = am;
 });
 
