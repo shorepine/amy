@@ -16,6 +16,8 @@ On **macOS**, you need to remove the quarantine flag from the downloaded binary:
 xattr -dr com.apple.quarantine addons/amy/bin/*
 ```
 
+If you don't do this, you'll see a Godot error like "Apple could not verify 'libamy.macos.template_debug.universal.dylib' is free of malware that may harm your Mac or compromise your privacy." This command tells macOS you've chosen to trust the software yourself.
+
 ### Option B: Build from source
 
 Clone AMY and [godot-cpp](https://github.com/godotengine/godot-cpp), then run the setup script:
