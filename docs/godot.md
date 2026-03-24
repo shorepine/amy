@@ -8,7 +8,7 @@ On native platforms, AMY runs as a C library via GDExtension and routes audio th
 
 ### Option A: Download pre-built addon (easiest)
 
-Download the latest `amy-godot-addon.zip` from [AMY Releases](https://github.com/shorepine/amy/releases) or from the [Actions artifacts](https://github.com/shorepine/amy/actions/workflows/godot-addon.yml). Unzip it into your Godot project root so you have `your_project/addons/amy/`.
+Download the latest `amy-godot-addon.zip` from [AMY Releases](https://github.com/shorepine/amy/releases). Unzip it into your Godot project root so you have `your_project/addons/amy/`.
 
 On **macOS**, you need to remove the quarantine flag from the downloaded binary:
 
