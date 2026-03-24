@@ -722,7 +722,7 @@ class TestVoiceStealClick(AmyTest):
     amy.send(time=800, synth=0, vel=0)
 
 class TestOwBassClick(AmyTest):
-  """Hearing clicks on OwBass??."""
+  """Hearing clicks on OwBass??.  See https://github.com/shorepine/amy/issues/629. """
 
   def run(self):
     amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=3)
@@ -1177,8 +1177,8 @@ def main(argv):
     #TestRestartFileSample().test()
     #TestDiskSample().test()
     #print(TestFileTransfer().test()[1])
-    #TestVoiceStealClick().test()
-    TestOwBassClick().test()
+    #print(TestVoiceStealClick().test()[1])
+    print(TestOwBassClick().test()[1])
 
   if not quiet:
     amy.send(debug=0)
