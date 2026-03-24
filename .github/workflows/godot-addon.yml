@@ -14,14 +14,29 @@ jobs:
         include:
           - name: macOS
             runner: macos-latest
+            platform: macos
+            arch: universal
           - name: Linux
             runner: ubuntu-22.04
+            platform: linux
+            arch: x86_64
+          - name: Windows
+            runner: windows-latest
+            platform: windows
+            arch: x86_64
 
     runs-on: ${{ matrix.runner }}
     name: Build ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install scons
+        run: pip install scons
 
       - name: Checkout godot-cpp
         uses: actions/checkout@v4
@@ -31,25 +46,25 @@ jobs:
           path: godot-cpp
           submodules: true
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      - name: Build debug
+        working-directory: godot
+        run: scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_debug -j4
+        env:
+          GODOT_CPP_PATH: ${{ github.workspace }}/godot-cpp
+          AMY_SRC_PATH: ${{ github.workspace }}/src
 
-      - name: Install scons
-        run: pip install scons
+      - name: Build release
+        working-directory: godot
+        run: scons platform=${{ matrix.platform }} arch=${{ matrix.arch }} target=template_release -j4
+        env:
+          GODOT_CPP_PATH: ${{ github.workspace }}/godot-cpp
+          AMY_SRC_PATH: ${{ github.workspace }}/src
 
-      - name: Build addon
-        run: |
-          mkdir -p /tmp/godot-project
-          touch /tmp/godot-project/project.godot
-          GODOT_CPP_PATH=${{ github.workspace }}/godot-cpp ./setup_godot.sh /tmp/godot-project
-
-      - name: Upload addon
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: amy-addon-${{ matrix.name }}
-          path: /tmp/godot-project/addons/amy/
-          retention-days: 1
+          name: bin-${{ matrix.platform }}
+          path: godot/bin/
 
   package:
     needs: build
@@ -59,29 +74,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download macOS addon
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: amy-addon-macOS
-          path: addons/amy-macos/
+          path: collected-bins/
 
-      - name: Download Linux addon
-        uses: actions/download-artifact@v4
-        with:
-          name: amy-addon-Linux
-          path: addons/amy-linux/
-
-      - name: Merge addons
+      - name: Assemble addon zip
         run: |
-          # Start with macOS as the base (has all the scripts, web files, etc)
-          mkdir -p addons/amy/
-          cp -r addons/amy-macos/* addons/amy/
+          mkdir -p addons/amy/bin
 
-          # Copy Linux binaries into the same bin/ directory
-          cp addons/amy-linux/bin/* addons/amy/bin/ 2>/dev/null || true
+          # Copy compiled binaries from all platforms
+          cp -r collected-bins/bin-macos/* addons/amy/bin/
+          cp -r collected-bins/bin-linux/* addons/amy/bin/
+          cp -r collected-bins/bin-windows/* addons/amy/bin/
+
+          # Copy GDExtension config and scripts
+          cp godot/amy.gdextension addons/amy/
+          cp godot/amy.gd addons/amy/
+          cp godot/install.gd addons/amy/
+
+          # Copy web export files
+          mkdir -p addons/amy/web
+          cp godot/web/godot_amy_bridge.js addons/amy/web/
+          cp godot/web/custom_shell.html addons/amy/web/
+          cp docs/amy.js addons/amy/web/
+          cp docs/amy.wasm addons/amy/web/
+          cp docs/amy.aw.js addons/amy/web/
+          cp docs/amy.ww.js addons/amy/web/
+          cp docs/enable-threads.js addons/amy/web/
+          cp docs/enable-threads.js addons/amy/web/enable-threads-root.js
 
           # Create the zip
-          zip -r amy-godot-addon.zip addons/amy/
+          zip -r amy-godot-addon.zip addons/
 
       - name: Upload addon zip
         uses: actions/upload-artifact@v4
@@ -93,9 +117,7 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    name: Attach to Release
-    permissions:
-      contents: write
+    name: Create Release
 
     steps:
       - name: Download addon zip
