@@ -62,7 +62,7 @@ env.Append(CCFLAGS=["-DAMY_WAVETABLE", "-DAMY_NO_MINIAUDIO"])
 # Suppress warnings from AMY's C code (GCC/Clang vs MSVC)
 is_msvc = env.get("is_msvc", False) or (env["platform"] == "windows" and not env.get("use_mingw", False))
 if is_msvc:
-    env.Append(CFLAGS=["/wd4244", "/wd4267", "/wd4996", "/wd4100"])
+    env.Append(CFLAGS=["/std:c11", "/wd4244", "/wd4267", "/wd4996", "/wd4100"])
 else:
     env.Append(CFLAGS=["-Wno-unused-parameter", "-Wno-sign-compare", "-Wno-missing-field-initializers"])
 
