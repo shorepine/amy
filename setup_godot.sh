@@ -468,7 +468,6 @@ amy_sources = [
     "instrument.c",
     "interp_partials.c",
     "log2_exp2.c",
-    "amy_midi.c",
     "midi_mappings.c",
     "oscillators.c",
     "parse.c",
