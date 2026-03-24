@@ -23,9 +23,7 @@ extern SAMPLE ** fbl;
 #include "miniaudio.h"
 
 #include <stdio.h>
-#ifndef _MSC_VER
 #include <unistd.h>
-#endif
 
 #define DEVICE_FORMAT       ma_format_s16
 
