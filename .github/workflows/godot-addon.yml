@@ -1,0 +1,107 @@
+name: Build Godot Addon
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-latest
+          - name: Linux
+            runner: ubuntu-22.04
+
+    runs-on: ${{ matrix.runner }}
+    name: Build ${{ matrix.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout godot-cpp
+        uses: actions/checkout@v4
+        with:
+          repository: godotengine/godot-cpp
+          ref: godot-4.4-stable
+          path: godot-cpp
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install scons
+        run: pip install scons
+
+      - name: Build addon
+        run: |
+          mkdir -p /tmp/godot-project
+          touch /tmp/godot-project/project.godot
+          GODOT_CPP_PATH=${{ github.workspace }}/godot-cpp ./setup_godot.sh /tmp/godot-project
+
+      - name: Upload addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-addon-${{ matrix.name }}
+          path: /tmp/godot-project/addons/amy/
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Package Addon
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS addon
+        uses: actions/download-artifact@v4
+        with:
+          name: amy-addon-macOS
+          path: addons/amy-macos/
+
+      - name: Download Linux addon
+        uses: actions/download-artifact@v4
+        with:
+          name: amy-addon-Linux
+          path: addons/amy-linux/
+
+      - name: Merge addons
+        run: |
+          # Start with macOS as the base (has all the scripts, web files, etc)
+          mkdir -p addons/amy/
+          cp -r addons/amy-macos/* addons/amy/
+
+          # Copy Linux binaries into the same bin/ directory
+          cp addons/amy-linux/bin/* addons/amy/bin/ 2>/dev/null || true
+
+          # Create the zip
+          zip -r amy-godot-addon.zip addons/amy/
+
+      - name: Upload addon zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-godot-addon
+          path: amy-godot-addon.zip
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    name: Create Release
+
+    steps:
+      - name: Download addon zip
+        uses: actions/download-artifact@v4
+        with:
+          name: amy-godot-addon
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: amy-godot-addon.zip
+          generate_release_notes: true
