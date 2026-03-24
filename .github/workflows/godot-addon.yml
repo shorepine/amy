@@ -49,6 +49,7 @@ jobs:
         with:
           name: amy-addon-${{ matrix.name }}
           path: /tmp/godot-project/addons/amy/
+          retention-days: 1
 
   package:
     needs: build
