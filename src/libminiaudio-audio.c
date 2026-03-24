@@ -23,7 +23,11 @@ extern SAMPLE ** fbl;
 #include "miniaudio.h"
 
 #include <stdio.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 
 #define DEVICE_FORMAT       ma_format_s16
 
@@ -247,6 +251,33 @@ void miniaudio_deinit(void) {
 }
 
 
+#ifdef _WIN32
+static HANDLE amy_live_thread_handle = NULL;
+
+static DWORD WINAPI miniaudio_run(LPVOID lpParam) {
+    (void)lpParam;
+    while(amy_global.running) {
+        Sleep(1000);
+    }
+    return 0;
+}
+
+void miniaudio_start(void) {
+    miniaudio_init();
+    amy_global.running = 1;
+    amy_live_thread_handle = CreateThread(NULL, 0, miniaudio_run, NULL, 0, NULL);
+}
+
+void miniaudio_stop(void) {
+    amy_global.running = 0;
+    if (amy_live_thread_handle) {
+        WaitForSingleObject(amy_live_thread_handle, 2000);
+        CloseHandle(amy_live_thread_handle);
+        amy_live_thread_handle = NULL;
+    }
+    miniaudio_deinit();
+}
+#else
 void *miniaudio_run(void *vargp) {
     while(amy_global.running) {
         sleep(1);
@@ -255,17 +286,17 @@ void *miniaudio_run(void *vargp) {
 }
 
 void miniaudio_start(void) {
-    // This is a WASM/libminiaudio setup, we still need live_start.
-    miniaudio_init();    
+    miniaudio_init();
     amy_global.running = 1;
     pthread_t amy_live_thread;
     pthread_create(&amy_live_thread, NULL, miniaudio_run, NULL);
 }
 
 void miniaudio_stop(void) {
-    amy_global.running = 0;   // Causes miniaudio_run thread to exit.
+    amy_global.running = 0;
     miniaudio_deinit();
 }
+#endif
 
 
 #ifdef __EMSCRIPTEN__
