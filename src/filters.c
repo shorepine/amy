@@ -14,16 +14,20 @@ SAMPLE ** eq_coeffs;
 SAMPLE *** eq_delay;
 
 
+#ifdef __GNUC__
 #pragma GCC diagnostic push                             // save the actual diag context
 #pragma GCC diagnostic ignored "-Wuninitialized"  // disable maybe warnings
+#endif
 float dsps_sqrtf_f32_ansi(float f)
 {
     int* f_ptr = (int*)&f;
     const int result = 0x1fbb4000 + (*f_ptr >> 1);
     float* f_result = (float*)&result;
-    return *f_result;  
+    return *f_result;
 }
-#pragma GCC diagnostic pop 
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {

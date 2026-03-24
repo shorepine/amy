@@ -576,6 +576,14 @@ void run_midi() {
 }
 #endif
 
+#ifdef _WIN32
+void stop_midi() {
+}
+
+void run_midi() {
+}
+#endif
+
 void midi_out(uint8_t * bytes, uint16_t len) {
 
 // Is there USB gadget midi? Send it

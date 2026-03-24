@@ -8,13 +8,29 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#include <intrin.h>
+#define bzero(b,len) memset((b), 0, (len))
+#define bcopy(src,dest,len) memmove((dest), (src), (len))
+#define srand48(x) srand((unsigned int)(x))
+#define drand48() ((double)rand() / RAND_MAX)
+static inline int __builtin_clz(unsigned int x) {
+    unsigned long index;
+    return _BitScanReverse(&index, x) ? (31 - (int)index) : 32;
+}
+#else
 #include <unistd.h>
+#endif
 #include <inttypes.h>
 
 #ifndef __EMSCRIPTEN__
-#ifdef _POSIX_THREADS
+#ifdef _WIN32
+#include <windows.h>
+extern CRITICAL_SECTION amy_queue_lock;
+#elif defined _POSIX_THREADS
 #include <pthread.h>
-extern pthread_mutex_t amy_queue_lock; 
+extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
