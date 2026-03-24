@@ -9,8 +9,11 @@ When creating a new release:
 
 ## Godot GDExtension
 
-- The build is defined in `setup_godot.sh` which generates the SConstruct, C++ source, and GDScript wrapper inline
-- `amy_midi.c` is excluded from the Godot build because it conflicts with platform stubs. Any new functions added to `amy_midi.c` that are called from `amy.c` need stub implementations added in the `amy_platform_stubs.c` section of `setup_godot.sh`
+- Local builds use `setup_godot.sh` which generates the SConstruct, C++ source, and GDScript wrapper inline
+- CI builds use the `godot/` directory (SConstruct, src/, etc.) directly via `.github/workflows/godot-addon.yml`
+- `amy_midi.c` is excluded from the Godot build because it conflicts with platform stubs. Any new functions added to `amy_midi.c` (or other excluded files) that are called from core AMY code need stub implementations added in both:
+  - `godot/src/amy_platform_stubs.c` (for CI builds)
+  - The `amy_platform_stubs.c` section of `setup_godot.sh` (for local builds)
 - macOS builds produce a `.framework` bundle; the `gh auth` token needs `workflow` scope to push workflow file changes
 
 ## GitHub Auth
