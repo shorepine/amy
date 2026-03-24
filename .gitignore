@@ -66,3 +66,5 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+godot/.sconsign.dblite
+godot/src/*.os

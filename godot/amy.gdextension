@@ -1,0 +1,13 @@
+[configuration]
+
+entry_symbol = "amy_library_init"
+compatibility_minimum = "4.3"
+
+[libraries]
+
+macos.debug = "res://addons/amy/bin/libamy.macos.template_debug.universal.dylib"
+macos.release = "res://addons/amy/bin/libamy.macos.template_release.universal.dylib"
+linux.debug.x86_64 = "res://addons/amy/bin/libamy.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/amy/bin/libamy.linux.template_release.x86_64.so"
+windows.debug.x86_64 = "res://addons/amy/bin/libamy.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/amy/bin/libamy.windows.template_release.x86_64.dll"
