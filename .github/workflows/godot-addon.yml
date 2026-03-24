@@ -3,7 +3,7 @@ name: Build Godot Addon
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
   workflow_dispatch:
 
 jobs:
@@ -101,8 +101,7 @@ jobs:
         with:
           name: amy-godot-addon
 
-      - name: Create GitHub Release
+      - name: Attach addon to release
         uses: softprops/action-gh-release@v2
         with:
           files: amy-godot-addon.zip
-          generate_release_notes: true
