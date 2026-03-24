@@ -18,9 +18,13 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 
 // --- amy_midi.c stubs ---
 void stop_midi(void) {}
+void run_midi(void) {}
 void amy_send_midi_note_on(uint8_t channel, uint8_t note, uint8_t velocity) {
     (void)channel; (void)note; (void)velocity;
 }
 void amy_send_midi_note_off(uint8_t channel, uint8_t note, uint8_t velocity) {
     (void)channel; (void)note; (void)velocity;
 }
+
+// --- examples.c stubs ---
+void delay_ms(uint32_t ms) { (void)ms; }
