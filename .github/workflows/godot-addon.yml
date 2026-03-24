@@ -93,7 +93,9 @@ jobs:
     needs: package
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    name: Create Release
+    name: Attach to Release
+    permissions:
+      contents: write
 
     steps:
       - name: Download addon zip
