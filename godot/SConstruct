@@ -61,15 +61,24 @@ env.Append(CPPPATH=[amy_src_path])
 env.Append(CCFLAGS=["-DAMY_WAVETABLE", "-DAMY_NO_MINIAUDIO"])
 
 # Suppress warnings from AMY's C code (GCC/Clang vs MSVC)
-if env.get("is_msvc", False) or env["CC"] == "cl":
+is_msvc = env.get("is_msvc", False) or (env["platform"] == "windows" and not env.get("use_mingw", False))
+if is_msvc:
     env.Append(CFLAGS=["/wd4244", "/wd4267", "/wd4996", "/wd4100"])
 else:
     env.Append(CFLAGS=["-Wno-unused-parameter", "-Wno-sign-compare", "-Wno-missing-field-initializers"])
 
-# On macOS, we need some frameworks for threading
-if sys.platform == "darwin":
+# Platform-specific flags (use target platform, not build machine)
+target_platform = env["platform"]
+if target_platform == "macos":
     env.Append(CCFLAGS=["-DMACOS"])
     env.Append(LINKFLAGS=["-framework", "CoreFoundation"])
+elif target_platform == "linux":
+    env.Append(LIBS=["pthread", "m"])
+elif target_platform == "windows":
+    if is_msvc:
+        env.Append(CCFLAGS=["-DWINDOWS"])
+    else:
+        env.Append(CCFLAGS=["-DWINDOWS"])
 
 # Build all sources together - AMY C files + GDExtension C++ files
 all_sources = []
@@ -90,7 +99,7 @@ all_sources += [
 env.Append(CPPPATH=["src"])
 
 # Build shared library directly from all sources
-if sys.platform == "darwin":
+if target_platform == "macos":
     # Build as framework for macOS
     lib_name = "libamy{}".format(env["suffix"])
     framework_dir = "bin/{}.framework".format(lib_name)
