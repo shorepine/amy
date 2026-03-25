@@ -762,6 +762,23 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     }
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
 
+#ifdef NOTDEF
+    printf("FlPr t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
+           amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE,
+           ratio * AMY_SAMPLE_RATE, msynth[osc]->resonance, 
+           S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]),
+           S2F(synth[osc]->filter_delay[0]), 
+           S2F(synth[osc]->filter_delay[1]), 
+           S2F(synth[osc]->filter_delay[2]), 
+           S2F(synth[osc]->filter_delay[3]),
+           S2F(synth[osc]->filter_delay[4]), 
+           S2F(synth[osc]->filter_delay[5]), 
+           S2F(synth[osc]->filter_delay[6]),
+           S2F(synth[osc]->filter_delay[7]),
+           S2F(block[0]), S2F(block[1]), S2F(block[2]), S2F(block[3])
+           );
+#endif
+
     AMY_PROFILE_START(FILTER_PROCESS_STAGE1)
     //SAMPLE max_val = scan_max(block, AMY_BLOCK_SIZE);
     // Also have to consider the filter state.
@@ -795,6 +812,22 @@ SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
     // Final high-pass to remove residual DC offset from sub-fundamental LPF.  (Not needed now source waveforms are zero-mean).
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
+#ifdef NOTDEF
+    printf("FlP2 t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
+           amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE,
+           ratio * AMY_SAMPLE_RATE, msynth[osc]->resonance, 
+           S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]),
+           S2F(synth[osc]->filter_delay[0]), 
+           S2F(synth[osc]->filter_delay[1]), 
+           S2F(synth[osc]->filter_delay[2]), 
+           S2F(synth[osc]->filter_delay[3]),
+           S2F(synth[osc]->filter_delay[4]), 
+           S2F(synth[osc]->filter_delay[5]), 
+           S2F(synth[osc]->filter_delay[6]),
+           S2F(synth[osc]->filter_delay[7]),
+           S2F(block[0]), S2F(block[1]), S2F(block[2]), S2F(block[3])
+           );
+#endif
     return max_val;
 }
 

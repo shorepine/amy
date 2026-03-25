@@ -656,66 +656,8 @@ end:
 }
 
 
-void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
-    // set synth state to defaults given a pointer
-    psynth->wave = SINE;
-    AMY_UNSET(psynth->preset);
-    AMY_UNSET(psynth->midi_note);
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        psynth->amp_coefs[j] = 0;
-    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Mostly a no-op, but partials_note_on used to want this?
-    psynth->amp_coefs[COEF_VEL] = 1.0f;
-    psynth->amp_coefs[COEF_EG0] = 1.0f;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        psynth->logfreq_coefs[j] = 0;
-    psynth->logfreq_coefs[COEF_NOTE] = 1.0;
-    psynth->logfreq_coefs[COEF_BEND] = 1.0;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        psynth->filter_logfreq_coefs[j] = 0;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        psynth->duty_coefs[j] = 0;
-    psynth->duty_coefs[COEF_CONST] = 0.5f;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j)
-        psynth->pan_coefs[j] = 0;
-    psynth->pan_coefs[COEF_CONST] = 0.5f;
-    psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
-    psynth->phase = F2P(0);
-    AMY_UNSET(psynth->trigger_phase);
-    AMY_UNSET(psynth->logratio);
-    psynth->resonance = 0.7f;
-    psynth->portamento_alpha = 0;
-    psynth->velocity = 0;
-    psynth->step = 0;
-    AMY_UNSET(psynth->note_source);
-    psynth->mod_value = F2S(0);
-    psynth->substep = 0;
-    psynth->status = SYNTH_OFF;
-    AMY_UNSET(psynth->chained_osc);
-    AMY_UNSET(psynth->mod_source);
-    AMY_UNSET(psynth->render_clock);
-    AMY_UNSET(psynth->note_on_clock);
-    psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
-    AMY_UNSET(psynth->zero_amp_clock);
-    AMY_UNSET(psynth->mod_value_clock);
-    psynth->filter_type = FILTER_NONE;
-    for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
-    psynth->last_filt_norm_bits = 0;
-    psynth->algorithm = 0;
-    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(psynth->algo_source[j]);
-    psynth->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-        // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
-        for(uint8_t k=0;k<psynth->max_num_breakpoints[j];k++) {
-            AMY_UNSET(psynth->breakpoint_times[j][k]);
-            AMY_UNSET(psynth->breakpoint_values[j][k]);
-        }
-        psynth->eg_type[j] = ENVELOPE_NORMAL;
-    }
-    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
-    psynth->last_two[0] = 0;
-    psynth->last_two[1] = 0;
-    psynth->lut = NULL;
-    if (pmsynth != NULL) {
+void reset_modosc(struct mod_synthinfo *pmsynth) {
+        if (pmsynth != NULL) {
         pmsynth->last_duty = 0.5f;
         pmsynth->amp = 0;  // This matters for wave=PARTIAL, where msynth amp is effectively 1-frame delayed.
         pmsynth->last_amp = 0;
@@ -727,6 +669,76 @@ void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynt
         pmsynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
         pmsynth->resonance = 0.7f;
     }
+}
+
+void reset_osc_params(struct synthinfo *psynth) {
+    // osc params are the things set through the amy_event API
+    // Event-derived config
+    psynth->wave = SINE;
+    AMY_UNSET(psynth->preset);
+    AMY_UNSET(psynth->note_source);
+    AMY_UNSET(psynth->midi_note);
+    psynth->velocity = 0;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->amp_coefs[j] = 0;
+    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Partials_note_on used to want this?
+    psynth->amp_coefs[COEF_VEL] = 1.0f;
+    psynth->amp_coefs[COEF_EG0] = 1.0f;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->logfreq_coefs[j] = 0;
+    psynth->logfreq_coefs[COEF_NOTE] = 1.0;
+    psynth->logfreq_coefs[COEF_BEND] = 1.0;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->filter_logfreq_coefs[j] = 0;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->duty_coefs[j] = 0;
+    psynth->duty_coefs[COEF_CONST] = 0.5f;
+    for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->pan_coefs[j] = 0;
+    psynth->pan_coefs[COEF_CONST] = 0.5f;
+    psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
+    AMY_UNSET(psynth->trigger_phase);
+    AMY_UNSET(psynth->logratio);
+    psynth->portamento_alpha = 0;
+    psynth->resonance = 0.7f;
+    psynth->filter_type = FILTER_NONE;
+    AMY_UNSET(psynth->chained_osc);
+    AMY_UNSET(psynth->mod_source);
+    psynth->algorithm = 0;
+    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(psynth->algo_source[j]);
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
+        // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
+        for(uint8_t k=0;k<psynth->max_num_breakpoints[j];k++) {
+            AMY_UNSET(psynth->breakpoint_times[j][k]);
+            AMY_UNSET(psynth->breakpoint_values[j][k]);
+        }
+        psynth->eg_type[j] = ENVELOPE_NORMAL;
+    }
+    // Not part of event-driven config, but still stable through the evolution of a note.
+    psynth->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
+    psynth->lut = NULL;
+}
+
+void reset_osc_state(struct synthinfo *psynth) {
+    // osc state are the internal values that keep track of the osc evolution in time.
+    psynth->status = SYNTH_OFF;
+    psynth->phase = F2P(0);
+    psynth->step = 0;
+    psynth->substep = 0;
+    AMY_UNSET(psynth->render_clock);
+    AMY_UNSET(psynth->note_on_clock);
+    psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
+    AMY_UNSET(psynth->zero_amp_clock);
+    AMY_UNSET(psynth->mod_value_clock);
+    psynth->mod_value = F2S(0);
+    for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
+    psynth->last_two[0] = 0;
+    psynth->last_two[1] = 0;
+    for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
+    psynth->last_filt_norm_bits = 0;
+}
+
+void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
+    // set synth state to defaults given a pointer
+    // Current state
+    reset_osc_params(psynth);
+    reset_osc_state(psynth);
+    reset_modosc(pmsynth);
 }
 
 void reset_osc(uint16_t i ) {
@@ -1413,11 +1425,12 @@ void hold_and_modify(uint16_t osc) {
         float last_logfreq = msynth[osc]->last_filter_logfreq;
         if (filter_logfreq < last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN) {
             // Filter cutoff downward slew-rate limit.
+            // See https://github.com/shorepine/amy/issues/126
             filter_logfreq = last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN;
         }
     }
-    msynth[osc]->filter_logfreq = filter_logfreq;
     msynth[osc]->last_filter_logfreq = filter_logfreq;
+    msynth[osc]->filter_logfreq = filter_logfreq;
     msynth[osc]->duty = combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
     msynth[osc]->pan = combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
     // amp is a special case - coeffs apply in log domain.
@@ -1560,10 +1573,34 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
                     // .. but force it to start at zero phase next time.
                     synth[osc]->phase = 0;
-                    //reset_filter(osc);
                     // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
-                    msynth[osc]->filter_logfreq = 0;
-                    msynth[osc]->resonance = 0.7f;
+                    msynth[osc]->filter_logfreq = 0;  // (a)
+                    msynth[osc]->resonance = 0.7f;  // (b)
+                    //reset_filter(osc);                // (c)
+                    //AMY_UNSET(msynth[osc]->last_filter_logfreq);  // (d)
+
+                    // <none>                      err=-33.6 dB
+                    //                   (d)       err=-33.6 dB
+                    //                         (e) err=-35.6 dB
+                    // (a) + (b)             + (e) err=-35.6 dB
+                    // (a)                         err=-41.1 dB
+                    //       (b)                   err=-37.7 dB
+                    // (a) + (b)                   err=-100.0 dB
+                    // (a) + (b)       + (d)       err=-100.0 dB
+                    //             (c)             err=-50.5 dB
+                    //             (c)       + (e) err=-50.5 dB
+                    // (a)       + (c)             err=-50.5 dB
+                    // (a)       + (c)       + (e) err=-50.5 dB
+                    // (a) + (b) + (c)             err=-50.5 dB
+                    // (a) + (b) + (c)       + (e) err=-50.5 dB
+                    // (a) + (b) + (c) + (d) + (e) err=-50.5 dB
+                    //
+                    // Preserve the open-filter ring-out, then clear the filter state:
+                    // (a) + (b) + (f)             err=-87.8 dB   just as good as -100
+                    //             (f)             err=-35.8 dB   cutoff delayed, same prob
+                    //
+                    // (c) always gives -50.5 .. so emptying the filter state negates the impact of a,b,e
+                    // (d) never makes any difference .. so it's not slew rate?
                 }
             }
         } else if (max_val == 0) {
@@ -1587,12 +1624,19 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core]);
             // check it's not off, just in case. todo, why do i care?
             // apply filter to osc if set
-            if(synth[osc]->filter_type != FILTER_NONE) {
+            if(//synth[osc]->status == SYNTH_AUDIBLE &&  // (e)
+               synth[osc]->filter_type != FILTER_NONE) {
                 //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
                 //	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
                 //	osc, synth[osc]->filter_type);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
-	        }
+                // Maybe clear filter state here if we've finshed this osc.
+                if (synth[osc]->status != SYNTH_AUDIBLE) {
+                    reset_filter(osc);  // (f)
+                    reset_modosc(msynth[osc]);  // (g)  This makes a difference, but not clicks
+                    reset_osc_state(synth[osc]);
+                }
+            }
             uint8_t handled = 0;
             if(amy_global.config.amy_external_render_hook != NULL) {
                 handled = amy_global.config.amy_external_render_hook(osc, per_osc_fb[core], AMY_BLOCK_SIZE);

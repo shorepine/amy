@@ -538,55 +538,51 @@ typedef struct amy_event {
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
     uint16_t osc; // self-reference
+    // Configuration (can be fixed during oscillation)
     uint16_t wave;
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
+    uint8_t note_source;  // Was the most recent note on/off received e.g. from MIDI?
     float midi_note;
+    float velocity;
     float amp_coefs[NUM_COMBO_COEFS];
     float logfreq_coefs[NUM_COMBO_COEFS];
     float filter_logfreq_coefs[NUM_COMBO_COEFS];
     float duty_coefs[NUM_COMBO_COEFS];
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
-    uint8_t status;  // not in event
-    float velocity;
     float trigger_phase;
-    PHASOR phase;  // not in event
-    float step;  // not in event
-    float substep;  // not in event
-    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     float logratio;
-    float resonance;
     float portamento_alpha;
+    float resonance;
+    uint8_t filter_type;
     uint16_t chained_osc;
     uint16_t mod_source;
     uint8_t algorithm;
-    uint8_t filter_type;
-    // algo_source remains int16 because users can add -1 to indicate no osc 
-    int16_t algo_source[MAX_ALGO_OPS];
-    uint8_t terminate_on_silence;  // Do we enable the auto-termination of silent oscs?  Usually yes, not for PCM. not in event.
-    // Rum-time state, not in event
+    int16_t algo_source[MAX_ALGO_OPS];  // int16 not uint because -1 specified to indicate no osc 
+    uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
+    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // alloc'd length of breakpoint_times/vals
+    uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) dynamically sized.
+    float *breakpoint_values[MAX_BREAKPOINT_SETS];  // dynamically sized.
+    // Per-note state (set on initialization, does not change during note)
+    uint8_t terminate_on_silence;  // Usually yes, not for PCM. not in event.
+    const LUT *lut;       // Selected lookup table and size.
+    // Per-block state (changes with time)
+    uint8_t status;  // not in event
+    PHASOR phase;  // not in event
+    float step;  // not in event
+    float substep;  // not in event
     uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;
     uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
-    // Back to params
-    uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) was [MAX_BREAKPOINTS] now dynamically sized.
-    float *breakpoint_values[MAX_BREAKPOINT_SETS];  // was [MAX_BREAKPOINTS] now dynamically sized.
-    uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
+    SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
-    uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // actual length of breakpoint_times/breakpoint values
-  
-    // Selected lookup table and size.
-    const LUT *lut;
-    // For ALGO feedback ops
-    SAMPLE last_two[2];
+    SAMPLE last_two[2];    // For ALGO feedback ops
     // For filters.  Need 2x because LPF24 uses two instances of filter.
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
-    // Was the most recent note on/off received e.g. from MIDI?
-    uint8_t note_source;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
