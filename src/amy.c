@@ -1552,8 +1552,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     // .. but force it to start at zero phase next time.
                     synth[osc]->phase = 0;
                     // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
-                    //msynth[osc]->filter_logfreq = 0;  // (a)
-                    //msynth[osc]->resonance = 0.7f;  // (b)
+                    msynth[osc]->filter_logfreq = 0;  // (a)
+                    msynth[osc]->resonance = 0.7f;  // (b)
                     //reset_filter(osc);                // (c)
                     //AMY_UNSET(msynth[osc]->last_filter_logfreq);  // (d)
 
@@ -1611,7 +1611,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 // Maybe clear filter state here if we've finshed this osc.
                 if (synth[osc]->status != SYNTH_AUDIBLE) {
                     reset_filter(osc);  // (f)
-                    reset_modosc(msynth[osc]);  // (g)
+                    reset_modosc(msynth[osc]);  // (g)  This makes a difference, but not clicks
                     reset_osc_state(synth[osc]);
                 }
             }
