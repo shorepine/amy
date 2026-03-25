@@ -1,19 +1,20 @@
-# AMY - A high-performance fixed-point Music synthesizer librarY for microcontrollers
+# AMY - The high-performance fixed-point music synthesizer library
 
-AMY is a fast and small music synthesizer library written in C with Python, Javascript, GDScript and Arduino bindings. It can easily be embedded into almost any program, architecture or microcontroller. 
+AMY is a fast and small music synthesizer library written in C with (so far) Python, Arduino, Javascript and GDScript bindings. It can easily be embedded into almost any program, architecture or microcontroller. 
 
 It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a [very good synthesized piano](https://shorepine.github.io/amy/piano.html), a sampler or wavetable synth (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. AMY supports MIDI internally and can manage synthesizer note messages for you, including voice stealing and assigning controller changes. 
 
 We've run AMY on:
  * [the web](https://shorepine.github.io/amy/)
  * Mac, Linux, and [Windows](windows/README.md), and small Linux devices like the Raspberry Pi
- * ESP32, ESP32S3 and ESP32P4
- * Teensy 3.6, Teensy 4.1
- * Playdate
+ * ESP32, ESP32S3 (Xtensa)
+ * ESP32-P4, ESP32-C3, C6 (RISC-V)
  * Pi Pico RP2040, the Pi Pico 2 RP2350
+ * [NRF52 series](https://github.com/jgartrel/amy_synth_nrf52_example)
+ * Teensy 3.6, Teensy 4.1
+ * Playdate and Electro-Smith Daisy (ARM Cortex M7)
  * iOS devices
- * Electro-Smith Daisy (ARM Cortex M7)
- * [Godot](docs/godot.md)
+ * [Godot game engine](docs/godot.md)
  * And certainly much more
 
 AMY is highly optimized for polyphony and poly-timbral operation on even the lowest power and constrained RAM microcontroller but can scale to as many oscillators as you want. 
