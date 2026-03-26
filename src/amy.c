@@ -1771,18 +1771,17 @@ int16_t * amy_fill_buffer() {
     else output_block = output_block_0;
 
     // mix results from both cores.
-    SAMPLE max_val = core_max[0];
+    //SAMPLE max_val = core_max[0];
     #ifdef AMY_DUALCORE
         for (int16_t i=0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i)  fbl[0][i] += fbl[1][i];
-        if (core_max[1] > max_val)  max_val = core_max[1];
+    //    if (core_max[1] > max_val)  max_val = core_max[1];
     #endif
     // Apply global processing only if there is some signal.
-    if (max_val > 0) {
+    //if (max_val > 0) {      // NO - see #629
         // apply the eq filters if there is some signal and EQ is non-default.
         if (amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
             parametric_eq_process(fbl[0]);
         }
-
         if(AMY_HAS_CHORUS) {
             // apply chorus.
             if(amy_global.chorus.level > 0 && chorus_delay_lines[0] != NULL) {
@@ -1797,7 +1796,7 @@ int16_t * amy_fill_buffer() {
                 }
             }
         }
-    }
+    //}
     if (AMY_HAS_ECHO) {
         // Apply echo.
         if (amy_global.echo.level > 0 && echo_delay_lines[0] != NULL ) {
