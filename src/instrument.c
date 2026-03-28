@@ -281,6 +281,7 @@ bool instrument_number_exists(int instrument_number, char *tag) {
     if (instrument_number_ok(instrument_number, tag)) {
         if (instruments[instrument_number])
             return true;
+        fprintf(stderr, "synth %d not defined (%s)\n", instrument_number, tag);
     }
     return false;
 }
