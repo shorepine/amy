@@ -1042,11 +1042,9 @@ void patches_load_patch(amy_event *e) {
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
-    uint16_t patch_number = e->patch_number;
+    uint16_t patch_number = e->patch_number;   // Need to match type of e->patch_number so AMY_IS_UNSET(patch_number) will work.
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
     if (AMY_IS_SET(e->synth)) {
-        if (AMY_IS_UNSET(e->patch_number))
-            patch_number = instrument_get_patch_number(e->synth);
         num_voices = patches_voices_for_load_synth(e, voices);
     } else if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
@@ -1054,8 +1052,8 @@ void patches_load_patch(amy_event *e) {
     if (num_voices == 0) {
         if (AMY_IS_UNSET(e->num_voices)) {
             // Print a warning unless we deliberately set the voices to zero to release the synth.
-            fprintf(stderr, "synth %" PRId32 " patch %" PRIu16 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
-                    (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
+            fprintf(stderr, "synth %" PRId32 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
+                    (int32_t)e->synth, (int32_t)e->num_voices, e->voices[0]);
         }
         return;
     } else {
@@ -1078,25 +1076,29 @@ void patches_load_patch(amy_event *e) {
     // Figure out the #oscs per voice, setup message or deltas if available.
     if (AMY_IS_SET(e->oscs_per_voice)) {
         oscs_per_voice = e->oscs_per_voice;
-        if (AMY_IS_SET(e->patch_number)) {
+        if (AMY_IS_SET(patch_number)) {
             fprintf(stderr, "WARN: synth %" PRId32 ": oscs_per_voice %" PRIu16 " made me ignore patch number %" PRIu16 "\n",
                     (int32_t)e->synth, e->oscs_per_voice, patch_number);
         }
-    } else if(patch_number < _PATCHES_FIRST_USER_PATCH) {
-        // Built-in patch
-        message = (char*)patch_commands[patch_number];
-        oscs_per_voice = patch_oscs[patch_number];
     } else {
-        // User-defined patch
-        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-        oscs_per_voice = memory_patch_oscs[patch_index];
-        if(oscs_per_voice > 0){
-            deltas = memory_patch_deltas[patch_index];
+        if (AMY_IS_UNSET(patch_number))
+            patch_number = instrument_get_patch_number(e->synth);
+        if(patch_number < _PATCHES_FIRST_USER_PATCH) {
+            // Built-in patch
+            message = (char*)patch_commands[patch_number];
+            oscs_per_voice = patch_oscs[patch_number];
         } else {
-            fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
-                    patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
-                    (int32_t)e->synth, (int32_t)e->num_voices);
-            return;
+            // User-defined patch
+            int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+            oscs_per_voice = memory_patch_oscs[patch_index];
+            if(oscs_per_voice > 0){
+                deltas = memory_patch_deltas[patch_index];
+            } else {
+                fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
+                        patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
+                        (int32_t)e->synth, (int32_t)e->num_voices);
+                return;
+            }
         }
     }
 
