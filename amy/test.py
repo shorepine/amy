@@ -297,6 +297,17 @@ class TestFMRepeat(AmyTest):
       amy.send(time=t + 20, voices="0", vel=0)
 
 
+class TestXanaduFM(AmyTest):
+  """The Xanadu custom FM voice stopped working."""
+
+  def run(self):
+    amy.send(time=0, osc=2, wave=amy.SINE, ratio=1, amp='1.2,0,0,1', bp0='0,0,200,1,500,0.6,300,0.4,400,0,0,0', eg0_type=amy.ENVELOPE_LINEAR)
+    amy.send(time=0, osc=1, wave=amy.SINE, ratio=1.005, amp='1,0,0,1', bp0='0,0,400,1,500,1,500,0,0,0')
+    amy.send(time=0, osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1')
+    amy.send(time=100, osc=0, note=60, vel=10)
+    amy.send(time=900, osc=0, note=60, vel=0)
+
+
 class TestFilter(AmyTest):
 
   def run(self):

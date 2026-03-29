@@ -315,6 +315,8 @@ void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth)
             synth[CHORUS_MOD_SOURCE]->amp_coefs[COEF_EG0] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE]->wave = TRIANGLE;
             osc_note_on(CHORUS_MOD_SOURCE, freq_of_logfreq(synth[CHORUS_MOD_SOURCE]->logfreq_coefs[COEF_CONST]));
+            // Stop us from doing this again.
+            synth[CHORUS_MOD_SOURCE]->status = SYNTH_IS_MOD_SOURCE;
         }
         // apply max_delay.
         for (int chan=0; chan<AMY_NCHANS; ++chan) {
@@ -926,6 +928,7 @@ int8_t oscs_init() {
     }
 
     amy_global.total_blocks = 0;
+    amy_global.time = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
     //    AMY_OSCS, AMY_BLOCK_SIZE, AMY_CORES, AMY_NCHANS, pcm_samples);
     return 0;
@@ -1038,9 +1041,9 @@ void oscs_deinit() {
 
 
 void osc_note_on(uint16_t osc, float initial_freq) {
-    //fprintf(stderr,"Note on: osc %d wav %d filter_freq_coefs=%f %f %f %f %f %f\n", osc, synth[osc]->wave, 
-    //       synth[osc]->filter_logfreq_coefs[0], synth[osc]->filter_logfreq_coefs[1], synth[osc]->filter_logfreq_coefs[2],
-    //       synth[osc]->filter_logfreq_coefs[3], synth[osc]->filter_logfreq_coefs[4], synth[osc]->filter_logfreq_coefs[5]);
+    //fprintf(stderr,"Note on: osc %d wav %d note %.3f vel %.3f\n",
+    //        osc, synth[osc]->wave,
+    //        synth[osc]->midi_note, synth[osc]->velocity);
     // take care of fm & ks first -- no special treatment for bp/mod
     switch (synth[osc]->wave) {
     case KS: if(amy_global.config.ks_oscs) ks_note_on(osc); break;
@@ -1291,9 +1294,9 @@ void play_delta(struct delta *d) {
 		    // Now we've tested that, we can reset note-off clocks.
 		    AMY_UNSET(synth[osc]->note_off_clock);  // Most recent note event is not note-off.
 		    //AMY_UNSET(synth[osc]->zero_amp_clock);
-		    // Actually, start with an expectation that the voice will be zero amp, give it one frame to prove otherwise.
+		    // Actually, start with an expectation that the voice will be zero amp, give it two frames to prove otherwise.
 #define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-		    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + AMY_BLOCK_SIZE;
+		    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 2 * AMY_BLOCK_SIZE;
 
 		    float initial_freq = freq_of_logfreq(initial_logfreq);
 		    osc_note_on(osc, initial_freq);
@@ -1568,7 +1571,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if ( synth[osc]->terminate_on_silence
                      && ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock)
                          >= MIN_ZERO_AMP_TIME_SAMPS)) {
-                    //printf("h&m: time %f osc %d OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, osc);
+                    //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
                     // Oscillator has fallen silent, stop executing it.
                     synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
                     // .. but force it to start at zero phase next time.
@@ -1633,9 +1636,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 // Maybe clear filter state here if we've finshed this osc.
                 if (synth[osc]->status != SYNTH_AUDIBLE) {
                     reset_filter(osc);  // (f)
-                    reset_modosc(msynth[osc]);  // (g)  This makes a difference, but not clicks
-                    reset_osc_state(synth[osc]);
                 }
+            }
+            if (synth[osc]->status != SYNTH_AUDIBLE) {
+                reset_modosc(msynth[osc]);  // (g)  This makes a difference, but not clicks
+                reset_osc_state(synth[osc]);
             }
             uint8_t handled = 0;
             if(amy_global.config.amy_external_render_hook != NULL) {
@@ -1896,6 +1901,8 @@ int16_t * amy_fill_buffer() {
         }
     }
     amy_global.total_blocks++;
+    amy_global.time = amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE;
+
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
     amy_out_block = output_block;
@@ -1904,6 +1911,7 @@ int16_t * amy_fill_buffer() {
 
 void amy_reset_sysclock() {
     amy_global.total_blocks = 0;
+    amy_global.time = 0;
     amy_global.sequencer_tick_count = 0;
     sequencer_recompute();
 }

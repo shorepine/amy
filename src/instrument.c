@@ -200,7 +200,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
         instrument->pending_release[voice] = true;
         return _INSTRUMENT_NO_VOICE;
     }
-    //fprintf(stderr, "voice %d note %d off\n", instrument->amy_voices[voice], note);
+    //fprintf(stderr, "instr 0x%lx: patch %d voice %d note %d off\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note);
     return _instrument_voice_off(instrument, voice);
 }
 
@@ -231,7 +231,8 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, b
     }
     instrument->note_per_voice[voice] = note;
     instrument->pending_release[voice] = false;
-    //fprintf(stderr, "voice %d note %d on\n", instrument->amy_voices[voice], note);
+    //fprintf(stderr, "instr 0x%lx: patch %d voice %d note %d on\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note);
+    //instrument_debug(instrument);
     return instrument->amy_voices[voice];
 }
 
