@@ -830,9 +830,8 @@ class TestSynthFlags(AmyTest):
 
   def run(self):
     # The default config is NOT set, set up MIDI drums on instrument 1 here.
-    amy.send(patch=1024, patch_string='w7f0');
     # synth_flags=3 means do MIDI drums note translation and ignore note-offs.
-    amy.send(synth=1, synth_flags=3, num_voices=4, patch=1024)
+    amy.send(synth=1, synth_flags=3, num_voices=4, oscs_per_voice=1)
     amy.send(time=100, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=35, vel=100/127)  # bass
     amy.send(time=400, synth=1, note=37, vel=100/127)  # snare

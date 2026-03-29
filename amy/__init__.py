@@ -544,6 +544,6 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, tim
         prefix += "K%d" % patch_num
     if dest_synth:
         # Prepend command to reset the synth.
-        prologue = [prefix + "i%div0Z" % dest_synth, prefix + "i%div%din%dZ" % (dest_synth, num_voices, num_oscs)]
+        prologue = [prefix + "i%div%din%dZ" % (dest_synth, num_voices, num_oscs)]
         prefix += "i%d" % dest_synth
     return "\n".join(prologue + [prefix + command for command in commands])

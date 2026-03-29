@@ -797,6 +797,7 @@ bool setup_drum_event(amy_event *e, uint8_t note) {
   if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
       struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
       if (s.pcm_preset_number != -1) {
+          e->wave = PCM;
           e->preset = s.pcm_preset_number;
           e->midi_note = s.base_midi_note;
           forward_note = true;
