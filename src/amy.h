@@ -756,6 +756,7 @@ struct state {
     int16_t latency_ms;
     float tempo;
     uint32_t total_blocks;
+    float time;
     uint8_t debug_flag;
     
     reverb_state_t reverb;

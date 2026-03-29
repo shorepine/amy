@@ -297,6 +297,21 @@ class TestFMRepeat(AmyTest):
       amy.send(time=t + 20, voices="0", vel=0)
 
 
+class TestXanaduFM(AmyTest):
+  """The Xanadu custom FM voice stopped working."""
+
+  def run(self):
+    amy.send(volume=100)
+    #amy.send(time=0, osc=3, wave=amy.SINE, freq=1/7.5, phase=0.75, amp=.99)
+    amy.send(time=0, osc=2, wave=amy.SINE, ratio=1, amp='0.5,0,0,0,0,1') #, mod_source=3)
+    amy.send(time=0, osc=1, wave=amy.SINE, ratio=1, amp='1,0,0,1', bp0='1000,1,1000,0')
+    amy.send(time=0, osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1', bp0='0,1,1000,1,2000,0')
+    amy.send(time=100, osc=0, note=49, vel=1)
+    amy.send(time=450, osc=0, note=49, vel=0)
+    amy.send(time=550, osc=0, note=49, vel=1)
+    amy.send(time=900, osc=0, note=49, vel=0)
+
+
 class TestFilter(AmyTest):
 
   def run(self):
@@ -1178,7 +1193,8 @@ def main(argv):
     #TestDiskSample().test()
     #print(TestFileTransfer().test()[1])
     #print(TestVoiceStealClick().test()[1])
-    print(TestOwBassClick().test()[1])
+    #print(TestOwBassClick().test()[1])
+    print(TestXanaduFM().test()[1])
 
   if not quiet:
     amy.send(debug=0)

@@ -14,7 +14,8 @@
 #endif
 
 // Multiply used to apply amplitude to unit waveforms. sample is first arg (<=1), amp is 2nd.
-#define MULA_SS MUL6A_SS
+//#define MULA_SS MUL6A_SS
+#define MULA_SS(a, b) MUL5A_SS(a, b)
 
 
 /* Dan Ellis libblosca functions */

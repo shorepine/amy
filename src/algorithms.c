@@ -149,7 +149,7 @@ void algo_init() {
 
 }
 
-SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) { 
+SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     struct FmAlgorithm algo = algorithms[synth[osc]->algorithm];
     SAMPLE max_value = 0;
 
@@ -166,7 +166,8 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     
     SAMPLE amp = SHIFTR(F2S(msynth[osc]->amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
-        if(AMY_IS_SET(synth[osc]->algo_source[op]) && synth[synth[osc]->algo_source[op]]->status == SYNTH_IS_ALGO_SOURCE) {
+        if(AMY_IS_SET(synth[osc]->algo_source[op])
+           && synth[synth[osc]->algo_source[op]]->status == SYNTH_IS_ALGO_SOURCE) {
             SAMPLE feedback_level = 0;
             SAMPLE mod_amp = F2S(1.0f);
             if(algo.ops[op] & FB_IN) { 
@@ -192,7 +193,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
                 out_buf = BUS_TWO;
             } else {
                 out_buf = buf;
-                // We apply the mod_amp to every output that goes into the final output buffer.
+                // We apply the msynth amp to every buf that goes into the final output buffer.
                 mod_amp = amp;
             }
             if (!(algo.ops[op] & OUT_BUS_ADD)) {
@@ -209,6 +210,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
             }
         }
     }
+    //fprintf(stderr, "render_algo: time %.3f osc %d last_amp %f amp %f max_val=%f\n", amy_global.time, osc, (msynth[osc]->last_amp), (msynth[osc]->amp), S2F(max_value));
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     return max_value;
 }
