@@ -272,20 +272,20 @@ void amy_default_synths() {
 
     // sine wave "bleeper" on ch 0 (not a MIDI channel)
     amy_event e = amy_default_event();
-    e.patch_number= 1024;
     // osc=0 sinewave.
-    // Sine is default, but we need to have one delta, else the number of oscs is zero = no patch.
-    patches_store_patch(&e, "v0w0");
-    e.num_voices = 1;
     e.synth = 0;
+    e.num_voices = 1;
+    e.oscs_per_voice = 1;
+    e.wave = SINE;
     amy_add_event(&e);
 
     // GM drum synth on channel 10
     e = amy_default_event();
-    e.patch_number = 1025;
-    patches_store_patch(&e, "w7f0");
-    e.num_voices = 6;
     e.synth = 10;
+    e.num_voices = 6;
+    e.oscs_per_voice = 1;
+    e.wave = PCM;
+    e.amp_coefs[COEF_CONST] = 5.0;  // MIDI drums need to be louder to match juno patches.
     // Flag to perform note -> drum PCM patch translation.
     e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;
     amy_add_event(&e);

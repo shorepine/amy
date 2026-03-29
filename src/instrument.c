@@ -282,7 +282,8 @@ bool instrument_number_exists(int instrument_number, char *tag) {
     if (instrument_number_ok(instrument_number, tag)) {
         if (instruments[instrument_number])
             return true;
-        fprintf(stderr, "synth %d not defined (%s)\n", instrument_number, tag);
+        if (tag)
+            fprintf(stderr, "synth %d not defined (%s)\n", instrument_number, tag);
     }
     return false;
 }
@@ -296,7 +297,7 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
-    if (!instrument_number_exists(old_instrument_number, "change:old")) return;
+    if (!instrument_number_exists(old_instrument_number, NULL)) return;  // no error msg.
     if (!instrument_number_ok(new_instrument_number, "change:new")) return;
     if (old_instrument_number == new_instrument_number)
         return;  // Degenerate change.
