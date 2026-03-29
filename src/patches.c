@@ -728,67 +728,66 @@ struct pcm_sample_info {
 
 // drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
 
+// PCM presets available (from pcm_tiny.h):
+//  [0]  808-MARACA    root=89
+//  [1]  808-KIK 4     root=39
+//  [2]  808-SNR 4     root=45
+//  [3]  808-SNR 7     root=52
+//  [4]  808-SNR 10    root=51
+//  [5]  808-SNR 12    root=41
+//  [6]  808-C-HAT1    root=53
+//  [7]  808-O-HAT1    root=56
+//  [8]  808-LTOM M    root=61
+//  [9]  808-DRYCLP    root=94
+//  [10] 808-CWBELL    root=69
 struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
-    {1, 39},   // "808-KIK", 35)
-    {25, 60},  // "Pwr Kick", 36),
-    {2, 45},   // "Snare", 37),
-    {5, 41},   // "Snare4", 38),
-    {9, 94},   // "Clap", 39),
-    {20, 60},  // "Pwr Snare", 40),
-    {8, 61},   // "Low floor Tom", 41),
-    {6, 53},   // "Closed Hat", 42),
-    {8, 68},  // "Hi floor Tom", 43),
-    {7, 61},  // "Pedal hi-hat", 44
-    {21, 56},  // "low tom", 45
-    {7, 56},   // "Open Hat", 46),
-    {21, 63},  // "low-mid tom", 47
-    {21, 70},  // "hi-mid tom", 48
-    {16, 60},  // "Crash", 49),
-    {21, 77},  // "hi-tom", 50,
-    {7, 51},  // "ride cymbal", 51,
-    {16, 50},  // "chinese cymbal", 52,
-    {6,  47},  // "ride bell", 53,
-    {9, 84},  // "tambourine", 54,
-    {7, 46},  // "splash cymbal", 55,
-    {10, 69},  // "Cowbell", 56),
-    {7, 57},  // "crash cymbal 2", 57,
-    {-1, -1},  // "vibraslap", 58,
-    {7, 48},  // "ride cymbal", 59,
-    {11, 74},  // "hi bongo", 60,
-    {11, 67},  // "low bongo", 61,
-    {11, 77},  // "mute hi conga", 62,
-    {8, 77},  // "open hi conga", 63,
-    {11, 64},  // "Congo Low", 64),
-    {21, 79},  // "high timbale", 65,
-    {21, 73},  // "low timbale", 66,
-    {13, 55},  // "high agogo", 67,
-    {13, 50},  // "low agogo", 68,
-    {0, 79},   // "cabasa", 69,
-    {0, 89},   // "Maraca", 70),
-    {-1, -1},  // "short whistle", 71,
-    {-1, -1},  // "long whistle", 72,
-    {-1, -1},  // "short guiro", 73,
-    {-1, -1},  // "long guiro", 74,
-    {12, 82},  // "Clave", 75),
-    {13, 60},  // "hi Block", 76),
-    {13, 52},  // "low block", 77
-    {-1, -1},  // "mute cuica", 78
-    {-1, -1},  // "open cuica", 79
-    {-1, -1},  // "mute triangle", 80
-    {-1, -1},  // "open trianlge", 81
-    //    {1, 39},  // "Kick", None),
-    //    {3, 52},  // "Snare2", None),
-    //    {4, 51},  // "Snare3", None),
-    //    {14, 60},  // "Roll", None),
-    //    {15, 60},  // "Hit", None),
-    //    {26, 66},  // "Marimba", None),
-    //    {27, 60},  // "Frets", None),
-    //    {17, 60},  // "Shell", None),
-    //    {18, 60},  // "Chimes", None),
-    //    {19, 60},  // "Seashore", None),
-    //    {22, 66},  // "Shamisen", None),
-    //    {23, 66},  // "Koto", None),
-    //    {24, 72},  // "Steel", None),
+    {1, 39},   // 35 Acoustic Bass Drum -> 808-KIK
+    {1, 39},   // 36 Bass Drum 1        -> 808-KIK
+    {4, 51},   // 37 Side Stick         -> 808-SNR 10 (rimshot-like)
+    {2, 45},   // 38 Acoustic Snare     -> 808-SNR 4
+    {9, 94},   // 39 Hand Clap          -> 808-DRYCLP
+    {5, 41},   // 40 Electric Snare     -> 808-SNR 12
+    {8, 56},   // 41 Low Floor Tom      -> 808-LTOM (pitched down)
+    {6, 53},   // 42 Closed Hi Hat      -> 808-C-HAT1
+    {8, 61},   // 43 High Floor Tom     -> 808-LTOM (root)
+    {7, 61},   // 44 Pedal Hi-Hat       -> 808-O-HAT1 (short)
+    {8, 56},   // 45 Low Tom            -> 808-LTOM (pitched down)
+    {7, 56},   // 46 Open Hi-Hat        -> 808-O-HAT1
+    {8, 63},   // 47 Low-Mid Tom        -> 808-LTOM (slightly up)
+    {8, 68},   // 48 Hi Mid Tom         -> 808-LTOM (pitched up)
+    {7, 46},   // 49 Crash Cymbal 1     -> 808-O-HAT1 (pitched down for wash)
+    {8, 73},   // 50 High Tom           -> 808-LTOM (pitched up high)
+    {7, 51},   // 51 Ride Cymbal 1      -> 808-O-HAT1 (pitched down)
+    {7, 48},   // 52 Chinese Cymbal     -> 808-O-HAT1 (pitched down)
+    {6, 47},   // 53 Ride Bell          -> 808-C-HAT1 (pitched down, bell-like)
+    {0, 79},   // 54 Tambourine         -> 808-MARACA (pitched down)
+    {7, 46},   // 55 Splash Cymbal      -> 808-O-HAT1 (pitched down)
+    {10, 69},  // 56 Cowbell            -> 808-CWBELL
+    {7, 48},   // 57 Crash Cymbal 2     -> 808-O-HAT1 (pitched down)
+    {-1, -1},  // 58 Vibraslap
+    {7, 53},   // 59 Ride Cymbal 2      -> 808-O-HAT1 (pitched down)
+    {-1, -1},  // 60 Hi Bongo
+    {-1, -1},  // 61 Low Bongo
+    {-1, -1},  // 62 Mute Hi Conga
+    {-1, -1},  // 63 Open Hi Conga
+    {-1, -1},  // 64 Low Conga
+    {8, 73},   // 65 High Timbale       -> 808-LTOM (pitched up)
+    {8, 63},   // 66 Low Timbale        -> 808-LTOM (slightly up)
+    {10, 76},  // 67 High Agogo         -> 808-CWBELL (pitched up)
+    {10, 64},  // 68 Low Agogo          -> 808-CWBELL (pitched down)
+    {0, 79},   // 69 Cabasa             -> 808-MARACA (pitched down)
+    {0, 89},   // 70 Maracas            -> 808-MARACA (root)
+    {-1, -1},  // 71 Short Whistle
+    {-1, -1},  // 72 Long Whistle
+    {-1, -1},  // 73 Short Guiro
+    {-1, -1},  // 74 Long Guiro
+    {-1, -1},  // 75 Claves
+    {10, 76},  // 76 Hi Wood Block      -> 808-CWBELL (pitched up)
+    {10, 64},  // 77 Low Wood Block     -> 808-CWBELL (pitched down)
+    {-1, -1},  // 78 Mute Cuica
+    {-1, -1},  // 79 Open Cuica
+    {-1, -1},  // 80 Mute Triangle
+    {-1, -1},  // 81 Open Triangle
 };
 
 
@@ -1042,9 +1041,11 @@ void patches_load_patch(amy_event *e) {
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
-    uint16_t patch_number = e->patch_number;   // Need to match type of e->patch_number so AMY_IS_UNSET(patch_number) will work.
+    uint16_t patch_number = e->patch_number;
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
     if (AMY_IS_SET(e->synth)) {
+        if (AMY_IS_UNSET(e->patch_number))
+            patch_number = instrument_get_patch_number(e->synth);
         num_voices = patches_voices_for_load_synth(e, voices);
     } else if (AMY_IS_SET(e->voices[0])) {
         num_voices = copy_voices(e->voices, voices);
@@ -1052,8 +1053,8 @@ void patches_load_patch(amy_event *e) {
     if (num_voices == 0) {
         if (AMY_IS_UNSET(e->num_voices)) {
             // Print a warning unless we deliberately set the voices to zero to release the synth.
-            fprintf(stderr, "synth %" PRId32 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
-                    (int32_t)e->synth, (int32_t)e->num_voices, e->voices[0]);
+            fprintf(stderr, "synth %" PRId32 " patch %" PRIu16 ": no voices selected, ignored (e->num_voices %" PRId32 " e->voices [0] %" PRIu16 "...)\n",
+                    (int32_t)e->synth, patch_number, (int32_t)e->num_voices, e->voices[0]);
         }
         return;
     } else {
@@ -1076,29 +1077,25 @@ void patches_load_patch(amy_event *e) {
     // Figure out the #oscs per voice, setup message or deltas if available.
     if (AMY_IS_SET(e->oscs_per_voice)) {
         oscs_per_voice = e->oscs_per_voice;
-        if (AMY_IS_SET(patch_number)) {
+        if (AMY_IS_SET(e->patch_number)) {
             fprintf(stderr, "WARN: synth %" PRId32 ": oscs_per_voice %" PRIu16 " made me ignore patch number %" PRIu16 "\n",
                     (int32_t)e->synth, e->oscs_per_voice, patch_number);
         }
+    } else if(patch_number < _PATCHES_FIRST_USER_PATCH) {
+        // Built-in patch
+        message = (char*)patch_commands[patch_number];
+        oscs_per_voice = patch_oscs[patch_number];
     } else {
-        if (AMY_IS_UNSET(patch_number))
-            patch_number = instrument_get_patch_number(e->synth);
-        if(patch_number < _PATCHES_FIRST_USER_PATCH) {
-            // Built-in patch
-            message = (char*)patch_commands[patch_number];
-            oscs_per_voice = patch_oscs[patch_number];
+        // User-defined patch
+        int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+        oscs_per_voice = memory_patch_oscs[patch_index];
+        if(oscs_per_voice > 0){
+            deltas = memory_patch_deltas[patch_index];
         } else {
-            // User-defined patch
-            int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-            oscs_per_voice = memory_patch_oscs[patch_index];
-            if(oscs_per_voice > 0){
-                deltas = memory_patch_deltas[patch_index];
-            } else {
-                fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
-                        patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
-                        (int32_t)e->synth, (int32_t)e->num_voices);
-                return;
-            }
+            fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
+                    patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
+                    (int32_t)e->synth, (int32_t)e->num_voices);
+            return;
         }
     }
 
