@@ -1296,7 +1296,7 @@ void play_delta(struct delta *d) {
 		    //AMY_UNSET(synth[osc]->zero_amp_clock);
 		    // Actually, start with an expectation that the voice will be zero amp, give it two frames to prove otherwise.
 #define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-		    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 2 * AMY_BLOCK_SIZE;
+		    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 1 * AMY_BLOCK_SIZE;
 
 		    float initial_freq = freq_of_logfreq(initial_logfreq);
 		    osc_note_on(osc, initial_freq);
