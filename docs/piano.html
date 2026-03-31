@@ -129,7 +129,7 @@ from ulab import numpy as np
 #   harmonics_freq - Vector of (total_num_harmonics) int16s giving freq for each harmonic in "MIDI cents" i.e. 6900 = 440 Hz.
 #   harmonics_mags - Array of (total_num_harmonics, num_sample_times) uint8s giving envelope samples for each harmonic.  In dB, between 0 and 100.
 
-from piano_params import notes_params
+from amy.piano_params import notes_params
 
 NOTES = np.array(notes_params['notes'], dtype=np.int8)
 VELOCITIES = np.array(notes_params['velocities'], dtype=np.int8)
