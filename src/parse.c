@@ -389,6 +389,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         char filename[MAX_FILENAME_LEN];
         uint16_t len = parse_list_file_transfer_params(message, filename, sizeof(filename), &file_size);
         if (filename[0] != '\0') {
+            sequencer_midi_stop();  // Stop sequencer (and sketch loop) during file transfer.
             start_receiving_file_transfer(file_size, filename);
         }
         return len;
