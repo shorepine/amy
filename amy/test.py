@@ -400,19 +400,41 @@ class TestBrass(AmyTest):
     #         resonance=0.167, bp0='60,1,340,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,340,0.3,200,0')
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0',
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
              amp='0,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2,
              )
-    amy.send(time=0, osc=2,
-             wave=amy.SINE, freq=0.974, bp0='156,1.0,100,1.0,100,0')  # amp='1,0,0,0,0,0') #
+    # Osc 2 is LFO for vibrato
+    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
     amy.send(time=100, osc=1, note=76, vel=1.0)
     amy.send(time=300, osc=1, vel=0)
     amy.send(time=600, osc=1, note=76, vel=1.0)
     amy.send(time=800, osc=1, vel=0)
     # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,672,0.354,232,0'
+
+
+class TestBrassAlt(AmyTest):
+  """Reproduce TestBrass using the VCA on a SILENT osc."""
+
+  def run(self):
+    osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
+    # Osc 1 is waveform, with vibrato mod but no amp env
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
+             amp='1,0,0,0,0,0', mod_source=2)
+    # Osc 2 is LFO for vibrato
+    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
+    # Osc 0 is VCF and amplitude env
+    amy.send(time=0, osc=0, wave=amy.SILENT,
+             amp='1,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
+             filter_type=amy.FILTER_LPF24, resonance=0.167,
+             filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
+             mod_source=2, chained_osc=1)
+    amy.send(time=100, osc=0, note=76, vel=1.0)
+    amy.send(time=300, osc=0, vel=0)
+    amy.send(time=600, osc=0, note=76, vel=1.0)
+    amy.send(time=800, osc=0, vel=0)
 
 
 class TestBrass2(AmyTest):

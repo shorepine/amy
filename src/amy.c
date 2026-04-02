@@ -1069,6 +1069,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     #ifdef AMY_WAVETABLE
     case WAVETABLE: wavetable_note_on(osc, initial_freq); break;
     #endif
+    case SILENT: /* nothing */ break;
     case CUSTOM: if(AMY_HAS_CUSTOM) custom_note_on(osc, initial_freq); break;
     default: break;
     }
@@ -1559,6 +1560,10 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if (new_max_val > max_val)  max_val = new_max_val;
             }
         }
+        // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
+        if (synth[osc]->wave == SILENT) {
+            max_val = render_envelope(buf, osc);
+        }
         // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
         // from zero-amplitude (but maybe inheriting values from chained_oscs).
         // Stop oscillators if amp is zero for several frames in a row.
@@ -1573,15 +1578,18 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                          >= MIN_ZERO_AMP_TIME_SAMPS)) {
                     //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
                     // Oscillator has fallen silent, stop executing it.
-                    synth[osc]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
-                    // .. but force it to start at zero phase next time.
-                    synth[osc]->phase = 0;
-                    // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
-                    msynth[osc]->filter_logfreq = 0;  // (a)
-                    msynth[osc]->resonance = 0.7f;  // (b)
-                    //reset_filter(osc);                // (c)
-                    //AMY_UNSET(msynth[osc]->last_filter_logfreq);  // (d)
-
+                    uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
+                    while (AMY_IS_SET(osc_to_stop)) {
+                        synth[osc_to_stop]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
+                        // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
+                        msynth[osc_to_stop]->filter_logfreq = 0;  // (a)
+                        msynth[osc_to_stop]->resonance = 0.7f;  // (b)
+                        //reset_filter(osc_to_stop);                // (c)
+                        //AMY_UNSET(msynth[osc_to_stop]->last_filter_logfreq);  // (d)
+                        // .. but force it to start at zero phase next time.
+                        synth[osc_to_stop]->phase = 0;
+                        osc_to_stop = synth[osc_to_stop]->chained_osc;
+                    }
                     // <none>                      err=-33.6 dB
                     //                   (d)       err=-33.6 dB
                     //                         (e) err=-35.6 dB

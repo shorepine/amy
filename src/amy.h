@@ -252,8 +252,9 @@ enum coefs{
 #define PCM_RIGHT 18
 #define PCM_MIX 7 // same as PCM
 #define WAVETABLE 19
-#define CUSTOM 20
-#define WAVE_OFF 21
+#define SILENT 20  // A control osc for applying filte and env without contributing waveform
+#define CUSTOM 21
+#define WAVE_OFF 22
 
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
@@ -926,6 +927,7 @@ extern SAMPLE render_saw_down(SAMPLE * buf, uint16_t osc);
 extern SAMPLE render_saw_up(SAMPLE * buf, uint16_t osc);
 extern SAMPLE render_triangle(SAMPLE * buf, uint16_t osc); 
 extern SAMPLE render_noise(SAMPLE * buf, uint16_t osc); 
+extern SAMPLE render_envelope(SAMPLE *buf, uint16_t osc);
 extern SAMPLE render_pcm(SAMPLE * buf, uint16_t osc);
 extern SAMPLE render_algo(SAMPLE * buf, uint16_t osc, uint8_t core) ;
 extern SAMPLE render_partial(SAMPLE *buf, uint16_t osc) ;
