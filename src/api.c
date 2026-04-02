@@ -35,7 +35,7 @@ amy_config_t amy_default_config() {
     c.audio = AMY_AUDIO_IS_NONE;
     c.ks_oscs = 1;
 
-    c.max_oscs = 180;
+    c.max_oscs = 250;
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
     c.max_synths = 64;

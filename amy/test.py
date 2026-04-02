@@ -1159,7 +1159,7 @@ class TestPreset257(AmyTest):
   def run(self):
     amy.send(time=0, synth=1, patch=257, num_voices=4)
     amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=900, synth=1, vel=0)
+    amy.send(time=500, synth=1, vel=0)
 
 
 def main(argv):
