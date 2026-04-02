@@ -435,7 +435,7 @@ def make_patches(filename):
             j = juno.JunoPatch()
             j.set_patch(i)
             f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, amy.retrieve_patch()))  
-            num_oscs.append(5)
+            num_oscs.append(6)
         # Do dx7
         for i in range(128):
             amy.log_patch()

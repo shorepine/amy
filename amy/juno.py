@@ -184,10 +184,9 @@ class JunoPatch:
   post_set_fn = {'lfo': ['lfo_rate', 'lfo_delay_time'],
                  'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub',
                          'stop_16', 'stop_8', 'stop_4',
-                         'pulse', 'saw', 'pwm_manual', 'vca_level', 'vca_gate',
-                         'portamento'],
+                         'pulse', 'saw', 'pwm_manual', 'portamento'],
                  'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
-                 'env': ['env_a', 'env_d', 'env_s', 'env_r'],
+                 'env': ['env_a', 'env_d', 'env_s', 'env_r', 'vca_level', 'vca_gate'],
                  'cho': ['chorus', 'hpf']}
 
   # These lists name the fields in the order they appear in the sysex.
@@ -208,8 +207,6 @@ class JunoPatch:
   dirty_params = set()
   # Flag to defer param updates.
   defer_param_updates = False
-  # List of the 5 basic oscs that need cloning.
-  oscs_to_clone = set()
   # Amy synth
   amy_synth = None
 
@@ -313,28 +310,28 @@ class JunoPatch:
     """Output AMY commands to set up patches on all the allocated synth.
     Send amy.send(osc=0, note=50, vel=1) afterwards."""
     #amy.reset()
-    # base_osc is pulse/PWM
+    # base_osc is filter/VCA (AMYboard standard)
     # base_osc + 1 is LFO  (AMYboard standard)
-    # base_osc + 2 is SAW
-    # base_osc + 3 is SUBOCTAVE
-    # base_osc + 4 is NOISE
-    #   env0 is VCA
-    #   env1 is VCF
+    # base_osc + 2 is pulse/PWM
+    # base_osc + 3 is SAW
+    # base_osc + 4 is SUBOCTAVE
+    # base_osc + 5 is NOISE
+    #   env0 is VCA (on base_osc only)
+    #   env1 is VCF (on base_osc only)
     # These are the canonical oscs (to add to amy.send(synth=..)).
-    self.pwm_osc = 0
-    self.saw_osc = 2
-    self.sub_osc = 3
-    self.nse_osc = 4
+    self.ctl_osc = 0
+    self.pwm_osc = 2
+    self.saw_osc = 3
+    self.sub_osc = 4
+    self.nse_osc = 5
     self.lfo_osc = 1
-    self.voice_oscs = [
-      self.pwm_osc, self.saw_osc, self.sub_osc, self.nse_osc
-    ]
     # One-time setup of oscs.
     self.amy_send(osc=self.lfo_osc, wave=amy.TRIANGLE, amp='1,,0,1')
     filter_type = amy.FILTER_LPF if self.cheap_filter else amy.FILTER_LPF24
+    self.amy_send(osc=self.ctl_osc, wave=amy.SILENT, filter_type=filter_type,
+                  mod_source=self.lfo_osc, chained_osc=self.pwm_osc)
     self.amy_send(osc=self.pwm_osc, wave=amy.PULSE,
-                  mod_source=self.lfo_osc, chained_osc=self.saw_osc,
-                  filter_type=filter_type)
+                  mod_source=self.lfo_osc, chained_osc=self.saw_osc)
     self.amy_send(osc=self.saw_osc, wave=amy.SAW_UP,
                   mod_source=self.lfo_osc, chained_osc=self.sub_osc)
     self.amy_send(osc=self.sub_osc, wave=amy.PULSE,
@@ -359,13 +356,13 @@ class JunoPatch:
     # PWM square wave.
     const_duty = 0
     lfo_duty = to_level(self.dco_pwm)
+    port_ms = self._portamento_ms(self.portamento)
     if self.pwm_manual:
       # Swap duty parameters.
       const_duty, lfo_duty = lfo_duty, const_duty
-    port_ms = self._portamento_ms(self.portamento)
     self.amy_send(
       osc=self.pwm_osc,
-      amp=self._amp_coef_string(float(self.pulse)),
+      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.pulse))),
       freq=freq_str,
       portamento=port_ms,
       duty='%s,,,,,%s' % (
@@ -374,19 +371,19 @@ class JunoPatch:
     )
     self.amy_send(
       osc=self.saw_osc,
-      amp=self._amp_coef_string(float(self.saw)),
+      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.saw))),
       freq=freq_str,
       portamento=port_ms,
     )
     self.amy_send(
       osc=self.sub_osc,
-      amp=self._amp_coef_string(float(self.dco_sub)),
+      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.dco_sub))),
       freq=self._freq_coef_string(base_freq / 2.0),
       portamento=port_ms,
     )
     self.amy_send(
       osc=self.nse_osc,
-      amp=self._amp_coef_string(float(self.dco_noise)),
+      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.dco_noise))),
     )
 
   def update_vcf(self):
@@ -399,7 +396,7 @@ class JunoPatch:
     # to equal log2(cooked vcf_freq_hz) + vcf_kbd_level * (midi_note - 69) / 12
     # So, cooked / uncooked) = exp2(vcf_kbd_level * 9 / 12)
     vcf_freq_hz *= (2.0 ** (0.75 * vcf_kbd_level))
-    self.amy_send(osc=self.pwm_osc, resonance=to_resonance(self.vcf_res),
+    self.amy_send(osc=self.ctl_osc, resonance=to_resonance(self.vcf_res),
                   filter_freq='%s,%s,,%s,,%s' % (
                     ffmt(vcf_freq_hz),
                     ffmt(vcf_kbd_level),
@@ -408,10 +405,7 @@ class JunoPatch:
 
   def update_env(self):
     bp0_coefs = self._breakpoint_string()
-    self.amy_send(osc=self.pwm_osc, bp0=bp0_coefs)
-    self.amy_send(osc=self.saw_osc, bp0=bp0_coefs)
-    self.amy_send(osc=self.sub_osc, bp0=bp0_coefs)
-    self.amy_send(osc=self.nse_osc, bp0=bp0_coefs)
+    self.amy_send(osc=self.ctl_osc, bp0=bp0_coefs, amp=self._amp_coef_string(1.0))
 
   def update_cho(self):
     # Chorus & HPF
