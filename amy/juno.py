@@ -185,7 +185,7 @@ class JunoPatch:
                  'dco': ['dco_lfo', 'dco_pwm', 'dco_noise', 'dco_sub',
                          'stop_16', 'stop_8', 'stop_4',
                          'pulse', 'saw', 'pwm_manual', 'portamento'],
-                 'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd'],
+                 'vcf': ['vcf_neg', 'vcf_env', 'vcf_freq', 'vcf_lfo', 'vcf_res', 'vcf_kbd', 'vca_gate'],
                  'env': ['env_a', 'env_d', 'env_s', 'env_r', 'vca_level', 'vca_gate'],
                  'cho': ['chorus', 'hpf']}
 
@@ -281,11 +281,7 @@ class JunoPatch:
     )
 
   def _amp_coef_string(self, level):
-    if self.vca_gate:
-      # 'Gate' is provided by EG1, which is left unset == gate.
-      return ',,%s,0,1' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
-    else:
-      return ',,%s,1,0' % ffmt(max(.001, to_level(level) * to_level(self.vca_level)))
+    return ',,%s,1,0' % ffmt(max(.001, to_level(level)))
 
   def _freq_coef_string(self, base_freq):
     return '%s,1,,,,%s,1' % (
@@ -396,16 +392,26 @@ class JunoPatch:
     # to equal log2(cooked vcf_freq_hz) + vcf_kbd_level * (midi_note - 69) / 12
     # So, cooked / uncooked) = exp2(vcf_kbd_level * 9 / 12)
     vcf_freq_hz *= (2.0 ** (0.75 * vcf_kbd_level))
+    eg0_coef = 11 * vcf_env_polarity * to_level(self.vcf_env)
+    eg1_coef = 0
+    if self.vca_gate:
+      eg1_coef = eg0_coef
+      eg0_coef = 0
     self.amy_send(osc=self.ctl_osc, resonance=to_resonance(self.vcf_res),
-                  filter_freq='%s,%s,,%s,,%s' % (
+                  filter_freq='%s,%s,,%s,%s,%s' % (
                     ffmt(vcf_freq_hz),
                     ffmt(vcf_kbd_level),
-                    ffmt(11 * vcf_env_polarity * to_level(self.vcf_env)),
+                    ffmt(eg0_coef), ffmt(eg1_coef),
                     ffmt(1.25 * to_level(self.vcf_lfo))))
 
   def update_env(self):
-    bp0_coefs = self._breakpoint_string()
-    self.amy_send(osc=self.ctl_osc, bp0=bp0_coefs, amp=self._amp_coef_string(1.0))
+    coefs = {'osc': self.ctl_osc, 'amp': self._amp_coef_string(self.vca_level)}
+    bp_coefs = self._breakpoint_string()
+    if self.vca_gate:
+      coefs |= {'bp0': '0,1,0,1,0,0', 'bp1': bp_coefs}
+    else:
+      coefs |= {'bp0': bp_coefs}
+    self.amy_send(**coefs)
 
   def update_cho(self):
     # Chorus & HPF
