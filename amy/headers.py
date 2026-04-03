@@ -411,7 +411,7 @@ def make_amyboard_patch():
     lfo_osc = 1
     osc_a = 2
     osc_b = 3
-    message = amy.message(osc=ctl_osc, wave=amy.SILENT, chained_osc=osc_a,
+    message = amy.message(osc=ctl_osc, wave=amy.SILENT, mod_source=lfo_osc, chained_osc=osc_a,
                           filter_type=amy.FILTER_LPF24, filter_freq={'const': 200.0, 'note': 1.0, 'eg1': 5.0},
                           resonance=0.7, bp0='0,1,1000,0.2,100,0', bp1='0,1,1000,0.2,1000,0')
     message += amy.message(osc=osc_a, wave=amy.PULSE, amp={'vel': 0, 'eg0': 0}, mod_source=lfo_osc, chained_osc=osc_b)
