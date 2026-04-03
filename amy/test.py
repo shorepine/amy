@@ -1161,6 +1161,26 @@ class TestPreset257(AmyTest):
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
 
+class TestChangeSustain(AmyTest):
+  """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=500, synth=1, vel=0)
+
+class TestResetPreset(AmyTest):
+  """Setting a synth to a patch should rewrite all the params even if it's the same patch."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy.send(time=20, synth=1, patch=257)
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=500, synth=1, vel=0)
+    amy.send(time=750, synth=1, note=48, vel=1)
+    amy.send(time=950, synth=1, vel=0)
 
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':

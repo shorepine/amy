@@ -634,11 +634,19 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
                 }
             }
             // Send an unset value as the last + 1 breakpoint time to indicate the end of the BP set.
-            if (num_bps < MAX_BREAKPOINTS) {
-                d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
-                d.data.i = AMY_UNSET_VALUE(d.data.i);
-                add_delta_to_queue(&d, queue);
-            }
+            //if (num_bps < MAX_BREAKPOINTS) {
+            //    d.param = BP_START + (num_bps * 2) + (i * MAX_BREAKPOINTS * 2);
+            //    d.data.i = AMY_UNSET_VALUE(d.data.i);
+            //    add_delta_to_queue(&d, queue);
+            //}
+            // If we do this, then you can't set one value in the middle of a BP set without
+            // setting all the rest, because at this point we can't distinguish trailing
+            // commas from a truncated list.
+            // If we *don't* do this, you can't truncate an existing BP list, because the
+            // trailing part you don't overwrite never gets removed.  However, it seems like
+            // we don't have any use-cases where someone wants to curtail a BP list - but
+            // we *do* have use-cases for wanting to change the sustain level without
+            // re-specifying the release, so *don't* do this wins for now.
         }
     }
 

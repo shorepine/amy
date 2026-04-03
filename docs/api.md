@@ -201,6 +201,8 @@ Please see [AMY synthesizer details](synth.md) for more explanation on the synth
 
 [**Please see our interactive AMY tutorial for more tips on using AMY**](https://shorepine.github.io/amy/tutorial.html)
 
+A note on list parameters:  When an argument is a list of parameters, you can in general set any subset of those parameters by omitting the values you don't want to change - either by leaving them in their initial `AMY_UNSET` value in C, or by having missing values in Python lists.  For instance, you can set up an envelope that moves immediately to 1, then decase to a sutain level of 0.5 over 200ms, then has a 300ms decay to zero on note-off, with `bp0='0,1,200,0.5,300,0'.  Subsequently, you could change just the sustain level (the 4th value in the list) to 0.2 with `bp0=,,,0.2`.  However, there's at present no way to say ".. and the list should now only be 4 items long.  This only affects breakpoint sets which are variable length, but the net result is that once you have a certain number of breakpoints in a list, you cannot shorten it except by resetting the whole osc and building it all up again.
+
 
 ### `synth`s and `voice`s:
 
