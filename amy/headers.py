@@ -400,22 +400,25 @@ def make_piano_patch():
     # This just allocates the 20 oscs needed for a INTERP_PARTIALS patch
     # dpwe wants to add a `num_suboscs` field to fix this behavior soon
     amy.send(chorus=0) # Piano sounds weird with chorus on
-    amy.send(osc=0, wave=amy.INTERP_PARTIALS, preset=0)
+    amy.send(osc=0, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')  # Parent osc amp applies, disconnect vel and eg0.
     #amy.send(osc=20, wave=amy.PARTIAL)  # it's not 20, but it doesn't matter, voice is reallocated by interp_partials.c
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
 def make_amyboard_patch():
     import amy
+    # Modified for "silent control osc"
+    ctl_osc = 0
     lfo_osc = 1
-    osc_a = 0
-    osc_b = 2
-    message = amy.message(osc=osc_a, wave=amy.PULSE, mod_source=lfo_osc, bp0='0,1,1000,0.5,200,0')
-    message += amy.message(osc=osc_a, chained_osc=osc_b, filter_type=amy.FILTER_LPF24, filter_freq={'const': 200.0, 'note': 1.0, 'eg1': 5.0},
-                           resonance=0.7, bp1='0,1,1000,0.2,1000,0')
-    message += amy.message(osc=osc_b, wave=amy.SAW_DOWN, mod_source=lfo_osc, freq={'const': constants.ZERO_LOGFREQ_IN_HZ / 2}, bp0='0,1,1000,0.2,200,0')
+    osc_a = 2
+    osc_b = 3
+    message = amy.message(osc=ctl_osc, wave=amy.SILENT, mod_source=lfo_osc, chained_osc=osc_a,
+                          filter_type=amy.FILTER_LPF24, filter_freq={'const': 200.0, 'note': 1.0, 'eg1': 5.0},
+                          resonance=0.7, bp0='0,1,1000,0.2,100,0', bp1='0,1,1000,0.2,1000,0')
+    message += amy.message(osc=osc_a, wave=amy.PULSE, amp={'vel': 0, 'eg0': 0}, mod_source=lfo_osc, chained_osc=osc_b)
+    message += amy.message(osc=osc_b, wave=amy.SAW_DOWN, amp={'vel': 0, 'eg0': 0}, mod_source=lfo_osc, freq={'const': constants.ZERO_LOGFREQ_IN_HZ / 2})
     message += amy.message(osc=lfo_osc, wave=amy.TRIANGLE, amp={'vel': 0}, freq={'const': 4.0, 'note': 0, 'bend': 0}, bp0='0,1.0,10000,0')
     message += amy.message(eq=[0, 0, 0], chorus='0,,0.5,0.5')
-    return 3, message # 3 oscs
+    return 4, message # 4 oscs
 
 def make_patches(filename):
     def nothing(message):
@@ -435,7 +438,7 @@ def make_patches(filename):
             j = juno.JunoPatch()
             j.set_patch(i)
             f.write("\t/* %d: Juno %s */ \"%s\",\n" % (i, j.name, amy.retrieve_patch()))  
-            num_oscs.append(5)
+            num_oscs.append(6)
         # Do dx7
         for i in range(128):
             amy.log_patch()

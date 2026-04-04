@@ -583,6 +583,23 @@ SAMPLE compute_mod_noise(uint16_t osc) {
     return synth[osc]->last_two[0];
 }
 
+/* silent, i.e. just apply envelope */
+SAMPLE render_envelope(SAMPLE *buf, uint16_t osc) {
+    SAMPLE incoming_amp = F2S(msynth[osc]->last_amp);
+    SAMPLE ending_amp = F2S(msynth[osc]->amp);
+    SAMPLE max_value = 0;
+    SAMPLE current_amp = incoming_amp;
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+    for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
+        SAMPLE value = MULA_SS(buf[i], current_amp);
+        buf[i] = value;
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;
+        current_amp += incremental_amp;
+    }
+    msynth[osc]->last_amp = msynth[osc]->amp;
+    return max_value;
+}
 
 
 /* partial */

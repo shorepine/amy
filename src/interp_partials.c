@@ -111,9 +111,6 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
 }
 
 
-
-
-
 int _max_partials_for_partials_voice(const interp_partials_voice_t *partials_voice) {
     int max_num_partials = 0;
     for (int h = 0; h < partials_voice->num_harmonics[0]; ++h) {
@@ -175,13 +172,20 @@ void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partial
     synth[o]->breakpoint_values[0][partials_voice->num_sample_times_ms + 1] = 0;
     // Decouple osc freq and amp from note and amp.
     synth[o]->logfreq_coefs[COEF_NOTE] = 0;
-    synth[o]->amp_coefs[COEF_VEL] = 0;
+    synth[o]->amp_coefs[COEF_VEL] = 1.0;  // velocity is modified on-the-fly by the control osc to vary global amplitude.
     // Other osc params.
     synth[o]->status = SYNTH_IS_ALGO_SOURCE;
     synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     AMY_UNSET(synth[o]->note_off_clock);
     partial_note_on(o);
 }
+
+// HOW DOES INTERP_PARTIALS (e.g. DPWE_PIANO) WORK?
+// The special thing about interp_partials is that the harmonic envelopes depend on the note velocity,
+// so they all have to be recomputed in response at note_on time.  Then, because their values have been
+// determined to reflect velocity via the note_on calculation, the parent osc should not use velocity
+// as part of its overall scaling calculation, since it would otherwise be applied twice.
+// Thus, when setting up a control osc for piano, we set amp_coef[COEF_VELOCITY] = 0.
 
 void interp_partials_note_on(uint16_t osc) {
     // Choose the interp_partials preset.

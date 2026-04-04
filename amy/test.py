@@ -220,7 +220,7 @@ class TestInterpPartials(AmyTest):
     # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
     num_partials = 20
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0)
+    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
     amy.send(time=50, osc=0, note=60, vel=0.1)
@@ -234,7 +234,7 @@ class TestInterpPartialsRetrigger(AmyTest):
   def run(self):
     base_osc = 0
     num_partials = 20
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0)
+    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
     amy.send(time=50, osc=0, note=52, vel=0.7)
@@ -400,19 +400,41 @@ class TestBrass(AmyTest):
     #         resonance=0.167, bp0='60,1,340,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,340,0.3,200,0')
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0',
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
              amp='0,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2,
              )
-    amy.send(time=0, osc=2,
-             wave=amy.SINE, freq=0.974, bp0='156,1.0,100,1.0,100,0')  # amp='1,0,0,0,0,0') #
+    # Osc 2 is LFO for vibrato
+    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
     amy.send(time=100, osc=1, note=76, vel=1.0)
     amy.send(time=300, osc=1, vel=0)
     amy.send(time=600, osc=1, note=76, vel=1.0)
     amy.send(time=800, osc=1, vel=0)
     # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,672,0.354,232,0'
+
+
+class TestBrassAlt(AmyTest):
+  """Reproduce TestBrass using the VCA on a SILENT osc."""
+
+  def run(self):
+    osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
+    # Osc 1 is waveform, with vibrato mod but no amp env
+    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
+             amp='1,0,0,0,0,0', mod_source=2)
+    # Osc 2 is LFO for vibrato
+    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
+    # Osc 0 is VCF and amplitude env
+    amy.send(time=0, osc=0, wave=amy.SILENT,
+             amp='1,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
+             filter_type=amy.FILTER_LPF24, resonance=0.167,
+             filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
+             mod_source=2, chained_osc=1)
+    amy.send(time=100, osc=0, note=76, vel=1.0)
+    amy.send(time=300, osc=0, vel=0)
+    amy.send(time=600, osc=0, note=76, vel=1.0)
+    amy.send(time=800, osc=0, vel=0)
 
 
 class TestBrass2(AmyTest):
@@ -614,9 +636,9 @@ class TestPortamento(AmyTest):
     amy.send(time=50, voices="2", note=67, vel=1)
 
     # .. immediately start bending towards final pitches.
-    amy.send(time=60, voices="0,1,2", osc=0, portamento=100)
-    amy.send(time=60, voices="0,1,2", osc=1, portamento=100)
     amy.send(time=60, voices="0,1,2", osc=2, portamento=100)
+    amy.send(time=60, voices="0,1,2", osc=3, portamento=100)
+    amy.send(time=60, voices="0,1,2", osc=4, portamento=100)
     amy.send(time=60, voices="0", note=65)
     amy.send(time=60, voices="1", note=69)
     amy.send(time=60, voices="2", note=72)
@@ -1137,8 +1159,28 @@ class TestPreset257(AmyTest):
   def run(self):
     amy.send(time=0, synth=1, patch=257, num_voices=4)
     amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=900, synth=1, vel=0)
+    amy.send(time=500, synth=1, vel=0)
 
+class TestChangeSustain(AmyTest):
+  """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=500, synth=1, vel=0)
+
+class TestResetPreset(AmyTest):
+  """Setting a synth to a patch should rewrite all the params even if it's the same patch."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy.send(time=20, synth=1, patch=257)
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=500, synth=1, vel=0)
+    amy.send(time=750, synth=1, note=48, vel=1)
+    amy.send(time=950, synth=1, vel=0)
 
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
