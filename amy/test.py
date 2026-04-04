@@ -220,7 +220,7 @@ class TestInterpPartials(AmyTest):
     # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
     num_partials = 20
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0)
+    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
     amy.send(time=50, osc=0, note=60, vel=0.1)
@@ -234,7 +234,7 @@ class TestInterpPartialsRetrigger(AmyTest):
   def run(self):
     base_osc = 0
     num_partials = 20
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0)
+    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
     amy.send(time=50, osc=0, note=52, vel=0.7)
