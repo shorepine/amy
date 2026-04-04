@@ -690,7 +690,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     AMY_UNSET(psynth->midi_note);
     psynth->velocity = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->amp_coefs[j] = 0;
-    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Partials_note_on used to want this?
+    //psynth->amp_coefs[COEF_CONST] = 1.0f;  // Partials_note_on used to want this?
     psynth->amp_coefs[COEF_VEL] = 1.0f;
     psynth->amp_coefs[COEF_EG0] = 1.0f;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->logfreq_coefs[j] = 0;
@@ -1446,9 +1446,10 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc]->duty = combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
     msynth[osc]->pan = combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
     // amp is a special case - coeffs apply in log domain.
+    // Linear combination of amp coefs is then mapped so that 1 -> 0.001 and 2 -> 1 exponentially.
+    float new_amp = powf(10.0f, 3.0f * (-2.0f + combine_controls(ctrl_inputs, synth[osc]->amp_coefs)));
     // Also, we advance one frame by writing both last_amp and amp (=next amp)
     // *Except* for partials, where we allow one frame of ramp-on.
-    float new_amp = combine_controls_mult(ctrl_inputs, synth[osc]->amp_coefs);
     if (synth[osc]->wave == PARTIAL) {
         msynth[osc]->last_amp = msynth[osc]->amp;
         msynth[osc]->amp = new_amp;

@@ -77,7 +77,9 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     }
     if(bp_r < 0) {
         // no breakpoints, return key gate.
-        if(AMY_IS_SET(synth[osc]->note_off_clock)) scale = 0;
+        // Change: Now an empty env reads as 1.0 *all the time*.
+        // If you want a key gate, define bpX='0,1,0,1,0,0' (or maybe just '0,1,0,0').
+        //if(AMY_IS_SET(synth[osc]->note_off_clock)) scale = 0;
         synth[osc]->last_scale[bp_set] = scale;
         //return scale;
         goto return_label;

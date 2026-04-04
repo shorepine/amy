@@ -427,7 +427,7 @@ class TestBrassAlt(AmyTest):
     amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
     # Osc 0 is VCF and amplitude env
     amy.send(time=0, osc=0, wave=amy.SILENT,
-             amp='1,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
+             amp='0,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2, chained_osc=1)
