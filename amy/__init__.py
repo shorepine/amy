@@ -138,8 +138,10 @@ def str_of_int(arg):
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
     ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
-    ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'), ('bp0', 'AL'), 
-    ('bp1', 'BL'), ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'), 
+    ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
+    ('bp0', 'AL'), ('bp1', 'BL'),
+    ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
+    ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
     ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),

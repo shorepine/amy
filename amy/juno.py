@@ -281,7 +281,7 @@ class JunoPatch:
     )
 
   def _amp_coef_string(self, level):
-    return ',,%s,1,0' % ffmt(max(.001, to_level(level)))
+    return '%s,,1,1,0' % ffmt(max(.001, to_level(level)))
 
   def _freq_coef_string(self, base_freq):
     return '%s,1,,,,%s,1' % (

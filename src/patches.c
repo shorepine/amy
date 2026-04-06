@@ -525,12 +525,12 @@ void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
     // Generate the reference "empty synth".
     struct synthinfo empty_synth;
     // We need to have space for the breakpoints.
-    uint32_t times[MAX_BREAKPOINT_SETS * DEFAULT_NUM_BREAKPOINTS];
-    float values[MAX_BREAKPOINT_SETS * DEFAULT_NUM_BREAKPOINTS];
+    uint32_t times[MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS];
+    float values[MAX_BREAKPOINT_SETS * MAX_BREAKPOINTS];
     for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
-        empty_synth.max_num_breakpoints[i] = DEFAULT_NUM_BREAKPOINTS;
-        empty_synth.breakpoint_times[i] = times + i * DEFAULT_NUM_BREAKPOINTS;
-        empty_synth.breakpoint_values[i] = values + i * DEFAULT_NUM_BREAKPOINTS;
+        empty_synth.max_num_breakpoints[i] = synth[osc]->max_num_breakpoints[i];
+        empty_synth.breakpoint_times[i] = times + i * MAX_BREAKPOINTS;
+        empty_synth.breakpoint_values[i] = values + i * MAX_BREAKPOINTS;
     }
     reset_osc_by_pointer(&empty_synth, /* msynth */ NULL);
     // Go through parameter fields picking out the ones that are nondefault.
