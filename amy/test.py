@@ -222,7 +222,7 @@ class TestInterpPartials(AmyTest):
   def run(self):
     # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
-    num_partials = 25
+    num_partials = 25  # Doesn't do anything?
     amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL, amp='1,0,1,1')

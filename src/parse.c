@@ -250,8 +250,8 @@ static int parse_breakpoint_event_core_int_db(char* message, uint32_t *times_ms,
                 AMY_UNSET(times_ms[bp_index]);
             }
         } else {
-            //values[bp_index] = int_db_to_float_lin(vals[i]);
-            values[bp_index] = int_db_to_60dB_01(vals[i]);
+            values[bp_index] = int_db_to_float_lin(vals[i]);
+            //values[bp_index] = int_db_to_60dB_01(vals[i]);
         }
     }
     return num_vals;

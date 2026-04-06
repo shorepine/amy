@@ -1411,6 +1411,8 @@ float amp_combine_controls(float *controls, float *coefs) {
     // Linear combination of amp coefs is then mapped so that 0 -> 0.001 and 1 -> 1 exponentially.
     float result = 0;
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)  {
+        //if (amy_global.time > 0.311 && amy_global.time < 0.315)
+        //    fprintf(stderr, "amp_combine t=%.3f coef %d = %.3f arg %.3f\n", amy_global.time, i, coefs[i], controls[i]);
         result -= (i == 0 || coefs[i] > 0) ? 1.0f : 0;
         if (coefs[i] != 0)
             result += map_60dB_to_01f(coefs[i] * controls[i]);

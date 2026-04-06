@@ -103,8 +103,6 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             SAMPLE value = render_partial(buf, o);
             //fprintf(stderr, "render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
             if (value > max_value) max_value = value;
-            // Deferred termination of this partial, after final ramp-out.
-            if (synth[o]->amp_coefs[COEF_CONST] == 0)  partial_note_off(o);
         }
     }
     return max_value;

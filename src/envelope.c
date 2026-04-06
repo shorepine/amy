@@ -197,6 +197,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                                          F2S(1.0f)
                                          - exp2_lut(MUL4_SS(exponential_rate,
                                                             F2S(time_ratio)))));
+            if (scale < 0)  scale = 0;  // Overshoot ramp-to-zero from limited resolution?
             //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, time_ratio, S2F(scale));
         }
     }
