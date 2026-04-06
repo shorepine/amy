@@ -1246,7 +1246,7 @@ def main(argv):
 
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
-    print('\n'.join(sorted(errors, key=lambda x: float(x[-8:-3]), reverse=True)))
+    print('\n'.join(sorted(errors, key=lambda x: float(x.split(' ')[-2].split('=')[1]), reverse=True)))
     sys.exit(1)
   else:
     print(len(oks), "tests pass")
