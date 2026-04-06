@@ -49,7 +49,6 @@ void partials_note_on(uint16_t osc) {
             // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
             // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
             synth[o]->preset = synth[osc]->preset;
-
             synth[o]->logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
             synth[o]->status = SYNTH_IS_ALGO_SOURCE;
             synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
@@ -102,9 +101,8 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
             //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
             SAMPLE value = render_partial(buf, o);
+            //fprintf(stderr, "render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
             if (value > max_value) max_value = value;
-            // Deferred termination of this partial, after final ramp-out.
-            if (synth[o]->amp_coefs[COEF_CONST] == 0)  partial_note_off(o);
         }
     }
     return max_value;
@@ -159,6 +157,7 @@ void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partial
     // Setup the specified frequency.
     synth[o]->logfreq_coefs[COEF_CONST] = _logfreq_of_midi_cents(harm_param[0]);
     // Setup envelope.
+    //synth[o]->eg_type[0] = ENVELOPE_DB;
     synth[o]->breakpoint_times[0][0] = 0;
     synth[o]->breakpoint_values[0][0] = 0;
     int last_time = 0;

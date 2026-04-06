@@ -828,6 +828,9 @@ void config_echo(float level, float delay_ms, float max_delay_ms, float feedback
 void osc_note_on(uint16_t osc, float initial_freq);
 void chorus_note_on(float initial_freq);
 
+float map_60dB_to_01f(float lin);
+float map_01_to_60dBf(float log);
+
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
 

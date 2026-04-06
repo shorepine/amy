@@ -172,12 +172,15 @@ class TestBuildYourOwnPartials(AmyTest):
     num_partials = 16
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     base_osc = 0
-    amy.send(time=0, osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials)
+    amy.send(time=0, osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, eg0='0,1,30000,0')
     for i in range(1, num_partials + 1):
       # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
-      amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, bp0='50,%.2f,%d,0,0,0' % ((1.0 / i), 1000 // i))
+      # Note that "vel sentivity" in amp actually means "Sensitivity to parent osc amplitude", since it is passed down through a modified vel.
+      amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, eg0='50,1,%d,0,50,0' % (1000 // i),
+               amp='%.2f,0,1,1' % (1.0 / i))
     amy.send(time=100, osc=0, note=60, vel=0.5)
     amy.send(time=200, osc=0, note=72, vel=1)
+    amy.send(time=800, osc=0, note=72, vel=0)
 
 
 class TestBYOPVoices(AmyTest):
@@ -219,10 +222,10 @@ class TestInterpPartials(AmyTest):
   def run(self):
     # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
-    num_partials = 20
+    num_partials = 25  # Doesn't do anything?
     amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
-      amy.send(osc=base_osc + i, wave=amy.PARTIAL)
+      amy.send(osc=base_osc + i, wave=amy.PARTIAL, amp='1,0,1,1')
     amy.send(time=50, osc=0, note=60, vel=0.1)
     amy.send(time=300, osc=0, note=67, vel=0.6)
     amy.send(time=550, osc=0, note=72, vel=1)
@@ -251,8 +254,8 @@ class TestSineEnv(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='0,0,0.85,1,0,0', bp0='50,1,200,0.1,50,0')
-    amy.send(time=100, vel=1)
+    amy.send(time=0, osc=0, amp='1,0,1,1,0,0', bp0='50,1,200,0.1,50,0')
+    amy.send(time=100, vel=.85)
     amy.send(time=500, vel=0)
 
 
@@ -260,7 +263,7 @@ class TestSineEnv2(AmyTest):
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='0,0,1,1,0,0', bp0='0,0,200,5,200,0,0,0')
+    amy.send(time=0, osc=0, amp='1.0,0,1,1,0,0', bp0='0,0,200,5,200,0,0,0')
     amy.send(time=100, vel=1)
     amy.send(time=500, vel=0)
     # The DX7 algo is weird - attack is different from decay, envelope is clipped to 1.
@@ -303,7 +306,7 @@ class TestXanaduFM(AmyTest):
   def run(self):
     amy.send(volume=100)
     #amy.send(time=0, osc=3, wave=amy.SINE, freq=1/7.5, phase=0.75, amp=.99)
-    amy.send(time=0, osc=2, wave=amy.SINE, ratio=1, amp='0.5,0,0,0,0,1') #, mod_source=3)
+    amy.send(time=0, osc=2, wave=amy.SINE, ratio=1, amp='0.5,0,0,0,0,0') #, mod_source=3)
     amy.send(time=0, osc=1, wave=amy.SINE, ratio=1, amp='1,0,0,1', bp0='1000,1,1000,0')
     amy.send(time=0, osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1', bp0='0,1,1000,1,2000,0')
     amy.send(time=100, osc=0, note=49, vel=1)
@@ -393,15 +396,15 @@ class TestBrass(AmyTest):
   """One of the Juno-6 patches, spelled out."""
 
   def run(self):
-    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
+    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
     #         resonance=0.167, bp0='60,1,740,0.9,200,0', filter_freq='6000,0.5,0,0,1,0',
     #         bp1='60,1,740,0.9,200,0')
-    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
+    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
     #         resonance=0.167, bp0='60,1,340,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,340,0.3,200,0')
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
     amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
-             amp='0,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
+             amp='0.85,0,1,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2,
@@ -427,7 +430,7 @@ class TestBrassAlt(AmyTest):
     amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
     # Osc 0 is VCF and amplitude env
     amy.send(time=0, osc=0, wave=amy.SILENT,
-             amp='1,0,0.85,1,0,0', bp0='30,1,672,0.354,100,0',
+             amp='0.85,0,1,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2, chained_osc=1)
@@ -442,7 +445,7 @@ class TestBrass2(AmyTest):
 
   def run(self):
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.85,1', freq=osc_freq_str + ',1',
+    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1', freq=osc_freq_str + ',1',
              resonance=0.713, filter_type=amy.FILTER_LPF24, filter_freq='93.726,0.677,0,0,9.134',
              bp0='30,1,672,0.354,232,0', bp1='30,1,672,0.354,232,0')
     amy.send(time=100, osc=0, note=60, vel=1.0)
@@ -454,7 +457,7 @@ class TestGuitar(AmyTest):
 
   def run(self):
     base_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0,0,0.756,1', freq=base_freq_str + ',1',
+    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.756,0,1,1', freq=base_freq_str + ',1',
              filter_freq='16.23,0.236,0,0,11.181', resonance=0.753, filter_type=amy.FILTER_LPF24,
              bp0='6,1,51,0.425,153,0',
              bp1='6,1,51,0.425,153,0')
@@ -522,7 +525,7 @@ class TestLowVcf(AmyTest):
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
              filter_type=amy.FILTER_LPF24, resonance=1.0,
-             amp='0,0,0.85,1',
+             amp='0.85,0,1,1',
              filter_freq='161.28,0,0,0,5',
              bp0='0,1,0,0',
              bp1='0,1,600,0,1,0')
@@ -536,7 +539,7 @@ class TestLowerVcf(AmyTest):
   def run(self):
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
              filter_type=amy.FILTER_LPF24, resonance=4.0,
-             amp='0,0,0.85,1',
+             amp='0.85,0,1,1',
              filter_freq='50,0,0,0,6',
              bp0='0,1,0,0',
              bp1='0,1,300,0,1,0')
@@ -582,11 +585,11 @@ class TestChainedOsc(AmyTest):
     # TestFilter but on Saw + subosc with same envelope.
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
     #amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    #amy.send(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0,0,0.2,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    #amy.send(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0.2,0,1,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     #amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
-    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0,0,0.2,1", freq=osc_freq_str + ',1,0,0,0,0,1')
+    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0.2,0,1,1", freq=osc_freq_str + ',1,0,0,0,0,1')
     amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=900, osc=0, vel=0)
@@ -764,10 +767,10 @@ class TestOwBassClick(AmyTest):
   def run(self):
     amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=3)
     # Ow Bass reproduced by hand on AMYboard Editor.
-    amy.send(time=10, synth=0, osc=0, wave=amy.PULSE, amp=',,0.551', freq=220, filter_freq='20,1,,,5.443', duty=0.697,
+    amy.send(time=10, synth=0, osc=0, wave=amy.PULSE, amp='0.551,,1', freq=220, filter_freq='20,1,,,5.443', duty=0.697,
              resonance=4.381, chained_osc=2, mod_source=1, filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0')
     amy.send(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
-    amy.send(time=10, synth=0, osc=2, wave=amy.SAW_UP, amp=',,0.551', freq='110', mod_source=1, bp0='13,1,0,1,16,0')
+    amy.send(time=10, synth=0, osc=2, wave=amy.SAW_UP, amp='0.551,,1', freq='110', mod_source=1, bp0='13,1,0,1,16,0')
     amy.send(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')
     # Rapid repeated notes.
     amy.send(time=100, synth=0, note=48, vel=1)
@@ -1214,11 +1217,11 @@ def main(argv):
     #TestBleep().test()
     #TestBrass().test()
     #TestBrass2().test()
-    #TestSineEnv().test()
+    #print(TestSineEnv().test()[1])
     #TestSawDownOsc().test()
     #TestGuitar().test()
     #TestFilter().test()
-    #TestAlgo().test()
+    print(TestAlgo().test()[1])
     #TestBleep().test()
     #TestChainedOsc().test()
     #TestJunoPatch().test()
@@ -1235,14 +1238,15 @@ def main(argv):
     #print(TestFileTransfer().test()[1])
     #print(TestVoiceStealClick().test()[1])
     #print(TestOwBassClick().test()[1])
-    print(TestXanaduFM().test()[1])
+    #print(TestXanaduFM().test()[1])
+    #print(TestInterpPartials().test()[1])
 
   if not quiet:
     amy.send(debug=0)
 
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
-    print('\n'.join(errors))
+    print('\n'.join(sorted(errors, key=lambda x: float(x.split(' ')[-2].split('=')[1]), reverse=True)))
     sys.exit(1)
   else:
     print(len(oks), "tests pass")

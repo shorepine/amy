@@ -191,7 +191,23 @@ void copy_param_list_substring(char *dest, const char *src) {
     dest[c] = '\0';
 }
 
-float int_db_to_float_lin(uint32_t db);
+float int_db_to_float_lin(uint32_t db) {
+    // in interp_partials.h, we store amplitudes as integer dB values in range 0..100.
+    float lin = 0;
+    if (AMY_IS_UNSET(db)) return AMY_UNSET_VALUE(lin);
+    lin = powf(10.0f, ((((float)db) - 100.0f) / 20.0f)) - 0.001f;
+    if (lin < 0) return 0;
+    return lin;
+}
+
+float int_db_to_60dB_01(uint32_t db) {
+    // Map 100 (db) to 1.0, 40 (db) to 0.0
+    float lin = 0;
+    if (AMY_IS_UNSET(db)) return AMY_UNSET_VALUE(lin);
+    lin = 1.0f + (((float)db - 100.0f) / (3.0f * 20.0f));
+    if (lin < 0) return 0;
+    return lin;
+}
 
 //static int16_t clamp_bp_time_ms_to_i16(uint32_t t_ms) {
 //    if (t_ms >= (uint32_t)SHRT_MAX) return (int16_t)(SHRT_MAX - 1);
@@ -235,6 +251,7 @@ static int parse_breakpoint_event_core_int_db(char* message, uint32_t *times_ms,
             }
         } else {
             values[bp_index] = int_db_to_float_lin(vals[i]);
+            //values[bp_index] = int_db_to_60dB_01(vals[i]);
         }
     }
     return num_vals;
@@ -284,14 +301,6 @@ uint32_t ms_to_samples(uint32_t ms) {
     if (AMY_IS_UNSET(ms)) return AMY_UNSET_VALUE(samps);
     samps = (uint32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
     return samps;
-}
-
-float int_db_to_float_lin(uint32_t db) {
-    float lin = 0;
-    if (AMY_IS_UNSET(db)) return AMY_UNSET_VALUE(lin);
-    lin = powf(10.0f, ((((float)db) - 100.0f) / 20.0f)) - 0.001f;
-    if (lin < 0) return 0;
-    return lin;
 }
 
 void parse_coef_message(char *message, float *coefs) {

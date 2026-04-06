@@ -272,7 +272,7 @@ void instrument_release(int instrument_number) {
 
 bool instrument_number_ok(int instrument_number, char *tag) {
     if (instrument_number < 0 || instrument_number >= max_instruments) {
-        fprintf(stderr, "instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
+        if (tag) fprintf(stderr, "instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
         return false;
     }
     return true;

@@ -64,6 +64,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     int eg_type = synth[osc]->eg_type[bp_set];
     uint32_t bp_end_times[MAX_BREAKPOINTS];
     uint32_t cumulated_time = 0;
+    int sign = 1;
 
     // Scan breakpoints to find which one is release (the last one)
     bp_r = -1;
@@ -77,7 +78,9 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
     }
     if(bp_r < 0) {
         // no breakpoints, return key gate.
-        if(AMY_IS_SET(synth[osc]->note_off_clock)) scale = 0;
+        // Change: Now an empty env reads as 1.0 *all the time*.
+        // If you want a key gate, define bpX='0,1,0,1,0,0' (or maybe just '0,1,0,0').
+        //if(AMY_IS_SET(synth[osc]->note_off_clock)) scale = 0;
         synth[osc]->last_scale[bp_set] = scale;
         //return scale;
         goto return_label;
@@ -133,7 +136,6 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         v0 = F2S(synth[osc]->breakpoint_values[bp_set][found-1]);
     }
     scale = v0;
-    int sign = 1;
     if (v0 < 0 || v1 < 0) {
         sign = -1;
         v0 = -v0; v1 = -v1;
@@ -186,7 +188,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                                 exp2_lut(MUL4_SS(dx7_exponential_rate,
                                                  F2S(0.001f * (elapsed - t0)))));
             }
-        } else { // ENVELOPE_NORMAL - "false exponential"?
+        } else { // ENVELOPE_NORMAL - "false exponential"? or ENVELOPE_DB
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
             // so make the target gap a little bit bigger, to ensure we meet v1
             //scale = v0 + MUL4_SS(v1 - v0, F2S(exponential_rate_overshoot_factor * (1.0f - exp2f(-exponential_rate * time_ratio))));
@@ -195,19 +197,19 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                                          F2S(1.0f)
                                          - exp2_lut(MUL4_SS(exponential_rate,
                                                             F2S(time_ratio)))));
+            if (scale < 0)  scale = 0;  // Overshoot ramp-to-zero from limited resolution?
             //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, time_ratio, S2F(scale));
         }
     }
-    // If sign is negative, flip it back again.
-    if (sign < 0) {
-        scale = -scale;
-    }
-    // Keep track of the most-recently returned non-release scale.
  return_label:
     if (!release) synth[osc]->last_scale[bp_set] = scale;
+    // If sign is negative, flip it back again.
+    if (sign < 0) {
+        scale = -scale;  // does not mix well with no_amp_001
+    }
+    // Keep track of the most-recently returned non-release scale.
     //if (osc < AMY_OSCS && found != -1)
     //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)
     return scale;
 }
-

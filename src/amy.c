@@ -278,12 +278,12 @@ void alloc_chorus_delay_lines(void) {
     bool success = true;
     for(int c = 0; c < AMY_NCHANS; ++c) {
         delay_line_t *delay_line = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
-	if (delay_line) {
-	    chorus_delay_lines[c] = delay_line;
-	} else {
-	    success = false;
-	    break;
-	}
+        if (delay_line) {
+            chorus_delay_lines[c] = delay_line;
+        } else {
+            success = false;
+            break;
+        }
     }
     if (!success) {
         fprintf(stderr, "unable to alloc chorus of %d samples\n", (int)DELAY_LINE_LEN);
@@ -485,6 +485,20 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 
 }
 
+float map_60dB_to_01f(float lin) {
+    // Map .001 to 0, 1 to 1 logarithmically.
+    if (lin == 0) return -10.0f;
+    float result = 1.0f + 0.10034333188799373f * log2f(lin);  // 0.100343 = 1 / (3 * log2(10))
+    return result;
+}
+
+float map_01_to_60dBf(float log) {
+    // Inverse of map_60dB_to_01f - Map (0, 1) to (.001, 1) exponentially
+    if (log <= -10.0f) return 0;
+    float result = exp2f((log - 1.0f) / 0.10034333188799373f);
+    return result;
+}
+
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < (uint32_t)AMY_OSCS + 1) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
@@ -493,17 +507,19 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
         EVENT_TO_DELTA_F(FIELD[i], FLAG + i)
 // Const freq coef is in Hz, rest are linear.
-#define EVENT_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
+#define EVENT_TO_DELTA_COEFS_COEF0_SPECIAL(FIELD, FLAG, COEF0_FN)        \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
         if (AMY_IS_SET(e->FIELD[i]))  {              \
             d.param = FLAG + i;  \
             if (i == COEF_CONST)  \
-                d.data.f = logfreq_of_freq(e->FIELD[i]);  \
+                d.data.f = COEF0_FN(e->FIELD[i]);  \
             else \
                 d.data.f = e->FIELD[i]; \
             add_delta_to_queue(&d, queue); \
         }    \
     }
+#define EVENT_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
+    EVENT_TO_DELTA_COEFS_COEF0_SPECIAL(FIELD, FLAG, logfreq_of_freq)
 
 // Add a API facing event, convert into delta directly
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
@@ -690,9 +706,9 @@ void reset_osc_params(struct synthinfo *psynth) {
     AMY_UNSET(psynth->midi_note);
     psynth->velocity = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->amp_coefs[j] = 0;
-    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Partials_note_on used to want this?
-    psynth->amp_coefs[COEF_VEL] = 1.0f;
-    psynth->amp_coefs[COEF_EG0] = 1.0f;
+    psynth->amp_coefs[COEF_CONST] = 1.0f;  // Default overall gain
+    psynth->amp_coefs[COEF_VEL] = 1.0f;    // Default sensitive to vel
+    psynth->amp_coefs[COEF_EG0] = 1.0f;    // Default gate by eg0
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->logfreq_coefs[j] = 0;
     psynth->logfreq_coefs[COEF_NOTE] = 1.0;
     psynth->logfreq_coefs[COEF_BEND] = 1.0;
@@ -717,8 +733,13 @@ void reset_osc_params(struct synthinfo *psynth) {
             AMY_UNSET(psynth->breakpoint_times[j][k]);
             AMY_UNSET(psynth->breakpoint_values[j][k]);
         }
-        psynth->eg_type[j] = ENVELOPE_NORMAL;
+        psynth->eg_type[j] = ENVELOPE_NORMAL;  // ENVELOPE_LINEAR;  // no_amp_001: was ENVELOPE_NORMAL
     }
+    // Default EG0 setup to be key gate
+    psynth->breakpoint_times[0][0] = 0;
+    psynth->breakpoint_values[0][0] = 1.0f;
+    psynth->breakpoint_times[0][1] = 0;
+    psynth->breakpoint_values[0][1] = 0;
     // Not part of event-driven config, but still stable through the evolution of a note.
     psynth->terminate_on_silence = 1;  // This is what we do, *except* for PCM.
     psynth->lut = NULL;
@@ -884,6 +905,11 @@ void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
                     synth[osc]->breakpoint_times[i][j] = breakpoint_times[i][j];
                     synth[osc]->breakpoint_values[i][j] = breakpoint_values[i][j];
                 }
+                // And clear the ones beyond
+                for (int j = num_old_breakpoints[i]; j < synth[osc]->max_num_breakpoints[i]; ++j) {
+                    AMY_UNSET(synth[osc]->breakpoint_times[i][j]);
+                    AMY_UNSET(synth[osc]->breakpoint_values[i][j]);
+                }
             }
         }
     }
@@ -1001,7 +1027,7 @@ void show_debug(uint8_t type) {
         }
         if (type > 6) {
             for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
-                if (instrument_number_exists(synth, "debug")) {
+                if (instrument_number_exists(synth, NULL)) {
                     fprintf(stderr, "synth %d:\n", synth);
                     void * state = NULL;
                     amy_event event = amy_default_event();
@@ -1123,10 +1149,10 @@ void play_delta(struct delta *d) {
 
     if(d->param == MIDI_NOTE) {
         // Midi note and Velocity are propagated to chained_osc.
-	uint16_t osc = d->osc;
-	while(AMY_IS_SET(osc)) {
-	    synth[osc]->midi_note = d->data.f;
-	    osc = synth[osc]->chained_osc;
+        uint16_t osc = d->osc;
+        while(AMY_IS_SET(osc)) {
+            synth[osc]->midi_note = d->data.f;
+            osc = synth[osc]->chained_osc;
         }
     }
     if(d->param == WAVE) {
@@ -1269,105 +1295,106 @@ void play_delta(struct delta *d) {
     if(d->param == VELOCITY) {
         //fprintf(stderr, "play_delta velocity %.1f osc %d note %.1f time %d\n", d->data.f, d->osc, synth[d->osc]->midi_note, d->time);
         if (d->data.f > 0) { // new note on (even if something is already playing on this osc)
-	    // Calculation common to all chained oscs.
-	    float note_logfreq = 0;
-	    if (AMY_IS_SET(synth[d->osc]->midi_note)) {
-		// synth[osc]->logfreq_coefs[COEF_CONST] = 0;
-		note_logfreq = logfreq_for_midi_note(synth[d->osc]->midi_note);
-	    }
-	    // Loop through chained oscs
-	    uint16_t osc = d->osc;
-	    while(AMY_IS_SET(osc)) {
-		synth[osc]->velocity = d->data.f;
-		if (AMY_IS_SET(synth[osc]->chained_osc)
+            // Calculation common to all chained oscs.
+            float note_logfreq = 0;
+            if (AMY_IS_SET(synth[d->osc]->midi_note)) {
+                // synth[osc]->logfreq_coefs[COEF_CONST] = 0;
+                note_logfreq = logfreq_for_midi_note(synth[d->osc]->midi_note);
+            }
+            // Loop through chained oscs
+            uint16_t osc = d->osc;
+            while(AMY_IS_SET(osc)) {
+                synth[osc]->velocity = d->data.f;  // was map_60dB_to_01f
+                if (AMY_IS_SET(synth[osc]->chained_osc)
                     || synth[osc]->amp_coefs[COEF_VEL] == 0
                     || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH) {
-		    synth[osc]->status = SYNTH_AUDIBLE;
-		    // an osc came in with a note on.
-		    // start the bp clock
-		    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; //esp_timer_get_time() / 1000;
+                    synth[osc]->status = SYNTH_AUDIBLE;
+                    // ** no_amp_001
+                    // an osc came in with a note on.
+                    // start the bp clock
+                    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; //esp_timer_get_time() / 1000;
 
-		    // if there was a filter active for this voice, reset it
-		    //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
-		    // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
-		    // But if a trigger_phase is set, use that.
-		    if (AMY_IS_SET(synth[osc]->trigger_phase))
-			synth[osc]->phase = F2P(synth[osc]->trigger_phase);
+                    // if there was a filter active for this voice, reset it
+                    //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
+                    // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
+                    // But if a trigger_phase is set, use that.
+                    if (AMY_IS_SET(synth[osc]->trigger_phase))
+                        synth[osc]->phase = F2P(synth[osc]->trigger_phase);
 
-		    // restart the waveforms
-		    // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
-		    float initial_logfreq = synth[osc]->logfreq_coefs[COEF_CONST] + synth[osc]->logfreq_coefs[COEF_NOTE] * note_logfreq;
-		    // If we're coming out of note-off, set the freq history for portamento.
-		    //if (AMY_IS_SET(synth[osc]->note_off_clock))
-		    //    msynth[osc]->last_logfreq = initial_logfreq;
-		    // Now we've tested that, we can reset note-off clocks.
-		    AMY_UNSET(synth[osc]->note_off_clock);  // Most recent note event is not note-off.
-		    //AMY_UNSET(synth[osc]->zero_amp_clock);
-		    // Actually, start with an expectation that the voice will be zero amp, give it one frame to prove otherwise.
+                    // restart the waveforms
+                    // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
+                    float initial_logfreq = synth[osc]->logfreq_coefs[COEF_CONST] + synth[osc]->logfreq_coefs[COEF_NOTE] * note_logfreq;
+                    // If we're coming out of note-off, set the freq history for portamento.
+                    //if (AMY_IS_SET(synth[osc]->note_off_clock))
+                    //    msynth[osc]->last_logfreq = initial_logfreq;
+                    // Now we've tested that, we can reset note-off clocks.
+                    AMY_UNSET(synth[osc]->note_off_clock);  // Most recent note event is not note-off.
+                    //AMY_UNSET(synth[osc]->zero_amp_clock);
+                    // Actually, start with an expectation that the voice will be zero amp, give it one frame to prove otherwise.
 #define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-		    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 1 * AMY_BLOCK_SIZE;
+                    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 1 * AMY_BLOCK_SIZE;
 
-		    float initial_freq = freq_of_logfreq(initial_logfreq);
-		    osc_note_on(osc, initial_freq);
-		    // trigger the mod source, if we have one
-		    uint16_t mod_osc = synth[osc]->mod_source;
-		    if(AMY_IS_SET(mod_osc)) {
-			if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
-			    synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
-
-			synth[mod_osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.
-			switch(synth[mod_osc]->wave) {
-			case SINE: sine_mod_trigger(mod_osc); break;
-			case SAW_DOWN: saw_up_mod_trigger(mod_osc); break;
-			case SAW_UP: saw_down_mod_trigger(mod_osc); break;
-			case TRIANGLE: triangle_mod_trigger(mod_osc); break;
-			case PULSE: pulse_mod_trigger(mod_osc); break;
-            case PCM:
-            case PCM_LEFT:
-            case PCM_RIGHT:
-                pcm_mod_trigger(mod_osc);
-                break;
-			case CUSTOM: custom_mod_trigger(mod_osc); break;
-			}
-		    }
-		}
-		osc = synth[osc]->chained_osc;
-	    }
+                    float initial_freq = freq_of_logfreq(initial_logfreq);
+                    osc_note_on(osc, initial_freq);
+                    // trigger the mod source, if we have one
+                    uint16_t mod_osc = synth[osc]->mod_source;
+                    if(AMY_IS_SET(mod_osc)) {
+                        if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
+                            synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
+                        synth[mod_osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.
+                        switch(synth[mod_osc]->wave) {
+                        case SINE: sine_mod_trigger(mod_osc); break;
+                        case SAW_DOWN: saw_up_mod_trigger(mod_osc); break;
+                        case SAW_UP: saw_down_mod_trigger(mod_osc); break;
+                        case TRIANGLE: triangle_mod_trigger(mod_osc); break;
+                        case PULSE: pulse_mod_trigger(mod_osc); break;
+                        case PCM:
+                        case PCM_LEFT:
+                        case PCM_RIGHT:
+                            pcm_mod_trigger(mod_osc);
+                            break;
+                        case CUSTOM: custom_mod_trigger(mod_osc); break;
+                        }
+                    }
+                }
+                osc = synth[osc]->chained_osc;
+            }
         } else if(synth[d->osc]->velocity > 0 && d->data.f == 0) { // new note off
-	    uint16_t osc = d->osc;
-	    while(AMY_IS_SET(osc)) {
-		// DON'T clear velocity, we still need to reference it in decay.
-		//synth[osc]->velocity = 0;
-		switch(synth[osc]->wave) {
-		case KS: ks_note_off(osc); break;
-		case ALGO:  algo_note_off(osc); break;
-        case PCM:
-        case PCM_LEFT:
-        case PCM_RIGHT:
-            pcm_note_off(osc);
-            break;
-		case AMY_MIDI: amy_send_midi_note_off(osc); break;
-		case CUSTOM: custom_note_off(osc); break;
-		case BYO_PARTIALS:
-		case INTERP_PARTIALS:
-		    AMY_UNSET(synth[osc]->note_on_clock);
-		    synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-		    if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
-		    else partials_note_off(osc);
-		    break;
-		default:
-		    // osc note off, start release
-		    // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
-		    // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
-		    // those waves on note-off.
-		    AMY_UNSET(synth[osc]->note_on_clock);
-		    if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
-			// Only set the note_off_clock (start of release) if we don't already have one.
-			synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-		    }
-		}
-		osc = synth[osc]->chained_osc;
-	    }
+            uint16_t osc = d->osc;
+            while(AMY_IS_SET(osc)) {
+                // DON'T clear velocity, we still need to reference it in decay.
+                //synth[osc]->velocity = 0;
+                switch(synth[osc]->wave) {
+                case KS: ks_note_off(osc); break;
+                case ALGO: algo_note_off(osc); break;
+                case PCM:
+                case PCM_LEFT:
+                case PCM_RIGHT:
+                    pcm_note_off(osc);
+                    break;
+                case AMY_MIDI: amy_send_midi_note_off(osc); break;
+                case CUSTOM: custom_note_off(osc); break;
+                case BYO_PARTIALS:
+                case INTERP_PARTIALS:
+                    AMY_UNSET(synth[osc]->note_on_clock);
+                    synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                    if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
+                    else partials_note_off(osc);
+                    break;
+                default:
+                    // ** no_amp_001
+                    // osc note off, start release
+                    // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
+                    // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
+                    // those waves on note-off.
+                    AMY_UNSET(synth[osc]->note_on_clock);
+                    if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
+                        // Only set the note_off_clock (start of release) if we don't already have one.
+                        synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                    }
+                }
+                osc = synth[osc]->chained_osc;
+            }
         }
     }
     AMY_PROFILE_STOP(PLAY_DELTA)
@@ -1380,13 +1407,22 @@ float combine_controls(float *controls, float *coefs) {
     return result;
 }
 
-float combine_controls_mult(float *controls, float *coefs) {
-    float result = 1.0;
-    for (int i = 0; i < NUM_COMBO_COEFS; ++i)
+float amp_combine_controls(float *controls, float *coefs) {
+    // Linear combination of amp coefs is then mapped so that 0 -> 0.001 and 1 -> 1 exponentially.
+    float result = 0;
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i)  {
+        //if (amy_global.time > 0.311 && amy_global.time < 0.315)
+        //    fprintf(stderr, "amp_combine t=%.3f coef %d = %.3f arg %.3f\n", amy_global.time, i, coefs[i], controls[i]);
+        result -= (i == 0 || coefs[i] > 0) ? 1.0f : 0;
         if (coefs[i] != 0)
-            // COEF_MOD and COEF_BEND are applied as amp *= (1 + COEF * CONTROL).
-            result *= ((i > COEF_EG1)? 1.0f : 0) + coefs[i] * controls[i];
-    // Apply a threshold to "fully off".
+            result += map_60dB_to_01f(coefs[i] * controls[i]);
+    }
+    result = 3.0f * (result);
+    //if (log_amp < -2.0f) {
+    //    // Double the slope below 0.01.
+    //    log_amp = -2.0f + 2.0f * (log_amp + 2.0f);
+    //}
+    result = powf(10.0f, result);
     if (result <= AMP_THRESH_PLUS)  result = 0; 
     return result;
 }
@@ -1446,9 +1482,9 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc]->duty = combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
     msynth[osc]->pan = combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
     // amp is a special case - coeffs apply in log domain.
+    float new_amp = amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
     // Also, we advance one frame by writing both last_amp and amp (=next amp)
     // *Except* for partials, where we allow one frame of ramp-on.
-    float new_amp = combine_controls_mult(ctrl_inputs, synth[osc]->amp_coefs);
     if (synth[osc]->wave == PARTIAL) {
         msynth[osc]->last_amp = msynth[osc]->amp;
         msynth[osc]->amp = new_amp;
@@ -1460,7 +1496,7 @@ void hold_and_modify(uint16_t osc) {
         // Advance the envelopes to the beginning of the next frame.
         ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
         ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
-        msynth[osc]->amp = combine_controls_mult(ctrl_inputs, synth[osc]->amp_coefs);
+        msynth[osc]->amp = amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
     }
     // synth[osc]->feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
     // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
@@ -1646,8 +1682,8 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
             if(//synth[osc]->status == SYNTH_AUDIBLE &&  // (e)
                synth[osc]->filter_type != FILTER_NONE) {
                 //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
-                //	(float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
-                //	osc, synth[osc]->filter_type);
+                //        (float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
+                //        osc, synth[osc]->filter_type);
                 max_val = filter_process(per_osc_fb[core], osc, max_val);
                 // Maybe clear filter state here if we've finshed this osc.
                 if (synth[osc]->status != SYNTH_AUDIBLE) {
@@ -1857,10 +1893,10 @@ int16_t * amy_fill_buffer() {
             // soft clipping.
             int positive = 1;
             if (fsample < 0) {
-		        positive = 0;
-	            // avoid fabs()
+                positive = 0;
+                // avoid fabs()
                 fsample = -fsample;
-	        }
+            }
 
             int32_t uintval = S2L(fsample);
             if (uintval >= FIRST_NONLIN) {
