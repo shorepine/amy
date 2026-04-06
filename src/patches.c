@@ -603,6 +603,7 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
         fprintf(stderr, "yield_synth_events: synth %" PRId32" has no voices.\n", (int32_t)synth);
         return NULL;  // instrument not allocated.
     }
+    uint32_t flags = instrument_get_flags(synth);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = 0;
@@ -611,16 +612,25 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", synth, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
-    if (state_val < num_oscs) {
+    int first_osc_state_val = 0;
+    int final_state_val = num_oscs;
+    if (flags != 0) {
+        ++first_osc_state_val;
+        ++final_state_val;
+        if (state_val == 0) {
+            event->synth_flags = flags;
+        }
+    }
+    if (state_val >= first_osc_state_val && state_val < final_state_val) {
         set_event_for_osc(base_osc + state_val, base_osc, event);
         // Set the osc number relative to the synth
         event->osc = state_val;
-    } else if (state_val == num_oscs) {
+    } else if (state_val == final_state_val) {
         // final event, when state == num_oscs, contains the global settings (volume, eq, chorus, echo, reverb).
         set_event_for_global_fx(event, &amy_global);
     }
     ++state_val;
-    if (state_val == num_oscs + 1) state_val = 0;  // Indicate this is the final event.
+    if (state_val == final_state_val + 1) state_val = 0;  // Indicate this is the final event.
     return (void *)((intptr_t)state_val);
 }
 
