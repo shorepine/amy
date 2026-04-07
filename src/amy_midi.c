@@ -4,9 +4,17 @@
 #include "amy.h"
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
+// Forward-declare to avoid including the shared tinyusb header path. Defined
+// in micropython/shared/tinyusb/mp_usbd_runtime.c and safe to call from the MP
+// main thread to drain USB events (e.g. flush the MIDI IN endpoint FIFO).
+extern void mp_usbd_task(void);
 #endif
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#endif
+#if defined(ESP_PLATFORM)
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #endif
 
 #if (defined ARDUINO_ARCH_RP2040) || (defined ARDUINO_ARCH_RP2350)
@@ -166,8 +174,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
         else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
-        else if(status_byte == 0xFA && external_midi_sync_enabled) sequencer_midi_start();
-        else if(status_byte == 0xFC && external_midi_sync_enabled) sequencer_midi_stop();
+        else if(status_byte == 0xFA) sequencer_midi_start();
+        else if(status_byte == 0xFC) sequencer_midi_stop();
     }
 
     // Also send the external hooks if set
@@ -589,7 +597,36 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 // Is there USB gadget midi? Send it
 #if defined TUD_USB_GADGET
     if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
-        tud_midi_stream_write(0, bytes, len);
+        // tud_midi_stream_write uses a small FIFO (e.g. 64 bytes). For long
+        // messages (e.g. zD sysex dumps) we must loop and yield until the
+        // USB task flushes the FIFO, otherwise bytes are silently dropped.
+        if (len > 64) fprintf(stderr, "midi_out: USB gadget, want to send %d bytes\n", (int)len);
+        uint32_t sent = 0;
+        int stall_ticks = 0;
+        while (sent < len) {
+            uint32_t n = tud_midi_stream_write(0, bytes + sent, len - sent);
+            if (n == 0) {
+#if defined(TULIP) || defined(AMYBOARD)
+                // We're running on the MP main thread; the USB task also runs
+                // here, so vTaskDelay alone won't drain the FIFO. Pump USB
+                // events directly.
+                mp_usbd_task();
+#endif
+#if defined ESP_PLATFORM
+                vTaskDelay(pdMS_TO_TICKS(1));
+#endif
+                if (++stall_ticks > 1000) {
+                    fprintf(stderr, "midi_out: STALLED after %u of %u bytes\n",
+                            (unsigned)sent, (unsigned)len);
+                    break;
+                }
+            } else {
+                stall_ticks = 0;
+            }
+            sent += n;
+        }
+        if (len > 64) fprintf(stderr, "midi_out: USB gadget sent %u/%u bytes\n",
+                              (unsigned)sent, (unsigned)len);
     }
 #endif
 

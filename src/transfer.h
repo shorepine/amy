@@ -60,6 +60,11 @@ void parse_transfer_message(char * message, uint16_t len) ;
 void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage);
 void stop_receiving_sample();
 
+// State dump functions (used by zD wire command in parse.c)
+void amy_dump_state_to_sysex(void);
+void amy_dump_file_to_sysex(const char *filename);
+char *amy_dump_state_to_string(int *out_len);
+
 
 
 /**

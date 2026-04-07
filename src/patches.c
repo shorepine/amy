@@ -622,9 +622,19 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
         }
     }
     if (state_val >= first_osc_state_val && state_val < final_state_val) {
-        set_event_for_osc(base_osc + state_val, base_osc, event);
+        // was
+        // set_event_for_osc(base_osc + state_val, base_osc, event);
         // Set the osc number relative to the synth
-        event->osc = state_val;
+        // event->osc = state_val;
+
+        // now
+        //fprintf(stderr, "1 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d final_state_val %d\n", 
+        //    base_osc, event->osc, state_val, first_osc_state_val, final_state_val);
+        event->osc = state_val - first_osc_state_val;
+        //fprintf(stderr, "2 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d final_state_val %d\n", 
+        //    base_osc, event->osc, state_val, first_osc_state_val, final_state_val);
+        set_event_for_osc(base_osc + event->osc, base_osc, event);
+
     } else if (state_val == final_state_val) {
         // final event, when state == num_oscs, contains the global settings (volume, eq, chorus, echo, reverb).
         set_event_for_global_fx(event, &amy_global);

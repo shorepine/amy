@@ -692,6 +692,8 @@ typedef struct  {
     void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
     void (*amy_external_fclose_hook)(uint32_t fptr);
     void (*amy_external_file_transfer_done_hook)(const char *filename);
+    void (*amy_external_factory_reset_hook)(void);
+    void (*amy_external_update_file_hook)(const char *filename);
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -957,6 +959,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
+extern int max_instruments;
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();

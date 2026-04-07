@@ -2,6 +2,7 @@
 // handle parsing wire strings
 
 #include "amy.h"
+#include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
@@ -439,6 +440,61 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         //zO: stop sampling from any bus
         stop_receiving_sample();
         return 1;
+    }
+    else if (cmd == 'D') {
+        // zD: Dump data over MIDI sysex.
+        //   zDZ              — dump all active instrument state + global effects.
+        //   zD<filename>Z    — dump file contents from the filesystem.
+        // message already points past 'D' (consumed above).
+        // We need to consume all chars up to (but not including) 'Z' so the
+        // outer parser's _next_alpha lands on 'Z' (end of message).
+        // Return value = chars consumed from `message` (after 'D').
+        // The outer parser adds +1 for 'z', so total skip = 1(z) + 1(D via cmd) + len.
+        // BUT the outer parser only does ++pos (for 'z') then _next_alpha which
+        // stops at alpha chars.  To avoid misparse we must consume up to 'Z'.
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = 0;
+        while (message[len] && message[len] != 'Z' && len < MAX_FILENAME_LEN - 1) {
+            filename[len] = message[len];
+            len++;
+        }
+        filename[len] = '\0';
+        if (filename[0] == '\0') {
+            fprintf(stderr, "zD: received zD (state dump)\n");
+            amy_dump_state_to_sysex();
+        } else {
+            fprintf(stderr, "zD: received zD file dump for '%s'\n", filename);
+            amy_dump_file_to_sysex(filename);
+        }
+        // Return chars consumed from the original arg pointer (which starts at 'D').
+        // len = filename length (from after 'D'). Add 1 for 'D' itself.
+        // The outer parser does: pos += return_val; ++pos; _next_alpha().
+        // We need the outer parser to land on 'Z', so we return enough to
+        // get there: 1 (for 'D') + len (filename) = positions consumed.
+        // The remaining char before Z is handled by _next_alpha (which skips '.' but not alpha).
+        // Safest: scan forward to find 'Z' from arg and return that distance.
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;  // back to 'D'
+            while (scan[total] && scan[total] != 'Z') total++;
+            return total;
+        }
+    }
+    else if (cmd == 'P') {
+        // zP: Ping — send a short sysex reply for diagnostics.
+        uint8_t frame[] = { 0xF0, 0x00, 0x03, 0x45, 'p', 'o', 'n', 'g', 0xF7 };
+        fprintf(stderr, "zP: sending ping sysex (9 bytes)\n");
+        midi_out(frame, sizeof(frame));
+        fprintf(stderr, "zP: ping sent\n");
+        return 0;
+    }
+    else if (cmd == 'R') {
+        // zR: Factory reset. Platform hook writes default sketch and reboots.
+        fprintf(stderr, "zR: factory reset requested\n");
+        if (amy_global.config.amy_external_factory_reset_hook) {
+            amy_global.config.amy_external_factory_reset_hook();
+        }
+        return 0;
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;

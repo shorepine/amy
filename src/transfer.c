@@ -4,9 +4,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "transfer.h"
+#include "amy_midi.h"  // for midi_out, MAX_SYSEX_BYTES
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
@@ -65,13 +67,12 @@ static void free_handle(uint32_t h) {
 
 uint32_t posix_external_fopen_hook(char * filename, char *mode) {
 #ifdef __EMSCRIPTEN__
-    (void)mode;
     uint32_t js_handle = EM_ASM_INT({
         if (typeof amy_shared_open === 'function') {
-            return amy_shared_open(UTF8ToString($0));
+            return amy_shared_open(UTF8ToString($0), UTF8ToString($1));
         }
         return 0;
-    }, filename);
+    }, filename, mode);
     if (js_handle == 0) {
         return HANDLE_INVALID;
     }
@@ -147,10 +148,17 @@ void posix_external_fseek_hook(uint32_t h, uint32_t pos) {
 
 uint32_t posix_external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
 #ifdef __EMSCRIPTEN__
-    (void)h;
-    (void)buf;
-    (void)n;
-    return 0;
+    if (h == 0 || h >= MAX_OPEN_FILES || g_em_handle[h] == 0) {
+        return 0;
+    }
+    uint32_t written = EM_ASM_INT({
+        if (typeof amy_shared_write === 'function') {
+            return amy_shared_write($0, $1, $2);
+        }
+        return 0;
+    }, g_em_handle[h], buf, n);
+    g_em_pos[h] += written;
+    return written;
 #else
     FILE *f = lookup_handle(h);
     if (!f) {
@@ -445,6 +453,137 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
     return (unsigned char*) decbuf->ptr;
 }
 
+
+// ── State dump helpers ──────────────────────────────────────────────────────
+
+// Walk all active instruments and emit one wire-command line per callback.
+static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx), void *ctx) {
+    char buf[1024];
+    char line[1100];
+    bool effects_written = false;
+    for (int inst = 0; inst < max_instruments; inst++) {
+        uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+        int num_voices = instrument_get_num_voices(inst, voices);
+        if (num_voices < 1) continue;
+        int oscs_per_voice = instrument_get_oscs_per_voice(inst);
+        int n = snprintf(line, sizeof(line), "i%dic255Z", inst);
+        cb(line, n, ctx);
+        n = snprintf(line, sizeof(line), "i%div%din%dZ", inst, num_voices, oscs_per_voice);
+        cb(line, n, ctx);
+        void *state = NULL;
+        do {
+            state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), state);
+            if (buf[0] == '\0') continue;
+            bool is_fx = (buf[0] == 'V' || buf[0] == 'x' || buf[0] == 'M' ||
+                          buf[0] == 'k' || buf[0] == 'h');
+            if (is_fx) {
+                if (effects_written) continue;
+                effects_written = true;
+                n = snprintf(line, sizeof(line), "%s", buf);
+                cb(line, n, ctx);
+            } else {
+                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);
+                cb(line, n, ctx);
+            }
+        } while (state);
+    }
+}
+
+typedef struct { char *buf; int pos; int cap; } _string_ctx;
+static void _dump_string_cb(const char *line, int len, void *ctx) {
+    _string_ctx *c = (_string_ctx *)ctx;
+    if (c->pos + len + 1 > c->cap) return;
+    memcpy(c->buf + c->pos, line, len);
+    c->pos += len;
+    c->buf[c->pos++] = '\n';
+}
+
+char *amy_dump_state_to_string(int *out_len) {
+    int cap = 16384;
+    char *buf = (char *)malloc_caps(cap, amy_global.config.ram_caps_sysex);
+    if (!buf) { *out_len = 0; return NULL; }
+    _string_ctx ctx = { buf, 0, cap };
+    amy_emit_state_lines(_dump_string_cb, &ctx);
+    buf[ctx.pos] = '\0';
+    *out_len = ctx.pos;
+    return buf;
+}
+
+typedef struct { uint8_t *buf; int pos; int cap; } _sysex_ctx;
+static void _dump_sysex_cb(const char *line, int len, void *ctx) {
+    _sysex_ctx *c = (_sysex_ctx *)ctx;
+    if (c->pos + len + 1 > c->cap) return;
+    memcpy(c->buf + c->pos, line, len);
+    c->pos += len;
+    c->buf[c->pos++] = '\n';
+}
+
+static void _send_as_sysex_b64(const uint8_t *raw_bytes, int raw_len) {
+    if (raw_len < 0) raw_len = 0;
+    int enc_cap = ((4 * raw_len / 3) + 3) & ~3;
+    enc_cap += 4;
+    char *enc = (char *)malloc_caps(enc_cap, amy_global.config.ram_caps_sysex);
+    if (!enc) { fprintf(stderr, "zD: malloc enc(%d) FAILED\n", enc_cap); return; }
+    b64_buffer_t bb = { enc, 1 };
+    b64_encode(raw_bytes, &bb, (size_t)raw_len);
+    int enc_len = (int)strlen(enc);
+    int total = enc_len + 5;
+    uint8_t *frame = (uint8_t *)malloc_caps(total, amy_global.config.ram_caps_sysex);
+    if (!frame) { fprintf(stderr, "zD: malloc frame(%d) FAILED\n", total); free(enc); return; }
+    frame[0] = 0xF0; frame[1] = 0x00; frame[2] = 0x03; frame[3] = 0x45;
+    memcpy(frame + 4, enc, enc_len);
+    frame[total - 1] = 0xF7;
+    fprintf(stderr, "zD: raw=%d b64=%d frame=%d midi cfg=0x%x\n",
+            raw_len, enc_len, total, (unsigned)amy_global.config.midi);
+    midi_out(frame, total);
+    free(frame);
+    free(enc);
+}
+
+void amy_dump_state_to_sysex(void) {
+    fprintf(stderr, "zD: amy_dump_state_to_sysex entered\n");
+    int max_raw = (MAX_SYSEX_BYTES - 8) * 3 / 4;
+    uint8_t *raw = (uint8_t *)malloc_caps(max_raw, amy_global.config.ram_caps_sysex);
+    if (!raw) { fprintf(stderr, "zD: malloc raw(%d) FAILED\n", max_raw); return; }
+    _sysex_ctx ctx = { raw, 0, max_raw };
+    amy_emit_state_lines(_dump_sysex_cb, &ctx);
+    fprintf(stderr, "zD: built %d raw bytes of state\n", ctx.pos);
+    _send_as_sysex_b64(raw, ctx.pos > 0 ? ctx.pos : 0);
+    free(raw);
+}
+
+void amy_dump_file_to_sysex(const char *filename) {
+    if (amy_global.config.amy_external_update_file_hook) {
+        amy_global.config.amy_external_update_file_hook(filename);
+    }
+    if (!amy_global.config.amy_external_fopen_hook ||
+        !amy_global.config.amy_external_fread_hook  ||
+        !amy_global.config.amy_external_fclose_hook) {
+        fprintf(stderr, "zD: file I/O hooks unavailable\n");
+        return;
+    }
+    uint32_t fh = amy_global.config.amy_external_fopen_hook((char *)filename, "r");
+    if (!fh) { fprintf(stderr, "zD: could not open '%s'\n", filename); return; }
+    int max_raw = (MAX_SYSEX_BYTES - 8) * 3 / 4;
+    uint8_t *raw = (uint8_t *)malloc_caps(max_raw, amy_global.config.ram_caps_sysex);
+    if (!raw) {
+        fprintf(stderr, "zD: malloc raw(%d) FAILED\n", max_raw);
+        amy_global.config.amy_external_fclose_hook(fh);
+        return;
+    }
+    int pos = 0;
+    while (pos < max_raw) {
+        uint32_t n = amy_global.config.amy_external_fread_hook(fh, raw + pos, max_raw - pos);
+        if (n == 0) break;
+        pos += n;
+    }
+    amy_global.config.amy_external_fclose_hook(fh);
+    fprintf(stderr, "zD: read %d bytes from '%s'\n", pos, filename);
+    _send_as_sysex_b64(raw, pos);
+    free(raw);
+}
+
+// ── End state dump helpers ──────────────────────────────────────────────────
 
 void transfer_init() {
     #ifdef __EMSCRIPTEN__

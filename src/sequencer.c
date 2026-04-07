@@ -117,14 +117,16 @@ static void sequencer_process_tick(void) {
 }
 
 void sequencer_midi_start() {
-    // MIDI "Start" begins from tick 0 and then advances from F8 clocks.
-    sequencer_external_clock = true;
+    // MIDI "Start" restarts the sequencer from tick 0.
+    // If external clock was not previously enabled, keep using internal clock
+    // so the sequencer advances on its own without needing F8 ticks.
+    if (sequencer_external_clock) {
+        amy_global.sequencer_tick_count = 0;
+    }
     sequencer_running = true;
-    amy_global.sequencer_tick_count = 0;
 }
 
 void sequencer_midi_stop() {
-    sequencer_external_clock = true;
     sequencer_running = false;
 }
 
