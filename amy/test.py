@@ -1079,7 +1079,7 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f110.000c1Z
+    expected = """v0f110.000c1T2X3Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic5,0,0.000,10.000,0.000,helloZ
@@ -1108,7 +1108,7 @@ class TestClearMidiCCs(AmyTest):
     amy.send_raw('i1ic255v0f999')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f999.000c1Z
+    expected = """v0f999.000c1T2X3Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
     if commands != expected:
@@ -1133,7 +1133,7 @@ class TestClearOneMidiCC(AmyTest):
     amy.send_raw('i1ic5v0f999')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f999.000c1Z
+    expected = """v0f999.000c1T2X3Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
