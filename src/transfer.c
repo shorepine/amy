@@ -460,7 +460,7 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx), void *ctx) {
     char buf[1024];
     char line[1100];
-    bool effects_written = false;
+    bool include_fx = true;
     for (int inst = 0; inst < max_instruments; inst++) {
         uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
         int num_voices = instrument_get_num_voices(inst, voices);
@@ -472,20 +472,13 @@ static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx
         cb(line, n, ctx);
         void *state = NULL;
         do {
-            state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), state);
+            state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), include_fx, state);
             if (buf[0] == '\0') continue;
-            bool is_fx = (buf[0] == 'V' || buf[0] == 'x' || buf[0] == 'M' ||
-                          buf[0] == 'k' || buf[0] == 'h');
-            if (is_fx) {
-                if (effects_written) continue;
-                effects_written = true;
-                n = snprintf(line, sizeof(line), "%s", buf);
-                cb(line, n, ctx);
-            } else {
-                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);
-                cb(line, n, ctx);
-            }
+            n = snprintf(line, sizeof(line), "i%d%s", inst, buf);  // Prepends to FX as well, that's OK.
+            cb(line, n, ctx);
         } while (state);
+        // We include FX only in the first osc.
+        include_fx = false;
     }
 }
 

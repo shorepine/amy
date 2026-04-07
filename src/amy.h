@@ -947,8 +947,8 @@ extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state);
-extern void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state);
-extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state);
+extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
+extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state);
 extern int size_of_amy_event(void);
 
 extern struct delta **queue_for_patch_number(int patch_number);

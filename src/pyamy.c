@@ -228,13 +228,19 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
 static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
     char s[MAX_MESSAGE_LEN];
     void *state = NULL;
-    int synth;
-    if(PyTuple_Size(args) != 1 || !PyArg_ParseTuple(args, "i", &synth)) {
+    int synth, include_fx;
+    if(!(PyTuple_Size(args) == 1 || PyTuple_Size(args) == 2)) {
         return NULL;
+    }
+    if (PyTuple_Size(args) == 1) {
+        if (!PyArg_ParseTuple(args, "i", &synth)) return NULL;
+        include_fx = 1;
+    } else {  // 2 args
+        if (!PyArg_ParseTuple(args, "ip", &synth, &include_fx)) return NULL;
     }
     PyObject* list_obj = PyList_New(0);
     do {
-        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, state);
+        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, include_fx, state);
         int slen = strlen(s);
         if (slen)
             PyList_Append(list_obj, PyUnicode_FromString(s));

@@ -1032,8 +1032,9 @@ void show_debug(uint8_t type) {
                     void * state = NULL;
                     amy_event event = amy_default_event();
                     char s[MAX_MESSAGE_LEN];
+                    bool include_fx = true;
                     do {
-                        state = yield_synth_events(synth, &event, state);
+                        state = yield_synth_events(synth, &event, include_fx, state);
                         sprint_event(&event, s, MAX_MESSAGE_LEN, false);
                         fprintf(stderr, "%s\n", s);
                     } while(state != NULL);

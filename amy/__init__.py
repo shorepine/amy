@@ -519,10 +519,10 @@ def echo(level=None, delay_ms=None, max_delay_ms=None, feedback=None, filter_coe
 """
     Reading back synth configuration
 """
-def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, time=None):
+def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, include_fx=True, time=None):
     if patch_num is not None and dest_synth is not None:
         raise ValueError("At most one of patch_num and dest_synth can be specified")
-    commands = _get_synth_commands(synth)
+    commands = _get_synth_commands(synth, include_fx)
 
     def len_digit_prefix(s):
         len = 0
