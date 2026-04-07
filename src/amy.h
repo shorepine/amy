@@ -959,7 +959,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
-extern int max_instruments;
+extern int instruments_max_instruments();
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();

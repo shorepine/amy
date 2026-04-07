@@ -461,24 +461,26 @@ static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx
     char buf[1024];
     char line[1100];
     bool include_fx = true;
-    for (int inst = 0; inst < max_instruments; inst++) {
-        uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-        int num_voices = instrument_get_num_voices(inst, voices);
-        if (num_voices < 1) continue;
-        int oscs_per_voice = instrument_get_oscs_per_voice(inst);
-        int n = snprintf(line, sizeof(line), "i%dic255Z", inst);
-        cb(line, n, ctx);
-        n = snprintf(line, sizeof(line), "i%div%din%dZ", inst, num_voices, oscs_per_voice);
-        cb(line, n, ctx);
-        void *state = NULL;
-        do {
-            state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), include_fx, state);
-            if (buf[0] == '\0') continue;
-            n = snprintf(line, sizeof(line), "i%d%s", inst, buf);  // Prepends to FX as well, that's OK.
+    for (int inst = 0; inst < instruments_max_instruments(); inst++) {
+        if (instrument_number_exists(inst, NULL)) {
+            uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+            int num_voices = instrument_get_num_voices(inst, voices);
+            if (num_voices < 1) continue;  // should never happen.
+            int oscs_per_voice = instrument_get_oscs_per_voice(inst);
+            int n = snprintf(line, sizeof(line), "i%dic255Z", inst);
             cb(line, n, ctx);
-        } while (state);
-        // We include FX only in the first osc.
-        include_fx = false;
+            n = snprintf(line, sizeof(line), "i%div%din%dZ", inst, num_voices, oscs_per_voice);
+            cb(line, n, ctx);
+            void *state = NULL;
+            do {
+                state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), include_fx, state);
+                if (buf[0] == '\0') continue;
+                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);  // Prepends to FX as well, that's OK.
+                cb(line, n, ctx);
+            } while (state);
+            // We include FX only in the first osc.
+            include_fx = false;
+        }
     }
 }
 
