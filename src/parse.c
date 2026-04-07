@@ -368,7 +368,10 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
         }
         ++skip_chars;  // step over the "," before the wire string template.
         midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
-        skip_chars = strlen(message) + 1;
+        // Consume rest of message but leave the trailing 'Z' for the outer parser.
+        int remainder = strlen(message);
+        if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
+        skip_chars = remainder;
     }
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
     return skip_chars;

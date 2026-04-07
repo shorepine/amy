@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "transfer.h"
-#include "amy_midi.h"  // for midi_out, MAX_SYSEX_BYTES
+#include "amy_midi.h"    // for midi_out, MAX_SYSEX_BYTES
+#include "sequencer.h"   // for sequencer_midi_stop/start
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -537,17 +538,20 @@ static void _send_as_sysex_b64(const uint8_t *raw_bytes, int raw_len) {
 
 void amy_dump_state_to_sysex(void) {
     fprintf(stderr, "zD: amy_dump_state_to_sysex entered\n");
+    sequencer_midi_stop();
     int max_raw = (MAX_SYSEX_BYTES - 8) * 3 / 4;
     uint8_t *raw = (uint8_t *)malloc_caps(max_raw, amy_global.config.ram_caps_sysex);
-    if (!raw) { fprintf(stderr, "zD: malloc raw(%d) FAILED\n", max_raw); return; }
+    if (!raw) { fprintf(stderr, "zD: malloc raw(%d) FAILED\n", max_raw); sequencer_midi_start(); return; }
     _sysex_ctx ctx = { raw, 0, max_raw };
     amy_emit_state_lines(_dump_sysex_cb, &ctx);
     fprintf(stderr, "zD: built %d raw bytes of state\n", ctx.pos);
     _send_as_sysex_b64(raw, ctx.pos > 0 ? ctx.pos : 0);
     free(raw);
+    sequencer_midi_start();
 }
 
 void amy_dump_file_to_sysex(const char *filename) {
+    sequencer_midi_stop();
     if (amy_global.config.amy_external_update_file_hook) {
         amy_global.config.amy_external_update_file_hook(filename);
     }
@@ -555,15 +559,17 @@ void amy_dump_file_to_sysex(const char *filename) {
         !amy_global.config.amy_external_fread_hook  ||
         !amy_global.config.amy_external_fclose_hook) {
         fprintf(stderr, "zD: file I/O hooks unavailable\n");
+        sequencer_midi_start();
         return;
     }
     uint32_t fh = amy_global.config.amy_external_fopen_hook((char *)filename, "r");
-    if (!fh) { fprintf(stderr, "zD: could not open '%s'\n", filename); return; }
+    if (!fh) { fprintf(stderr, "zD: could not open '%s'\n", filename); sequencer_midi_start(); return; }
     int max_raw = (MAX_SYSEX_BYTES - 8) * 3 / 4;
     uint8_t *raw = (uint8_t *)malloc_caps(max_raw, amy_global.config.ram_caps_sysex);
     if (!raw) {
         fprintf(stderr, "zD: malloc raw(%d) FAILED\n", max_raw);
         amy_global.config.amy_external_fclose_hook(fh);
+        sequencer_midi_start();
         return;
     }
     int pos = 0;
@@ -576,6 +582,7 @@ void amy_dump_file_to_sysex(const char *filename) {
     fprintf(stderr, "zD: read %d bytes from '%s'\n", pos, filename);
     _send_as_sysex_b64(raw, pos);
     free(raw);
+    sequencer_midi_start();
 }
 
 // ── End state dump helpers ──────────────────────────────────────────────────
