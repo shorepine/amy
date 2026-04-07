@@ -538,6 +538,7 @@ static void _send_as_sysex_b64(const uint8_t *raw_bytes, int raw_len) {
 
 void amy_dump_state_to_sysex(void) {
     fprintf(stderr, "zD: amy_dump_state_to_sysex entered\n");
+    if (!amy_global.config.midi) return;
     sequencer_midi_stop();
     int max_raw = (MAX_SYSEX_BYTES - 8) * 3 / 4;
     uint8_t *raw = (uint8_t *)malloc_caps(max_raw, amy_global.config.ram_caps_sysex);
@@ -551,6 +552,9 @@ void amy_dump_state_to_sysex(void) {
 }
 
 void amy_dump_file_to_sysex(const char *filename) {
+    // Only meaningful on platforms with MIDI sysex output (hardware, emscripten).
+    // On desktop, midi_out can overflow its stack buffer with large sysex.
+    if (!amy_global.config.midi) return;
     sequencer_midi_stop();
     if (amy_global.config.amy_external_update_file_hook) {
         amy_global.config.amy_external_update_file_hook(filename);
