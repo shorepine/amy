@@ -556,9 +556,6 @@ void amy_dump_file_to_sysex(const char *filename) {
     // On desktop, midi_out can overflow its stack buffer with large sysex.
     if (!amy_global.config.midi) return;
     sequencer_midi_stop();
-    if (amy_global.config.amy_external_update_file_hook) {
-        amy_global.config.amy_external_update_file_hook(filename);
-    }
     if (!amy_global.config.amy_external_fopen_hook ||
         !amy_global.config.amy_external_fread_hook  ||
         !amy_global.config.amy_external_fclose_hook) {

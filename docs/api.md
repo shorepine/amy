@@ -301,6 +301,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `W`    | `external_channel` | `external_channel` | uint | External channel routing (used by Tulip for CV output). |
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |
 | `zT`   | **TODO**| `transfer_file` | string,uint | Transfer a file to the host. Params: destination filename, file size. See `hooks` for writing files on host disk. |
-| `zD`   | **TODO**| `dump_sysex` | string (optional) | Dump data over MIDI sysex (base64-encoded, wrapped with SPSS manufacturer ID `00 03 45`). With no params (`zDZ`): dumps all active instrument state. With a filename (`zD/user/current/sketch.pyZ`): calls `update_file_hook` to refresh the file, then reads and sends it. |
+| `zA`   | **TODO**| `update_file` | string (optional) | Update a file on disk with current AMY state via `update_file_hook`. Default path: `/user/current/sketch.py`. On AMYboard, splices `_auto_generated_knobs` section with live state. |
+| `zD`   | **TODO**| `dump_sysex` | string (optional) | Dump data over MIDI sysex (base64-encoded, wrapped with SPSS manufacturer ID `00 03 45`). With no params (`zDZ`): dumps all active instrument state. With a filename (`zD/user/current/sketch.pyZ`): reads file and sends it. |
 | `zR`   | **TODO**| `factory_reset` | (none) | Trigger a factory reset via `amy_external_factory_reset_hook`. On AMYboard, writes the default sketch.py and restarts. |
 | `zP`   | **TODO**| `ping` | (none) | Send a short sysex reply (`F0 00 03 45 'p' 'o' 'n' 'g' F7`) for connection diagnostics. |

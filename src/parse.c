@@ -483,6 +483,31 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             return total;
         }
     }
+    else if (cmd == 'A') {
+        // zA: Update sketch.py on disk with current AMY state (calls update_file_hook).
+        // Takes optional filename; defaults to /user/current/sketch.py on AMYboard.
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = 0;
+        while (message[len] && message[len] != 'Z' && len < MAX_FILENAME_LEN - 1) {
+            filename[len] = message[len];
+            len++;
+        }
+        filename[len] = '\0';
+        fprintf(stderr, "zA: update file '%s'\n", filename[0] ? filename : "(default)");
+        if (amy_global.config.amy_external_update_file_hook) {
+            if (filename[0]) {
+                amy_global.config.amy_external_update_file_hook(filename);
+            } else {
+                amy_global.config.amy_external_update_file_hook("/user/current/sketch.py");
+            }
+        }
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;
+            while (scan[total] && scan[total] != 'Z') total++;
+            return total;
+        }
+    }
     else if (cmd == 'P') {
         // zP: Ping — send a short sysex reply for diagnostics.
         uint8_t frame[] = { 0xF0, 0x00, 0x03, 0x45, 'p', 'o', 'n', 'g', 0xF7 };
