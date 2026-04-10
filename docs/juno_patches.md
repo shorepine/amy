@@ -5,6 +5,8 @@ of the 128 factory patches that came with the Juno-60 (the first MIDI-enabled Ju
 for users who want to modify or manipulate Juno patches, but also as a case-study in how complex voices can be built from basic AMY
 oscillators.
 
+You may also want to look at the page on [AMY Synthesizer Details](synth.md) for a more detailed introduction of oscs, voices, synths, and parameters in AMY.
+
 ## Juno patches
 
 You can quickly configure a polyphonic Juno synthesizer by loading one of the Juno patches:
@@ -40,7 +42,7 @@ v0F300.23,0.661,,2.252,0,0R1.015Z
 v0a0.591,,1,1,0A518,1,83561,0.299,310,0Z
 x7,-3,-3k1,,0.5,0.5Z"
 ```
-Wire strings consist of one or two-letter commands followed by an argument (documented on the [API page](api.md),
+Wire strings consist of one or two-letter commands followed by an argument (documented on the [API page](api.md)),
 often a single numerical value, or a comma-separated list.
 `Z` is a separator, so I've broken the string into separate `Z`-terminated phrases; the stored string does not include any line breaks.
 All the settings in a single, `Z`-separated phrase apply to a single osc as specified (or zero by default; some commands like EQ and chorus

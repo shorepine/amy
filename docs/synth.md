@@ -99,6 +99,16 @@ So you can do:
 ```
 AMY infers the number of oscs needed for the patch from the cumulated commands. If you store a new patch over an old one, that old memory is freed and re-allocated. (We rely on `malloc` for all of this.)
 
+You can do something very similar directly into a synth, provided it has been initialized with the correct number of oscs.  So we could get
+the same final synth as above with these commands:
+```python
+>>> amy.send(synth=0, num_voices=1, oscs_per_voice=2)  # We will be using 2 oscs per voice.
+>>> amy.send(synth=0, osc=1, wave=amy.SINE, freq=0.25, phase=0.5, amp=0.5)  # "Pitch sigh" modulator.
+>>> amy.send(synth=0, osc=0, wave=amy.SINE, freq='440,1,0,0,0,1', bp0='0,1,500,0,0,0', mod_source=1)  # decaying sine modulated by sigh.
+>>> # Ready to play!
+>>> amy.send(synth=0, vel=2, note=50)
+```
+
 
 ## Control Coefficients
 
