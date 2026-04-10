@@ -281,7 +281,7 @@ class JunoPatch:
     )
 
   def _amp_coef_string(self, level):
-    return '%s,,1,1,0' % ffmt(max(.001, to_level(level)))
+    return '%s,,1,1,0' % ffmt(to_level(level))
 
   def _freq_coef_string(self, base_freq):
     return '%s,1,,,,%s,1' % (
@@ -358,7 +358,7 @@ class JunoPatch:
       const_duty, lfo_duty = lfo_duty, const_duty
     self.amy_send(
       osc=self.pwm_osc,
-      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.pulse))),
+      amp='%s,,0,0' % ffmt(to_level(self.pulse)),
       freq=freq_str,
       portamento=port_ms,
       duty='%s,,,,,%s' % (
@@ -367,19 +367,19 @@ class JunoPatch:
     )
     self.amy_send(
       osc=self.saw_osc,
-      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.saw))),
+      amp='%s,,0,0' % ffmt(to_level(self.saw)),
       freq=freq_str,
       portamento=port_ms,
     )
     self.amy_send(
       osc=self.sub_osc,
-      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.dco_sub))),
+      amp='%s,,0,0' % ffmt(to_level(self.dco_sub)),
       freq=self._freq_coef_string(base_freq / 2.0),
       portamento=port_ms,
     )
     self.amy_send(
       osc=self.nse_osc,
-      amp='%s,0,0,0,0,0' % ffmt(max(.001, to_level(self.dco_noise))),
+      amp='%s,,0,0' % ffmt(to_level(self.dco_noise)),
     )
 
   def update_vcf(self):
