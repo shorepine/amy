@@ -246,11 +246,12 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_FILE;
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length_bytes = length;
-    amy_global.transfer_stored_bytes = 0; 
+    amy_global.transfer_stored_bytes = 0;
     amy_global.transfer_file_handle = handle;
     strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
     amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
     b64_buf_malloc(&decbuf);
+    fprintf(stderr, "zT: start_receiving_file_transfer filename='%s' size=%u\n", amy_global.transfer_filename, (unsigned)length);
 }
 
 // takes a wire message and adds it to storage after decoding it. stops transfer when it's done
