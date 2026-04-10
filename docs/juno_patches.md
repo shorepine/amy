@@ -43,6 +43,8 @@ x7,-3,-3k1,,0.5,0.5Z"
 Wire strings consist of one or two-letter commands followed by an argument (documented on the [API page](api.md),
 often a single numerical value, or a comma-separated list.
 `Z` is a separator, so I've broken the string into separate `Z`-terminated phrases; the stored string does not include any line breaks.
+All the settings in a single, `Z`-separated phrase apply to a single osc as specified (or zero by default; some commands like EQ and chorus
+apply to all oscs at once, so no osc needs to be indicated).
 But even broken up this way, the command strings are not very readable.  However, each command phrase is equivalent to a single `amy.send()`
 command in the Python interface.  Thus, the wire strings above correspond to:
 ```Python
@@ -68,23 +70,24 @@ Now we can begin to understand how this patch works.  The patch consists of six 
 * Osc 0 is the `SILENT` osc, a special osc with gathers the summed outputs of all the oscs connected to it via a `chained_osc` chain.
   The first osc in its chain is 2.
 * Osc 1 is the LFO: It has a `TRIANGLE` waveform and a frequency of 0.609 Hz
-* Osc 2 (which is part of the chain starting with osc 0) has a PULSE waveform and continues the chain with osc 3.
+* Osc 2 (which is part of the chain starting with osc 0) has a `PULSE` waveform and continues the chain with osc 3.
 However it also a `const` term in its amplitude (`amp`) of 0.001, or -60 dB relative to 1.0, which makes it inaudible.
-* Osc 3 is a `SAW` (sawtooth), and chain forward to osc 4.
+* Osc 3 is a `SAW` (sawtooth), and chains forward to osc 4.
 * Osc 4 is another `PULSE` oscillator, but with a base frequency of 220 Hz, in contrast to the 440 Hz of oscs 2 and 3.  It chains forward to osc 5.
 * Osc 5 has a `NOISE` waveform.  Its amp is also 0.001, i.e. silenced.
 
 Oscs 2-5 correspond to the four waveform sources on the Juno: pulse/PWM, sawtooth, subosc (pulse one octave below), and noise.
 
 We see a chain: Osc 0 > Osc 2 > Osc 3 > Osc 4 > Osc 5.  "Chaining" is a convenience to allow a single note-on/off event to be passed to multiple
-voices in a single event.  So `note` and `vel` parameters sent to Osc 0 will propagate down the chain until all of oscs 2-5 see the same event.
+oscs in a single event.  So `note` and `vel` parameters sent to osc 0 will propagate down the chain until all of oscs 2-5 see the same event.
 
-Osc 0, the `SILENT` osc, is a special case that gathers the summed waveforms of all its chained oscs, then applies a single amplitude envelope
-(`bp0`, which contributes to `amp` via the `eg0` coefficient) and applies a filter (`filter_type`).  We *could* put filters and envelopes
-on each osc indidually before they get summed through the chain, but its more efficient to do it once after summing the waveforms.
+`SILENT` osca, such as osc 0, are special-cases that gather the summed waveforms of all their chained oscs, then apply a single amplitude envelope
+(`bp0`, which contributes to `amp` via the `eg0` coefficient) and a filter (`filter_type`).  We *could* put filters and envelopes
+on each osc indidually before they get summed through the chain, but its more efficient to do it once after summing the waveforms, since,
+for a Juno, all oscillator waveforms are subject to the same envelope and filtering.
 
 Each of the "sounding" oscs, 2-5, has its overall level set by its `amp['const']` coefficient, but no amplitude envelope or velocity scaling
-(leaving the velocity scaling to be applied by osc 0).
+(since the envelope and velocity scaling are applied by osc 0).
 
 The LFO, osc 1, is connected to each of the sounding oscs by their `mod_source` argument.  However, in this patch neither pitch, PWM duty,
 or filter frequency, are influenced by the LFO, because in each case their `mod` coefficients are zero.  The LFO does have an amplitude
