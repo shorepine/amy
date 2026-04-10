@@ -81,7 +81,7 @@ Oscs 2-5 correspond to the four waveform sources on the Juno: pulse/PWM, sawtoot
 We see a chain: Osc 0 > Osc 2 > Osc 3 > Osc 4 > Osc 5.  "Chaining" is a convenience to allow a single note-on/off event to be passed to multiple
 oscs in a single event.  So `note` and `vel` parameters sent to osc 0 will propagate down the chain until all of oscs 2-5 see the same event.
 
-`SILENT` osca, such as osc 0, are special-cases that gather the summed waveforms of all their chained oscs, then apply a single amplitude envelope
+`SILENT` oscs, such as osc 0, are special-cases that gather the summed waveforms of all their chained oscs, then apply a single amplitude envelope
 (`bp0`, which contributes to `amp` via the `eg0` coefficient) and a filter (`filter_type`).  We *could* put filters and envelopes
 on each osc indidually before they get summed through the chain, but its more efficient to do it once after summing the waveforms, since,
 for a Juno, all oscillator waveforms are subject to the same envelope and filtering.
@@ -103,3 +103,7 @@ the Juno chorus.
 
 All Juno patches have the same structure, and vary only in the values of their parameters, corresponding more or less to the positioning of the
 sliders on the original Juno front-panel.
+
+Note that the commands above address explicit osc numbers.  But when used to set up a synth (e.g., by including `synth=1` in each `amy.send()`),
+the commands refer to an osc relative to the base osc for each voice of the synth, and are thus applied to `num_voices` distinct oscs, one
+within each voice of the synth.
