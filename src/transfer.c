@@ -515,6 +515,12 @@ static void _dump_sysex_cb(const char *line, int len, void *ctx) {
     c->buf[c->pos++] = '\n';
 }
 
+// Max base64 chars per sysex chunk. Empirically Chrome's Web MIDI has trouble
+// delivering sysex messages above a few KB reliably, so we split large dumps
+// into multiple smaller sysex frames. 1024 base64 chars → ~1035-byte sysex
+// frame including header/footer, well within the "reliably delivered" band.
+#define ZDUMP_CHUNK_B64_MAX 1024
+
 static void _send_as_sysex_b64(const uint8_t *raw_bytes, int raw_len) {
     if (raw_len < 0) raw_len = 0;
     int enc_cap = ((4 * raw_len / 3) + 3) & ~3;
@@ -524,15 +530,44 @@ static void _send_as_sysex_b64(const uint8_t *raw_bytes, int raw_len) {
     b64_buffer_t bb = { enc, 1 };
     b64_encode(raw_bytes, &bb, (size_t)raw_len);
     int enc_len = (int)strlen(enc);
-    int total = enc_len + 5;
-    uint8_t *frame = (uint8_t *)malloc_caps(total, amy_global.config.ram_caps_sysex);
-    if (!frame) { fprintf(stderr, "zD: malloc frame(%d) FAILED\n", total); free(enc); return; }
-    frame[0] = 0xF0; frame[1] = 0x00; frame[2] = 0x03; frame[3] = 0x45;
-    memcpy(frame + 4, enc, enc_len);
-    frame[total - 1] = 0xF7;
-    fprintf(stderr, "zD: raw=%d b64=%d frame=%d midi cfg=0x%x\n",
-            raw_len, enc_len, total, (unsigned)amy_global.config.midi);
-    midi_out(frame, total);
+
+    // Determine how many chunks we need.
+    int chunks = (enc_len + ZDUMP_CHUNK_B64_MAX - 1) / ZDUMP_CHUNK_B64_MAX;
+    if (chunks < 1) chunks = 1;
+
+    // Allocate a reusable frame buffer big enough for the largest chunk.
+    int frame_cap = ZDUMP_CHUNK_B64_MAX + 6;  // F0 00 03 45 <marker> <b64...> F7
+    uint8_t *frame = (uint8_t *)malloc_caps(frame_cap, amy_global.config.ram_caps_sysex);
+    if (!frame) { fprintf(stderr, "zD: malloc frame(%d) FAILED\n", frame_cap); free(enc); return; }
+
+    fprintf(stderr, "zD: raw=%d b64=%d chunks=%d midi cfg=0x%x\n",
+            raw_len, enc_len, chunks, (unsigned)amy_global.config.midi);
+
+    for (int chunk = 0; chunk < chunks; chunk++) {
+        int chunk_start = chunk * ZDUMP_CHUNK_B64_MAX;
+        int chunk_len = enc_len - chunk_start;
+        if (chunk_len > ZDUMP_CHUNK_B64_MAX) chunk_len = ZDUMP_CHUNK_B64_MAX;
+        // Chunk marker: '0' = single chunk (whole message), 'C' = continue
+        // (more chunks follow), 'E' = end (last of multi). The web-side
+        // reassembler appends 'C' chunks to an accumulator and flushes on 'E'
+        // or single '0'.
+        uint8_t marker;
+        if (chunks == 1) marker = '0';
+        else if (chunk == chunks - 1) marker = 'E';
+        else marker = 'C';
+        frame[0] = 0xF0;
+        frame[1] = 0x00;
+        frame[2] = 0x03;
+        frame[3] = 0x45;
+        frame[4] = marker;
+        memcpy(frame + 5, enc + chunk_start, chunk_len);
+        frame[5 + chunk_len] = 0xF7;
+        int total = 6 + chunk_len;
+        fprintf(stderr, "zD: chunk %d/%d marker='%c' b64=%d frame=%d\n",
+                chunk + 1, chunks, marker, chunk_len, total);
+        midi_out(frame, total);
+    }
+
     free(frame);
     free(enc);
 }
