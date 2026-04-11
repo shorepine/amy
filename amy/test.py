@@ -289,6 +289,29 @@ class TestAlgo2(AmyTest):
     amy.send(time=500, voices="0", vel=0)
 
 
+class TestWoodPiano(AmyTest):
+  """Test 4-op FM voice to check unassigned voices behave OK."""
+
+  def run(self):
+    # The four-op WOOD PIANO patch
+    amy.send(time=0, synth=1, num_voices=6, oscs_per_voice=5)
+    amy.send(time=0, synth=1, osc=4, wave=amy.SINE, ratio=1, bp0='10,1,1000,0.8,100,0', amp='0.4,0,0,1', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=3, wave=amy.SINE, ratio=0.5, bp0='0,1,1000,0,100,0', amp='1,0,0,1', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=2, wave=amy.SINE, ratio=1, bp0='0,1,300,0.5,500,0.3,1000,0', amp='0.8,0,0,1,0,0', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SINE, ratio=0.495, bp0='0,1,2000,0,300,0', amp='1,0,0,1,0,0', eg0_type=2, phase=0)
+    # Osc 0 amp envelope is just to avoid truncating the FM output.
+    amy.send(time=0, synth=1, osc=0, wave=amy.ALGO, algorithm=2, algo_source=',,4,3,2,1', bp0='0,1,1000,1,300,0', amp='4,0,1,1', freq='220,1,0,0,0,0')
+    # Notes
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=350, synth=1, note=48, vel=0)
+    amy.send(time=400, synth=1, note=48, vel=1)
+    amy.send(time=650, synth=1, note=48, vel=0)
+    amy.send(time=700, synth=1, note=58, vel=1)
+    amy.send(time=800, synth=1, note=58, vel=0)
+    amy.send(time=800, synth=1, note=60, vel=1)
+    amy.send(time=900, synth=1, note=60, vel=0)
+
+
 class TestFMRepeat(AmyTest):
   """Douglas reports that the DX7 Marimba sometimes clicks at onset."""
 
