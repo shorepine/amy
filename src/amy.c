@@ -1208,8 +1208,18 @@ void play_delta(struct delta *d) {
         PARAM_IS_BP_COEF(d->param)) {
         // Changes to Amp/filter/EGs can potentially make a silence-suspended note come back.
         // Revive the note if it hasn't seen a note_off since the last note_on.
-        if (synth[d->osc]->status == SYNTH_AUDIBLE_SUSPENDED && AMY_IS_UNSET(synth[d->osc]->note_off_clock))
+        if (synth[d->osc]->status == SYNTH_INAUDIBLE && AMY_IS_UNSET(synth[d->osc]->note_off_clock))
             synth[d->osc]->status = SYNTH_AUDIBLE;
+        // In theory, changing the amp coefs away from their defaults could turn on an osc.  But we won't
+        // But it won't get started without a note-on.  Unfortunately, we can't call hold_and_modify first.
+        // (if the osc has a modulator, we call the modulator in hold_and_modify, but the LUT hasn't been
+        // set up yet, so we get an access error.)
+        //else if (synth[d->osc]->status == SYNTH_OFF) {
+        //    hold_and_modify(d->osc);
+        //    if (msynth[d->osc]->amp > 0) {
+        //        osc_note_on(d->osc, freq_of_logfreq(msynth[d->osc]->logfreq));
+        //    }
+        //}
     }
     if(d->param == CHAINED_OSC) {
         int chained_osc = d->data.i;
@@ -1412,11 +1422,14 @@ float amp_combine_controls(float *controls, float *coefs) {
     // Linear combination of amp coefs is then mapped so that 0 -> 0.001 and 1 -> 1 exponentially.
     float result = 0;
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)  {
-        //if (amy_global.time > 0.311 && amy_global.time < 0.315)
-        //    fprintf(stderr, "amp_combine t=%.3f coef %d = %.3f arg %.3f\n", amy_global.time, i, coefs[i], controls[i]);
-        result -= (i == 0 || coefs[i] > 0) ? 1.0f : 0;
-        if (coefs[i] != 0)
-            result += map_60dB_to_01f(coefs[i] * controls[i]);
+        float coef = coefs[i];
+        float val = controls[i];
+        if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
+        if (i != COEF_MOD) {
+            val = map_60dB_to_01f(MAX(0, val)) - 1.0;    // const, vel, eg0, eg1 get log-compressed.
+            // make 0 mean "no amp" and 1 mean "regular (full) amp".
+        }
+        result += coef * val;
     }
     result = 3.0f * (result);
     //if (log_amp < -2.0f) {
@@ -1597,6 +1610,16 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_HAS_CUSTOM) {
             if(synth[osc]->wave == CUSTOM) max_val = render_custom(buf, osc);
         }
+        if (synth[osc]->wave != SILENT) {
+            // apply filter to osc if set
+            if (synth[osc]->filter_type != FILTER_NONE) {
+                max_val = filter_process(per_osc_fb[core], osc, max_val);
+                // Maybe clear filter state here if we've finshed this osc.
+                if (synth[osc]->status != SYNTH_AUDIBLE) {
+                    reset_filter(osc);  // (f)
+                }
+            }
+        }
         if(AMY_IS_SET(synth[osc]->chained_osc)) {
             // Stack oscillators - render next osc into same buffer.
             uint16_t chained_osc = synth[osc]->chained_osc;
@@ -1608,6 +1631,14 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
         if (synth[osc]->wave == SILENT) {
             max_val = render_envelope(buf, osc);
+            // apply filter to osc if set
+            if (synth[osc]->filter_type != FILTER_NONE) {
+                max_val = filter_process(per_osc_fb[core], osc, max_val);
+                // Maybe clear filter state here if we've finshed this osc.
+                if (synth[osc]->status != SYNTH_AUDIBLE) {
+                    reset_filter(osc);  // (f)
+                }
+            }
         }
         // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
         // from zero-amplitude (but maybe inheriting values from chained_oscs).
@@ -1615,7 +1646,10 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
 //#define MIN_ZERO_AMP_TIME_SAMPS (5 * AMY_BLOCK_SIZE)
         if(AMY_IS_SET(synth[osc]->zero_amp_clock)) {
-            if (max_val > 0) {
+            // We terminate zero_amp_clock if the max_val goes above threshold *or* if it's the start of the note and it's above zero.
+            if (max_val >= F2S(AMP_THRESH)
+                || (max_val > 0
+                    && ((amy_global.total_blocks * AMY_BLOCK_SIZE) < (synth[osc]->note_on_clock + AMY_BLOCK_SIZE)))) {
                 AMY_UNSET(synth[osc]->zero_amp_clock);
             } else {
                 if ( synth[osc]->terminate_on_silence
@@ -1625,7 +1659,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     // Oscillator has fallen silent, stop executing it.
                     uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
                     while (AMY_IS_SET(osc_to_stop)) {
-                        synth[osc_to_stop]->status = SYNTH_AUDIBLE_SUSPENDED;  // It *could* come back...
+                        synth[osc_to_stop]->status = SYNTH_INAUDIBLE;  // It *could* come back...
                         // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
                         msynth[osc_to_stop]->filter_logfreq = 0;  // (a)
                         msynth[osc_to_stop]->resonance = 0.7f;  // (b)
@@ -1659,9 +1693,10 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     // (d) never makes any difference .. so it's not slew rate?
                 }
             }
-        } else if (max_val == 0) {
+        } else if (max_val < F2S(AMP_THRESH)) {
             synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         }
+        //fprintf(stderr, "render_osc_wave: t=%.3f osc=%d max_val %.6f\n", amy_global.time, osc, S2F(max_val));
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
     //fprintf(stderr, "-render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
@@ -1685,11 +1720,11 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 //fprintf(stderr, "time %.3f osc %d filter_type %d\n",
                 //        (float)amy_global.total_blocks*AMY_BLOCK_SIZE / AMY_SAMPLE_RATE,
                 //        osc, synth[osc]->filter_type);
-                max_val = filter_process(per_osc_fb[core], osc, max_val);
-                // Maybe clear filter state here if we've finshed this osc.
-                if (synth[osc]->status != SYNTH_AUDIBLE) {
-                    reset_filter(osc);  // (f)
-                }
+                //max_val = filter_process(per_osc_fb[core], osc, max_val);
+                //// Maybe clear filter state here if we've finshed this osc.
+                //if (synth[osc]->status != SYNTH_AUDIBLE) {
+                //    reset_filter(osc);  // (f)
+                //}
             }
             if (synth[osc]->status != SYNTH_AUDIBLE) {
                 reset_modosc(msynth[osc]);  // (g)  This makes a difference, but not clicks

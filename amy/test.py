@@ -272,6 +272,18 @@ class TestSineEnv2(AmyTest):
     amy.send(time=950, vel=0)
 
 
+class TestSineAM(AmyTest):
+  """Amplitude modulation was messed up by log-combination amp."""
+
+  def run(self):
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=5)
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000, mod_source=1, amp='1,0,0,0,0,0.05')
+    amy.send(time=100, vel=1)  # Needed to wake up osc, even though vel value is ignored
+    amy.send(time=500, vel=0)  # Will not turn off osc since vel value is ignored / eg0 not engaged.
+    amy.send(time=600, amp=0)  # Should silence osc.
+    amy.send(time=800, amp=1)  # osc ready to go, but will still wait for nonzero vel note-on
+
+
 class TestAlgo(AmyTest):
 
   def run(self):
@@ -287,6 +299,29 @@ class TestAlgo2(AmyTest):
     amy.send(time=0, voices="0", patch=128+24)
     amy.send(time=100, voices="0", note=58, vel=2)
     amy.send(time=500, voices="0", vel=0)
+
+
+class TestWoodPiano(AmyTest):
+  """Test 4-op FM voice to check unassigned voices behave OK."""
+
+  def run(self):
+    # The four-op WOOD PIANO patch
+    amy.send(time=0, synth=1, num_voices=6, oscs_per_voice=5)
+    amy.send(time=0, synth=1, osc=4, wave=amy.SINE, ratio=1, bp0='10,1,1000,0.8,100,0', amp='0.4,0,0,1', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=3, wave=amy.SINE, ratio=0.5, bp0='0,1,1000,0,100,0', amp='1,0,0,1', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=2, wave=amy.SINE, ratio=1, bp0='0,1,300,0.5,500,0.3,1000,0', amp='0.8,0,0,1,0,0', eg0_type=2, phase=0)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SINE, ratio=0.495, bp0='0,1,2000,0,300,0', amp='1,0,0,1,0,0', eg0_type=2, phase=0)
+    # Osc 0 amp envelope is just to avoid truncating the FM output.
+    amy.send(time=0, synth=1, osc=0, wave=amy.ALGO, algorithm=2, algo_source=',,4,3,2,1', bp0='0,1,1000,1,300,0', amp='4,0,1,1', freq='220,1,0,0,0,0')
+    # Notes
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=350, synth=1, note=48, vel=0)
+    amy.send(time=400, synth=1, note=48, vel=1)
+    amy.send(time=650, synth=1, note=48, vel=0)
+    amy.send(time=700, synth=1, note=58, vel=1)
+    amy.send(time=800, synth=1, note=58, vel=0)
+    amy.send(time=800, synth=1, note=60, vel=1)
+    amy.send(time=900, synth=1, note=60, vel=0)
 
 
 class TestFMRepeat(AmyTest):
@@ -579,7 +614,7 @@ class TestOscBD(AmyTest):
 
 
 class TestChainedOsc(AmyTest):
-  """Two oscillators chained together."""
+  """Two oscillators chained together behind a silent_osc."""
 
   def run(self):
     # TestFilter but on Saw + subosc with same envelope.
@@ -588,8 +623,9 @@ class TestChainedOsc(AmyTest):
     #amy.send(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0.2,0,1,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
     #amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
-    amy.send(time=0, osc=1, wave=amy.PULSE, amp="0.2,0,1,1", freq=osc_freq_str + ',1,0,0,0,0,1')
+    amy.send(time=0, osc=0, wave=amy.SILENT, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
+    amy.send(time=0, osc=1, wave=amy.SAW_DOWN, chained_osc=2)
+    amy.send(time=0, osc=2, wave=amy.PULSE, amp="0.2,0,1,1", freq=osc_freq_str + ',1,0,0,0,0,1')
     amy.send(time=100, osc=0, note=48, vel=1.0)
     #amy.send(time=100, osc=1, note=48, vel=1.0)
     amy.send(time=900, osc=0, vel=0)
@@ -765,12 +801,13 @@ class TestOwBassClick(AmyTest):
   """Hearing clicks on OwBass??.  See https://github.com/shorepine/amy/issues/629. """
 
   def run(self):
-    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=3)
+    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=4)
     # Ow Bass reproduced by hand on AMYboard Editor.
-    amy.send(time=10, synth=0, osc=0, wave=amy.PULSE, amp='0.551,,1', freq=220, filter_freq='20,1,,,5.443', duty=0.697,
-             resonance=4.381, chained_osc=2, mod_source=1, filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0')
+    amy.send(time=10, synth=0, osc=0, wave=amy.SILENT, amp='1,,1,1', freq=220, filter_freq='20,1,,,5.443', resonance=4.381,
+             filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0', mod_source=1, chained_osc=2)
     amy.send(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
-    amy.send(time=10, synth=0, osc=2, wave=amy.SAW_UP, amp='0.551,,1', freq='110', mod_source=1, bp0='13,1,0,1,16,0')
+    amy.send(time=10, synth=0, osc=2, wave=amy.PULSE, amp='0.551,,0', freq=220, duty=0.697, chained_osc=3, mod_source=1)
+    amy.send(time=10, synth=0, osc=3, wave=amy.SAW_UP, amp='0.551,,0', freq=110, mod_source=1)
     amy.send(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')
     # Rapid repeated notes.
     amy.send(time=100, synth=0, note=48, vel=1)
@@ -1164,6 +1201,7 @@ class TestPreset257(AmyTest):
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
 
+
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 
@@ -1172,6 +1210,15 @@ class TestChangeSustain(AmyTest):
     amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
+
+
+def float_or_val(str, error_val=None):
+  """Like float, but returns None if string doesn't parse."""
+  try:
+    return float(str)
+  except ValueError:
+    return error_val
+
 
 class TestResetPreset(AmyTest):
   """Setting a synth to a patch should rewrite all the params even if it's the same patch."""
@@ -1219,9 +1266,9 @@ def main(argv):
     #TestBrass2().test()
     #print(TestSineEnv().test()[1])
     #TestSawDownOsc().test()
-    #TestGuitar().test()
+    print(TestGuitar().test()[1])
     #TestFilter().test()
-    print(TestAlgo().test()[1])
+    #print(TestAlgo().test()[1])
     #TestBleep().test()
     #TestChainedOsc().test()
     #TestJunoPatch().test()
@@ -1246,7 +1293,7 @@ def main(argv):
 
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
-    print('\n'.join(sorted(errors, key=lambda x: float(x.split(' ')[-2].split('=')[1]), reverse=True)))
+    print('\n'.join(sorted(errors, key=lambda x: float_or_val(x.split(' ')[-2].split('=')[-1], error_val=1000), reverse=True)))
     sys.exit(1)
   else:
     print(len(oks), "tests pass")

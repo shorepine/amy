@@ -261,7 +261,7 @@ enum coefs{
 // synth[].status values
 #define SYNTH_OFF 0
 #define SYNTH_AUDIBLE 1
-#define SYNTH_AUDIBLE_SUSPENDED 2
+#define SYNTH_INAUDIBLE 2
 #define SYNTH_IS_MOD_SOURCE 3
 #define SYNTH_IS_ALGO_SOURCE 4
 

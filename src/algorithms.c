@@ -166,48 +166,49 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     
     SAMPLE amp = SHIFTR(F2S(msynth[osc]->amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
+        SAMPLE feedback_level = 0;
+        SAMPLE mod_amp = F2S(1.0f);
+        if(algo.ops[op] & FB_IN) {
+            feedback_level = F2S(synth[osc]->feedback);
+        } // main algo voice stores feedback, not the op
+
+        if(algo.ops[op] & IN_BUS_ONE) {
+            in_buf = BUS_ONE;
+        } else if(algo.ops[op] & IN_BUS_TWO) { 
+            in_buf = BUS_TWO;
+        } else {
+            // no in_buf
+            in_buf = NULL;
+        }
+        if ( (algo.ops[op] & IN_BUS_ONE)
+             && (algo.ops[op] & OUT_BUS_ONE)
+             /* && !(algo.ops[op] & OUT_BUS_ADD) */ ) {  // IN_BUS_ONE + OUT_BUS_ONE is never ADD
+            // Input is BUS_ONE and output overwrites it, use a temp buffer.
+            out_buf = SCRATCH;
+        } else if (algo.ops[op] & OUT_BUS_ONE) {
+            out_buf = BUS_ONE;
+        } else if (algo.ops[op] & OUT_BUS_TWO) {
+            out_buf = BUS_TWO;
+        } else {
+            out_buf = buf;
+            // We apply the msynth amp to every buf that goes into the final output buffer.
+            mod_amp = amp;
+        }
+        if (!(algo.ops[op] & OUT_BUS_ADD)) {
+            // Output is not being accumulated, so have to clear it first.
+            zero(out_buf);
+        }
+
+        SAMPLE value = 0;
         if(AMY_IS_SET(synth[osc]->algo_source[op])
            && synth[synth[osc]->algo_source[op]]->status == SYNTH_IS_ALGO_SOURCE) {
-            SAMPLE feedback_level = 0;
-            SAMPLE mod_amp = F2S(1.0f);
-            if(algo.ops[op] & FB_IN) { 
-                feedback_level = F2S(synth[osc]->feedback);
-            } // main algo voice stores feedback, not the op 
+            value = render_mod(in_buf, out_buf, synth[osc]->algo_source[op], feedback_level, osc, mod_amp);
+        } // If osc is not set, output has already been cleared.
+        if (out_buf == buf && value > max_value)  max_value = value;
 
-            if(algo.ops[op] & IN_BUS_ONE) { 
-                in_buf = BUS_ONE;
-            } else if(algo.ops[op] & IN_BUS_TWO) { 
-                in_buf = BUS_TWO;
-            } else {
-                // no in_buf
-                in_buf = NULL;
-            }
-            if ( (algo.ops[op] & IN_BUS_ONE)
-                 && (algo.ops[op] & OUT_BUS_ONE)
-                 /* && !(algo.ops[op] & OUT_BUS_ADD) */ ) {  // IN_BUS_ONE + OUT_BUS_ONE is never ADD
-                // Input is BUS_ONE and output overwrites it, use a temp buffer.
-                out_buf = SCRATCH;
-            } else if (algo.ops[op] & OUT_BUS_ONE) {
-                out_buf = BUS_ONE;
-            } else if (algo.ops[op] & OUT_BUS_TWO) {
-                out_buf = BUS_TWO;
-            } else {
-                out_buf = buf;
-                // We apply the msynth amp to every buf that goes into the final output buffer.
-                mod_amp = amp;
-            }
-            if (!(algo.ops[op] & OUT_BUS_ADD)) {
-                // Output is not being accumulated, so have to clear it first.
-                zero(out_buf);
-            }
-
-            SAMPLE value = render_mod(in_buf, out_buf, synth[osc]->algo_source[op], feedback_level, osc, mod_amp);
-            if (out_buf == buf && value > max_value)  max_value = value;
-
-            if (out_buf == SCRATCH) {
-                // We had to invoke the spare buffer, meaning we're overwriting BUS_ONE
-                copy(out_buf, BUS_ONE);
-            }
+        if (out_buf == SCRATCH) {
+            // We had to invoke the spare buffer, meaning we're overwriting BUS_ONE
+            copy(out_buf, BUS_ONE);
         }
     }
     //fprintf(stderr, "render_algo: time %.3f osc %d last_amp %f amp %f max_val=%f\n", amy_global.time, osc, (msynth[osc]->last_amp), (msynth[osc]->amp), S2F(max_value));
