@@ -272,6 +272,18 @@ class TestSineEnv2(AmyTest):
     amy.send(time=950, vel=0)
 
 
+class TestSineAM(AmyTest):
+  """Amplitude modulation was messed up by log-combination amp."""
+
+  def run(self):
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=5)
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000, mod_source=1, amp='1,0,0,0,0,0.05')
+    amy.send(time=100, vel=1)  # Needed to wake up osc, even though vel value is ignored
+    amy.send(time=500, vel=0)  # Will not turn off osc since vel value is ignored / eg0 not engaged.
+    amy.send(time=600, amp=0)  # Should silence osc.
+    amy.send(time=800, amp=1)  # osc ready to go, but will still wait for nonzero vel note-on
+
+
 class TestAlgo(AmyTest):
 
   def run(self):
@@ -1189,6 +1201,7 @@ class TestPreset257(AmyTest):
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
 
+
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 
@@ -1197,6 +1210,15 @@ class TestChangeSustain(AmyTest):
     amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
+
+
+def float_or_val(str, error_val=None):
+  """Like float, but returns None if string doesn't parse."""
+  try:
+    return float(str)
+  except ValueError:
+    return error_val
+
 
 class TestResetPreset(AmyTest):
   """Setting a synth to a patch should rewrite all the params even if it's the same patch."""
@@ -1271,7 +1293,7 @@ def main(argv):
 
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
-    print('\n'.join(sorted(errors, key=lambda x: float(x.split(' ')[-2].split('=')[1]), reverse=True)))
+    print('\n'.join(sorted(errors, key=lambda x: float_or_val(x.split(' ')[-2].split('=')[-1], error_val=1000), reverse=True)))
     sys.exit(1)
   else:
     print(len(oks), "tests pass")
