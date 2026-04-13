@@ -236,7 +236,6 @@ uint8_t * sysex_buffer = NULL;
 // arriving before the scheduled callback fires doesn't overwrite the previous
 // message. This matters when the sketch's loop() is CPU-heavy and the
 // mp_sched callback is delayed.
-#define SYSEX_COPY_SLOTS 4
 char * sysex_message_copies[SYSEX_COPY_SLOTS] = {NULL};
 uint8_t sysex_copy_write_idx = 0;  // MIDI task writes here
 uint8_t sysex_copy_read_idx = 0;   // MP callback reads here
@@ -499,8 +498,10 @@ void stop_midi() {
     }
     free(sysex_buffer);
     sysex_buffer = NULL;
-    free(sysex_message_copy);
-    sysex_message_copy = NULL;
+    for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+        free(sysex_message_copies[i]);
+        sysex_message_copies[i] = NULL;
+    }
 }
 
 
@@ -562,8 +563,10 @@ void stop_midi() {
         }
         free(sysex_buffer);
         sysex_buffer = NULL;
-        free(sysex_message_copy);
-        sysex_message_copy = NULL;
+        for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+            free(sysex_message_copies[i]);
+            sysex_message_copies[i] = NULL;
+        }
     }
 }
 
