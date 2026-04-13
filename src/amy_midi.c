@@ -245,13 +245,19 @@ void parse_sysex() {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
             sysex_buffer[sysex_len] = 0;
-            // zB: Reboot into bootloader mode. Handled in pure C — no
-            // mp_sched_schedule needed, works even when loop() is hogging
-            // the scheduler. The hook sets an RTC flag and calls esp_restart().
+            // zB[mode]: Reboot. Handled in pure C — no mp_sched_schedule
+            // needed, works even when loop() is hogging the scheduler.
+            //   zBZ  / zB0Z — bootloader mode (skip sketch.py)
+            //   zB1Z       — normal reboot (run sketch.py)
+            //   zB2Z       — ROM download/flash mode
             if (sysex_len > 4 && sysex_buffer[3] == 'z' && sysex_buffer[4] == 'B') {
-                fprintf(stderr, "zB: reboot to bootloader mode\n");
+                uint8_t mode = 0;
+                if (sysex_len > 5 && sysex_buffer[5] >= '0' && sysex_buffer[5] <= '9') {
+                    mode = sysex_buffer[5] - '0';
+                }
+                fprintf(stderr, "zB: reboot mode=%d\n", mode);
                 if (amy_global.config.amy_external_reboot_hook) {
-                    amy_global.config.amy_external_reboot_hook();
+                    amy_global.config.amy_external_reboot_hook(mode);
                 }
                 sysex_len = 0;
                 return;

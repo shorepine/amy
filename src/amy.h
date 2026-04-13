@@ -695,7 +695,7 @@ typedef struct  {
     void (*amy_external_file_transfer_done_hook)(const char *filename);
     void (*amy_external_update_file_hook)(const char *filename);
     void (*amy_external_exec_hook)(const char *code);
-    void (*amy_external_reboot_hook)(void);
+    void (*amy_external_reboot_hook)(uint8_t mode);
 
     // pins for MCU platforms
     int8_t i2s_lrc;
