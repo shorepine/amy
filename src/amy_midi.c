@@ -231,10 +231,15 @@ uint16_t sysex_len = 0;
 extern const mp_obj_fun_builtin_var_t tulip_amy_send_sysex_obj;
 #endif
 uint8_t * sysex_buffer = NULL;
-// Snapshot of sysex payload for deferred MicroPython processing.
-// parse_sysex() copies here before scheduling so the MIDI task can
-// safely reuse sysex_buffer for the next incoming message.
-char * sysex_message_copy = NULL;
+// Ring buffer of sysex payload snapshots for deferred MicroPython processing.
+// parse_sysex() copies each payload into a separate slot so that a new sysex
+// arriving before the scheduled callback fires doesn't overwrite the previous
+// message. This matters when the sketch's loop() is CPU-heavy and the
+// mp_sched callback is delayed.
+#define SYSEX_COPY_SLOTS 4
+char * sysex_message_copies[SYSEX_COPY_SLOTS] = {NULL};
+uint8_t sysex_copy_write_idx = 0;  // MIDI task writes here
+uint8_t sysex_copy_read_idx = 0;   // MP callback reads here
 void parse_sysex() {
     uint32_t time = AMY_UNSET_VALUE(time);
     if(sysex_len>3) {
@@ -244,15 +249,19 @@ void parse_sysex() {
             // For Micropython hosted systems, we run MIDI on a separate "thread" (task)
             // than MP, so just calling amy_send_message here can fail if it needs to access
             // underlying MP resources. So we schedule it to run in the MP main loop instead.
-            // We copy the payload into sysex_message_copy first because sysex_buffer is
-            // shared and the MIDI task may overwrite it before the callback runs.
+            // Each message gets its own ring-buffer slot so a fast-arriving next sysex
+            // doesn't overwrite an unprocessed message.
             #if defined(TULIP) || defined(AMYBOARD)
-            if(sysex_message_copy) {
-                uint16_t payload_len = sysex_len - 3;
-                memcpy(sysex_message_copy, (char*)sysex_buffer + 3, payload_len);
-                sysex_message_copy[payload_len] = '\0';
+            {
+                char *slot = sysex_message_copies[sysex_copy_write_idx];
+                if(slot) {
+                    uint16_t payload_len = sysex_len - 3;
+                    memcpy(slot, (char*)sysex_buffer + 3, payload_len);
+                    slot[payload_len] = '\0';
+                    sysex_copy_write_idx = (sysex_copy_write_idx + 1) % SYSEX_COPY_SLOTS;
+                }
+                mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_amy_send_sysex_obj), mp_const_none);
             }
-            mp_sched_schedule(MP_OBJ_FROM_PTR(&tulip_amy_send_sysex_obj), mp_const_none);
             #else
             amy_add_message((char*)sysex_buffer+3);
             #endif
@@ -463,7 +472,9 @@ void run_midi_task() {
 void run_midi() {
     if (sysex_buffer == NULL) {
         sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        sysex_message_copy = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+            sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        }
         #if defined(AMYBOARD_ARDUINO)
         // Initialize TinyUSB with amy's MIDI+CDC descriptors before starting MIDI polling
         if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
@@ -525,7 +536,9 @@ extern void pico_teardown_midi();
 void run_midi() {
     if (sysex_buffer == NULL) {
         sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        sysex_message_copy = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+            sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        }
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
             gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
