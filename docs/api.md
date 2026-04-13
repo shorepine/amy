@@ -171,21 +171,21 @@ amy_start(amy_config);
 
 Hook fields in `amy_config_t`:
 
-```c
-uint8_t (*amy_external_render_hook)(uint16_t osc, SAMPLE *buf, uint16_t len);
-float (*amy_external_coef_hook)(uint16_t channel);
-void (*amy_external_block_done_hook)(void);
-void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
-void (*amy_external_sequencer_hook)(uint32_t tick_count);
-uint32_t (*amy_external_fopen_hook)(char *filename, char *mode);
-uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
-uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
-void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
-void (*amy_external_fclose_hook)(uint32_t fptr);
-void (*amy_external_file_transfer_done_hook)(const char *filename);
-void (*amy_external_factory_reset_hook)(void);
-void (*amy_external_update_file_hook)(const char *filename);
-```
+| Hook | Signature | Used by | Description |
+| ---- | --------- | ------- | ----------- |
+| `amy_external_render_hook` | `uint8_t (uint16_t osc, SAMPLE *buf, uint16_t len)` | — | Custom oscillator renderer. Return 1 if handled. |
+| `amy_external_coef_hook` | `float (uint16_t channel)` | — | Provide external coefficient values (e.g. CV input). |
+| `amy_external_block_done_hook` | `void (void)` | — | Called after each audio block is rendered. |
+| `amy_external_midi_input_hook` | `void (uint8_t *bytes, uint16_t len, uint8_t is_sysex)` | — | Called when MIDI bytes are received. |
+| `amy_external_sequencer_hook` | `void (uint32_t tick_count)` | — | Called on each sequencer tick. |
+| `amy_external_fopen_hook` | `uint32_t (char *filename, char *mode)` | `zT`, `zD`, `zF` | Open a file on host disk. Returns opaque handle. |
+| `amy_external_fwrite_hook` | `uint32_t (uint32_t fptr, uint8_t *bytes, uint32_t len)` | `zT` | Write bytes to a file opened via fopen hook. |
+| `amy_external_fread_hook` | `uint32_t (uint32_t fptr, uint8_t *bytes, uint32_t len)` | `zD` | Read bytes from a file opened via fopen hook. |
+| `amy_external_fseek_hook` | `void (uint32_t fptr, uint32_t pos)` | `zD` | Seek to position in a file opened via fopen hook. |
+| `amy_external_fclose_hook` | `void (uint32_t fptr)` | `zT`, `zD`, `zF` | Close a file opened via fopen hook. |
+| `amy_external_file_transfer_done_hook` | `void (const char *filename)` | `zT` | Called after a `zT` file transfer completes. On AMYboard, restarts sketch.py. |
+| `amy_external_update_file_hook` | `void (const char *filename)` | `zA` | Called by `zA` to update a file with current AMY state. On AMYboard, splices live knob state into sketch.py. |
+| `amy_external_exec_hook` | `void (const char *code)` | `zP` | Called by `zP` to execute a string on the host. On AMYboard, runs the string as Python via `exec()`. |
 
 All hook fields default to `NULL` in `amy_default_config()`.
 
@@ -303,5 +303,4 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zT`   | **TODO**| `transfer_file` | string,uint | Transfer a file to the host. Params: destination filename, file size. See `hooks` for writing files on host disk. |
 | `zA`   | **TODO**| `update_file` | string (optional) | Update a file on disk with current AMY state via `update_file_hook`. Default path: `/user/current/sketch.py`. On AMYboard, splices `_auto_generated_knobs` section with live state. |
 | `zD`   | **TODO**| `dump_sysex` | string (optional) | Dump data over MIDI sysex (base64-encoded, wrapped with SPSS manufacturer ID `00 03 45`). With no params (`zDZ`): dumps all active instrument state. With a filename (`zD/user/current/sketch.pyZ`): reads file and sends it. |
-| `zR`   | **TODO**| `factory_reset` | (none) | Trigger a factory reset via `amy_external_factory_reset_hook`. On AMYboard, writes the default sketch.py and restarts. |
-| `zP`   | **TODO**| `ping` | (none) | Send a short sysex reply (`F0 00 03 45 'p' 'o' 'n' 'g' F7`) for connection diagnostics. |
+| `zP`   | **TODO**| `exec` | string | Execute code on the host via `amy_external_exec_hook`. On AMYboard, runs the string as Python (e.g. `zPimport amyboard; amyboard.restart_sketch()Z`). Max 255 chars. |
