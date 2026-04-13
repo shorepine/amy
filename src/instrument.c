@@ -322,7 +322,9 @@ int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices) {
         //fprintf(stderr, "get_num_voices: instrument_number %d is not defined.\n", instrument_number);
     } else {
         num_voices = instrument->num_voices;
-        for (int i = 0; i < num_voices; ++i)  amy_voices[i] = instrument->amy_voices[i];
+        if (amy_voices != NULL)
+            for (int i = 0; i < num_voices; ++i)
+                amy_voices[i] = instrument->amy_voices[i];
     }
     return num_voices;
 }
@@ -332,6 +334,10 @@ uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool i
     // *pstolen is set (if pstolen is nonnull) if the note is stolen, otherwise not touched.
     if (!instrument_number_exists(instrument_number, "voice_for_event")) return _INSTRUMENT_NO_VOICE;
     struct instrument_info *instrument = instruments[instrument_number];
+    if (instrument->num_voices == 1) {
+        // If there's only one voice, we can skip the voice management.
+        return instrument->amy_voices[0];
+    }
     if (is_note_off) {
         // Note off.
         if (note == 0) {

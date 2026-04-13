@@ -837,7 +837,7 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
     // Identify the specific voice (or voices) for a note on/off event.
     // e->velocity is assumed to be set when this function is called.
     int num_voices = 0;
-    if (AMY_IS_UNSET(e->midi_note) && AMY_IS_UNSET(e->preset)) {
+    if (AMY_IS_UNSET(e->midi_note) && AMY_IS_UNSET(e->preset) && instrument_get_num_voices(e->synth, NULL) != 1) {
         // velocity without midi_note is valid for velocity==0 => all-notes-off.
         if (e->velocity != 0) {
             // Attempted a note-on to all voices, suppress.
