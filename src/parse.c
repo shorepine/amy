@@ -509,20 +509,24 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         }
     }
     else if (cmd == 'P') {
-        // zP: Ping — send a short sysex reply for diagnostics.
-        uint8_t frame[] = { 0xF0, 0x00, 0x03, 0x45, 'p', 'o', 'n', 'g', 0xF7 };
-        fprintf(stderr, "zP: sending ping sysex (9 bytes)\n");
-        midi_out(frame, sizeof(frame));
-        fprintf(stderr, "zP: ping sent\n");
-        return 0;
-    }
-    else if (cmd == 'R') {
-        // zR: Factory reset. Platform hook writes default sketch and reboots.
-        fprintf(stderr, "zR: factory reset requested\n");
-        if (amy_global.config.amy_external_factory_reset_hook) {
-            amy_global.config.amy_external_factory_reset_hook();
+        // zP: Execute Python code on host (e.g. zPimport amyboard; amyboard.restart_sketch()Z).
+        char code[256];
+        uint16_t len = 0;
+        while (message[len] && message[len] != 'Z' && len < sizeof(code) - 1) {
+            code[len] = message[len];
+            len++;
         }
-        return 0;
+        code[len] = '\0';
+        fprintf(stderr, "zP: exec '%s'\n", code);
+        if (amy_global.config.amy_external_exec_hook) {
+            amy_global.config.amy_external_exec_hook(code);
+        }
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;
+            while (scan[total] && scan[total] != 'Z') total++;
+            return total;
+        }
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;

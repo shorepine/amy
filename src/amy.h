@@ -294,6 +294,7 @@ enum coefs{
 #define RESET_ALL_NOTES 131072
 #define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
 #define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
+#define RESET_QUEUE 1048576 // resets the amy queue
 
 #define true 1
 #define false 0
@@ -692,8 +693,8 @@ typedef struct  {
     void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
     void (*amy_external_fclose_hook)(uint32_t fptr);
     void (*amy_external_file_transfer_done_hook)(const char *filename);
-    void (*amy_external_factory_reset_hook)(void);
     void (*amy_external_update_file_hook)(const char *filename);
+    void (*amy_external_exec_hook)(const char *code);
 
     // pins for MCU platforms
     int8_t i2s_lrc;
