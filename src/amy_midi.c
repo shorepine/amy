@@ -256,6 +256,14 @@ void parse_sysex() {
                 sysex_len = 0;
                 return;
             }
+            // zI: Ping/identity — reply with a short sysex so the web side
+            // knows the board is alive and ready. Pure C, no scheduler needed.
+            if (sysex_len > 4 && sysex_buffer[3] == 'z' && sysex_buffer[4] == 'I') {
+                uint8_t frame[] = { 0xF0, 0x00, 0x03, 0x45, 'O', 'K', 0xF7 };
+                midi_out(frame, sizeof(frame));
+                sysex_len = 0;
+                return;
+            }
             // For Micropython hosted systems, we run MIDI on a separate "thread" (task)
             // than MP, so just calling amy_send_message here can fail if it needs to access
             // underlying MP resources. So we schedule it to run in the MP main loop instead.
