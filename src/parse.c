@@ -494,6 +494,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         }
         filename[len] = '\0';
         fprintf(stderr, "zA: update file '%s'\n", filename[0] ? filename : "(default)");
+        sequencer_midi_stop();
         if (amy_global.config.amy_external_update_file_hook) {
             if (filename[0]) {
                 amy_global.config.amy_external_update_file_hook(filename);
@@ -501,6 +502,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
                 amy_global.config.amy_external_update_file_hook("/user/current/sketch.py");
             }
         }
+        sequencer_midi_start();
         {
             uint16_t total = 0;
             const char *scan = message - 1;
@@ -518,9 +520,11 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         }
         code[len] = '\0';
         fprintf(stderr, "zP: exec '%s'\n", code);
+        sequencer_midi_stop();
         if (amy_global.config.amy_external_exec_hook) {
             amy_global.config.amy_external_exec_hook(code);
         }
+        sequencer_midi_start();
         {
             uint16_t total = 0;
             const char *scan = message - 1;
