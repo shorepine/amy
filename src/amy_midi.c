@@ -252,6 +252,10 @@ void parse_sysex() {
             // doesn't overwrite an unprocessed message.
             #if defined(TULIP) || defined(AMYBOARD)
             {
+                // Stop the sequencer BEFORE scheduling so loop() callbacks
+                // don't fill the scheduler queue and starve this callback.
+                // The callback restarts the sequencer after processing.
+                sequencer_midi_stop();
                 char *slot = sysex_message_copies[sysex_copy_write_idx];
                 if(slot) {
                     uint16_t payload_len = sysex_len - 3;
