@@ -245,6 +245,17 @@ void parse_sysex() {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
             sysex_buffer[sysex_len] = 0;
+            // zB: Reboot into bootloader mode. Handled in pure C — no
+            // mp_sched_schedule needed, works even when loop() is hogging
+            // the scheduler. The hook sets an RTC flag and calls esp_restart().
+            if (sysex_len > 4 && sysex_buffer[3] == 'z' && sysex_buffer[4] == 'B') {
+                fprintf(stderr, "zB: reboot to bootloader mode\n");
+                if (amy_global.config.amy_external_reboot_hook) {
+                    amy_global.config.amy_external_reboot_hook();
+                }
+                sysex_len = 0;
+                return;
+            }
             // For Micropython hosted systems, we run MIDI on a separate "thread" (task)
             // than MP, so just calling amy_send_message here can fail if it needs to access
             // underlying MP resources. So we schedule it to run in the MP main loop instead.

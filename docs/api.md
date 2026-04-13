@@ -186,6 +186,7 @@ Hook fields in `amy_config_t`:
 | `amy_external_file_transfer_done_hook` | `void (const char *filename)` | `zT` | Called after a `zT` file transfer completes. On AMYboard, restarts sketch.py. |
 | `amy_external_update_file_hook` | `void (const char *filename)` | `zA` | Called by `zA` to update a file with current AMY state. On AMYboard, splices live knob state into sketch.py. |
 | `amy_external_exec_hook` | `void (const char *code)` | `zP` | Called by `zP` to execute a string on the host. On AMYboard, runs the string as Python via `exec()`. |
+| `amy_external_reboot_hook` | `void (void)` | `zB` | Called by `zB` to reboot into bootloader mode. Handled in pure C before `mp_sched_schedule`. On AMYboard, sets an RTC flag and calls `esp_restart()`. |
 
 All hook fields default to `NULL` in `amy_default_config()`.
 
@@ -303,4 +304,5 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zT`   | **TODO**| `transfer_file` | string,uint | Transfer a file to the host. Params: destination filename, file size. See `hooks` for writing files on host disk. |
 | `zA`   | **TODO**| `update_file` | string (optional) | Update a file on disk with current AMY state via `update_file_hook`. Default path: `/user/current/sketch.py`. On AMYboard, splices `_auto_generated_knobs` section with live state. |
 | `zD`   | **TODO**| `dump_sysex` | string (optional) | Dump data over MIDI sysex (base64-encoded, wrapped with SPSS manufacturer ID `00 03 45`). With no params (`zDZ`): dumps all active instrument state. With a filename (`zD/user/current/sketch.pyZ`): reads file and sends it. |
-| `zP`   | **TODO**| `exec` | string | Execute code on the host via `amy_external_exec_hook`. On AMYboard, runs the string as Python (e.g. `zPimport amyboard; amyboard.restart_sketch()Z`). Max 255 chars. |
+| `zP`   | **TODO**| `exec` | string | Execute code on the host via `amy_external_exec_hook`. On AMYboard, runs the string as Python (e.g. `zPimport amyboard; amyboard.restart_sketch()`). Max 255 chars. |
+| `zB`   | **TODO**| `reboot` | (none) | Reboot into bootloader mode via `amy_external_reboot_hook`. Handled in pure C (no scheduler needed). On AMYboard, sets an RTC flag and calls `esp_restart()`. On next boot, the sketch is skipped. |
