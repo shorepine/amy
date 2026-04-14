@@ -262,14 +262,19 @@ void parse_transfer_message(char * message, uint16_t len) {
         if (amy_global.config.amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
             uint32_t wrote = amy_global.config.amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
             amy_global.transfer_stored_bytes += wrote;
-            fprintf(stderr, "zT chunk: b64_len=%d decoded=%zu wrote=%u total=%u/%u first=%c%c%c%c\n",
-                    len, decoded, (unsigned)wrote,
-                    (unsigned)amy_global.transfer_stored_bytes,
-                    (unsigned)amy_global.transfer_length_bytes,
-                    decoded > 0 ? block[0] : '?',
-                    decoded > 1 ? block[1] : '?',
-                    decoded > 2 ? block[2] : '?',
-                    decoded > 3 ? block[3] : '?');
+            // If the chunk is not a normal 252-byte base64 chunk, log the
+            // raw incoming bytes so we can figure out what garbage is
+            // interrupting the transfer.
+            if (len != 252) {
+                fprintf(stderr, "zT SHORT chunk: b64_len=%d wrote=%u total=%u/%u raw=[",
+                        len, (unsigned)wrote,
+                        (unsigned)amy_global.transfer_stored_bytes,
+                        (unsigned)amy_global.transfer_length_bytes);
+                for (int i = 0; i < len && i < 16; i++) {
+                    fprintf(stderr, "%02x ", (unsigned char)message[i]);
+                }
+                fprintf(stderr, "]\n");
+            }
         }
     } else {
         for (uint16_t i = 0; i < decoded; i++) {
