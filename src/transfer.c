@@ -262,6 +262,14 @@ void parse_transfer_message(char * message, uint16_t len) {
         if (amy_global.config.amy_external_fwrite_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
             uint32_t wrote = amy_global.config.amy_external_fwrite_hook(amy_global.transfer_file_handle, block, (uint32_t)decoded);
             amy_global.transfer_stored_bytes += wrote;
+            fprintf(stderr, "zT chunk: b64_len=%d decoded=%zu wrote=%u total=%u/%u first=%c%c%c%c\n",
+                    len, decoded, (unsigned)wrote,
+                    (unsigned)amy_global.transfer_stored_bytes,
+                    (unsigned)amy_global.transfer_length_bytes,
+                    decoded > 0 ? block[0] : '?',
+                    decoded > 1 ? block[1] : '?',
+                    decoded > 2 ? block[2] : '?',
+                    decoded > 3 ? block[3] : '?');
         }
     } else {
         for (uint16_t i = 0; i < decoded; i++) {
