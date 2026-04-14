@@ -277,13 +277,12 @@ void parse_sysex() {
             // doesn't overwrite an unprocessed message.
             #if defined(TULIP) || defined(AMYBOARD)
             {
-                // ACK: tell the sender we received this sysex. Pure C, no
-                // scheduler needed. The sender waits for this before sending
-                // the next message, preventing ring buffer overflow.
-                {
-                    uint8_t ack[] = { 0xF0, 0x00, 0x03, 0x45, 'A', 'K', 0xF7 };
-                    midi_out(ack, sizeof(ack));
-                }
+                // NOTE: ACK is sent from the callback (tulip_amy_send_sysex)
+                // AFTER the message is processed, not here in parse_sysex.
+                // This ensures the sender only proceeds once the ring buffer
+                // slot has been drained — receiving the ACK here would just
+                // confirm receipt, allowing the ring buffer to overflow if
+                // callbacks are slow.
                 sequencer_midi_stop();
                 char *slot = sysex_message_copies[sysex_copy_write_idx];
                 if(slot) {
