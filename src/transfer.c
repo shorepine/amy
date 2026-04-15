@@ -273,8 +273,14 @@ void parse_transfer_message(char * message, uint16_t len) {
             if (amy_global.config.amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
                 amy_global.config.amy_external_fclose_hook(amy_global.transfer_file_handle);
             }
+            // Pair the sequencer_midi_stop() that zT's start handler fired in
+            // amy_parse_transfer_layer_message(). Do it BEFORE the done hook so
+            // the hook can observe a running sequencer if it needs to, and so
+            // any platform that uses zT without a platform-specific restart in
+            // its file_transfer_done_hook doesn't leave playback wedged.
+            sequencer_midi_start();
             if (amy_global.config.amy_external_file_transfer_done_hook != NULL) {
-                amy_global.config.amy_external_file_transfer_done_hook(amy_global.transfer_filename); 
+                amy_global.config.amy_external_file_transfer_done_hook(amy_global.transfer_filename);
             }
             amy_global.transfer_file_handle = 0;
             amy_global.transfer_filename[0] = '\0';
