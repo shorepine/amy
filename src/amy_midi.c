@@ -241,14 +241,12 @@ uint8_t sysex_copy_write_idx = 0;  // MIDI task writes here
 uint8_t sysex_copy_read_idx = 0;   // MP callback reads here
 void parse_sysex() {
     uint32_t time = AMY_UNSET_VALUE(time);
-    // Log short incoming sysex during file transfer to diagnose corruption
-    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE && sysex_len < 32) {
-        fprintf(stderr, "parse_sysex in transfer: len=%d raw=[", sysex_len);
-        for (int i = 0; i < sysex_len && i < 20; i++) {
-            fprintf(stderr, "%02x ", sysex_buffer[i]);
-        }
-        fprintf(stderr, "]\n");
-    }
+    fprintf(stderr, "parse_sysex: len=%d first=%02x%02x%02x%02x\n",
+            sysex_len,
+            sysex_len > 0 ? sysex_buffer[0] : 0,
+            sysex_len > 1 ? sysex_buffer[1] : 0,
+            sysex_len > 2 ? sysex_buffer[2] : 0,
+            sysex_len > 3 ? sysex_buffer[3] : 0);
     if(sysex_len>3) {
         // let's use 0x00 0x03 0x45 for SPSS
         if(sysex_buffer[0] == 0x00 && sysex_buffer[1] == 0x03 && sysex_buffer[2] == 0x45) {
