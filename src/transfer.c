@@ -251,7 +251,6 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
     amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
     b64_buf_malloc(&decbuf);
-    fprintf(stderr, "zT: start_receiving_file_transfer filename='%s' size=%u\n", amy_global.transfer_filename, (unsigned)length);
 }
 
 // takes a wire message and adds it to storage after decoding it. stops transfer when it's done
@@ -630,7 +629,6 @@ static void _zdump_state_line_cb(const char *line, int len, void *ctx) {
 }
 
 void amy_dump_state_to_sysex(void) {
-    fprintf(stderr, "zD: amy_dump_state_to_sysex entered\n");
     if (!amy_global.config.midi) return;
     sequencer_midi_stop();
     _zdump_stream stream;
@@ -640,8 +638,6 @@ void amy_dump_state_to_sysex(void) {
     }
     amy_emit_state_lines(_zdump_state_line_cb, &stream);
     _zdump_stream_finish(&stream);
-    fprintf(stderr, "zD: streamed %d raw bytes of state in %d frame(s)\n",
-            stream.bytes_sent, stream.frames_sent);
     _zdump_stream_destroy(&stream);
     sequencer_midi_start();
 }
@@ -685,8 +681,6 @@ void amy_dump_file_to_sysex(const char *filename) {
     }
     free(read_buf);
     _zdump_stream_finish(&stream);
-    fprintf(stderr, "zD: streamed %d raw bytes from '%s' in %d frame(s)\n",
-            stream.bytes_sent, filename, stream.frames_sent);
     _zdump_stream_destroy(&stream);
     amy_global.config.amy_external_fclose_hook(fh);
     sequencer_midi_start();

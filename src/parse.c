@@ -464,10 +464,8 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             filename[--len] = '\0';
         }
         if (filename[0] == '\0') {
-            fprintf(stderr, "zD: received zD (state dump)\n");
             amy_dump_state_to_sysex();
         } else {
-            fprintf(stderr, "zD: received zD file dump for '%s'\n", filename);
             amy_dump_file_to_sysex(filename);
         }
         // Consume the whole rest of the message so the outer parser exits.
@@ -494,7 +492,6 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         if (len > 0 && filename[len - 1] == 'Z') {
             filename[--len] = '\0';
         }
-        fprintf(stderr, "zA: update file '%s'\n", filename[0] ? filename : "(default)");
         if (amy_global.config.amy_external_update_file_hook) {
             if (filename[0]) {
                 amy_global.config.amy_external_update_file_hook(filename);
@@ -524,7 +521,6 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         if (len > 0 && code[len - 1] == 'Z') {
             code[--len] = '\0';
         }
-        fprintf(stderr, "zP: exec '%s'\n", code);
         if (amy_global.config.amy_external_exec_hook) {
             amy_global.config.amy_external_exec_hook(code);
         }

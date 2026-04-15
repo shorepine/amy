@@ -255,7 +255,6 @@ void parse_sysex() {
                 if (sysex_len > 5 && sysex_buffer[5] >= '0' && sysex_buffer[5] <= '9') {
                     mode = sysex_buffer[5] - '0';
                 }
-                fprintf(stderr, "zB: reboot mode=%d\n", mode);
                 if (amy_global.config.amy_external_reboot_hook) {
                     amy_global.config.amy_external_reboot_hook(mode);
                 }
