@@ -291,7 +291,12 @@ void parse_sysex() {
                 // slot has been drained — receiving the ACK here would just
                 // confirm receipt, allowing the ring buffer to overflow if
                 // callbacks are slow.
-                sequencer_midi_stop();
+                //
+                // Do NOT stop the sequencer here. We used to do that to
+                // prevent loop() from stealing MP scheduler slots during
+                // large file transfers, but it caused sequencer_midi_start
+                // to reset next_amy_tick_us on every sysex, effectively
+                // speeding up the sequencer when knob updates arrive.
                 char *slot = sysex_message_copies[sysex_copy_write_idx];
                 if(slot) {
                     uint16_t payload_len = sysex_len - 3;
