@@ -858,6 +858,9 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Like amy_add_message but the data is treated as coming from an external
+// sysex source, so file transfer routing (transfer_flag) applies.
+void amy_add_message_from_sysex(char *message);
 void amy_add_event(amy_event *e);
 int amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);

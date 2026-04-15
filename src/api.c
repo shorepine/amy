@@ -215,6 +215,14 @@ uint32_t amy_sysclock() {
 }
 
 
+// Flag indicating whether the current amy_add_message call is from an
+// external sysex source (in which case transfer_flag should route data
+// to parse_transfer_message) or from an internal amy.send() call (in
+// which case it should be processed as a normal wire command).
+// Without this, a sketch's amy.send(note=36) during a file transfer
+// would get base64-decoded and written to the file as garbage.
+bool amy_parsing_from_sysex = false;
+
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
     peek_stack("add_message");
@@ -229,6 +237,14 @@ void amy_add_message(char *message) {
 	remains += pos;
 	length -= pos;
     }
+}
+
+// Like amy_add_message but marks the message as coming from an external
+// sysex source so the file transfer routing in amy_parse_message applies.
+void amy_add_message_from_sysex(char *message) {
+    amy_parsing_from_sysex = true;
+    amy_add_message(message);
+    amy_parsing_from_sysex = false;
 }
 
 // given an event play / schedule the event directly (C API)

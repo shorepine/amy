@@ -552,8 +552,15 @@ int amy_parse_message(char * message, int length, amy_event *e) {
     char cmd = '\0';
     uint16_t pos = 0;
 
-    // Check if we're in a transfer block, if so, parse it and leave this loop
-    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
+    // Check if we're in a transfer block, if so, parse it and leave this loop.
+    // ONLY route to parse_transfer_message when the data is coming from an
+    // external sysex source (amy_add_message_from_sysex), not from internal
+    // amy.send() calls made by a running sketch. Otherwise a sketch calling
+    // amy.send(note=36) during a zT transfer would get its wire command
+    // base64-decoded as file data, corrupting the transfer.
+    extern bool amy_parsing_from_sysex;
+    if (amy_parsing_from_sysex &&
+        (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO)) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return length;
