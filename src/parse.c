@@ -446,22 +446,23 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
     }
     else if (cmd == 'D') {
         // zD: Dump data over MIDI sysex.
-        //   zDZ              — dump all active instrument state + global effects.
-        //   zD<filename>Z    — dump file contents from the filesystem.
-        // message already points past 'D' (consumed above).
-        // We need to consume all chars up to (but not including) 'Z' so the
-        // outer parser's _next_alpha lands on 'Z' (end of message).
-        // Return value = chars consumed from `message` (after 'D').
-        // The outer parser adds +1 for 'z', so total skip = 1(z) + 1(D via cmd) + len.
-        // BUT the outer parser only does ++pos (for 'z') then _next_alpha which
-        // stops at alpha chars.  To avoid misparse we must consume up to 'Z'.
+        //   zD[Z]              — dump all active instrument state + global effects.
+        //   zD<filename>[Z]    — dump file contents from the filesystem.
+        // The filename/payload is "rest of message" — we consume everything
+        // to the end of the C string. A trailing 'Z' (end-of-message marker
+        // some senders append) is stripped, so interior capital-Z characters
+        // in the filename (e.g. "/ZIPFILE.py") are preserved. Limitation:
+        // filenames whose last char is 'Z' are not addressable.
         char filename[MAX_FILENAME_LEN];
         uint16_t len = 0;
-        while (message[len] && message[len] != 'Z' && len < MAX_FILENAME_LEN - 1) {
+        while (message[len] && len < MAX_FILENAME_LEN - 1) {
             filename[len] = message[len];
             len++;
         }
         filename[len] = '\0';
+        if (len > 0 && filename[len - 1] == 'Z') {
+            filename[--len] = '\0';
+        }
         if (filename[0] == '\0') {
             fprintf(stderr, "zD: received zD (state dump)\n");
             amy_dump_state_to_sysex();
@@ -469,30 +470,30 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             fprintf(stderr, "zD: received zD file dump for '%s'\n", filename);
             amy_dump_file_to_sysex(filename);
         }
-        // Return chars consumed from the original arg pointer (which starts at 'D').
-        // len = filename length (from after 'D'). Add 1 for 'D' itself.
-        // The outer parser does: pos += return_val; ++pos; _next_alpha().
-        // We need the outer parser to land on 'Z', so we return enough to
-        // get there: 1 (for 'D') + len (filename) = positions consumed.
-        // The remaining char before Z is handled by _next_alpha (which skips '.' but not alpha).
-        // Safest: scan forward to find 'Z' from arg and return that distance.
+        // Consume the whole rest of the message so the outer parser exits.
         {
             uint16_t total = 0;
             const char *scan = message - 1;  // back to 'D'
-            while (scan[total] && scan[total] != 'Z') total++;
+            while (scan[total]) total++;
             return total;
         }
     }
     else if (cmd == 'A') {
         // zA: Update sketch.py on disk with current AMY state (calls update_file_hook).
         // Takes optional filename; defaults to /user/current/sketch.py on AMYboard.
+        // Payload semantics match zD: the filename is "rest of message", a
+        // trailing 'Z' terminator is stripped, and interior capital-Z chars
+        // in the filename are preserved.
         char filename[MAX_FILENAME_LEN];
         uint16_t len = 0;
-        while (message[len] && message[len] != 'Z' && len < MAX_FILENAME_LEN - 1) {
+        while (message[len] && len < MAX_FILENAME_LEN - 1) {
             filename[len] = message[len];
             len++;
         }
         filename[len] = '\0';
+        if (len > 0 && filename[len - 1] == 'Z') {
+            filename[--len] = '\0';
+        }
         fprintf(stderr, "zA: update file '%s'\n", filename[0] ? filename : "(default)");
         if (amy_global.config.amy_external_update_file_hook) {
             if (filename[0]) {
@@ -504,19 +505,25 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         {
             uint16_t total = 0;
             const char *scan = message - 1;
-            while (scan[total] && scan[total] != 'Z') total++;
+            while (scan[total]) total++;
             return total;
         }
     }
     else if (cmd == 'P') {
         // zP: Execute Python code on host (e.g. zPimport amyboard; amyboard.restart_sketch()Z).
+        // Payload semantics match zD: the code string is "rest of message",
+        // a trailing 'Z' terminator is stripped, and interior capital-Z chars
+        // in the code are preserved.
         char code[256];
         uint16_t len = 0;
-        while (message[len] && message[len] != 'Z' && len < sizeof(code) - 1) {
+        while (message[len] && len < sizeof(code) - 1) {
             code[len] = message[len];
             len++;
         }
         code[len] = '\0';
+        if (len > 0 && code[len - 1] == 'Z') {
+            code[--len] = '\0';
+        }
         fprintf(stderr, "zP: exec '%s'\n", code);
         if (amy_global.config.amy_external_exec_hook) {
             amy_global.config.amy_external_exec_hook(code);
@@ -524,7 +531,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         {
             uint16_t total = 0;
             const char *scan = message - 1;
-            while (scan[total] && scan[total] != 'Z') total++;
+            while (scan[total]) total++;
             return total;
         }
     }
