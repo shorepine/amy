@@ -25,6 +25,8 @@ void amy_send_midi_note_on(uint8_t channel, uint8_t note, uint8_t velocity) {
 void amy_send_midi_note_off(uint8_t channel, uint8_t note, uint8_t velocity) {
     (void)channel; (void)note; (void)velocity;
 }
+// Called from parse.c zD handler; no MIDI output on Godot so this is a no-op.
+void midi_out(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
 
 // --- examples.c stubs ---
 void delay_ms(uint32_t ms) { (void)ms; }

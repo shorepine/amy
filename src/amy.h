@@ -294,6 +294,7 @@ enum coefs{
 #define RESET_ALL_NOTES 131072
 #define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
 #define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
+#define RESET_QUEUE 1048576 // resets the amy queue
 
 #define true 1
 #define false 0
@@ -692,6 +693,9 @@ typedef struct  {
     void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
     void (*amy_external_fclose_hook)(uint32_t fptr);
     void (*amy_external_file_transfer_done_hook)(const char *filename);
+    void (*amy_external_update_file_hook)(const char *filename);
+    void (*amy_external_exec_hook)(const char *code);
+    void (*amy_external_reboot_hook)(uint8_t mode);
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -854,6 +858,9 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Like amy_add_message but the data is treated as coming from an external
+// sysex source, so file transfer routing (transfer_flag) applies.
+void amy_add_message_from_sysex(char *message);
 void amy_add_event(amy_event *e);
 int amy_parse_message(char * message, int length, amy_event *e);
 void amy_start(amy_config_t);
@@ -945,8 +952,8 @@ extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state);
-extern void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state);
-extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state);
+extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
+extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state);
 extern int size_of_amy_event(void);
 
 extern struct delta **queue_for_patch_number(int patch_number);
@@ -957,6 +964,7 @@ extern void patches_store_patch(amy_event *e, char * message);
 #define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
 #define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
 #define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
+extern int instruments_max_instruments();
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();

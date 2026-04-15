@@ -478,7 +478,7 @@ void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *s
 
 #define EVENT_FROM_OSC_BASEOSC(FIELD)  \
     if (synth[osc]->FIELD != empty_synth.FIELD)  \
-        event->FIELD = synth[osc]->FIELD - baseosc;
+        event->FIELD = synth[osc]->FIELD - base_osc;
 
 #define EVENT_FROM_OSC_MAPPED(SYNTH_FIELD, EVENT_FIELD, MAP_FN)        \
     if (synth[osc]->SYNTH_FIELD != empty_synth.SYNTH_FIELD)            \
@@ -493,7 +493,7 @@ void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *s
 #define EVENT_FROM_OSC_ARRAY_BASEOSC(FIELD, NUM_ELS)                   \
     for (int i = 0; i < NUM_ELS; ++i) {                                \
         if (synth[osc]->FIELD[i] != empty_synth.FIELD[i])              \
-            event->FIELD[i] = synth[osc]->FIELD[i] - baseosc;          \
+            event->FIELD[i] = synth[osc]->FIELD[i] - base_osc;          \
     }
 
 #define EVENT_FROM_OSC_ARRAY2(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)       \
@@ -518,10 +518,11 @@ void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *s
         }                                                                 \
     }
 
-void set_event_for_osc(int osc, int baseosc, struct amy_event *event) {
+void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     // Set fields in the event to configure the osc away from default.
     // We assume event has already been cleared.
     // We do not set the osc field of the event.
+    int osc = base_osc + rel_osc;
     // Generate the reference "empty synth".
     struct synthinfo empty_synth;
     // We need to have space for the breakpoints.
@@ -593,10 +594,10 @@ void set_event_for_global_fx(amy_event *event, struct state *state) {
 }
 
 
-void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
+void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
-    // Find oscs for synth.
+   // Find oscs for synth.
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     int num_voices = instrument_get_num_voices(synth, voices);
     if (num_voices < 1) {
@@ -613,36 +614,37 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, void *state) {
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", synth, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
     int first_osc_state_val = 0;
-    int final_state_val = num_oscs;
+    int last_osc_state_val = num_oscs;
     if (flags != 0) {
         ++first_osc_state_val;
-        ++final_state_val;
+        ++last_osc_state_val;
         if (state_val == 0) {
             event->synth_flags = flags;
         }
     }
-    if (state_val >= first_osc_state_val && state_val < final_state_val) {
-        set_event_for_osc(base_osc + state_val, base_osc, event);
-        // Set the osc number relative to the synth
-        event->osc = state_val;
-    } else if (state_val == final_state_val) {
-        // final event, when state == num_oscs, contains the global settings (volume, eq, chorus, echo, reverb).
+    if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
+        event->osc = state_val - first_osc_state_val;
+        //fprintf(stderr, "2 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d last_osc_state_val %d\n",
+        //    base_osc, event->osc, state_val, first_osc_state_val, last_osc_state_val);
+        set_event_for_osc(base_osc, event->osc, event);
+    } else if (include_fx && (state_val == last_osc_state_val)) {
+        // optional final event contains the global settings (volume, eq, chorus, echo, reverb).
         set_event_for_global_fx(event, &amy_global);
     }
     ++state_val;
-    if (state_val == final_state_val + 1) state_val = 0;  // Indicate this is the final event.
+    if (state_val == last_osc_state_val + (include_fx ? 1 : 0))  state_val = 0;  // Indicate this is the final event.
     return (void *)((intptr_t)state_val);
 }
 
 #define STATE_START_OF_MIDI 1024
-void *yield_synth_commands(uint8_t synth, char *s, size_t len, void *state) {
+void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", synth, state_val);
     s[0] = '\0';  // By default, return an empty string.
     if (state_val < STATE_START_OF_MIDI) {
         amy_event event = amy_default_event();
-        state_val = (intptr_t)yield_synth_events(synth, &event, (void *)(intptr_t)state_val);
+        state_val = (intptr_t)yield_synth_events(synth, &event, include_fx, (void *)(intptr_t)state_val);
         sprint_event(&event, s, len, /* wirecode= */ true);
         if (state_val == 0) {
             // Push the state machine on to the MIDI codes

@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "transfer.h"
+#include "amy_midi.h"    // for midi_out, MAX_SYSEX_BYTES
+#include "sequencer.h"   // for sequencer_midi_stop/start
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
@@ -65,13 +68,12 @@ static void free_handle(uint32_t h) {
 
 uint32_t posix_external_fopen_hook(char * filename, char *mode) {
 #ifdef __EMSCRIPTEN__
-    (void)mode;
     uint32_t js_handle = EM_ASM_INT({
         if (typeof amy_shared_open === 'function') {
-            return amy_shared_open(UTF8ToString($0));
+            return amy_shared_open(UTF8ToString($0), UTF8ToString($1));
         }
         return 0;
-    }, filename);
+    }, filename, mode);
     if (js_handle == 0) {
         return HANDLE_INVALID;
     }
@@ -147,10 +149,17 @@ void posix_external_fseek_hook(uint32_t h, uint32_t pos) {
 
 uint32_t posix_external_fwrite_hook(uint32_t h, uint8_t *buf, uint32_t n) {
 #ifdef __EMSCRIPTEN__
-    (void)h;
-    (void)buf;
-    (void)n;
-    return 0;
+    if (h == 0 || h >= MAX_OPEN_FILES || g_em_handle[h] == 0) {
+        return 0;
+    }
+    uint32_t written = EM_ASM_INT({
+        if (typeof amy_shared_write === 'function') {
+            return amy_shared_write($0, $1, $2);
+        }
+        return 0;
+    }, g_em_handle[h], buf, n);
+    g_em_pos[h] += written;
+    return written;
 #else
     FILE *f = lookup_handle(h);
     if (!f) {
@@ -237,7 +246,7 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_FILE;
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length_bytes = length;
-    amy_global.transfer_stored_bytes = 0; 
+    amy_global.transfer_stored_bytes = 0;
     amy_global.transfer_file_handle = handle;
     strncpy(amy_global.transfer_filename, filename, sizeof(amy_global.transfer_filename) - 1);
     amy_global.transfer_filename[sizeof(amy_global.transfer_filename) - 1] = '\0';
@@ -263,8 +272,14 @@ void parse_transfer_message(char * message, uint16_t len) {
             if (amy_global.config.amy_external_fclose_hook != NULL && amy_global.transfer_file_handle != HANDLE_INVALID) {
                 amy_global.config.amy_external_fclose_hook(amy_global.transfer_file_handle);
             }
+            // Pair the sequencer_midi_stop() that zT's start handler fired in
+            // amy_parse_transfer_layer_message(). Do it BEFORE the done hook so
+            // the hook can observe a running sequencer if it needs to, and so
+            // any platform that uses zT without a platform-specific restart in
+            // its file_transfer_done_hook doesn't leave playback wedged.
+            sequencer_midi_start();
             if (amy_global.config.amy_external_file_transfer_done_hook != NULL) {
-                amy_global.config.amy_external_file_transfer_done_hook(amy_global.transfer_filename); 
+                amy_global.config.amy_external_file_transfer_done_hook(amy_global.transfer_filename);
             }
             amy_global.transfer_file_handle = 0;
             amy_global.transfer_filename[0] = '\0';
@@ -445,6 +460,233 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
     return (unsigned char*) decbuf->ptr;
 }
 
+
+// ── State dump helpers ──────────────────────────────────────────────────────
+
+// Walk all active instruments and emit one wire-command line per callback.
+static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx), void *ctx) {
+    char buf[1024];
+    char line[1100];
+    bool include_fx = true;
+    for (int inst = 0; inst < instruments_max_instruments(); inst++) {
+        if (instrument_number_exists(inst, NULL)) {
+            uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+            int num_voices = instrument_get_num_voices(inst, voices);
+            if (num_voices < 1) continue;  // should never happen.
+            int oscs_per_voice = instrument_get_oscs_per_voice(inst);
+            int n = snprintf(line, sizeof(line), "i%dic255Z", inst);
+            cb(line, n, ctx);
+            n = snprintf(line, sizeof(line), "i%div%din%dZ", inst, num_voices, oscs_per_voice);
+            cb(line, n, ctx);
+            void *state = NULL;
+            do {
+                state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), include_fx, state);
+                if (buf[0] == '\0') continue;
+                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);  // Prepends to FX as well, that's OK.
+                cb(line, n, ctx);
+            } while (state);
+            // We include FX only in the first osc.
+            include_fx = false;
+        }
+    }
+}
+
+typedef struct { char *buf; int pos; int cap; } _string_ctx;
+static void _dump_string_cb(const char *line, int len, void *ctx) {
+    _string_ctx *c = (_string_ctx *)ctx;
+    if (c->pos + len + 1 > c->cap) return;
+    memcpy(c->buf + c->pos, line, len);
+    c->pos += len;
+    c->buf[c->pos++] = '\n';
+}
+
+char *amy_dump_state_to_string(int *out_len) {
+    int cap = 16384;
+    char *buf = (char *)malloc_caps(cap, amy_global.config.ram_caps_sysex);
+    if (!buf) { *out_len = 0; return NULL; }
+    _string_ctx ctx = { buf, 0, cap };
+    amy_emit_state_lines(_dump_string_cb, &ctx);
+    buf[ctx.pos] = '\0';
+    *out_len = ctx.pos;
+    return buf;
+}
+
+// Max base64 chars per sysex chunk. Empirically Chrome's Web MIDI has trouble
+// delivering sysex messages above a few KB reliably, so we split large dumps
+// into multiple smaller sysex frames. 1024 base64 chars → ~1030-byte sysex
+// frame including header/footer, well within the "reliably delivered" band.
+#define ZDUMP_CHUNK_B64_MAX 1024
+
+// Raw bytes per streamed chunk. 768 = 3 * 256 → exactly 1024 base64 chars with
+// no padding, so non-final chunks can be concatenated on the receiver and
+// decoded as one base64 string. Only the final chunk may emit '=' padding
+// (which is fine: it's appended last).
+#define ZDUMP_STREAM_RAW_CHUNK 768
+
+// Streaming sysex dump state. Lets amy_dump_state_to_sysex and
+// amy_dump_file_to_sysex produce arbitrarily-large dumps without holding the
+// whole payload in RAM. Each ZDUMP_STREAM_RAW_CHUNK bytes of raw data is
+// base64-encoded and emitted as one sysex frame (marker 'C' if more follow,
+// 'E' or '0' on the last frame). The effective upper bound is now the
+// web-side reassembler's SYSEX_REASM_MAX rather than MAX_SYSEX_BYTES.
+typedef struct {
+    uint8_t *raw_buf;     // ZDUMP_STREAM_RAW_CHUNK-byte raw accumulator
+    int raw_pos;          // current fill of raw_buf
+    uint8_t *enc;         // base64 scratch: b64(raw_buf)
+    uint8_t *frame;       // sysex frame scratch: F0 00 03 45 <marker> <b64...> F7
+    int frames_sent;
+    int bytes_sent;       // raw bytes drained so far, for logging
+    bool ok;
+} _zdump_stream;
+
+static int _zdump_stream_init(_zdump_stream *c) {
+    c->raw_buf = NULL;
+    c->enc = NULL;
+    c->frame = NULL;
+    c->raw_pos = 0;
+    c->frames_sent = 0;
+    c->bytes_sent = 0;
+    c->ok = false;
+    c->raw_buf = (uint8_t *)malloc_caps(ZDUMP_STREAM_RAW_CHUNK, amy_global.config.ram_caps_sysex);
+    c->enc     = (uint8_t *)malloc_caps(ZDUMP_CHUNK_B64_MAX + 4, amy_global.config.ram_caps_sysex);
+    c->frame   = (uint8_t *)malloc_caps(ZDUMP_CHUNK_B64_MAX + 6, amy_global.config.ram_caps_sysex);
+    if (!c->raw_buf || !c->enc || !c->frame) {
+        fprintf(stderr, "zD: stream init malloc failed (raw=%p enc=%p frame=%p)\n",
+                (void *)c->raw_buf, (void *)c->enc, (void *)c->frame);
+        return -1;
+    }
+    c->ok = true;
+    return 0;
+}
+
+static void _zdump_stream_destroy(_zdump_stream *c) {
+    if (c->raw_buf) { free(c->raw_buf); c->raw_buf = NULL; }
+    if (c->enc)     { free(c->enc);     c->enc = NULL; }
+    if (c->frame)   { free(c->frame);   c->frame = NULL; }
+    c->ok = false;
+}
+
+// Emit one sysex frame carrying b64(raw_buf[0..raw_pos]). If is_last is false
+// the marker is 'C' (more frames follow); otherwise it's 'E' when we've
+// already sent at least one frame, or '0' for a single-frame dump.
+static void _zdump_stream_drain(_zdump_stream *c, bool is_last) {
+    if (!c->ok) return;
+    uint8_t marker;
+    if (is_last) {
+        marker = (c->frames_sent == 0) ? '0' : 'E';
+    } else {
+        marker = 'C';
+    }
+    b64_buffer_t bb = { (char *)c->enc, 1 };
+    b64_encode(c->raw_buf, &bb, (size_t)c->raw_pos);
+    int enc_len = (int)strlen((char *)c->enc);
+    c->frame[0] = 0xF0;
+    c->frame[1] = 0x00;
+    c->frame[2] = 0x03;
+    c->frame[3] = 0x45;
+    c->frame[4] = marker;
+    memcpy(c->frame + 5, c->enc, enc_len);
+    c->frame[5 + enc_len] = 0xF7;
+    midi_out(c->frame, 6 + enc_len);
+    c->bytes_sent += c->raw_pos;
+    c->frames_sent++;
+    c->raw_pos = 0;
+}
+
+// Append `len` bytes from `data` to the raw accumulator, draining as 'C'
+// frames whenever the accumulator is full and more data arrives. The last
+// (possibly partial) chunk is held until _zdump_stream_finish is called.
+static void _zdump_stream_write(_zdump_stream *c, const uint8_t *data, int len) {
+    if (!c->ok) return;
+    while (len > 0) {
+        if (c->raw_pos == ZDUMP_STREAM_RAW_CHUNK) {
+            _zdump_stream_drain(c, false);
+        }
+        int space = ZDUMP_STREAM_RAW_CHUNK - c->raw_pos;
+        int take = len < space ? len : space;
+        memcpy(c->raw_buf + c->raw_pos, data, take);
+        c->raw_pos += take;
+        data += take;
+        len -= take;
+    }
+}
+
+// Emit any buffered data as the final frame. Always emits at least one frame
+// so the receiver sees a well-formed '0' (empty-payload) dump response for
+// empty inputs.
+static void _zdump_stream_finish(_zdump_stream *c) {
+    if (!c->ok) return;
+    _zdump_stream_drain(c, true);
+}
+
+// amy_emit_state_lines callback: forward each wire-command line (plus '\n')
+// into the stream.
+static void _zdump_state_line_cb(const char *line, int len, void *ctx) {
+    _zdump_stream *c = (_zdump_stream *)ctx;
+    _zdump_stream_write(c, (const uint8_t *)line, len);
+    uint8_t nl = '\n';
+    _zdump_stream_write(c, &nl, 1);
+}
+
+void amy_dump_state_to_sysex(void) {
+    if (!amy_global.config.midi) return;
+    sequencer_midi_stop();
+    _zdump_stream stream;
+    if (_zdump_stream_init(&stream) != 0) {
+        sequencer_midi_start();
+        return;
+    }
+    amy_emit_state_lines(_zdump_state_line_cb, &stream);
+    _zdump_stream_finish(&stream);
+    _zdump_stream_destroy(&stream);
+    sequencer_midi_start();
+}
+
+void amy_dump_file_to_sysex(const char *filename) {
+    // Only meaningful on platforms with MIDI sysex output (hardware, emscripten).
+    // On desktop, midi_out can overflow its stack buffer with large sysex.
+    if (!amy_global.config.midi) return;
+    sequencer_midi_stop();
+    if (!amy_global.config.amy_external_fopen_hook ||
+        !amy_global.config.amy_external_fread_hook  ||
+        !amy_global.config.amy_external_fclose_hook) {
+        fprintf(stderr, "zD: file I/O hooks unavailable\n");
+        sequencer_midi_start();
+        return;
+    }
+    uint32_t fh = amy_global.config.amy_external_fopen_hook((char *)filename, "r");
+    if (!fh) {
+        fprintf(stderr, "zD: could not open '%s'\n", filename);
+        sequencer_midi_start();
+        return;
+    }
+    _zdump_stream stream;
+    if (_zdump_stream_init(&stream) != 0) {
+        amy_global.config.amy_external_fclose_hook(fh);
+        sequencer_midi_start();
+        return;
+    }
+    uint8_t *read_buf = (uint8_t *)malloc_caps(ZDUMP_STREAM_RAW_CHUNK, amy_global.config.ram_caps_sysex);
+    if (!read_buf) {
+        fprintf(stderr, "zD: malloc read_buf(%d) FAILED\n", ZDUMP_STREAM_RAW_CHUNK);
+        _zdump_stream_destroy(&stream);
+        amy_global.config.amy_external_fclose_hook(fh);
+        sequencer_midi_start();
+        return;
+    }
+    while (1) {
+        uint32_t n = amy_global.config.amy_external_fread_hook(fh, read_buf, ZDUMP_STREAM_RAW_CHUNK);
+        if (n == 0) break;
+        _zdump_stream_write(&stream, read_buf, (int)n);
+    }
+    free(read_buf);
+    _zdump_stream_finish(&stream);
+    _zdump_stream_destroy(&stream);
+    amy_global.config.amy_external_fclose_hook(fh);
+    sequencer_midi_start();
+}
+
+// ── End state dump helpers ──────────────────────────────────────────────────
 
 void transfer_init() {
     #ifdef __EMSCRIPTEN__

@@ -2,6 +2,7 @@
 // handle parsing wire strings
 
 #include "amy.h"
+#include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
@@ -367,7 +368,10 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
         }
         ++skip_chars;  // step over the "," before the wire string template.
         midi_store_control_code(e->synth, cc_code, is_log, min_val, max_val, offset_val, message + skip_chars);
-        skip_chars = strlen(message) + 1;
+        // Consume rest of message but leave the trailing 'Z' for the outer parser.
+        int remainder = strlen(message);
+        if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
+        skip_chars = remainder;
     }
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
     return skip_chars;
@@ -440,6 +444,93 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         stop_receiving_sample();
         return 1;
     }
+    else if (cmd == 'D') {
+        // zD: Dump data over MIDI sysex.
+        //   zD[Z]              — dump all active instrument state + global effects.
+        //   zD<filename>[Z]    — dump file contents from the filesystem.
+        // The filename/payload is "rest of message" — we consume everything
+        // to the end of the C string. A trailing 'Z' (end-of-message marker
+        // some senders append) is stripped, so interior capital-Z characters
+        // in the filename (e.g. "/ZIPFILE.py") are preserved. Limitation:
+        // filenames whose last char is 'Z' are not addressable.
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = 0;
+        while (message[len] && len < MAX_FILENAME_LEN - 1) {
+            filename[len] = message[len];
+            len++;
+        }
+        filename[len] = '\0';
+        if (len > 0 && filename[len - 1] == 'Z') {
+            filename[--len] = '\0';
+        }
+        if (filename[0] == '\0') {
+            amy_dump_state_to_sysex();
+        } else {
+            amy_dump_file_to_sysex(filename);
+        }
+        // Consume the whole rest of the message so the outer parser exits.
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;  // back to 'D'
+            while (scan[total]) total++;
+            return total;
+        }
+    }
+    else if (cmd == 'A') {
+        // zA: Update sketch.py on disk with current AMY state (calls update_file_hook).
+        // Takes optional filename; defaults to /user/current/sketch.py on AMYboard.
+        // Payload semantics match zD: the filename is "rest of message", a
+        // trailing 'Z' terminator is stripped, and interior capital-Z chars
+        // in the filename are preserved.
+        char filename[MAX_FILENAME_LEN];
+        uint16_t len = 0;
+        while (message[len] && len < MAX_FILENAME_LEN - 1) {
+            filename[len] = message[len];
+            len++;
+        }
+        filename[len] = '\0';
+        if (len > 0 && filename[len - 1] == 'Z') {
+            filename[--len] = '\0';
+        }
+        if (amy_global.config.amy_external_update_file_hook) {
+            if (filename[0]) {
+                amy_global.config.amy_external_update_file_hook(filename);
+            } else {
+                amy_global.config.amy_external_update_file_hook("/user/current/sketch.py");
+            }
+        }
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;
+            while (scan[total]) total++;
+            return total;
+        }
+    }
+    else if (cmd == 'P') {
+        // zP: Execute Python code on host (e.g. zPimport amyboard; amyboard.restart_sketch()Z).
+        // Payload semantics match zD: the code string is "rest of message",
+        // a trailing 'Z' terminator is stripped, and interior capital-Z chars
+        // in the code are preserved.
+        char code[256];
+        uint16_t len = 0;
+        while (message[len] && len < sizeof(code) - 1) {
+            code[len] = message[len];
+            len++;
+        }
+        code[len] = '\0';
+        if (len > 0 && code[len - 1] == 'Z') {
+            code[--len] = '\0';
+        }
+        if (amy_global.config.amy_external_exec_hook) {
+            amy_global.config.amy_external_exec_hook(code);
+        }
+        {
+            uint16_t total = 0;
+            const char *scan = message - 1;
+            while (scan[total]) total++;
+            return total;
+        }
+    }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;
 }
@@ -464,8 +555,15 @@ int amy_parse_message(char * message, int length, amy_event *e) {
     char cmd = '\0';
     uint16_t pos = 0;
 
-    // Check if we're in a transfer block, if so, parse it and leave this loop
-    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO) {
+    // Check if we're in a transfer block, if so, parse it and leave this loop.
+    // ONLY route to parse_transfer_message when the data is coming from an
+    // external sysex source (amy_add_message_from_sysex), not from internal
+    // amy.send() calls made by a running sketch. Otherwise a sketch calling
+    // amy.send(note=36) during a zT transfer would get its wire command
+    // base64-decoded as file data, corrupting the transfer.
+    extern bool amy_parsing_from_sysex;
+    if (amy_parsing_from_sysex &&
+        (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO)) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return length;

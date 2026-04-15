@@ -399,14 +399,22 @@ def transfer_file(source_filename, dest_filename=None):
     file_size = os.path.getsize(source_filename)
     s = "%s,%d" % (dest_filename, file_size)
     send(transfer_file=s)
-    
+
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
+    # Use the _from_sysex variant so the chunks are routed to
+    # parse_transfer_message via the amy_parsing_from_sysex flag. Internal
+    # amy.send() calls from other contexts (e.g. a sketch's loop() on
+    # AMYboard hardware running during a live transfer) use the regular
+    # path and won't be mis-interpreted as transfer data.
     w = open(source_filename, 'rb')
     for i in range(ceil(file_size/188)):
         file_bytes = w.read(188)
         message = b64(file_bytes)
-        send_raw(message.decode('ascii'))
+        if override_send is not None:
+            override_send(message.decode('ascii'))
+        else:
+            _amy.send_wire_from_sysex(message.decode('ascii'))
     w.close()
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
@@ -519,10 +527,10 @@ def echo(level=None, delay_ms=None, max_delay_ms=None, feedback=None, filter_coe
 """
     Reading back synth configuration
 """
-def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, time=None):
+def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, include_fx=True, time=None):
     if patch_num is not None and dest_synth is not None:
         raise ValueError("At most one of patch_num and dest_synth can be specified")
-    commands = _get_synth_commands(synth)
+    commands = _get_synth_commands(synth, include_fx)
 
     def len_digit_prefix(s):
         len = 0

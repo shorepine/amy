@@ -117,14 +117,19 @@ static void sequencer_process_tick(void) {
 }
 
 void sequencer_midi_start() {
-    // MIDI "Start" begins from tick 0 and then advances from F8 clocks.
-    sequencer_external_clock = true;
+    // MIDI "Start" restarts the sequencer.
+    // If external clock was not previously enabled, keep using internal clock
+    // so the sequencer advances on its own without needing F8 ticks.
+    if (sequencer_external_clock) {
+        amy_global.sequencer_tick_count = 0;
+    }
+    // Reset the tick timer to now so sequencer_check_and_fill doesn't try to
+    // catch up all the ticks that elapsed while stopped.
+    amy_global.next_amy_tick_us = (uint64_t)amy_sysclock() * 1000L;
     sequencer_running = true;
-    amy_global.sequencer_tick_count = 0;
 }
 
 void sequencer_midi_stop() {
-    sequencer_external_clock = true;
     sequencer_running = false;
 }
 
@@ -169,6 +174,13 @@ uint8_t sequencer_add_event(amy_event *e) {
 
 void sequencer_check_and_fill() {
     if (!sequencer_running || sequencer_external_clock) return;
+    // If we've fallen behind by more than 1 second (e.g. sequencer was stopped
+    // and restarted, or a long blocking operation occurred), skip ahead instead
+    // of processing hundreds of backed-up ticks at once.
+    uint64_t now_us = (uint64_t)amy_sysclock() * 1000L;
+    if (now_us > amy_global.next_amy_tick_us + 1000000ULL) {
+        amy_global.next_amy_tick_us = now_us;
+    }
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
     while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
         sequencer_process_tick();

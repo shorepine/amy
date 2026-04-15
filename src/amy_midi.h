@@ -23,7 +23,10 @@ void amy_external_midi_sync(uint8_t enabled);
 #define MIDI_QUEUE_DEPTH 1024
 #define MAX_SYSEX_BYTES (16384)
 extern uint8_t *sysex_buffer;
-extern char *sysex_message_copy;
+#define SYSEX_COPY_SLOTS 32
+extern char *sysex_message_copies[SYSEX_COPY_SLOTS];
+extern uint8_t sysex_copy_write_idx;
+extern uint8_t sysex_copy_read_idx;
 extern uint16_t sysex_len;
 extern void parse_sysex();
 extern uint8_t last_midi[MIDI_QUEUE_DEPTH][MAX_MIDI_BYTES_PER_MESSAGE];

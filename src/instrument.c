@@ -263,6 +263,10 @@ void instruments_reset() {
         instrument_release(i);
 }
 
+int instruments_max_instruments() {
+    return max_instruments;
+}
+
 void instrument_release(int instrument_number) {
     if(instrument_number < max_instruments && instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
