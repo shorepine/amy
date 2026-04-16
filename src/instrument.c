@@ -192,7 +192,11 @@ uint16_t _instrument_voice_off(struct instrument_info *instrument, uint16_t voic
 uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) {
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
-        fprintf(stderr, "note off for %d does not match note on\n", note);
+        // A note-off for a note we never saw on is a common/expected condition
+        // in real MIDI streams (sustain pedal + retrigger, external controllers
+        // that emit stray offs, voice stealing, loops that drop note-ons, etc.),
+        // so don't spam stderr about it.
+        //fprintf(stderr, "note off for %d does not match note on\n", note);
         //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
     }
