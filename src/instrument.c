@@ -95,8 +95,9 @@ void voice_fifo_remove(struct voice_fifo *fifo, uint8_t val) {
     fprintf(stderr, "**fifo %s: remove did not find %d (#entries=%d)\n", fifo->name, val, (fifo->head - fifo->tail) % fifo->length);
 }
 
-// How many stolen notes to we remember (to match their note-offs)
-#define STOLEN_POOL_SIZE 16
+// How many forgotten note-ons (due to repeated onsets, or note stealing) do we remember
+// (to match their note-offs)
+#define FORGOTTEN_POOL_SIZE 16
 
 struct instrument_info {
     struct voice_fifo *released_voices;
@@ -111,9 +112,9 @@ struct instrument_info {
     uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
     // Track which note each voice is sounding.  We use int16 so we can store PCM_PRESET *127 + midi_note
     uint16_t note_per_voice[MAX_VOICES_PER_INSTRUMENT];
-    // A buffer of stolen notes, so we don't complain about their note-offs.
-    uint16_t stolen_notes[STOLEN_POOL_SIZE];  // We have a max capacity for stolen notes.
-    uint16_t stolen_note_count[STOLEN_POOL_SIZE];  // Count mulitple onsets per stolen note.
+    // A buffer of forgotten notes, so we don't complain about their note-offs.
+    uint16_t forgotten_notes[FORGOTTEN_POOL_SIZE];  // We have a max capacity for forgotten notes.
+    uint16_t forgotten_note_count[FORGOTTEN_POOL_SIZE];  // Count mulitple onsets per forgotten note.
     // Delay added to note-ons.  Permits some decay for voice stealing.
     uint16_t noteon_delay_ms;
     // Sustain tracking
@@ -139,10 +140,10 @@ void instrument_debug(struct instrument_info *instrument) {
 // Defined in amy.h because patches.c needs to know it.
 //#define _INSTRUMENT_NO_VOICE 255
 
-void _instrument_reset_stolen_pool(struct instrument_info *instrument) {
-    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
-        instrument->stolen_notes[i] = _INSTRUMENT_NO_NOTE;
-        instrument->stolen_note_count[i] = 0;
+void _instrument_reset_forgotten_pool(struct instrument_info *instrument) {
+    for (int i = 0; i < FORGOTTEN_POOL_SIZE; ++i) {
+        instrument->forgotten_notes[i] = _INSTRUMENT_NO_NOTE;
+        instrument->forgotten_note_count[i] = 0;
     }
 }
 
@@ -170,7 +171,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
         instrument->note_per_voice[voice] = _INSTRUMENT_NO_NOTE;
         instrument->pending_release[voice] = false;
     }
-    _instrument_reset_stolen_pool(instrument);
+    _instrument_reset_forgotten_pool(instrument);
     return instrument;
 }
 
@@ -180,40 +181,40 @@ void instrument_free(struct instrument_info *instrument) {
     free(instrument);
 }
 
-void _instrument_push_note_stolen(struct instrument_info *instrument, uint16_t note) {
+void _instrument_push_note_forgotten(struct instrument_info *instrument, uint16_t note) {
     int available_index = -1;
-    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
-        if (instrument->stolen_notes[i] == note) {
-            ++instrument->stolen_note_count[i];
-            //fprintf(stderr, "synth %d: caching existing stolen note %d/%d (%d, count %d)\n",
-            //        instrument->id, note / 128, note & 0x7F, i, instrument->stolen_note_count[i]);
+    for (int i = 0; i < FORGOTTEN_POOL_SIZE; ++i) {
+        if (instrument->forgotten_notes[i] == note) {
+            ++instrument->forgotten_note_count[i];
+            //fprintf(stderr, "synth %d: caching existing forgotten note %d/%d (%d, count %d)\n",
+            //        instrument->id, note / 128, note & 0x7F, i, instrument->forgotten_note_count[i]);
             return;
         }
-        if (available_index < 0 && instrument->stolen_notes[i] == _INSTRUMENT_NO_NOTE) {
+        if (available_index < 0 && instrument->forgotten_notes[i] == _INSTRUMENT_NO_NOTE) {
             available_index = i;
         }
     }
     // We didn't find the note, hopefully we saw an empty slot.
     if (available_index >= 0) {
-        instrument->stolen_notes[available_index] = note;
-        instrument->stolen_note_count[available_index] = 1;
-        //fprintf(stderr, "synth %d: caching new stolen note %d/%d (%d, count %d)\n",
-        //        instrument->id, note / 128, note & 0x7F, available_index, instrument->stolen_note_count[available_index]);
+        instrument->forgotten_notes[available_index] = note;
+        instrument->forgotten_note_count[available_index] = 1;
+        //fprintf(stderr, "synth %d: caching new forgotten note %d/%d (%d, count %d)\n",
+        //        instrument->id, note / 128, note & 0x7F, available_index, instrument->forgotten_note_count[available_index]);
     } else {
-        fprintf(stderr, "**_instrument_push_stolen_note: stolen pool overflow synth %d note %d/%d\n",
+        fprintf(stderr, "**_instrument_push_forgotten_note: forgotten pool overflow synth %d note %d/%d\n",
                 instrument->id, note / 128, note & 0x7F);
     }
 }
 
-bool _instrument_pop_note_stolen(struct instrument_info *instrument, uint16_t note) {
-    // Checks stolen_notes for this note; if found, remove it and return true; else false.
-    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
-        if (instrument->stolen_notes[i] == note) {
-            //fprintf(stderr, "synth %d: uncaching stolen note %d/%d (%d, count %d)\n",
-            //        instrument->id, note / 128, note & 0x7F, i, instrument->stolen_note_count[i]);
-            --instrument->stolen_note_count[i];
-            if (instrument->stolen_note_count[i] == 0)
-                instrument->stolen_notes[i] = _INSTRUMENT_NO_NOTE;
+bool _instrument_pop_note_forgotten(struct instrument_info *instrument, uint16_t note) {
+    // Checks forgotten_notes for this note; if found, remove it and return true; else false.
+    for (int i = 0; i < FORGOTTEN_POOL_SIZE; ++i) {
+        if (instrument->forgotten_notes[i] == note) {
+            //fprintf(stderr, "synth %d: uncaching forgotten note %d/%d (%d, count %d)\n",
+            //        instrument->id, note / 128, note & 0x7F, i, instrument->forgotten_note_count[i]);
+            --instrument->forgotten_note_count[i];
+            if (instrument->forgotten_note_count[i] == 0)
+                instrument->forgotten_notes[i] = _INSTRUMENT_NO_NOTE;
             return true;
         }
     }
@@ -228,7 +229,7 @@ uint16_t _instrument_get_voice(struct instrument_info *instrument, bool *pstolen
     if (pstolen) *pstolen = true;  // *pstolen is set if steal occurs, otherwise not touched.
     // Mark this note as one that got stolen, so we can absorb its eventual note-off.
     uint16_t voice = voice_fifo_get(instrument->active_voices);
-    _instrument_push_note_stolen(instrument, instrument->note_per_voice[voice]);
+    _instrument_push_note_forgotten(instrument, instrument->note_per_voice[voice]);
     return voice;
 }
 
@@ -252,7 +253,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         // Don't report an unmatched note-off if it was a victim of stealing.
-        if (!_instrument_pop_note_stolen(instrument, note))
+        if (!_instrument_pop_note_forgotten(instrument, note))
             fprintf(stderr, "note off for %d/%d does not match note on\n", note / 128, note & 0x7F);
         //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
@@ -275,7 +276,7 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
             *amy_voices++ = instrument->amy_voices[voice];
             ++num_voices_turned_off;
         }
-    _instrument_reset_stolen_pool(instrument);
+    _instrument_reset_forgotten_pool(instrument);
     return num_voices_turned_off;
 }
 
@@ -292,7 +293,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, b
         voice_fifo_put(instrument->active_voices, voice);
     } else {
         // If re-onset, push the previous onset
-        _instrument_push_note_stolen(instrument, note);
+        _instrument_push_note_forgotten(instrument, note);
     }
     instrument->note_per_voice[voice] = note;
     instrument->pending_release[voice] = false;
