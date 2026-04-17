@@ -759,6 +759,11 @@ class TestVoiceStealing(AmyTest):
     amy.send(time=900, synth=1, note=76, vel=0)
     amy.send(time=920, synth=1, note=79, vel=0)
     amy.send(time=940, synth=1, note=82, vel=0)
+    # Sent spurious note-offs, just to check that error report works
+    print("expect to see excess note-off for notes 64, 82, 99")
+    amy.send(time=940, synth=1, note=64, vel=0)
+    amy.send(time=940, synth=1, note=82, vel=0)
+    amy.send(time=940, synth=1, note=99, vel=0)
 
 
 class TestVoiceStealDecay(AmyTest):
@@ -834,6 +839,22 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestDrumsVoiceStealing(AmyTest):
+  """Drums ignore missing note offs, but should still notice excess note-offs."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    for i in range(14):
+      amy.send(time=100 + i * 20, synth=10, note=40 + i // 2, vel=1)
+    for i in range(14):
+      amy.send(time=400 + i * 20, synth=10, note=40 + i // 2, vel=0)
+    print("expect to see excess note-off for note 40")
+    amy.send(time=900, synth=10, note=40, vel=0)
+
+  
 class TestDefaultChan1Synth(AmyTest):
   """Test default setup of Juno synth on synth 1 (MIDI channel 1)."""
 
@@ -954,6 +975,7 @@ class TestInvalidPatchNumber(AmyTest):
   def run(self):
     patch = 25
     osc_freq = constants.ZERO_LOGFREQ_IN_HZ / 2
+    print("expect to see 'patch number %d is out of range' twice" % patch)
     amy.send(time=0, patch=patch, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
     amy.send(time=0, patch=patch, osc=1, wave=amy.SINE, freq=osc_freq, bp0='0,1,500,0,200,0')
     amy.send(time=0, synth=0, num_voices=4, patch=patch)
