@@ -95,6 +95,9 @@ void voice_fifo_remove(struct voice_fifo *fifo, uint8_t val) {
     fprintf(stderr, "**fifo %s: remove did not find %d (#entries=%d)\n", fifo->name, val, (fifo->head - fifo->tail) % fifo->length);
 }
 
+// How many stolen notes to we remember (to match their note-offs)
+#define STOLEN_POOL_SIZE 16
+
 struct instrument_info {
     struct voice_fifo *released_voices;
     struct voice_fifo *active_voices;
@@ -107,6 +110,8 @@ struct instrument_info {
     uint16_t amy_voices[MAX_VOICES_PER_INSTRUMENT];
     // Track which note each voice is sounding.  We use int16 so we can store PCM_PRESET *127 + midi_note
     uint16_t note_per_voice[MAX_VOICES_PER_INSTRUMENT];
+    // A buffer of stolen notes, so we don't complain about their note-offs.
+    uint16_t stolen_notes[STOLEN_POOL_SIZE];  // We have a max capacity for stolen notes.
     // Delay added to note-ons.  Permits some decay for voice stealing.
     uint16_t noteon_delay_ms;
     // Sustain tracking
@@ -132,6 +137,12 @@ void instrument_debug(struct instrument_info *instrument) {
 // Defined in amy.h because patches.c needs to know it.
 //#define _INSTRUMENT_NO_VOICE 255
 
+void _instrument_reset_stolen_pool(struct instrument_info *instrument) {
+    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
+        instrument->stolen_notes[i] = _INSTRUMENT_NO_NOTE;
+    }
+}
+
 struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     if (num_voices <= 0 || num_voices > MAX_VOICES_PER_INSTRUMENT) {
@@ -155,6 +166,7 @@ struct instrument_info *instrument_init(int num_voices, uint16_t* amy_voices, ui
         instrument->note_per_voice[voice] = _INSTRUMENT_NO_NOTE;
         instrument->pending_release[voice] = false;
     }
+    _instrument_reset_stolen_pool(instrument);
     return instrument;
 }
 
@@ -164,13 +176,38 @@ void instrument_free(struct instrument_info *instrument) {
     free(instrument);
 }
 
+void _instrument_push_note_stolen(struct instrument_info *instrument, uint16_t note) {
+    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
+        if (instrument->stolen_notes[i] == _INSTRUMENT_NO_NOTE) {
+            instrument->stolen_notes[i] = note;
+            //fprintf(stderr, "caching stolen note %d (%d)\n", note, i);
+            return;
+        }
+    }
+}
+
+bool _instrument_pop_note_stolen(struct instrument_info *instrument, uint16_t note) {
+    // Checks stolen_notes for this note; if found, remove it and return true; else false.
+    for (int i = 0; i < STOLEN_POOL_SIZE; ++i) {
+        if (instrument->stolen_notes[i] == note) {
+            //fprintf(stderr, "uncaching stolen note %d (%d)\n", note, i);
+            instrument->stolen_notes[i] = _INSTRUMENT_NO_NOTE;
+            return true;
+        }
+    }
+    return false;
+}
+
 uint16_t _instrument_get_voice(struct instrument_info *instrument, bool *pstolen) {
     if (!voice_fifo_empty(instrument->released_voices)) {
         return voice_fifo_get(instrument->released_voices);
     }
     // No released voices, have to steal.
     if (pstolen) *pstolen = true;  // *pstolen is set if steal occurs, otherwise not touched.
-    return voice_fifo_get(instrument->active_voices);
+    // Mark this note as one that got stolen, so we can absorb its eventual note-off.
+    uint16_t voice = voice_fifo_get(instrument->active_voices);
+    _instrument_push_note_stolen(instrument, instrument->note_per_voice[voice]);
+    return voice;
 }
 
 uint16_t _instrument_voice_for_note(struct instrument_info *instrument, uint16_t note) {
@@ -192,11 +229,9 @@ uint16_t _instrument_voice_off(struct instrument_info *instrument, uint16_t voic
 uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) {
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
-        // A note-off for a note we never saw on is a common/expected condition
-        // in real MIDI streams (sustain pedal + retrigger, external controllers
-        // that emit stray offs, voice stealing, loops that drop note-ons, etc.),
-        // so don't spam stderr about it.
-        //fprintf(stderr, "note off for %d does not match note on\n", note);
+        // Don't report an unmatched note-off if it was a victim of stealing.
+        if (!_instrument_pop_note_stolen(instrument, note))
+            fprintf(stderr, "note off for %d does not match note on\n", note);
         //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
     }
@@ -218,6 +253,7 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
             *amy_voices++ = instrument->amy_voices[voice];
             ++num_voices_turned_off;
         }
+    _instrument_reset_stolen_pool(instrument);
     return num_voices_turned_off;
 }
 

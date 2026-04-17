@@ -759,6 +759,10 @@ class TestVoiceStealing(AmyTest):
     amy.send(time=900, synth=1, note=76, vel=0)
     amy.send(time=920, synth=1, note=79, vel=0)
     amy.send(time=940, synth=1, note=82, vel=0)
+    # Sent spurious note-offs, just to check that error report works
+    amy.send(time=940, synth=1, note=64, vel=0)
+    amy.send(time=940, synth=1, note=82, vel=0)
+    amy.send(time=940, synth=1, note=99, vel=0)
 
 
 class TestVoiceStealDecay(AmyTest):
