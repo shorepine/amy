@@ -138,7 +138,7 @@ def str_of_int(arg):
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
     ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
-    ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
+    ('volume', 'VL'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
     ('bp0', 'AL'), ('bp1', 'BL'),
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
     ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
@@ -150,7 +150,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
-    ('midi_cc', 'icL'),
+    ('midi_cc', 'icL'), ('bus', 'yI'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.

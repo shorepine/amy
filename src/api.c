@@ -118,7 +118,8 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);
-    AMY_UNSET(e->volume);
+    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
+        AMY_UNSET(e->volume[bus]);
     AMY_UNSET(e->pitch_bend);
     AMY_UNSET(e->tempo);
     AMY_UNSET(e->latency_ms);

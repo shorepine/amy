@@ -150,7 +150,7 @@ extern const uint32_t pcm_wavetable_len;
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5
 #define CHORUS_DEFAULT_LEVEL 0
 #define CHORUS_DEFAULT_MAX_DELAY 320
-// Chorus gets is modulator from a special osc one beyond the normal range.
+// Per-bus choruses get modulators from a special osc one beyond the normal range.
 #define CHORUS_MOD_SOURCE AMY_OSCS
 
 // center frequencies for the EQ
@@ -330,14 +330,16 @@ enum params{
     FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 21
     FREQ,                                // 22..30
     VELOCITY=FREQ + NUM_COMBO_COEFS,     // 31
-    PHASE, DETUNE, VOLUME, PITCH_BEND,   // 32, 33, 34, 35
-    PAN,                                 // 36..44
-    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 45..53
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 54
-    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 55, 56, 57
-    MOD_SOURCE, FILTER_TYPE,             // 58, 59
-    EQ_L, EQ_M, EQ_H,                    // 60, 61, 62
-    ALGORITHM, LATENCY, TEMPO,           // 63, 64, 65
+    PHASE, DETUNE, PITCH_BEND,           // 32, 33, 34
+    PAN,                                 // 35..43
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 44..52
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 53
+    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 54, 55, 56
+    MOD_SOURCE, FILTER_TYPE,             // 57, 58
+    EQ_L, EQ_M, EQ_H,                    // 59, 60, 61
+    ALGORITHM, LATENCY, TEMPO,           // 62, 63, 64
+    VOLUME_BASE,                         // 65..68
+    VOLUME_END=VOLUME_BASE + AMY_NUM_BUSES, // 69
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..202
@@ -488,7 +490,7 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float trigger_phase;
-    float volume;  // event_only
+    float volume[AMY_NUM_BUSES];  // event_only
     float pitch_bend;  // event_only
     float tempo;  // event_only
     uint16_t latency_ms;  // event_only
@@ -773,21 +775,20 @@ typedef struct echo_config {
 
 
 // Per-bus parameters
-struct bus_state {
+typedef struct bus_state {
     // State of fixed dc-blocking HPF
-    SAMPLE hpf_state;
     eq_state_t eq;
     reverb_state_t reverb;
     chorus_config_t chorus;
     echo_config_t echo;
-};
+} bus_state_t;
 
 // global synth state
-struct state {
+typedef struct global_state {
     amy_config_t config;
     uint8_t running;
     uint8_t i2s_is_in_background;  // Flag not to handle I2S in amy_update.
-    float volume;
+    float volume[AMY_NUM_BUSES];  // Volume controls mix of buses into final output.
     float pitch_bend;  // Legacy global pitch bend, will be subsumed per-synth (instrument).
     
     uint16_t delta_qsize;
@@ -797,6 +798,9 @@ struct state {
     uint32_t total_blocks;
     float time;
     uint8_t debug_flag;
+    // How many buses do we actually have to process?
+    uint8_t highest_bus;
+    SAMPLE hpf_state;
     
     // Transfer
     uint8_t transfer_flag;
@@ -813,11 +817,11 @@ struct state {
     sequence_entry_ll_t * sequence_entry_ll_start;
 
     // Buses
-    struct bus_state *bus[AMY_NUM_BUSES];
+    bus_state_t *bus[AMY_NUM_BUSES];
 
     // Final output mix
     float bus_gain[AMY_NUM_BUSES];
-};
+} global_state_t;
 
 
 // custom oscillator
@@ -836,7 +840,7 @@ struct custom_oscillator {
 // Shared structures
 extern struct synthinfo** synth;
 extern struct mod_synthinfo** msynth;
-extern struct state amy_global; 
+extern global_state_t amy_global; 
 
 extern output_sample_type * amy_out_block;
 extern output_sample_type * amy_in_block;

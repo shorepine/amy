@@ -378,17 +378,6 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     return skip_chars;
 }
 
-void parse_mix_levels(char *message, amy_event *e) {
-    float vals[AMY_NUM_BUSES + 1];
-    int num_parsed = parse_list_float(message, vals, AMY_NUM_BUSES + 1, 
-                                        AMY_UNSET_VALUE(vals[0]));
-    // Clear unspecified values.
-    for (int i = num_parsed; i < MAX_ALGO_OPS; ++i) {
-        AMY_UNSET(vals[i]);
-    }
-    
-}
-
 // Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
 uint16_t amy_parse_transfer_layer_message(char *message) {
 
@@ -687,7 +676,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
-            case 'V': e->volume = atoff(arg); break;
+            case 'V': parse_list_float(arg, e->volume, AMY_NUM_BUSES, AMY_UNSET_VALUE(e->volume[0])); break;
             case 'w': e->wave=atoi(arg); break;
             /* W used by Tulip for CV, external_channel */
             case 'X': e->eg_type[1] = atoi(arg); break;
@@ -700,7 +689,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
                 }
                 break;
             case 'y': e->bus = atoi(arg); break;
-            case 'Y': parse_mix_levels(arg, e); break;
+            /* Y still available */
             case 'z': {
                 pos += amy_parse_transfer_layer_message(arg);
                 break;
