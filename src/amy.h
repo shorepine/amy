@@ -93,9 +93,9 @@ extern const uint32_t pcm_wavetable_len;
 // File-streaming buffer size multiplier (in blocks).
 #define PCM_FILE_BUFFER_MULT 8
 
-// Values used to indicate nature of transfer.
-#define AMY_TRANSFER_OUTPUT 1
-#define AMY_TRANSFER_AUDIO_IN 2
+// Values used to indicate sampling source
+#define SAMPLE_FROM_OUTPUT 1
+#define SAMPLE_FROM_AUDIO_IN 2
 
 // Each bus has separate FX (EQ, chorus, reverb, echo)
 #define AMY_NUM_BUSES 4

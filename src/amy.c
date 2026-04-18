@@ -2027,10 +2027,10 @@ int16_t * amy_fill_buffer() {
         if(byte_offset + bytes_to_copy >= amy_global.transfer_length_bytes) {
             bytes_to_copy = amy_global.transfer_length_bytes - byte_offset;
         }
-        if(amy_global.transfer_file_handle==AMY_TRANSFER_OUTPUT) {
+        if(amy_global.transfer_file_handle==SAMPLE_FROM_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
             memcpy(amy_global.transfer_storage + byte_offset, output_block, bytes_to_copy);
-        } else if(amy_global.transfer_file_handle==AMY_TRANSFER_AUDIO_IN) {
+        } else if(amy_global.transfer_file_handle==SAMPLE_FROM_AUDIO_IN) {
             // copy audio input buffer to storage
             memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
         }

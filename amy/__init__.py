@@ -356,8 +356,8 @@ except ImportError:
     def b64(b):
         return ubinascii.b2a_base64(b)[:-1]
 
-def start_sample(preset=0, bus=1,  max_frames=0, midinote=60, loopstart=0, loopend=0):
-    s = "%d,%d,%d,%d,%d,%d" % (preset, bus, max_frames, midinote, loopstart, loopend)
+def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60, loopstart=0, loopend=0):
+    s = "%d,%d,%d,%d,%d,%d" % (preset, source, max_frames, midinote, loopstart, loopend)
     send(start_sample=s)
 
 def stop_sample():

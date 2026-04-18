@@ -1052,7 +1052,7 @@ class TestDiskSampleStereo(AmyTest):
 class TestSample(AmyTest):
 
   def run(self):
-    amy.start_sample(preset=1024,bus=1,max_frames=22050, midinote=60)
+    amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=22050, midinote=60)
     amy.send(time=0, synth=1, num_voices=4, patch=20)
     amy.send(time=50, synth=1, note=48, vel=1)
     amy.send(time=150, synth=1, note=60, vel=1)
