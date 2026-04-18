@@ -234,14 +234,15 @@ void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, f
     if (AMY_IS_UNSET(filter_coef)) filter_coef = S2F(amy_global.bus[bus]->echo.filter_coef);
 
     uint32_t delay_samples = (uint32_t)(delay_ms / 1000.f * AMY_SAMPLE_RATE);
-    //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
+    uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
+    // Remember this value for max_delay_samples even if we don't allocate on this call, so a later UNSET call will pick it up.
+    amy_global.bus[bus]->echo.max_delay_samples = max_delay_samples;
+    //fprintf(stderr, "config_echo: bus %d delay=%.3f ms / %d samps max_delay=%.3f ms / %d samps echo.max_delay_samples=%d\n", bus, delay_ms, delay_samples, max_delay_ms, max_delay_samples, amy_global.bus[bus]->echo.max_delay_samples);
 
     if (level > 0) {
         if (amy_global.bus[bus]->echo.echo_delay_lines[0] == NULL) {
             // Delay line len must be power of 2.
-            uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
             if (!alloc_echo_delay_lines(bus, max_delay_samples)) return;
-            amy_global.bus[bus]->echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
         // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.

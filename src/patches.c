@@ -588,7 +588,7 @@ void set_event_for_global_fx(amy_event *event, struct state *state) {
     // Echo
     event->echo_level = S2F(state->bus[bus]->echo.level);
     event->echo_delay_ms = state->bus[bus]->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    if (state->bus[bus]->echo.max_delay_samples != 65536)
+    if (state->bus[bus]->echo.max_delay_samples != (uint32_t)(ECHO_DEFAULT_MAX_DELAY_MS / 1000.f * AMY_SAMPLE_RATE))
         event->echo_max_delay_ms = state->bus[bus]->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
     event->echo_feedback = S2F(state->bus[bus]->echo.feedback);
     event->echo_filter_coef = S2F(state->bus[bus]->echo.filter_coef);

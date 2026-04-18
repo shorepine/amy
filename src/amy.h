@@ -168,7 +168,7 @@ extern const uint32_t pcm_wavetable_len;
 #define ECHO_DEFAULT_LEVEL 0
 #define ECHO_DEFAULT_DELAY_MS  500.f
 // Delay line allocates in 2^n samples at 44k; 743ms is just under 32768 samples.
-#define ECHO_DEFAULT_MAX_DELAY_MS 743.f
+#define ECHO_DEFAULT_MAX_DELAY_MS 743.039f
 #define ECHO_DEFAULT_FEEDBACK 0
 #define ECHO_DEFAULT_FILTER_COEF 0
 
