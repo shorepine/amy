@@ -1263,7 +1263,7 @@ class TestBuses(AmyTest):
     amy.send(time=0, bus=0, reverb=1, echo=0)
     amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
     amy.send(time=0, bus=1, reverb=0, echo='1,100,,0.5,0.5')
-    amy.send(time=0, volume='2,0.5')
+    amy.send(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
     amy.send(time=100, synth=1, note=60, vel=5)
     amy.send(time=300, synth=2, note=63, vel=5)
     amy.send(time=500, synth=1, note=67, vel=5)

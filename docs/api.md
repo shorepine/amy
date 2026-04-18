@@ -220,6 +220,7 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `in`   | `oscs_per_voice`  | `oscs_per_voice`  | >0  | Reserve this many oscs for each voice.  Needed when initializing a synth (or voice) withouth an initial patch. Setting `oscs_per_voice` on an existing synth resets all oscs to their default state. |
 | `im`   | `grab_midi_notes` | `grab_midi_notes` | 0/1 | Use `amy.send(synth=CHANNEL, grab_midi_notes=0)` to prevent the default direct forwarding of MIDI note-on/offs to synth CHANNEL. |
 | `ip`   | `pedal` | `pedal` | int | Non-zero means pedal is down (i.e., sustain).  Must be used with `synth`. |
+| `iy`   | `bus`   | `bus`   | int | Bus onto which the synth outputs are added (synonym for `y`). |
 | `K`    | `patch_number` | `patch` | uint 0-X | Apply a saved or user patch to a specified synth or voice. |
 | `r`    | `voices[]` | `voices` | int[,int] | Comma separated list of voices to send message to, or load patch into. |
 | `u`    | **TODO**| `patch_string` | string | Provide AMY message to define up to 32 patches in RAM with ID numbers (1024-1055) provided via `patch_number`, or directly configure a `synth`. |
@@ -249,6 +250,7 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
+| `y`    | bus        | `bus` | int   | Bus that this osc gets added onto (default 0) |
 | `l`    | `velocity` | `vel` | float | Note on velocity. Use to start an envelope or set amplitude |
 
 ### CtrlCoefs
@@ -269,7 +271,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `z`    | **TODO**| `load_sample` | uint x 6 | Signal to start loading sample. preset number, length(frames), samplerate, channels, midinote, loopstart, loopend. All subsequent messages are base64 encoded WAVE-style frames of audio until `length` is reached. Set `preset` and `length=0` to unload a sample from RAM. |
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
-| `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from bus. Params: preset number,  bus, max length in frames, midinote, loopstart, loopend. bus = 1 is AMY mixed output. bus = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
+| `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from source. Params: preset number,  source, max length in frames, midinote, loopstart, loopend. source = 1 is AMY mixed output. source = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
 | `zO`   | **TODO**| `stop_sample` | uint | Stop sampling. Does nothing if no sampling active. param ignored. | 
 
 ### WAVETABLE wave type
@@ -284,6 +286,11 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 - Each wavetable preset is expected to be one 64-cycle table (normally `16384` samples total, `256` samples per cycle).
 - `duty` crossfades across the 64 cycles inside the selected wavetable preset.
 
+### Per-bus Effects
+
+Each of the `y` busses
+
+
 ### Other
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
@@ -296,7 +303,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `N`    | `latency_ms`| `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `s`    | `pitch_bend` | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
 | `t`    | `time` | `time` | uint | Request playback time relative to some fixed start point on your host, in ms. Allows precise future scheduling. |
-| `V`    | `volume`| `volume` | float 0-10 | Volume knob for entire synth, default 1.0 |
+| `V`    | `volume`| `volume` | float, float, ...  | Volume knob for each bus in the final mixdown, default 1.0 |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
 | `g`    | `client` | `client` | uint | Client number for Alles distributed synthesis. |
 | `W`    | `external_channel` | `external_channel` | uint | External channel routing (used by Tulip for CV output). |
