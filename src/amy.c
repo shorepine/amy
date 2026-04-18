@@ -2,6 +2,7 @@
 // brian@variogr.am / dan.ellis@gmail.com
 
 #include "amy.h"
+#include "delay.h"
 
 #ifdef AMY_DEBUG
 
@@ -78,11 +79,6 @@ void amy_profiles_print() {}
 #include "pcm_tiny.h"
 
 #include "clipping_lookup_table.h"
-
-// Final output delay lines.
-delay_line_t *chorus_delay_lines[AMY_MAX_CHANNELS] = {NULL, NULL};
-delay_line_t *echo_delay_lines[AMY_MAX_CHANNELS] = {NULL, NULL};
-SAMPLE *delay_mod = NULL;
 
 
 // Set up the mutex for accessing the queue during rendering (for multicore)
@@ -197,19 +193,20 @@ output_sample_type * output_block;
 #endif
 
 
-void dealloc_echo_delay_lines(void) {
+void dealloc_echo_delay_lines(uint8_t bus) {
     for (int c = AMY_NCHANS - 1; c >= 0; --c) {
-        if (echo_delay_lines[c]) free_delay_line(echo_delay_lines[c]);
-        echo_delay_lines[c] = NULL;
+        if (amy_global.bus[bus]->echo.echo_delay_lines[c])
+            free_delay_line(amy_global.bus[bus]->echo.echo_delay_lines[c]);
+        amy_global.bus[bus]->echo.echo_delay_lines[c] = NULL;
     }
 }
 
-bool alloc_echo_delay_lines(uint32_t max_delay_samples) {
+bool alloc_echo_delay_lines(uint8_t bus, uint32_t max_delay_samples) {
     bool success = true;
     for (int c = 0; c < AMY_NCHANS; ++c) {
         delay_line_t *delay_line = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
         if (delay_line) {
-            echo_delay_lines[c] = delay_line;
+            amy_global.bus[bus]->echo.echo_delay_lines[c] = delay_line;
         } else {
             success = false;
             break;
@@ -217,7 +214,7 @@ bool alloc_echo_delay_lines(uint32_t max_delay_samples) {
     }
     if (!success) {
         fprintf(stderr, "unable to alloc echo of %d samples\n", (int)max_delay_samples);
-        dealloc_echo_delay_lines();
+        dealloc_echo_delay_lines(bus);
         return false;
     }
     return true;
@@ -229,57 +226,57 @@ uint32_t enclosing_power_of_2(uint32_t n) {
     return result;
 }
 
-void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
-    if (AMY_IS_UNSET(level)) level = S2F(amy_global.echo.level);
-    if (AMY_IS_UNSET(delay_ms)) delay_ms = (amy_global.echo.delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
-    if (AMY_IS_UNSET(max_delay_ms)) max_delay_ms = (amy_global.echo.max_delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
-    if (AMY_IS_UNSET(feedback)) feedback = S2F(amy_global.echo.feedback);
-    if (AMY_IS_UNSET(filter_coef)) filter_coef = S2F(amy_global.echo.filter_coef);
+void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->echo.level);
+    if (AMY_IS_UNSET(delay_ms)) delay_ms = (amy_global.bus[bus]->echo.delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
+    if (AMY_IS_UNSET(max_delay_ms)) max_delay_ms = (amy_global.bus[bus]->echo.max_delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
+    if (AMY_IS_UNSET(feedback)) feedback = S2F(amy_global.bus[bus]->echo.feedback);
+    if (AMY_IS_UNSET(filter_coef)) filter_coef = S2F(amy_global.bus[bus]->echo.filter_coef);
 
     uint32_t delay_samples = (uint32_t)(delay_ms / 1000.f * AMY_SAMPLE_RATE);
     //fprintf(stderr, "config_echo: delay_ms=%.3f max_delay_ms=%.3f delay_samples=%d echo.max_delay_samples=%d\n", delay_ms, max_delay_ms, delay_samples, echo.max_delay_samples);
 
     if (level > 0) {
-        if (echo_delay_lines[0] == NULL) {
+        if (amy_global.bus[bus]->echo.echo_delay_lines[0] == NULL) {
             // Delay line len must be power of 2.
             uint32_t max_delay_samples = enclosing_power_of_2((uint32_t)(max_delay_ms / 1000.f * AMY_SAMPLE_RATE));
-            if (!alloc_echo_delay_lines(max_delay_samples)) return;
-            amy_global.echo.max_delay_samples = max_delay_samples;
+            if (!alloc_echo_delay_lines(bus, max_delay_samples)) return;
+            amy_global.bus[bus]->echo.max_delay_samples = max_delay_samples;
             //fprintf(stderr, "config_echo: max_delay_samples=%d\n", max_delay_samples);
         }
         // Apply delay.  We have to stay 1 sample less than delay line length for FIR EQ delay.
-        if (delay_samples > amy_global.echo.max_delay_samples - 1) delay_samples = amy_global.echo.max_delay_samples - 1;
+        if (delay_samples > amy_global.bus[bus]->echo.max_delay_samples - 1) delay_samples = amy_global.bus[bus]->echo.max_delay_samples - 1;
         for (int c = 0; c < AMY_NCHANS; ++c) {
-            echo_delay_lines[c]->fixed_delay = delay_samples;
+            amy_global.bus[bus]->echo.echo_delay_lines[c]->fixed_delay = delay_samples;
         }
     }
-    amy_global.echo.level = F2S(level);
-    amy_global.echo.delay_samples = delay_samples;
+    amy_global.bus[bus]->echo.level = F2S(level);
+    amy_global.bus[bus]->echo.delay_samples = delay_samples;
     // Filter is IIR [1, filter_coef] normalized for filter_coef > 0 (LPF), or FIR [1, filter_coef] normalized for filter_coef < 0 (HPF).
     if (filter_coef > 0.99)  filter_coef = 0.99;  // Avoid unstable filters.
-    amy_global.echo.filter_coef = F2S(filter_coef);
+    amy_global.bus[bus]->echo.filter_coef = F2S(filter_coef);
     // FIR filter potentially has gain > 1 for high frequencies, so discount the loop feedback to stop things exploding.
     if (filter_coef < 0)  feedback /= 1.f - filter_coef;
-    amy_global.echo.feedback = F2S(feedback);
+    amy_global.bus[bus]->echo.feedback = F2S(feedback);
     //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
 }
 
-void dealloc_chorus_delay_lines(void) {
+void dealloc_chorus_delay_lines(uint8_t bus) {
     for(int c = AMY_NCHANS - 1; c >= 0; --c) {
-        if (chorus_delay_lines[c]) free_delay_line(chorus_delay_lines[c]);
-        chorus_delay_lines[c] = NULL;
+        if (amy_global.bus[bus]->chorus.chorus_delay_lines[c]) free_delay_line(amy_global.bus[bus]->chorus.chorus_delay_lines[c]);
+        amy_global.bus[bus]->chorus.chorus_delay_lines[c] = NULL;
     }
-    free(delay_mod);
-    delay_mod = NULL;
+    free(amy_global.bus[bus]->chorus.delay_mod);
+    amy_global.bus[bus]->chorus.delay_mod = NULL;
 }
 
-void alloc_chorus_delay_lines(void) {
-    delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
+void alloc_chorus_delay_lines(uint8_t bus) {
+    amy_global.bus[bus]->chorus.delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
     bool success = true;
     for(int c = 0; c < AMY_NCHANS; ++c) {
         delay_line_t *delay_line = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
         if (delay_line) {
-            chorus_delay_lines[c] = delay_line;
+            amy_global.bus[bus]->chorus.chorus_delay_lines[c] = delay_line;
         } else {
             success = false;
             break;
@@ -287,22 +284,22 @@ void alloc_chorus_delay_lines(void) {
     }
     if (!success) {
         fprintf(stderr, "unable to alloc chorus of %d samples\n", (int)DELAY_LINE_LEN);
-        dealloc_chorus_delay_lines();
+        dealloc_chorus_delay_lines(bus);
     }
 }
 
-void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth) {
-    if (AMY_IS_UNSET(level)) level = S2F(amy_global.chorus.level);
-    if (AMY_IS_UNSET(max_delay)) max_delay = amy_global.chorus.max_delay;
-    if (AMY_IS_UNSET(lfo_freq)) lfo_freq = amy_global.chorus.lfo_freq;
-    if (AMY_IS_UNSET(depth)) depth = amy_global.chorus.depth;
+void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq, float depth) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->chorus.level);
+    if (AMY_IS_UNSET(max_delay)) max_delay = amy_global.bus[bus]->chorus.max_delay;
+    if (AMY_IS_UNSET(lfo_freq)) lfo_freq = amy_global.bus[bus]->chorus.lfo_freq;
+    if (AMY_IS_UNSET(depth)) depth = amy_global.bus[bus]->chorus.depth;
     //fprintf(stderr, "config_chorus: osc %d level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
     //        CHORUS_MOD_SOURCE, level, max_delay, lfo_freq, depth);
     if (level > 0) {
         ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
         // only allocate delay lines if chorus is more than inaudible.
-        if (chorus_delay_lines[0] == NULL) {
-            alloc_chorus_delay_lines();
+        if (amy_global.bus[bus]->chorus.chorus_delay_lines[0] == NULL) {
+            alloc_chorus_delay_lines(bus);
         }
         // if we're turning on for the first time, start the oscillator.
         if (synth[CHORUS_MOD_SOURCE]->status == SYNTH_OFF) {  //chorus.level == 0) {
@@ -321,32 +318,45 @@ void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth)
         // apply max_delay.
         for (int chan=0; chan<AMY_NCHANS; ++chan) {
             //chorus_delay_lines[chan]->max_delay = max_delay;
-            chorus_delay_lines[chan]->fixed_delay = (int)max_delay / 2;
+            amy_global.bus[bus]->chorus.chorus_delay_lines[chan]->fixed_delay = (int)max_delay / 2;
         }
     }
-    amy_global.chorus.max_delay = max_delay;
-    amy_global.chorus.level = F2S(level);
-    amy_global.chorus.lfo_freq = lfo_freq;
-    amy_global.chorus.depth = depth;
+    amy_global.bus[bus]->chorus.max_delay = max_delay;
+    amy_global.bus[bus]->chorus.level = F2S(level);
+    amy_global.bus[bus]->chorus.lfo_freq = lfo_freq;
+    amy_global.bus[bus]->chorus.depth = depth;
 }
 
-void config_reverb(float level, float liveness, float damping, float xover_hz) {
-    if (AMY_IS_UNSET(level)) level = S2F(amy_global.reverb.level);
-    if (AMY_IS_UNSET(liveness)) liveness = amy_global.reverb.liveness;
-    if (AMY_IS_UNSET(damping)) damping = amy_global.reverb.damping;
-    if (AMY_IS_UNSET(xover_hz)) xover_hz = amy_global.reverb.xover_hz;
+void alloc_reverb_delay_lines(uint8_t bus) {
+    if (amy_global.bus[bus]->reverb.rev == NULL)
+        amy_global.bus[bus]->reverb.rev = new_reverb();
+    init_stereo_reverb(amy_global.bus[bus]->reverb.rev);
+}
+
+void dealloc_reverb_delay_lines(uint8_t bus) {
+    if (amy_global.bus[bus]->reverb.rev != NULL) {
+        deinit_stereo_reverb(amy_global.bus[bus]->reverb.rev);
+        delete_reverb(amy_global.bus[bus]->reverb.rev);
+    }
+}
+
+void config_reverb(uint8_t bus, float level, float liveness, float damping, float xover_hz) {
+    if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->reverb.level);
+    if (AMY_IS_UNSET(liveness)) liveness = amy_global.bus[bus]->reverb.liveness;
+    if (AMY_IS_UNSET(damping)) damping = amy_global.bus[bus]->reverb.damping;
+    if (AMY_IS_UNSET(xover_hz)) xover_hz = amy_global.bus[bus]->reverb.xover_hz;
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
-        if (amy_global.reverb.level == 0) { 
-            init_stereo_reverb();  // In case it's the first time
+        if (amy_global.bus[bus]->reverb.level == 0) {
+            alloc_reverb_delay_lines(bus);
         }
-        config_stereo_reverb(liveness, xover_hz, damping);
+        config_stereo_reverb(amy_global.bus[bus]->reverb.rev, liveness, xover_hz, damping);
     }
-    amy_global.reverb.level = F2S(level);
-    amy_global.reverb.liveness = liveness;
-    amy_global.reverb.damping = damping;
-    amy_global.reverb.xover_hz = xover_hz;
+    amy_global.bus[bus]->reverb.level = F2S(level);
+    amy_global.bus[bus]->reverb.liveness = liveness;
+    amy_global.bus[bus]->reverb.damping = damping;
+    amy_global.bus[bus]->reverb.xover_hz = xover_hz;
 }
 
 
@@ -386,6 +396,33 @@ int peek_stack(char *tag)  { return 0; }
 
 #endif
 
+
+void config_eq(uint8_t bus, SAMPLE eq_l, SAMPLE eq_m, SAMPLE eq_h) {
+    amy_global.bus[bus]->eq.eq[0] = eq_l;
+    amy_global.bus[bus]->eq.eq[1] = eq_m;
+    amy_global.bus[bus]->eq.eq[2] = eq_h;
+}
+
+
+void bus_reset(uint8_t bus) {
+    struct bus_state *bus_st = amy_global.bus[bus];
+    bus_st->hpf_state = 0; 
+
+    config_eq(bus, F2S(1.0f), F2S(1.0f), F2S(1.0f));
+    filters_init(bus);
+    reset_parametric(bus);
+
+    if (AMY_HAS_CHORUS) config_chorus(bus, CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
+    if (AMY_HAS_REVERB) config_reverb(bus, REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
+    if (AMY_HAS_ECHO)   config_echo(bus, S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
+}
+
+void buses_reset() {
+    for (int i = 0; i < AMY_NUM_BUSES; ++i) {
+        bus_reset(i);
+    }
+}
+
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
@@ -396,10 +433,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
     amy_global.tempo = 108.0; 
-    amy_global.eq[0] = F2S(1.0f);
-    amy_global.eq[1] = F2S(1.0f);
-    amy_global.eq[2] = F2S(1.0f);
-    amy_global.hpf_state = 0; 
+    amy_global.pitch_bend = 0;
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
     amy_global.transfer_storage = NULL;
     amy_global.transfer_length_bytes = 0;
@@ -411,26 +445,24 @@ int8_t global_init(amy_config_t c) {
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
     amy_global.sequence_entry_ll_start = NULL;
+
+    struct bus_state *bus_configs = malloc_caps(sizeof(struct bus_state) * AMY_NUM_BUSES,
+                                                amy_global.config.ram_caps_synth);
+    bzero(bus_configs, sizeof(struct bus_state) * AMY_NUM_BUSES);
+    for (int i = 0; i < AMY_NUM_BUSES; ++i) {
+        amy_global.bus[i] = bus_configs;
+        ++bus_configs;
+    }
+    buses_reset();
     
-    amy_global.reverb.level = F2S(REVERB_DEFAULT_LEVEL);
-    amy_global.reverb.liveness= REVERB_DEFAULT_LIVENESS;
-    amy_global.reverb.damping = REVERB_DEFAULT_DAMPING;
-    amy_global.reverb.xover_hz = REVERB_DEFAULT_XOVER_HZ;
-
-    amy_global.chorus.level = F2S(CHORUS_DEFAULT_LEVEL);
-    amy_global.chorus.max_delay =  CHORUS_DEFAULT_MAX_DELAY;
-    amy_global.chorus.lfo_freq = CHORUS_DEFAULT_LFO_FREQ;
-    amy_global.chorus.depth = CHORUS_DEFAULT_MOD_DEPTH;
-
-    amy_global.echo.level = F2S(ECHO_DEFAULT_LEVEL);
-    amy_global.echo.delay_samples = (uint32_t)(ECHO_DEFAULT_DELAY_MS / 1000.f * AMY_SAMPLE_RATE);
-    amy_global.echo.max_delay_samples = 65536;
-    amy_global.echo.feedback = F2S(ECHO_DEFAULT_FEEDBACK);
-    amy_global.echo.filter_coef = ECHO_DEFAULT_FILTER_COEF;
-
     amy_init_lock();
 
     return 0;
+}
+
+void global_deinit(void) {
+    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)  filters_deinit(bus);
+    free(amy_global.bus[0]);
 }
 
 // Convert to and from the log-frequency scale.
@@ -532,11 +564,23 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     if(AMY_IS_UNSET(e->osc)) { d.osc = 0; } 
     if(AMY_IS_UNSET(e->time)) { d.time = 0; } 
 
-    // First, adapt the osc in this event with base_osc offsets for voices
-    d.osc += base_osc;
-
-    // Ensure this osc has its synthinfo allocated.
-    ensure_osc_allocd(d.osc, NULL);
+    // If this is a bus-directed event, use d->osc to store the bus number instead.
+    bool bus_directed_command = false;
+    if (AMY_IS_SET(e->eq_l) || AMY_IS_SET(e->eq_m) || AMY_IS_SET(e->eq_h)
+        || AMY_IS_SET(e->echo_level) || AMY_IS_SET(e->echo_delay_ms) || AMY_IS_SET(e->echo_max_delay_ms) || AMY_IS_SET(e->echo_feedback) || AMY_IS_SET(e->echo_filter_coef)
+        || AMY_IS_SET(e->chorus_level) || AMY_IS_SET(e->chorus_max_delay) || AMY_IS_SET(e->chorus_lfo_freq) || AMY_IS_SET(e->chorus_depth) 
+        || AMY_IS_SET(e->reverb_level) || AMY_IS_SET(e->reverb_liveness) || AMY_IS_SET(e->reverb_damping) || AMY_IS_SET(e->reverb_xover_hz)) {
+        if (AMY_IS_SET(e->osc))  fprintf(stderr, "** osc %d specific for bus-directed command, ignoring\n", e->osc);  // Can't at this moment be more specific about which command.
+        // Store the target bus in d.osc.
+        d.osc = AMY_IS_SET(e->bus) ? e->bus : AMY_DEFAULT_BUS;
+        bus_directed_command = true;
+    } else {
+        // d.osc refers to an osc
+        // First, adapt the osc in this event with base_osc offsets for voices
+        d.osc += base_osc;
+        // Ensure this osc has its synthinfo allocated.
+        ensure_osc_allocd(d.osc, NULL);
+    }
 
     // Voices / patches gets set up here 
     // you must set both voices & load_patch together to load a patch 
@@ -563,6 +607,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     }
 
     // Everything else only added to queue if set
+    if (!bus_directed_command) EVENT_TO_DELTA_I(bus, BUS)
     EVENT_TO_DELTA_I(wave, WAVE)
     EVENT_TO_DELTA_I(preset, PRESET)
     EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
@@ -700,6 +745,7 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
 void reset_osc_params(struct synthinfo *psynth) {
     // osc params are the things set through the amy_event API
     // Event-derived config
+    psynth->bus = AMY_DEFAULT_BUS;
     psynth->wave = SINE;
     AMY_UNSET(psynth->preset);
     AMY_UNSET(psynth->note_source);
@@ -788,16 +834,8 @@ void amy_reset_oscs() {
     //for(uint16_t i=0;i<AMY_OSCS+1;i++) reset_osc(i);
     // also reset filters and volume
     amy_global.volume = 1.0f;
-    amy_global.pitch_bend = 0;
-    amy_global.eq[0] = F2S(1.0f);
-    amy_global.eq[1] = F2S(1.0f);
-    amy_global.eq[2] = F2S(1.0f);
     my_srand48(517730);
-    reset_parametric();
-    // Reset chorus oscillator etc.
-    if (AMY_HAS_CHORUS) config_chorus(CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
-    if (AMY_HAS_REVERB) config_reverb(REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
-    if (AMY_HAS_ECHO)   config_echo(S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
+    buses_reset();
     // Reset patches
     patches_reset();
     // Reset instruments (synths)
@@ -920,7 +958,6 @@ void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
 int8_t oscs_init() {
     if(amy_global.config.ks_oscs>0)
         ks_init();
-    filters_init();
     algo_init();
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
@@ -1015,7 +1052,7 @@ void show_debug(uint8_t type) {
     if(type>1) {
         // print out all the osc data
         //printf("global: filter %f resonance %f volume %f bend %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.pitch_bend, amy_global.status);
-        fprintf(stderr,"global: volume %f bend %f eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.eq[0]), S2F(amy_global.eq[1]), S2F(amy_global.eq[2]));
+        fprintf(stderr,"global: volume %f bend %f bus 0 eq: %f %f %f \n", amy_global.volume, amy_global.pitch_bend, S2F(amy_global.bus[0]->eq.eq[0]), S2F(amy_global.bus[0]->eq.eq[1]), S2F(amy_global.bus[0]->eq.eq[2]));
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
             print_osc_debug(i, (type > 3) /* show_eg */);
         }
@@ -1047,8 +1084,11 @@ void show_debug(uint8_t type) {
 
 void oscs_deinit() {
     midi_mappings_deinit();
-    dealloc_chorus_delay_lines();
-    dealloc_echo_delay_lines();
+    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
+        dealloc_chorus_delay_lines(bus);
+        dealloc_echo_delay_lines(bus);
+        dealloc_reverb_delay_lines(bus);
+    }
     for(int core = 0; core < AMY_CORES; ++core) {
         free(fbl[core]);
         free(per_osc_fb[core]);
@@ -1068,7 +1108,6 @@ void oscs_deinit() {
     instruments_deinit();
     patches_deinit();
     algo_deinit();
-    filters_deinit();
     if(amy_global.config.ks_oscs > 0)
         ks_deinit();
 }
@@ -1164,6 +1203,7 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc]->logfreq_coefs[COEF_CONST]));
         }
     }
+    DELTA_TO_SYNTH_I(BUS, bus)
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
@@ -1279,26 +1319,27 @@ void play_delta(struct delta *d) {
         }
     }
     // for global changes, just make the change, no need to update the per-osc synth
+    uint8_t bus = d->osc;  // We assume d.osc was hijacked in amy_event_to_deltas_queue
     if(d->param == VOLUME) amy_global.volume = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
     if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
     if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
-    if(d->param == EQ_L) amy_global.eq[0] = F2S(powf(10, d->data.f / 20.0));
-    if(d->param == EQ_M) amy_global.eq[1] = F2S(powf(10, d->data.f / 20.0));
-    if(d->param == EQ_H) amy_global.eq[2] = F2S(powf(10, d->data.f / 20.0));
-    if(d->param == ECHO_LEVEL) config_echo(d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == ECHO_DELAY_MS) config_echo(AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == ECHO_MAX_DELAY_MS) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == ECHO_FEEDBACK) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
-    if(d->param == ECHO_FILTER_COEF) config_echo(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
-    if(d->param == CHORUS_LEVEL) config_chorus(d->data.f, UINT16_MAX, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == CHORUS_MAX_DELAY) config_chorus(AMY_UNSET_FLOAT, AMY_IS_UNSET(d->data.f)?UINT16_MAX : (uint16_t)roundf(d->data.f), AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == CHORUS_LFO_FREQ) config_chorus(AMY_UNSET_FLOAT, UINT16_MAX, d->data.f, AMY_UNSET_FLOAT);
-    if(d->param == CHORUS_DEPTH) config_chorus(AMY_UNSET_FLOAT, UINT16_MAX, AMY_UNSET_FLOAT, d->data.f);
-    if(d->param == REVERB_LEVEL) config_reverb(d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == REVERB_LIVENESS) config_reverb(AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
-    if(d->param == REVERB_DAMPING) config_reverb(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
-    if(d->param == REVERB_XOVER_HZ) config_reverb(AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == EQ_L) amy_global.bus[bus]->eq.eq[0] = F2S(powf(10, d->data.f / 20.0));
+    if(d->param == EQ_M) amy_global.bus[bus]->eq.eq[1] = F2S(powf(10, d->data.f / 20.0));
+    if(d->param == EQ_H) amy_global.bus[bus]->eq.eq[2] = F2S(powf(10, d->data.f / 20.0));
+    if(d->param == ECHO_LEVEL) config_echo(bus, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_DELAY_MS) config_echo(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_MAX_DELAY_MS) config_echo(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_FEEDBACK) config_echo(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == ECHO_FILTER_COEF) config_echo(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == CHORUS_LEVEL) config_chorus(bus, d->data.f, UINT16_MAX, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_MAX_DELAY) config_chorus(bus, AMY_UNSET_FLOAT, AMY_IS_UNSET(d->data.f)?UINT16_MAX : (uint16_t)roundf(d->data.f), AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_LFO_FREQ) config_chorus(bus, AMY_UNSET_FLOAT, UINT16_MAX, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == CHORUS_DEPTH) config_chorus(bus, AMY_UNSET_FLOAT, UINT16_MAX, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == REVERB_LEVEL) config_reverb(bus, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_LIVENESS) config_reverb(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_DAMPING) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
+    if(d->param == REVERB_XOVER_HZ) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
 
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.
@@ -1707,6 +1748,8 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
 
 void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     AMY_PROFILE_START(AMY_RENDER)
+    uint8_t bus = 0;  // FIXME: Render per bus
+
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) { fbl[core][i] = 0; }
     SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
@@ -1746,11 +1789,12 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     core_max[core] = max_max;
 
     if(AMY_HAS_CHORUS && core == 0) {
+        // **FIXME: chorus is per-bus
         ensure_osc_allocd(CHORUS_MOD_SOURCE, NULL);
         hold_and_modify(CHORUS_MOD_SOURCE);
-        if(amy_global.chorus.level!=0)  {
-            bzero(delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
-            render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, delay_mod);
+        if(amy_global.bus[bus]->chorus.level!=0)  {
+            bzero(amy_global.bus[bus]->chorus.delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+            render_osc_wave(CHORUS_MOD_SOURCE, 0 /* core */, amy_global.bus[bus]->chorus.delay_mod);
         }
     }
 
@@ -1852,6 +1896,7 @@ void amy_process_event(amy_event *e) {
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
+    uint8_t bus = 0;  // FIXME: handle buses.
     #ifdef __EMSCRIPTEN__
     // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
     //emscripten_audio_worklet_post_function_v(0, amy_block_processed);
@@ -1872,18 +1917,18 @@ int16_t * amy_fill_buffer() {
     // Apply global processing only if there is some signal.
     //if (max_val > 0) {      // NO - see #629
         // apply the eq filters if there is some signal and EQ is non-default.
-        if (amy_global.eq[0] != F2S(1.0f) || amy_global.eq[1] != F2S(1.0f) || amy_global.eq[2] != F2S(1.0f)) {
-            parametric_eq_process(fbl[0]);
+        if (amy_global.bus[bus]->eq.eq[0] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[1] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[2] != F2S(1.0f)) {
+            parametric_eq_process(bus, fbl[0]);
         }
         if(AMY_HAS_CHORUS) {
             // apply chorus.
-            if(amy_global.chorus.level > 0 && chorus_delay_lines[0] != NULL) {
+            if(amy_global.bus[bus]->chorus.level > 0 && amy_global.bus[bus]->chorus.chorus_delay_lines[0] != NULL) {
                 // apply time-varying delays to both chans.
                 // delay_mod_val, the modulated delay amount, is set up before calling render_*.
                 SAMPLE scale = F2S(1.0f);
                 for (int16_t c=0; c < AMY_NCHANS; ++c) {
-                    apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, chorus_delay_lines[c],
-                                         delay_mod, scale, amy_global.chorus.level, 0);
+                    apply_variable_delay(fbl[0] + c * AMY_BLOCK_SIZE, amy_global.bus[bus]->chorus.chorus_delay_lines[c],
+                                         amy_global.bus[bus]->chorus.delay_mod, scale, amy_global.bus[bus]->chorus.level, 0);
                     // flip delay direction for alternating channels.
                     scale = -scale;
                 }
@@ -1892,19 +1937,19 @@ int16_t * amy_fill_buffer() {
     //}
     if (AMY_HAS_ECHO) {
         // Apply echo.
-        if (amy_global.echo.level > 0 && echo_delay_lines[0] != NULL ) {
+        if (amy_global.bus[bus]->echo.level > 0 && amy_global.bus[bus]->echo.echo_delay_lines[0] != NULL ) {
             for (int16_t c=0; c < AMY_NCHANS; ++c) {
-                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, echo_delay_lines[c], amy_global.echo.delay_samples, amy_global.echo.level, amy_global.echo.feedback, amy_global.echo.filter_coef);
+                apply_fixed_delay(fbl[0] + c * AMY_BLOCK_SIZE, amy_global.bus[bus]->echo.echo_delay_lines[c], amy_global.bus[bus]->echo.delay_samples, amy_global.bus[bus]->echo.level, amy_global.bus[bus]->echo.feedback, amy_global.bus[bus]->echo.filter_coef);
             }
         }
     }
     if(AMY_HAS_REVERB) {
         // apply reverb.
-        if(amy_global.reverb.level > 0) {
+        if(amy_global.bus[bus]->reverb.level > 0) {
             if(AMY_NCHANS == 1) {
-                stereo_reverb(fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, amy_global.reverb.level);
+                stereo_reverb(amy_global.bus[bus]->reverb.rev, fbl[0], NULL, fbl[0], NULL, AMY_BLOCK_SIZE, amy_global.bus[bus]->reverb.level);
             } else {
-                stereo_reverb(fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, amy_global.reverb.level);
+                stereo_reverb(amy_global.bus[bus]->reverb.rev, fbl[0], fbl[0] + AMY_BLOCK_SIZE, fbl[0], fbl[0] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, amy_global.bus[bus]->reverb.level);
             }
         }
     }
@@ -1976,10 +2021,10 @@ int16_t * amy_fill_buffer() {
         if(byte_offset + bytes_to_copy >= amy_global.transfer_length_bytes) {
             bytes_to_copy = amy_global.transfer_length_bytes - byte_offset;
         }
-        if(amy_global.transfer_file_handle==AMY_BUS_OUTPUT) {
+        if(amy_global.transfer_file_handle==AMY_TRANSFER_OUTPUT) {
             // copy block[] to amy_global.transfer_storage
             memcpy(amy_global.transfer_storage + byte_offset, output_block, bytes_to_copy);
-        } else if(amy_global.transfer_file_handle==AMY_BUS_AUDIO_IN) {
+        } else if(amy_global.transfer_file_handle==AMY_TRANSFER_AUDIO_IN) {
             // copy audio input buffer to storage
             memcpy(amy_global.transfer_storage + byte_offset, amy_in_block, bytes_to_copy);
         }

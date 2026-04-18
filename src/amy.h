@@ -93,9 +93,13 @@ extern const uint32_t pcm_wavetable_len;
 // File-streaming buffer size multiplier (in blocks).
 #define PCM_FILE_BUFFER_MULT 8
 
+// Values used to indicate nature of transfer.
+#define AMY_TRANSFER_OUTPUT 1
+#define AMY_TRANSFER_AUDIO_IN 2
 
-#define AMY_BUS_OUTPUT 1
-#define AMY_BUS_AUDIO_IN 2
+// Each bus has separate FX (EQ, chorus, reverb, echo)
+#define AMY_NUM_BUSES 4
+#define AMY_DEFAULT_BUS 0
 
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
@@ -107,7 +111,6 @@ extern const uint32_t pcm_wavetable_len;
 
 // Always use 2 channels. Clients that want mono can deinterleave
 #define AMY_NCHANS 2
-
 
 // Use dual cores on supported platforms
 #if (defined (ESP_PLATFORM) || defined (ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
@@ -356,7 +359,8 @@ enum params{
     REVERB_LIVENESS,
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
-    NO_PARAM                    // 209
+    BUS,
+    NO_PARAM                    // 210
 };
 
 ///////////////////////////////////////
@@ -515,12 +519,15 @@ typedef struct amy_event {
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
+    uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
+    //
     uint32_t sequence[3]; // tick, period, tag
     //
     uint8_t status;
     uint8_t note_source;  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
     // Global effects
+    uint8_t bus;  // Which bus this osc ends up on / Prefix for global FX params
     float echo_level;
     float echo_delay_ms;
     float echo_max_delay_ms;
@@ -534,13 +541,13 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
-    uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
     uint16_t osc; // self-reference
     // Configuration (can be fixed during oscillation)
+    uint8_t bus;  // Which bus this osc ends up on
     uint16_t wave;
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     uint8_t note_source;  // Was the most recent note on/off received e.g. from MIDI?
@@ -622,7 +629,7 @@ typedef struct delay_line {
 } delay_line_t;
 
 
-#include "delay.h"
+//#include "delay.h"
 #include "sequencer.h"
 #include "amy_midi.h"
 #include "transfer.h"
@@ -723,11 +730,27 @@ typedef struct  {
 
 } amy_config_t;
 
+typedef struct eq_state {
+    SAMPLE eq[3];
+    SAMPLE ** eq_coeffs;
+    SAMPLE *** eq_delay;
+} eq_state_t;
+
+typedef struct reverb_params {
+    SAMPLE f1state, f2state, f3state, f4state;
+    delay_line_t *delay_1, *delay_2, *delay_3, *delay_4;
+    delay_line_t *ref_1, *ref_2, *ref_3, *ref_4, *ref_5, *ref_6;
+    SAMPLE lpfcoef;
+    SAMPLE lpfgain;
+    SAMPLE liveness;
+} reverb_params_t;
+
 typedef struct reverb_state {
     SAMPLE level;
     float liveness;
     float damping;
     float xover_hz;
+    reverb_params_t *rev;
 } reverb_state_t;
 
 typedef struct chorus_config {
@@ -735,6 +758,8 @@ typedef struct chorus_config {
     int32_t max_delay;    // Max delay when modulating.  Must be <= DELAY_LINE_LEN
     float lfo_freq;
     float depth;
+    delay_line_t *chorus_delay_lines[AMY_MAX_CHANNELS];
+    SAMPLE *delay_mod;
 } chorus_config_t;
 
 typedef struct echo_config {
@@ -743,8 +768,19 @@ typedef struct echo_config {
     uint32_t max_delay_samples;  // Maximum delay, i.e. size of allocated delay line.
     SAMPLE feedback;  // Gain applied when feeding back output to input.
     SAMPLE filter_coef;  // Echo is filtered by a two-point normalize IIR.  This is the real pole location.
+    delay_line_t *echo_delay_lines[AMY_MAX_CHANNELS];
 } echo_config_t;
 
+
+// Per-bus parameters
+struct bus_state {
+    // State of fixed dc-blocking HPF
+    SAMPLE hpf_state;
+    eq_state_t eq;
+    reverb_state_t reverb;
+    chorus_config_t chorus;
+    echo_config_t echo;
+};
 
 // global synth state
 struct state {
@@ -752,10 +788,8 @@ struct state {
     uint8_t running;
     uint8_t i2s_is_in_background;  // Flag not to handle I2S in amy_update.
     float volume;
-    float pitch_bend;
-    // State of fixed dc-blocking HPF
-    SAMPLE hpf_state;
-    SAMPLE eq[3];
+    float pitch_bend;  // Legacy global pitch bend, will be subsumed per-synth (instrument).
+    
     uint16_t delta_qsize;
     struct delta * delta_queue; // start of the sorted queue of deltas to execute.
     int16_t latency_ms;
@@ -764,10 +798,6 @@ struct state {
     float time;
     uint8_t debug_flag;
     
-    reverb_state_t reverb;
-    chorus_config_t chorus;
-    echo_config_t echo;
-
     // Transfer
     uint8_t transfer_flag;
     uint8_t * transfer_storage;
@@ -782,6 +812,11 @@ struct state {
     uint32_t us_per_tick;
     sequence_entry_ll_t * sequence_entry_ll_start;
 
+    // Buses
+    struct bus_state *bus[AMY_NUM_BUSES];
+
+    // Final output mix
+    float bus_gain[AMY_NUM_BUSES];
 };
 
 
@@ -808,6 +843,7 @@ extern output_sample_type * amy_in_block;
 extern output_sample_type * amy_external_in_block;
 
 int8_t global_init(amy_config_t c);
+void global_deinit();
 void amy_deltas_reset();
 void add_delta_to_queue(struct delta *d, struct delta **queue);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
@@ -826,9 +862,9 @@ float portamento_ms_to_alpha(uint16_t portamento_ms);
 uint16_t alpha_to_portamento_ms(float alpha);
 int8_t check_init(amy_err_t (*fn)(), char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
-void config_reverb(float level, float liveness, float damping, float xover_hz);
-void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth);
-void config_echo(float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
+void config_reverb(uint8_t bus, float level, float liveness, float damping, float xover_hz);
+void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
+void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
 void osc_note_on(uint16_t osc, float initial_freq);
 void chorus_note_on(float initial_freq);
 
@@ -968,7 +1004,7 @@ extern int instruments_max_instruments();
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();
 extern void instruments_reset();
-extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags);
+extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags);
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
@@ -980,6 +1016,8 @@ extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy
 extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern uint8_t instrument_get_bus(int instrument_number);
+extern void instrument_set_bus(int instrument_number, uint8_t bus);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);
 extern bool instrument_grab_midi_notes(int instrument_number);
@@ -1031,12 +1069,12 @@ extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
 
 // filters
-extern void filters_init();
-extern void filters_deinit();
+extern void filters_init(uint8_t bus);
+extern void filters_deinit(uint8_t bus);
 extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
-extern void parametric_eq_process(SAMPLE *block);
+extern void parametric_eq_process(uint8_t bus, SAMPLE *block);
 extern void reset_filter(uint16_t osc);
-extern void reset_parametric(void);
+extern void reset_parametric(uint8_t bus);
 extern float dsps_sqrtf_f32_ansi(float f);
 extern int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor);
 extern int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w);

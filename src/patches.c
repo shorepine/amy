@@ -568,29 +568,30 @@ float lin_to_db(float lin) {
 
 void set_event_for_global_fx(amy_event *event, struct state *state) {
     // Always emit all FX fields so saved patches are fully self-describing.
+    uint8_t bus = 0;  // FIXME - identify the actual bus.
     // Volume
     event->volume = state->volume;
     // EQ
-    event->eq_l = lin_to_db(S2F(state->eq[0]));
-    event->eq_m = lin_to_db(S2F(state->eq[1]));
-    event->eq_h = lin_to_db(S2F(state->eq[2]));
+    event->eq_l = lin_to_db(S2F(state->bus[bus]->eq.eq[0]));
+    event->eq_m = lin_to_db(S2F(state->bus[bus]->eq.eq[1]));
+    event->eq_h = lin_to_db(S2F(state->bus[bus]->eq.eq[2]));
     // Reverb
-    event->reverb_level = S2F(state->reverb.level);
-    event->reverb_liveness = state->reverb.liveness;
-    event->reverb_damping = state->reverb.damping;
-    event->reverb_xover_hz = state->reverb.xover_hz;
+    event->reverb_level = S2F(state->bus[bus]->reverb.level);
+    event->reverb_liveness = state->bus[bus]->reverb.liveness;
+    event->reverb_damping = state->bus[bus]->reverb.damping;
+    event->reverb_xover_hz = state->bus[bus]->reverb.xover_hz;
     // Chorus
-    event->chorus_level = S2F(state->chorus.level);
-    event->chorus_max_delay = state->chorus.max_delay;
-    event->chorus_lfo_freq = state->chorus.lfo_freq;
-    event->chorus_depth = state->chorus.depth;
+    event->chorus_level = S2F(state->bus[bus]->chorus.level);
+    event->chorus_max_delay = state->bus[bus]->chorus.max_delay;
+    event->chorus_lfo_freq = state->bus[bus]->chorus.lfo_freq;
+    event->chorus_depth = state->bus[bus]->chorus.depth;
     // Echo
-    event->echo_level = S2F(state->echo.level);
-    event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    if (state->echo.max_delay_samples != 65536)
-        event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    event->echo_feedback = S2F(state->echo.feedback);
-    event->echo_filter_coef = S2F(state->echo.filter_coef);
+    event->echo_level = S2F(state->bus[bus]->echo.level);
+    event->echo_delay_ms = state->bus[bus]->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    if (state->bus[bus]->echo.max_delay_samples != 65536)
+        event->echo_max_delay_ms = state->bus[bus]->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    event->echo_feedback = S2F(state->bus[bus]->echo.feedback);
+    event->echo_filter_coef = S2F(state->bus[bus]->echo.filter_coef);
 }
 
 
@@ -966,6 +967,8 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     AMY_UNSET(e->synth);
+    // Set the bus for the instrument, but also for each osc of each voice, below.
+    if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // for each voice, send the event to the base osc (+ e->osc if given)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
@@ -1192,7 +1195,9 @@ void patches_load_patch(amy_event *e) {
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
-        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, flags);
+        uint8_t bus = 0;
+        if (AMY_IS_SET(e->bus)) bus = e->bus;
+        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
     }
 
 }
