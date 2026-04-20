@@ -297,30 +297,32 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
     //fprintf(stderr, "config_chorus: osc %d level %.3f max_del %d lfo_freq %.3f depth %.3f\n",
     //        CHORUS_MOD_SOURCE + bus, level, max_delay, lfo_freq, depth);
     if (level > 0) {
-        ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL);
         // only allocate delay lines if chorus is more than inaudible.
         if (amy_global.bus[bus]->chorus.chorus_delay_lines[0] == NULL) {
             alloc_chorus_delay_lines(bus);
-        }
-        // if we're turning on for the first time, start the oscillator.
-        if (synth[CHORUS_MOD_SOURCE + bus]->status == SYNTH_OFF) {  //chorus.level == 0) {
-            // Setup chorus oscillator.
-            synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
-            synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
-            synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
-            synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_CONST] = depth;
-            synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_VEL] = 0;  // Turn off default.
-            synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_EG0] = 0;  // Turn off default.
-            synth[CHORUS_MOD_SOURCE + bus]->wave = TRIANGLE;
-            osc_note_on(CHORUS_MOD_SOURCE + bus, freq_of_logfreq(synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_CONST]));
-            // Stop us from doing this again.
-            synth[CHORUS_MOD_SOURCE + bus]->status = SYNTH_IS_MOD_SOURCE;
         }
         // apply max_delay.
         for (int chan=0; chan<AMY_NCHANS; ++chan) {
             //chorus_delay_lines[chan]->max_delay = max_delay;
             amy_global.bus[bus]->chorus.chorus_delay_lines[chan]->fixed_delay = (int)max_delay / 2;
         }
+        // Configure the LFO osc.
+        ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL);
+        // if we're turning on for the first time, start the oscillator.
+        if (synth[CHORUS_MOD_SOURCE + bus]->status == SYNTH_OFF) {  //chorus.level == 0) {
+            // Setup chorus oscillator.
+            synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_VEL] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_EG0] = 0;  // Turn off default.
+            synth[CHORUS_MOD_SOURCE + bus]->wave = TRIANGLE;
+            osc_note_on(CHORUS_MOD_SOURCE + bus, lfo_freq);
+            // Stop us from doing this again.
+            synth[CHORUS_MOD_SOURCE + bus]->status = SYNTH_IS_MOD_SOURCE;
+        }
+        // apply depth, lfo_freq
+        synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_CONST] = depth;
+        synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_CONST] = logfreq_of_freq(lfo_freq);
     }
     amy_global.bus[bus]->chorus.max_delay = max_delay;
     amy_global.bus[bus]->chorus.level = F2S(level);
