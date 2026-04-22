@@ -350,7 +350,7 @@ void config_reverb(float level, float liveness, float damping, float xover_hz) {
 }
 
 
-int8_t check_init(amy_err_t (*fn)(), char *name) {
+int8_t check_init(amy_err_t (*fn)(), const char *name) {
     //fprintf(stderr,"starting %s: ", name);
     const amy_err_t ret = (*fn)();
     if(ret != AMY_OK) {
@@ -371,7 +371,7 @@ uint8_t *get_sp() {
     //return NULL;
 }
 
-int peek_stack(char *tag) {
+int peek_stack(const char *tag) {
     if (stack_baseline == NULL) {
         stack_baseline = get_sp();
     }
@@ -382,7 +382,7 @@ int peek_stack(char *tag) {
 
 #else  // !DEBUG_STACK
 
-int peek_stack(char *tag)  { return 0; }
+int peek_stack(const char *tag)  { return 0; }
 
 #endif
 
