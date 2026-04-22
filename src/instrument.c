@@ -105,6 +105,7 @@ struct instrument_info {
     uint8_t num_voices;
     uint8_t oscs_per_voice; // How many oscs each voice uses.  Stored for convenience.
     uint8_t id;             // synth number assigned by client.
+    uint8_t bus;            // which bus this instrument ends up on.
     uint16_t patch_number;  // What patch this instrument is currently set to.  Stored for convenience.
     int16_t bank_number;    // Optional top-7-bit word of Program, set by MIDI CC 0 (-1 if not set).
     uint32_t flags;         // Bitmask of special instrument properties (for MIDI Drums translation).
@@ -124,8 +125,8 @@ struct instrument_info {
 };
 
 void instrument_debug(struct instrument_info *instrument) {
-    fprintf(stderr, "**instrument 0x%lx id %d num_voices %d patch %d oscs %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
-            (unsigned long)instrument, instrument->id, instrument->num_voices, instrument->patch_number, instrument->oscs_per_voice, instrument->bank_number, instrument->flags,
+    fprintf(stderr, "**instrument 0x%lx id %d bus %d num_voices %d patch %d oscs %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
+            (unsigned long)instrument, instrument->id, instrument->bus, instrument->num_voices, instrument->patch_number, instrument->oscs_per_voice, instrument->bank_number, instrument->flags,
             instrument->noteon_delay_ms, instrument->in_sustain, instrument->grab_midi_notes);
     for (int i = 0; i < instrument->num_voices; ++i)
         fprintf(stderr, "voice %d amy_voice %d note_per_voice %d pending_release %d\n",
@@ -147,7 +148,7 @@ void _instrument_reset_forgotten_pool(struct instrument_info *instrument) {
     }
 }
 
-struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags) {
+struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     instrument->id = id;
     if (num_voices <= 0 || num_voices > MAX_VOICES_PER_INSTRUMENT) {
@@ -159,6 +160,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
     instrument->patch_number = patch_number;
     instrument->oscs_per_voice = oscs_per_voice;
     instrument->bank_number = -1;
+    instrument->bus = bus;
     instrument->flags = flags;
     instrument->noteon_delay_ms = 0;
     instrument->in_sustain = false;
@@ -358,12 +360,12 @@ bool instrument_number_exists(int instrument_number, char *tag) {
     return false;
 }
 
-void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint32_t flags) {
+void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags) {
     if (!instrument_number_ok(instrument_number, "add_new")) return;
     if(instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
     }
-    instruments[instrument_number] = instrument_init(instrument_number, num_voices, amy_voices, patch_number, oscs_per_voice, flags);
+    instruments[instrument_number] = instrument_init(instrument_number, num_voices, amy_voices, patch_number, oscs_per_voice, bus, flags);
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
@@ -443,6 +445,18 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
             ++num_voices_turned_off;
         }
     return num_voices_turned_off;
+}
+
+uint8_t instrument_get_bus(int instrument_number) {
+    if (!instrument_number_exists(instrument_number, "get_bus")) return -1;
+    struct instrument_info *instrument = instruments[instrument_number];
+    return instrument->bus;
+}
+
+void instrument_set_bus(int instrument_number, uint8_t bus) {
+    if (!instrument_number_exists(instrument_number, "set_bus")) return;
+    struct instrument_info *instrument = instruments[instrument_number];
+    instrument->bus = bus;
 }
 
 int instrument_get_patch_number(int instrument_number) {
