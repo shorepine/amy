@@ -687,7 +687,7 @@ typedef struct  {
     void (*amy_external_block_done_hook)(void);
     void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
     void (*amy_external_sequencer_hook)(uint32_t tick_count);
-    uint32_t (*amy_external_fopen_hook)(char *filename, char *mode);
+    uint32_t (*amy_external_fopen_hook)(char *filename, const char *mode);
     uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
     uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
     void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
@@ -824,7 +824,7 @@ float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
 float portamento_ms_to_alpha(uint16_t portamento_ms);
 uint16_t alpha_to_portamento_ms(float alpha);
-int8_t check_init(amy_err_t (*fn)(), char *name);
+int8_t check_init(amy_err_t (*fn)(), const char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
 void config_reverb(float level, float liveness, float damping, float xover_hz);
 void config_chorus(float level, uint16_t max_delay, float lfo_freq, float depth);
@@ -973,7 +973,7 @@ extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
 #define _INSTRUMENT_NO_VOICE (255)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
-extern bool instrument_number_exists(int instrument_number, char *tag);
+extern bool instrument_number_exists(int instrument_number, const char *tag);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 extern int instrument_all_notes_off(int instrument_number, uint16_t *amy_voices);
 extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices);
@@ -1076,6 +1076,6 @@ extern void delta_release_list(struct delta *d);  // releases a whole list of de
 extern int32_t delta_list_len(struct delta *d);
 extern int32_t delta_num_free();  // The size of the remaining pool.
 
-extern int peek_stack(char *tag);
+extern int peek_stack(const char *tag);
 
 #endif
