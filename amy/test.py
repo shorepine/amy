@@ -1049,6 +1049,18 @@ class TestDiskSampleStereo(AmyTest):
     amy.send(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
 
 
+class TestLoadSample(AmyTest):
+  """amy.load_sample streams base64 chunks via send_raw -> amy_add_message
+  (no sysex flag). Regression coverage for the parse.c transfer-routing
+  guard: AUDIO transfers must route to parse_transfer_message even when
+  amy_parsing_from_sysex is false, otherwise every chunk gets dropped as
+  an "Unrecognized transfer-level command"."""
+
+  def run(self):
+    amy.load_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+
+
 class TestSample(AmyTest):
 
   def run(self):
