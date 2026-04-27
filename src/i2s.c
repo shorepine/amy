@@ -5,8 +5,8 @@
 // rp2350, rp2040
 // teensy 3.6, 4.0, 4.1
 
-// Only run this code on MCUs
-#if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO) || defined(ARDUINO_ARCH_RP2350)
+// Only run this code on MCU targets with platform backends in this file.
+#if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_RP2350) || defined(ARDUINO_ARCH_SPRESENSE)
 
 #include "amy.h"
 
@@ -571,6 +571,39 @@ void amy_platform_deinit() {
     }
 #endif
     pico_teardown_i2s(&amy_global.config);
+}
+
+
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+
+// Spresense analog output backend is implemented in C++.
+extern void spresense_setup_audio(amy_config_t *config);
+extern void spresense_teardown_audio(amy_config_t *config);
+extern size_t spresense_audio_write(const uint8_t *buffer, size_t nbytes);
+
+void amy_platform_init() {
+    if (AMY_HAS_SPRESENSE_AUDIO) {
+        spresense_setup_audio(&amy_global.config);
+    }
+}
+
+void amy_platform_deinit() {
+    if (AMY_HAS_SPRESENSE_AUDIO) {
+        spresense_teardown_audio(&amy_global.config);
+    }
+}
+
+void amy_update_tasks() {
+    amy_execute_deltas();
+}
+
+int16_t *amy_render_audio() {
+    amy_render(0, AMY_OSCS, 0);
+    return amy_fill_buffer();
+}
+
+size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
+    return spresense_audio_write(buffer, nbytes);
 }
 
 

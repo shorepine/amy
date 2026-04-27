@@ -72,6 +72,8 @@ extern const uint32_t pcm_wavetable_len;
 
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+#define AMY_SAMPLE_RATE 48000
 #elif defined __EMSCRIPTEN__
 #define AMY_SAMPLE_RATE 48000
 #else
@@ -121,6 +123,8 @@ extern const uint32_t pcm_wavetable_len;
 #define AMY_HAS_REVERB (amy_global.config.features.reverb)
 #define AMY_HAS_AUDIO_IN (amy_global.config.features.audio_in)
 #define AMY_HAS_I2S (amy_global.config.audio == AMY_AUDIO_IS_I2S)
+#define AMY_HAS_SPRESENSE_AUDIO (amy_global.config.audio == AMY_AUDIO_IS_SPRESENSE)
+#define AMY_HAS_PLATFORM_AUDIO_OUT (AMY_HAS_I2S || AMY_HAS_SPRESENSE_AUDIO)
 #define AMY_HAS_DEFAULT_SYNTHS (amy_global.config.features.default_synths)
 #define AMY_HAS_CHORUS (amy_global.config.features.chorus)
 #define AMY_HAS_ECHO (amy_global.config.features.echo)
@@ -313,7 +317,7 @@ typedef int amy_err_t;
 
 #include "amy_fixedpoint.h"
 
-#if defined ARDUINO && !defined TLONG && !defined ESP_PLATFORM
+#if defined ARDUINO && !defined TLONG && !defined ESP_PLATFORM && !defined(ARDUINO_ARCH_SPRESENSE)
 #include "avr/pgmspace.h" // for PROGMEM, DMAMEM, FASTRUN
 #else
 #define PROGMEM 
@@ -634,6 +638,13 @@ typedef struct delay_line {
 #define AMY_AUDIO_IS_I2S 0x01
 #define AMY_AUDIO_IS_USB_GADGET 0x02
 #define AMY_AUDIO_IS_MINIAUDIO 0x04
+#define AMY_AUDIO_IS_SPRESENSE 0x08
+
+#if defined(ARDUINO_ARCH_SPRESENSE)
+// Spresense audio output device selection
+#define SPRESENSE_OUTPUT_ANALOG 0
+#define SPRESENSE_OUTPUT_I2S 1
+#endif
 
 #define AMY_MIDI_IS_NONE 0x0
 #define AMY_MIDI_IS_UART 0x01
@@ -720,6 +731,11 @@ typedef struct  {
     // device ids for miniaudio platforms
     int8_t capture_device_id;
     int8_t playback_device_id;
+
+#if defined(ARDUINO_ARCH_SPRESENSE)
+    // Spresense audio output device (SPRESENSE_OUTPUT_ANALOG or SPRESENSE_OUTPUT_I2S)
+    uint8_t spresense_output_device;
+#endif
 
 } amy_config_t;
 

@@ -619,6 +619,14 @@ void stop_midi() {
 }
 #endif
 
+#if defined(ARDUINO_ARCH_SPRESENSE)
+void run_midi() {
+}
+
+void stop_midi() {
+}
+#endif
+
 
 #ifdef __linux__
 void stop_midi() {
