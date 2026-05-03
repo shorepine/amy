@@ -193,6 +193,23 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         } \
     }     \
 }
+#define _EPRINT_F_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
+    int last_set = -1; \
+    for (int i = 0; i < LEN; ++i) {    \
+        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
+    }                                              \
+    if (last_set >= 0) { \
+        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        s += strlen(s);  \
+        for (int i = 0; i <= last_set; ++i) { \
+            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (AMY_IS_SET(e->FIELD[i])) { \
+                sprintf(s, "%.3f", e->FIELD[i]); \
+                s += strlen(s); \
+            } \
+        } \
+    }     \
+}
 
 #define _EPRINT_BP(TFIELD, VFIELD, NAME, WIRECODE) {         \
     int last_set = -1;                              \
@@ -265,7 +282,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
     _EPRINT_F(trigger_phase, "phase", "P");
-    _EPRINT_F(volume, "volume", "V");  // NOT osc-dep
+    _EPRINT_F_SEQ(volume, "volume", AMY_NUM_BUSES, "V");  // NOT osc-dep
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
     _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
     _EPRINT_I(latency_ms, "latency_ms", "N");  // NOT osc-dep
@@ -351,7 +368,6 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(midi_note, MIDI_NOTE)
       _CASE_F(feedback, FEEDBACK)
       _CASE_F(trigger_phase, PHASE)
-      _CASE_F(volume, VOLUME)
       _CASE_F(pitch_bend, PITCH_BEND)
       _CASE_I(latency_ms, LATENCY)
       _CASE_F(tempo, TEMPO)
@@ -389,6 +405,10 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
       _TEST_COEFS(duty_coefs, DUTY)
       _TEST_COEFS(pan_coefs, PAN)
+      for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
+          if ((int)queue->param == (int)VOLUME_BASE + bus)
+              event->volume[bus] = queue->data.f;
+      }
       for (int i = 0; i < MAX_ALGO_OPS; ++i) {
           if ((int)queue->param == (int)ALGO_SOURCE_START + i)
               event->algo_source[i] = queue->data.i;
@@ -566,52 +586,54 @@ float lin_to_db(float lin) {
     return 20.0f * log10f(lin);
 }
 
-void set_event_for_global_fx(amy_event *event, struct state *state) {
+void set_event_for_bus_fx(amy_event *event, uint8_t bus, global_state_t *state) {
     // Always emit all FX fields so saved patches are fully self-describing.
-    // Volume
-    event->volume = state->volume;
+    // Set the bus
+    event->bus = bus;
+    // Volume for this bus alone.
+    event->volume[bus] = state->volume[bus];
     // EQ
-    event->eq_l = lin_to_db(S2F(state->eq[0]));
-    event->eq_m = lin_to_db(S2F(state->eq[1]));
-    event->eq_h = lin_to_db(S2F(state->eq[2]));
+    event->eq_l = lin_to_db(S2F(state->bus[bus]->eq.eq[0]));
+    event->eq_m = lin_to_db(S2F(state->bus[bus]->eq.eq[1]));
+    event->eq_h = lin_to_db(S2F(state->bus[bus]->eq.eq[2]));
     // Reverb
-    event->reverb_level = S2F(state->reverb.level);
-    event->reverb_liveness = state->reverb.liveness;
-    event->reverb_damping = state->reverb.damping;
-    event->reverb_xover_hz = state->reverb.xover_hz;
+    event->reverb_level = S2F(state->bus[bus]->reverb.level);
+    event->reverb_liveness = state->bus[bus]->reverb.liveness;
+    event->reverb_damping = state->bus[bus]->reverb.damping;
+    event->reverb_xover_hz = state->bus[bus]->reverb.xover_hz;
     // Chorus
-    event->chorus_level = S2F(state->chorus.level);
-    event->chorus_max_delay = state->chorus.max_delay;
-    event->chorus_lfo_freq = state->chorus.lfo_freq;
-    event->chorus_depth = state->chorus.depth;
+    event->chorus_level = S2F(state->bus[bus]->chorus.level);
+    event->chorus_max_delay = state->bus[bus]->chorus.max_delay;
+    event->chorus_lfo_freq = state->bus[bus]->chorus.lfo_freq;
+    event->chorus_depth = state->bus[bus]->chorus.depth;
     // Echo
-    event->echo_level = S2F(state->echo.level);
-    event->echo_delay_ms = state->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    if (state->echo.max_delay_samples != 65536)
-        event->echo_max_delay_ms = state->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
-    event->echo_feedback = S2F(state->echo.feedback);
-    event->echo_filter_coef = S2F(state->echo.filter_coef);
+    event->echo_level = S2F(state->bus[bus]->echo.level);
+    event->echo_delay_ms = state->bus[bus]->echo.delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    if (state->bus[bus]->echo.max_delay_samples != (uint32_t)(ECHO_DEFAULT_MAX_DELAY_MS / 1000.f * AMY_SAMPLE_RATE))
+        event->echo_max_delay_ms = state->bus[bus]->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
+    event->echo_feedback = S2F(state->bus[bus]->echo.feedback);
+    event->echo_filter_coef = S2F(state->bus[bus]->echo.filter_coef);
 }
 
 
-void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state) {
+void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool include_fx, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
    // Find oscs for synth.
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-    int num_voices = instrument_get_num_voices(synth, voices);
+    int num_voices = instrument_get_num_voices(instr_num, voices);
     if (num_voices < 1) {
-        fprintf(stderr, "yield_synth_events: synth %" PRId32" has no voices.\n", (int32_t)synth);
+        fprintf(stderr, "yield_synth_events: synth %" PRId32" has no voices.\n", (int32_t)instr_num);
         return NULL;  // instrument not allocated.
     }
-    uint32_t flags = instrument_get_flags(synth);
+    uint32_t flags = instrument_get_flags(instr_num);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = 0;
     while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
     // The "state" indicates which osc within the voice we're going to report for.
     int state_val = (intptr_t)state;
-    //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", synth, voice, num_oscs, (int)state_val);
+    //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", instr_num, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
     int first_osc_state_val = 0;
     int last_osc_state_val = num_oscs;
@@ -628,8 +650,9 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx
         //    base_osc, event->osc, state_val, first_osc_state_val, last_osc_state_val);
         set_event_for_osc(base_osc, event->osc, event);
     } else if (include_fx && (state_val == last_osc_state_val)) {
-        // optional final event contains the global settings (volume, eq, chorus, echo, reverb).
-        set_event_for_global_fx(event, &amy_global);
+        // optional final event contains the global/bus settings (volume, eq, chorus, echo, reverb).
+        // The bus is determined by the bus value on the base_osc, probably OK.
+        set_event_for_bus_fx(event, synth[base_osc]->bus, &amy_global);
     }
     ++state_val;
     if (state_val == last_osc_state_val + (include_fx ? 1 : 0))  state_val = 0;  // Indicate this is the final event.
@@ -637,14 +660,14 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx
 }
 
 #define STATE_START_OF_MIDI 1024
-void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state) {
+void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_fx, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
     int state_val = (intptr_t)state;
-    //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", synth, state_val);
+    //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", instr_num, state_val);
     s[0] = '\0';  // By default, return an empty string.
     if (state_val < STATE_START_OF_MIDI) {
         amy_event event = amy_default_event();
-        state_val = (intptr_t)yield_synth_events(synth, &event, include_fx, (void *)(intptr_t)state_val);
+        state_val = (intptr_t)yield_synth_events(instr_num, &event, include_fx, (void *)(intptr_t)state_val);
         sprint_event(&event, s, len, /* wirecode= */ true);
         if (state_val == 0) {
             // Push the state machine on to the MIDI codes
@@ -654,7 +677,7 @@ void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, 
         // MIDI CC part
         bool found = false;
         for (int next_midi_code = state_val - STATE_START_OF_MIDI; next_midi_code < 128; ++next_midi_code) {
-            if (midi_fetch_control_code_command(synth, next_midi_code, s, len) == true) {
+            if (midi_fetch_control_code_command(instr_num, next_midi_code, s, len) == true) {
                 state_val = STATE_START_OF_MIDI + next_midi_code + 1;
                 found = true;
                 break;
@@ -966,6 +989,8 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     AMY_UNSET(e->synth);
+    // Set the bus for the instrument, but also for each osc of each voice, below.
+    if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // for each voice, send the event to the base osc (+ e->osc if given)
     for(uint8_t i=0;i<num_voices;i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
@@ -1192,7 +1217,9 @@ void patches_load_patch(amy_event *e) {
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
-        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, flags);
+        uint8_t bus = 0;
+        if (AMY_IS_SET(e->bus)) bus = e->bus;
+        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
     }
 
 }

@@ -341,13 +341,14 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     }
     char cmd = message[0];
     message++;
-    if (cmd == 'p')  e->pedal = atoi(message);
+    if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'f')  e->synth_flags = atoi(message);
-    else if (cmd == 'v')  e->num_voices = atoi(message);
-    else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
-    else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
+    else if (cmd == 'p')  e->pedal = atoi(message);
+    else if (cmd == 't')  e->to_synth = atoi(message);
+    else if (cmd == 'v')  e->num_voices = atoi(message);
+    else if (cmd == 'y')  e->bus = atoi(message);  // 'i1iy1' is the same as 'i1y1'.
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
         // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
@@ -607,7 +608,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'H': parse_list_uint32_t(arg, e->sequence, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
                 float reverb_params[4];
-                parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(amy_global.reverb.liveness));
+                parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(e->reverb_level));
                 e->reverb_level = reverb_params[0];
                 e->reverb_liveness = reverb_params[1];
                 e->reverb_damping = reverb_params[2];
@@ -618,7 +619,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atof(arg); break;
-            /* j, J available */
+            /* J available */
             // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
                 float chorus_params[4];
@@ -681,7 +682,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
-            case 'V': e->volume = atoff(arg); break;
+            case 'V': parse_list_float(arg, e->volume, AMY_NUM_BUSES, AMY_UNSET_VALUE(e->volume[0])); break;
             case 'w': e->wave=atoi(arg); break;
             /* W used by Tulip for CV, external_channel */
             case 'X': e->eg_type[1] = atoi(arg); break;
@@ -693,11 +694,12 @@ int amy_parse_message(char * message, int length, amy_event *e) {
                   e->eq_h = eq[2];
                 }
                 break;
+            case 'y': e->bus = atoi(arg); break;
+            /* Y still available */
             case 'z': {
                 pos += amy_parse_transfer_layer_message(arg);
                 break;
             }
-            /* Y,y available */
             /* Z used for end of message */
             case 'Z':
 	      ++pos;
