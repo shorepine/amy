@@ -23,7 +23,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: pip install numpy scipy
+      run: pip install numpy soundfile
 
     - name: Build and test
       env:
