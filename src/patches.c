@@ -653,8 +653,9 @@ void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, 
     } else {
         // MIDI CC part
         bool found = false;
+        int type = MIDI_MAP_TYPE_CC;
         for (int next_midi_code = state_val - STATE_START_OF_MIDI; next_midi_code < 128; ++next_midi_code) {
-            if (midi_fetch_control_code_command(synth, next_midi_code, s, len) == true) {
+            if (midi_fetch_mapping_command(synth, type, next_midi_code, s, len) == true) {
                 state_val = STATE_START_OF_MIDI + next_midi_code + 1;
                 found = true;
                 break;
@@ -1030,8 +1031,9 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
             instrument_release(e->synth);
             // Delete the instrument number so we don't forward the 'rest' of the event to it.
             AMY_UNSET(e->synth);
-            // Clear all the midi control code mappings.
-            midi_clear_channel_mappings(e->synth);
+            // Clear all the midi mappings.
+            int type = MIDI_MAP_TYPE_ANY;
+            midi_clear_channel_mappings(e->synth, type);
             return 0;
         }
         //fprintf(stderr, "Allocated %d voices to instrument %d\n", num_voices, e->synth);

@@ -1023,7 +1023,7 @@ void show_debug(uint8_t type) {
             patches_debug();
         }
         if (type > 5) {
-            cc_mapping_debug();
+            midi_mapping_debug();
         }
         if (type > 6) {
             for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
