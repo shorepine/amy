@@ -10,10 +10,6 @@
 
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
-SAMPLE ** eq_coeffs;
-SAMPLE *** eq_delay;
-
-
 #ifdef __GNUC__
 #pragma GCC diagnostic push                             // save the actual diag context
 #pragma GCC diagnostic ignored "-Wuninitialized"  // disable maybe warnings
@@ -465,7 +461,9 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
-void filters_deinit() {
+void filters_deinit(uint8_t bus) {
+    SAMPLE **eq_coeffs = amy_global.bus[bus]->eq.eq_coeffs;
+    SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
         for(uint16_t j=0;j<3;j++) free(eq_delay[i][j]);
         free(eq_delay[i]);
@@ -473,31 +471,35 @@ void filters_deinit() {
     for(uint16_t i=0;i<3;i++) free(eq_coeffs[i]);
     free(eq_coeffs);
     free(eq_delay);
+    amy_global.bus[bus]->eq.eq_coeffs = NULL;
+    amy_global.bus[bus]->eq.eq_delay = NULL;
 }
 
 
-void filters_init() {
-    eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
-    eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, amy_global.config.ram_caps_fbl);
+void filters_init(uint8_t bus) {
+    SAMPLE ***p_eq_coeffs = &amy_global.bus[bus]->eq.eq_coeffs;
+    SAMPLE ****p_eq_delay = &amy_global.bus[bus]->eq.eq_delay;
+    *p_eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
+    *p_eq_delay = malloc_caps(sizeof(SAMPLE**)*AMY_NCHANS, amy_global.config.ram_caps_fbl);
     for(uint16_t i=0;i<3;i++) {
-        eq_coeffs[i] = malloc_caps(sizeof(SAMPLE) * 5, amy_global.config.ram_caps_fbl);
+        (*p_eq_coeffs)[i] = malloc_caps(sizeof(SAMPLE) * 5, amy_global.config.ram_caps_fbl);
     }
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
-        eq_delay[i] = malloc_caps(sizeof(SAMPLE*) * 3, amy_global.config.ram_caps_fbl);
+        (*p_eq_delay)[i] = malloc_caps(sizeof(SAMPLE*) * 3, amy_global.config.ram_caps_fbl);
         for(uint16_t j=0;j<3;j++) {
-            eq_delay[i][j] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, amy_global.config.ram_caps_fbl);
+            (*p_eq_delay)[i][j] = malloc_caps(sizeof(SAMPLE) * FILT_NUM_DELAYS, amy_global.config.ram_caps_fbl);
 
         }
     }
 
     // update the parametric filters 
-    dsps_biquad_gen_lpf_f32(eq_coeffs[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
-    dsps_biquad_gen_bpf_f32(eq_coeffs[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
-    dsps_biquad_gen_hpf_f32(eq_coeffs[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
+    dsps_biquad_gen_lpf_f32((*p_eq_coeffs)[0], EQ_CENTER_LOW /(float)AMY_SAMPLE_RATE, 0.707);
+    dsps_biquad_gen_bpf_f32((*p_eq_coeffs)[1], EQ_CENTER_MED /(float)AMY_SAMPLE_RATE, 1.000);
+    dsps_biquad_gen_hpf_f32((*p_eq_coeffs)[2], EQ_CENTER_HIGH/(float)AMY_SAMPLE_RATE, 0.707);
     for (int c = 0; c < AMY_NCHANS; ++c) {
         for (int b = 0; b < 3; ++b) {
             for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
-                eq_delay[c][b][d] = 0;
+                (*p_eq_delay)[c][b][d] = 0;
             }
         }
     }
@@ -507,80 +509,6 @@ void filters_init() {
 #define FILT_MUL_SS_EQ(a, b) top16SMUL(a, b)
 //#define FILT_MUL_SS_EQ(a, b) SMULR6(a, b)
 
-void parametric_eq_process_old(SAMPLE *block);
-void parametric_eq_process_full(SAMPLE *block);
-void parametric_eq_process_top16block(SAMPLE *block);
-
-void parametric_eq_process(SAMPLE *block) {
-    //parametric_eq_process_full(block);
-    parametric_eq_process_top16block(block);
-}
-
-void parametric_eq_process_old(SAMPLE *block) {
-    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
-
-    SAMPLE output[2][AMY_BLOCK_SIZE];
-    for(int c = 0; c < AMY_NCHANS; ++c) {
-        SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
-        dsps_biquad_f32_ansi(cblock, output[0], AMY_BLOCK_SIZE, eq_coeffs[0], eq_delay[c][0]);
-        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[1], eq_delay[c][1]);
-        for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            output[0][i] = FILT_MUL_SS_EQ(output[0][i], amy_global.eq[0]) - FILT_MUL_SS_EQ(output[1][i], amy_global.eq[1]);
-        dsps_biquad_f32_ansi(cblock, output[1], AMY_BLOCK_SIZE, eq_coeffs[2], eq_delay[c][2]);
-        for(int i = 0; i < AMY_BLOCK_SIZE; ++i)
-            cblock[i] = output[0][i] + FILT_MUL_SS_EQ(output[1][i], amy_global.eq[2]);
-    }
-    AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
-
-}
-
-void parametric_eq_process_full(SAMPLE *block) {
-    // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
-    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
-
-    for(int c = 0; c < AMY_NCHANS; ++c) {
-        SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
-        // Zeros then poles - Direct Form I
-        // We need 2 memories for input, and 2 for output.
-        SAMPLE x1 = eq_delay[c][0][0];
-        SAMPLE x2 = eq_delay[c][0][1];
-        SAMPLE y01 = eq_delay[c][0][2];
-        SAMPLE y02 = eq_delay[c][0][3];
-        SAMPLE y11 = eq_delay[c][1][2];
-        SAMPLE y12 = eq_delay[c][1][3];
-        SAMPLE y21 = eq_delay[c][2][2];
-        SAMPLE y22 = eq_delay[c][2][3];
-        for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
-            SAMPLE x0 = SHIFTL(cblock[i], FILTER_BIQUAD_SCALEUP_BITS);
-            SAMPLE w00 = FILT_MUL_SS_EQ(eq_coeffs[0][0], x0) + FILT_MUL_SS_EQ(eq_coeffs[0][1], x1) + FILT_MUL_SS(eq_coeffs[0][2], x2);
-            SAMPLE y00 = w00 - FILT_MUL_SS_EQ(eq_coeffs[0][3], y01) - FILT_MUL_SS_EQ(eq_coeffs[0][4], y02);
-            SAMPLE w10 = FILT_MUL_SS_EQ(eq_coeffs[1][0], x0) + FILT_MUL_SS_EQ(eq_coeffs[1][1], x1) + FILT_MUL_SS_EQ(eq_coeffs[1][2], x2);
-            SAMPLE y10 = w10 - FILT_MUL_SS_EQ(eq_coeffs[1][3], y11) - FILT_MUL_SS_EQ(eq_coeffs[1][4], y12);
-            SAMPLE w20 = FILT_MUL_SS_EQ(eq_coeffs[2][0], x0) + FILT_MUL_SS_EQ(eq_coeffs[2][1], x1) + FILT_MUL_SS_EQ(eq_coeffs[2][2], x2);
-            SAMPLE y20 = w20 - FILT_MUL_SS_EQ(eq_coeffs[2][3], y21) - FILT_MUL_SS_EQ(eq_coeffs[2][4], y22);
-            x2 = x1;
-            x1 = x0;
-            y02 = y01;
-            y01 = y00;
-            y12 = y11;
-            y11 = y10;
-            y22 = y21;
-            y21 = y20;
-            cblock[i] = SHIFTR(FILT_MUL_SS_EQ(y00, amy_global.eq[0]) - FILT_MUL_SS_EQ(y10, amy_global.eq[1]) + FILT_MUL_SS_EQ(y20, amy_global.eq[2]), FILTER_BIQUAD_SCALEUP_BITS);
-        }
-        eq_delay[c][0][0] = x1;
-        eq_delay[c][0][1] = x2;
-        eq_delay[c][0][2] = y01;
-        eq_delay[c][0][3] = y02;
-        eq_delay[c][1][2] = y11;
-        eq_delay[c][1][3] = y12;
-        eq_delay[c][2][2] = y21;
-        eq_delay[c][2][3] = y22;
-    }
-    AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
-
-}
-
 inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
     if (a < 0) a = -a;
     if (b < 0) b = -b;
@@ -588,10 +516,13 @@ inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
     return b;
 }
 
-void parametric_eq_process_top16block(SAMPLE *block) {
+void parametric_eq_process(uint8_t bus, SAMPLE *block) {
+    // was void parametric_eq_process_top16block
     // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
     AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
-
+    SAMPLE **eq_coeffs = amy_global.bus[bus]->eq.eq_coeffs;
+    SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
+        
     for(int c = 0; c < AMY_NCHANS; ++c) {
         SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
         // Zeros then poles - Direct Form I
@@ -609,13 +540,13 @@ void parametric_eq_process_top16block(SAMPLE *block) {
         int c20bits, c23bits, c24bits;
         // int c21bits, c22bits, c11bits, c12bits, c01bits, c02bits;
         // Fold the global EQ parameters into the forward-gains of each stage.
-        SAMPLE c00 = top16SMUL_a_part(top16SMUL(amy_global.eq[0], eq_coeffs[0][0]), &c00bits);
+        SAMPLE c00 = top16SMUL_a_part(top16SMUL(amy_global.bus[bus]->eq.eq[0], eq_coeffs[0][0]), &c00bits);
         SAMPLE c03 = top16SMUL_a_part(eq_coeffs[0][3], &c03bits);
         SAMPLE c04 = top16SMUL_a_part(eq_coeffs[0][4], &c04bits);
-        SAMPLE c10 = top16SMUL_a_part(top16SMUL(amy_global.eq[1], eq_coeffs[1][0]), &c10bits);
+        SAMPLE c10 = top16SMUL_a_part(top16SMUL(amy_global.bus[bus]->eq.eq[1], eq_coeffs[1][0]), &c10bits);
         SAMPLE c13 = top16SMUL_a_part(eq_coeffs[1][3], &c13bits);
         SAMPLE c14 = top16SMUL_a_part(eq_coeffs[1][4], &c14bits);
-        SAMPLE c20 = top16SMUL_a_part(top16SMUL(amy_global.eq[2], eq_coeffs[2][0]), &c20bits);
+        SAMPLE c20 = top16SMUL_a_part(top16SMUL(amy_global.bus[bus]->eq.eq[2], eq_coeffs[2][0]), &c20bits);
         SAMPLE c23 = top16SMUL_a_part(eq_coeffs[2][3], &c23bits);
         SAMPLE c24 = top16SMUL_a_part(eq_coeffs[2][4], &c24bits);
         for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
@@ -841,7 +772,8 @@ void reset_filter(uint16_t osc) {
 }
 
 
-void reset_parametric(void) {
+void reset_parametric(uint8_t bus) {
+    SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
     for (int c = 0; c < AMY_NCHANS; ++c) {
         for (int b = 0; b < 3; ++b) {
             for (int d = 0; d < FILT_NUM_DELAYS; ++d) {
