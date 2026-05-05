@@ -1,8 +1,10 @@
 # headers.py
 # Generate headers for AMY
+import os
 import sys
 import glob
 import numpy as np
+import soundfile as sf
 import amy
 
 from . import constants
@@ -12,7 +14,7 @@ def _read_wavetables(wavetable_files):
     wavetable_len = None
     for wavfile in wavetable_files:
         with open(wavfile, 'rb') as f:
-            samplerate, wav_data = wav.read(f)
+            wav_data, samplerate = sf.read(f, dtype='int16')
         if getattr(wav_data, "ndim", 1) != 1:
             raise ValueError(f"{wavfile} is not mono")
         wav_data = wav_data.astype(np.int16)
@@ -516,9 +518,6 @@ def make_interp_partials(filename, data_dict):
 
     print("wrote", filename)
 
-
-import scipy.io.wavfile as wav
-import os
 
 """
     Generate all the headers except for the partials headers
