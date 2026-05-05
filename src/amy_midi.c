@@ -72,30 +72,6 @@ void amy_send_midi_note_off(uint16_t osc) {
     }
 }
 
-// Given a MIDI note on IN, create a AMY message on that instrument and play it
-void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
-    if (!instrument_grab_midi_notes(channel)) return;
-    amy_event e = amy_default_event();
-    e.time = time;
-    e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
-    e.midi_note = note;
-    e.velocity = ((float)vel/127.0f);
-    amy_add_event(&e);
-}
-
-// Given a MIDI note off IN, create a AMY message on that instrument and play it
-void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
-    if (!instrument_grab_midi_notes(channel)) return;
-    amy_event e = amy_default_event();
-    e.time = time;
-    e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
-    e.midi_note = note;
-    e.velocity = 0;
-    amy_add_event(&e);
-}
-
 void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value, uint32_t time) {
     if (control == 0) {
         // Bank select coarse.
