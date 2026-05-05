@@ -3,4 +3,4 @@ name = "amy"
 version = "0.1.0"
 description = "AMY synthesizer"
 readme = "README.md"
-dependencies = ['numpy', 'scipy']
+dependencies = ['numpy', 'soundfile']
