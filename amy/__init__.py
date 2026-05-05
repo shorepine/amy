@@ -286,9 +286,9 @@ def show(data):
 
 # Writes a WAV file of rendered data
 def write(data, filename):
-    import scipy.io.wavfile as wav
+    import soundfile as sf
     import numpy as np
-    wav.write(filename, int(AMY_SAMPLE_RATE), (32768.0 * data).astype(np.int16))
+    sf.write(filename, (32768.0 * data).astype(np.int16), int(AMY_SAMPLE_RATE), subtype='PCM_16')
 
 # Play a rendered sound out of default sounddevice
 def play(samples):

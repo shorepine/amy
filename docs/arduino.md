@@ -2,6 +2,11 @@
 
 AMY is on the Arduino Libraries repository. Simply search for "AMY" in the Library Manager and you should find us!
 
+You can run AMY on many types of Arduino boards. The simplest way is to get our new [AMYboard](https://amyboard.com) which is only US$29 and has a lot of great built-in features. But AMY also runs great on 
+ - Any esp32, esp32-s3, esp32-p4 or esp32-c6
+ - Teensy 4.x
+ - Pi Pico RP2350 or RP2040
+
 <img src="https://github.com/shorepine/amy/raw/main/docs/arduino1.png" width="400"/>
 
 We recommend always using the latest released version in the Arduino Library Manager. 

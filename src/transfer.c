@@ -66,7 +66,7 @@ static void free_handle(uint32_t h) {
 // uint32_t (*amy_external_fread_hook)(uint32_t fptr, uint8_t * bytes, uint32_t len) = NULL;
 // void (*amy_external_fclose_hook)(uint32_t fptr) = NULL;
 
-uint32_t posix_external_fopen_hook(char * filename, char *mode) {
+uint32_t posix_external_fopen_hook(char * filename, const char *mode) {
 #ifdef __EMSCRIPTEN__
     uint32_t js_handle = EM_ASM_INT({
         if (typeof amy_shared_open === 'function') {

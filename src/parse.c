@@ -557,14 +557,20 @@ int amy_parse_message(char * message, int length, amy_event *e) {
     uint16_t pos = 0;
 
     // Check if we're in a transfer block, if so, parse it and leave this loop.
-    // ONLY route to parse_transfer_message when the data is coming from an
-    // external sysex source (amy_add_message_from_sysex), not from internal
-    // amy.send() calls made by a running sketch. Otherwise a sketch calling
-    // amy.send(note=36) during a zT transfer would get its wire command
-    // base64-decoded as file data, corrupting the transfer.
+    // FILE transfers (zT, used to write files over MIDI sysex) arrive async
+    // while a sketch may also be running, so we ONLY route them to the
+    // transfer handler when the data is sysex-originated -- otherwise a
+    // sketch calling amy.send(note=36) mid-transfer would get its wire
+    // command base64-decoded as file data and corrupt the file.
+    //
+    // AUDIO transfers (amy.load_sample / load_sample_bytes) are different:
+    // Python sends every chunk synchronously in a tight loop within the same
+    // call, so no other amy.send() can interleave. They route regardless of
+    // the sysex flag (which they don't carry, since send_raw goes through
+    // the regular wire path).
     extern bool amy_parsing_from_sysex;
-    if (amy_parsing_from_sysex &&
-        (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO)) {
+    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
+        (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE)) {
         parse_transfer_message(message, length);
         e->status = EVENT_TRANSFER_DATA;
         return length;

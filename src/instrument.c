@@ -13,7 +13,7 @@
 #define INSTRUMENT_RAM_CAPS SYNTH_RAM_CAPS
 
 struct voice_fifo {
-    char *name;
+    const char *name;
     uint8_t length;
     uint8_t entries[MAX_VOICES_PER_INSTRUMENT + 1];  // fifo has one extra element to distinguish empty and full.
     uint8_t head;
@@ -32,7 +32,7 @@ void voice_fifo_debug(struct voice_fifo *fifo) {
     fprintf(stderr, "\n");
 }
 
-struct voice_fifo *voice_fifo_init(int size, char *name) {
+struct voice_fifo *voice_fifo_init(int size, const char *name) {
     if (size <=0 || size > MAX_VOICES_PER_INSTRUMENT) {
         fprintf(stderr, "init_voice_fifo: size %d value error (max size is %d)\n", size, MAX_VOICES_PER_INSTRUMENT);
         return NULL;
@@ -342,7 +342,7 @@ void instrument_release(int instrument_number) {
     instruments[instrument_number] = NULL;
 }
 
-bool instrument_number_ok(int instrument_number, char *tag) {
+bool instrument_number_ok(int instrument_number, const char *tag) {
     if (instrument_number < 0 || instrument_number >= max_instruments) {
         if (tag) fprintf(stderr, "instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
         return false;
@@ -350,7 +350,7 @@ bool instrument_number_ok(int instrument_number, char *tag) {
     return true;
 }
 
-bool instrument_number_exists(int instrument_number, char *tag) {
+bool instrument_number_exists(int instrument_number, const char *tag) {
     if (instrument_number_ok(instrument_number, tag)) {
         if (instruments[instrument_number])
             return true;

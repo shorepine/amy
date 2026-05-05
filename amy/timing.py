@@ -2,7 +2,7 @@ import sys
 import os
 
 import numpy as np
-import scipy.io.wavfile as wav
+import soundfile as sf
 
 import amy
 
@@ -10,10 +10,9 @@ import amy
 def wavread(filename):
   """Read in audio data from a wav file.  Return d, sr."""
   # Read in wav file.
-  file_handle = open(filename, 'rb')
-  samplerate, wave_data = wav.read(file_handle)
+  wav_data, samplerate = sf.read(filename, dtype='int16')
   # Normalize short ints to floats in range [-1..1).
-  data = (wave_data.astype(np.float32)) / 32768.0
+  data = (wav_data.astype(np.float32)) / 32768.0
   return data, samplerate
 
 
