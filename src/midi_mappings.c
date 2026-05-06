@@ -57,7 +57,7 @@ struct midi_mapping default_note_mapping = {
     .min_val = 0,
     .max_val = 1.0f,
     .offset_val = 0,
-    .message_template = "i%in%nl%v",
+    .message_template = "i%iiM1n%nl%v",
 };
 
 

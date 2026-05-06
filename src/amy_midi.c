@@ -51,6 +51,8 @@ static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t syse
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
+    //fprintf(stderr, "amy_send_midi_note_on: osc %d source %d note %.1f vel %.3f\n",
+    //        osc, synth[osc]->note_source, synth[osc]->midi_note, synth[osc]->velocity);
     if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
         uint8_t bytes[3];
         bytes[0] = 0x90;
@@ -65,9 +67,10 @@ void amy_send_midi_note_off(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
     if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
         uint8_t bytes[3];
-        bytes[0] = 0x80;
+        // Send note-off as a note-on with vel 0.
+        bytes[0] = 0x90;
         bytes[1] = (uint8_t)roundf(synth[osc]->midi_note);
-        bytes[2] = (uint8_t)roundf(synth[osc]->velocity*127.0f);
+        bytes[2] = 0;
         midi_out(bytes, 3);
     }
 }

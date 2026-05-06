@@ -272,7 +272,7 @@ enum coefs{
 #define EVENT_SEQUENCE 3
 
 // note_source values
-#define NOTE_SOURCE_MIDI 2
+#define NOTE_SOURCE_MIDI 1
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
