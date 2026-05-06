@@ -31,28 +31,46 @@ void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
     }
 }
 
-struct cc_mapping {
-    struct cc_mapping *next;
+struct midi_mapping {
+    struct midi_mapping *next;
     int channel;
-    int code;
+    int type;        //
+    int code;        // For note-ons, note number for note-specific events; MIDI_MAP_CODE_ANY for non-note-specific events.
+    // Transform of value field
     int is_log;
     float min_val;
     float max_val;
     float offset_val;
+    // What we actually do.
     char *message_template;
 };
 
-struct cc_mapping *cc_mapping_root = NULL;
+struct midi_mapping *midi_mapping_root = NULL;
 
-void cc_mapping_print(struct cc_mapping *mapping) {
-    fprintf(stderr, "mapping 0x%lx chan %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
-            (unsigned long)mapping, mapping->channel, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
+// Built-in default for note commands
+struct midi_mapping default_note_mapping = {
+    .next = NULL,
+    .channel = 0,
+    .type = MIDI_MAP_TYPE_NOTE,
+    .code = MIDI_MAP_CODE_ANY,
+    .is_log = 0,
+    .min_val = 0,
+    .max_val = 1.0f,
+    .offset_val = 0,
+    .message_template = "i%iiM1n%nl%v",
+};
+
+
+void midi_mapping_print(struct midi_mapping *mapping) {
+    fprintf(stderr, "mapping 0x%lx chan %d type %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
+            (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
 }
 
-struct cc_mapping *cc_mapping_init(struct cc_mapping **p_root, int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message_template) {
-    struct cc_mapping *result = (struct cc_mapping *)malloc_caps(sizeof(struct cc_mapping) + strlen(message_template) + 1, amy_global.config.ram_caps_synth);
-    result->message_template = ((char *)result) + sizeof(struct cc_mapping);
+struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message_template) {
+    struct midi_mapping *result = (struct midi_mapping *)malloc_caps(sizeof(struct midi_mapping) + strlen(message_template) + 1, amy_global.config.ram_caps_synth);
+    result->message_template = ((char *)result) + sizeof(struct midi_mapping);
     result->channel = channel;
+    result->type = type;
     result->code = code;
     result->is_log = is_log;
     result->min_val = min_val;
@@ -65,95 +83,100 @@ struct cc_mapping *cc_mapping_init(struct cc_mapping **p_root, int channel, int 
     return result;
 }
 
-void cc_mapping_debug(void) {
-    fprintf(stderr, "cc_mapping_debug:\n");
-    struct cc_mapping **p_mapping = &cc_mapping_root;
+void midi_mapping_debug(void) {
+    fprintf(stderr, "midi_mapping_debug:\n");
+    struct midi_mapping **p_mapping = &midi_mapping_root;
     while (*p_mapping != NULL) {
-        cc_mapping_print(*p_mapping);
+        midi_mapping_print(*p_mapping);
         p_mapping = &((*p_mapping)->next);
     }
 }
 
-void cc_mapping_free(struct cc_mapping **p_mapping) {
+void midi_mapping_free(struct midi_mapping **p_mapping) {
     // Close up the linked list.
-    struct cc_mapping *doomed = *p_mapping;
+    struct midi_mapping *doomed = *p_mapping;
     *p_mapping = doomed->next;
     // Return the memory
     free(doomed);
 }
 
 void midi_mappings_init(void) {
-    cc_mapping_root = NULL;
+    midi_mapping_root = NULL;
 }
 
 void midi_mappings_deinit(void) {
-    struct cc_mapping **p_mapping = &cc_mapping_root;
+    struct midi_mapping **p_mapping = &midi_mapping_root;
     while (*p_mapping != NULL) {
-        cc_mapping_free(p_mapping);
+        midi_mapping_free(p_mapping);
     }
 }
 
-void midi_clear_channel_mappings(int channel) {
-    struct cc_mapping **p_mapping = &cc_mapping_root;
+void midi_clear_channel_mappings(int channel, int type) {
+    struct midi_mapping **p_mapping = &midi_mapping_root;
     while (*p_mapping != NULL) {
-        if ((*p_mapping)->channel == channel) {
-            cc_mapping_free(p_mapping);
+        if ((*p_mapping)->channel == channel && ((type == MIDI_MAP_TYPE_ANY) || ((*p_mapping)->type == type))) {
+            midi_mapping_free(p_mapping);
         } else {
             p_mapping = &((*p_mapping)->next);
         }
     }
 }
 
-struct cc_mapping **cc_mapping_find(int channel, int code) {
+struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
     // Retrieve the mapping associated with a midi channel + code, if any.
-    struct cc_mapping **p_mapping = &cc_mapping_root;
+    struct midi_mapping **p_mapping = &midi_mapping_root;
     while (*p_mapping != NULL) {
-        if ((*p_mapping)->channel == channel && (*p_mapping)->code == code)  return p_mapping;
+        if ((*p_mapping)->channel == channel && ((type == MIDI_MAP_TYPE_ANY) || (*p_mapping)->type == type)) {
+            if ((code == MIDI_MAP_CODE_ANY) || ((*p_mapping)->code == MIDI_MAP_CODE_ANY) || ((*p_mapping)->code == code))
+                return p_mapping;
+        }
         p_mapping = &((*p_mapping)->next);
     }
     return NULL;
 }
 
-int midi_clear_control_code(int channel, int code) {
-    if (code == 255) {
+int midi_clear_mapping(int channel, int type, int code) {
+    // Backwards compatibility
+    if (code == 255) code = MIDI_MAP_CODE_ANY;
+    if (code == MIDI_MAP_CODE_ANY) {
         // Magic value means clear all MIDI CCs for this channel
-        midi_clear_channel_mappings(channel);
+        midi_clear_channel_mappings(channel, type);
         return 1;
     }
-    struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
-    if (p_mapping) { cc_mapping_free(p_mapping); return 1; }
+    struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
+    if (p_mapping) { midi_mapping_free(p_mapping); return 1; }
     return 0;  // nothing found.
 }
 
-int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message) {
-    // Register a MIDI control code and mapping and a wire code template.
+int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message) {
+    // Register a MIDI mapping and a wire code template.
     // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
     size_t mlen = strlen(message);
     while (mlen > 0 && message[mlen - 1] == 'Z') {
         message[--mlen] = '\0';
     }
-    struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
-    if (p_mapping) cc_mapping_free(p_mapping);
+    struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
+    if (p_mapping) midi_mapping_free(p_mapping);
     // store with an empty string removes mapping
     if (mlen) {
-        /* struct cc_mapping *mapping = */ cc_mapping_init(&cc_mapping_root, channel, code, is_log, min_val, max_val, offset_val, message);
-        //cc_mapping_debug();
+        /* struct midi_mapping *mapping = */ midi_mapping_init(&midi_mapping_root, channel, type, code, is_log, min_val, max_val, offset_val, message);
+        midi_mapping_debug();
     }
     return 1;
 }
 
-bool midi_fetch_control_code_command(int channel, int code, char *s, size_t len) {
-    struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
-    //fprintf(stderr, "midi_fetch_control_code chan %d code %d mapping 0x%llx\n", channel, code, (uint64_t)p_mapping);
+bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len) {
+    struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
+    //fprintf(stderr, "midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
     if (p_mapping == NULL)
         return false;
     // Format the control code - ic<C>,<L>,<N>,<X>,<O>,<CODE>
-    sprintf(s, "ic%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
+    sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
     assert(strlen(s) < len);
     return true;
 }
 
-float map_cc_value(struct cc_mapping *mapping, uint8_t value) {
+float map_midi_value(struct midi_mapping *mapping, uint8_t value) {
     if (mapping->is_log != 0) {
         return (mapping->min_val + mapping->offset_val)
             * expf(
@@ -171,7 +194,7 @@ float map_cc_value(struct cc_mapping *mapping, uint8_t value) {
 
 #define WIRE_COMMAND_LEN 256
 
-void substitute_cc_special_values(char *dest, const char *src, int channel, float value) {
+void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value) {
     // Copy src string to dest, but replace "%i" with channel and "%v" with value.
     const char *s;
     const char *entry_src = src;
@@ -191,8 +214,10 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
             sprintf(dest, "%d", (int)value);
         } else if (src[0] == 'i') {
             sprintf(dest, "%d", channel);
+        } else if (src[0] == 'n') {  // 'n' is for note.
+            sprintf(dest, "%d", code);
         } else {
-            fprintf(stderr, "substitute_cc: unrecognized '%%%c' in %s\n", src[0], entry_src);
+            fprintf(stderr, "substitute_midi: unrecognized '%%%c' in %s\n", src[0], entry_src);
         }
         ++src;  // skip over the code char
         nchars = strlen(dest);
@@ -203,15 +228,25 @@ void substitute_cc_special_values(char *dest, const char *src, int channel, floa
     if (n_remain > (int)strlen(src)) strcpy(dest, src);
 }
 
-void midi_cc_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
-    if ((bytes[0] & 0xF0) == 0xB0) {  // CC
+void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
+    uint8_t status = bytes[0] & 0xF0;
+    if (status == 0xB0 || status == 0x90) {  // CC or note-on
         int channel = (bytes[0] & 0x0F) + 1;
-        int code = bytes[1];
-        struct cc_mapping **p_mapping = cc_mapping_find(channel, code);
-        if (p_mapping != NULL) {
-            float value = map_cc_value(*p_mapping, bytes[2]);
+        int type = (status == 0xB0) ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
+        int code = bytes[1];  // note for note-on events
+        struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
+        struct midi_mapping *mapping = &default_note_mapping;
+        if (type == MIDI_MAP_TYPE_NOTE || p_mapping != NULL) {
+            if (p_mapping != NULL)
+                mapping = *p_mapping;
+            float value = map_midi_value(mapping, bytes[2]);
             char message[WIRE_COMMAND_LEN];
-            substitute_cc_special_values(message, (*p_mapping)->message_template, channel, value);
+            char offset = 0;
+            if (AMY_IS_SET(time)) {
+                sprintf(message, "t%d", time);
+                offset = strlen(message);
+            }
+            substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
             //fprintf(stderr, "midi_cc_handler: message %s\n", message);
             amy_add_message(message);
         }

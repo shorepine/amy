@@ -228,8 +228,8 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
     uint8_t byte_data[MAX_MIDI_ARGS];
     uint32_t time = AMY_UNSET_VALUE(time);
     // But for now we accept only exactly 3 or 4 values: [time,] midi_bytes0..2
-    if (! PyArg_ParseTuple(args, "iiii", &time, &data[0], &data[1], &data[2]))
-      if (! PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2]))
+    if (!PyArg_ParseTuple(args, "iiii", &time, &data[0], &data[1], &data[2])
+        && !PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2]))
         return NULL;
     uint8_t sysex = 0;
     for (int i = 0; i < 3; ++i)  byte_data[i] = (uint8_t)data[i];

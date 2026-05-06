@@ -272,7 +272,7 @@ enum coefs{
 #define EVENT_SEQUENCE 3
 
 // note_source values
-#define NOTE_SOURCE_MIDI 2
+#define NOTE_SOURCE_MIDI 1
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
@@ -901,13 +901,22 @@ extern int parse_int_list_message16(char *message, int16_t *vals, int max_num_va
 extern void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth);
 extern void reset_osc(uint16_t i );
 
-extern int midi_store_control_code(int channel, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
-extern int midi_clear_control_code(int channel, int code);
-extern bool midi_fetch_control_code_command(int channel, int code, char *s, size_t len);
-extern void cc_mapping_debug();
+// Values for midi_mapping.type
+#define MIDI_MAP_TYPE_ANY (-1)
+#define MIDI_MAP_TYPE_CC (0)
+#define MIDI_MAP_TYPE_NOTE (1)
+
+// Value for code (or note) that matches anything
+#define MIDI_MAP_CODE_ANY (-1)
+
+extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
+extern int midi_clear_mapping(int channel, int type, int code);
+extern bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len);
+extern void midi_mapping_debug();
 extern void midi_mappings_init();
 extern void midi_mappings_deinit();
-extern void midi_clear_channel_mappings(int channel);
+extern void midi_clear_channel_mappings(int channel, int type);
+extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();

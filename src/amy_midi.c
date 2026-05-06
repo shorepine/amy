@@ -51,6 +51,8 @@ static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t syse
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
+    //fprintf(stderr, "amy_send_midi_note_on: osc %d source %d note %.1f vel %.3f\n",
+    //        osc, synth[osc]->note_source, synth[osc]->midi_note, synth[osc]->velocity);
     if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
         uint8_t bytes[3];
         bytes[0] = 0x90;
@@ -65,35 +67,12 @@ void amy_send_midi_note_off(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
     if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
         uint8_t bytes[3];
-        bytes[0] = 0x80;
+        // Send note-off as a note-on with vel 0.
+        bytes[0] = 0x90;
         bytes[1] = (uint8_t)roundf(synth[osc]->midi_note);
-        bytes[2] = (uint8_t)roundf(synth[osc]->velocity*127.0f);
+        bytes[2] = 0;
         midi_out(bytes, 3);
     }
-}
-
-// Given a MIDI note on IN, create a AMY message on that instrument and play it
-void amy_received_note_on(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
-    if (!instrument_grab_midi_notes(channel)) return;
-    amy_event e = amy_default_event();
-    e.time = time;
-    e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
-    e.midi_note = note;
-    e.velocity = ((float)vel/127.0f);
-    amy_add_event(&e);
-}
-
-// Given a MIDI note off IN, create a AMY message on that instrument and play it
-void amy_received_note_off(uint8_t channel, uint8_t note, uint8_t vel, uint32_t time) {
-    if (!instrument_grab_midi_notes(channel)) return;
-    amy_event e = amy_default_event();
-    e.time = time;
-    e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
-    e.midi_note = note;
-    e.velocity = 0;
-    amy_add_event(&e);
 }
 
 void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value, uint32_t time) {
@@ -167,9 +146,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         uint8_t status = status_byte & 0xF0;
         uint8_t channel = status_byte & 0x0F;
         // Do the AMY instrument things here
-        if(status == 0x80) amy_received_note_off(channel+1, data[1], data[2], time);
-        else if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
-        else if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
+        /* if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
+           else */ if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
         else if(status == 0xB0 && data[1] == 0x7B) amy_received_all_notes_off(channel+1, time);
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
@@ -177,6 +155,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status_byte == 0xFA) sequencer_midi_start();
         else if(status_byte == 0xFC) sequencer_midi_stop();
     }
+    midi_msg_handler(data, len, sysex, time);
 
     // Also send the external hooks if set
     if(amy_global.config.amy_external_midi_input_hook != NULL) {
