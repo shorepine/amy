@@ -95,6 +95,11 @@ amy_config_t amy_default_config() {
     c.midi_uart = 1; // This is MIDI UART _number_, like index
     #endif
 
+    #if defined(ARDUINO_ARCH_SPRESENSE)
+    c.audio = AMY_AUDIO_IS_SPRESENSE;
+    c.spresense_output_device = SPRESENSE_OUTPUT_ANALOG;  // Default to analog DAC output
+    #endif
+
     return c;
 }
 
@@ -407,7 +412,7 @@ int16_t *amy_update() {
     // Single function to update buffers.
     amy_update_tasks();
     int16_t *block = amy_render_audio();
-    if (AMY_HAS_I2S && !amy_global.i2s_is_in_background) {
+    if (AMY_HAS_PLATFORM_AUDIO_OUT && !amy_global.i2s_is_in_background) {
         amy_i2s_write(
             (uint8_t *)block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t)
         );

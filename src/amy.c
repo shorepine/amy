@@ -48,6 +48,9 @@ uint64_t profile_start_us = 0;
 int64_t amy_get_us() { return esp_timer_get_time(); }
 #elif defined PICO_ON_DEVICE
 int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
+#elif defined(ARDUINO_ARCH_SPRESENSE)
+extern unsigned long micros(void);
+int64_t amy_get_us() { return (int64_t)micros(); }
 #elif defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
