@@ -515,6 +515,7 @@ typedef struct amy_event {
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
     uint8_t pedal;  // MIDI pedal value.
     uint16_t num_voices;
+    uint16_t cv_gate[2];  // CV channel numbers for Gate and Note, respectively.  0 = no CV triggering.
     uint32_t sequence[3]; // tick, period, tag
     //
     uint8_t status;
@@ -980,8 +981,11 @@ extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy
 extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern void instrument_set_flags(int instrument_number, uint32_t flags);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);
+extern void instrument_set_cv_gate(int instrument_number, uint16_t cv_gate, uint16_t cv_note);
+extern void instrument_get_cv_gate(int instrument_number, uint16_t *p_cv_gate, uint16_t *p_cv_note);
 extern bool instrument_grab_midi_notes(int instrument_number);
 extern void instrument_set_grab_midi_notes(int instrument_number, bool grab_midi_notes);
 extern int instrument_bank_number(int instrument_number);

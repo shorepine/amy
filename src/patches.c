@@ -92,8 +92,10 @@ void patches_debug() {
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
         int num_voices = instrument_get_num_voices(i, voices);
         if (num_voices) {
-            fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " flags %" PRIu32 " voices",
-                    i, (int32_t)num_voices, (int32_t)instrument_get_patch_number(i), instrument_get_flags(i));
+            uint16_t cv_gate, cv_note;
+            instrument_get_cv_gate(i, &cv_gate, &cv_note);
+            fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " cv_gate %d cv_note %d flags %" PRIu32 " voices",
+                    i, (int32_t)num_voices, (int32_t)instrument_get_patch_number(i), cv_gate, cv_note, instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %" PRIu16, voices[j]);
             fprintf(stderr, "\n");
         }
@@ -287,6 +289,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Instrument-layer values.
     _EPRINT_I(synth, "synth", "i");
     _EPRINT_I(synth_flags, "synth_flags", "if");  // Special flags to set when defining instruments.
+    _EPRINT_I_SEQ(cv_gate, "cv_gate", 2, "ig");  // CV channels to use for gate and note
     _EPRINT_I(synth_delay_ms, "synth_delay_ms", "id");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _EPRINT_I(to_synth, "to_synth", "it");  // For moving setup between synth numbers.
     _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
@@ -605,6 +608,9 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx
         return NULL;  // instrument not allocated.
     }
     uint32_t flags = instrument_get_flags(synth);
+    uint16_t cv_gate = 0;
+    uint16_t cv_note = 0;
+    instrument_get_cv_gate(synth, &cv_gate, &cv_note);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = 0;
@@ -615,11 +621,13 @@ void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx
     amy_clear_event(event);
     int first_osc_state_val = 0;
     int last_osc_state_val = num_oscs;
-    if (flags != 0) {
+    if (flags != 0 || cv_note != 0) {
         ++first_osc_state_val;
         ++last_osc_state_val;
         if (state_val == 0) {
             event->synth_flags = flags;
+            event->cv_gate[0] = cv_gate;
+            event->cv_gate[1] = cv_note;
         }
     }
     if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
@@ -900,6 +908,16 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
         if (AMY_IS_SET(e->synth_delay_ms)) {
             // Set the synth noteon delay.
             instrument_set_noteon_delay_ms(e->synth, e->synth_delay_ms);
+        }
+        if (AMY_IS_SET(e->grab_midi_notes)) {
+            // Set the grab_midi state.
+            instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
+        }
+        if (AMY_IS_SET(e->synth_flags)) {
+            instrument_set_flags(e->synth, e->synth_flags);
+        }
+        if (AMY_IS_SET(e->cv_gate[0])) {
+            instrument_set_cv_gate(e->synth, e->cv_gate[0], e->cv_gate[1]);
         }
         if (AMY_IS_SET(e->grab_midi_notes)) {
             // Set the grab_midi state.

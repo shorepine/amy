@@ -341,13 +341,14 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     }
     char cmd = message[0];
     message++;
-    if (cmd == 'p')  e->pedal = atoi(message);
+    if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'f')  e->synth_flags = atoi(message);
-    else if (cmd == 'v')  e->num_voices = atoi(message);
-    else if (cmd == 't')  e->to_synth = atoi(message);
+    else if (cmd == 'g')  {skip_chars = strspn(message, "0123456789,"); parse_list_uint16_t(message, e->cv_gate, 2, AMY_UNSET_VALUE(e->cv_gate[0]));}
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
-    else if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
+    else if (cmd == 'p')  e->pedal = atoi(message);
+    else if (cmd == 't')  e->to_synth = atoi(message);
+    else if (cmd == 'v')  e->num_voices = atoi(message);
     else if (cmd == 'c')  {
         // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
         // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
