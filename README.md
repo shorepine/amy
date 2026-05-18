@@ -4,6 +4,11 @@ AMY is a fast and small music synthesizer library written in C with (so far) Pyt
 
 It can be used as a very good analog-type synthesizer (Juno-6 style) a FM synthesizer (DX7 style), a partial breakpoint synthesizer (Alles machine or Atari AMY), a [very good synthesized piano](https://shorepine.github.io/amy/piano.html), a sampler or wavetable synth (where you load in your own PCM data), a drum machine (808-style PCM samples are included), or as a lower level toolkit to make your own combinations of oscillators, filters, LFOs and effects. AMY supports MIDI internally and can manage synthesizer note messages for you, including voice stealing and assigning controller changes. 
 
+<a href="https://amyboard.com"><img src="https://camo.githubusercontent.com/5b351578a01aae63aa032964bedbbc42bc2d3fe124743da6d1b3a0e303e7733b/68747470733a2f2f616d79626f6172642e636f6d2f696d672f616d79626f6172645f707265766965772e706e67" width=400></a>
+
+**NEW!** Check out the [AMYboard](https://amyboard.com) - the perfect hardware to run AMY on.
+
+
 We've run AMY on:
  * [the web](https://shorepine.github.io/amy/)
  * Mac, Linux, and [Windows](windows/README.md), and small Linux devices like the Raspberry Pi
