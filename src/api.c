@@ -97,6 +97,7 @@ amy_config_t amy_default_config() {
 
     #if defined(ARDUINO_ARCH_SPRESENSE)
     c.audio = AMY_AUDIO_IS_SPRESENSE;
+    c.midi_uart = 2; // Spresense external UART is exposed as Serial2.
     c.spresense_output_device = SPRESENSE_OUTPUT_ANALOG;  // Default to analog DAC output
     #endif
 

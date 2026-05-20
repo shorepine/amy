@@ -8,16 +8,57 @@
 #define AMY_PCM_FRAME_SIZE (256)  // Samples per frame (match AMY block size)
 #define AMY_BYTEWIDTH (2)         // 16-bit
 #define AMY_CHANNELS (2)          // Stereo
+
 #define AMY_READSIZE (AMY_PCM_FRAME_SIZE * AMY_BYTEWIDTH * AMY_CHANNELS)
+
+static HardwareSerial *spresense_get_midi_port(int8_t midi_uart) {
+    // Spresense Arduino core exposes the external logic-level UART as Serial2.
+    // Accept both the old AMY index (1) and the board-facing UART number (2).
+    if (midi_uart == 1 || midi_uart == 2) {
+        return &Serial2;
+    }
+    return nullptr;
+}
 
 static OutputMixer *theMixer = nullptr;
 static AsPcmDataParam g_pcm_frame;
 static volatile bool g_frame_valid = false;
 
 // Forward declaration for callback
-extern "C" void spresense_mixer_callback(int32_t identifier, bool is_end);
 
+// MIDI UARTラッパー
+extern "C" void spresense_mixer_callback(int32_t identifier, bool is_end);
 extern "C" {
+
+void spresense_midi_begin(int8_t midi_uart) {
+    HardwareSerial *port = spresense_get_midi_port(midi_uart);
+    if (port != nullptr) {
+        port->begin(31250);
+    }
+}
+
+void spresense_midi_end(int8_t midi_uart) {
+    HardwareSerial *port = spresense_get_midi_port(midi_uart);
+    if (port != nullptr) {
+        port->end();
+    }
+}
+
+int spresense_midi_read_byte(int8_t midi_uart) {
+    HardwareSerial *port = spresense_get_midi_port(midi_uart);
+    if (port == nullptr || port->available() <= 0) {
+        return -1;
+    }
+    return port->read();
+}
+
+size_t spresense_midi_write(const uint8_t *bytes, uint16_t len, int8_t midi_uart) {
+    HardwareSerial *port = spresense_get_midi_port(midi_uart);
+    if (port == nullptr || bytes == nullptr || len == 0) {
+        return 0;
+    }
+    return port->write(bytes, len);
+}
 
 static bool spresense_make_silence_frame(AsPcmDataParam *pcm_param) {
     if (pcm_param == nullptr) {
