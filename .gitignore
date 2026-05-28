@@ -12,6 +12,7 @@ src/amy.egg-info/
 .python-version
 amy.egg-info/
 build/
+venv/
 
 
 # Prerequisites
