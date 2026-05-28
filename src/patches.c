@@ -307,6 +307,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(synth_delay_ms, "synth_delay_ms", "id");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _EPRINT_I(to_synth, "to_synth", "it");  // For moving setup between synth numbers.
     _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
+    _EPRINT_I(note_source, "note_source", "iM");  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
     _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
     _EPRINT_I(num_voices, "num_voices", "iv");
     _EPRINT_I(oscs_per_voice, "oscs_per_voice", "in");
@@ -678,7 +679,7 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
         bool found = false;
         int type = MIDI_MAP_TYPE_CC;
         for (int next_midi_code = state_val - STATE_START_OF_MIDI; next_midi_code < 128; ++next_midi_code) {
-            if (midi_fetch_mapping_command(synth, type, next_midi_code, s, len) == true) {
+            if (midi_fetch_mapping_command(instr_num, type, next_midi_code, s, len) == true) {
                 state_val = STATE_START_OF_MIDI + next_midi_code + 1;
                 found = true;
                 break;

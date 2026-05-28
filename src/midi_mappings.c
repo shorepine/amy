@@ -230,7 +230,7 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
 
 void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
     uint8_t status = bytes[0] & 0xF0;
-    if (status == 0xB0 || status == 0x90) {  // CC or note-on
+    if (status == 0xB0 || status == 0x90 || status == 0x80) {  // CC or note-on
         int channel = (bytes[0] & 0x0F) + 1;
         int type = (status == 0xB0) ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
         int code = bytes[1];  // note for note-on events
@@ -240,10 +240,14 @@ void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t 
             if (p_mapping != NULL)
                 mapping = *p_mapping;
             float value = map_midi_value(mapping, bytes[2]);
+            if (status == 0x80) {  // Translate note-off to note-on with vel 0.
+                status = 0x90;
+                value = 0;
+            }
             char message[WIRE_COMMAND_LEN];
             char offset = 0;
             if (AMY_IS_SET(time)) {
-                sprintf(message, "t%d", time);
+                sprintf(message, "t%" PRId32, time);
                 offset = strlen(message);
             }
             substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
