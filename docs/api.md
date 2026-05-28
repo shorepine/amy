@@ -250,7 +250,7 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
-| `y`    | bus        | `bus` | int   | Bus that this osc gets added onto (default 0) |
+| `y`    | `bus`      | `bus` | int   | Bus that this osc gets added onto (default 0) |
 | `l`    | `velocity` | `vel` | float | Note on velocity. Use to start an envelope or set amplitude |
 
 ### CtrlCoefs
@@ -299,7 +299,7 @@ Default AMY has 4 buses, 0..3.  If the bus (`y`) is not specified for one of the
 | `h`    | `reverb_level, reverb_liveness, reverb_damping, reverb_xover_hz` | `reverb` | float[,float,float,float] | Reverb parameters -- level, liveness, damping, xover: Level is for output mix;
 | `k`    | `chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth` | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `M`    | `echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef` | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, filter_coef (-1 is HPF, 0 is flat, +1 is LPF). |
-| `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Gz) -15 to 15. 0 is off. default 0. |
+| `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Hz) -15 to 15. 0 is off. default 0. |
 
 ### Other
 
