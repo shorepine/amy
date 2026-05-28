@@ -238,7 +238,7 @@ class AMYPatch:
         # Set up each operator.
         last_release_time = 0
         last_release_value = 0
-        # Oscs: 0 is algo, 1 is pitch LFO, 2 is amp LFO, 3-8 are ops 1-6
+        # Oscs: 0 is algo, 1 is LFO, 2-7 are ops 1-6
         main_osc = 0
         lfo_osc = 1
         # The osc of op0 (they go up from here)
@@ -251,14 +251,14 @@ class AMYPatch:
                 amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
                 amp_times[4], t(amp_levels[4])
             )
-            oscbpfmt = "%d,%s/%d,%s/%d,%s/%d,%s/%d,%s" % (
-                amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
-                amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
-                amp_times[4], t(amp_levels[4])
-            )
             if(amp_times[4] > last_release_time):
                 last_release_time = amp_times[4]
                 last_release_value = amp_levels[4]
+            #oscbpfmt = "%d,%s/%d,%s/%d,%s/%d,%s/%d,%s" % (
+            #    amp_times[0], t(amp_levels[0]), amp_times[1], t(amp_levels[1]),
+            #    amp_times[2], t(amp_levels[2]), amp_times[3], t(amp_levels[3]),
+            #    amp_times[4], t(amp_levels[4])
+            #)
             #print("osc %d (op %d) freq %.6f ratio %d env %s amp %.6f amp_mod %d" % \
             #      (osc_num, osc.op_num_from_0, osc.frequency, osc.freq_is_ratio, oscbpfmt,
             #       osc.op_amp, osc.ampmodsens))
@@ -270,7 +270,7 @@ class AMYPatch:
                 args["ratio"] = t(osc.frequency)
             else:
                 args["freq"] = t(osc.frequency)
-            # TODO: we xignore intensity of amp mod sens, just on/off
+            # TODO: we ignore intensity of amp mod sens, just on/off
             args.update({"mod_source": lfo_osc, "amp": "%s,0,0,1,0,%s" % (t(osc.op_amp), t(self.amp_lfo_amp * (osc.ampmodsens > 0)))})
 
             # We are _NOT_ updating operators with pitch bp, per dan tuesday 7/5 morning (but not monday 7/4 morning)

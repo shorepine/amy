@@ -254,13 +254,15 @@ void example_patches() {
 }
 void example_reverb() {
     if(AMY_HAS_REVERB) {
-        config_reverb(2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
+        uint8_t bus = 0;
+        config_reverb(bus, 2, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ); 
     }
 }
 
 void example_chorus() {
     if(AMY_HAS_CHORUS) {
-        config_chorus(0.8, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
+        uint8_t bus = 0;
+        config_chorus(bus, 0.8, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     }
 }
 
