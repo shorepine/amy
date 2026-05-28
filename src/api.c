@@ -110,6 +110,7 @@ void amy_clear_event(amy_event *e) {
     e->status = EVENT_EMPTY;
     AMY_UNSET(e->time);
     AMY_UNSET(e->osc);
+    AMY_UNSET(e->bus);
     AMY_UNSET(e->preset);
     AMY_UNSET(e->wave);
     AMY_UNSET(e->patch_number);
@@ -117,7 +118,8 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);
-    AMY_UNSET(e->volume);
+    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
+        AMY_UNSET(e->volume[bus]);
     AMY_UNSET(e->pitch_bend);
     AMY_UNSET(e->tempo);
     AMY_UNSET(e->latency_ms);
@@ -400,6 +402,7 @@ void amy_stop() {
     stop_midi();
     amy_platform_deinit();
     oscs_deinit();
+    global_deinit();
 }
 
 

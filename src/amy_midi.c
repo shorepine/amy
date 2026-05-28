@@ -106,7 +106,11 @@ void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value
         //e.volume = (float)value/12.7;  // Max volume is 10.
         //e.note_source = NOTE_SOURCE_MIDI;
         //amy_add_event(&e);
-        amy_global.volume = (float)value/12.7;  // Max volume is 10.
+        if (instrument_number_exists(channel, NULL)) {
+            int bus = instrument_get_bus(channel);
+            if (bus >= 0 && bus < AMY_NUM_BUSES)
+                amy_global.volume[bus] = (float)value/12.7;  // Max volume is 10.
+        }
     }
 }
 
