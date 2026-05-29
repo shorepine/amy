@@ -27,7 +27,7 @@ void cv_trigger_print(cv_trigger_t *cv_trig) {
     fprintf(stderr, "cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, cv_trig->thresh_high, cv_trig->thresh_low, cv_trig->pitch_cv, cv_trig->pitch_scale, cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
 }
 
-cv_trigger_t *cv_trigger_new(cv_trigger_t **p_root, uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
+void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
     cv_trigger_t *result = (cv_trigger_t *)malloc_caps(
         sizeof(cv_trigger_t) + strlen(message_template) + 1,
         amy_global.config.ram_caps_synth
@@ -42,9 +42,8 @@ cv_trigger_t *cv_trigger_new(cv_trigger_t **p_root, uint8_t trigger_cv, float th
     result->pitch_offset = pitch_offset;
     result->state = CV_TRIG_TRIGGERED;  // Wait for transition below thresh_low before arming
     // Insert into linked list at head.
-    result->next = *p_root;
-    *p_root = result;
-    return result;
+    result->next = cv_trigger_root;
+    cv_trigger_root = result;
 }
 
 void cv_trigger_debug(void) {
@@ -75,6 +74,13 @@ void cv_trigger_deinit(void) {
     }
 }
 
-int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
-    return skip_chars;
+void cv_trigger_clear_mappings(int gate_cv) {
+    cv_trigger_t **p_cv_trig = &cv_trigger_root;
+    while (*p_cv_trig != NULL) {
+        if ( (*p_cv_trig)->trigger_cv == gate_cv)
+            cv_trigger_free(p_cv_trig);
+        else
+            p_cv_trig = &((*p_cv_trig)->next);
+    }
 }
+

@@ -958,7 +958,11 @@ extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
 
-extern int cv_trigger_from_message(char *message, int instr_num, int skip_chars);
+extern void cv_trigger_debug(void);
+extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template);
+extern void cv_trigger_init(void);
+extern void cv_trigger_deinit(void);
+extern void cv_trigger_clear_mappings(int gate_cv);
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();

@@ -359,6 +359,51 @@ int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_c
     return skip_chars;
 }
 
+int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_high, float *p_thresh_low, int32_t *p_pitch_cv, float *p_pitch_scale, float *p_pitch_offset) {
+    char *m = message;
+    m += parse_val_int32_t(m, p_gate_cv);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_thresh_high);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_thresh_low);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_int32_t(m, p_pitch_cv);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_pitch_scale);
+    if (m[0] != ',') goto end; else ++m;
+    m += parse_val_float(m, p_pitch_offset);
+ end:
+    return m - message;
+}
+
+int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
+    // i<synth>ig<gate_cv>,<thresh_high>,<thresh_low>,<pitch_cv>,<pitch_scale>,<pitch_offset>,<wire_template>
+    int32_t gate_cv, pitch_cv;
+    float thresh_high, thresh_low, pitch_scale, pitch_offset;
+    AMY_UNSET(gate_cv);
+    AMY_UNSET(thresh_high);
+    skip_chars = parse_cv_trigger_payload(message, &gate_cv, &thresh_high, &thresh_low, &pitch_cv, &pitch_scale, &pitch_offset);
+    if (*(message + skip_chars) != ',') {
+        if (AMY_IS_UNSET(gate_cv) || AMY_IS_SET(thresh_high)) {
+            // Either parsing bailed without even a CC code, or it got past the thresh, meaning it wasn't a bare ic<NUM> command.
+            fprintf(stderr, "cv_trigger: payload didn't parse for %s.\n", message - 1);
+            return skip_chars;  // maybe the rest will parse?
+        }
+        // Else we got an incomplete message with a valid gate_cv - clear it
+        cv_trigger_clear_mappings(gate_cv);
+        return skip_chars;
+    }
+    ++skip_chars;  // step over the "," before the wire string template.
+    // Clear any mapping for this gate_cv before we set it again.
+    cv_trigger_clear_mappings(gate_cv);
+    cv_trigger_new(gate_cv, thresh_high, thresh_low, pitch_cv, pitch_scale, pitch_offset, message + skip_chars);
+    // Consume rest of message but leave the trailing 'Z' for the outer parser.
+    int remainder = strlen(message);
+    if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
+    skip_chars = remainder;
+    return skip_chars;
+}
+
 // Parser for synth-layer ('i') prefix.
 int amy_parse_synth_layer_message(char *message, amy_event *e) {
     int skip_chars = 1;  // default is to skip one extra char.

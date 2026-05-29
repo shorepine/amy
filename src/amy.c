@@ -856,6 +856,8 @@ void amy_reset_oscs() {
     // Reset midi_mappings.
     midi_mappings_deinit();
     midi_mappings_init();
+    cv_trigger_deinit();
+    cv_trigger_init();
 }
 
 
@@ -991,6 +993,7 @@ int8_t oscs_init() {
     amy_deltas_reset();
 
     midi_mappings_init();
+    cv_trigger_init();
 
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
@@ -1070,6 +1073,7 @@ void show_debug(uint8_t type) {
         }
         if (type > 5) {
             midi_mapping_debug();
+            cv_trigger_debug();
         }
         if (type > 6) {
             for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
@@ -1092,6 +1096,7 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
+    cv_trigger_deinit();
     midi_mappings_deinit();
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
         dealloc_chorus_delay_lines(bus);
