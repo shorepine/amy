@@ -75,3 +75,6 @@ void cv_trigger_deinit(void) {
     }
 }
 
+int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
+    return skip_chars;
+}

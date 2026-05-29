@@ -958,6 +958,8 @@ extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
 
+extern int cv_trigger_from_message(char *message, int instr_num, int skip_chars);
+
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
 extern void ks_deinit();
@@ -1029,6 +1031,7 @@ extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy
 extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern void instrument_set_flags(int instrument_number, uint32_t flags);
 extern uint8_t instrument_get_bus(int instrument_number);
 extern void instrument_set_bus(int instrument_number, uint8_t bus);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);

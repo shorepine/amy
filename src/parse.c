@@ -331,6 +331,34 @@ int parse_midi_mapping_payload(char *message, int32_t *p_code, int32_t *p_is_log
     return m - message;
 }
 
+int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_chars) {
+    // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
+    // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
+    int32_t code, is_log;
+    float min_val, max_val, offset_val;
+    int type = (cmd == 'c') ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
+    AMY_UNSET(code);
+    AMY_UNSET(is_log);
+    skip_chars = parse_midi_mapping_payload(message, &code, &is_log, &min_val, &max_val, &offset_val);
+    if (*(message + skip_chars) != ',') {
+        if (AMY_IS_UNSET(code) || AMY_IS_SET(is_log)) {
+            // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
+            fprintf(stderr, "synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
+            return skip_chars;  // maybe the rest will parse?
+        }
+        // Else we got an incomplete message with a valid CC code - clear it
+        midi_clear_mapping(instr_num, type, code);  // (handles 255 as special case).
+        return skip_chars;
+    }
+    ++skip_chars;  // step over the "," before the wire string template.
+    midi_store_mapping(instr_num, type, code, is_log, min_val, max_val, offset_val, message + skip_chars);
+    // Consume rest of message but leave the trailing 'Z' for the outer parser.
+    int remainder = strlen(message);
+    if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
+    skip_chars = remainder;
+    return skip_chars;
+}
+
 // Parser for synth-layer ('i') prefix.
 int amy_parse_synth_layer_message(char *message, amy_event *e) {
     int skip_chars = 1;  // default is to skip one extra char.
@@ -343,6 +371,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     message++;
     if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'f')  e->synth_flags = atoi(message);
+    else if (cmd == 'g')  skip_chars = cv_trigger_from_message(message, e->synth, skip_chars);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else if (cmd == 'M')  e->note_source = atoi(message);  // To mark MIDI-in notes.
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
@@ -350,32 +379,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'v')  e->num_voices = atoi(message);
     else if (cmd == 'y')  e->bus = atoi(message);  // 'i1iy1' is the same as 'i1y1'.
-    else if (cmd == 'c' || cmd == 'o')  {
-        // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
-        // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
-        int32_t code, is_log;
-        float min_val, max_val, offset_val;
-        int type = (cmd == 'c') ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
-        AMY_UNSET(code);
-        AMY_UNSET(is_log);
-        skip_chars = parse_midi_mapping_payload(message, &code, &is_log, &min_val, &max_val, &offset_val);
-        if (*(message + skip_chars) != ',') {
-            if (AMY_IS_UNSET(code) || AMY_IS_SET(is_log)) {
-                // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
-                fprintf(stderr, "synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
-                return skip_chars;  // maybe the rest will parse?
-            }
-            // Else we got an incomplete message with a valid CC code - clear it
-            midi_clear_mapping(e->synth, type, code);  // (handles 255 as special case).
-            return skip_chars;
-        }
-        ++skip_chars;  // step over the "," before the wire string template.
-        midi_store_mapping(e->synth, type, code, is_log, min_val, max_val, offset_val, message + skip_chars);
-        // Consume rest of message but leave the trailing 'Z' for the outer parser.
-        int remainder = strlen(message);
-        if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
-        skip_chars = remainder;
-    }
+    else if (cmd == 'c' || cmd == 'o') skip_chars = midi_mapping_from_message(message, cmd, e->synth, skip_chars);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
     return skip_chars;
 }
