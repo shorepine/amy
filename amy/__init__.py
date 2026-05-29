@@ -11,9 +11,11 @@ try:
     import c_amy as _amy  # Import the C module
     live = _amy.live
     _get_synth_commands = _amy.get_synth_commands
+    _set_cv_from_osc = _amy.set_cv_from_osc
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
+    _set_cv_from_osc = lambda c, o: None
     try:
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
@@ -558,3 +560,9 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
         prologue = [prefix + "i%div%din%dZ" % (dest_synth, num_voices, num_oscs)]
         prefix += "i%d" % dest_synth
     return "\n".join(prologue + [prefix + command for command in commands])
+
+"""
+    Simulate CV input from an osc (testing support)
+"""
+def set_cv_from_osc(cv, osc):
+    _set_cv_from_osc(cv, osc)

@@ -858,6 +858,8 @@ void amy_reset_oscs() {
     midi_mappings_init();
     cv_trigger_deinit();
     cv_trigger_init();
+    cv_from_osc_deinit();
+    cv_from_osc_init();
 }
 
 
@@ -994,6 +996,7 @@ int8_t oscs_init() {
 
     midi_mappings_init();
     cv_trigger_init();
+    cv_from_osc_init();
 
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
@@ -1017,6 +1020,14 @@ int8_t oscs_init() {
     return 0;
 }
 
+void fprint_combo_coefs(char *name, float *coefs) {
+    fprintf(stderr, "  %s:", name);
+    for (int i=0; i < NUM_COMBO_COEFS; ++i) {
+        fprintf(stderr, " %.3f", coefs[i]);
+    }
+    fprintf(stderr, "\n");
+}
+
 void print_osc_debug(int i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %d not defined\n", i); return; }
     fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d algo_source %d,%d,%d,%d,%d,%d  \n",
@@ -1024,11 +1035,11 @@ void print_osc_debug(int i /* osc */, bool show_eg) {
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
-    fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->amp_coefs[0], synth[i]->amp_coefs[1], synth[i]->amp_coefs[2], synth[i]->amp_coefs[3], synth[i]->amp_coefs[4], synth[i]->amp_coefs[5], synth[i]->amp_coefs[6]);
-    fprintf(stderr, "  lfr_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->logfreq_coefs[0], synth[i]->logfreq_coefs[1], synth[i]->logfreq_coefs[2], synth[i]->logfreq_coefs[3], synth[i]->logfreq_coefs[4], synth[i]->logfreq_coefs[5], synth[i]->logfreq_coefs[6]);
-    fprintf(stderr, "  flf_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->filter_logfreq_coefs[0], synth[i]->filter_logfreq_coefs[1], synth[i]->filter_logfreq_coefs[2], synth[i]->filter_logfreq_coefs[3], synth[i]->filter_logfreq_coefs[4], synth[i]->filter_logfreq_coefs[5], synth[i]->filter_logfreq_coefs[6]);
-    fprintf(stderr, "  dut_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->duty_coefs[0], synth[i]->duty_coefs[1], synth[i]->duty_coefs[2], synth[i]->duty_coefs[3], synth[i]->duty_coefs[4], synth[i]->duty_coefs[5], synth[i]->duty_coefs[6]);
-    fprintf(stderr, "  pan_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->pan_coefs[0], synth[i]->pan_coefs[1], synth[i]->pan_coefs[2], synth[i]->pan_coefs[3], synth[i]->pan_coefs[4], synth[i]->pan_coefs[5], synth[i]->pan_coefs[6]);
+    fprint_combo_coefs("amp_coefs", synth[i]->amp_coefs);
+    fprint_combo_coefs("lfr_coefs", synth[i]->logfreq_coefs);
+    fprint_combo_coefs("flf_coefs", synth[i]->filter_logfreq_coefs);
+    fprint_combo_coefs("dut_coefs", synth[i]->duty_coefs);
+    fprint_combo_coefs("pan_coefs", synth[i]->pan_coefs);
     if(show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
             fprintf(stderr,"  eg%d (type %d): ", j, synth[i]->eg_type[j]);
@@ -1096,6 +1107,7 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
+    cv_from_osc_deinit();
     cv_trigger_deinit();
     midi_mappings_deinit();
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
@@ -1514,6 +1526,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
+    ctrl_inputs[COEF_EXT0] = 0;
+    ctrl_inputs[COEF_EXT1] = 0;
     if(amy_global.config.amy_external_coef_hook != NULL) {
         ctrl_inputs[COEF_EXT0] = amy_global.config.amy_external_coef_hook(0);
         ctrl_inputs[COEF_EXT1] = amy_global.config.amy_external_coef_hook(1);
@@ -1521,9 +1535,6 @@ void hold_and_modify(uint16_t osc) {
         #ifdef __EMSCRIPTEN__
         ctrl_inputs[COEF_EXT0] = amy_web_cv_1;
         ctrl_inputs[COEF_EXT1] = amy_web_cv_2;
-        #else
-        ctrl_inputs[COEF_EXT0] = 0;
-        ctrl_inputs[COEF_EXT1] = 0;        
         #endif
     }
 

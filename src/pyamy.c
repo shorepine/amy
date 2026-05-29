@@ -260,6 +260,13 @@ static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
     return list_obj;
 }
 
+static PyObject *set_cv_from_osc_wrapper(PyObject *self, PyObject *args) {
+    if (!(PyTuple_Size(args) == 2)) return NULL;
+    int cv_channel, osc;
+    if (!PyArg_ParseTuple(args, "ii", &cv_channel, &osc)) return NULL;
+    set_cv_from_osc(cv_channel, osc);
+    return Py_None;
+}
 
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
@@ -271,6 +278,7 @@ static PyMethodDef c_amyMethods[] = {
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
+    {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
     { NULL, NULL, 0, NULL }
 };
 

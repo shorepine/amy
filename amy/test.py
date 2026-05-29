@@ -1281,6 +1281,18 @@ class TestBuses(AmyTest):
     amy.send(time=700, synth=2, note=70, vel=5)
 
 
+class TestCVFromOsc(AmyTest):
+  """Facility to simulate CV input from an osc, for testing."""
+
+  def run(self):
+    # Make ext0 come from osc 1
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=0, freq={'const': 440, 'note': 1, 'ext0': 1})
+    amy.send(time=0, osc=1, freq=4.0, amp=0.1)
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=900, osc=0, vel=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True

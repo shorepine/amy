@@ -101,6 +101,9 @@ extern const uint32_t pcm_wavetable_len;
 #define AMY_NUM_BUSES 4
 #define AMY_DEFAULT_BUS 0
 
+// How many external CV inputs to contemplate.
+#define AMY_MAX_CV_IN 2
+
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
 
@@ -963,6 +966,12 @@ extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_l
 extern void cv_trigger_init(void);
 extern void cv_trigger_deinit(void);
 extern void cv_trigger_clear_mappings(int gate_cv);
+
+// Testing-oriented facility to pull External CV input from a mod osc
+extern void cv_from_osc_init(void);
+extern void cv_from_osc_deinit(void);
+extern void set_cv_from_osc(int cv_channel, int osc);
+
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();

@@ -84,3 +84,58 @@ void cv_trigger_clear_mappings(int gate_cv) {
     }
 }
 
+// To support testing, simulate CV input with a mod osc
+
+// Static array mapping oscs to CV inputs.
+int osc_for_cv[AMY_MAX_CV_IN];
+
+void cv_from_osc_init(void) {
+    for (int i = 0; i < AMY_MAX_CV_IN; ++i) {
+        osc_for_cv[i] = -1;
+    }
+}
+
+void cv_from_osc_deinit(void) {
+}
+
+// Hack to stop trying to evaluate external_coef_hook inside hold_and_modify
+// leading to infinite recursion.
+static bool _recursion_stop = false;
+
+float cv_from_osc(uint16_t cv_channel) {
+    float val = 0;
+    if (!_recursion_stop && cv_channel < AMY_MAX_CV_IN) {
+        int osc = osc_for_cv[cv_channel];
+        if (osc >= 0) {
+            _recursion_stop = true;
+            hold_and_modify(osc);  // this is what envelope.c does for mod oscs, but causes an infinite loop because hold_and_modify evaluates external_cv inputs.
+            _recursion_stop = false;
+            val = S2F(compute_mod_value(osc));
+        }
+    }
+    return val;
+}
+
+void set_cv_from_osc(int cv_channel, int osc) {
+    // Mirror MOD_SOURCE setup from amy.c:config_chorus
+    osc_for_cv[cv_channel] = osc;
+    if (osc < 0)  return;  // syntax to unset cv_from_osc.
+    ensure_osc_allocd(osc, NULL);
+    synth[osc]->status = SYNTH_IS_MOD_SOURCE;
+    // No longer record this osc in note_off state.
+    AMY_UNSET(synth[osc]->note_off_clock);
+    // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
+    synth[osc]->logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
+    synth[osc]->logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
+    synth[osc]->amp_coefs[COEF_VEL] = 0;  // Turn off default.
+    synth[osc]->amp_coefs[COEF_EG0] = 0;  // Turn off default.
+    synth[osc]->wave = TRIANGLE;
+    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+    osc_note_on(osc, freq_of_logfreq(synth[osc]->logfreq_coefs[COEF_CONST]));
+    // Stop us from doing this again.
+    synth[osc]->status = SYNTH_IS_MOD_SOURCE;
+    // Add the CV retrieval hook.
+    if (amy_global.config.amy_external_coef_hook != NULL && amy_global.config.amy_external_coef_hook != cv_from_osc)
+        fprintf(stderr, "set_cv_from_osc: WARNING: overwriting existing amy_external_coef_hook\n");
+    amy_global.config.amy_external_coef_hook = cv_from_osc;
+}
