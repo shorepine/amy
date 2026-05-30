@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <strings.h>
 #ifdef _WIN32
 #include <io.h>
 #include <intrin.h>
