@@ -408,8 +408,9 @@ void triangle_mod_trigger(uint16_t osc) {
 
 // TODO -- this should use dpwe code 
 SAMPLE compute_mod_triangle(uint16_t osc) {
-    // Saw waveform is just the phasor.
-    SAMPLE sample = SHIFTL(P2S(synth[osc]->phase), 2);  // 0..4
+    // Offset phase by 1/4 cycle for Triangle waveform in "sine phase" (starts at 0).
+    SAMPLE sample = SHIFTL(P2S(synth[osc]->phase), 2) + F2S(1.0f);  // 1..5
+    if (sample > F2S(4.0f))  sample -= F2S(4.0f);  // 1..4/0..1
     if (sample > F2S(2.0f))  sample = F2S(4.0f) - sample;  // 0..2..0
     sample -= F2S(1.0f);  // -1 .. 1
     float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;  // samples per sec / samples per call = calls per sec

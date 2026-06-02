@@ -125,15 +125,13 @@ void set_cv_from_osc(int cv_channel, int osc) {
     // No longer record this osc in note_off state.
     AMY_UNSET(synth[osc]->note_off_clock);
     // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
-    synth[osc]->logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
-    synth[osc]->logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
-    synth[osc]->amp_coefs[COEF_VEL] = 0;  // Turn off default.
-    synth[osc]->amp_coefs[COEF_EG0] = 0;  // Turn off default.
-    synth[osc]->wave = TRIANGLE;
-    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+    synth[osc]->logfreq_coefs[COEF_NOTE] = 0;
+    synth[osc]->logfreq_coefs[COEF_BEND] = 0;
+    synth[osc]->amp_coefs[COEF_VEL] = 0;
+    synth[osc]->amp_coefs[COEF_EG0] = 0;
+    synth[osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
     osc_note_on(osc, freq_of_logfreq(synth[osc]->logfreq_coefs[COEF_CONST]));
-    // Stop us from doing this again.
-    synth[osc]->status = SYNTH_IS_MOD_SOURCE;
+    synth[osc]->wave = TRIANGLE;
     // Add the CV retrieval hook.
     if (amy_global.config.amy_external_coef_hook != NULL && amy_global.config.amy_external_coef_hook != cv_from_osc)
         fprintf(stderr, "set_cv_from_osc: WARNING: overwriting existing amy_external_coef_hook\n");
