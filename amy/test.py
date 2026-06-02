@@ -1350,7 +1350,7 @@ class TestCVTriggerNoteOff(AmyTest):
     # Note on when CV osc passes 0.5 rising (reset lower than trigger).
     amy.send(time=0, cv_trigger='0,0.5,0.1,1,1,0,v0l1n%v')
     # Note off when CV osc passes 0.5 falling (reset higher than trigger).
-    amy.send(time=0, cv_trigger='0,0.5,0.6,1,0,0,v0l0')
+    amy.send(time=0, cv_trigger='0,0.5,0.6,v0l0')
     # Also test that we can cancel the trigger events by clearing them
     # midway through last tone.  All triggers on CV0 are cancelled together.
     #amy.send(time=800, cv_trigger='0')

@@ -33,7 +33,7 @@ void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset
     //if (pitch_cv < 0)  pitch_cv = 0;
     // Can't happen - CV args are uint.
     if (trigger_cv >= AMY_MAX_CV_IN)  trigger_cv = AMY_MAX_CV_IN - 1;
-    if (pitch_cv >= AMY_MAX_CV_IN)  pitch_cv = AMY_MAX_CV_IN - 1;
+    if (AMY_IS_SET(pitch_cv) && (pitch_cv >= AMY_MAX_CV_IN))  pitch_cv = AMY_MAX_CV_IN - 1;
     // Construct a new linked list entry.
     cv_trigger_t *result = (cv_trigger_t *)malloc_caps(
         sizeof(cv_trigger_t) + strlen(message_template) + 1,
@@ -101,13 +101,18 @@ void cv_trigger_generate_events(float *cv_inputs) {
         if (cv_trig->state == CV_TRIG_READY) {
             if ((polarity * cv_val) >= (polarity * cv_trig->thresh_trigger)) {
                 // execute the event
-                float note = midi_note_for_logfreq(
-                    cv_trig->pitch_offset
-                    + cv_trig->pitch_scale * cv_inputs[cv_trig->pitch_cv]
-                );
+                float note = 0;
+                if (AMY_IS_SET(cv_trig->pitch_cv)) {
+                    // resample the pitch CV
+                    float cv_input = amy_global.config.amy_external_coef_hook(cv_trig->pitch_cv);
+                    note = midi_note_for_logfreq(
+                        cv_trig->pitch_offset
+                        + cv_trig->pitch_scale * cv_input
+                    );
+                }
                 char message[AMY_WIRE_COMMAND_LEN];
                 substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
-                //fprintf(stderr, "update_external_cv_in: message %s\n", message);
+                fprintf(stderr, "update_external_cv_in: message %s\n", message);
                 amy_add_message(message);
                 // Mark as waiting for reset.
                 cv_trig->state = CV_TRIG_TRIGGERED;
@@ -116,6 +121,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
             // Check for reset
             if ((polarity * cv_val) < (polarity * cv_trig->thresh_reset)) {
                 cv_trig->state = CV_TRIG_READY;
+                fprintf(stderr, "update_external_cv_in: RESET message %s\n", cv_trig->message_template);
             }
         }
         cv_trig = cv_trig->next;

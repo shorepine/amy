@@ -367,6 +367,13 @@ int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_
     if (m[0] != ',') goto end; else ++m;
     m += parse_val_float(m, p_thresh_low);
     if (m[0] != ',') goto end; else ++m;
+    // The pitch CV args are optional
+    if (strspn(m, "0123456789.-") == 0) {
+        // Next arg is not numeric, looks like the wire code
+        // Rewind over the comma.
+        --m;
+        goto end;
+    }
     m += parse_val_int32_t(m, p_pitch_cv);
     if (m[0] != ',') goto end; else ++m;
     m += parse_val_float(m, p_pitch_scale);
@@ -379,8 +386,10 @@ int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_
 int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
     // i<synth>ig<gate_cv>,<thresh_high>,<thresh_low>,<pitch_cv>,<pitch_scale>,<pitch_offset>,<wire_template>
     int32_t gate_cv, pitch_cv;
+    uint8_t pitch_cv_uint8;
     float thresh_high, thresh_low, pitch_scale, pitch_offset;
     AMY_UNSET(gate_cv);
+    AMY_UNSET(pitch_cv);
     AMY_UNSET(thresh_high);
     skip_chars = parse_cv_trigger_payload(message, &gate_cv, &thresh_high, &thresh_low, &pitch_cv, &pitch_scale, &pitch_offset);
     if (*(message + skip_chars) != ',') {
@@ -394,7 +403,12 @@ int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
         return skip_chars;
     }
     ++skip_chars;  // step over the "," before the wire string template.
-    cv_trigger_new(gate_cv, thresh_high, thresh_low, pitch_cv, pitch_scale, pitch_offset, message + skip_chars);
+    if (AMY_IS_SET(pitch_cv))
+        pitch_cv_uint8 = pitch_cv;
+    else
+        AMY_UNSET(pitch_cv_uint8);
+    cv_trigger_new(gate_cv, thresh_high, thresh_low,
+                   pitch_cv_uint8, pitch_scale, pitch_offset, message + skip_chars);
     // Consume rest of message but leave the trailing 'Z' for the outer parser.
     int remainder = strlen(message);
     if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
