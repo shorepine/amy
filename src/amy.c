@@ -1243,8 +1243,12 @@ void play_delta(struct delta *d) {
         synth[d->osc]->preset = (uint16_t)d->data.i;
     }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
-    if (d->param == PHASE) synth[d->osc]->trigger_phase = d->data.f;
-
+    if (d->param == PHASE) {
+        // Phase sets the *initial* phase of the osc.
+        synth[d->osc]->trigger_phase = d->data.f;
+        // .. but also warps the current phase to that value.
+        synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
+    }
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)
     DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)
@@ -1323,10 +1327,13 @@ void play_delta(struct delta *d) {
         // When an oscillator is named as a modulator, we change its state.
         ensure_osc_allocd(mod_osc, NULL);
         synth[mod_osc]->status = SYNTH_IS_MOD_SOURCE;
-        // No longer record this osc in note_off state.
-        AMY_UNSET(synth[mod_osc]->note_off_clock);
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
+        // No longer record this osc in note_off state.
+        AMY_UNSET(synth[mod_osc]->note_off_clock);
+        // Start the mod osc.
+        synth[mod_osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+        osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
     }
     if(d->param == ALGORITHM) {
         synth[d->osc]->algorithm = d->data.i;

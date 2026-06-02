@@ -57,7 +57,7 @@ class AmyTest:
       rms_n = dB(rms(samples - expected_samples))
       message += (' err=%.1f dB' % rms_n)
 
-    except FileNotFoundError:
+    except FileNotFoundError, sf.LibsndfileError:
       message += ' / Unable to read ' + ref_file
       rms_n = 0
 
@@ -1290,6 +1290,18 @@ class TestCVFromOsc(AmyTest):
     amy.send(time=0, osc=0, freq={'const': 440, 'note': 1, 'ext0': 1})
     amy.send(time=0, osc=1, freq=4.0, amp=0.1)
     amy.send(time=100, osc=0, vel=1)
+    amy.send(time=900, osc=0, vel=0)
+
+
+class TestZeroFreqModPhase(AmyTest):
+  """Test that we can set a constant value for mod_osc via its phase."""
+
+  def run(self):
+    # Make ext0 come from osc 1
+    amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
+    amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=500, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
     amy.send(time=900, osc=0, vel=0)
 
 

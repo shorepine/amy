@@ -490,6 +490,7 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
 SAMPLE compute_mod_sine(uint16_t osc) { 
     // One sample pulled out of render_lut.
     const LUT *lut = synth[osc]->lut;
+    if (lut == NULL) return 0;   // Avoid bus error if somehow the osc is not set up yet.
     int lut_mask = lut->table_size - 1;
     int lut_bits = lut->log_2_table_size;
     int16_t base_index = INT_OF_P(synth[osc]->phase, lut_bits);
