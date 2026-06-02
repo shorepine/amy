@@ -385,17 +385,15 @@ int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
     skip_chars = parse_cv_trigger_payload(message, &gate_cv, &thresh_high, &thresh_low, &pitch_cv, &pitch_scale, &pitch_offset);
     if (*(message + skip_chars) != ',') {
         if (AMY_IS_UNSET(gate_cv) || AMY_IS_SET(thresh_high)) {
-            // Either parsing bailed without even a CC code, or it got past the thresh, meaning it wasn't a bare ic<NUM> command.
+            // Either parsing bailed without even a gate CV, or it got past the thresh, meaning it wasn't a bare ic<NUM> command.
             fprintf(stderr, "cv_trigger: payload didn't parse for %s.\n", message - 1);
             return skip_chars;  // maybe the rest will parse?
         }
-        // Else we got an incomplete message with a valid gate_cv - clear it
+        // Else we got an incomplete message with a valid gate_cv - clear all triggers for that CV.
         cv_trigger_clear_mappings(gate_cv);
         return skip_chars;
     }
     ++skip_chars;  // step over the "," before the wire string template.
-    // Clear any mapping for this gate_cv before we set it again.
-    cv_trigger_clear_mappings(gate_cv);
     cv_trigger_new(gate_cv, thresh_high, thresh_low, pitch_cv, pitch_scale, pitch_offset, message + skip_chars);
     // Consume rest of message but leave the trailing 'Z' for the outer parser.
     int remainder = strlen(message);

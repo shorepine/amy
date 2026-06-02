@@ -10,8 +10,8 @@ typedef struct cv_trigger {
     struct cv_trigger *next;
     // Parameters
     uint8_t trigger_cv;  // Which CV input to use.
-    float thresh_high;   // Trigger when voltage goes above this
-    float thresh_low;    // Reset when voltage goes below this
+    float thresh_trigger;  // Trigger when voltage passes this
+    float thresh_reset;    // Reset when voltage passes this
     uint8_t pitch_cv;    // CV to use to generate pitch
     float pitch_scale;   // Multiply pitch voltage by this to get 1VPO note
     float pitch_offset;  // Add this to scaled pitch_cv to get 1VPO note
@@ -24,14 +24,15 @@ typedef struct cv_trigger {
 cv_trigger_t *cv_trigger_root = NULL;
 
 void cv_trigger_print(cv_trigger_t *cv_trig) {
-    fprintf(stderr, "cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, cv_trig->thresh_high, cv_trig->thresh_low, cv_trig->pitch_cv, cv_trig->pitch_scale, cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
+    fprintf(stderr, "cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, cv_trig->thresh_trigger, cv_trig->thresh_reset, cv_trig->pitch_cv, cv_trig->pitch_scale, cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
 }
 
-void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
+void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
     // Prevent references outside known CV index range.
-    if (trigger_cv < 0)  trigger_cv = 0;
+    //if (trigger_cv < 0)  trigger_cv = 0;
+    //if (pitch_cv < 0)  pitch_cv = 0;
+    // Can't happen - CV args are uint.
     if (trigger_cv >= AMY_MAX_CV_IN)  trigger_cv = AMY_MAX_CV_IN - 1;
-    if (pitch_cv < 0)  pitch_cv = 0;
     if (pitch_cv >= AMY_MAX_CV_IN)  pitch_cv = AMY_MAX_CV_IN - 1;
     // Construct a new linked list entry.
     cv_trigger_t *result = (cv_trigger_t *)malloc_caps(
@@ -41,12 +42,12 @@ void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uin
     result->message_template = ((char *)result) + sizeof(cv_trigger_t);
     strcpy(result->message_template, message_template);
     result->trigger_cv = trigger_cv;
-    result->thresh_high = thresh_high;
-    result->thresh_low = thresh_low;
+    result->thresh_trigger = thresh_trigger;
+    result->thresh_reset = thresh_reset;
     result->pitch_cv = pitch_cv;
     result->pitch_scale = pitch_scale;
     result->pitch_offset = pitch_offset;
-    result->state = CV_TRIG_TRIGGERED;  // Wait for transition below thresh_low before arming
+    result->state = CV_TRIG_TRIGGERED;  // Wait for transition below thresh_reset before arming
     // Insert into linked list at head.
     result->next = cv_trigger_root;
     cv_trigger_root = result;
@@ -95,8 +96,10 @@ void cv_trigger_generate_events(float *cv_inputs) {
     cv_trigger_t *cv_trig =  cv_trigger_root;
     while(cv_trig) {
         float cv_val = cv_inputs[cv_trig->trigger_cv];
+        bool rising = (cv_trig->thresh_trigger > cv_trig->thresh_reset);
+        int polarity = rising ? 1 : -1;
         if (cv_trig->state == CV_TRIG_READY) {
-            if (cv_val >= cv_trig->thresh_high) {
+            if ((polarity * cv_val) >= (polarity * cv_trig->thresh_trigger)) {
                 // execute the event
                 float note = midi_note_for_logfreq(
                     cv_trig->pitch_offset
@@ -111,7 +114,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
             }
         } else if (cv_trig->state == CV_TRIG_TRIGGERED) {
             // Check for reset
-            if (cv_val < cv_trig->thresh_low) {
+            if ((polarity * cv_val) < (polarity * cv_trig->thresh_reset)) {
                 cv_trig->state = CV_TRIG_READY;
             }
         }

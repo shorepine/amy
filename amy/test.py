@@ -57,8 +57,11 @@ class AmyTest:
       rms_n = dB(rms(samples - expected_samples))
       message += (' err=%.1f dB' % rms_n)
 
-    except FileNotFoundError, sf.LibsndfileError:
-      message += ' / Unable to read ' + ref_file
+    except FileNotFoundError:
+      message += ' / Could not find ' + ref_file
+      rms_n = 0
+    except sf.LibsndfileError:
+      message += ' / Error reading ' + ref_file
       rms_n = 0
 
     # For now, any value above this threshold counts as a failed test
@@ -1332,6 +1335,27 @@ class TestCVTriggerNote(AmyTest):
     amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
     # Tone is triggered when CV osc passes 0.5.
     amy.send(cv_trigger='0,0.5,0.1,1,0.5,0,v0l1n%v')
+
+
+class TestCVTriggerNoteOff(AmyTest):
+  """Test pitch input of CV-triggered events including note off."""
+
+  def run(self):
+    amy.send(reset=amy.RESET_TIMEBASE)
+    # Setup the simulated CV input 0 as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Osc 0 gives a gated tone.
+    amy.send(time=0, osc=0, freq=440, eg1='0,1,1000,0,100,0')
+    # Note on when CV osc passes 0.5 rising (reset lower than trigger).
+    amy.send(time=0, cv_trigger='0,0.5,0.1,1,1,0,v0l1n%v')
+    # Note off when CV osc passes 0.5 falling (reset higher than trigger).
+    amy.send(time=0, cv_trigger='0,0.5,0.6,1,0,0,v0l0')
+    # Also test that we can cancel the trigger events by clearing them
+    # midway through last tone.  All triggers on CV0 are cancelled together.
+    #amy.send(time=800, cv_trigger='0')
+    # Oh, cv_trigger is executed on message parse, not deferred to a timed
+    # event, so this cleared the events before they even started.
 
 
 def main(argv):
