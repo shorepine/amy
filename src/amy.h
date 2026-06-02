@@ -138,6 +138,9 @@ extern const uint32_t pcm_wavetable_len;
 // On which MIDI channel to install the default MIDI drums handler.
 #define AMY_MIDI_CHANNEL_DRUMS 10
 
+// Default length of char buffer for building wire commands (e.g. in midi_mapping)
+#define AMY_WIRE_COMMAND_LEN 256
+
 
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
@@ -959,13 +962,17 @@ extern void midi_mapping_debug();
 extern void midi_mappings_init();
 extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
+extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
 
+extern float cv_inputs[AMY_MAX_CV_IN];
 extern void cv_trigger_debug(void);
 extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template);
 extern void cv_trigger_init(void);
 extern void cv_trigger_deinit(void);
 extern void cv_trigger_clear_mappings(int gate_cv);
+// Read the external CV and run triggers.
+extern void update_external_cv_in(void);
 
 // Testing-oriented facility to pull External CV input from a mod osc
 extern void cv_from_osc_init(void);

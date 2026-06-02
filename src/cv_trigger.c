@@ -28,6 +28,12 @@ void cv_trigger_print(cv_trigger_t *cv_trig) {
 }
 
 void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
+    // Prevent references outside known CV index range.
+    if (trigger_cv < 0)  trigger_cv = 0;
+    if (trigger_cv >= AMY_MAX_CV_IN)  trigger_cv = AMY_MAX_CV_IN - 1;
+    if (pitch_cv < 0)  pitch_cv = 0;
+    if (pitch_cv >= AMY_MAX_CV_IN)  pitch_cv = AMY_MAX_CV_IN - 1;
+    // Construct a new linked list entry.
     cv_trigger_t *result = (cv_trigger_t *)malloc_caps(
         sizeof(cv_trigger_t) + strlen(message_template) + 1,
         amy_global.config.ram_caps_synth
@@ -84,6 +90,58 @@ void cv_trigger_clear_mappings(int gate_cv) {
     }
 }
 
+void cv_trigger_generate_events(float *cv_inputs) {
+    // Check to see if triggers are run based on new vector of trigger values.
+    cv_trigger_t *cv_trig =  cv_trigger_root;
+    while(cv_trig) {
+        float cv_val = cv_inputs[cv_trig->trigger_cv];
+        if (cv_trig->state == CV_TRIG_READY) {
+            if (cv_val >= cv_trig->thresh_high) {
+                // execute the event
+                float note = midi_note_for_logfreq(
+                    cv_trig->pitch_offset
+                    + cv_trig->pitch_scale * cv_inputs[cv_trig->pitch_cv]
+                );
+                char message[AMY_WIRE_COMMAND_LEN];
+                substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
+                //fprintf(stderr, "update_external_cv_in: message %s\n", message);
+                amy_add_message(message);
+                // Mark as waiting for reset.
+                cv_trig->state = CV_TRIG_TRIGGERED;
+            }
+        } else if (cv_trig->state == CV_TRIG_TRIGGERED) {
+            // Check for reset
+            if (cv_val < cv_trig->thresh_low) {
+                cv_trig->state = CV_TRIG_READY;
+            }
+        }
+        cv_trig = cv_trig->next;
+    }
+}
+
+
+// Main entry, called once per block, check if triggers are run.
+
+float cv_inputs[AMY_MAX_CV_IN];
+
+void update_external_cv_in(void) {
+    // Update the CV inputs.
+    if (amy_global.config.amy_external_coef_hook != NULL) {
+        cv_inputs[0] = amy_global.config.amy_external_coef_hook(0);
+        cv_inputs[1] = amy_global.config.amy_external_coef_hook(1);
+    } else {
+        #ifdef __EMSCRIPTEN__
+        cv_inputs[0] = amy_web_cv_1;
+        cv_inputs[1] = amy_web_cv_2;
+        #else
+        cv_inputs[0] = 0;
+        cv_inputs[1] = 0;
+        #endif
+    }
+    // Run triggers
+    cv_trigger_generate_events(cv_inputs);
+}
+
 // To support testing, simulate CV input with a mod osc
 
 // Static array mapping oscs to CV inputs.
@@ -131,7 +189,6 @@ void set_cv_from_osc(int cv_channel, int osc) {
     synth[osc]->amp_coefs[COEF_EG0] = 0;
     synth[osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
     osc_note_on(osc, freq_of_logfreq(synth[osc]->logfreq_coefs[COEF_CONST]));
-    synth[osc]->wave = TRIANGLE;
     // Add the CV retrieval hook.
     if (amy_global.config.amy_external_coef_hook != NULL && amy_global.config.amy_external_coef_hook != cv_from_osc)
         fprintf(stderr, "set_cv_from_osc: WARNING: overwriting existing amy_external_coef_hook\n");

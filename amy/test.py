@@ -1281,6 +1281,18 @@ class TestBuses(AmyTest):
     amy.send(time=700, synth=2, note=70, vel=5)
 
 
+class TestZeroFreqModPhase(AmyTest):
+  """Test that we can set a constant value for mod_osc via its phase."""
+
+  def run(self):
+    # Make ext0 come from osc 1
+    amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
+    amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=500, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
+    amy.send(time=900, osc=0, vel=0)
+
+
 class TestCVFromOsc(AmyTest):
   """Facility to simulate CV input from an osc, for testing."""
 
@@ -1293,16 +1305,33 @@ class TestCVFromOsc(AmyTest):
     amy.send(time=900, osc=0, vel=0)
 
 
-class TestZeroFreqModPhase(AmyTest):
-  """Test that we can set a constant value for mod_osc via its phase."""
+class TestCVTrigger(AmyTest):
+  """Test events triggered by CV transitions, using simulated CV-from-osc."""
 
   def run(self):
-    # Make ext0 come from osc 1
-    amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
-    amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
-    amy.send(time=100, osc=0, vel=1)
-    amy.send(time=500, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
-    amy.send(time=900, osc=0, vel=0)
+    # Setup the simulated CV input as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Osc 0 gives a little tone.
+    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    # Tone is triggered when CV osc passes 0.5.
+    amy.send(cv_trigger='0,0.5,0.1,1,0,1,v0l1')
+
+
+class TestCVTriggerNote(AmyTest):
+  """Test pitch input of CV-triggered events."""
+
+  def run(self):
+    # Setup the simulated CV input 0 as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Setup the simulated CV input 1 (pitch) as slow ramp
+    amy.set_cv_from_osc(1, 2)
+    amy.send(time=0, osc=2, freq=1, wave=amy.SAW_UP)
+    # Osc 0 gives a little tone.
+    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    # Tone is triggered when CV osc passes 0.5.
+    amy.send(cv_trigger='0,0.5,0.1,1,0.5,0,v0l1n%v')
 
 
 def main(argv):

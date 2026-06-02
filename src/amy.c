@@ -1533,17 +1533,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
-    ctrl_inputs[COEF_EXT0] = 0;
-    ctrl_inputs[COEF_EXT1] = 0;
-    if(amy_global.config.amy_external_coef_hook != NULL) {
-        ctrl_inputs[COEF_EXT0] = amy_global.config.amy_external_coef_hook(0);
-        ctrl_inputs[COEF_EXT1] = amy_global.config.amy_external_coef_hook(1);
-    } else {
-        #ifdef __EMSCRIPTEN__
-        ctrl_inputs[COEF_EXT0] = amy_web_cv_1;
-        ctrl_inputs[COEF_EXT1] = amy_web_cv_2;
-        #endif
-    }
+    ctrl_inputs[COEF_EXT0] = cv_inputs[0];
+    ctrl_inputs[COEF_EXT1] = cv_inputs[1];
 
     msynth[osc]->last_pan = msynth[osc]->pan;
 
@@ -1857,6 +1848,9 @@ void amy_execute_delta() {
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
+    // Make sure any CV-triggered events are added to delta queue
+    update_external_cv_in();
+
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
     amy_grab_lock();
