@@ -157,20 +157,20 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-#define _EPRINT_I(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { sprintf(s, "%s%" PRId32, wirecode ? WIRECODE : " " NAME ": ", (int32_t)e->FIELD); s += strlen(s); }
-#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { sprintf(s, "%s%.3f", wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
+#define _EPRINT_I(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintf(s, len - (size_t)(s - s_entry), "%s%" PRId32, wirecode ? WIRECODE : " " NAME ": ", (int32_t)e->FIELD); s += strlen(s); }
+#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintf(s, len - (size_t)(s - s_entry), "%s%.3f", wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
 #define _EPRINT_COEF(FIELD, NAME, WIRECODE) {            \
     int last_set = -1; \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {    \
         if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
     }                                              \
     if (last_set >= 0) { \
-        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");        \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");        \
         s += strlen(s);  \
         for (int i = 0; i <= last_set; ++i) { \
-            if (i > 0) { sprintf(s, ","); s += strlen(s); }      \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }      \
             if (AMY_IS_SET(e->FIELD[i])) {        \
-                sprintf(s, "%.3f", e->FIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->FIELD[i]); \
                 s += strlen(s);  \
             }   \
         } \
@@ -182,12 +182,12 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
     }                                              \
     if (last_set >= 0) { \
-        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");       \
         s += strlen(s);  \
         for (int i = 0; i <= last_set; ++i) { \
-            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->FIELD[i])) { \
-                sprintf(s, "%" PRId32, (int32_t)e->FIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%" PRId32, (int32_t)e->FIELD[i]); \
                 s += strlen(s); \
             } \
         } \
@@ -199,12 +199,12 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
     }                                              \
     if (last_set >= 0) { \
-        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");       \
         s += strlen(s);  \
         for (int i = 0; i <= last_set; ++i) { \
-            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->FIELD[i])) { \
-                sprintf(s, "%.3f", e->FIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->FIELD[i]); \
                 s += strlen(s); \
             } \
         } \
@@ -217,18 +217,18 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         if (AMY_IS_SET(e->TFIELD[i]) || AMY_IS_SET(e->VFIELD[i])) last_set = i; \
     }                                                \
     if (last_set >= 0) {                            \
-        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");        \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");        \
         s += strlen(s);   \
         for (int i = 0; i <= last_set; ++i) {       \
-            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->TFIELD[i])) {                        \
-                sprintf(s, "%" PRIu32, e->TFIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%" PRIu32, e->TFIELD[i]); \
                 s += strlen(s);  \
             }    \
-            sprintf(s, ",");                   \
+            snprintf(s, len - (size_t)(s - s_entry), ",");                   \
             s += strlen(s);    \
             if (AMY_IS_SET(e->VFIELD[i])) {       \
-                sprintf(s, "%.3f", e->VFIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->VFIELD[i]); \
                 s += strlen(s);  \
             }  \
         }                                            \
@@ -243,15 +243,15 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
             if (AMY_IS_SET(vals[i])) last_one = i; \
         } \
         if (last_one >= 0) { \
-            sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": "); \
+            snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": "); \
             s += strlen(s); \
             for (int j = 0; j <= last_one; ++j) {  \
                 if (AMY_IS_SET(vals[j])) { \
-                    sprintf(s, "%.3f", vals[j]);   \
+                    snprintf(s, len - (size_t)(s - s_entry), "%.3f", vals[j]);   \
                     s += strlen(s); \
                 } \
                 if (j < last_one) { \
-                    sprintf(s, ","); \
+                    snprintf(s, len - (size_t)(s - s_entry), ","); \
                     s += strlen(s); \
                 } \
             } \
@@ -264,11 +264,11 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Return is how many chrs written to s.  Will abort if it overruns.
     char *s_entry = s;
     if (!wirecode) {
-        sprintf(s, "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
+        snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
         s += strlen(s);
     } else {
-        if (AMY_IS_SET(e->time)) { sprintf(s, "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
-        if (AMY_IS_SET(e->osc)) { sprintf(s, "v%" PRIu16, (int16_t)e->osc); s += strlen(s); }
+        if (AMY_IS_SET(e->time)) { snprintf(s, len - (size_t)(s - s_entry), "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
+        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%" PRIu16, (int16_t)e->osc); s += strlen(s); }
     }
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
@@ -322,7 +322,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
     _EPRINT_VALS_5(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT, "reverb_{level,live,damp,xover}", "h");
 
-    if (wirecode && (s - s_entry) > 0) { sprintf(s, "Z"); s += strlen(s); }
+    if (wirecode && (s - s_entry) > 0) { snprintf(s, len - (size_t)(s - s_entry), "Z"); s += strlen(s); }
 
     assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
     return s - s_entry;
