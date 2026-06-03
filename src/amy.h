@@ -973,6 +973,11 @@ extern void substitute_midi_special_values(char *dest, const char *src, int chan
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
+#ifdef __EMSCRIPTEN__
+// Web CV input voltages, sampled from JS each block (defined in libminiaudio-audio.c).
+extern float amy_web_cv_1;
+extern float amy_web_cv_2;
+#endif
 extern void cv_trigger_debug(void);
 extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template);
 extern void cv_trigger_init(void);
