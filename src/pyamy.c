@@ -156,7 +156,7 @@ static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value)
 
 static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs) {
     amy_stop();
-    amy_config_t amy_config = amy_global.config;
+    amy_config_t amy_config = amy_default_config();
     Py_ssize_t pos = 0;
     PyObject *key_obj = NULL;
     PyObject *value_obj = NULL;
@@ -165,8 +165,6 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "live() no longer accepts positional args; use keyword args like live(playback_device_id=..., capture_device_id=...)");
         return NULL;
     }
-
-    amy_config.features.audio_in = 1;
 
     while (kwargs != NULL && PyDict_Next(kwargs, &pos, &key_obj, &value_obj)) {
         const char *key = PyUnicode_AsUTF8(key_obj);
