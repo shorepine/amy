@@ -335,7 +335,7 @@ int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_c
     // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
     // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
     int32_t code, is_log;
-    float min_val, max_val, offset_val;
+    float min_val = 0, max_val = 0, offset_val = 0;
     int type = (cmd == 'c') ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
     AMY_UNSET(code);
     AMY_UNSET(is_log);
@@ -387,7 +387,7 @@ int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
     // i<synth>ig<gate_cv>,<thresh_high>,<thresh_low>,<pitch_cv>,<pitch_scale>,<pitch_offset>,<wire_template>
     int32_t gate_cv, pitch_cv;
     uint8_t pitch_cv_uint8;
-    float thresh_high, thresh_low, pitch_scale, pitch_offset;
+    float thresh_high = 0, thresh_low = 0, pitch_scale = 0, pitch_offset = 0;
     AMY_UNSET(gate_cv);
     AMY_UNSET(pitch_cv);
     AMY_UNSET(thresh_high);
