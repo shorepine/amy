@@ -217,18 +217,18 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         if (AMY_IS_SET(e->TFIELD[i]) || AMY_IS_SET(e->VFIELD[i])) last_set = i; \
     }                                                \
     if (last_set >= 0) {                            \
-        sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": ");        \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");        \
         s += strlen(s);   \
         for (int i = 0; i <= last_set; ++i) {       \
-            if (i > 0) { sprintf(s, ","); s += strlen(s); }        \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->TFIELD[i])) {                        \
-                sprintf(s, "%" PRIu32, e->TFIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%" PRIu32, e->TFIELD[i]); \
                 s += strlen(s);  \
             }    \
-            sprintf(s, ",");                   \
+            snprintf(s, len - (size_t)(s - s_entry), ",");                   \
             s += strlen(s);    \
             if (AMY_IS_SET(e->VFIELD[i])) {       \
-                sprintf(s, "%.3f", e->VFIELD[i]); \
+                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->VFIELD[i]); \
                 s += strlen(s);  \
             }  \
         }                                            \
@@ -243,15 +243,15 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
             if (AMY_IS_SET(vals[i])) last_one = i; \
         } \
         if (last_one >= 0) { \
-            sprintf(s, "%s", wirecode ? WIRECODE : " " NAME ": "); \
+            snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": "); \
             s += strlen(s); \
             for (int j = 0; j <= last_one; ++j) {  \
                 if (AMY_IS_SET(vals[j])) { \
-                    sprintf(s, "%.3f", vals[j]);   \
+                    snprintf(s, len - (size_t)(s - s_entry), "%.3f", vals[j]);   \
                     s += strlen(s); \
                 } \
                 if (j < last_one) { \
-                    sprintf(s, ","); \
+                    snprintf(s, len - (size_t)(s - s_entry), ","); \
                     s += strlen(s); \
                 } \
             } \
