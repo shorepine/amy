@@ -115,7 +115,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
                    }
                    char message[AMY_WIRE_COMMAND_LEN];
                    substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
-                   fprintf(stderr, "update_external_cv_in: message %s\n", message);
+                   //fprintf(stderr, "update_external_cv_in: message %s\n", message);
                    amy_add_message(message);
                 }
             }
@@ -123,7 +123,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
             if (cv_trig->state != CV_TRIG_READY) {
                 // Reset
                 cv_trig->state = CV_TRIG_READY;
-                fprintf(stderr, "update_external_cv_in: RESET message %s\n", cv_trig->message_template);
+                //fprintf(stderr, "update_external_cv_in: RESET message %s\n", cv_trig->message_template);
             }
         }
         cv_trig = cv_trig->next;
