@@ -58,7 +58,7 @@
 
 #include "driver/i2s_std.h"
 #ifdef AMYBOARD_ARDUINO
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 #endif
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
@@ -171,22 +171,13 @@ amy_err_t esp32_setup_i2s(void) {
 #ifdef AMYBOARD_ARDUINO
     // Initialize PCM9211 SPDIF transceiver via I2C.
     // On the MicroPython AMYBOARD path this is done in Python (amyboard.py).
+    // Uses the new (driver_ng) I2C master API so it coexists with Arduino's Wire,
+    // which also uses driver_ng on ESP32 Arduino core 3.x.
     {
         #define PCM9211_I2C_ADDR   0x40
         #define PCM9211_I2C_SDA    17
         #define PCM9211_I2C_SCL    18
         #define PCM9211_I2C_FREQ   400000
-
-        i2c_config_t i2c_conf = {
-            .mode = I2C_MODE_MASTER,
-            .sda_io_num = PCM9211_I2C_SDA,
-            .scl_io_num = PCM9211_I2C_SCL,
-            .sda_pullup_en = GPIO_PULLUP_ENABLE,
-            .scl_pullup_en = GPIO_PULLUP_ENABLE,
-            .master.clk_speed = PCM9211_I2C_FREQ,
-        };
-        i2c_param_config(I2C_NUM_0, &i2c_conf);
-        i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
 
         static const uint8_t pcm9211_regs[][2] = {
             { 0x40, 0x33 },  // Power down ADC, DIR, DIT, OSC
@@ -202,18 +193,41 @@ amy_err_t esp32_setup_i2s(void) {
             { 0x6F, 0x40 },  // MPIO_A = CLKST / MPIO_B = AUXIN2 / MPIO_C = AUXIN1
         };
 
-        for (int i = 0; i < sizeof(pcm9211_regs) / sizeof(pcm9211_regs[0]); i++) {
-            uint8_t buf[2] = { pcm9211_regs[i][0], pcm9211_regs[i][1] };
-            esp_err_t ret = i2c_master_write_to_device(
-                I2C_NUM_0, PCM9211_I2C_ADDR, buf, 2, pdMS_TO_TICKS(100));
-            if (ret != ESP_OK) {
-                fprintf(stderr, "PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
-                    buf[0], buf[1], esp_err_to_name(ret));
+        i2c_master_bus_config_t bus_conf = {
+            .i2c_port = I2C_NUM_0,
+            .sda_io_num = PCM9211_I2C_SDA,
+            .scl_io_num = PCM9211_I2C_SCL,
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+            .glitch_ignore_cnt = 7,
+            .flags.enable_internal_pullup = true,
+        };
+        i2c_master_bus_handle_t bus_handle = NULL;
+        i2c_master_dev_handle_t dev_handle = NULL;
+        esp_err_t ret = i2c_new_master_bus(&bus_conf, &bus_handle);
+        if (ret == ESP_OK) {
+            i2c_device_config_t dev_conf = {
+                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+                .device_address = PCM9211_I2C_ADDR,
+                .scl_speed_hz = PCM9211_I2C_FREQ,
+            };
+            ret = i2c_master_bus_add_device(bus_handle, &dev_conf, &dev_handle);
+        }
+        if (ret != ESP_OK) {
+            fprintf(stderr, "PCM9211: I2C init failed: %s\n", esp_err_to_name(ret));
+        } else {
+            for (int i = 0; i < sizeof(pcm9211_regs) / sizeof(pcm9211_regs[0]); i++) {
+                uint8_t buf[2] = { pcm9211_regs[i][0], pcm9211_regs[i][1] };
+                ret = i2c_master_transmit(dev_handle, buf, 2, 100);
+                if (ret != ESP_OK) {
+                    fprintf(stderr, "PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
+                        buf[0], buf[1], esp_err_to_name(ret));
+                }
             }
         }
 
         // Tear down the I2C driver so Arduino Wire can use bus 0 later
-        i2c_driver_delete(I2C_NUM_0);
+        if (dev_handle) i2c_master_bus_rm_device(dev_handle);
+        if (bus_handle) i2c_del_master_bus(bus_handle);
     }
 #endif // AMYBOARD_ARDUINO
 
