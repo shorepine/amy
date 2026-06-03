@@ -34,6 +34,12 @@ extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
+#ifdef ESP_PLATFORM
+// PRIu8 is normally hu, but the clang we're using doesn't seem to understand it.
+#undef PRIu8
+#define PRIu8 "u"
+#endif
+
 
 // This is for baked in samples that come with AMY. The header file written by `amy/headers.py` writes this.
 typedef struct {
@@ -860,7 +866,7 @@ void amy_add_event_internal(amy_event *e, uint16_t base_osc);
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue);
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
-void print_osc_debug(int i /* osc */, bool show_eg);
+void print_osc_debug(uint16_t i /* osc */, bool show_eg);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 float freq_for_midi_note(float midi_note);

@@ -1028,9 +1028,9 @@ void fprint_combo_coefs(char *name, float *coefs) {
     fprintf(stderr, "\n");
 }
 
-void print_osc_debug(int i /* osc */, bool show_eg) {
-    if (synth[i] == NULL)  {fprintf(stderr, "osc %d not defined\n", i); return; }
-    fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d algo_source %d,%d,%d,%d,%d,%d  \n",
+void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
+    if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " wave %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
             i, synth[i]->status, synth[i]->wave, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
@@ -1042,13 +1042,13 @@ void print_osc_debug(int i /* osc */, bool show_eg) {
     fprint_combo_coefs("pan_coefs", synth[i]->pan_coefs);
     if(show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-            fprintf(stderr,"  eg%d (type %d): ", j, synth[i]->eg_type[j]);
+            fprintf(stderr,"  eg%" PRIu8 " (type %" PRIu8 "): ", j, synth[i]->eg_type[j]);
             for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
                 fprintf(stderr,"%" PRIi32 ": %f ", synth[i]->breakpoint_times[j][k], synth[i]->breakpoint_values[j][k]);
             }
             fprintf(stderr,"\n");
         }
-        fprintf(stderr,"mod osc %d: amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan);
+        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan);
     }
 }
 
@@ -1066,7 +1066,7 @@ void show_debug(uint8_t type) {
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
-            fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
+            fprintf(stderr,"%" PRIu16 " time %" PRIu32 " osc %" PRIu16 " param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
         fprintf(stderr, "deltas_queue len %" PRIi32 ", free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
