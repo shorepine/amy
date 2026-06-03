@@ -3,8 +3,9 @@
 
 #include "amy.h"
 
-#define CV_TRIG_TRIGGERED 0
-#define CV_TRIG_READY 1
+// Gap between READY and TRIGGERED is how many frames to wait before triggering
+#define CV_TRIG_READY 0
+#define CV_TRIG_TRIGGERED 2
 
 typedef struct cv_trigger {
     struct cv_trigger *next;
@@ -98,28 +99,29 @@ void cv_trigger_generate_events(float *cv_inputs) {
         float cv_val = cv_inputs[cv_trig->trigger_cv];
         bool rising = (cv_trig->thresh_trigger > cv_trig->thresh_reset);
         int polarity = rising ? 1 : -1;
-        if (cv_trig->state == CV_TRIG_READY) {
-            if ((polarity * cv_val) >= (polarity * cv_trig->thresh_trigger)) {
-                // execute the event
-                float note = 0;
-                if (AMY_IS_SET(cv_trig->pitch_cv)) {
-                    // resample the pitch CV
-                    float cv_input = amy_global.config.amy_external_coef_hook(cv_trig->pitch_cv);
-                    note = midi_note_for_logfreq(
-                        cv_trig->pitch_offset
-                        + cv_trig->pitch_scale * cv_input
-                    );
+        if ((polarity * cv_val) >= (polarity * cv_trig->thresh_trigger)) {
+            if (cv_trig->state <= CV_TRIG_TRIGGERED) {
+                ++cv_trig->state;
+                if (cv_trig->state == CV_TRIG_TRIGGERED) {
+                   // execute the event
+                   float note = 0;
+                   if (AMY_IS_SET(cv_trig->pitch_cv)) {
+                       // resample the pitch CV
+                       float cv_input = amy_global.config.amy_external_coef_hook(cv_trig->pitch_cv);
+                       note = midi_note_for_logfreq(
+                           cv_trig->pitch_offset
+                           + cv_trig->pitch_scale * cv_input
+                       );
+                   }
+                   char message[AMY_WIRE_COMMAND_LEN];
+                   substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
+                   fprintf(stderr, "update_external_cv_in: message %s\n", message);
+                   amy_add_message(message);
                 }
-                char message[AMY_WIRE_COMMAND_LEN];
-                substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
-                fprintf(stderr, "update_external_cv_in: message %s\n", message);
-                amy_add_message(message);
-                // Mark as waiting for reset.
-                cv_trig->state = CV_TRIG_TRIGGERED;
             }
-        } else if (cv_trig->state == CV_TRIG_TRIGGERED) {
-            // Check for reset
-            if ((polarity * cv_val) < (polarity * cv_trig->thresh_reset)) {
+        } else if ((polarity * cv_val) < (polarity * cv_trig->thresh_reset)) {
+            if (cv_trig->state != CV_TRIG_READY) {
+                // Reset
                 cv_trig->state = CV_TRIG_READY;
                 fprintf(stderr, "update_external_cv_in: RESET message %s\n", cv_trig->message_template);
             }
