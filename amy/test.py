@@ -1292,8 +1292,8 @@ class TestZeroFreqModPhase(AmyTest):
     amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
     amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
     amy.send(time=100, osc=0, vel=1)
-    amy.send(time=500, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
-    amy.send(time=900, osc=0, vel=0)
+    amy.send(time=200, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
+    amy.send(time=400, osc=0, vel=0)
 
 
 class TestCVFromOsc(AmyTest):
