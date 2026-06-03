@@ -1520,8 +1520,6 @@ float amp_combine_controls(float *controls, float *coefs) {
 // apply an mod & bp, if any, to the osc
 #ifdef __EMSCRIPTEN__
 #include "emscripten/webaudio.h"
-extern float amy_web_cv_1;
-extern float amy_web_cv_2;
 #endif
 void hold_and_modify(uint16_t osc) {
     AMY_PROFILE_START(HOLD_AND_MODIFY)
