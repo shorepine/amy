@@ -930,6 +930,13 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Set the grab_midi state.
             instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
         }
+        if (AMY_IS_SET(e->synth_flags)) {
+            instrument_set_flags(e->synth, e->synth_flags);
+        }
+        if (AMY_IS_SET(e->grab_midi_notes)) {
+            // Set the grab_midi state.
+            instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
+        }
         if (AMY_IS_SET(e->pedal)) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);

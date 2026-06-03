@@ -192,13 +192,11 @@ float map_midi_value(struct midi_mapping *mapping, uint8_t value) {
     }
 }
 
-#define WIRE_COMMAND_LEN 256
-
 void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value) {
     // Copy src string to dest, but replace "%i" with channel and "%v" with value.
     const char *s;
     const char *entry_src = src;
-    int n_remain = WIRE_COMMAND_LEN - 1;
+    int n_remain = AMY_WIRE_COMMAND_LEN - 1;
     while((s = strchr(src, '%')) != NULL && n_remain > (int)strlen(src)) {
         // Copy up to the %.
         int nchars = s - src;
@@ -244,7 +242,7 @@ void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t 
                 status = 0x90;
                 value = 0;
             }
-            char message[WIRE_COMMAND_LEN];
+            char message[AMY_WIRE_COMMAND_LEN];
             char offset = 0;
             if (AMY_IS_SET(time)) {
                 sprintf(message, "t%" PRId32, time);

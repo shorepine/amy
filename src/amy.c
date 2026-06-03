@@ -856,6 +856,10 @@ void amy_reset_oscs() {
     // Reset midi_mappings.
     midi_mappings_deinit();
     midi_mappings_init();
+    cv_trigger_deinit();
+    cv_trigger_init();
+    cv_from_osc_deinit();
+    cv_from_osc_init();
 }
 
 
@@ -991,6 +995,8 @@ int8_t oscs_init() {
     amy_deltas_reset();
 
     midi_mappings_init();
+    cv_trigger_init();
+    cv_from_osc_init();
 
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
@@ -1014,27 +1020,35 @@ int8_t oscs_init() {
     return 0;
 }
 
-void print_osc_debug(int i /* osc */, bool show_eg) {
-    if (synth[i] == NULL)  {fprintf(stderr, "osc %d not defined\n", i); return; }
-    fprintf(stderr,"osc %d: status %d wave %d mod_source %d velocity %f logratio %f feedback %f filtype %d resonance %f portamento_alpha %f step %f chained %d algo %d algo_source %d,%d,%d,%d,%d,%d  \n",
+void fprint_combo_coefs(char *name, float *coefs) {
+    fprintf(stderr, "  %s:", name);
+    for (int i=0; i < NUM_COMBO_COEFS; ++i) {
+        fprintf(stderr, " %.3f", coefs[i]);
+    }
+    fprintf(stderr, "\n");
+}
+
+void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
+    if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " wave %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
             i, synth[i]->status, synth[i]->wave, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
-    fprintf(stderr, "  amp_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->amp_coefs[0], synth[i]->amp_coefs[1], synth[i]->amp_coefs[2], synth[i]->amp_coefs[3], synth[i]->amp_coefs[4], synth[i]->amp_coefs[5], synth[i]->amp_coefs[6]);
-    fprintf(stderr, "  lfr_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->logfreq_coefs[0], synth[i]->logfreq_coefs[1], synth[i]->logfreq_coefs[2], synth[i]->logfreq_coefs[3], synth[i]->logfreq_coefs[4], synth[i]->logfreq_coefs[5], synth[i]->logfreq_coefs[6]);
-    fprintf(stderr, "  flf_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->filter_logfreq_coefs[0], synth[i]->filter_logfreq_coefs[1], synth[i]->filter_logfreq_coefs[2], synth[i]->filter_logfreq_coefs[3], synth[i]->filter_logfreq_coefs[4], synth[i]->filter_logfreq_coefs[5], synth[i]->filter_logfreq_coefs[6]);
-    fprintf(stderr, "  dut_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->duty_coefs[0], synth[i]->duty_coefs[1], synth[i]->duty_coefs[2], synth[i]->duty_coefs[3], synth[i]->duty_coefs[4], synth[i]->duty_coefs[5], synth[i]->duty_coefs[6]);
-    fprintf(stderr, "  pan_coefs: %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n", synth[i]->pan_coefs[0], synth[i]->pan_coefs[1], synth[i]->pan_coefs[2], synth[i]->pan_coefs[3], synth[i]->pan_coefs[4], synth[i]->pan_coefs[5], synth[i]->pan_coefs[6]);
+    fprint_combo_coefs("amp_coefs", synth[i]->amp_coefs);
+    fprint_combo_coefs("lfr_coefs", synth[i]->logfreq_coefs);
+    fprint_combo_coefs("flf_coefs", synth[i]->filter_logfreq_coefs);
+    fprint_combo_coefs("dut_coefs", synth[i]->duty_coefs);
+    fprint_combo_coefs("pan_coefs", synth[i]->pan_coefs);
     if(show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
-            fprintf(stderr,"  eg%d (type %d): ", j, synth[i]->eg_type[j]);
+            fprintf(stderr,"  eg%" PRIu8 " (type %" PRIu8 "): ", j, synth[i]->eg_type[j]);
             for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
                 fprintf(stderr,"%" PRIi32 ": %f ", synth[i]->breakpoint_times[j][k], synth[i]->breakpoint_values[j][k]);
             }
             fprintf(stderr,"\n");
         }
-        fprintf(stderr,"mod osc %d: amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan);
+        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan);
     }
 }
 
@@ -1052,7 +1066,7 @@ void show_debug(uint8_t type) {
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
-            fprintf(stderr,"%d time %" PRIu32 " osc %d param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
+            fprintf(stderr,"%" PRIu16 " time %" PRIu32 " osc %" PRIu16 " param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
         fprintf(stderr, "deltas_queue len %" PRIi32 ", free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
@@ -1070,6 +1084,7 @@ void show_debug(uint8_t type) {
         }
         if (type > 5) {
             midi_mapping_debug();
+            cv_trigger_debug();
         }
         if (type > 6) {
             for (int synth = 0; synth < 32 /* MAX_INSTRUMENTS */; ++synth) {
@@ -1092,6 +1107,8 @@ void show_debug(uint8_t type) {
 }
 
 void oscs_deinit() {
+    cv_from_osc_deinit();
+    cv_trigger_deinit();
     midi_mappings_deinit();
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
         dealloc_chorus_delay_lines(bus);
@@ -1226,8 +1243,12 @@ void play_delta(struct delta *d) {
         synth[d->osc]->preset = (uint16_t)d->data.i;
     }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
-    if (d->param == PHASE) synth[d->osc]->trigger_phase = d->data.f;
-
+    if (d->param == PHASE) {
+        // Phase sets the *initial* phase of the osc.
+        synth[d->osc]->trigger_phase = d->data.f;
+        // .. but also warps the current phase to that value.
+        synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
+    }
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)
     DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)
@@ -1306,10 +1327,13 @@ void play_delta(struct delta *d) {
         // When an oscillator is named as a modulator, we change its state.
         ensure_osc_allocd(mod_osc, NULL);
         synth[mod_osc]->status = SYNTH_IS_MOD_SOURCE;
-        // No longer record this osc in note_off state.
-        AMY_UNSET(synth[mod_osc]->note_off_clock);
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
+        // No longer record this osc in note_off state.
+        AMY_UNSET(synth[mod_osc]->note_off_clock);
+        // Start the mod osc.
+        synth[mod_osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+        osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
     }
     if(d->param == ALGORITHM) {
         synth[d->osc]->algorithm = d->data.i;
@@ -1509,18 +1533,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
     ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
-    if(amy_global.config.amy_external_coef_hook != NULL) {
-        ctrl_inputs[COEF_EXT0] = amy_global.config.amy_external_coef_hook(0);
-        ctrl_inputs[COEF_EXT1] = amy_global.config.amy_external_coef_hook(1);
-    } else {
-        #ifdef __EMSCRIPTEN__
-        ctrl_inputs[COEF_EXT0] = amy_web_cv_1;
-        ctrl_inputs[COEF_EXT1] = amy_web_cv_2;
-        #else
-        ctrl_inputs[COEF_EXT0] = 0;
-        ctrl_inputs[COEF_EXT1] = 0;        
-        #endif
-    }
+    ctrl_inputs[COEF_EXT0] = cv_inputs[0];
+    ctrl_inputs[COEF_EXT1] = cv_inputs[1];
 
     msynth[osc]->last_pan = msynth[osc]->pan;
 
@@ -1834,6 +1848,9 @@ void amy_execute_delta() {
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
+    // Make sure any CV-triggered events are added to delta queue
+    update_external_cv_in();
+
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
     amy_grab_lock();

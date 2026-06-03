@@ -477,6 +477,12 @@ uint32_t instrument_get_flags(int instrument_number) {
     return instrument->flags;
 }
 
+void instrument_set_flags(int instrument_number, uint32_t flags) {
+    if (!instrument_number_exists(instrument_number, "set_flags")) return;
+    struct instrument_info *instrument = instruments[instrument_number];
+    instrument->flags = flags;
+}
+
 uint16_t instrument_noteon_delay_ms(int instrument_number) {
     if (!instrument_number_exists(instrument_number, "noteon_delay")) return 0;
     struct instrument_info *instrument = instruments[instrument_number];

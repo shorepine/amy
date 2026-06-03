@@ -58,7 +58,10 @@ class AmyTest:
       message += (' err=%.1f dB' % rms_n)
 
     except FileNotFoundError:
-      message += ' / Unable to read ' + ref_file
+      message += ' / Could not find ' + ref_file
+      rms_n = 0
+    except sf.LibsndfileError:
+      message += ' / Error reading ' + ref_file
       rms_n = 0
 
     # For now, any value above this threshold counts as a failed test
@@ -1279,6 +1282,80 @@ class TestBuses(AmyTest):
     amy.send(time=300, synth=2, note=63, vel=5)
     amy.send(time=500, synth=1, note=67, vel=5)
     amy.send(time=700, synth=2, note=70, vel=5)
+
+
+class TestZeroFreqModPhase(AmyTest):
+  """Test that we can set a constant value for mod_osc via its phase."""
+
+  def run(self):
+    # Make ext0 come from osc 1
+    amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
+    amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=200, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
+    amy.send(time=400, osc=0, vel=0)
+
+
+class TestCVFromOsc(AmyTest):
+  """Facility to simulate CV input from an osc, for testing."""
+
+  def run(self):
+    # Make ext0 come from osc 1
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=0, freq={'const': 440, 'note': 1, 'ext0': 1})
+    amy.send(time=0, osc=1, freq=4.0, amp=0.1)
+    amy.send(time=100, osc=0, vel=1)
+    amy.send(time=900, osc=0, vel=0)
+
+
+class TestCVTrigger(AmyTest):
+  """Test events triggered by CV transitions, using simulated CV-from-osc."""
+
+  def run(self):
+    # Setup the simulated CV input as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Osc 0 gives a little tone.
+    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    # Tone is triggered when CV osc passes 0.5.
+    amy.send(cv_trigger='0,0.5,0.1,1,0,1,v0l1')
+
+
+class TestCVTriggerNote(AmyTest):
+  """Test pitch input of CV-triggered events."""
+
+  def run(self):
+    # Setup the simulated CV input 0 as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Setup the simulated CV input 1 (pitch) as slow ramp
+    amy.set_cv_from_osc(1, 2)
+    amy.send(time=0, osc=2, freq=1, wave=amy.SAW_UP)
+    # Osc 0 gives a little tone.
+    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    # Tone is triggered when CV osc passes 0.5.
+    amy.send(cv_trigger='0,0.5,0.1,1,0.5,0,v0l1n%v')
+
+
+class TestCVTriggerNoteOff(AmyTest):
+  """Test pitch input of CV-triggered events including note off."""
+
+  def run(self):
+    amy.send(reset=amy.RESET_TIMEBASE)
+    # Setup the simulated CV input 0 as 4 Hz sine
+    amy.set_cv_from_osc(0, 1)
+    amy.send(time=0, osc=1, freq=4)
+    # Osc 0 gives a gated tone.
+    amy.send(time=0, osc=0, freq=440, eg1='0,1,1000,0,100,0')
+    # Note on when CV osc passes 0.5 rising (reset lower than trigger).
+    amy.send(time=0, cv_trigger='0,0.5,0.1,1,1,0,v0l1n%v')
+    # Note off when CV osc passes 0.5 falling (reset higher than trigger).
+    amy.send(time=0, cv_trigger='0,0.5,0.6,v0l0')
+    # Also test that we can cancel the trigger events by clearing them
+    # midway through last tone.  All triggers on CV0 are cancelled together.
+    #amy.send(time=800, cv_trigger='0')
+    # Oh, cv_trigger is executed on message parse, not deferred to a timed
+    # event, so this cleared the events before they even started.
 
 
 def main(argv):

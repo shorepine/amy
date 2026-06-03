@@ -11,9 +11,11 @@ try:
     import c_amy as _amy  # Import the C module
     live = _amy.live
     _get_synth_commands = _amy.get_synth_commands
+    _set_cv_from_osc = _amy.set_cv_from_osc
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
+    _set_cv_from_osc = lambda c, o: None
     try:
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
@@ -151,7 +153,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('bus', 'yI'),
-    ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), 
+    ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), ('cv_trigger', 'igL'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
@@ -558,3 +560,9 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
         prologue = [prefix + "i%div%din%dZ" % (dest_synth, num_voices, num_oscs)]
         prefix += "i%d" % dest_synth
     return "\n".join(prologue + [prefix + command for command in commands])
+
+"""
+    Simulate CV input from an osc (testing support)
+"""
+def set_cv_from_osc(cv, osc):
+    _set_cv_from_osc(cv, osc)

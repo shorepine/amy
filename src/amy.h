@@ -34,6 +34,12 @@ extern pthread_mutex_t amy_queue_lock;
 #endif
 #endif
 
+#ifdef ESP_PLATFORM
+// PRIu8 is normally hu, but the clang we're using doesn't seem to understand it.
+#undef PRIu8
+#define PRIu8 "u"
+#endif
+
 
 // This is for baked in samples that come with AMY. The header file written by `amy/headers.py` writes this.
 typedef struct {
@@ -101,6 +107,9 @@ extern const uint32_t pcm_wavetable_len;
 #define AMY_NUM_BUSES 4
 #define AMY_DEFAULT_BUS 0
 
+// How many external CV inputs to contemplate.
+#define AMY_MAX_CV_IN 2
+
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
 
@@ -134,6 +143,9 @@ extern const uint32_t pcm_wavetable_len;
 
 // On which MIDI channel to install the default MIDI drums handler.
 #define AMY_MIDI_CHANNEL_DRUMS 10
+
+// Default length of char buffer for building wire commands (e.g. in midi_mapping)
+#define AMY_WIRE_COMMAND_LEN 256
 
 
 #ifdef ESP_PLATFORM
@@ -854,7 +866,7 @@ void amy_add_event_internal(amy_event *e, uint16_t base_osc);
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue);
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
-void print_osc_debug(int i /* osc */, bool show_eg);
+void print_osc_debug(uint16_t i /* osc */, bool show_eg);
 void show_debug(uint8_t type) ;
 void oscs_deinit() ;
 float freq_for_midi_note(float midi_note);
@@ -956,7 +968,23 @@ extern void midi_mapping_debug();
 extern void midi_mappings_init();
 extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
+extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
+
+extern float cv_inputs[AMY_MAX_CV_IN];
+extern void cv_trigger_debug(void);
+extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_low, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template);
+extern void cv_trigger_init(void);
+extern void cv_trigger_deinit(void);
+extern void cv_trigger_clear_mappings(int gate_cv);
+// Read the external CV and run triggers.
+extern void update_external_cv_in(void);
+
+// Testing-oriented facility to pull External CV input from a mod osc
+extern void cv_from_osc_init(void);
+extern void cv_from_osc_deinit(void);
+extern void set_cv_from_osc(int cv_channel, int osc);
+
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
 extern void ks_init();
@@ -1029,6 +1057,7 @@ extern int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy
 extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
+extern void instrument_set_flags(int instrument_number, uint32_t flags);
 extern uint8_t instrument_get_bus(int instrument_number);
 extern void instrument_set_bus(int instrument_number, uint8_t bus);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
