@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <strings.h>
 #ifdef _WIN32
 #include <io.h>
 #include <intrin.h>
@@ -22,6 +21,7 @@ static inline int __builtin_clz(unsigned int x) {
 }
 #else
 #include <unistd.h>
+#include <strings.h>  // POSIX-only (strcasecmp, bzero, ...); absent on MSVC, which uses the bzero/bcopy shims above
 #endif
 #include <inttypes.h>
 
