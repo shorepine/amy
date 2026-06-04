@@ -219,7 +219,7 @@ uint8_t * sysex_buffer = NULL;
 // arriving before the scheduled callback fires doesn't overwrite the previous
 // message. This matters when the sketch's loop() is CPU-heavy and the
 // mp_sched callback is delayed.
-char * sysex_message_copies[SYSEX_COPY_SLOTS] = {NULL};
+char * sysex_message_copies[SYSEX_COPY_SLOTS];  // zero-length unless AMYBOARD/TULIP; static => zero-initialized
 uint8_t sysex_copy_write_idx = 0;  // MIDI task writes here
 uint8_t sysex_copy_read_idx = 0;   // MP callback reads here
 void parse_sysex() {
@@ -555,11 +555,12 @@ extern void pico_teardown_midi();
 
 void run_midi() {
     if (sysex_buffer == NULL) {
-        // No SYSEX buffering on PICO - not enough RAM
-        //sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        //for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
-        //    sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        //}
+        // sysex_buffer is allocated on every platform; the SYSEX_COPY_SLOTS
+        // backup ring is sized 0 (no alloc) on Pico, so this loop is a no-op here.
+        sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+            sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        }
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
             gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));
