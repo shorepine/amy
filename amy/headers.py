@@ -4,12 +4,15 @@ import os
 import sys
 import glob
 import numpy as np
-import soundfile as sf
 import amy
 
 from . import constants
 
 def _read_wavetables(wavetable_files):
+    # Lazy import: soundfile is only needed when (optionally) regenerating the PCM /
+    # wavetable headers. Keeping it out of module scope means `python3 -m amy.headers`
+    # (and therefore `make web`) does not require soundfile to be installed.
+    import soundfile as sf
     tables = []
     wavetable_len = None
     for wavfile in wavetable_files:
