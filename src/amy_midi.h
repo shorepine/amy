@@ -36,7 +36,13 @@ extern uint8_t *sysex_buffer;
 #else
 #define SYSEX_COPY_SLOTS 0
 #endif
-extern char *sysex_message_copies[SYSEX_COPY_SLOTS];
+// The alloc/free loops use SYSEX_COPY_SLOTS directly (0 => no slots off-board),
+// but the array dimension must be >= 1: MSVC (the Godot Windows build includes
+// this header transitively via amy.h) rejects a zero-length array with C2466,
+// unlike the GCC/Clang extension. Floor the dimension at 1; that lone slot is
+// never touched off-board because the loops iterate 0 times.
+#define SYSEX_COPY_SLOTS_DIM ((SYSEX_COPY_SLOTS) > 0 ? (SYSEX_COPY_SLOTS) : 1)
+extern char *sysex_message_copies[SYSEX_COPY_SLOTS_DIM];
 extern uint8_t sysex_copy_write_idx;
 extern uint8_t sysex_copy_read_idx;
 extern uint16_t sysex_len;
