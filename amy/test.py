@@ -1358,6 +1358,35 @@ class TestCVTriggerNoteOff(AmyTest):
     # event, so this cleared the events before they even started.
 
 
+class TestCVLegato(AmyTest):
+  """CV-driven Juno oscs sound kinda weird when two notes run together."""
+
+  def run(self):
+    # Wire up CV_IN0 to osc 100 and CV_IN1 to osc 101
+    amy.set_cv_from_osc(0, 100)
+    amy.set_cv_from_osc(1, 101)
+    # Hijack random oscs for simulated CV_INs with constant value.
+    amy.send(time=0, osc=100, freq=0, phase=0)
+    amy.send(time=0, osc=101, freq=0, phase=0, amp=2)
+    # Setup synth driven by 2nd CV_IN (ext1)
+    amy.send(time=0, synth=1, patch=2, num_voices=2)
+    amy.send(time=0, cv_trigger='0,0.6,0.4,i1l1n69')
+    amy.send(time=0, cv_trigger='0,0.4,0.6,i1l0')
+    amy.send(time=0, synth=1, osc=2, freq={'const': 220, 'ext1':1})
+    amy.send(time=0, synth=1, osc=3, freq={'const': 220, 'ext1':1})
+    amy.send(time=0, synth=1, osc=4, freq={'const': 110, 'ext1':1})
+    # Shift CV0 to cause trigger.
+    amy.send(time=100, osc=100, phase=0.25)
+    # Shift CV1 to alter pitch.
+    amy.send(time=100, osc=101, phase=0.20)
+    amy.send(time=200, osc=101, phase=0.25)
+    amy.send(time=300, osc=101, phase=0.20)
+    amy.send(time=400, osc=101, phase=0.25)
+    amy.send(time=500, osc=101, phase=0.20)
+    # Move CV0 back to 0 to turn off.
+    amy.send(time=700, osc=100, phase=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
