@@ -555,10 +555,11 @@ extern void pico_teardown_midi();
 
 void run_midi() {
     if (sysex_buffer == NULL) {
-        sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
-            sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
-        }
+        // No SYSEX buffering on PICO - not enough RAM
+        //sysex_buffer = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        //for (int i = 0; i < SYSEX_COPY_SLOTS; i++) {
+        //    sysex_message_copies[i] = malloc_caps(MAX_SYSEX_BYTES, amy_global.config.ram_caps_sysex);
+        //}
         if(amy_global.config.midi & AMY_MIDI_IS_UART) {
             uart_init(rp_get_uart(amy_global.config.midi_uart), 31250);
             gpio_set_function(amy_global.config.midi_out, UART_FUNCSEL_NUM(rp_get_uart(amy_global.config.midi_uart), amy_global.config.midi_out));

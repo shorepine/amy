@@ -50,9 +50,9 @@ void test_audio_in() {
   e.velocity = 1.0f;
   amy_add_event(&e);
   // Add echo to show that audio in is being processed.
-  config_echo(0.5f, 150.0f, 160.0f, 0.5f, 0.0f);  // I get errors on ESP32-S3 N8R8 if I go above 160.0ms
+  config_echo(/* bus */ 0, 0.5f, 150.0f, 160.0f, 0.5f, 0.0f);  // I get errors on ESP32-S3 N8R8 if I go above 160.0ms
   // Turn off chorus, for better audio pass-through.
-  config_chorus(0, 320, 0.5f, 0.5f);
+  config_chorus(/* bus */ 0, 0, 320, 0.5f, 0.5f);
 }
 
 
