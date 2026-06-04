@@ -23,7 +23,19 @@ void amy_external_midi_sync(uint8_t enabled);
 #define MIDI_QUEUE_DEPTH 1024
 #define MAX_SYSEX_BYTES (16384)
 extern uint8_t *sysex_buffer;
+// Every platform allocates the single sysex_buffer above. The sysex copy-slot
+// ring buffer below holds backup snapshots so a fast-arriving message isn't lost
+// while a previous one waits for the deferred MicroPython mp_sched callback.
+// Only the MicroPython-hosted boards (AMYBOARD, TULIP) create and read these
+// slots (see parse_sysex()); other platforms handle sysex synchronously from
+// sysex_buffer. Size the ring to 0 elsewhere so we don't malloc
+// SYSEX_COPY_SLOTS x MAX_SYSEX_BYTES (32 x 16KB = 512KB), which alone would
+// exhaust e.g. the rp2350's 520KB of SRAM.
+#if defined(AMYBOARD) || defined(TULIP)
 #define SYSEX_COPY_SLOTS 32
+#else
+#define SYSEX_COPY_SLOTS 0
+#endif
 extern char *sysex_message_copies[SYSEX_COPY_SLOTS];
 extern uint8_t sysex_copy_write_idx;
 extern uint8_t sysex_copy_read_idx;

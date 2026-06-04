@@ -41,7 +41,7 @@ void setup() {
   amy_add_event(&e);
 
   // Turn on reverb
-  config_reverb(0.5f, 0.85f, 0.5f, 3000.0f);
+  config_reverb(/* bus */ 0, 0.5f, 0.85f, 0.5f, 3000.0f);
 }
 
 struct timed_note {
