@@ -1238,6 +1238,20 @@ class TestPreset257(AmyTest):
     amy.send(time=500, synth=1, vel=0)
 
 
+class TestPreset257DefaultCCs(AmyTest):
+  """Loading K257 (the amyboard default) installs a default MIDI CC map, so a
+  controller works with no explicit `ic` setup. Here CC7 (channel volume) is
+  injected before the note to drop the channel level — audible proof that the
+  default mapping is live."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    # inject_midi args are (time, midi_status, data1, data2). 0xB0 = CC on ch 1.
+    amy.inject_midi(50, 0xB0, 7, 30)  # CC7 -> i1v0a..., lowers the channel level
+    amy.send(time=100, synth=1, note=48, vel=1)
+    amy.send(time=500, synth=1, vel=0)
+
+
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 

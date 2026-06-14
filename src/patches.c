@@ -8,6 +8,11 @@
 
 #define _PATCHES_FIRST_USER_PATCH 1024
 
+// Built-in patch 257 is the "amyboard default" (see patches.h). Loading it also
+// installs the amyboard default MIDI CC map on the target channel so a hardware
+// controller works out of the box. See midi_install_amyboard_default_ccs().
+#define PATCH_AMYBOARD_DEFAULT 257
+
 
 uint32_t max_num_memory_patches = 0;
 struct delta **memory_patch_deltas = NULL;
@@ -1230,6 +1235,10 @@ void patches_load_patch(amy_event *e) {
         uint8_t bus = 0;
         if (AMY_IS_SET(e->bus)) bus = e->bus;
         instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
+        // The amyboard default patch ships a default MIDI CC map so a controller
+        // works out of the box before the web editor pushes any ic mappings.
+        if (patch_number == PATCH_AMYBOARD_DEFAULT)
+            midi_install_amyboard_default_ccs(e->synth);
     }
 
 }
