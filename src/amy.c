@@ -1218,7 +1218,8 @@ void play_delta(struct delta *d) {
     if(d->param == MIDI_NOTE) {
         // Midi note and Velocity are propagated to chained_osc.
         uint16_t osc = d->osc;
-        while(AMY_IS_SET(osc)) {
+        while(AMY_IS_SET(osc) && synth[d->osc]->status != SYNTH_IS_MOD_SOURCE) {
+            // (We ignore note values directed at MOD_SOURCE to avoid default voice note-on messing up mod_osc.)
             synth[osc]->midi_note = d->data.f;
             osc = synth[osc]->chained_osc;
         }
@@ -1390,11 +1391,18 @@ void play_delta(struct delta *d) {
             }
             // Loop through chained oscs
             uint16_t osc = d->osc;
+            //fprintf(stderr, "t %.3f: delta note_on: osc %d vel %.3f\n\r", amy_global.time, osc, d->data.f);
             while(AMY_IS_SET(osc)) {
-                synth[osc]->velocity = d->data.f;  // was map_60dB_to_01f
-                if (AMY_IS_SET(synth[osc]->chained_osc)
-                    || synth[osc]->amp_coefs[COEF_VEL] == 0
-                    || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH) {
+                //fprintf(stderr, "osc: %d wave %d status %d\n\r", osc, synth[osc]->wave, synth[osc]->status);
+                if (!(synth[osc]->status == SYNTH_IS_MOD_SOURCE
+                      || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
+                      || synth[osc]->wave == PARTIAL)
+                    && (AMY_IS_SET(synth[osc]->chained_osc)
+                        || synth[osc]->amp_coefs[COEF_VEL] == 0
+                        || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH)) {
+                    synth[osc]->velocity = d->data.f;  // was map_60dB_to_01f
+                    //fprintf(stderr, "osc: %d status -> AUDIBLE\n\r", osc);
+                    // Ignore velocity events for mod source or algo notes.
                     synth[osc]->status = SYNTH_AUDIBLE;
                     // ** no_amp_001
                     // an osc came in with a note on.
@@ -1449,35 +1457,38 @@ void play_delta(struct delta *d) {
         } else if(synth[d->osc]->velocity > 0 && d->data.f == 0) { // new note off
             uint16_t osc = d->osc;
             while(AMY_IS_SET(osc)) {
-                // DON'T clear velocity, we still need to reference it in decay.
-                //synth[osc]->velocity = 0;
-                switch(synth[osc]->wave) {
-                case KS: ks_note_off(osc); break;
-                case ALGO: algo_note_off(osc); break;
-                case PCM:
-                case PCM_LEFT:
-                case PCM_RIGHT:
-                    pcm_note_off(osc);
-                    break;
-                case AMY_MIDI: amy_send_midi_note_off(osc); break;
-                case CUSTOM: custom_note_off(osc); break;
-                case BYO_PARTIALS:
-                case INTERP_PARTIALS:
-                    AMY_UNSET(synth[osc]->note_on_clock);
-                    synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-                    if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
-                    else partials_note_off(osc);
-                    break;
-                default:
-                    // ** no_amp_001
-                    // osc note off, start release
-                    // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
-                    // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
-                    // those waves on note-off.
-                    AMY_UNSET(synth[osc]->note_on_clock);
-                    if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
-                        // Only set the note_off_clock (start of release) if we don't already have one.
+                if (!(synth[osc]->status == SYNTH_IS_MOD_SOURCE
+                      || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
+                      || synth[osc]->wave == PARTIAL)) {
+                    //synth[osc]->velocity = 0;
+                    switch(synth[osc]->wave) {
+                    case KS: ks_note_off(osc); break;
+                    case ALGO: algo_note_off(osc); break;
+                    case PCM:
+                    case PCM_LEFT:
+                    case PCM_RIGHT:
+                        pcm_note_off(osc);
+                        break;
+                    case AMY_MIDI: amy_send_midi_note_off(osc); break;
+                    case CUSTOM: custom_note_off(osc); break;
+                    case BYO_PARTIALS:
+                    case INTERP_PARTIALS:
+                        AMY_UNSET(synth[osc]->note_on_clock);
                         synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                        if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
+                        else partials_note_off(osc);
+                        break;
+                    default:
+                        // ** no_amp_001
+                        // osc note off, start release
+                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
+                        // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
+                        // those waves on note-off.
+                        AMY_UNSET(synth[osc]->note_on_clock);
+                        if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
+                            // Only set the note_off_clock (start of release) if we don't already have one.
+                            synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                        }
                     }
                 }
                 osc = synth[osc]->chained_osc;
@@ -1634,9 +1645,10 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)
     // Returns abs max of what it wrote.
-    //fprintf(stderr, "+render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
-    //        amy_global.total_blocks, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
-    //        osc, synth[osc]->render_clock);
+        //if (osc < amy_global.config.max_oscs) // exclude chorus LFOs.
+        //fprintf(stderr, "+render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n\r",
+        //    amy_global.total_blocks*AMY_BLOCK_SIZE, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+        //    osc, synth[osc]->render_clock);
     SAMPLE max_val = 0;
     // Only render if osc has not already been rendered this time step e.g. by chained_osc.
     if (synth[osc]->render_clock != amy_global.total_blocks*AMY_BLOCK_SIZE) {
