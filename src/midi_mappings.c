@@ -165,6 +165,52 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     return 1;
 }
 
+// Amyboard default MIDI CC map.
+//
+// Installed for a channel when patch 257 (the "amyboard default") is loaded, so
+// a MIDI controller can drive the standard synth parameters out of the box —
+// before the web editor pushes any `ic` mappings (e.g. on a freshly-booted /
+// factory-reset board). These mirror the default `cc:` assignments in tulipcc's
+// tulip/amyboardweb/static/amy_parameters.js (introduced in amy #920); keep the
+// two tables in sync. Templates use %i (channel) and %v (value) exactly like a
+// hand-written ic code, and v0/v1/v2/v3 are the K257 control/LFO/oscA/oscB oscs.
+struct amyboard_default_cc {
+    int code;                    // MIDI CC number
+    int is_log;                  // 1 = exponential value mapping
+    float min_val;               // value at MIDI 0
+    float max_val;               // value at MIDI 127
+    float offset_val;            // log-scale offset
+    const char *message_template;
+};
+
+static const struct amyboard_default_cc amyboard_default_ccs[] = {
+    {  7, 1, 0.001f,    7.0f,  0.1f,   "i%iv0a%v" },                       // channel level (CTL osc amp)
+    { 74, 1,   20.0f, 8000.0f, 0.0f,   "i%iv0F%v" },                       // VCF freq
+    { 71, 1,    0.5f,   16.0f, 0.0f,   "i%iv0R%v" },                       // VCF resonance
+    { 76, 1,    0.1f,   20.0f, 0.0f,   "i%iv1f%v" },                       // LFO freq
+    { 77, 1,    0.0f,    4.0f, 0.001f, "i%iv2f,,,,,%vZi%iv3f,,,,,%v" },    // LFO -> osc A/B depth
+    { 93, 1,    0.0f,    1.0f, 0.1f,   "k%v" },                            // chorus level
+    { 73, 0,    0.0f, 1000.0f, 0.0f,   "i%iv0A%v,1,,,,0" },                // ADSR attack
+    { 75, 1,    0.0f, 2000.0f, 50.0f,  "i%iv0A,1,%v,,,0" },                // ADSR decay
+    { 79, 0,    0.0f,    1.0f, 0.0f,   "i%iv0A,1,,%v,,0" },                // ADSR sustain
+    { 72, 1,    0.0f, 8000.0f, 50.0f,  "i%iv0A,1,,,%v,0" },                // ADSR release
+    { 91, 1,    0.0f,    1.0f, 0.1f,   "h%v" },                            // reverb level
+    { 94, 0,    0.0f,    2.0f, 0.0f,   "M%v" },                            // echo level
+};
+
+void midi_install_amyboard_default_ccs(int channel) {
+    int n = (int)(sizeof(amyboard_default_ccs) / sizeof(amyboard_default_ccs[0]));
+    for (int i = 0; i < n; i++) {
+        const struct amyboard_default_cc *m = &amyboard_default_ccs[i];
+        // midi_store_mapping() may strip a trailing 'Z' in place, so hand it a
+        // writable copy rather than the read-only string literal.
+        char tmpl[AMY_WIRE_COMMAND_LEN];
+        snprintf(tmpl, sizeof(tmpl), "%s", m->message_template);
+        midi_store_mapping(channel, MIDI_MAP_TYPE_CC, m->code, m->is_log,
+                           m->min_val, m->max_val, m->offset_val, tmpl);
+    }
+}
+
 bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len) {
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
     //fprintf(stderr, "midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
