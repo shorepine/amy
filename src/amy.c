@@ -1218,7 +1218,10 @@ void play_delta(struct delta *d) {
     if(d->param == MIDI_NOTE) {
         // Midi note and Velocity are propagated to chained_osc.
         uint16_t osc = d->osc;
-        while(AMY_IS_SET(osc) && synth[d->osc]->status != SYNTH_IS_MOD_SOURCE) {
+        while(AMY_IS_SET(osc) &&
+              !(synth[osc]->status == SYNTH_IS_MOD_SOURCE
+                || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
+                || synth[osc]->wave == PARTIAL)) {
             // (We ignore note values directed at MOD_SOURCE to avoid default voice note-on messing up mod_osc.)
             synth[osc]->midi_note = d->data.f;
             osc = synth[osc]->chained_osc;
