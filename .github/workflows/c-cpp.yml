@@ -48,6 +48,11 @@ jobs:
       run: pip install numpy
 
     - uses: mymindstorm/setup-emsdk@v14
+      with:
+        # Pin to the emsdk the web build is developed/deployed against. Newer
+        # emsdk fails the link with undefined pthread_* symbols under the
+        # AUDIO_WORKLET / WASM_WORKERS flags make web uses.
+        version: 4.0.22
 
     - name: Build web (emscripten)
       run: make web
