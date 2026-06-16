@@ -29,3 +29,30 @@ jobs:
       env:
         AMY_TEST_THRESHOLD_DB: "-70.0"
       run: make test
+
+  web:
+    # Build the emscripten / WASM target (`make web`) so breaks there are caught.
+    # The other CI jobs build the MCU targets and run the Python tests but never
+    # the browser build, so e.g. a stale `make web` EXPORTED_FUNCTIONS entry
+    # (exporting a removed symbol) links fine on-device yet fails wasm-ld.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install dependencies
+      run: pip install numpy
+
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        # Pin to the emsdk the web build is developed/deployed against. Newer
+        # emsdk fails the link with undefined pthread_* symbols under the
+        # AUDIO_WORKLET / WASM_WORKERS flags make web uses.
+        version: 4.0.22
+
+    - name: Build web (emscripten)
+      run: make web
