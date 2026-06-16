@@ -454,45 +454,6 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
   return queue;
 }
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
-
-void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state) {
-    // Return a sequence of events defining a patch (specified by number).
-    // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
-    amy_clear_event(event);
-    struct delta *queue = (struct delta *)state;
-    if (queue == NULL) {
-      // First call, initialize deltas queue.
-      if (patch_number < _PATCHES_FIRST_USER_PATCH) {
-	// This grabs a new set of deltas from the pool, when are they returned?
-	parse_patch_string_to_queue((char *)patch_commands[patch_number], 0, &queue, 0);
-      } else {
-	  int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
-	  if (patch_index < 0 || patch_index >= (int32_t)max_num_memory_patches) {
-		      fprintf(stderr, "patch_number %" PRIu16 " is out of range (%" PRId32 " .. %" PRId32 ")\n",
-			      patch_number, (int32_t)_PATCHES_FIRST_USER_PATCH,
-			      (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
-	      return NULL;
-	  }
-	  queue = memory_patch_deltas[patch_index];
-      }
-    }
-    struct delta *queue_on_entry = queue;
-    /* Loop down the queue emitting events as needed. */
-    queue = deltas_to_event(queue, event);
-
-    if (patch_number < _PATCHES_FIRST_USER_PATCH) {
-      // We allocated this queue, take care of releasing deltas we're finished with.
-      while (queue_on_entry != queue) {
-	struct delta *doomed = queue_on_entry;
-	queue_on_entry = doomed->next;
-	delta_release(doomed);
-      }
-    }
-
-    return (void *)queue;
-}
-
 #define EVENT_FROM_OSC(FIELD)  \
     if (synth[osc]->FIELD != empty_synth.FIELD)  \
         event->FIELD = synth[osc]->FIELD;
@@ -694,13 +655,17 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 }
 
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time) {
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
     //fprintf(stderr, "parse_patch_string: message %s\n", message);
     while(strlen(message + start)) {
       amy_event patch_event = amy_default_event();
+      if (message[start] == 'i') {
+          // It's a synth-layer message, it needs a synth defined.
+          patch_event.synth = synth;
+      }
       int num_used = amy_parse_message(message + start, strlen(message + start), &patch_event);
       //{
       //  char sub_message[256];
@@ -743,7 +708,7 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
     // Store the patch as deltas and  find out how many oscs this message uses
-    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->time);
+    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
@@ -1028,8 +993,6 @@ void release_voice_oscs(int32_t voice) {
     }
 }
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint32_t time);
-
 uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     // When load_patch specifies a synth, convert that into voices.
     // e->synth is assumed to be set.
@@ -1217,7 +1180,7 @@ void patches_load_patch(amy_event *e) {
             if (deltas) {
                 add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
             } else if (message) {
-                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
+                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time);
             }
             // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
         }

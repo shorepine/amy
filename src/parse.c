@@ -334,29 +334,47 @@ int parse_midi_mapping_payload(char *message, int32_t *p_code, int32_t *p_is_log
 int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_chars) {
     // MIDI CC mapping ic<C>,<L>,<N>,<X>,<O>,<CODE>, see https://github.com/shorepine/amy/issues/524
     // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
-    int32_t code, is_log;
-    float min_val = 0, max_val = 0, offset_val = 0;
-    int type = (cmd == 'c') ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
-    AMY_UNSET(code);
-    AMY_UNSET(is_log);
-    skip_chars = parse_midi_mapping_payload(message, &code, &is_log, &min_val, &max_val, &offset_val);
-    if (*(message + skip_chars) != ',') {
-        if (AMY_IS_UNSET(code) || AMY_IS_SET(is_log)) {
-            // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
-            fprintf(stderr, "synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
-            return skip_chars;  // maybe the rest will parse?
+    size_t pos = 0;
+    size_t mlen = strlen(message);
+    while (pos < mlen) {
+        // Break the mapping on ZZs (for K257).
+        size_t sub_mlen, next_pos;
+        char *end = strstr(message + pos, "ZZ");
+        if (end != NULL) {
+            sub_mlen = end - (message + pos);
+            next_pos = pos + sub_mlen + 2;  // Step over "ZZ"
+        } else {
+            sub_mlen = mlen - pos;
+            next_pos = mlen;
         }
-        // Else we got an incomplete message with a valid CC code - clear it
-        midi_clear_mapping(instr_num, type, code);  // (handles 255 as special case).
-        return skip_chars;
+        while (sub_mlen > 0 && message[pos + sub_mlen - 1] == 'Z') {
+            --sub_mlen;
+        }
+        // Parse the fragment.
+        int32_t code, is_log;
+        float min_val = 0, max_val = 0, offset_val = 0;
+        int type = (cmd == 'c') ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
+        AMY_UNSET(code);
+        AMY_UNSET(is_log);
+        skip_chars = parse_midi_mapping_payload(message + pos, &code, &is_log, &min_val, &max_val, &offset_val);
+        if (*(message + pos + skip_chars) != ',') {
+            if (AMY_IS_UNSET(code) || AMY_IS_SET(is_log)) {
+                // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
+                fprintf(stderr, "synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
+                return pos + skip_chars;  // maybe the rest will parse?
+            }
+            // Else we got an incomplete message with a valid CC code - clear it
+            midi_clear_mapping(instr_num, type, code);  // (handles 255 as special case).
+            return pos + skip_chars;
+        }
+        ++skip_chars;  // step over the "," before the wire string template.
+        midi_store_mapping(instr_num, type, code, is_log, min_val, max_val, offset_val, message + pos + skip_chars, sub_mlen - skip_chars);
+        pos = next_pos;
+        if (pos < mlen && message[pos] != 'i') break;
+        cmd = message[pos + 1];
+        pos += 2;
     }
-    ++skip_chars;  // step over the "," before the wire string template.
-    midi_store_mapping(instr_num, type, code, is_log, min_val, max_val, offset_val, message + skip_chars);
-    // Consume rest of message but leave the trailing 'Z' for the outer parser.
-    int remainder = strlen(message);
-    if (remainder > 0 && message[remainder - 1] == 'Z') remainder--;
-    skip_chars = remainder;
-    return skip_chars;
+    return pos - 1;
 }
 
 int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_high, float *p_thresh_low, int32_t *p_pitch_cv, float *p_pitch_scale, float *p_pitch_offset) {

@@ -962,7 +962,7 @@ extern void reset_osc(uint16_t i );
 // Value for code (or note) that matches anything
 #define MIDI_MAP_CODE_ANY (-1)
 
-extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message);
+extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len);
 extern int midi_clear_mapping(int channel, int type, int code);
 extern bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len);
 extern void midi_mapping_debug();
@@ -1034,7 +1034,6 @@ extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
 extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
-extern void *yield_patch_events(uint16_t patch_number, struct amy_event *event, void *state);
 extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
 extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state);
 extern int size_of_amy_event(void);

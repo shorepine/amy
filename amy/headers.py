@@ -409,6 +409,21 @@ def make_piano_patch():
     #amy.send(osc=20, wave=amy.PARTIAL)  # it's not 20, but it doesn't matter, voice is reallocated by interp_partials.c
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
+amyboard_patch_cc_defs = [
+    'ic7,1,0.001,7,0.1,i%iv0a%vZ',                     # channel level (CTL osc amp)
+    'ic74,1,20,8000,0,i%iv0F%vZ',                      # VCF freq
+    'ic71,1,0.5,16,0,i%iv0R%vZ',                       # VCF resonance
+    'ic76,1,0.1,20,0,i%iv1f%vZ',                       # LFO freq
+    'ic77,1,0,4,0.001,i%iv2f,,,,,%vZi%iv3f,,,,,%vZ',   # LFO -> osc A/B depth
+    'ic93,1,0,1,0.1,k%vZ',                             # chorus level
+    'ic73,0,0,1000,0,i%iv0A%v,1,,,,0Z',                # ADSR attack
+    'ic75,1,0,2000,50,i%iv0A,1,%v,,,0Z',               # ADSR decay
+    'ic79,0,0,1,0,i%iv0A,1,,%v,,0Z',                   # ADSR sustain
+    'ic72,1,0,8000,50,i%iv0A,1,,,%v,0Z',               # ADSR release
+    'ic91,1,0,1,0.1,h%vZ',                             # reverb level
+    'ic94,0,0,2,0,M%vZ',                               # echo level
+]
+
 def make_amyboard_patch():
     import amy
     # Modified for "silent control osc"
@@ -423,6 +438,8 @@ def make_amyboard_patch():
     message += amy.message(osc=osc_b, wave=amy.SAW_DOWN, amp={'vel': 0, 'eg0': 0}, mod_source=lfo_osc, freq={'const': constants.ZERO_LOGFREQ_IN_HZ / 2})
     message += amy.message(osc=lfo_osc, wave=amy.TRIANGLE, amp={'vel': 0}, freq={'const': 4.0, 'note': 0, 'bend': 0}, bp0='0,1.0,10000,0')
     message += amy.message(eq=[0, 0, 0], chorus='0,,0.5,0.5')
+    for cc_def in amyboard_patch_cc_defs:
+        message += cc_def + 'Z'
     return 4, message # 4 oscs
 
 def make_patches(filename):

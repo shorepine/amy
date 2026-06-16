@@ -1152,7 +1152,7 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f110.000c1T2X3Z
+    expected = """v0f110.000c1Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic5,0,0.000,10.000,0.000,helloZ
@@ -1181,7 +1181,7 @@ class TestClearMidiCCs(AmyTest):
     amy.send_raw('i1ic255v0f999')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f999.000c1T2X3Z
+    expected = """v0f999.000c1Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
     if commands != expected:
@@ -1206,7 +1206,7 @@ class TestClearOneMidiCC(AmyTest):
     amy.send_raw('i1ic5v0f999')
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
-    expected = """v0f999.000c1T2X3Z
+    expected = """v0f999.000c1Z
 v1w3f500.000Z
 V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
@@ -1236,6 +1236,17 @@ class TestPreset257(AmyTest):
     amy.send(time=0, synth=1, patch=257, num_voices=4)
     amy.send(time=100, synth=1, note=48, vel=1)
     amy.send(time=500, synth=1, vel=0)
+
+
+class TestPreset257MidiCCs(AmyTest):
+  """Preset 257 now includes a range of default MIDI CC mappings."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=100, synth=1, note=48, vel=1)
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(400, 0xB0, 74, 127)  # Make the VCF freq be low - 1/4 of the way from 20 to 8000, so 89 Hz
+    amy.send(time=800, synth=1, vel=0)
 
 
 class TestChangeSustain(AmyTest):
