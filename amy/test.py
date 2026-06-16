@@ -1238,6 +1238,17 @@ class TestPreset257(AmyTest):
     amy.send(time=500, synth=1, vel=0)
 
 
+class TestPreset257MidiCCs(AmyTest):
+  """Preset 257 now includes a range of default MIDI CC mappings."""
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=257, num_voices=4)
+    amy.send(time=100, synth=1, note=48, vel=1)
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(400, 0xB0, 74, 127)  # Make the VCF freq be low - 1/4 of the way from 20 to 8000, so 89 Hz
+    amy.send(time=800, synth=1, vel=0)
+
+
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 

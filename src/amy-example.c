@@ -19,19 +19,6 @@ uint8_t render(uint16_t osc, SAMPLE * buf, uint16_t len) {
     return 0; // 0 means, ignore this. 1 means, i handled this and don't mix it in with the audio
 }
 
-void print_events_for_patch_number(int patch_number) {
-    void *state = NULL;
-    fprintf(stderr, "start delta_num_free = %d\n", delta_num_free());
-    amy_event event = amy_default_event();
-    char s[MAX_MESSAGE_LEN];
-    do {
-        state = yield_patch_events(patch_number, &event, state);
-        sprint_event(&event, s, MAX_MESSAGE_LEN, false);
-        fprintf(stderr, "%s\n", s);
-    } while (state != NULL);
-    fprintf(stderr, "end delta_num_free = %d\n", delta_num_free());
-}
-
 void print_events_for_synth(int synth, bool wirecode) {
     fprintf(stderr, "synth %d:\n", synth);
     void * state = NULL;
@@ -96,10 +83,18 @@ void test_algo() {
     amy_add_message("t400r0l0Z");
 }
 
+void test_K257() {
+    //amy.send(time=0, voices="0",  patch=257)
+    amy_add_message("t0i0iv4K257Z");
+    //amy.send(time=100, voices="0", note=58, vel=1)
+    amy_add_message("t100i0n58l1Z");
+    //amy.send(time=500, voices="0", vel=0)
+    amy_add_message("t400i0l0Z");
+}
+
 void test_stored_patch() {
     // Reading back a stored patch
     int patch_number = 0;
-    print_events_for_patch_number(patch_number);
     // Reading back a user-defined patch
     patch_number = 1024;
     amy_event e = amy_default_event();
@@ -171,8 +166,6 @@ void test_stored_patch() {
     e.chorus_lfo_freq = 0.5f;
     e.chorus_depth = 0.5f;
     amy_add_event(&e);
-
-    print_events_for_patch_number(patch_number);
 }
 
 int main(int argc, char ** argv) {
@@ -231,7 +224,8 @@ int main(int argc, char ** argv) {
     //example_patch_from_events();
 
     //test_loop_env_filt();
-    test_algo();
+    //test_algo();
+    test_K257();
 
     // Now just spin for a while
     uint32_t start = amy_sysclock();

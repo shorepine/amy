@@ -66,8 +66,8 @@ void midi_mapping_print(struct midi_mapping *mapping) {
             (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
 }
 
-struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message_template) {
-    struct midi_mapping *result = (struct midi_mapping *)malloc_caps(sizeof(struct midi_mapping) + strlen(message_template) + 1, amy_global.config.ram_caps_synth);
+struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
+    struct midi_mapping *result = (struct midi_mapping *)malloc_caps(sizeof(struct midi_mapping) + message_len + 1, amy_global.config.ram_caps_synth);
     result->message_template = ((char *)result) + sizeof(struct midi_mapping);
     result->channel = channel;
     result->type = type;
@@ -76,7 +76,8 @@ struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel
     result->min_val = min_val;
     result->max_val = max_val;
     result->offset_val = offset_val;
-    strcpy(result->message_template, message_template);
+    strncpy(result->message_template, message_template, message_len);
+    result->message_template[message_len] = '\0';
     // Insert into the linked list at the head.
     result->next = *p_root;
     *p_root = result;
@@ -148,19 +149,18 @@ int midi_clear_mapping(int channel, int type, int code) {
     return 0;  // nothing found.
 }
 
-int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, char *message) {
+int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len) {
     // Register a MIDI mapping and a wire code template.
     // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
-    size_t mlen = strlen(message);
-    while (mlen > 0 && message[mlen - 1] == 'Z') {
-        message[--mlen] = '\0';
+    while (message_len > 0 && message[message_len - 1] == 'Z') {
+        --message_len;
     }
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
     if (p_mapping) midi_mapping_free(p_mapping);
     // store with an empty string removes mapping
-    if (mlen) {
-        /* struct midi_mapping *mapping = */ midi_mapping_init(&midi_mapping_root, channel, type, code, is_log, min_val, max_val, offset_val, message);
-        midi_mapping_debug();
+    if (message_len) {
+        /* struct midi_mapping *mapping = */ midi_mapping_init(&midi_mapping_root, channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
+        //midi_mapping_debug();
     }
     return 1;
 }
