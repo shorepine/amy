@@ -79,17 +79,6 @@ void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value
     if (control == 0) {
         // Bank select coarse.
         instrument_set_bank_number(channel, value);
-    } else if (control == 7) {
-        // Use CC 7 for global volume control (on any channel).
-        //amy_event e = amy_default_event();
-        //e.volume = (float)value/12.7;  // Max volume is 10.
-        //e.note_source = NOTE_SOURCE_MIDI;
-        //amy_add_event(&e);
-        if (instrument_number_exists(channel, NULL)) {
-            int bus = instrument_get_bus(channel);
-            if (bus >= 0 && bus < AMY_NUM_BUSES)
-                amy_global.volume[bus] = (float)value/12.7;  // Max volume is 10.
-        }
     }
 }
 
