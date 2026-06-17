@@ -153,11 +153,15 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         } else if(eg_type == ENVELOPE_TRUE_EXPONENTIAL) {
             v0 = MAX(v0, F2S(BREAKPOINT_EPS));
             v1 = MAX(v1, F2S(BREAKPOINT_EPS));
-            SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v1) - log2_lut(v0))
-                                              / (0.001f * (t1 - t0)));
-            scale = MUL4_SS(v0,
-                            exp2_lut(MUL4_SS(dx7_exponential_rate,
-                                             F2S(0.001f * (elapsed - t0)))));
+            // Interpolate linearly in the log2 domain using the bounded
+            // time_ratio (0..1).  The previous rate*(elapsed-t0) form built an
+            // intermediate F2S(0.001f * (elapsed - t0)) that overflowed the
+            // Q8.23 SAMPLE type once (elapsed - t0) exceeded ~256k samples
+            // (~5.8s @ 44.1kHz): the rising envelope froze and then stepped to
+            // the target at the segment boundary.  See issue #731.
+            float log2_v0 = S2F(log2_lut(v0));
+            float log2_v1 = S2F(log2_lut(v1));
+            scale = exp2_lut(F2S(log2_v0 + (log2_v1 - log2_v0) * time_ratio));
         } else if(eg_type == ENVELOPE_DX7) {
             // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
             // in SAMPLE version, DX7 levels are div 8 i.e. 0 to 12.375 instead of 0 to 99.
@@ -177,16 +181,15 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
                 // This is the magic equation that shapes the DX7 attack envelopes.
                 scale = DX7_LEVEL_TO_LINEAR_SAMP(MIN_LEVEL_S + ATTACK_RANGE_S * S2F(F2S(1.0f) - exp2_lut(-F2S((my_t0 + elapsed)/t_const))));
             } else {
-                // Decay is regular true_exponential
+                // Decay is regular true_exponential.  Interpolate in the log2
+                // domain via the bounded time_ratio to avoid the SAMPLE
+                // overflow described for ENVELOPE_TRUE_EXPONENTIAL (issue #731);
+                // this also affects DX7 decays longer than ~5.8s @ 44.1kHz.
                 v0 = MAX(v0, F2S(BREAKPOINT_EPS));
                 v1 = MAX(v1, F2S(BREAKPOINT_EPS));
-                //float dx7_exponential_rate = -logf(S2F(v1)/S2F(v0)) / (t1 - t0);
-                //scale = MUL4_SS(v0, F2S(expf(-dx7_exponential_rate * (elapsed - t0))));
-                SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v1) - log2_lut(v0))
-                                                  / (0.001f * (t1 - t0)));
-                scale = MUL4_SS(v0,
-                                exp2_lut(MUL4_SS(dx7_exponential_rate,
-                                                 F2S(0.001f * (elapsed - t0)))));
+                float log2_v0 = S2F(log2_lut(v0));
+                float log2_v1 = S2F(log2_lut(v1));
+                scale = exp2_lut(F2S(log2_v0 + (log2_v1 - log2_v0) * time_ratio));
             }
         } else { // ENVELOPE_NORMAL - "false exponential"? or ENVELOPE_DB
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
