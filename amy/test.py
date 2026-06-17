@@ -274,6 +274,32 @@ class TestSineEnv2(AmyTest):
     amy.send(time=950, vel=0)
 
 
+class TestDelayedAttack(AmyTest):
+  """#720: an osc that is silent at onset (here a delayed attack that holds at zero
+  for 150ms before ramping up) must not be terminated before it ever sounds.  The old
+  silence detector culled it within ~11ms of the note-on, so the note never played."""
+
+  def run(self):
+    # eg0 holds at 0 for 150ms, then ramps to 1 over 300ms (a slow swell), 100ms release.
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=440, bp0='150,0,300,1,100,0')
+    amy.send(time=10, osc=0, note=69, vel=1)
+    amy.send(time=800, osc=0, vel=0)
+
+
+class TestChainSkipsSilencedOsc(AmyTest):
+  """#720: a zero-amplitude osc in the middle of a chain is suspended at onset, but that
+  must not stop the still-sounding oscs chained behind it from rendering through the head."""
+
+  def run(self):
+    osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
+    # osc 0: SILENT VCA (amp env) -> osc 1: zero-amp pulse (culled) -> osc 2: sounding saw.
+    amy.send(time=0, osc=0, wave=amy.SILENT, amp='1,0,1,1,0,0', bp0='0,1,800,0.3,100,0', chained_osc=1)
+    amy.send(time=0, osc=1, wave=amy.PULSE, amp='0,0,0,0,0,0', chained_osc=2)
+    amy.send(time=0, osc=2, wave=amy.SAW_DOWN, amp='0.5,0,1,1,0,0', freq=osc_freq_str + ',1')
+    amy.send(time=100, osc=0, note=48, vel=1.0)
+    amy.send(time=900, osc=0, vel=0)
+
+
 class TestSineAM(AmyTest):
   """Amplitude modulation was messed up by log-combination amp."""
 

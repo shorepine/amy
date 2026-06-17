@@ -1416,10 +1416,11 @@ void play_delta(struct delta *d) {
                     //    msynth[osc]->last_logfreq = initial_logfreq;
                     // Now we've tested that, we can reset note-off clocks.
                     AMY_UNSET(synth[osc]->note_off_clock);  // Most recent note event is not note-off.
-                    //AMY_UNSET(synth[osc]->zero_amp_clock);
-                    // Actually, start with an expectation that the voice will be zero amp, give it one frame to prove otherwise.
-#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-                    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 1 * AMY_BLOCK_SIZE;
+                    // #720: Don't arm a silence timer at onset.  While the gate is active the osc is
+                    // protected from silence-termination (see render_osc_wave), so a slow attack -- or
+                    // any momentary silence at the start of a note -- can no longer kill it before it
+                    // ever sounds.  Truly-silent oscs are instead suspended explicitly just below.
+                    AMY_UNSET(synth[osc]->zero_amp_clock);
 
                     float initial_freq = freq_of_logfreq(initial_logfreq);
                     osc_note_on(osc, initial_freq);
@@ -1443,6 +1444,15 @@ void play_delta(struct delta *d) {
                         case CUSTOM: custom_mod_trigger(mod_osc); break;
                         }
                     }
+                    // #720: An osc whose amplitude is a hard constant zero (and isn't amp-modulated)
+                    // can never make sound -- its envelopes and velocity can only attenuate further.
+                    // Suspend it right away (INAUDIBLE) instead of burning cycles until the silence
+                    // detector catches it.  This is what keeps lightly-used Juno voices (4 oscs, often
+                    // only 1-2 sounding) cheap.  It's set up (osc_note_on above) so an amp change can
+                    // still revive it.  A chain head is exempt: it drives rendering of its chained oscs.
+                    if (synth[osc]->amp_coefs[COEF_CONST] == 0 && synth[osc]->amp_coefs[COEF_MOD] == 0
+                        && !(osc == d->osc && AMY_IS_SET(synth[osc]->chained_osc)))
+                        synth[osc]->status = SYNTH_INAUDIBLE;
                 }
                 osc = synth[osc]->chained_osc;
             }
@@ -1631,6 +1641,31 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
 }
 
 
+// How long an osc must be continuously silent (once it's eligible) before we stop
+// executing it.  10 blocks is ~54ms at the default rate; see issue #720.
+#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
+
+// #720: These wave types use note_off_clock to mark the release phase, so they can be
+// protected from silence-termination while their gate is still active (e.g. a slow
+// attack that hasn't risen above the noise floor yet).  The other waves (KS, ALGO, PCM,
+// CUSTOM, partials) manage their own lifecycle and don't reliably set note_off_clock on
+// note-off, so they keep the legacy behaviour of terminating as soon as they've been
+// silent long enough, regardless of gate state.
+static inline uint8_t wave_terminates_only_in_release(uint16_t wave) {
+    switch (wave) {
+    case KS:
+    case ALGO:
+    case PCM: case PCM_LEFT: case PCM_RIGHT:
+    case AMY_MIDI:
+    case CUSTOM:
+    case PARTIAL: case BYO_PARTIALS: case INTERP_PARTIALS:
+        return 0;
+    default:
+        return 1;
+    }
+}
+
+
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)
     // Returns abs max of what it wrote.
@@ -1686,10 +1721,18 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         }
         if(AMY_IS_SET(synth[osc]->chained_osc)) {
             // Stack oscillators - render next osc into same buffer.
+            // #720: Walk past any inactive oscs (e.g. ones suspended at onset for having zero
+            // amplitude) rather than stopping at the first one, so a silenced osc in the middle
+            // of a chain doesn't strand the still-sounding oscs behind it.  render_osc_wave()
+            // recurses into the remainder of the chain, so we only need the first audible osc.
             uint16_t chained_osc = synth[osc]->chained_osc;
-            if (synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
-                SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
-                if (new_max_val > max_val)  max_val = new_max_val;
+            while (AMY_IS_SET(chained_osc)) {
+                if (synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
+                    SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
+                    if (new_max_val > max_val)  max_val = new_max_val;
+                    break;
+                }
+                chained_osc = synth[chained_osc]->chained_osc;
             }
         }
         // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
@@ -1706,19 +1749,26 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         }
         // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
         // from zero-amplitude (but maybe inheriting values from chained_oscs).
-        // Stop oscillators if amp is zero for several frames in a row.
-        // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-//#define MIN_ZERO_AMP_TIME_SAMPS (5 * AMY_BLOCK_SIZE)
-        if(AMY_IS_SET(synth[osc]->zero_amp_clock)) {
-            // We terminate zero_amp_clock if the max_val goes above threshold *or* if it's the start of the note and it's above zero.
-            if (max_val >= F2S(AMP_THRESH)
-                || (max_val > 0
-                    && ((amy_global.total_blocks * AMY_BLOCK_SIZE) < (synth[osc]->note_on_clock + AMY_BLOCK_SIZE)))) {
-                AMY_UNSET(synth[osc]->zero_amp_clock);
+        // Stop oscillators once they've been silent for a while -- but NOT while the note's gate is
+        // still active, so a slow attack (or a brief mid-note dip below the noise floor) isn't
+        // mistaken for "done" and terminated before it ever sounds (#720).  Waves that don't use
+        // note_off_clock as their release signal (KS, ALGO, PCM, CUSTOM, partials) keep terminating
+        // whenever they fall silent, regardless of gate, since they manage their own note lifecycle
+        // (e.g. we still need to turn off PARTIAL oscs when their envelopes end, even with no note-off).
+        uint8_t gate_active = wave_terminates_only_in_release(synth[osc]->wave)
+            && AMY_IS_SET(synth[osc]->note_on_clock)
+            && AMY_IS_UNSET(synth[osc]->note_off_clock);
+        if (gate_active) {
+            // Held: keep the osc alive, and keep the silence timer disarmed so the release-phase
+            // grace period starts fresh once the note is released.
+            AMY_UNSET(synth[osc]->zero_amp_clock);
+        } else if (synth[osc]->terminate_on_silence) {
+            if (max_val >= F2S(AMP_THRESH)) {
+                AMY_UNSET(synth[osc]->zero_amp_clock);   // (still) making sound
             } else {
-                if ( synth[osc]->terminate_on_silence
-                     && ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock)
-                         >= MIN_ZERO_AMP_TIME_SAMPS)) {
+                if (AMY_IS_UNSET(synth[osc]->zero_amp_clock))
+                    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // start the silence timer
+                if ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock) >= MIN_ZERO_AMP_TIME_SAMPS) {
                     //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
                     // Oscillator has fallen silent, stop executing it.
                     uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
@@ -1757,8 +1807,6 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                     // (d) never makes any difference .. so it's not slew rate?
                 }
             }
-        } else if (max_val < F2S(AMP_THRESH)) {
-            synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         }
         //fprintf(stderr, "render_osc_wave: t=%.3f osc=%d max_val %.6f\n", amy_global.time, osc, S2F(max_val));
     }
