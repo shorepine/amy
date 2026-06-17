@@ -578,6 +578,17 @@ void set_event_for_bus_fx(amy_event *event, uint8_t bus, global_state_t *state) 
 }
 
 
+int num_oscs_for_voice(int voice) {
+    uint16_t osc = voice_to_base_osc[voice];
+    int num_oscs = 0;
+    while(osc < amy_global.config.max_oscs
+          && osc_to_voice[osc] == voice) {
+        ++num_oscs;
+        ++osc;
+    }
+    return num_oscs;
+}
+
 void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool include_fx, void *state) {
     // Return a sequence of events defining a synth.
     // state = NULL on first call and it returns state to be passed on next call.  Returns NULL when event sequence is finished.
@@ -591,8 +602,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
     uint32_t flags = instrument_get_flags(instr_num);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
-    int num_oscs = 0;
-    while(osc_to_voice[base_osc + num_oscs] == voice) ++num_oscs;
+    int num_oscs = num_oscs_for_voice(voice);
     // The "state" indicates which osc within the voice we're going to report for.
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", instr_num, voice, num_oscs, (int)state_val);
@@ -966,10 +976,22 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // for each voice, send the event to the base osc (+ e->osc if given)
-    for(uint8_t i=0;i<num_voices;i++) {
+    for(uint8_t i = 0; i < num_voices; i++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
             uint16_t target_osc = voice_to_base_osc[voices[i]];
-            amy_event_to_deltas_queue(e, target_osc, queue);
+            if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
+                // Not a note on/off, or osc is specified
+                amy_event_to_deltas_queue(e, target_osc, queue);
+            } else {
+                // Note on/off and osc is not specified - send to all oscs in voice.
+                int num_oscs = num_oscs_for_voice(voices[i]);
+                for (int osc = 0; osc < num_oscs; ++osc) {
+                    e->osc = osc;
+                    //if (osc != 1)
+                    amy_event_to_deltas_queue(e, target_osc, queue);
+                }
+                AMY_UNSET(e->osc);
+            }
 	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }

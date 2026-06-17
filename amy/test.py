@@ -1225,7 +1225,7 @@ class TestResetOscs(AmyTest):
   def run(self):
     amy.send(time=0, synth=1, patch=0, num_voices=4)
     amy.send(time=10, synth=1, oscs_per_voice=5)  # Should cause oscs to reset.
-    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=50, synth=1, note=48, vel=1)    # Will sound all the oscs in unison (post #716)
     amy.send(time=400, synth=1, note=48, vel=0)
 
 
@@ -1367,6 +1367,24 @@ class TestCVTriggerNoteOff(AmyTest):
     #amy.send(time=800, cv_trigger='0')
     # Oh, cv_trigger is executed on message parse, not deferred to a timed
     # event, so this cleared the events before they even started.
+
+
+class TestAllVoiceOscsGetNoteOn(AmyTest):
+  """#716 modifies behavior of sending note-on to a synth/voice to send it to all oscs."""
+
+  def run(self):
+    amy.send(time=0, synth=1, num_voices=2, oscs_per_voice=3)
+    amy.send(time=0, synth=1, osc=0, mod_source=1)  # Mark osc 1 as a mod, should NOT get note-ons
+    amy.send(time=0, synth=1, osc=1, freq=10)
+    amy.send(time=0, synth=1, osc=2, freq=660)  # Second sounding osc
+    amy.send(time=100, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
+    amy.send(time=200, synth=1, osc=0, note=84, vel=0)
+    amy.send(time=300, synth=1, note=84, vel=1)   # Trigger both oscs
+    amy.send(time=400, synth=1, note=84, vel=0)
+    # Check mod_osc is working and not being shifted by note.  10 Hz should do one mod cycle in 0.1 s note.
+    amy.send(time=450, synth=1, osc=0, freq={'mod': 0.2})
+    amy.send(time=500, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
+    amy.send(time=600, synth=1, osc=0, note=84, vel=0)
 
 
 def main(argv):

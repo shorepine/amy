@@ -45,17 +45,15 @@ void partials_note_on(uint16_t osc) {
     for (int i = 0; i < num_partials; ++i) {
         int o = osc + 1 + i;
         ensure_osc_allocd(o, NULL);
-        if (synth[o]->wave == PARTIAL) {  // User has marked this as a partial.
-            // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
-            // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
-            synth[o]->preset = synth[osc]->preset;
-            synth[o]->logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
-            synth[o]->status = SYNTH_IS_ALGO_SOURCE;
-            synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-            AMY_UNSET(synth[o]->note_off_clock);
-            msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
-            partial_note_on(o);
-        }
+        // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
+        // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
+        synth[o]->preset = synth[osc]->preset;
+        synth[o]->logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
+        synth[o]->status = SYNTH_IS_ALGO_SOURCE;
+        synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+        AMY_UNSET(synth[o]->note_off_clock);
+        msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
+        partial_note_on(o);
     }
 }
 
@@ -238,6 +236,7 @@ void interp_partials_note_on(uint16_t osc) {
     for (int o = 0; o < max_num_partials; ++o) {
         ensure_osc_allocd(osc + 1 + o, max_num_breakpoints);
     }
+    int partial_osc = osc;
     for (int h = 0; h < num_harmonics; ++h) {
         if (use_this_partial_map[h]) {
             for (int i = 0; i < MAX_NUM_MAGNITUDES + 1; ++i)  harm_param[i] = 0;
@@ -250,10 +249,12 @@ void interp_partials_note_on(uint16_t osc) {
             _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vh + h,
                                              alpha_ph_vh, partials_voice);
             //fprintf(stderr, "harm %d freq %.2f bps %.3f %.3f %.3f %.3f\n", h, harm_param[0], harm_param[1], harm_param[2], harm_param[3], harm_param[4]);
-            ++osc;
-            _osc_on_with_harm_param(osc, harm_param, partials_voice);
+            ++partial_osc;
+            _osc_on_with_harm_param(partial_osc, harm_param, partials_voice);
         }
     }
+    // Make sure any remaining oscs are still marked as ALGO_SOURCE
+    while(partial_osc < osc + 1 + max_num_partials)  { synth[partial_osc]->status = SYNTH_IS_ALGO_SOURCE; ++partial_osc; }
 }
 
 void interp_partials_note_off(uint16_t osc) {
