@@ -144,49 +144,44 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         // This way we return exact zero for v1 at the end of the segment, rather than BREAKPOINT_EPS
         scale = v1;
     } else {
-#define BREAKPOINT_EPS 0.0002
         // OK, we are transition from v0 to v1 , and we're at elapsed time between t0 and t1
         float time_ratio = ((float)(elapsed - t0) / (float)(t1 - t0));
         // Compute scale based on which type we have
         if(eg_type == ENVELOPE_LINEAR) {
             scale = v0 + MUL4_SS(v1 - v0, F2S(time_ratio));
-        } else if(eg_type == ENVELOPE_TRUE_EXPONENTIAL) {
+        } else if(eg_type == ENVELOPE_TRUE_EXPONENTIAL || eg_type == ENVELOPE_DX7) {
+#define BREAKPOINT_EPS 0.0002
             v0 = MAX(v0, F2S(BREAKPOINT_EPS));
             v1 = MAX(v1, F2S(BREAKPOINT_EPS));
-            SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v1) - log2_lut(v0))
-                                              / (0.001f * (t1 - t0)));
-            scale = MUL4_SS(v0,
-                            exp2_lut(MUL4_SS(dx7_exponential_rate,
-                                             F2S(0.001f * (elapsed - t0)))));
-        } else if(eg_type == ENVELOPE_DX7) {
-            // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
-            // in SAMPLE version, DX7 levels are div 8 i.e. 0 to 12.375 instead of 0 to 99.
+            if (eg_type == ENVELOPE_DX7) {
+                // DX7 is only defined for amps up to 1.0, clip to avoid negative values (which caused a math panic when using float math).
+                v0 = MIN(F2S(1.0f), v0);
+                v1 = MIN(F2S(1.0f), v1);
+            }
+            if (eg_type == ENVELOPE_DX7 && (v1 > v0)) {
+                // Somewhat complicated relationship, see https://colab.research.google.com/drive/1qZmOw4r24IDijUFlel_eSoWEf3L5VSok#scrollTo=F5zkeACrOlum
+                // in SAMPLE version, DX7 levels are div 8 i.e. 0 to 12.375 instead of 0 to 99.
 #define LINEAR_SAMP_TO_DX7_LEVEL(samp) (S2F(log2_lut(MAX(F2S(BREAKPOINT_EPS), samp))) + 12.375)
 #define DX7_LEVEL_TO_LINEAR_SAMP(level) (exp2_lut(F2S(level - 12.375)))
 #define MIN_LEVEL_S 4.25
 #define ATTACK_RANGE_S 9.375
 #define MAP_ATTACK_LEVEL_S(level) (1 - MAX(level - MIN_LEVEL_S, 0) / ATTACK_RANGE_S)
-            // DX7 is only defined for amps up to 1.0, clip to avoid negative values (which caused a math panic when using float math).
-            v0 = MIN(F2S(1.0f), v0);
-            v1 = MIN(F2S(1.0f), v1);
-            SAMPLE mapped_current_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v0)));
-            SAMPLE mapped_target_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v1)));
-            float t_const = (t1 - t0) / S2F(log2_lut(mapped_current_level) - log2_lut(mapped_target_level));
-            float my_t0 = -t_const * S2F(log2_lut(mapped_current_level));
-            if (v1 > v0) {
+                SAMPLE mapped_current_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v0)));
+                SAMPLE mapped_target_level = F2S(MAP_ATTACK_LEVEL_S(LINEAR_SAMP_TO_DX7_LEVEL(v1)));
+                float t_const = (t1 - t0) / S2F(log2_lut(mapped_current_level) - log2_lut(mapped_target_level));
+                float my_t0 = -t_const * S2F(log2_lut(mapped_current_level));
                 // This is the magic equation that shapes the DX7 attack envelopes.
                 scale = DX7_LEVEL_TO_LINEAR_SAMP(MIN_LEVEL_S + ATTACK_RANGE_S * S2F(F2S(1.0f) - exp2_lut(-F2S((my_t0 + elapsed)/t_const))));
             } else {
-                // Decay is regular true_exponential
+                // TRUE_EXPONENTIAL or DX7 Decay (which is also regular true_exponential)
                 v0 = MAX(v0, F2S(BREAKPOINT_EPS));
                 v1 = MAX(v1, F2S(BREAKPOINT_EPS));
                 //float dx7_exponential_rate = -logf(S2F(v1)/S2F(v0)) / (t1 - t0);
                 //scale = MUL4_SS(v0, F2S(expf(-dx7_exponential_rate * (elapsed - t0))));
-                SAMPLE dx7_exponential_rate = F2S(S2F(log2_lut(v1) - log2_lut(v0))
-                                                  / (0.001f * (t1 - t0)));
-                scale = MUL4_SS(v0,
-                                exp2_lut(MUL4_SS(dx7_exponential_rate,
-                                                 F2S(0.001f * (elapsed - t0)))));
+                // Claude's solution avoids SAMPLE overflow for times > 5.8 sec.
+                float log2_v0 = S2F(log2_lut(v0));
+                float log2_v1 = S2F(log2_lut(v1));
+                scale = exp2_lut(F2S(log2_v0 + (log2_v1 - log2_v0) * time_ratio));
             }
         } else { // ENVELOPE_NORMAL - "false exponential"? or ENVELOPE_DB
             // After the full amount of time, the exponential decay will reach (1 - expf(-3)) = 0.95
