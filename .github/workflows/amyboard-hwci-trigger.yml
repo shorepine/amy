@@ -1,0 +1,79 @@
+name: AMYboard HW CI (dispatch)
+
+# Run THIS PR's AMY code on the physical AMYboard bench — without duplicating any
+# of the bench machinery. The firmware build, the Vercel preview/flasher, the
+# self-hosted Pi bench, the hwci.py driver, and the reference audio all live in
+# shorepine/tulipcc (AMY is a submodule there). So instead of copying that here,
+# we fire a `repository_dispatch` at tulipcc telling it: build your AMYboard
+# pipeline but pin the `amy` submodule to THIS PR's SHA, run the bench, and
+# comment the pass/fail back on this PR.
+#
+# SECURITY: the bench is a self-hosted Pi and this repo is public, so it must
+# never execute fork code. We gate to SAME-REPO PRs only (branches pushed to
+# shorepine/amy). Fork PRs don't fire this and can't read the dispatch token; a
+# maintainer can still run the bench for a fork by manually dispatching tulipcc's
+# "AMYboard PR preview" workflow with the fork's amy SHA.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**'                                   # only src/ is compiled into firmware
+      - '.github/workflows/amyboard-hwci-trigger.yml'
+
+concurrency:
+  group: amyboard-hwci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true                         # a new push supersedes the prior request
+
+permissions:
+  pull-requests: write                             # post the "dispatched" note on this PR
+
+jobs:
+  dispatch:
+    # Same-repo branches only. Fork PRs (head repo != shorepine/amy) are skipped
+    # so fork code never reaches the self-hosted Pi.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the bench run to tulipcc
+        uses: actions/github-script@v7
+        with:
+          # Fine-grained PAT (or GitHub App token) with `contents: write` on
+          # shorepine/tulipcc (the permission repository_dispatch requires). The
+          # SAME token, scoped to also grant `issues: write` + `pull-requests:
+          # write` on shorepine/amy, is used on the tulipcc side to comment
+          # results back here — so store one token as a secret in BOTH repos
+          # (named HWCI_BRIDGE_TOKEN in each).
+          github-token: ${{ secrets.HWCI_BRIDGE_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            await github.rest.repos.createDispatchEvent({
+              owner: 'shorepine', repo: 'tulipcc',
+              event_type: 'amy-pr',
+              client_payload: {
+                amy_pr: pr.number,
+                amy_sha: pr.head.sha,
+                amy_repo: `${context.repo.owner}/${context.repo.repo}`,
+              },
+            });
+            core.info(`Dispatched amy-pr to tulipcc: PR #${pr.number} @ ${pr.head.sha}`);
+
+      - name: Note on the PR that the bench was kicked off
+        uses: actions/github-script@v7
+        with:                                        # default GITHUB_TOKEN (same-repo PR can comment)
+          script: |
+            const marker = '<!-- amyboard-hwci-dispatch -->';
+            const body = [
+              marker,
+              '### 🎛️ AMYboard HW CI',
+              '',
+              "Dispatched this PR's `amy` SHA to the tulipcc bench — it builds the AMYboard firmware with your change and runs it on the physical board (audio spectral-compared to a committed reference). Results post here in a few minutes.",
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
