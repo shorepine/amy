@@ -71,7 +71,8 @@ amy_config_t amy_default_config() {
     c.i2s_mclk_mult = 256;  // MCLK = mclk_mult * Fs.
     c.midi_out = -1;
     c.midi_in = -1;
-    c.midi_uart = -1; 
+    c.midi_uart = -1;
+    c.midi_thru = 0;  // MIDI thru (echo MIDI in -> MIDI out) off by default
 
     #if defined(AMYBOARD_ARDUINO) || defined(AMYBOARD)
     // Set default pins 

@@ -155,6 +155,7 @@ amy_start(amy_config);
 | `i2s_lrc`, `i2s_dout`, `i2s_din`, `i2s_bclk`, `i2s_mclk` | Int | -1 | Pin numbers for the I2S interface |
 | `midi_out`, `midi_in` | Int | -1 | Pin number for the MIDI UART pins |
 | `midi_uart` | 0,1,[2] | -1 | UART device index for MCU. Default 1 (`UART1`) on Pi Pico and ESP. Teensy is always `8` |
+| `midi_thru` | `0=off, 1=on` | Off | If set, every incoming MIDI byte is echoed straight to MIDI out, in addition to being processed normally. Can be toggled at runtime via `amy_global.config.midi_thru` |
 | `capture_device_id`, `playback_device_id` | Int | -1 | Which miniaudio device to use, -1 is auto |
 
 

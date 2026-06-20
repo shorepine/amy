@@ -41,6 +41,10 @@ Preface your wire message with AMY's SYSEX manufacturer code: `0x00 0x03 0x45`.
 For example, to send the wire message `v0f440l1` (sine wave, 440Hz, note on) to AMY over SYSEX, you'd send `0xF0 0x00 0x03 0x45 v 0 f 4 4 0 l 1 0xF7`. 
 
 
+## MIDI Thru
+
+AMY can pass every incoming MIDI byte straight through to its MIDI output, in addition to processing it normally. This is off by default. Enable it by setting `midi_thru` on `amy_config_t` (e.g. `amy_config.midi_thru = 1` before `amy_start`), or toggle it at runtime via `amy_global.config.midi_thru`. When enabled, all bytes received on any MIDI input (UART, USB) are echoed to all active MIDI outputs as they are parsed. On Tulip this is exposed as `tulip.amy_midi_thru(True)` / `tulip.amy_midi_thru(False)`.
+
 ## Others
 
 AMY supports MIDI realtime transport for the internal sequencer:
