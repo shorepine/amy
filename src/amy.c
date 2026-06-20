@@ -1,6 +1,8 @@
 // DAn Ellis and Brian Whitman
 // brian@variogr.am / dan.ellis@gmail.com
 
+// HWCI smoke test — no-op comment to exercise the AMYboard hardware-CI pipeline.
+
 #include "amy.h"
 #include "delay.h"
 
