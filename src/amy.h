@@ -737,6 +737,7 @@ typedef struct  {
     int8_t midi_out;
     int8_t midi_in;
     int8_t midi_uart;
+    uint8_t midi_thru;  // If set, echo every incoming MIDI byte straight to MIDI out (in addition to normal processing). Off by default.
 
     // memory caps for MCUs
     uint32_t ram_caps_events;
