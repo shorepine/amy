@@ -9,14 +9,16 @@ name: AMYboard HW CI (dispatch)
 # comment the pass/fail back on this PR.
 #
 # SECURITY: the bench is a self-hosted Pi and this repo is public, so it must
-# never execute fork code. We gate to SAME-REPO PRs only (branches pushed to
-# shorepine/amy). Fork PRs don't fire this and can't read the dispatch token; a
-# maintainer can still run the bench for a fork by manually dispatching tulipcc's
-# "AMYboard PR preview" workflow with the fork's amy SHA.
+# never execute UNVETTED fork code. Same-repo PRs (maintainers push branches to
+# shorepine/amy) run automatically — no label needed. A fork PR runs ONLY after a
+# maintainer adds the `hwci-ok` label; only maintainers can apply labels, so that
+# label IS the human-review gate (and GitHub's own "Approve and run" for fork
+# workflows still applies on top). A maintainer can also bench a fork by manually
+# dispatching tulipcc's "AMYboard PR preview" workflow with the fork's amy SHA.
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - 'src/**'                                   # only src/ is compiled into firmware
       - '.github/workflows/amyboard-hwci-trigger.yml'
@@ -30,9 +32,17 @@ permissions:
 
 jobs:
   dispatch:
-    # Same-repo branches only. Fork PRs (head repo != shorepine/amy) are skipped
-    # so fork code never reaches the self-hosted Pi.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Run for: a same-repo branch (maintainers — no label needed), OR a fork PR a
+    # maintainer has tagged `hwci-ok`. The `action == 'labeled'` arm fires the
+    # moment the label is added; the other arm re-runs on each push to an
+    # already-labeled fork PR. Adding an unrelated label to a same-repo PR does
+    # NOT re-trigger (avoids a duplicate bench). Forks can't reach the Pi without
+    # the label.
+    if: >-
+      (github.event.action == 'labeled' && github.event.label.name == 'hwci-ok') ||
+      (github.event.action != 'labeled' &&
+       (github.event.pull_request.head.repo.full_name == github.repository ||
+        contains(github.event.pull_request.labels.*.name, 'hwci-ok')))
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch the bench run to tulipcc
@@ -60,7 +70,10 @@ jobs:
 
       - name: Note on the PR that the bench was kicked off
         uses: actions/github-script@v7
-        with:                                        # default GITHUB_TOKEN (same-repo PR can comment)
+        with:
+          # Use the bridge token (not GITHUB_TOKEN) so the note also posts on fork
+          # PRs, whose GITHUB_TOKEN is read-only even after a maintainer approves.
+          github-token: ${{ secrets.HWCI_BRIDGE_TOKEN }}
           script: |
             const marker = '<!-- amyboard-hwci-dispatch -->';
             const body = [
