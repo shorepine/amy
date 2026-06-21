@@ -136,9 +136,22 @@ void sequencer_midi_stop() {
 void sequencer_midi_clock_tick() {
     sequencer_external_clock = true;
     if (!sequencer_running) return;
-    for (uint8_t i = 0; i < AMY_SEQUENCER_PPQ/MIDI_SEQUENCER_PPQ; ++i) { 
+    for (uint8_t i = 0; i < AMY_SEQUENCER_PPQ/MIDI_SEQUENCER_PPQ; ++i) {
         sequencer_process_tick();
     }
+}
+
+void sequencer_external_clock_disable() {
+    // Leave external-clock mode and hand back to the internal timer. Without
+    // this, sequencer_external_clock latches true on the first F8 tick and is
+    // never cleared, so the internal sequencer stays dead once an external
+    // clock stops -- even after the caller turns external sync back off. Called
+    // from amy_external_midi_sync(0) so disabling sync is a real recovery path.
+    sequencer_external_clock = false;
+    sequencer_running = true;
+    // Re-anchor the tick timer to now so sequencer_check_and_fill doesn't try to
+    // replay every tick that elapsed while we were on external clock.
+    amy_global.next_amy_tick_us = (uint64_t)amy_sysclock() * 1000L;
 }
 
 uint8_t sequencer_add_event(amy_event *e) {
