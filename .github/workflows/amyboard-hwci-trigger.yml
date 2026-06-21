@@ -9,15 +9,24 @@ name: AMYboard HW CI (dispatch)
 # comment the pass/fail back on this PR.
 #
 # SECURITY: the bench is a self-hosted Pi and this repo is public, so it must
-# never execute UNVETTED fork code. Same-repo PRs (maintainers push branches to
-# shorepine/amy) run automatically — no label needed. A fork PR runs ONLY after a
-# maintainer adds the `hwci-ok` label; only maintainers can apply labels, so that
-# label IS the human-review gate (and GitHub's own "Approve and run" for fork
-# workflows still applies on top). A maintainer can also bench a fork by manually
+# never run UNVETTED fork code. Same-repo PRs (maintainers push branches to
+# shorepine/amy) dispatch automatically — no label needed. A fork PR dispatches
+# ONLY after a maintainer adds the `hwci-ok` label; only maintainers can label, so
+# that label IS the human-review gate. This job never checks out PR code — it only
+# reads head.sha + number and fires the dispatch (see the `on:` note for why it
+# runs as `pull_request_target`). A maintainer can also bench a fork by manually
 # dispatching tulipcc's "AMYboard PR preview" workflow with the fork's amy SHA.
 
 on:
-  pull_request:
+  # `pull_request_target`, NOT `pull_request`: the job must run in THIS repo's
+  # trusted context to read HWCI_BRIDGE_TOKEN. A fork's `pull_request` run is given
+  # NO secrets (a hard GitHub rule), so it could never dispatch — that's why
+  # labeling a fork PR did nothing. SAFE here because the job never checks out or
+  # runs the PR's code; it only reads head.sha + number and fires the cross-repo
+  # dispatch. (The fork's code runs only downstream on the bench — the `hwci-ok`
+  # label is the maintainer gate for that.) Note: the workflow that runs is always
+  # main's version, so changes here take effect only once merged.
+  pull_request_target:
     types: [opened, synchronize, reopened, labeled]
     paths:
       - 'src/**'                                   # only src/ is compiled into firmware
