@@ -841,6 +841,29 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestMidiRunningStatusClock(AmyTest):
+  """Running status must survive System Real-Time bytes interleaved into the
+  stream. Regression for shorepine/amy#747/#748: an interleaved MIDI clock
+  (0xF8) or active-sensing (0xFE) byte used to clobber the stored status byte,
+  so the following running-status note was silently dropped. Here three notes
+  are sent with the status byte (0x90) given only once -- a clock byte sits
+  before note 2 and an active-sensing byte before note 3 -- and all three
+  (60, 62, 64) must sound."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.inject_midi_bytes([
+        0x90, 60, 100,   # note on, channel 1, note 60, velocity 100
+        0xF8,            # interleaved MIDI clock (real-time) -- must not break running status
+        62, 100,         # running status: note on 62 (status byte not resent)
+        0xFE,            # interleaved active sensing (real-time)
+        64, 100,         # running status: note on 64
+    ])
+
+
 class TestDrumsVoiceStealing(AmyTest):
   """Drums ignore missing note offs, but should still notice excess note-offs."""
 

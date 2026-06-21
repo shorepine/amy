@@ -235,6 +235,28 @@ static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
+static PyObject * inject_midi_bytes_wrapper(PyObject *self, PyObject *args) {
+    // Feed a raw MIDI byte stream through the real byte-stream parser
+    // (convert_midi_bytes_to_messages) -- exercises running status, real-time
+    // interleaving, etc. Unlike inject_midi, which hands a pre-formed 3-byte
+    // message straight to amy_event_midi_message_received, this is the only way
+    // to test the parser from Python.
+    PyObject *seq;
+    int usb = 0;
+    if (!PyArg_ParseTuple(args, "O|i", &seq, &usb))
+        return NULL;
+    PyObject *fast = PySequence_Fast(seq, "inject_midi_bytes expects a list/tuple/bytes of ints");
+    if (fast == NULL) return NULL;
+    Py_ssize_t n = PySequence_Fast_GET_SIZE(fast);
+    uint8_t *buf = (uint8_t *)malloc(n > 0 ? (size_t)n : 1);
+    for (Py_ssize_t i = 0; i < n; ++i)
+        buf[i] = (uint8_t)(PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, i)) & 0xFF);
+    Py_DECREF(fast);
+    convert_midi_bytes_to_messages(buf, (size_t)n, (uint8_t)usb);
+    free(buf);
+    return Py_None;
+}
+
 static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
     char s[MAX_MESSAGE_LEN];
     void *state = NULL;
@@ -275,6 +297,7 @@ static PyMethodDef c_amyMethods[] = {
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
+    {"inject_midi_bytes", inject_midi_bytes_wrapper, METH_VARARGS, "Inject a raw MIDI byte stream through the parser"},
     {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
     {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
     { NULL, NULL, 0, NULL }

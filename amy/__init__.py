@@ -317,7 +317,13 @@ def inject_midi(a, b, c, d=None):
         _amy.inject_midi(a, b, c)
     else:
         _amy.inject_midi(a, b, c, d)
-    
+
+def inject_midi_bytes(data, usb=0):
+    # Feed a raw MIDI byte stream (list/tuple/bytes of ints) through AMY's
+    # byte-stream parser, exercising running status and real-time interleaving --
+    # unlike inject_midi(), which injects a single pre-formed message.
+    _amy.inject_midi_bytes(data, usb)
+
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)
     send(load_sample=s)
