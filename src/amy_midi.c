@@ -36,6 +36,9 @@ static uint8_t external_midi_sync_enabled = 0;
 
 void amy_external_midi_sync(uint8_t enabled) {
     external_midi_sync_enabled = enabled ? 1 : 0;
+    // Turning sync off must restore internal clocking, otherwise the sequencer
+    // stays latched to a (now silent) external clock and never ticks again.
+    if (!external_midi_sync_enabled) sequencer_external_clock_disable();
 }
 
 #if 0
@@ -145,8 +148,11 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
         else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
-        else if(status_byte == 0xFA) sequencer_midi_start();
-        else if(status_byte == 0xFC) sequencer_midi_stop();
+        // MIDI transport (Start/Stop) only drives the sequencer when the user
+        // has opted into external sync; otherwise a connected DAW's transport
+        // would hijack the AMYboard's own internal sequence.
+        else if(status_byte == 0xFA) { if(external_midi_sync_enabled) sequencer_midi_start(); }
+        else if(status_byte == 0xFC) { if(external_midi_sync_enabled) sequencer_midi_stop(); }
     }
     midi_msg_handler(data, len, sysex, time);
 
@@ -300,22 +306,35 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
                 sysex_buffer[sysex_len++] = byte;
             }
         } else {
-            if(byte & 0x80) { // new status byte 
-                sysex_flag = 0; sysex_len = 0;
-                // Single byte message?
-                current_midi_message[0] = byte;
-                if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6 || byte == 0xF9 || 
-                    byte == 0xFA || byte == 0xFB || byte == 0xFC || byte == 0xFD || byte == 0xFE || byte == 0xFF) {
-                    amy_event_midi_message_received(current_midi_message, 1, 0, time);
+            if(byte & 0x80) { // new status byte
+                // System Real-Time messages (0xF8-0xFF) may be interleaved
+                // anywhere in the stream -- even between the data bytes of
+                // another message -- and must NOT disturb running status. So
+                // handle them with a scratch buffer, leaving current_midi_message[]
+                // and midi_message_slot untouched.
+                if(byte >= 0xF8) {
+                    if(byte == 0xF8) { // clock. don't forward this on to Tulip userspace
+                        midi_clock_received();
+                    } else { // start/continue/stop/active-sensing/reset/etc
+                        uint8_t rt[1] = { byte };
+                        amy_event_midi_message_received(rt, 1, 0, time);
+                    }
                     if(usb) i = len+1; // exit the loop if usb
-                }  else if(byte == 0xF0) { // sysex start 
-                    // if that's there we then assume everything is an AMY message until 0xF7
-                    sysex_flag = 1;
-                } else if(byte == 0xF8) { // clock. don't forward this on to Tulip userspace
-                    midi_clock_received();
-                    if(usb) i = len+1; // exit the loop if usb
-                } else { // a new status message that expects at least one byte of message after
+                } else {
+                    // Channel Voice (0x80-0xE0) or System Common (0xF0-0xF7):
+                    // these begin a fresh message and cancel running status.
+                    sysex_flag = 0; sysex_len = 0;
                     current_midi_message[0] = byte;
+                    midi_message_slot = 0; // drop any half-collected data bytes
+                    if(byte == 0xF4 || byte == 0xF5 || byte == 0xF6) {
+                        // 1-byte System Common (undefined / tune request)
+                        amy_event_midi_message_received(current_midi_message, 1, 0, time);
+                        if(usb) i = len+1; // exit the loop if usb
+                    } else if(byte == 0xF0) { // sysex start
+                        // everything is an AMY message until 0xF7
+                        sysex_flag = 1;
+                    }
+                    // else: channel voice or F1/F2/F3 -- status stored, await data bytes
                 }
             } else { // data byte of some kind
                 uint8_t status = current_midi_message[0] & 0xF0;
