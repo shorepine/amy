@@ -1707,7 +1707,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_IS_SET(synth[osc]->chained_osc)) {
             // Stack oscillators - render next osc into same buffer.
             uint16_t chained_osc = synth[osc]->chained_osc;
-            if (synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
+            if (synth[chained_osc] != NULL && synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
                 SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
                 if (new_max_val > max_val)  max_val = new_max_val;
             }
