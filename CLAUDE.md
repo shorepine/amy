@@ -2,10 +2,12 @@
 
 ## Releases
 
-When creating a new release:
-1. Update the version in `library.properties` to match the release tag
-2. Create the GitHub release with a plain version tag (e.g. `1.2.3`, NOT `v1.2.3`) — Arduino requires this format
-3. The Godot addon build workflow triggers automatically on tag push and attaches `amy-godot-addon.zip` to the release
+Releases are cut **automatically on every merge to `main`** by `.github/workflows/release.yml`:
+1. It bumps the **patch** number in `library.properties` (e.g. `1.2.7` → `1.2.8`). Because `main` is protected (PR required, `enforce_admins` on), the bump can't be pushed directly — the workflow opens and merges a `bump-X` PR with the built-in `GITHUB_TOKEN` (whose pushes/merges don't re-trigger workflows, so it can't loop).
+2. It creates the GitHub release with a plain version tag (e.g. `1.2.8`, NOT `v1.2.8`) — Arduino requires this format — which the Arduino Library Manager picks up.
+3. The Godot addon build (`godot-addon.yml`) attaches `amy-godot-addon.zip`. A `GITHUB_TOKEN`-created tag can't fire `godot-addon.yml`'s `push: tags` trigger, so the release workflow instead dispatches it via `workflow_dispatch` at the new tag (the one event `GITHUB_TOKEN` *can* trigger). No PAT is involved.
+
+To **skip** a release for a given merge, put `[skip release]` in the merge commit message. To cut a release manually, the same three steps work by hand (bump `library.properties` via PR, `gh release create <ver>`, then the Godot build).
 
 ## Godot GDExtension
 
