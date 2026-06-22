@@ -330,10 +330,10 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
     amy_global.bus[bus]->chorus.depth = depth;
 }
 
-void alloc_reverb_delay_lines(uint8_t bus) {
+bool alloc_reverb_delay_lines(uint8_t bus) {
     if (amy_global.bus[bus]->reverb.rev == NULL)
         amy_global.bus[bus]->reverb.rev = new_reverb();
-    init_stereo_reverb(amy_global.bus[bus]->reverb.rev);
+    return init_stereo_reverb(amy_global.bus[bus]->reverb.rev);
 }
 
 void dealloc_reverb_delay_lines(uint8_t bus) {
@@ -352,7 +352,10 @@ void config_reverb(uint8_t bus, float level, float liveness, float damping, floa
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
         if (amy_global.bus[bus]->reverb.level == 0) {
-            alloc_reverb_delay_lines(bus);
+            if (!alloc_reverb_delay_lines(bus)) {
+                amy_global.bus[bus]->reverb.level = 0;
+                return;
+            }
         }
         config_stereo_reverb(amy_global.bus[bus]->reverb.rev, liveness, xover_hz, damping);
     }
@@ -1943,7 +1946,7 @@ int16_t * amy_fill_buffer() {
         }
         if(AMY_HAS_REVERB) {
             // apply per-bus reverb.
-            if(amy_global.bus[bus]->reverb.level > 0) {
+            if(amy_global.bus[bus]->reverb.level > 0 && amy_global.bus[bus]->reverb.rev != NULL && amy_global.bus[bus]->reverb.rev->delay_1 != NULL) {
                 if(AMY_NCHANS == 1) {
                     stereo_reverb(amy_global.bus[bus]->reverb.rev, fbl[0][bus], NULL, fbl[0][bus], NULL, AMY_BLOCK_SIZE, amy_global.bus[bus]->reverb.level);
                 } else {

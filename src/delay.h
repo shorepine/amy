@@ -16,7 +16,7 @@ void apply_fixed_delay(SAMPLE *block, delay_line_t *delay_line, uint32_t delay_s
 reverb_params_t *new_reverb();
 void delete_reverb(reverb_params_t *rev);
 void config_stereo_reverb(reverb_params_t *rev, float a_liveness, float crossover_hz, float damping);
-void init_stereo_reverb(reverb_params_t *rev);
+bool init_stereo_reverb(reverb_params_t *rev);
 void deinit_stereo_reverb(reverb_params_t *rev);
 void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int n_samples, SAMPLE level);
 
