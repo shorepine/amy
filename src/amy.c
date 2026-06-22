@@ -810,7 +810,6 @@ void reset_osc_state(struct synthinfo *psynth) {
     AMY_UNSET(psynth->render_clock);
     AMY_UNSET(psynth->note_on_clock);
     psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
-    AMY_UNSET(psynth->zero_amp_clock);
     AMY_UNSET(psynth->mod_value_clock);
     psynth->mod_value = F2S(0);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
@@ -1014,6 +1013,7 @@ int8_t oscs_init() {
     }
 
     amy_global.total_blocks = 0;
+    amy_global.total_samples = 0;
     amy_global.time = 0;
     //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
     //    AMY_OSCS, AMY_BLOCK_SIZE, AMY_CORES, AMY_NCHANS, pcm_samples);
@@ -1336,7 +1336,7 @@ void play_delta(struct delta *d) {
         // No longer record this osc in note_off state.
         AMY_UNSET(synth[mod_osc]->note_off_clock);
         // Start the mod osc.
-        synth[mod_osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+        synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
         osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
     }
     if(d->param == ALGORITHM) {
@@ -1410,7 +1410,7 @@ void play_delta(struct delta *d) {
                     // ** no_amp_001
                     // an osc came in with a note on.
                     // start the bp clock
-                    synth[osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE; //esp_timer_get_time() / 1000;
+                    synth[osc]->note_on_clock = amy_global.total_samples; //esp_timer_get_time() / 1000;
 
                     // if there was a filter active for this voice, reset it
                     //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
@@ -1427,10 +1427,6 @@ void play_delta(struct delta *d) {
                     //    msynth[osc]->last_logfreq = initial_logfreq;
                     // Now we've tested that, we can reset note-off clocks.
                     AMY_UNSET(synth[osc]->note_off_clock);  // Most recent note event is not note-off.
-                    //AMY_UNSET(synth[osc]->zero_amp_clock);
-                    // Actually, start with an expectation that the voice will be zero amp, give it one frame to prove otherwise.
-#define MIN_ZERO_AMP_TIME_SAMPS (10 * AMY_BLOCK_SIZE)
-                    synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE - MIN_ZERO_AMP_TIME_SAMPS + 1 * AMY_BLOCK_SIZE;
 
                     float initial_freq = freq_of_logfreq(initial_logfreq);
                     osc_note_on(osc, initial_freq);
@@ -1439,7 +1435,7 @@ void play_delta(struct delta *d) {
                     if(AMY_IS_SET(mod_osc)) {
                         if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
                             synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
-                        synth[mod_osc]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;  // Need a note_on_clock to have envelope work correctly.
+                        synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.
                         switch(synth[mod_osc]->wave) {
                         case SINE: sine_mod_trigger(mod_osc); break;
                         case SAW_DOWN: saw_up_mod_trigger(mod_osc); break;
@@ -1477,7 +1473,7 @@ void play_delta(struct delta *d) {
                     case BYO_PARTIALS:
                     case INTERP_PARTIALS:
                         AMY_UNSET(synth[osc]->note_on_clock);
-                        synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                        synth[osc]->note_off_clock = amy_global.total_samples;
                         if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
                         else partials_note_off(osc);
                         break;
@@ -1490,7 +1486,7 @@ void play_delta(struct delta *d) {
                         AMY_UNSET(synth[osc]->note_on_clock);
                         if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
                             // Only set the note_off_clock (start of release) if we don't already have one.
-                            synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
+                            synth[osc]->note_off_clock = amy_global.total_samples;
                         }
                     }
                 }
@@ -1536,6 +1532,7 @@ float amp_combine_controls(float *controls, float *coefs) {
 #include "emscripten/webaudio.h"
 #endif
 void hold_and_modify(uint16_t osc) {
+    // Calculate the dynamic parameters for this frame and store them in the msynth[osc] structure.
     AMY_PROFILE_START(HOLD_AND_MODIFY)
     float ctrl_inputs[NUM_COMBO_COEFS];
     ctrl_inputs[COEF_CONST] = 1.0f;
@@ -1582,7 +1579,8 @@ void hold_and_modify(uint16_t osc) {
         msynth[osc]->amp = new_amp;
     } else {
         // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
-        if (new_amp > msynth[osc]->last_amp) {   // was > 0
+        //if (new_amp > msynth[osc]->last_amp) {   // was > 0
+        if (msynth[osc]->last_amp == 0) {
             msynth[osc]->last_amp = new_amp;
         }
         // Advance the envelopes to the beginning of the next frame.
@@ -1598,7 +1596,7 @@ void hold_and_modify(uint16_t osc) {
 
     if (osc == 999) {
         fprintf(stderr, "h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
-               amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc,
+               amy_global.time, osc,
                ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
                synth[osc]->amp_coefs[0], synth[osc]->amp_coefs[1], synth[osc]->amp_coefs[2], synth[osc]->amp_coefs[3], synth[osc]->amp_coefs[4], synth[osc]->amp_coefs[5],
                synth[osc]->logfreq_coefs[0], synth[osc]->logfreq_coefs[1], synth[osc]->logfreq_coefs[2], synth[osc]->logfreq_coefs[3], synth[osc]->logfreq_coefs[4], synth[osc]->logfreq_coefs[5],
@@ -1644,46 +1642,50 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
     AMY_PROFILE_STOP(MIX_WITH_PAN)
 }
 
+// Test if the specified osc is in its release phase (i.e., note-off has been received).
+#define OSC_IN_RELEASE(osc)  (AMY_IS_SET(synth[osc]->note_off_clock))
 
 SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     AMY_PROFILE_START(RENDER_OSC_WAVE)
     // Returns abs max of what it wrote.
         //if (osc < amy_global.config.max_oscs) // exclude chorus LFOs.
         //fprintf(stderr, "+render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n\r",
-        //    amy_global.total_blocks*AMY_BLOCK_SIZE, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+        //    amy_global.total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
         //    osc, synth[osc]->render_clock);
     SAMPLE max_val = 0;
     // Only render if osc has not already been rendered this time step e.g. by chained_osc.
-    if (synth[osc]->render_clock != amy_global.total_blocks*AMY_BLOCK_SIZE) {
-        synth[osc]->render_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
-        // fill buf with next block_size of samples for specified osc.
-        hold_and_modify(osc); // apply bp / mod
-        if(!(msynth[osc]->amp == 0 && msynth[osc]->last_amp == 0)) {
-            if(synth[osc]->wave == NOISE) max_val = render_noise(buf, osc);
-            if(synth[osc]->wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
-            if(synth[osc]->wave == SAW_UP) max_val = render_saw_up(buf, osc);
-            if(synth[osc]->wave == PULSE) max_val = render_pulse(buf, osc);
-            if(synth[osc]->wave == TRIANGLE) max_val = render_triangle(buf, osc);
-            if(synth[osc]->wave == SINE) max_val = render_sine(buf, osc);
-            #ifdef AMY_WAVETABLE
-            if(synth[osc]->wave == WAVETABLE) max_val = render_wavetable(buf, osc);
-            #endif
-            if(synth[osc]->wave == AUDIO_IN0) max_val = render_audio_in(buf, osc, 0);
-            if(synth[osc]->wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
-            if(synth[osc]->wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
-            if(synth[osc]->wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
-            if(synth[osc]->wave == AMY_MIDI) max_val = 1;
-            if(synth[osc]->wave == KS) {
-                if(amy_global.config.ks_oscs) {
-                    max_val = render_ks(buf, osc);
+    if (synth[osc]->render_clock != amy_global.total_samples) {
+        synth[osc]->render_clock = amy_global.total_samples;
+        if (synth[osc]->amp_coefs[COEF_CONST] != 0) {
+                    // fill buf with next block_size of samples for specified osc.
+            hold_and_modify(osc); // apply bp / mod
+            if(!(msynth[osc]->amp == 0 && msynth[osc]->last_amp == 0)) {
+                if(synth[osc]->wave == NOISE) max_val = render_noise(buf, osc);
+                if(synth[osc]->wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
+                if(synth[osc]->wave == SAW_UP) max_val = render_saw_up(buf, osc);
+                if(synth[osc]->wave == PULSE) max_val = render_pulse(buf, osc);
+                if(synth[osc]->wave == TRIANGLE) max_val = render_triangle(buf, osc);
+                if(synth[osc]->wave == SINE) max_val = render_sine(buf, osc);
+                #ifdef AMY_WAVETABLE
+                if(synth[osc]->wave == WAVETABLE) max_val = render_wavetable(buf, osc);
+                #endif
+                if(synth[osc]->wave == AUDIO_IN0) max_val = render_audio_in(buf, osc, 0);
+                if(synth[osc]->wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
+                if(synth[osc]->wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
+                if(synth[osc]->wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
+                if(synth[osc]->wave == AMY_MIDI) max_val = 1;
+                if(synth[osc]->wave == KS) {
+                    if(amy_global.config.ks_oscs) {
+                        max_val = render_ks(buf, osc);
+                    }
                 }
-            }
-            if(pcm_samples)
-                if (AMY_WAVE_IS_PCM(synth[osc]->wave)) max_val = render_pcm(buf, osc);
-            if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
-            if(AMY_HAS_PARTIALS) {
-                if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
-                    max_val = render_partials(buf, osc);
+                if(pcm_samples)
+                    if (AMY_WAVE_IS_PCM(synth[osc]->wave)) max_val = render_pcm(buf, osc);
+                if(synth[osc]->wave == ALGO) max_val = render_algo(buf, osc, core);
+                if(AMY_HAS_PARTIALS) {
+                    if(synth[osc]->wave == BYO_PARTIALS || synth[osc]->wave == INTERP_PARTIALS)
+                        max_val = render_partials(buf, osc);
+                }
             }
         }
         if(AMY_HAS_CUSTOM) {
@@ -1723,63 +1725,27 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // from zero-amplitude (but maybe inheriting values from chained_oscs).
         // Stop oscillators if amp is zero for several frames in a row.
         // Note: We can't wait for the note off because we need to turn off PARTIAL oscs when envelopes end, even if no note off.
-//#define MIN_ZERO_AMP_TIME_SAMPS (5 * AMY_BLOCK_SIZE)
-        if(AMY_IS_SET(synth[osc]->zero_amp_clock)) {
-            // We terminate zero_amp_clock if the max_val goes above threshold *or* if it's the start of the note and it's above zero.
-            if (max_val >= F2S(AMP_THRESH)
-                || (max_val > 0
-                    && ((amy_global.total_blocks * AMY_BLOCK_SIZE) < (synth[osc]->note_on_clock + AMY_BLOCK_SIZE)))) {
-                AMY_UNSET(synth[osc]->zero_amp_clock);
-            } else {
-                if ( synth[osc]->terminate_on_silence
-                     && ((amy_global.total_blocks*AMY_BLOCK_SIZE - synth[osc]->zero_amp_clock)
-                         >= MIN_ZERO_AMP_TIME_SAMPS)) {
-                    //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
-                    // Oscillator has fallen silent, stop executing it.
-                    uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
-                    while (AMY_IS_SET(osc_to_stop)) {
-                        synth[osc_to_stop]->status = SYNTH_INAUDIBLE;  // It *could* come back...
-                        // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
-                        msynth[osc_to_stop]->filter_logfreq = 0;  // (a)
-                        msynth[osc_to_stop]->resonance = 0.7f;  // (b)
-                        //reset_filter(osc_to_stop);                // (c)
-                        //AMY_UNSET(msynth[osc_to_stop]->last_filter_logfreq);  // (d)
-                        // .. but force it to start at zero phase next time.
-                        synth[osc_to_stop]->phase = 0;
-                        osc_to_stop = synth[osc_to_stop]->chained_osc;
-                    }
-                    // <none>                      err=-33.6 dB
-                    //                   (d)       err=-33.6 dB
-                    //                         (e) err=-35.6 dB
-                    // (a) + (b)             + (e) err=-35.6 dB
-                    // (a)                         err=-41.1 dB
-                    //       (b)                   err=-37.7 dB
-                    // (a) + (b)                   err=-100.0 dB
-                    // (a) + (b)       + (d)       err=-100.0 dB
-                    //             (c)             err=-50.5 dB
-                    //             (c)       + (e) err=-50.5 dB
-                    // (a)       + (c)             err=-50.5 dB
-                    // (a)       + (c)       + (e) err=-50.5 dB
-                    // (a) + (b) + (c)             err=-50.5 dB
-                    // (a) + (b) + (c)       + (e) err=-50.5 dB
-                    // (a) + (b) + (c) + (d) + (e) err=-50.5 dB
-                    //
-                    // Preserve the open-filter ring-out, then clear the filter state:
-                    // (a) + (b) + (f)             err=-87.8 dB   just as good as -100
-                    //             (f)             err=-35.8 dB   cutoff delayed, same prob
-                    //
-                    // (c) always gives -50.5 .. so emptying the filter state negates the impact of a,b,e
-                    // (d) never makes any difference .. so it's not slew rate?
-                }
+        if (OSC_IN_RELEASE(osc) && max_val < F2S(AMP_THRESH) && synth[osc]->terminate_on_silence) {
+            //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
+            // Oscillator has fallen silent, stop executing it.
+            uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
+            while (AMY_IS_SET(osc_to_stop)) {
+                synth[osc_to_stop]->status = SYNTH_INAUDIBLE;  // It *could* come back...
+                // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
+                msynth[osc_to_stop]->filter_logfreq = 0;  // (a)
+                msynth[osc_to_stop]->resonance = 0.7f;  // (b)
+                //reset_filter(osc_to_stop);                // (c)
+                //AMY_UNSET(msynth[osc_to_stop]->last_filter_logfreq);  // (d)
+                // .. but force it to start at zero phase next time.
+                synth[osc_to_stop]->phase = 0;
+                osc_to_stop = synth[osc_to_stop]->chained_osc;
             }
-        } else if (max_val < F2S(AMP_THRESH)) {
-            synth[osc]->zero_amp_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         }
         //fprintf(stderr, "render_osc_wave: t=%.3f osc=%d max_val %.6f\n", amy_global.time, osc, S2F(max_val));
     }
     AMY_PROFILE_STOP(RENDER_OSC_WAVE)
     //fprintf(stderr, "-render_osc_wave: t=%ld core=%d buf=0x%lx (%f, %f, %f, %f...) osc=%d osc_t=%ld\n",
-    //    amy_global.total_blocks*AMY_BLOCK_SIZE, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
+    //    amy_global.total_samples, core, buf, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]),
     //    osc, synth[osc]->render_clock);
     return max_val;
 }
@@ -1828,7 +1794,7 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if (amy_global.debug_flag) {
         amy_global.debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core][0 /* bus */], AMY_BLOCK_SIZE);
-        fprintf(stderr, "time %" PRIu32 " core %d bus 0 max_max=%.3f post-eq max=%.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, core, S2F(max_max), S2F(smax));
+        fprintf(stderr, "time %" PRIu32 " core %d bus 0 max_max=%.3f post-eq max=%.3f\n", amy_global.total_samples, core, S2F(max_max), S2F(smax));
     }
 
     AMY_PROFILE_STOP(AMY_RENDER)
@@ -2072,7 +2038,8 @@ int16_t * amy_fill_buffer() {
         }
     }
     amy_global.total_blocks++;
-    amy_global.time = amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE;
+    amy_global.total_samples = amy_global.total_blocks * AMY_BLOCK_SIZE;
+    amy_global.time = amy_global.total_samples / (float)AMY_SAMPLE_RATE;
 
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
@@ -2082,6 +2049,7 @@ int16_t * amy_fill_buffer() {
 
 void amy_reset_sysclock() {
     amy_global.total_blocks = 0;
+    amy_global.total_samples = 0;
     amy_global.time = 0;
     amy_global.sequencer_tick_count = 0;
     sequencer_recompute();

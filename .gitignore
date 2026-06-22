@@ -1,6 +1,7 @@
 uv.lock
 amy-example
 amy-message
+failed_tests.txt
 tests/tst
 amy-piano
 src/build/
