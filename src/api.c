@@ -252,6 +252,7 @@ void amy_add_message_from_sysex(char *message) {
 // given an event play / schedule the event directly (C API)
 void amy_add_event(amy_event *e) {
     peek_stack("add_event");
+    // amy_process_event snarfs scheduler events and (with bizarre specificity) patch reset events, for others it makes sure e->time is set, then marks as EVENT_SCHEDULED
     amy_process_event(e);
     // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
     if(e->status == EVENT_SCHEDULED) {

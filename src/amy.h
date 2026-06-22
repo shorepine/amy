@@ -598,7 +598,6 @@ struct synthinfo {
     uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;
-    uint32_t zero_amp_clock;   // Time amplitude hits zero.
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
@@ -809,6 +808,7 @@ typedef struct global_state {
     int16_t latency_ms;
     float tempo;
     uint32_t total_blocks;
+    uint32_t total_samples;
     float time;
     uint8_t debug_flag;
     // How many buses do we actually have to process?

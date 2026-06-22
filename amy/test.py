@@ -1410,6 +1410,23 @@ class TestAllVoiceOscsGetNoteOn(AmyTest):
     amy.send(time=600, synth=1, osc=0, note=84, vel=0)
 
 
+class TestNoteGoesToZero(AmyTest):
+  """Per issue #720, we don't want to stop a note just because it's silent if it hasn't had a note-off."""
+
+  def run(self):
+    # 15 Hz AM modulator
+    amy.send(time=0, osc=0, freq=15)
+    # Osc 1 on left has AM that doesn't push it to zero
+    amy.send(time=0, osc=1, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.5, 'mod': 0.5}, pan=0)
+    # Osc 2 on the right has much deeper AM that pushes to zero in the troughs.  It will be killed in the first release trough.
+    amy.send(time=0, osc=2, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.01, 'mod': 1.0}, pan=1)
+    amy.send(time=100, osc=1, note=60, vel=1)
+    amy.send(time=100, osc=2, note=60, vel=1)
+    # Start release at 600 ms.
+    amy.send(time=600, osc=1, note=60, vel=0)
+    amy.send(time=600, osc=2, note=60, vel=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
@@ -1469,10 +1486,16 @@ def main(argv):
   if not quiet:
     amy.send(debug=0)
 
+  # Write out failed_tests.txt even if it's empty.
+  with open("failed_tests.txt", "wt") as f:
+    for e in errors:
+      f.write(e.split(' ')[0] + '\n')
+
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
     print('\n'.join(sorted(errors, key=lambda x: float_or_val(x.split(' ')[-2].split('=')[-1], error_val=1000), reverse=True)))
-    sys.exit(1)
+    if not quiet:
+      sys.exit(1)
   else:
     print(len(oks), "tests pass")
 
