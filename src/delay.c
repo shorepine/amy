@@ -344,7 +344,7 @@ void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_o
         d3 = LPF(d3, rev->f3state, rev->lpfcoef, rev->lpfgain, rev->liveness);
 
         SAMPLE d4 = DEL_OUT(rev->delay_4, 0);
-        d4 = LPF(d4, rev->f3state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        d4 = LPF(d4, rev->f4state, rev->lpfcoef, rev->lpfgain, rev->liveness);
 
         // Mixing and feedback.
         DEL_IN(rev->delay_1, d1 + d2 + d3 + d4);
