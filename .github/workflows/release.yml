@@ -1,0 +1,134 @@
+name: Release
+
+# Cut a GitHub release on every merge to main. The Arduino Library Manager polls
+# this repo's releases and picks up each new tag automatically, so creating the
+# release here is all it takes to publish a new Arduino library version.
+#
+# WHY THE BUMP GOES THROUGH A PR: main is a protected branch (a PR is required to
+# merge, and enforce_admins is on), so the "Bump version to X" change to
+# library.properties cannot be pushed straight to main — not even by an admin or
+# a PAT. This workflow therefore opens a one-line bump PR and merges it, matching
+# the manual claude/bump-* flow that produced every release to date.
+#
+# WHY THIS DOESN'T LOOP: the bump branch, PR, and merge are all done with the
+# built-in GITHUB_TOKEN. Pushes and merges performed with GITHUB_TOKEN do NOT
+# trigger workflow runs, so the bump merge can't re-trigger this workflow. (The
+# "[skip release]" marker on the merge commit + the job `if:` below are just
+# belt-and-suspenders on top of that guarantee.)
+#
+# WHY THE GODOT ZIP STILL ATTACHES: the Godot addon build (godot-addon.yml) runs
+# on tag push and attaches amy-godot-addon.zip to the release. A tag created with
+# GITHUB_TOKEN won't trigger that push event -- but workflow_dispatch is the one
+# event GITHUB_TOKEN *is* allowed to trigger. So after creating the release we
+# dispatch godot-addon.yml at the new tag; inside that run github.ref is
+# refs/tags/<version>, so its existing release job attaches the zip. No PAT, and
+# nothing to renew.
+#
+# TO SKIP a release for a given merge, include "[skip release]" in the merge
+# commit message.
+
+on:
+  push:
+    branches: [ "main" ]
+
+# Serialize releases so two merges landing close together can't both read the
+# same current version and collide on the next tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write          # push the bump branch, create the tag + release
+  pull-requests: write     # open and merge the bump PR
+  actions: write           # workflow_dispatch the Godot addon build
+
+jobs:
+  release:
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0          # full history + tags, needed to bump and tag
+
+      - name: Compute next patch version
+        id: ver
+        run: |
+          set -euo pipefail
+          current=$(grep -E '^version=' library.properties | cut -d= -f2 | tr -d '[:space:]')
+          IFS=. read -r major minor patch <<< "$current"
+          next="$major.$minor.$((patch + 1))"
+          git fetch --tags --quiet
+          # If that tag already exists (e.g. a re-run), keep bumping until it's free.
+          while git rev-parse -q --verify "refs/tags/$next" >/dev/null; do
+            patch=$((patch + 1)); next="$major.$minor.$patch"
+          done
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "Releasing $current -> $next"
+
+      - name: Open and merge the version-bump PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          branch="bump-$NEXT"
+          git switch -c "$branch"
+          sed -i -E "s/^version=.*/version=$NEXT/" library.properties
+          git commit -am "Bump version to $NEXT"
+          git push -u origin "$branch"
+
+          gh pr create --base main --head "$branch" \
+            --title "Bump version to $NEXT" \
+            --body "Automated release bump to $NEXT, cut on merge to main by .github/workflows/release.yml."
+
+          # The PR was created with GITHUB_TOKEN, so it triggers no checks and is
+          # immediately mergeable; retry briefly while GitHub computes mergeability.
+          for i in $(seq 1 10); do
+            if gh pr merge "$branch" --merge --delete-branch \
+                 --subject "Bump version to $NEXT [skip release]"; then
+              exit 0
+            fi
+            echo "Bump PR not mergeable yet (attempt $i/10); retrying..."
+            sleep 6
+          done
+          echo "::error::Could not merge the version-bump PR for $NEXT" >&2
+          exit 1
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          set -euo pipefail
+          # Tag main's tip, which is now the bump merge (library.properties ==
+          # $NEXT). Plain tag (no leading "v") -- Arduino requires this format.
+          gh release create "$NEXT" \
+            --target main \
+            --title "$NEXT" \
+            --generate-notes
+
+      - name: Build & attach the Godot addon zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.ver.outputs.next }}
+        run: |
+          # Dispatch the existing Godot build at the new tag. workflow_dispatch is
+          # the one event GITHUB_TOKEN can trigger; the run sees github.ref =
+          # refs/tags/$NEXT, so its release job attaches amy-godot-addon.zip here.
+          # The release + tag already exist, so don't fail the job over a transient
+          # dispatch hiccup -- just warn (it can be re-dispatched by hand).
+          for i in $(seq 1 5); do
+            if gh workflow run godot-addon.yml --ref "$NEXT"; then
+              echo "Dispatched godot-addon.yml at $NEXT"
+              exit 0
+            fi
+            echo "Godot dispatch failed (attempt $i/5); retrying..."
+            sleep 5
+          done
+          echo "::warning::Release $NEXT is published, but dispatching godot-addon.yml failed. Re-run it manually: gh workflow run godot-addon.yml --ref $NEXT"
