@@ -1272,6 +1272,24 @@ class TestPreset257MidiCCs(AmyTest):
     amy.send(time=800, synth=1, vel=0)
 
 
+class TestProgChangeOnPreset257(AmyTest):
+  """MIDI Program Change while on the AMYboard Web Editor base patch (257).
+
+  With no prior Bank Select, AMY infers the bank from the current patch number.
+  Patch 257 used to infer bank 2, so a PC selected an undefined patch in the
+  258-383 range and the synth went silent (issue #758).  The inferred bank now
+  falls back to bank 0 (Juno), so the note below sounds (Juno patch 5)."""
+
+  def run(self):
+    # AMYboard-style: synth 1 starts on the Web Editor base patch (257).
+    amy.send(synth=1, patch=257, num_voices=1)
+    # Program Change to program 5, no prior Bank Select.  Used to map to patch
+    # 261 (undefined -> silent); now maps to Juno patch 5.
+    amy.inject_midi_bytes([0xC0, 5])
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=600, synth=1, note=60, vel=0)
+
+
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 

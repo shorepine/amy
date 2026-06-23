@@ -96,6 +96,11 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
         // If the bank hasn't been set, stay within the block of 128 of the current patch
         // (so e.g. DX7 voices remain DX7).
         bank_number = (instrument_get_patch_number(e.synth) & 0xFF80) >> 7;
+        // Only banks 0 (Juno, patches 0-127) and 1 (DX7, 128-255) are full 128-patch
+        // banks.  Patches 256+ (additive piano, AMYboard Web Editor base) infer bank 2,
+        // whose PC targets are almost all undefined and silence the board (issue #758),
+        // so fall back to bank 0 (Juno) for those.
+        if (bank_number > 1) bank_number = 0;
     }
     e.patch_number = program + 128 * bank_number;
     if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
