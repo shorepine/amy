@@ -328,73 +328,79 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     return s - s_entry;
 }
 
-#define _RET_FALSE_IF_SET(FIELD) if (AMY_IS_SET(e->FIELD)) return false;
-#define _RET_FALSE_IF_SET_SEQ(FIELD, LEN)          \
-    for (int i = 0; i < LEN; ++i) {                \
-       if (AMY_IS_SET(e->FIELD[i])) return false;  \
+#define _RET_TRUE_IF_SET(FIELD) if (AMY_IS_SET(e->FIELD)) return true;
+#define _RET_TRUE_IF_SET_SEQ(FIELD, LEN)          \
+    for (int i = 0; i < LEN; ++i) {               \
+        _RET_TRUE_IF_SET(FIELD[i]);               \
     }
-#define _RET_FALSE_IF_SET_COEF(FIELD)   _RET_FALSE_IF_SET_SEQ(FIELD, NUM_COMBO_COEFS)
-#define _RET_FALSE_IF_SET_BP(TFIELD, VFIELD) {        \
-        _RET_FALSE_IF_SET_SEQ(TFIELD, MAX_BPS)        \
-        _RET_FALSE_IF_SET_SEQ(VFIELD, MAX_BPS)        \
+#define _RET_TRUE_IF_SET_COEF(FIELD)   _RET_TRUE_IF_SET_SEQ(FIELD, NUM_COMBO_COEFS)
+#define _RET_TRUE_IF_SET_BP(TFIELD, VFIELD) {        \
+        _RET_TRUE_IF_SET_SEQ(TFIELD, MAX_BPS)        \
+        _RET_TRUE_IF_SET_SEQ(VFIELD, MAX_BPS)        \
     }
+#define _TRUE_IF_5_F_UNSET(VAL1, VAL2, VAL3, VAL4, VAL5)  \
+    (AMY_IS_UNSET((float)(VAL1)) && AMY_IS_UNSET((float)(VAL2)) && AMY_IS_UNSET((float)(VAL3)) && AMY_IS_UNSET((float)(VAL4)) && AMY_IS_UNSET((float)(VAL5)))
 
-bool event_is_empty(amy_event *e) {
+bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     // We don't want to go through the rigmarole of passing events down to voices if the instruments haven't been set up yet.
     // Check to see if this event has any fields set other than time, osc, synth.
-    _RET_FALSE_IF_SET(wave);
-    _RET_FALSE_IF_SET(preset);
-    _RET_FALSE_IF_SET(midi_note);
-    _RET_FALSE_IF_SET(velocity);
-    _RET_FALSE_IF_SET(patch_number);
-    _RET_FALSE_IF_SET_COEF(amp_coefs);
-    _RET_FALSE_IF_SET_COEF(freq_coefs);
-    _RET_FALSE_IF_SET_COEF(filter_freq_coefs);
-    _RET_FALSE_IF_SET_COEF(duty_coefs);
-    _RET_FALSE_IF_SET_COEF(pan_coefs);
-    _RET_FALSE_IF_SET(feedback);
-    _RET_FALSE_IF_SET(trigger_phase);
-    _RET_FALSE_IF_SET_SEQ(volume, AMY_NUM_BUSES);  // NOT osc-dep
-    _RET_FALSE_IF_SET(pitch_bend);  // NOT osc-dep
-    _RET_FALSE_IF_SET(tempo);  // NOT osc-dep
-    _RET_FALSE_IF_SET(latency_ms);  // NOT osc-dep
-    _RET_FALSE_IF_SET(ratio);
-    _RET_FALSE_IF_SET(resonance);
-    _RET_FALSE_IF_SET(portamento_ms);
-    _RET_FALSE_IF_SET(chained_osc);
-    _RET_FALSE_IF_SET(mod_source);
-    _RET_FALSE_IF_SET(algorithm);
-    _RET_FALSE_IF_SET(filter_type);
-    _RET_FALSE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
+    if (p_is_empty) *p_is_empty = false;   // If we early-exit, it wasn't empty.
+    _RET_TRUE_IF_SET(wave);
+    _RET_TRUE_IF_SET(preset);
+    _RET_TRUE_IF_SET(midi_note);
+    _RET_TRUE_IF_SET(velocity);
+    _RET_TRUE_IF_SET(patch_number);
+    _RET_TRUE_IF_SET_COEF(amp_coefs);
+    _RET_TRUE_IF_SET_COEF(freq_coefs);
+    _RET_TRUE_IF_SET_COEF(filter_freq_coefs);
+    _RET_TRUE_IF_SET_COEF(duty_coefs);
+    _RET_TRUE_IF_SET_COEF(pan_coefs);
+    _RET_TRUE_IF_SET(feedback);
+    _RET_TRUE_IF_SET(trigger_phase);
+    _RET_TRUE_IF_SET_SEQ(volume, AMY_NUM_BUSES);  // NOT osc-dep
+    _RET_TRUE_IF_SET(pitch_bend);  // NOT osc-dep
+    _RET_TRUE_IF_SET(tempo);  // NOT osc-dep
+    _RET_TRUE_IF_SET(latency_ms);  // NOT osc-dep
+    _RET_TRUE_IF_SET(ratio);
+    _RET_TRUE_IF_SET(resonance);
+    _RET_TRUE_IF_SET(portamento_ms);
+    _RET_TRUE_IF_SET(chained_osc);
+    _RET_TRUE_IF_SET(mod_source);
+    _RET_TRUE_IF_SET(algorithm);
+    _RET_TRUE_IF_SET(filter_type);
+    _RET_TRUE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
     // Convert these two at least to vectors of ints, save several hundred bytes
-    _RET_FALSE_IF_SET_SEQ(algo_source, MAX_ALGO_OPS);
-    _RET_FALSE_IF_SET_SEQ(voices, MAX_VOICES_PER_INSTRUMENT);
-    _RET_FALSE_IF_SET_BP(eg0_times, eg0_values);
-    _RET_FALSE_IF_SET_BP(eg1_times, eg1_values);
-    _RET_FALSE_IF_SET(eg_type[0]);
-    _RET_FALSE_IF_SET(eg_type[1]);
+    _RET_TRUE_IF_SET_SEQ(algo_source, MAX_ALGO_OPS);
+    _RET_TRUE_IF_SET_SEQ(voices, MAX_VOICES_PER_INSTRUMENT);
+    _RET_TRUE_IF_SET_BP(eg0_times, eg0_values);
+    _RET_TRUE_IF_SET_BP(eg1_times, eg1_values);
+    _RET_TRUE_IF_SET(eg_type[0]);
+    _RET_TRUE_IF_SET(eg_type[1]);
     // Instrument-layer values.
-    //_RET_FALSE_IF_SET(synth);
-    _RET_FALSE_IF_SET(synth_flags);  // Special flags to set when defining instruments.
-    _RET_FALSE_IF_SET(synth_delay_ms);  // Extra delay added to synth note-ons to allow decay on voice-stealing.
-    _RET_FALSE_IF_SET(to_synth);  // For moving setup between synth numbers.
-    _RET_FALSE_IF_SET(grab_midi_notes);  // To enable/disable automatic MIDI note-on/off generating note-on/off.
-    _RET_FALSE_IF_SET(note_source);  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
-    _RET_FALSE_IF_SET(pedal);  // MIDI pedal value.
-    _RET_FALSE_IF_SET(num_voices);
-    _RET_FALSE_IF_SET(oscs_per_voice);
-    _RET_FALSE_IF_SET_SEQ(sequence, 3); // tick, period, tag
+    //_RET_TRUE_IF_SET(synth);
+    _RET_TRUE_IF_SET(synth_flags);  // Special flags to set when defining instruments.
+    _RET_TRUE_IF_SET(synth_delay_ms);  // Extra delay added to synth note-ons to allow decay on voice-stealing.
+    _RET_TRUE_IF_SET(to_synth);  // For moving setup between synth numbers.
+    _RET_TRUE_IF_SET(grab_midi_notes);  // To enable/disable automatic MIDI note-on/off generating note-on/off.
+    _RET_TRUE_IF_SET(note_source);  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
+    _RET_TRUE_IF_SET(pedal);  // MIDI pedal value.
+    _RET_TRUE_IF_SET(num_voices);
+    _RET_TRUE_IF_SET(oscs_per_voice);
+    _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
-    //_RET_FALSE_IF_SET(status, "status");
-    _RET_FALSE_IF_SET(note_source);  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
-    _RET_FALSE_IF_SET(reset_osc);
+    //_RET_TRUE_IF_SET(status, "status");
+    _RET_TRUE_IF_SET(note_source);  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
+    _RET_TRUE_IF_SET(reset_osc);
     // Global effects
-    //_EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
-    //_EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
-    //_EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
-    //_EPRINT_VALS_5(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT, "reverb_{level,live,damp,xover}", "h");
+    bool is_empty = true;
+    is_empty &= _TRUE_IF_5_F_UNSET(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
+    is_empty &= _TRUE_IF_5_F_UNSET(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef);
+    is_empty &= _TRUE_IF_5_F_UNSET(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT);
+    is_empty &= _TRUE_IF_5_F_UNSET(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT);
 
-    return true;
+    if (p_is_empty) *p_is_empty = is_empty;
+
+    return false;   // None of the osc-addressing fields were set.
 }
 
 
@@ -1031,8 +1037,22 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
 // If the event also has synth and patch_number specified (a "load patch"), those are handled before this is called.
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(amy_event *e, struct delta **queue) {
-    if (event_is_empty(e)) return;  // Early exit.
     peek_stack("has_voices");
+    {
+        bool is_empty = true;
+        if (!event_addresses_oscs(e, &is_empty)) {
+            if (!is_empty) {
+                // does contain FX-facing events, must strip instr/voices, set bus.
+                if (AMY_IS_UNSET(e->bus) && AMY_IS_SET(e->synth)) {
+                    e->bus = instrument_get_bus(e->synth);
+                }
+                AMY_UNSET(e->synth);
+                AMY_UNSET(e->voices[0]);
+                amy_event_to_deltas_queue(e, 0 /* base_osc, should be ignored */, queue);
+            }
+            return;  // Early exit.
+        }
+    }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = patches_voices_for_event(e, voices);
     if (num_voices == 0) {
