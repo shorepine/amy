@@ -1427,6 +1427,39 @@ class TestNoteGoesToZero(AmyTest):
     amy.send(time=600, osc=2, note=60, vel=0)
 
 
+class TestSynthGlobalFX(AmyTest):
+  """Issue #755: synth-directed FX commands were being ignored.  Result should match TestJunoPatch"""
+
+  def run(self):
+    # Also test the synth mechanism.
+    amy.send(time=0, synth=1, num_voices=4, patch=20)
+    amy.send(time=0, chorus=0)   # Turn off the chorus
+    amy.send(time=0, synth=1, chorus=1)  #  Turn it back on with synth-directed command.
+    amy.send(time=50, synth=1, note=48, vel=1)
+    amy.send(time=150, synth=1, note=60, vel=1)
+    amy.send(time=250, synth=1, note=63, vel=1)
+    amy.send(time=350, synth=1, note=67, vel=1)
+    amy.send(time=600, synth=1, note=48, vel=0)
+    amy.send(time=700, synth=1, note=60, vel=0)
+    amy.send(time=800, synth=1, note=63, vel=0)
+    amy.send(time=900, synth=1, note=67, vel=0)
+
+
+class TestSynthBusCmds(AmyTest):
+  """Test that FX commands to nondefault bus via synth is right.   Should match TestBuses. """
+
+  def run(self):
+    amy.send(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
+    amy.send(time=0, bus=0, reverb=1, echo=0)
+    amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
+    amy.send(time=0, synth=2, reverb=0, echo='1,100,,0.5,0.5')  # Bus implied by synth.
+    amy.send(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
+    amy.send(time=100, synth=1, note=60, vel=5)
+    amy.send(time=300, synth=2, note=63, vel=5)
+    amy.send(time=500, synth=1, note=67, vel=5)
+    amy.send(time=700, synth=2, note=70, vel=5)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
