@@ -613,6 +613,13 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             return total;
         }
     }
+    else if (cmd == 'Y') {
+        // zY: sequencer transport. zY1 starts the sequencer, zY0 stops it. Lets a
+        // host drive playback without MIDI clock sync (see external_midi_sync).
+        if (atoi(message)) sequencer_midi_start();
+        else sequencer_midi_stop();
+        return 1;
+    }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;
 }
