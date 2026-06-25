@@ -1,0 +1,261 @@
+name: Pin AMY in tulipcc (on merge)
+
+# When an AMY PR is MERGED to main, open a PR on shorepine/tulipcc that bumps the
+# `amy` submodule pointer to the just-merged commit. That tulipcc PR runs the full
+# tulipcc CI (AMYboard preview, Tulip preview, desktop build) against this AMY, and
+# is left for a human to test and MERGE MANUALLY — it's the post-merge, whole-system
+# integration check that complements the per-PR AMYboard HW bench
+# (amyboard-hwci-trigger.yml), which still runs BEFORE merge on the AMY PR itself.
+#
+# WHY pull_request_target (not pull_request): we need repo secrets (HWCI_BRIDGE_TOKEN)
+# to push a branch + open a PR on tulipcc. A fork PR's `pull_request` run is denied
+# all secrets (hard GitHub rule), so a merged fork PR (rt-rtos, drepetto, ...) would
+# silently produce no tulipcc PR — exactly the trap the HW-CI trigger hit. With
+# pull_request_target the job runs in THIS repo's trusted base context (has secrets,
+# always main's workflow). It is SAFE because this job NEVER checks out or runs the
+# PR's code: it only reads PR metadata via the API and bumps a submodule gitlink in
+# tulipcc via the Git Data API. Do not add a checkout of the PR head here.
+#
+# WHY it doesn't loop / fire on release bumps: the release.yml version-bump PRs are
+# merged with GITHUB_TOKEN, and GITHUB_TOKEN merges never trigger workflow runs — so
+# this won't fire for them. The `!startsWith(... 'bump-')` guard is belt-and-suspenders
+# in case a bump PR is ever merged by hand.
+#
+# WHY a PAT and not GITHUB_TOKEN opens the tulipcc PR: a PR opened with GITHUB_TOKEN
+# triggers no `pull_request` workflows, so tulipcc CI would NOT run on it — defeating
+# the point. A PAT (HWCI_BRIDGE_TOKEN) is a user identity, so the PR it opens triggers
+# tulipcc's CI normally.
+#
+# TOKEN: reuses HWCI_BRIDGE_TOKEN (the same fine-grained PAT the HW-CI bridge uses).
+# It already has `contents: write` on shorepine/tulipcc and `issues/pull-requests:
+# write` on shorepine/amy. For THIS workflow it ALSO needs **`pull-requests: write`
+# on shorepine/tulipcc** (to open the bump PR). If that scope is missing the "Open
+# the bump PR on tulipcc" step fails with 403 — add it to the PAT and re-save the
+# secret. See the amy-hwci-bridge note for the token's owner/expiry.
+
+on:
+  pull_request_target:
+    types: [closed]
+    # Only code tulipcc actually consumes: the C sources it compiles into firmware /
+    # desktop (src/**) and the frozen Python module (amy/**). A docs/tests/CI-only
+    # merge changes nothing tulipcc builds, so it shouldn't open a tulipcc PR. Widen
+    # this list if tulipcc ever starts pulling other paths out of the submodule.
+    paths:
+      - 'src/**'
+      - 'amy/**'
+      - '.github/workflows/tulipcc-pin.yml'
+
+concurrency:
+  group: tulipcc-pin-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read           # GITHUB_TOKEN: read this merged PR's commits/files
+  pull-requests: read
+
+jobs:
+  pin:
+    # Only on a real MERGE (not a plain close), and never for a release version bump.
+    if: >-
+      github.event.pull_request.merged == true &&
+      !startsWith(github.event.pull_request.head.ref, 'bump-')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gather merged-PR details and build the tulipcc PR body
+        id: gather
+        uses: actions/github-script@v7
+        with:
+          # Built-in token: read-only on this repo, enough to read the merged PR.
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;   // shorepine
+            const repo = context.repo.repo;     // amy
+
+            // Pin the exact commit the merge produced on main. Using merge_commit_sha
+            // (not main's tip) means we pin the code under test and never race with
+            // release.yml, which advances main with a library.properties bump commit
+            // right after this same merge.
+            let sha = pr.merge_commit_sha;
+            if (!sha) {
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: pr.number });
+              sha = data.merge_commit_sha;
+            }
+            const short = sha.slice(0, 9);
+
+            const author = (pr.user && pr.user.login) || 'unknown';
+            // The person who clicked Merge — who we want to own the tulipcc merge too.
+            const merger = (pr.merged_by && pr.merged_by.login) || author;
+
+            // Concrete "what changed": the PR's own commits + a file-change summary.
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner, repo, pull_number: pr.number, per_page: 100,
+            });
+            const adds = files.reduce((n, f) => n + f.additions, 0);
+            const dels = files.reduce((n, f) => n + f.deletions, 0);
+
+            const COMMIT_CAP = 40;
+            const commitLines = commits.slice(0, COMMIT_CAP).map(c => {
+              const subj = (c.commit.message.split('\n')[0] || '').trim();
+              return `- [\`${c.sha.slice(0, 7)}\`](https://github.com/${owner}/${repo}/commit/${c.sha}) ${subj}`;
+            });
+            if (commits.length > COMMIT_CAP) {
+              commitLines.push(`- …and ${commits.length - COMMIT_CAP} more commit(s)`);
+            }
+
+            const FILE_CAP = 50;
+            const fileLines = files.slice(0, FILE_CAP).map(f => `- \`${f.filename}\` (+${f.additions}/-${f.deletions})`);
+            if (files.length > FILE_CAP) {
+              fileLines.push(`- …and ${files.length - FILE_CAP} more file(s)`);
+            }
+
+            // Markdown only — written to a file, never interpolated into a shell or a
+            // second script, so the (already-merged, vetted) PR title/commit text
+            // can't inject anything. The `${owner}/${repo}#${pr.number}` reference
+            // back-links this on the AMY PR (notifying its participants), and the
+            // `cc @${merger}` line mails the person who merged it.
+            const body = [
+              '<!-- amy-tulipcc-pin -->',
+              `## ⛓️ Pin \`amy\` → \`${short}\` (validates ${owner}/${repo}#${pr.number})`,
+              '',
+              `\`amy\` was just merged to **${owner}/${repo}@main**. This PR bumps the \`amy\` submodule`,
+              'pointer to that commit so the full tulipcc CI (AMYboard preview, Tulip preview, desktop',
+              'build) runs against it.',
+              '',
+              '**Please test, then merge this PR manually** to move tulipcc onto the latest AMY.',
+              '',
+              '| | |',
+              '|---|---|',
+              `| Merged AMY PR | ${owner}/${repo}#${pr.number} — ${pr.title} |`,
+              `| Author | @${author} |`,
+              `| Merged by | @${merger} |`,
+              `| AMY commit | ${owner}/${repo}@${sha} |`,
+              '',
+              '### What changed in this AMY PR',
+              '',
+              ...commitLines,
+              '',
+              `<details><summary>${files.length} file(s) changed (+${adds}/-${dels})</summary>`,
+              '',
+              ...fileLines,
+              '</details>',
+              '',
+              '---',
+              `cc @${merger} — you merged the AMY change above; please review the tulipcc CI on this PR and merge it here when green.`,
+            ].join('\n');
+
+            fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/tulipcc_pr_body.md`, body);
+            core.setOutput('amy_sha', sha);
+            core.setOutput('short', short);
+            core.setOutput('merger', merger);
+            core.setOutput('amy_pr', String(pr.number));
+
+      - name: Open the bump PR on tulipcc
+        id: pin
+        uses: actions/github-script@v7
+        env:
+          AMY_SHA: ${{ steps.gather.outputs.amy_sha }}
+          SHORT: ${{ steps.gather.outputs.short }}
+          MERGER: ${{ steps.gather.outputs.merger }}
+          AMY_PR: ${{ steps.gather.outputs.amy_pr }}
+        with:
+          # Fine-grained PAT with contents:write + pull-requests:write on tulipcc.
+          github-token: ${{ secrets.HWCI_BRIDGE_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const owner = 'shorepine', repo = 'tulipcc', base = 'main';
+            const amySha = process.env.AMY_SHA;
+            const short = process.env.SHORT;
+            const merger = process.env.MERGER;
+            const amyPr = process.env.AMY_PR;
+            const branch = `amy-pin/${short}`;
+            const body = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/tulipcc_pr_body.md`, 'utf8');
+            const title = `Pin amy to ${short} (amy#${amyPr})`;
+
+            // Idempotent: if this exact pin is already open (manual re-run), reuse it.
+            const open = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${branch}` });
+            if (open.data.length) {
+              core.notice(`tulipcc PR already open for ${branch}: ${open.data[0].html_url}`);
+              core.setOutput('pr_url', open.data[0].html_url);
+              return;
+            }
+
+            // Build the bump commit straight on tulipcc with the Git Data API — no
+            // checkout, no submodule fetch. A 160000-mode tree entry IS a submodule
+            // gitlink; the amy commit need not exist in tulipcc for this to commit.
+            const baseRef = await github.rest.git.getRef({ owner, repo, ref: `heads/${base}` });
+            const baseSha = baseRef.data.object.sha;
+            const baseCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: baseSha });
+
+            const tree = await github.rest.git.createTree({
+              owner, repo, base_tree: baseCommit.data.tree.sha,
+              tree: [{ path: 'amy', mode: '160000', type: 'commit', sha: amySha }],
+            });
+
+            // Nothing to do if tulipcc already points at this amy commit.
+            if (tree.data.sha === baseCommit.data.tree.sha) {
+              core.notice(`tulipcc main already pins amy@${short}; nothing to open.`);
+              return;
+            }
+
+            const commit = await github.rest.git.createCommit({
+              owner, repo,
+              message: `Bump amy submodule to ${short} (amy#${amyPr})`,
+              tree: tree.data.sha,
+              parents: [baseSha],
+            });
+
+            try {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+            } catch (e) {
+              if (e.status === 422) {
+                // Stale branch from a prior run — repoint it.
+                await github.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: true });
+              } else {
+                throw e;
+              }
+            }
+
+            const pr = await github.rest.pulls.create({ owner, repo, base, head: branch, title, body });
+            core.setOutput('pr_url', pr.data.html_url);
+            core.info(`Opened tulipcc PR: ${pr.data.html_url}`);
+
+            // Best-effort: assign the AMY merger so the manual merge here is clearly theirs.
+            try {
+              await github.rest.issues.addAssignees({ owner, repo, issue_number: pr.data.number, assignees: [merger] });
+            } catch (e) {
+              core.warning(`Could not assign @${merger} on the tulipcc PR: ${e.message}`);
+            }
+
+      - name: Link the tulipcc PR back on the AMY PR
+        if: steps.pin.outputs.pr_url != ''
+        uses: actions/github-script@v7
+        env:
+          PR_URL: ${{ steps.pin.outputs.pr_url }}
+        with:
+          # Bridge token so the note also posts on merged fork PRs (whose GITHUB_TOKEN
+          # is read-only). It has issues:write on shorepine/amy.
+          github-token: ${{ secrets.HWCI_BRIDGE_TOKEN }}
+          script: |
+            const url = process.env.PR_URL;
+            const marker = '<!-- amy-tulipcc-pin-back -->';
+            const body = [
+              marker,
+              '### ⛓️ tulipcc integration PR opened',
+              '',
+              `This merge was pinned into tulipcc for full-system CI: ${url}`,
+              '',
+              'Test it there and merge that PR to move tulipcc onto this AMY.',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
