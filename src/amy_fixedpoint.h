@@ -96,6 +96,8 @@
 
 #define MUL0_SS(a, b) ((a) * (b))
 #define MUL4_SS(a, b) ((a) * (b))
+#define MUL5A_SS(a, b) ((a) * (b))
+#define MUL6A_SS(a, b) ((a) * (b))
 #define MUL8_SS(a, b) ((a) * (b))
 #define MUL8F_SS(a, b) ((a) * (b))
 #define MUL4E_SS(a, b) ((a) * (b))
