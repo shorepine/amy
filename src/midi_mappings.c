@@ -228,8 +228,10 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
 
 void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
     uint8_t status = bytes[0] & 0xF0;
-    if (status == 0xB0 || status == 0x90 || status == 0x80) {  // CC or note-on
-        int channel = (bytes[0] & 0x0F) + 1;
+    uint8_t channel = (bytes[0] & 0x0F) + 1;
+    if (status == 0xB0
+        || (instrument_grab_midi_notes(channel)
+            && (status == 0x90 || status == 0x80))) {  // CC or note-on with grab_midi set.
         int type = (status == 0xB0) ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
         int code = bytes[1];  // note for note-on events
         struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
