@@ -1478,6 +1478,24 @@ class TestSynthBusCmds(AmyTest):
     amy.send(time=700, synth=2, note=70, vel=5)
 
 
+class TestGrabMidiNotes(AmyTest):
+  """Test that grab_midi_notes=False works.  This test should not include the drums."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    # Disable MIDI on ch10
+    amy.send(time=0, synth=10, grab_midi_notes=False);
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(100, 0x90, 48, 100)  # low note
+    amy.inject_midi(400, 0x99, 35, 100)  # bass drum (should not sound)
+    amy.inject_midi(500, 0x80, 48, 0)  # low note off
+    amy.inject_midi(700, 0x99, 37, 100)  # snare (should not sound)
+    amy.inject_midi(900, 0x89, 37, 100)  # snare note off
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
