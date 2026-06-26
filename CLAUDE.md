@@ -32,4 +32,3 @@ The `docs/amy.js` file is a concatenation of the Emscripten build (`build/amy.js
 ## GitHub Auth
 
 - The `bwhitman` account needs `workflow` scope on its token to push changes to `.github/workflows/` files. Run `gh auth refresh -h github.com -s workflow` if pushes are rejected.
-- SSH pushes to `shorepine/amy` use the `brianklay` key by default; use HTTPS with `gh auth token` for `bwhitman` access.
