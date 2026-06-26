@@ -302,7 +302,7 @@ void amy_default_synths() {
     e.wave = PCM;
     e.amp_coefs[COEF_CONST] = 5.0;  // MIDI drums need to be louder to match juno patches.
     // Flag to perform note -> drum PCM patch translation.
-    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;
+    e.synth_flags = SYNTH_FLAGS_MIDI_DRUMS | SYNTH_FLAGS_IGNORE_NOTE_OFFS;
     amy_add_event(&e);
 
     // DX7 6 note poly on channel 2

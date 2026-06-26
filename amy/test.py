@@ -841,6 +841,24 @@ class TestMidiDrums(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestMidiDrumsPatch258(AmyTest):
+  """Test MIDI drums on channel 1 using patch 258 via injection.  Should match TestMidiDrums."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True  # Need default synths to set chorus, EQ like TestMidiDrums
+
+  def run(self):
+    # The MIDI drums default has amp=5
+    amy.send(time=0, synth=1, num_voices=6, patch=258, amp=5)
+    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
+    amy.inject_midi(100, 0x90, 35, 100)  # bass
+    amy.inject_midi(400, 0x90, 35, 100)  # bass
+    amy.inject_midi(400, 0x90, 37, 100)  # snare
+    amy.inject_midi(700, 0x90, 37, 100)  # snare
+    amy.inject_midi(750, 0x80, 37, 100)  # snare note off (should be ignored)
+
+
 class TestMidiRunningStatusClock(AmyTest):
   """Running status must survive System Real-Time bytes interleaved into the
   stream. Regression for shorepine/amy#747/#748: an interleaved MIDI clock

@@ -442,6 +442,100 @@ def make_amyboard_patch():
         message += cc_def + 'Z'
     return 4, message # 4 oscs
 
+
+# Default PCM patch mappings for MIDI CH 10 (drums) patches.
+# (used to be in patches.c)
+
+AMY_MIDI_DRUMS_LOWEST_NOTE = 35
+AMY_MIDI_DRUMS_HIGHEST_NOTE = 81
+
+# drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
+
+# PCM presets available (from pcm_tiny.h):
+#  [0]  808-MARACA    root=89
+#  [1]  808-KIK 4     root=39
+#  [2]  808-SNR 4     root=45
+#  [3]  808-SNR 7     root=52
+#  [4]  808-SNR 10    root=51
+#  [5]  808-SNR 12    root=41
+#  [6]  808-C-HAT1    root=53
+#  [7]  808-O-HAT1    root=56
+#  [8]  808-LTOM M    root=61
+#  [9]  808-DRYCLP    root=94
+#  [10] 808-CWBELL    root=69
+# DRUMKIT[midi_note_number - AMY_MIDI_DRUMS_LOWEST_NOTE] == (pcm_preset_number, base_midi_note)
+DRUMKIT = [
+    (1, 39),   # 35 Acoustic Bass Drum -> 808-KIK
+    (1, 39),   # 36 Bass Drum 1        -> 808-KIK
+    (4, 51),   # 37 Side Stick         -> 808-SNR 10 (rimshot-like)
+    (2, 45),   # 38 Acoustic Snare     -> 808-SNR 4
+    (9, 94),   # 39 Hand Clap          -> 808-DRYCLP
+    (5, 41),   # 40 Electric Snare     -> 808-SNR 12
+    (8, 56),   # 41 Low Floor Tom      -> 808-LTOM (pitched down)
+    (6, 53),   # 42 Closed Hi Hat      -> 808-C-HAT1
+    (8, 61),   # 43 High Floor Tom     -> 808-LTOM (root)
+    (7, 61),   # 44 Pedal Hi-Hat       -> 808-O-HAT1 (short)
+    (8, 56),   # 45 Low Tom            -> 808-LTOM (pitched down)
+    (7, 56),   # 46 Open Hi-Hat        -> 808-O-HAT1
+    (8, 63),   # 47 Low-Mid Tom        -> 808-LTOM (slightly up)
+    (8, 68),   # 48 Hi Mid Tom         -> 808-LTOM (pitched up)
+    (7, 46),   # 49 Crash Cymbal 1     -> 808-O-HAT1 (pitched down for wash)
+    (8, 73),   # 50 High Tom           -> 808-LTOM (pitched up high)
+    (7, 51),   # 51 Ride Cymbal 1      -> 808-O-HAT1 (pitched down)
+    (7, 48),   # 52 Chinese Cymbal     -> 808-O-HAT1 (pitched down)
+    (6, 47),   # 53 Ride Bell          -> 808-C-HAT1 (pitched down, bell-like)
+    (0, 79),   # 54 Tambourine         -> 808-MARACA (pitched down)
+    (7, 46),   # 55 Splash Cymbal      -> 808-O-HAT1 (pitched down)
+    (10, 69),  # 56 Cowbell            -> 808-CWBELL
+    (7, 48),   # 57 Crash Cymbal 2     -> 808-O-HAT1 (pitched down)
+    (-1, -1),  # 58 Vibraslap
+    (7, 53),   # 59 Ride Cymbal 2      -> 808-O-HAT1 (pitched down)
+    (-1, -1),  # 60 Hi Bongo
+    (-1, -1),  # 61 Low Bongo
+    (-1, -1),  # 62 Mute Hi Conga
+    (-1, -1),  # 63 Open Hi Conga
+    (-1, -1),  # 64 Low Conga
+    (8, 73),   # 65 High Timbale       -> 808-LTOM (pitched up)
+    (8, 63),   # 66 Low Timbale        -> 808-LTOM (slightly up)
+    (10, 76),  # 67 High Agogo         -> 808-CWBELL (pitched up)
+    (10, 64),  # 68 Low Agogo          -> 808-CWBELL (pitched down)
+    (0, 79),   # 69 Cabasa             -> 808-MARACA (pitched down)
+    (0, 89),   # 70 Maracas            -> 808-MARACA (root)
+    (-1, -1),  # 71 Short Whistle
+    (-1, -1),  # 72 Long Whistle
+    (-1, -1),  # 73 Short Guiro
+    (-1, -1),  # 74 Long Guiro
+    (-1, -1),  # 75 Claves
+    (10, 76),  # 76 Hi Wood Block      -> 808-CWBELL (pitched up)
+    (10, 64),  # 77 Low Wood Block     -> 808-CWBELL (pitched down)
+    (-1, -1),  # 78 Mute Cuica
+    (-1, -1),  # 79 Open Cuica
+    (-1, -1),  # 80 Mute Triangle
+    (-1, -1),  # 81 Open Triangle
+]
+
+
+def make_drums_patch():
+    # Set up a bunch of midi_note_cmd mappings for CH10 drums
+    message = amy.message(osc=0, wave=amy.PCM, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
+    message += amy.message(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
+    for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
+        pcm_preset_number, base_midi_note = DRUMKIT[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
+        if pcm_preset_number >= 0:
+            message += amy.message(
+                midi_note_cmd=(
+                    ("%d,0,0,1,0," % midi_note)
+                    + amy.message(
+                        synth=8888,
+                        preset=pcm_preset_number,
+                        note=base_midi_note,
+                        vel=9999
+                    ).replace('8888', '%i').replace('9999', '%v')
+                )
+            )
+    return 1, message  # 1 osc per voice
+
+
 def make_patches(filename):
     def nothing(message):
         return
@@ -450,10 +544,12 @@ def make_patches(filename):
     # Don't make any noise
     amy.override_send = nothing
 
+    TOTAL_NUM_PATCHES = 259
+
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 and custom patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
-        f.write("static const char * const patch_commands[258] PROGMEM = {\n")
+        f.write("static const char * const patch_commands[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)
         # Do juno
         for i in range(128):
             amy.log_patch()
@@ -480,8 +576,13 @@ def make_patches(filename):
         f.write("\t/* 257: amyboard default */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_amyboard)
 
+        # do MIDI drums via midi_note_cmd patch
+        num_osc_drums, patch_string  = make_drums_patch()
+        f.write("\t/* 258: MIDI drums */ \"%s\",\n" % (patch_string))
+        num_oscs.append(num_osc_drums)
+
         f.write("};\n")
-        f.write("const uint16_t patch_oscs[258] PROGMEM = {\n")
+        f.write("const uint16_t patch_oscs[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)
         for i in num_oscs:
             f.write("%d," % (i))
         f.write("\n};\n#endif\n")

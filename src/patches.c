@@ -740,7 +740,7 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 }
 
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time) {
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
@@ -748,6 +748,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
     while(strlen(message + start)) {
       amy_event patch_event = amy_default_event();
       if (message[start] == 'i') {
+          if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
           // It's a synth-layer message, it needs a synth defined.
           patch_event.synth = synth;
       }
@@ -792,8 +793,8 @@ void patches_store_patch(amy_event *e, char * patch_string) {
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
-    // Store the patch as deltas and  find out how many oscs this message uses
-    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time);
+    // Store the patch as deltas and find out how many oscs this message uses
+    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time, true);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
@@ -926,7 +927,7 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
         uint16_t note = 0;
         if (AMY_IS_SET(e->midi_note))  // midi note can be unset if preset is set.
             note = (uint8_t)roundf(e->midi_note);
-        if (synth_flags & _SYNTH_FLAGS_MIDI_DRUMS) {
+        if (synth_flags & SYNTH_FLAGS_MIDI_DRUMS) {
             if (!setup_drum_event(e, note))
                 return 0;   // It's not a MIDI drum event we can emulate, just drop the event.
         }
@@ -986,7 +987,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);
             synth_flags = instrument_get_flags(e->synth);
-            if (synth_flags & _SYNTH_FLAGS_NEGATE_PEDAL) {
+            if (synth_flags & SYNTH_FLAGS_NEGATE_PEDAL) {
                 sustain = !sustain;  // Some MIDI pedals report backwards.
             }
             // A sustain release can result in note-off events for multiple voices.
@@ -1023,7 +1024,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_num_voices(e->synth, voices);
         }
-        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & _SYNTH_FLAGS_IGNORE_NOTE_OFFS))
+        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & SYNTH_FLAGS_IGNORE_NOTE_OFFS))
             return 0;  // Ignore the note off, as requested.
     }
     return num_voices;
@@ -1283,18 +1284,6 @@ void patches_load_patch(amy_event *e) {
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
 
-    // Now actually initialize the newly-allocated osc blocks with the patch
-    for(uint8_t v = 0; v < num_voices; v++) {
-        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
-            if (deltas) {
-                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
-            } else if (message) {
-                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time);
-            }
-            // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
-        }
-    }
-
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
@@ -1303,4 +1292,18 @@ void patches_load_patch(amy_event *e) {
         if (AMY_IS_SET(e->bus)) bus = e->bus;
         instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
     }
+    // Now actually initialize the newly-allocated osc blocks with the patch
+    bool is_first_voice = true;  // flag for once-only messages.
+    for(uint8_t v = 0; v < num_voices; v++) {
+        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
+            if (deltas) {
+                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
+            } else if (message) {
+                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time, is_first_voice);
+            }
+            // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
+            is_first_voice = false;
+        }
+    }
+
 }

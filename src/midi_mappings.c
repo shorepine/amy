@@ -151,6 +151,11 @@ int midi_clear_mapping(int channel, int type, int code) {
 
 int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len) {
     // Register a MIDI mapping and a wire code template.
+    //char tmp[256];
+    //strncpy(tmp, message, message_len);
+    //tmp[message_len] = '\0';
+    //fprintf(stderr, "midi_store_mapping: ch %d type %d code %d L %d N %.3f X %.3f O %.3f CMD (%d) '%s'\n",
+    //        channel, type, code, is_log, min_val, max_val, offset_val, message_len, tmp);
     // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
     while (message_len > 0 && message[message_len - 1] == 'Z') {
         --message_len;
