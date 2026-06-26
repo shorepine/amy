@@ -7,6 +7,8 @@ Releases are cut **automatically on every merge to `main`** by `.github/workflow
 2. It creates the GitHub release with a plain version tag (e.g. `1.2.8`, NOT `v1.2.8`) — Arduino requires this format — which the Arduino Library Manager picks up.
 3. The Godot addon build (`godot-addon.yml`) attaches `amy-godot-addon.zip`. A `GITHUB_TOKEN`-created tag can't fire `godot-addon.yml`'s `push: tags` trigger, so the release workflow instead dispatches it via `workflow_dispatch` at the new tag (the one event `GITHUB_TOKEN` *can* trigger). No PAT is involved.
 
+The bump PR also carries **freshly rebuilt web assets**: the workflow runs `make deploy-web` and stages `docs/amy.js` / `amy.wasm` / `amy.aw.js` / `amy.ww.js` into that same bump commit, so the tagged release — and the Godot zip, which copies `docs/amy.*` — always ship web built from that exact source. (`docs/enable-threads.js` is static and the MicroPython `docs/micropython.*` REPL files are a separate build; neither is rebuilt here.)
+
 To **skip** a release for a given merge, put `[skip release]` in the merge commit message. To cut a release manually, the same three steps work by hand (bump `library.properties` via PR, `gh release create <ver>`, then the Godot build).
 
 ## Godot GDExtension
@@ -25,7 +27,7 @@ The live Python REPL at `docs/tutorial.html` runs MicroPython in the browser wit
 1. In `tulipcc`, update the amy submodule to latest: `cd tulipcc && git submodule update --remote amy`
 2. Rebuild MicroPython: `cd tulip/amyrepl && make clean && make`
 3. Copy the output to amy's docs: `cp build-standard/tulip/obj/micropython.mjs build-standard/tulip/obj/micropython.wasm <amy-repo>/docs/`
-4. If the AMY C code or JS API also changed, rebuild those too: `cd <amy-repo> && make web && make deploy-web`
+4. The browser AMY build (`docs/amy.js`, `docs/amy.wasm`, `docs/amy.aw.js`, `docs/amy.ww.js`) is now rebuilt and committed automatically on every release by `.github/workflows/release.yml` (it runs `make deploy-web` and folds the output into the version-bump commit it tags), so you don't need `make deploy-web` by hand for a release. Run `cd <amy-repo> && make web && make deploy-web` locally only to preview those changes before merging. This automation covers only `docs/amy.*` — the `docs/micropython.*` REPL files above are still the separate tulipcc build.
 
 The `docs/amy.js` file is a concatenation of the Emscripten build (`build/amy.js`), `src/amy_connector.js`, and `build/amy_api.generated.js`. The JS API is auto-generated from `amy/__init__.py` by `scripts/gen_amy_js_api.py`.
 
