@@ -313,7 +313,6 @@ enum coefs{
 #define RESET_QUEUE 1048576 // resets the amy queue
 
 // Bits for synth_flags=
-#define SYNTH_FLAGS_MIDI_DRUMS 1  // Special midi-note-to-drums mapping (deprecated)
 #define SYNTH_FLAGS_IGNORE_NOTE_OFFS 2
 #define SYNTH_FLAGS_NEGATE_PEDAL 4
 

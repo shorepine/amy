@@ -802,98 +802,6 @@ void patches_store_patch(amy_event *e, char * patch_string) {
 extern int32_t parse_list_uint16_t(char *message, uint16_t *vals, int32_t max_num_vals, uint16_t skipped_val);
 
 
-// This code was originally in midi.c, but putting it here allows endogenous use of MIDI drums.
-// Drum kit - copied from tulip/shared/py/patches.py
-// Drumkit is [base_midi_note, name, general_midi_note]
-
-struct pcm_sample_info {
-    int8_t pcm_preset_number;
-    int8_t base_midi_note;
-};
-
-#define AMY_MIDI_DRUMS_LOWEST_NOTE 35
-#define AMY_MIDI_DRUMS_HIGHEST_NOTE 81
-
-// drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
-
-// PCM presets available (from pcm_tiny.h):
-//  [0]  808-MARACA    root=89
-//  [1]  808-KIK 4     root=39
-//  [2]  808-SNR 4     root=45
-//  [3]  808-SNR 7     root=52
-//  [4]  808-SNR 10    root=51
-//  [5]  808-SNR 12    root=41
-//  [6]  808-C-HAT1    root=53
-//  [7]  808-O-HAT1    root=56
-//  [8]  808-LTOM M    root=61
-//  [9]  808-DRYCLP    root=94
-//  [10] 808-CWBELL    root=69
-struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
-    {1, 39},   // 35 Acoustic Bass Drum -> 808-KIK
-    {1, 39},   // 36 Bass Drum 1        -> 808-KIK
-    {4, 51},   // 37 Side Stick         -> 808-SNR 10 (rimshot-like)
-    {2, 45},   // 38 Acoustic Snare     -> 808-SNR 4
-    {9, 94},   // 39 Hand Clap          -> 808-DRYCLP
-    {5, 41},   // 40 Electric Snare     -> 808-SNR 12
-    {8, 56},   // 41 Low Floor Tom      -> 808-LTOM (pitched down)
-    {6, 53},   // 42 Closed Hi Hat      -> 808-C-HAT1
-    {8, 61},   // 43 High Floor Tom     -> 808-LTOM (root)
-    {7, 61},   // 44 Pedal Hi-Hat       -> 808-O-HAT1 (short)
-    {8, 56},   // 45 Low Tom            -> 808-LTOM (pitched down)
-    {7, 56},   // 46 Open Hi-Hat        -> 808-O-HAT1
-    {8, 63},   // 47 Low-Mid Tom        -> 808-LTOM (slightly up)
-    {8, 68},   // 48 Hi Mid Tom         -> 808-LTOM (pitched up)
-    {7, 46},   // 49 Crash Cymbal 1     -> 808-O-HAT1 (pitched down for wash)
-    {8, 73},   // 50 High Tom           -> 808-LTOM (pitched up high)
-    {7, 51},   // 51 Ride Cymbal 1      -> 808-O-HAT1 (pitched down)
-    {7, 48},   // 52 Chinese Cymbal     -> 808-O-HAT1 (pitched down)
-    {6, 47},   // 53 Ride Bell          -> 808-C-HAT1 (pitched down, bell-like)
-    {0, 79},   // 54 Tambourine         -> 808-MARACA (pitched down)
-    {7, 46},   // 55 Splash Cymbal      -> 808-O-HAT1 (pitched down)
-    {10, 69},  // 56 Cowbell            -> 808-CWBELL
-    {7, 48},   // 57 Crash Cymbal 2     -> 808-O-HAT1 (pitched down)
-    {-1, -1},  // 58 Vibraslap
-    {7, 53},   // 59 Ride Cymbal 2      -> 808-O-HAT1 (pitched down)
-    {-1, -1},  // 60 Hi Bongo
-    {-1, -1},  // 61 Low Bongo
-    {-1, -1},  // 62 Mute Hi Conga
-    {-1, -1},  // 63 Open Hi Conga
-    {-1, -1},  // 64 Low Conga
-    {8, 73},   // 65 High Timbale       -> 808-LTOM (pitched up)
-    {8, 63},   // 66 Low Timbale        -> 808-LTOM (slightly up)
-    {10, 76},  // 67 High Agogo         -> 808-CWBELL (pitched up)
-    {10, 64},  // 68 Low Agogo          -> 808-CWBELL (pitched down)
-    {0, 79},   // 69 Cabasa             -> 808-MARACA (pitched down)
-    {0, 89},   // 70 Maracas            -> 808-MARACA (root)
-    {-1, -1},  // 71 Short Whistle
-    {-1, -1},  // 72 Long Whistle
-    {-1, -1},  // 73 Short Guiro
-    {-1, -1},  // 74 Long Guiro
-    {-1, -1},  // 75 Claves
-    {10, 76},  // 76 Hi Wood Block      -> 808-CWBELL (pitched up)
-    {10, 64},  // 77 Low Wood Block     -> 808-CWBELL (pitched down)
-    {-1, -1},  // 78 Mute Cuica
-    {-1, -1},  // 79 Open Cuica
-    {-1, -1},  // 80 Mute Triangle
-    {-1, -1},  // 81 Open Triangle
-};
-
-
-bool setup_drum_event(amy_event *e, uint8_t note) {
-  // Special-case processing to convert MIDI drum notes into PCM patch events.
-  bool forward_note = false;
-  if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
-      struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
-      if (s.pcm_preset_number != -1) {
-          e->wave = PCM;
-          e->preset = s.pcm_preset_number;
-          e->midi_note = s.base_midi_note;
-          forward_note = true;
-      }
-  }
-  return forward_note;
-}
-
 int copy_voices(uint16_t *from, uint16_t *to) {
     // Copy voice vectors up until first unset; return how many copied.
     int num_voices = 0;
@@ -927,10 +835,6 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
         uint16_t note = 0;
         if (AMY_IS_SET(e->midi_note))  // midi note can be unset if preset is set.
             note = (uint8_t)roundf(e->midi_note);
-        if (synth_flags & SYNTH_FLAGS_MIDI_DRUMS) {
-            if (!setup_drum_event(e, note))
-                return 0;   // It's not a MIDI drum event we can emulate, just drop the event.
-        }
         if (AMY_IS_SET(e->preset)) {
             // This event includes a note *and* a preset, so it's like a drum sample note on.
             // Wrap the preset number into the note, so we don't allocate the same pitch for different drums to the same voice.

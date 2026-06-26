@@ -517,7 +517,7 @@ DRUMKIT = [
 
 def make_drums_patch():
     # Set up a bunch of midi_note_cmd mappings for CH10 drums
-    message = amy.message(osc=0, wave=amy.PCM, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
+    message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
     message += amy.message(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = DRUMKIT[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
