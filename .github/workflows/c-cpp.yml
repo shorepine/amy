@@ -56,3 +56,34 @@ jobs:
 
     - name: Build web (emscripten)
       run: make web
+
+  godot-api:
+    # The Godot send() kwarg map in godot/amy.gd is generated from
+    # amy/__init__.py's _KW_MAP_LIST. Fail the build if a PR changed the Python
+    # source without regenerating (so Godot can't silently drift like it did
+    # before), and confirm the generated GDScript still parses.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install gdtoolkit (gdparse)
+      run: pip install "gdtoolkit==4.*"
+
+    - name: Regenerate Godot API map
+      run: make godot-api
+
+    - name: Validate GDScript parses
+      run: gdparse godot/amy.gd
+
+    - name: Check godot/amy.gd is in sync with amy/__init__.py
+      run: |
+        if ! git diff --quiet -- godot/amy.gd; then
+          echo "::error::godot/amy.gd is out of sync with amy/__init__.py _KW_MAP_LIST. Run 'make godot-api' and commit the result."
+          git diff -- godot/amy.gd
+          exit 1
+        fi

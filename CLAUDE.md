@@ -13,8 +13,9 @@ To **skip** a release for a given merge, put `[skip release]` in the merge commi
 
 ## Godot GDExtension
 
-- Local builds use `setup_godot.sh` which generates the SConstruct, C++ source, and GDScript wrapper inline
+- Local builds use `setup_godot.sh` which generates the SConstruct, C++ source, and `amy.gdextension` inline, and copies the GDScript wrapper straight from `godot/amy.gd` (it no longer embeds its own copy)
 - CI builds use the `godot/` directory (SConstruct, src/, etc.) directly via `.github/workflows/godot-addon.yml`
+- **The `send()` kwarg map in `godot/amy.gd` is generated, not hand-edited.** `scripts/gen_amy_gd_api.py` mirrors `amy/__init__.py`'s `_KW_MAP_LIST` (the source of truth, shared with the JS build's `gen_amy_js_api.py`) into the `# BEGIN/END GENERATED` region. Run `make godot-api` after changing `_KW_MAP_LIST`; it's regenerated on release (`release.yml`) and a `c-cpp.yml` job fails any PR where it (or its GDScript syntax) has drifted
 - `amy_midi.c` is excluded from the Godot build because it conflicts with platform stubs. Any new functions added to `amy_midi.c` (or other excluded files) that are called from core AMY code need stub implementations added in both:
   - `godot/src/amy_platform_stubs.c` (for CI builds)
   - The `amy_platform_stubs.c` section of `setup_godot.sh` (for local builds)

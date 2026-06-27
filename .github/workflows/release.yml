@@ -32,6 +32,12 @@ name: Release
 # built from this exact source. The toolchain mirrors the `web` job in c-cpp.yml
 # (same pinned emsdk), which already verifies `make web` links on every PR.
 #
+# WHY THE GODOT MAP IS REGENERATED HERE: godot/amy.gd's send() kwarg map mirrors
+# amy/__init__.py's _KW_MAP_LIST (the source of truth). `make godot-api` rewrites
+# it so the Godot wrapper ships the same kwargs as Python/JS; folding it into the
+# bump commit keeps the tag (and the Godot zip built from godot/ at that tag) in
+# sync. CI (c-cpp.yml) also fails any PR that lets it drift.
+#
 # TO SKIP a release for a given merge, include "[skip release]" in the merge
 # commit message.
 
@@ -101,6 +107,14 @@ jobs:
           # REPL files are intentionally not rebuilt here.)
           make deploy-web
 
+      - name: Regenerate the Godot API map
+        run: |
+          # Mirror amy/__init__.py's _KW_MAP_LIST into godot/amy.gd so the Godot
+          # send() wrapper ships the same kwargs as Python/JS. Folded into the bump
+          # commit below; the Godot zip is built from godot/ at the tag. (Pure
+          # Python -- no extra toolchain beyond the setup-python above.)
+          make godot-api
+
       - name: Open and merge the version-bump PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,14 +127,15 @@ jobs:
           branch="bump-$NEXT"
           git switch -c "$branch"
           sed -i -E "s/^version=.*/version=$NEXT/" library.properties
-          # Stage the version bump alongside the rebuilt web assets so the single
-          # tagged commit carries both. Explicit paths (not `commit -a`) keep any
-          # other files `make` touched (build/, src/patches.h, amy/constants.py)
-          # out of the commit. If a rebuilt asset is byte-identical, `git add` is
-          # a harmless no-op and only library.properties lands.
+          # Stage the version bump alongside the rebuilt web + Godot assets so the
+          # single tagged commit carries all of them. Explicit paths (not
+          # `commit -a`) keep any other files `make` touched (build/, src/patches.h,
+          # amy/constants.py) out of the commit. If a regenerated file is
+          # byte-identical, `git add` is a harmless no-op.
           git add library.properties \
-            docs/amy.js docs/amy.wasm docs/amy.aw.js docs/amy.ww.js
-          git commit -m "Bump version to $NEXT, rebuild web assets"
+            docs/amy.js docs/amy.wasm docs/amy.aw.js docs/amy.ww.js \
+            godot/amy.gd
+          git commit -m "Bump version to $NEXT, rebuild web + Godot API"
           git push -u origin "$branch"
 
           gh pr create --base main --head "$branch" \
