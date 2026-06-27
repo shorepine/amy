@@ -24,7 +24,7 @@ name: Release
 # refs/tags/<version>, so its existing release job attaches the zip. No PAT, and
 # nothing to renew.
 #
-# WHY WEB ASSETS ARE REBUILT HERE: docs/amy.js + amy.wasm + amy.aw.js + amy.ww.js
+# WHY WEB ASSETS ARE REBUILT HERE: docs/amy.js + amy.wasm
 # are Emscripten build outputs (not hand-edited), and both the docs/ web demo and
 # the Godot zip (godot-addon.yml copies docs/amy.*) ship them. So before tagging
 # we run `make deploy-web` and fold the rebuilt docs/amy.* into the same bump
@@ -98,7 +98,7 @@ jobs:
 
       - name: Rebuild web assets from this main
         run: |
-          # Regenerate docs/amy.js + amy.wasm + amy.aw.js + amy.ww.js from the
+          # Regenerate docs/amy.js + amy.wasm from the
           # current source so the tagged release -- and the Godot zip dispatched
           # afterwards, which copies docs/amy.* -- always ship web assets built
           # from this exact commit. Folded into the bump commit below so main and
@@ -133,7 +133,7 @@ jobs:
           # amy/constants.py) out of the commit. If a regenerated file is
           # byte-identical, `git add` is a harmless no-op.
           git add library.properties \
-            docs/amy.js docs/amy.wasm docs/amy.aw.js docs/amy.ww.js \
+            docs/amy.js docs/amy.wasm \
             godot/amy.gd
           git commit -m "Bump version to $NEXT, rebuild web + Godot API"
           git push -u origin "$branch"

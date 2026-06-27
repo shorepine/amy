@@ -572,8 +572,6 @@ echo "Copying web export files..."
 WEB_SRC="${AMY_DIR}/docs"
 cp "${WEB_SRC}/amy.js"    "${ADDON_DIR}/web/"
 cp "${WEB_SRC}/amy.wasm"  "${ADDON_DIR}/web/"
-cp "${WEB_SRC}/amy.aw.js" "${ADDON_DIR}/web/"
-cp "${WEB_SRC}/amy.ww.js" "${ADDON_DIR}/web/"
 cp "${WEB_SRC}/enable-threads.js" "${ADDON_DIR}/web/"
 
 # A copy for project root (service worker needs root scope)
@@ -882,7 +880,7 @@ func _run() -> void:
 
 	# Copy web audio files
 	var web_files: Array[String] = [
-		"amy.js", "amy.wasm", "amy.aw.js", "amy.ww.js",
+		"amy.js", "amy.wasm",
 		"godot_amy_bridge.js", "enable-threads.js"
 	]
 
