@@ -22,7 +22,7 @@ func _run() -> void:
 
 	# Copy web audio files
 	var web_files: Array[String] = [
-		"amy.js", "amy.wasm", "amy.aw.js", "amy.ww.js",
+		"amy.js", "amy.wasm",
 		"godot_amy_bridge.js", "enable-threads.js"
 	]
 

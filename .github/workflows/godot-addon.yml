@@ -102,8 +102,6 @@ jobs:
           cp godot/web/custom_shell.html addons/amy/web/
           cp docs/amy.js addons/amy/web/
           cp docs/amy.wasm addons/amy/web/
-          cp docs/amy.aw.js addons/amy/web/
-          cp docs/amy.ww.js addons/amy/web/
           cp docs/enable-threads.js addons/amy/web/
           cp docs/enable-threads.js addons/amy/web/enable-threads-root.js
 
