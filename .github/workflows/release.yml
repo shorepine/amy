@@ -24,6 +24,20 @@ name: Release
 # refs/tags/<version>, so its existing release job attaches the zip. No PAT, and
 # nothing to renew.
 #
+# WHY WEB ASSETS ARE REBUILT HERE: docs/amy.js + amy.wasm
+# are Emscripten build outputs (not hand-edited), and both the docs/ web demo and
+# the Godot zip (godot-addon.yml copies docs/amy.*) ship them. So before tagging
+# we run `make deploy-web` and fold the rebuilt docs/amy.* into the same bump
+# commit -- guaranteeing main, the tag, and the Godot zip all carry web assets
+# built from this exact source. The toolchain mirrors the `web` job in c-cpp.yml
+# (same pinned emsdk), which already verifies `make web` links on every PR.
+#
+# WHY THE GODOT MAP IS REGENERATED HERE: godot/amy.gd's send() kwarg map mirrors
+# amy/__init__.py's _KW_MAP_LIST (the source of truth). `make godot-api` rewrites
+# it so the Godot wrapper ships the same kwargs as Python/JS; folding it into the
+# bump commit keeps the tag (and the Godot zip built from godot/ at that tag) in
+# sync. CI (c-cpp.yml) also fails any PR that lets it drift.
+#
 # TO SKIP a release for a given merge, include "[skip release]" in the merge
 # commit message.
 
@@ -52,6 +66,20 @@ jobs:
           ref: main
           fetch-depth: 0          # full history + tags, needed to bump and tag
 
+      # Toolchain for the `make deploy-web` rebuild below. Mirrors the `web` job
+      # in c-cpp.yml -- same pinned emsdk so the committed bytes match what CI
+      # builds and verifies on every PR.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install web build deps
+        run: pip install numpy
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.22
+
       - name: Compute next patch version
         id: ver
         run: |
@@ -68,6 +96,25 @@ jobs:
           echo "next=$next" >> "$GITHUB_OUTPUT"
           echo "Releasing $current -> $next"
 
+      - name: Rebuild web assets from this main
+        run: |
+          # Regenerate docs/amy.js + amy.wasm from the
+          # current source so the tagged release -- and the Godot zip dispatched
+          # afterwards, which copies docs/amy.* -- always ship web assets built
+          # from this exact commit. Folded into the bump commit below so main and
+          # the tag carry them. (Only docs/amy.* are deploy-web outputs; the
+          # static docs/enable-threads.js and the MicroPython docs/micropython.*
+          # REPL files are intentionally not rebuilt here.)
+          make deploy-web
+
+      - name: Regenerate the Godot API map
+        run: |
+          # Mirror amy/__init__.py's _KW_MAP_LIST into godot/amy.gd so the Godot
+          # send() wrapper ships the same kwargs as Python/JS. Folded into the bump
+          # commit below; the Godot zip is built from godot/ at the tag. (Pure
+          # Python -- no extra toolchain beyond the setup-python above.)
+          make godot-api
+
       - name: Open and merge the version-bump PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,12 +127,20 @@ jobs:
           branch="bump-$NEXT"
           git switch -c "$branch"
           sed -i -E "s/^version=.*/version=$NEXT/" library.properties
-          git commit -am "Bump version to $NEXT"
+          # Stage the version bump alongside the rebuilt web + Godot assets so the
+          # single tagged commit carries all of them. Explicit paths (not
+          # `commit -a`) keep any other files `make` touched (build/, src/patches.h,
+          # amy/constants.py) out of the commit. If a regenerated file is
+          # byte-identical, `git add` is a harmless no-op.
+          git add library.properties \
+            docs/amy.js docs/amy.wasm \
+            godot/amy.gd
+          git commit -m "Bump version to $NEXT, rebuild web + Godot API"
           git push -u origin "$branch"
 
           gh pr create --base main --head "$branch" \
             --title "Bump version to $NEXT" \
-            --body "Automated release bump to $NEXT, cut on merge to main by .github/workflows/release.yml."
+            --body "Automated release bump to $NEXT (with rebuilt web assets), cut on merge to main by .github/workflows/release.yml."
 
           # The PR was created with GITHUB_TOKEN, so it triggers no checks and is
           # immediately mergeable; retry briefly while GitHub computes mergeability.

@@ -41,7 +41,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test web deploy-web
+.PHONY: default all clean amy-module test web deploy-web godot-api
 
 default: $(TARGET)
 all: default
@@ -120,9 +120,16 @@ build/patches.generated.js: scripts/gen_patches_js.py src/patches.h
 
 web: build/amy.js build/amy_api.generated.js build/patches.generated.js
 
+# emscripten (>=4.x) inlines the AudioWorklet/WasmWorker glue into amy.js, so it
+# no longer emits separate amy.aw.js / amy.ww.js files (older builds did).
 deploy-web: web
 	cat build/amy.js src/amy_connector.js build/amy_api.generated.js > docs/amy.js
-	cp build/amy.wasm build/amy.aw.js build/amy.ww.js docs/
+	cp build/amy.wasm docs/
+
+# Regenerate the Godot GDScript send() kwarg map from amy/__init__.py (the
+# source of truth). Run on release and verified in CI so godot/amy.gd can't drift.
+godot-api:
+	$(PYTHON) scripts/gen_amy_gd_api.py
 
 clean:
 	-rm -f src/*.o
