@@ -103,9 +103,9 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
         if (bank_number > 1) bank_number = 0;
     }
     e.patch_number = program + 128 * bank_number;
-    if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
+    //if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
-    }
+    //}
 }
 
 void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
@@ -147,8 +147,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         uint8_t status = status_byte & 0xF0;
         uint8_t channel = status_byte & 0x0F;
         // Do the AMY instrument things here
-        /* if(status == 0x90) amy_received_note_on(channel+1, data[1], data[2], time);
-           else */ if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
+        if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
         else if(status == 0xB0 && data[1] == 0x7B) amy_received_all_notes_off(channel+1, time);
         else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);

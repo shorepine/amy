@@ -286,8 +286,8 @@ void amy_default_synths() {
     // Configure several default synthesizers for "out of box" playability.
 
     // sine wave "bleeper" on ch 0 (not a MIDI channel)
+    // synth 0 sinewave.
     amy_event e = amy_default_event();
-    // osc=0 sinewave.
     e.synth = 0;
     e.num_voices = 1;
     e.oscs_per_voice = 1;
@@ -296,28 +296,25 @@ void amy_default_synths() {
 
     // GM drum synth on channel 10
     e = amy_default_event();
-    e.synth = 10;
+    e.synth = AMY_MIDI_CHANNEL_DRUMS;  // 10
     e.num_voices = 6;
-    e.oscs_per_voice = 1;
-    e.wave = PCM;
-    e.amp_coefs[COEF_CONST] = 5.0;  // MIDI drums need to be louder to match juno patches.
-    // Flag to perform note -> drum PCM patch translation.
-    e.synth_flags = _SYNTH_FLAGS_MIDI_DRUMS | _SYNTH_FLAGS_IGNORE_NOTE_OFFS;
+    e.patch_number = 258;  // Set up in headers.py to use midi_note_cmd to match some midi note events to PCM samples
+    e.synth_flags = SYNTH_FLAGS_NOTES_VIA_MIDI | SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Ensure note events go via midi_note_cmd
     amy_add_event(&e);
 
     // DX7 6 note poly on channel 2
     e = amy_default_event();
+    e.synth = 2;
     e.num_voices = 6;
     e.patch_number = 128;
-    e.synth = 2;
     amy_add_event(&e);
 
     // Juno 6 poly on channel 1
     // Define this last so if we release it, the oscs aren't fragmented.
     e = amy_default_event();
+    e.synth = 1;
     e.num_voices = 6;
     e.patch_number = 0;
-    e.synth = 1;
     amy_add_event(&e);
     // Add some MIDI CCs for the Juno (defined in midi_mappings.c).
     amy_global.config.amy_external_midi_input_hook = juno_filter_midi_handler;

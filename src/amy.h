@@ -312,6 +312,11 @@ enum coefs{
 #define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
 #define RESET_QUEUE 1048576 // resets the amy queue
 
+// Bits for synth_flags=
+#define SYNTH_FLAGS_NOTES_VIA_MIDI 1    // Note-on/off events are routed through the MIDI interface (to pick up MIDI note cmds)
+#define SYNTH_FLAGS_IGNORE_NOTE_OFFS 2  // Note offs are ignored (for drums with long decays)
+#define SYNTH_FLAGS_NEGATE_PEDAL 4      // Flip interpretation of MIDI pedals
+
 #define true 1
 #define false 0
 
@@ -1043,9 +1048,6 @@ extern void update_num_oscs_for_patch_number(int patch_number);
 extern void all_notes_off();
 extern void patches_debug();
 extern void patches_store_patch(amy_event *e, char * message);
-#define _SYNTH_FLAGS_MIDI_DRUMS (0x01)
-#define _SYNTH_FLAGS_IGNORE_NOTE_OFFS (0x02)
-#define _SYNTH_FLAGS_NEGATE_PEDAL (0x04)
 extern int instruments_max_instruments();
 extern void instruments_init(int num_instruments);
 extern void instruments_deinit();

@@ -740,7 +740,7 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 }
 
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time) {
+void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     uint16_t start = 0;
@@ -748,6 +748,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
     while(strlen(message + start)) {
       amy_event patch_event = amy_default_event();
       if (message[start] == 'i') {
+          if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
           // It's a synth-layer message, it needs a synth defined.
           patch_event.synth = synth;
       }
@@ -792,106 +793,14 @@ void patches_store_patch(amy_event *e, char * patch_string) {
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
-    // Store the patch as deltas and  find out how many oscs this message uses
-    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time);
+    // Store the patch as deltas and find out how many oscs this message uses
+    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time, true);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
 
 extern int32_t parse_list_uint16_t(char *message, uint16_t *vals, int32_t max_num_vals, uint16_t skipped_val);
 
-
-// This code was originally in midi.c, but putting it here allows endogenous use of MIDI drums.
-// Drum kit - copied from tulip/shared/py/patches.py
-// Drumkit is [base_midi_note, name, general_midi_note]
-
-struct pcm_sample_info {
-    int8_t pcm_preset_number;
-    int8_t base_midi_note;
-};
-
-#define AMY_MIDI_DRUMS_LOWEST_NOTE 35
-#define AMY_MIDI_DRUMS_HIGHEST_NOTE 81
-
-// drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE] == {pcm_patch_number, base_midi_note}
-
-// PCM presets available (from pcm_tiny.h):
-//  [0]  808-MARACA    root=89
-//  [1]  808-KIK 4     root=39
-//  [2]  808-SNR 4     root=45
-//  [3]  808-SNR 7     root=52
-//  [4]  808-SNR 10    root=51
-//  [5]  808-SNR 12    root=41
-//  [6]  808-C-HAT1    root=53
-//  [7]  808-O-HAT1    root=56
-//  [8]  808-LTOM M    root=61
-//  [9]  808-DRYCLP    root=94
-//  [10] 808-CWBELL    root=69
-struct pcm_sample_info drumkit[AMY_MIDI_DRUMS_HIGHEST_NOTE - AMY_MIDI_DRUMS_LOWEST_NOTE + 1] = {
-    {1, 39},   // 35 Acoustic Bass Drum -> 808-KIK
-    {1, 39},   // 36 Bass Drum 1        -> 808-KIK
-    {4, 51},   // 37 Side Stick         -> 808-SNR 10 (rimshot-like)
-    {2, 45},   // 38 Acoustic Snare     -> 808-SNR 4
-    {9, 94},   // 39 Hand Clap          -> 808-DRYCLP
-    {5, 41},   // 40 Electric Snare     -> 808-SNR 12
-    {8, 56},   // 41 Low Floor Tom      -> 808-LTOM (pitched down)
-    {6, 53},   // 42 Closed Hi Hat      -> 808-C-HAT1
-    {8, 61},   // 43 High Floor Tom     -> 808-LTOM (root)
-    {7, 61},   // 44 Pedal Hi-Hat       -> 808-O-HAT1 (short)
-    {8, 56},   // 45 Low Tom            -> 808-LTOM (pitched down)
-    {7, 56},   // 46 Open Hi-Hat        -> 808-O-HAT1
-    {8, 63},   // 47 Low-Mid Tom        -> 808-LTOM (slightly up)
-    {8, 68},   // 48 Hi Mid Tom         -> 808-LTOM (pitched up)
-    {7, 46},   // 49 Crash Cymbal 1     -> 808-O-HAT1 (pitched down for wash)
-    {8, 73},   // 50 High Tom           -> 808-LTOM (pitched up high)
-    {7, 51},   // 51 Ride Cymbal 1      -> 808-O-HAT1 (pitched down)
-    {7, 48},   // 52 Chinese Cymbal     -> 808-O-HAT1 (pitched down)
-    {6, 47},   // 53 Ride Bell          -> 808-C-HAT1 (pitched down, bell-like)
-    {0, 79},   // 54 Tambourine         -> 808-MARACA (pitched down)
-    {7, 46},   // 55 Splash Cymbal      -> 808-O-HAT1 (pitched down)
-    {10, 69},  // 56 Cowbell            -> 808-CWBELL
-    {7, 48},   // 57 Crash Cymbal 2     -> 808-O-HAT1 (pitched down)
-    {-1, -1},  // 58 Vibraslap
-    {7, 53},   // 59 Ride Cymbal 2      -> 808-O-HAT1 (pitched down)
-    {-1, -1},  // 60 Hi Bongo
-    {-1, -1},  // 61 Low Bongo
-    {-1, -1},  // 62 Mute Hi Conga
-    {-1, -1},  // 63 Open Hi Conga
-    {-1, -1},  // 64 Low Conga
-    {8, 73},   // 65 High Timbale       -> 808-LTOM (pitched up)
-    {8, 63},   // 66 Low Timbale        -> 808-LTOM (slightly up)
-    {10, 76},  // 67 High Agogo         -> 808-CWBELL (pitched up)
-    {10, 64},  // 68 Low Agogo          -> 808-CWBELL (pitched down)
-    {0, 79},   // 69 Cabasa             -> 808-MARACA (pitched down)
-    {0, 89},   // 70 Maracas            -> 808-MARACA (root)
-    {-1, -1},  // 71 Short Whistle
-    {-1, -1},  // 72 Long Whistle
-    {-1, -1},  // 73 Short Guiro
-    {-1, -1},  // 74 Long Guiro
-    {-1, -1},  // 75 Claves
-    {10, 76},  // 76 Hi Wood Block      -> 808-CWBELL (pitched up)
-    {10, 64},  // 77 Low Wood Block     -> 808-CWBELL (pitched down)
-    {-1, -1},  // 78 Mute Cuica
-    {-1, -1},  // 79 Open Cuica
-    {-1, -1},  // 80 Mute Triangle
-    {-1, -1},  // 81 Open Triangle
-};
-
-
-bool setup_drum_event(amy_event *e, uint8_t note) {
-  // Special-case processing to convert MIDI drum notes into PCM patch events.
-  bool forward_note = false;
-  if (note >= AMY_MIDI_DRUMS_LOWEST_NOTE && note <= AMY_MIDI_DRUMS_HIGHEST_NOTE) {
-      struct pcm_sample_info s = drumkit[note - AMY_MIDI_DRUMS_LOWEST_NOTE];
-      if (s.pcm_preset_number != -1) {
-          e->wave = PCM;
-          e->preset = s.pcm_preset_number;
-          e->midi_note = s.base_midi_note;
-          forward_note = true;
-      }
-  }
-  return forward_note;
-}
 
 int copy_voices(uint16_t *from, uint16_t *to) {
     // Copy voice vectors up until first unset; return how many copied.
@@ -926,10 +835,6 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
         uint16_t note = 0;
         if (AMY_IS_SET(e->midi_note))  // midi note can be unset if preset is set.
             note = (uint8_t)roundf(e->midi_note);
-        if (synth_flags & _SYNTH_FLAGS_MIDI_DRUMS) {
-            if (!setup_drum_event(e, note))
-                return 0;   // It's not a MIDI drum event we can emulate, just drop the event.
-        }
         if (AMY_IS_SET(e->preset)) {
             // This event includes a note *and* a preset, so it's like a drum sample note on.
             // Wrap the preset number into the note, so we don't allocate the same pitch for different drums to the same voice.
@@ -975,10 +880,6 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Set the synth noteon delay.
             instrument_set_noteon_delay_ms(e->synth, e->synth_delay_ms);
         }
-        if (AMY_IS_SET(e->grab_midi_notes)) {
-            // Set the grab_midi state.
-            instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
-        }
         if (AMY_IS_SET(e->synth_flags)) {
             instrument_set_flags(e->synth, e->synth_flags);
         }
@@ -990,7 +891,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);
             synth_flags = instrument_get_flags(e->synth);
-            if (synth_flags & _SYNTH_FLAGS_NEGATE_PEDAL) {
+            if (synth_flags & SYNTH_FLAGS_NEGATE_PEDAL) {
                 sustain = !sustain;  // Some MIDI pedals report backwards.
             }
             // A sustain release can result in note-off events for multiple voices.
@@ -1027,7 +928,7 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_num_voices(e->synth, voices);
         }
-        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & _SYNTH_FLAGS_IGNORE_NOTE_OFFS))
+        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & SYNTH_FLAGS_IGNORE_NOTE_OFFS))
             return 0;  // Ignore the note off, as requested.
     }
     return num_voices;
@@ -1063,27 +964,40 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->voices[0]);
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
+    int synth_flags = 0;
+    if (AMY_IS_SET(e->synth))  synth_flags = instrument_get_flags(e->synth);
     AMY_UNSET(e->synth);
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
-    // for each voice, send the event to the base osc (+ e->osc if given)
-    for(uint8_t i = 0; i < num_voices; i++) {
-        if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
-            uint16_t target_osc = voice_to_base_osc[voices[i]];
-            if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
-                // Not a note on/off, or osc is specified
-                amy_event_to_deltas_queue(e, target_osc, queue);
-            } else {
-                // Note on/off and osc is not specified - send to all oscs in voice.
-                int num_oscs = num_oscs_for_voice(voices[i]);
-                for (int osc = 0; osc < num_oscs; ++osc) {
-                    e->osc = osc;
-                    //if (osc != 1)
+    // Should we invoke MIDI note-on cmd rules?
+    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source != NOTE_SOURCE_MIDI)) {
+        // Route note-on event via MIDI to invoke midi_note_cmds
+        uint8_t bytes[3];
+        bytes[0] = 0x90 + (0x0F & (instrument - 1));
+        bytes[1] = 0x7F & (uint8_t)(e->midi_note);
+        bytes[2] = (uint8_t) MIN(127, 127.1f * e->velocity);
+        //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
+        midi_msg_handler(bytes, 3, /* is_sysex */ 0, e->time);
+    } else {
+        // for each voice, send the event to the base osc (+ e->osc if given)
+        for(uint8_t i = 0; i < num_voices; i++) {
+            if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
+                uint16_t target_osc = voice_to_base_osc[voices[i]];
+                if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
+                    // Not a note on/off, or osc is specified
                     amy_event_to_deltas_queue(e, target_osc, queue);
+                } else {
+                    // Note on/off and osc is not specified - send to all oscs in voice.
+                    int num_oscs = num_oscs_for_voice(voices[i]);
+                    for (int osc = 0; osc < num_oscs; ++osc) {
+                        e->osc = osc;
+                        //if (osc != 1)
+                        amy_event_to_deltas_queue(e, target_osc, queue);
+                    }
+                    AMY_UNSET(e->osc);
                 }
-                AMY_UNSET(e->osc);
+                //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
             }
-	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
     // Restore the instrument in case this event is re-used.
@@ -1287,18 +1201,6 @@ void patches_load_patch(amy_event *e) {
         }
     }  // end of loop setting up voice_to_base_osc for all voices[v]
 
-    // Now actually initialize the newly-allocated osc blocks with the patch
-    for(uint8_t v = 0; v < num_voices; v++) {
-        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
-            if (deltas) {
-                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
-            } else if (message) {
-                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time);
-            }
-            // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
-        }
-    }
-
     // Finally, store as an instrument if instrument number is specified.
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
@@ -1307,4 +1209,18 @@ void patches_load_patch(amy_event *e) {
         if (AMY_IS_SET(e->bus)) bus = e->bus;
         instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
     }
+    // Now actually initialize the newly-allocated osc blocks with the patch
+    bool is_first_voice = true;  // flag for once-only messages.
+    for(uint8_t v = 0; v < num_voices; v++) {
+        if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
+            if (deltas) {
+                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
+            } else if (message) {
+                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time, is_first_voice);
+            }
+            // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
+            is_first_voice = false;
+        }
+    }
+
 }
