@@ -250,9 +250,11 @@ void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t 
                 value = 0;
             }
             char message[AMY_WIRE_COMMAND_LEN];
-            char offset = 0;
+            // Mark message as MIDI-sourced.
+            sprintf(message, "iM%d", NOTE_SOURCE_MIDI);
+            int offset = strlen(message);
             if (AMY_IS_SET(time)) {
-                sprintf(message, "t%" PRId32, time);
+                sprintf(message + offset, "t%" PRId32, time);
                 offset = strlen(message);
             }
             substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);

@@ -964,27 +964,40 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->voices[0]);
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
+    int synth_flags = 0;
+    if (AMY_IS_SET(e->synth))  synth_flags = instrument_get_flags(e->synth);
     AMY_UNSET(e->synth);
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
-    // for each voice, send the event to the base osc (+ e->osc if given)
-    for(uint8_t i = 0; i < num_voices; i++) {
-        if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
-            uint16_t target_osc = voice_to_base_osc[voices[i]];
-            if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
-                // Not a note on/off, or osc is specified
-                amy_event_to_deltas_queue(e, target_osc, queue);
-            } else {
-                // Note on/off and osc is not specified - send to all oscs in voice.
-                int num_oscs = num_oscs_for_voice(voices[i]);
-                for (int osc = 0; osc < num_oscs; ++osc) {
-                    e->osc = osc;
-                    //if (osc != 1)
+    // Should we invoke MIDI note-on cmd rules?
+    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source != NOTE_SOURCE_MIDI)) {
+        // Route note-on event via MIDI to invoke midi_note_cmds
+        uint8_t bytes[3];
+        bytes[0] = 0x90 + (0x0F & (instrument - 1));
+        bytes[1] = 0x7F & (uint8_t)(e->midi_note);
+        bytes[2] = (uint8_t) MIN(127, 127.1f * e->velocity);
+        //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
+        midi_msg_handler(bytes, 3, /* is_sysex */ 0, e->time);
+    } else {
+        // for each voice, send the event to the base osc (+ e->osc if given)
+        for(uint8_t i = 0; i < num_voices; i++) {
+            if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
+                uint16_t target_osc = voice_to_base_osc[voices[i]];
+                if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
+                    // Not a note on/off, or osc is specified
                     amy_event_to_deltas_queue(e, target_osc, queue);
+                } else {
+                    // Note on/off and osc is not specified - send to all oscs in voice.
+                    int num_oscs = num_oscs_for_voice(voices[i]);
+                    for (int osc = 0; osc < num_oscs; ++osc) {
+                        e->osc = osc;
+                        //if (osc != 1)
+                        amy_event_to_deltas_queue(e, target_osc, queue);
+                    }
+                    AMY_UNSET(e->osc);
                 }
-                AMY_UNSET(e->osc);
+                //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
             }
-	    //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
         }
     }
     // Restore the instrument in case this event is re-used.

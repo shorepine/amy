@@ -919,6 +919,21 @@ class TestDefaultChan1Synth(AmyTest):
     amy.send(time=950, synth=1, note=74, vel=0)
 
 
+class TestSynthDrums(AmyTest):
+  """Test MIDI drums using synth-level note translation."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
+    amy.send(time=400, synth=10, note=37, vel=100/127)  # snare
+    amy.send(time=700, synth=10, note=37, vel=100/127)  # snare
+    amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
+
+
 class TestSynthProgChange(AmyTest):
   """Test switchting default synth to DX7, do oscs allocate OK?"""
 

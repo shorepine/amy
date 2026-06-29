@@ -296,9 +296,10 @@ void amy_default_synths() {
 
     // GM drum synth on channel 10
     e = amy_default_event();
-    e.synth = 10;
+    e.synth = AMY_MIDI_CHANNEL_DRUMS;  // 10
     e.num_voices = 6;
     e.patch_number = 258;  // Set up in headers.py to use midi_note_cmd to match some midi note events to PCM samples
+    e.synth_flags = SYNTH_FLAGS_NOTES_VIA_MIDI | SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Ensure note events go via midi_note_cmd
     amy_add_event(&e);
 
     // DX7 6 note poly on channel 2

@@ -103,9 +103,9 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
         if (bank_number > 1) bank_number = 0;
     }
     e.patch_number = program + 128 * bank_number;
-    if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
+    //if (channel != AMY_MIDI_CHANNEL_DRUMS) {  // What would that even mean?
         amy_add_event(&e);
-    }
+    //}
 }
 
 void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
