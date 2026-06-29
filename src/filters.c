@@ -1,3 +1,7 @@
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize ("O2")  // #779: AMY DSP is CPU-bound; Arduino esp32 core builds libs at -Os with no opt menu. -O2 (not -O3: arduino-pico -O3 crashes RP2350).
+#endif
+
 #include "amy.h"
 #include "assert.h"
 

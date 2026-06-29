@@ -1,3 +1,7 @@
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC optimize ("O2")  // #779: AMY DSP is CPU-bound; Arduino esp32 core builds libs at -Os with no opt menu. -O2 (not -O3: arduino-pico -O3 crashes RP2350).
+#endif
+
 // DAn Ellis and Brian Whitman
 // brian@variogr.am / dan.ellis@gmail.com
 
@@ -526,7 +530,8 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 float map_60dB_to_01f(float lin) {
     // Map .001 to 0, 1 to 1 logarithmically.
     if (lin == 0) return -10.0f;
-    float result = 1.0f + 0.10034333188799373f * log2f(lin);  // 0.100343 = 1 / (3 * log2(10))
+    // Use AMY's fast log2 LUT instead of libm log2f (called per-osc per-block).
+    float result = 1.0f + 0.10034333188799373f * S2F(log2_lut(F2S(lin)));  // 0.100343 = 1 / (3 * log2(10))
     return result;
 }
 
@@ -1512,6 +1517,10 @@ float amp_combine_controls(float *controls, float *coefs) {
     float result = 0;
     for (int i = 0; i < NUM_COMBO_COEFS; ++i)  {
         float coef = coefs[i];
+        // A zero coef contributes nothing (0 * val == 0), so skip the expensive
+        // log-domain map below.  Bit-exact with computing it.  COEF_CONST is
+        // special-cased (its coef is forced to 1.0), so it's never skipped.
+        if (i != COEF_CONST && coef == 0)  continue;
         float val = controls[i];
         if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
         if (i != COEF_MOD) {
@@ -1525,8 +1534,9 @@ float amp_combine_controls(float *controls, float *coefs) {
     //    // Double the slope below 0.01.
     //    log_amp = -2.0f + 2.0f * (log_amp + 2.0f);
     //}
-    result = powf(10.0f, result);
-    if (result <= AMP_THRESH_PLUS)  result = 0; 
+    // 10^result == 2^(result * log2(10)); use AMY's fast exp2 LUT instead of libm powf.
+    result = S2F(exp2_lut(F2S(result * 3.321928094887362f)));
+    if (result <= AMP_THRESH_PLUS)  result = 0;
     return result;
 }
 
