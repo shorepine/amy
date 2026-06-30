@@ -1,6 +1,10 @@
 #ifndef __AMY_H
 #define __AMY_H
 
+#ifdef ESP_PATFORM
+#pragma GCC optimize ("O2")  // #779: Arduino esp32 core builds libs at -Os with no opt menu.
+#endif
+
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
