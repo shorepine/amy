@@ -1515,10 +1515,9 @@ class TestMidiNoteCmd(AmyTest):
     amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
     amy.send(time=0, synth=10, num_voices=4, patch=258, synth_flags=3)  # MIDI drums
     # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
-    # Use 9999 as int-compatible placeholder to be replaced by %v.
-    amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel=9999).replace('9999', '%v'))
+    amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
     # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)
-    amy.send(time=0, synth=2, midi_note_cmd='-1,0,0,1,0,' + amy.message(synth=1, note=8888, vel=9999).replace('9999', '%v').replace('8888', '%n'))
+    amy.send(time=0, synth=2, midi_note_cmd='-1,0,0,1,0,' + amy.message(synth=1, note='%n', vel='%v'))
     # Note 63 should play as normal, note 64 should cause cowbell.
     send_midi(time=100, synth=1, note=63, vel=1)
     send_midi(time=200, synth=1, note=64, vel=1)
