@@ -54,6 +54,9 @@ def millis():
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
     if type(number) == str:
+        if number and number[0] == '%':
+            # Allow token placeholders through (e.g. for building midi_note_cmds)
+            return number
         if number.strip() == '':
             return ''
         number = float(number)
@@ -134,6 +137,9 @@ def parse_list_or_comma_string(obj):
 
 def str_of_int(arg):
     """Cast arg to an int, but then convert it to a str for the wire string."""
+    if type(arg) == str and arg and arg[0] == '%':
+        # Allow token placeholders through (e.g. for building midi_note_cmds)
+        return arg
     return str(int(arg))
 
 
