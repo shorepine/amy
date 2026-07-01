@@ -40,7 +40,7 @@ You configure the `voices` in a `synth` by using a `patch`, which is a number re
 
 (Note that when you use voices/synths, you'll need to include the `synth` arg when addressing oscillators, and AMY will automatically route your command to the relevant oscillators in each voice of the synth's set -- there's no other way to tell which oscillators are being used by which voices.)
 
-To play a patch -- for instance the built-in patches emulating Juno and DX7 synthesizers and a piano -- you create a synth configured with that patch, then send note events, or parameter moidifications, to the synth. We ship patches 0-127 for Juno, 128-255 for DX7, and 256 for our [built-in piano](https://shorepine.github.io/amy/piano.html). For example, a multitimbral Juno/DX7 synth can be set up like this:
+To play a patch -- for instance the built-in patches emulating Juno and DX7 synthesizers and a piano -- you create a synth configured with that patch, then send note events, or parameter moidifications, to the synth. We ship patches 0-127 for Juno, 128-255 for DX7, 256 for our [built-in piano](https://shorepine.github.io/amy/piano.html), and 258 for a General MIDI drum kit (see the drum-synth example below). For example, a multitimbral Juno/DX7 synth can be set up like this:
 
 ```python
 amy.send(synth=1, num_voices=4, patch=1)     # 4 voices of Juno patch #1 on synth 1
@@ -72,11 +72,17 @@ amy.send(synth=0, vel=0)
 amy.send(synth=0, patch=13)  # Load a different Juno patch, it will remain 4-voice.
 # You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
 amy.send(synth=0, num_voices=0)
-# As a special case, you can use `synth_flags` to set up a MIDI drum synth
-# that will translate note events into PCM presets.
-# You can also use  `patch_string` to directly define a patch using a wire-command string.
-amy.send(synth=10, num_voices=3, patch_string='w7f0Z', synth_flags=3)
+# To set up a General MIDI drum synth, load the built-in GM drum-kit patch 258 with
+# synth_flags=3.  Bit 1 (SYNTH_FLAGS_NOTES_VIA_MIDI) routes notes through the MIDI note
+# map so note numbers select drum sounds; bit 2 (SYNTH_FLAGS_IGNORE_NOTE_OFFS) drops
+# note-offs so long decays ring out.  Note 36 = kick, 38 = snare, 40 = electric snare,
+# 42 = closed hi-hat, etc.
+amy.send(synth=10, num_voices=3, patch=258, synth_flags=3)
 amy.send(synth=10, note=40, vel=1)  # MIDI drums 'electric snare'
+# You can also use `patch_string` to directly define a patch from a wire-command string,
+# e.g. a single PCM sample (preset 0) as a one-osc voice:
+amy.send(synth=11, num_voices=1, patch_string='w7p0Z')
+amy.send(synth=11, note=48, vel=1)
 ```
 
 Note 1: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `preset` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.
