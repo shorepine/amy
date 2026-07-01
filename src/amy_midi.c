@@ -301,6 +301,18 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
 
         uint8_t byte = data[i];
 
+        // MIDI thru: when amy_config.midi_thru is set, echo every incoming MIDI
+        // byte straight back out (in addition to processing it normally below).
+        // We forward here, byte-by-byte inside the parse loop, rather than
+        // blasting the whole `data` buffer at once: USB MIDI always arrives in
+        // fixed 3-byte groups (padded with junk for <3-byte messages), and the
+        // `if(usb) i = len+1` early-exits below stop the loop before those
+        // padding bytes -- so only real MIDI bytes get forwarded. UART input has
+        // no padding and forwards in full. Off by default.
+        if(amy_global.config.midi_thru) {
+            midi_out(&byte, 1);
+        }
+
         // Skip sysex in this parser until we get an F7. We do not pass sysex over to python (yet)
         if(sysex_flag) {
             if(byte == 0xF7) {
