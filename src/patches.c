@@ -314,7 +314,6 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
-    _EPRINT_I(note_source, "note_source", "??");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
@@ -389,7 +388,6 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
     //_RET_TRUE_IF_SET(status, "status");
-    _RET_TRUE_IF_SET(note_source);  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     _RET_TRUE_IF_SET(reset_osc);
     // Global effects
     bool is_empty = true;
@@ -965,12 +963,13 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     int synth_flags = 0;
-    if (AMY_IS_SET(e->synth))  synth_flags = instrument_get_flags(e->synth);
+    uint8_t synth = e->synth;
     AMY_UNSET(e->synth);
+    if (AMY_IS_SET(synth))  synth_flags = instrument_get_flags(synth);
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // Should we invoke MIDI note-on cmd rules?
-    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source != NOTE_SOURCE_MIDI)) {
+    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));

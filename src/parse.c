@@ -706,7 +706,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             /* i is used by alles for sync index -- but only for sync messages -- ok to use here but test */
             case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
-            case 'j': e->tempo = atof(arg); break;
+            case 'j': e->tempo = atoff(arg); break;
             /* J available */
             // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
@@ -732,7 +732,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
                 e->echo_filter_coef = echo_params[4];
             }
             break;
-            case 'n': e->midi_note=atof(arg); break;
+            case 'n': e->midi_note=atoff(arg); break;
             case 'N': e->latency_ms = atoi(arg);  break;
             case 'o': e->algorithm=atoi(arg); break;
             case 'O': parse_algo_source(arg, e->algo_source); break;
