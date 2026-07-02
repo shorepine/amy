@@ -448,7 +448,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'f')  e->synth_flags = atoi(message);
     else if (cmd == 'g')  skip_chars = cv_trigger_from_message(message, e->synth, skip_chars);
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
-    else if (cmd == 'M')  e->note_source = atoi(message);  // To mark MIDI-in notes.
+    else if (cmd == 'M')  e->note_source_channel = atoi(message);  // To mark MIDI-in notes.
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);
     else if (cmd == 'p')  e->pedal = atoi(message);
     else if (cmd == 't')  e->to_synth = atoi(message);

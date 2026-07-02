@@ -142,7 +142,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->eg_type[0]);
     AMY_UNSET(e->eg_type[1]);
     AMY_UNSET(e->reset_osc);
-    AMY_UNSET(e->note_source);
+    AMY_UNSET(e->note_source_channel);
     for (int i = 0; i < MAX_ALGO_OPS; ++i) {
         AMY_UNSET(e->algo_source[i]);
     }
