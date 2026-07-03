@@ -637,10 +637,18 @@ int _next_alpha(char *s) {
 }
 
 
+size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
+    // Parse the wire string into an event
+    if (message[pos] == '\0')  pos = 0;  // Hit end of string
+    else pos += amy_parse_message(message + pos, e);
+    return pos;
+}
+
 
 // given a string return a parsed event
-int amy_parse_message(char * message, int length, amy_event *e) {
+int amy_parse_message(char * message, amy_event *e) {
     peek_stack("parse_message");
+    int length = strlen(message);
     char cmd = '\0';
     uint16_t pos = 0;
 

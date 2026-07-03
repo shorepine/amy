@@ -1874,29 +1874,6 @@ void amy_block_processed(void) {
 #endif
 }
 
-void amy_process_event(amy_event *e) {
-    peek_stack("process_event");
-    if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
-        uint8_t added = sequencer_add_event(e);
-        (void)added; // we don't need to do anything with this info at this time
-        e->status = EVENT_SEQUENCE;
-    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
-        // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
-        patches_reset_patch(e->patch_number);
-        AMY_UNSET(e->reset_osc);
-    } else {
-        // if time is set, play then
-        // if time and latency is set, play in time + latency
-        // if time is not set, play now
-        // if time is not set + latency is set, play in latency
-        uint32_t playback_time = amy_sysclock();
-        if(AMY_IS_SET(e->time)) playback_time = e->time;
-        playback_time += amy_global.latency_ms;
-        e->time = playback_time;
-        e->status = EVENT_SCHEDULED;
-    }
-}
-
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
     #ifdef __EMSCRIPTEN__

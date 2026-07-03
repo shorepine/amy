@@ -921,7 +921,8 @@ void amy_add_message(char *message);
 // sysex source, so file transfer routing (transfer_flag) applies.
 void amy_add_message_from_sysex(char *message);
 void amy_add_event(amy_event *e);
-int amy_parse_message(char * message, int length, amy_event *e);
+size_t yield_event_from_message(char *message, amy_event *e, size_t pos);
+int amy_parse_message(char * message, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
 
@@ -948,7 +949,6 @@ void amy_start_web_no_synths();
 
 
 // external functions
-void amy_process_event(amy_event *e);
 void amy_restart();
 void amy_reset_oscs();
 void amy_print_devices();

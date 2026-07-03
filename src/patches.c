@@ -741,29 +741,20 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
-    uint16_t start = 0;
     //fprintf(stderr, "parse_patch_string: message %s\n", message);
-    while(strlen(message + start)) {
-      amy_event patch_event = amy_default_event();
-      if (message[start] == 'i') {
-          if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
-          // It's a synth-layer message, it needs a synth defined.
-          patch_event.synth = synth;
-      }
-      int num_used = amy_parse_message(message + start, strlen(message + start), &patch_event);
-      //{
-      //  char sub_message[256];
-      //  strncpy(sub_message, message + start, num_used);
-      //  sub_message[num_used]= 0;
-      //  fprintf(stderr, "parse_patch_string: sub_message %s\n", sub_message);
-      //}
-      start += num_used;
-      amy_process_event(&patch_event);
-      patch_event.time = time;
-      if(patch_event.status == EVENT_SCHEDULED) {
-	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
-      }
-    }
+    amy_event e;
+    size_t pos = 0;
+    do {
+        amy_clear_event(&e);
+        e.time = time;
+        if (message[pos] == 'i') {
+            if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
+            // It's a synth-layer message, it needs a synth defined.
+            e.synth = synth;
+        }
+        pos = yield_event_from_message(message, &e, pos);
+        if (pos > 0) amy_event_to_deltas_queue(&e, base_osc, queue);
+    } while (pos > 0);
 }
 
 // So emscripten knows how big to make this struct.
