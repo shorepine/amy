@@ -1503,6 +1503,32 @@ class TestGrabMidiNotes(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+class TestTranceGlitch(AmyTest):
+  """Investigating a glitch that occurs in 'Emo Trance Backbeat' on AMYboard World."""
+
+  def run(self):
+    amy.send(time=0, volume=0.1)
+    amy.send(time=0, synth=2, patch=55, num_voices=6)
+    #for n in [40, 43, 47, 52, 55]:
+    for n in [52]:
+      amy.send(time=100, synth=2, note=n, vel=0.55)
+
+
+class TestPatch32Glitch(AmyTest):
+  """One of the excessive glitch voices reported."""
+
+  def run(self):
+    amy.send(time=0, synth=2, patch=32, num_voices=4)
+    amy.send(time=100, synth=2, note=71, vel=1)
+    amy.send(time=200, synth=2, note=71, vel=0)
+    amy.send(time=300, synth=2, note=71, vel=1)
+    amy.send(time=400, synth=2, note=71, vel=0)
+    amy.send(time=500, synth=2, note=71, vel=1)
+    amy.send(time=600, synth=2, note=71, vel=0)
+    amy.send(time=700, synth=2, note=71, vel=1)
+    amy.send(time=800, synth=2, note=71, vel=0)
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
