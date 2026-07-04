@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Gamma9001 — AMY web drum machine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="machine">
+    <div id="titlebar">
+      <span class="logo">Gamma<span class="logo9000">9001</span></span>
+      <span class="sub">Powered by <a href="https://github.com/shorepine/amy" target="_blank" rel="noopener">AMY</a></span>
+      <button id="power">POWER ON</button>
+      <span id="loadstatus"></span>
+      <button id="reset" title="Clear saved song, patterns and settings">Reset</button>
+    </div>
+
+    <div id="channels"></div>
+
+    <div id="bottom">
+      <div class="panel" id="seqpanel">
+        <div class="paneltitle">step seq</div>
+        <div class="transport">
+          <button id="play" class="tbtn">&#9654;</button>
+          <button id="stop" class="tbtn">&#9632;</button>
+          <div class="lcd" id="poslcd">1.1</div>
+          <div class="lanebtns">
+            <button class="lanebtn current" data-lane="hit">Hit</button>
+            <button class="lanebtn" data-lane="vel">Vel</button>
+            <button class="lanebtn" data-lane="pitch">Pitch</button>
+          </div>
+          <label>Tempo <input type="number" id="bpm" min="40" max="240" value="120"></label>
+          <label>Shuffle <input type="range" id="shuffle" min="0" max="100" value="0"><span id="shuffleval">0%</span></label>
+          <label>Length <input type="number" id="patlen" min="1" max="16" value="16"></label>
+          <label>Volume <input type="range" id="mastervol" min="0" max="30" value="10"></label>
+        </div>
+      </div>
+      <div class="panel" id="patpanel">
+        <div class="paneltitle">pattern <span class="modebtns"><button id="modepat" class="small current">Pattern</button><button id="modesong" class="small">Song</button></span></div>
+        <div id="patterns"></div>
+        <div class="patrow">
+          <button id="copypat" class="small">Copy</button>
+          <button id="clearpat" class="small">Clear</button>
+          <label class="looplabel"><input type="checkbox" id="loop" checked> Loop</label>
+        </div>
+        <div id="songrow">
+          <div id="songlist"></div>
+          <button id="songadd" class="small">+ Add</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bottom2">
+      <div class="panel" id="fxpanel">
+        <div class="paneltitle">effects</div>
+        <div class="fxrow" id="fxknobs"></div>
+      </div>
+      <div class="panel" id="globalpanel">
+        <div class="paneltitle">global</div>
+        <div class="globalrow">
+          <input id="songname" maxlength="64" value="Empty" title="song name — saved and shared with the setup">
+          <select id="songsel"><option value="">examples&hellip;</option></select>
+          <button id="sharebtn" class="small">Share</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="picker" class="hidden">
+    <div id="pickerbox">
+      <div id="pickerhead">Select sound <button id="pickerclose">&times;</button></div>
+      <div id="pickerbanks"></div>
+      <div id="pickerlist"></div>
+    </div>
+  </div>
+
+  <script src="../enable-threads.js"></script>
+  <script src="../amy.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
