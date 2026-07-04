@@ -148,6 +148,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
+    ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
