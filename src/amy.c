@@ -1565,12 +1565,12 @@ void hold_and_modify(uint16_t osc) {
     float filter_logfreq = combine_controls(ctrl_inputs, synth[osc]->filter_logfreq_coefs);
     if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
     if (AMY_IS_SET(msynth[osc]->last_filter_logfreq)) {
-        #define MAX_DELTA_FILTER_LOGFREQ_DOWN 2.0
+        #define MAX_DELTA_FILTER_LOGFREQ_DOWN 3.0
         float last_logfreq = msynth[osc]->last_filter_logfreq;
-        if (filter_logfreq < last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN) {
+        if (filter_logfreq < (last_logfreq - (MAX_DELTA_FILTER_LOGFREQ_DOWN / synth[osc]->resonance))) {
             // Filter cutoff downward slew-rate limit.
             // See https://github.com/shorepine/amy/issues/126
-            filter_logfreq = last_logfreq - MAX_DELTA_FILTER_LOGFREQ_DOWN;
+            filter_logfreq = last_logfreq - (MAX_DELTA_FILTER_LOGFREQ_DOWN / synth[osc]->resonance);
         }
     }
     msynth[osc]->last_filter_logfreq = filter_logfreq;
