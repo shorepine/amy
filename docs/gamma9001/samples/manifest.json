@@ -1,0 +1,1282 @@
+[
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Bass Drum 1",
+  "file": "tr808/tr-808-bass-drum-1.wav",
+  "sr": 44100,
+  "frames": 137664,
+  "seconds": 3.1216,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Bass Drum 2",
+  "file": "tr808/tr-808-bass-drum-2.wav",
+  "sr": 44100,
+  "frames": 54732,
+  "seconds": 1.2411,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Bass Drum 3",
+  "file": "tr808/tr-808-bass-drum-3.wav",
+  "sr": 44100,
+  "frames": 36096,
+  "seconds": 0.8185,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Clap",
+  "file": "tr808/tr-808-clap.wav",
+  "sr": 44100,
+  "frames": 6416,
+  "seconds": 0.1455,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Clave",
+  "file": "tr808/tr-808-clave.wav",
+  "sr": 44100,
+  "frames": 2063,
+  "seconds": 0.0468,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Conga Hi",
+  "file": "tr808/tr-808-conga-hi.wav",
+  "sr": 44100,
+  "frames": 6656,
+  "seconds": 0.1509,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Conga Lo",
+  "file": "tr808/tr-808-conga-lo.wav",
+  "sr": 44100,
+  "frames": 13568,
+  "seconds": 0.3077,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Conga Mid",
+  "file": "tr808/tr-808-conga-mid.wav",
+  "sr": 44100,
+  "frames": 7989,
+  "seconds": 0.1812,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Cowbell",
+  "file": "tr808/tr-808-cowbell.wav",
+  "sr": 44100,
+  "frames": 15232,
+  "seconds": 0.3454,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 HiHat Closed",
+  "file": "tr808/tr-808-hihat-closed.wav",
+  "sr": 44100,
+  "frames": 4420,
+  "seconds": 0.1002,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 HiHat Open",
+  "file": "tr808/tr-808-hihat-open.wav",
+  "sr": 44100,
+  "frames": 23680,
+  "seconds": 0.537,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Shaker",
+  "file": "tr808/tr-808-shaker.wav",
+  "sr": 44100,
+  "frames": 1510,
+  "seconds": 0.0342,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "BassDrum 1",
+  "file": "linn9000/bassdrum-1.wav",
+  "sr": 44100,
+  "frames": 5888,
+  "seconds": 0.1335,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "Bongo 3",
+  "file": "linn9000/bongo-3.wav",
+  "sr": 44100,
+  "frames": 8820,
+  "seconds": 0.2,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "CowBell 1",
+  "file": "linn9000/cowbell-1.wav",
+  "sr": 44100,
+  "frames": 10752,
+  "seconds": 0.2438,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "Cymbal 2",
+  "file": "linn9000/cymbal-2.wav",
+  "sr": 44100,
+  "frames": 54470,
+  "seconds": 1.2351,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "HiHat Closed 3",
+  "file": "linn9000/hihat-closed-3.wav",
+  "sr": 44100,
+  "frames": 3200,
+  "seconds": 0.0726,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "HiHat Open 2",
+  "file": "linn9000/hihat-open-2.wav",
+  "sr": 44100,
+  "frames": 20352,
+  "seconds": 0.4615,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "RimShoot 1",
+  "file": "linn9000/rimshoot-1.wav",
+  "sr": 44100,
+  "frames": 6528,
+  "seconds": 0.148,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "SnareDrum 1",
+  "file": "linn9000/snaredrum-1.wav",
+  "sr": 44100,
+  "frames": 9088,
+  "seconds": 0.2061,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "Taburine 1",
+  "file": "linn9000/taburine-1.wav",
+  "sr": 44100,
+  "frames": 11648,
+  "seconds": 0.2641,
+  "stereo_source": false
+ },
+ {
+  "bank": "linn9000",
+  "bank_name": "Linn 9000",
+  "name": "TomTom 2",
+  "file": "linn9000/tomtom-2.wav",
+  "sr": 44100,
+  "frames": 8448,
+  "seconds": 0.1916,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "African Conga 001",
+  "file": "percussion/african-conga-001.wav",
+  "sr": 44100,
+  "frames": 12256,
+  "seconds": 0.2779,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "African Conga 002",
+  "file": "percussion/african-conga-002.wav",
+  "sr": 44100,
+  "frames": 13661,
+  "seconds": 0.3098,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "African Conga 003",
+  "file": "percussion/african-conga-003.wav",
+  "sr": 44100,
+  "frames": 7925,
+  "seconds": 0.1797,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "African Conga 004",
+  "file": "percussion/african-conga-004.wav",
+  "sr": 44100,
+  "frames": 6934,
+  "seconds": 0.1572,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 001",
+  "file": "percussion/bongo-001.wav",
+  "sr": 44100,
+  "frames": 9000,
+  "seconds": 0.2041,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 002",
+  "file": "percussion/bongo-002.wav",
+  "sr": 44100,
+  "frames": 3928,
+  "seconds": 0.0891,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 003",
+  "file": "percussion/bongo-003.wav",
+  "sr": 44100,
+  "frames": 8043,
+  "seconds": 0.1824,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 004",
+  "file": "percussion/bongo-004.wav",
+  "sr": 44100,
+  "frames": 9560,
+  "seconds": 0.2168,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 005",
+  "file": "percussion/bongo-005.wav",
+  "sr": 44100,
+  "frames": 2482,
+  "seconds": 0.0563,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 006",
+  "file": "percussion/bongo-006.wav",
+  "sr": 44100,
+  "frames": 7548,
+  "seconds": 0.1712,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Bongo 007",
+  "file": "percussion/bongo-007.wav",
+  "sr": 44100,
+  "frames": 7784,
+  "seconds": 0.1765,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 001",
+  "file": "percussion/conga-001.wav",
+  "sr": 44100,
+  "frames": 12610,
+  "seconds": 0.2859,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 002",
+  "file": "percussion/conga-002.wav",
+  "sr": 44100,
+  "frames": 4272,
+  "seconds": 0.0969,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 003",
+  "file": "percussion/conga-003.wav",
+  "sr": 44100,
+  "frames": 4912,
+  "seconds": 0.1114,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 004",
+  "file": "percussion/conga-004.wav",
+  "sr": 44100,
+  "frames": 5984,
+  "seconds": 0.1357,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 005",
+  "file": "percussion/conga-005.wav",
+  "sr": 44100,
+  "frames": 6334,
+  "seconds": 0.1436,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Conga 006",
+  "file": "percussion/conga-006.wav",
+  "sr": 44100,
+  "frames": 5656,
+  "seconds": 0.1283,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Digeridoo",
+  "file": "percussion/digeridoo.wav",
+  "sr": 44100,
+  "frames": 80564,
+  "seconds": 1.8268,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Kanu 001",
+  "file": "percussion/kanu-001.wav",
+  "sr": 44100,
+  "frames": 16970,
+  "seconds": 0.3848,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Noice Kick",
+  "file": "percussion/noice-kick.wav",
+  "sr": 22050,
+  "frames": 6054,
+  "seconds": 0.2746,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Old Snare",
+  "file": "percussion/old-snare.wav",
+  "sr": 22050,
+  "frames": 3952,
+  "seconds": 0.1792,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Simple Shaker",
+  "file": "percussion/simple-shaker.wav",
+  "sr": 44100,
+  "frames": 7496,
+  "seconds": 0.17,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Simple Shaker 002",
+  "file": "percussion/simple-shaker-002.wav",
+  "sr": 44100,
+  "frames": 6728,
+  "seconds": 0.1526,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Sitar",
+  "file": "percussion/sitar.wav",
+  "sr": 44100,
+  "frames": 40023,
+  "seconds": 0.9076,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Strings Tutti 001",
+  "file": "percussion/strings-tutti-001.wav",
+  "sr": 44100,
+  "frames": 10496,
+  "seconds": 0.238,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Strings Tutti 002",
+  "file": "percussion/strings-tutti-002.wav",
+  "sr": 44100,
+  "frames": 18944,
+  "seconds": 0.4296,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Strings sweep",
+  "file": "percussion/strings-sweep.wav",
+  "sr": 44100,
+  "frames": 51477,
+  "seconds": 1.1673,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tabla 001",
+  "file": "percussion/tabla-001.wav",
+  "sr": 44100,
+  "frames": 6297,
+  "seconds": 0.1428,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tabla 002",
+  "file": "percussion/tabla-002.wav",
+  "sr": 44100,
+  "frames": 6874,
+  "seconds": 0.1559,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tabla 003",
+  "file": "percussion/tabla-003.wav",
+  "sr": 44100,
+  "frames": 7843,
+  "seconds": 0.1778,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tamb 001",
+  "file": "percussion/tamb-001.wav",
+  "sr": 44100,
+  "frames": 9673,
+  "seconds": 0.2193,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tamb 003",
+  "file": "percussion/tamb-003.wav",
+  "sr": 44100,
+  "frames": 5832,
+  "seconds": 0.1322,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tamb 004",
+  "file": "percussion/tamb-004.wav",
+  "sr": 22050,
+  "frames": 5645,
+  "seconds": 0.256,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Tamp 002",
+  "file": "percussion/tamp-002.wav",
+  "sr": 44100,
+  "frames": 14516,
+  "seconds": 0.3292,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timbales 001",
+  "file": "percussion/timbales-001.wav",
+  "sr": 22050,
+  "frames": 7248,
+  "seconds": 0.3287,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timbales 002",
+  "file": "percussion/timbales-002.wav",
+  "sr": 22050,
+  "frames": 2334,
+  "seconds": 0.1059,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timbales 003",
+  "file": "percussion/timbales-003.wav",
+  "sr": 22050,
+  "frames": 4572,
+  "seconds": 0.2073,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timbales 004",
+  "file": "percussion/timbales-004.wav",
+  "sr": 22050,
+  "frames": 5901,
+  "seconds": 0.2676,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timpani 001",
+  "file": "percussion/timpani-001.wav",
+  "sr": 22050,
+  "frames": 22716,
+  "seconds": 1.0302,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Timpani 002",
+  "file": "percussion/timpani-002.wav",
+  "sr": 22050,
+  "frames": 45478,
+  "seconds": 2.0625,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Triangle 001",
+  "file": "percussion/triangle-001.wav",
+  "sr": 22050,
+  "frames": 4046,
+  "seconds": 0.1835,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Triangle 002",
+  "file": "percussion/triangle-002.wav",
+  "sr": 22050,
+  "frames": 10728,
+  "seconds": 0.4865,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Untitled",
+  "file": "percussion/untitled.wav",
+  "sr": 44100,
+  "frames": 9673,
+  "seconds": 0.2193,
+  "stereo_source": false
+ },
+ {
+  "bank": "percussion",
+  "bank_name": "Percussion",
+  "name": "Wistle 001",
+  "file": "percussion/wistle-001.wav",
+  "sr": 22050,
+  "frames": 2314,
+  "seconds": 0.1049,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909BD",
+  "file": "tr909/909bd.wav",
+  "sr": 44100,
+  "frames": 37777,
+  "seconds": 0.8566,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909BD-LO",
+  "file": "tr909/909bd-lo.wav",
+  "sr": 44100,
+  "frames": 47191,
+  "seconds": 1.0701,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909CLAP",
+  "file": "tr909/909clap.wav",
+  "sr": 44100,
+  "frames": 42359,
+  "seconds": 0.9605,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909CRASH",
+  "file": "tr909/909crash.wav",
+  "sr": 44100,
+  "frames": 42651,
+  "seconds": 0.9671,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909HH",
+  "file": "tr909/909hh.wav",
+  "sr": 44100,
+  "frames": 5960,
+  "seconds": 0.1351,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909HH-LONG",
+  "file": "tr909/909hh-long.wav",
+  "sr": 44100,
+  "frames": 9742,
+  "seconds": 0.2209,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909HH-SHORT",
+  "file": "tr909/909hh-short.wav",
+  "sr": 44100,
+  "frames": 2682,
+  "seconds": 0.0608,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909OH",
+  "file": "tr909/909oh.wav",
+  "sr": 44100,
+  "frames": 23418,
+  "seconds": 0.531,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909OH-LONG",
+  "file": "tr909/909oh-long.wav",
+  "sr": 44100,
+  "frames": 23432,
+  "seconds": 0.5313,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909OH-SHORT",
+  "file": "tr909/909oh-short.wav",
+  "sr": 44100,
+  "frames": 17509,
+  "seconds": 0.397,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909RIDE",
+  "file": "tr909/909ride.wav",
+  "sr": 44100,
+  "frames": 46729,
+  "seconds": 1.0596,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909RIM",
+  "file": "tr909/909rim.wav",
+  "sr": 44100,
+  "frames": 34581,
+  "seconds": 0.7841,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909SD",
+  "file": "tr909/909sd.wav",
+  "sr": 44100,
+  "frames": 11318,
+  "seconds": 0.2566,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909SD-SHORT",
+  "file": "tr909/909sd-short.wav",
+  "sr": 44100,
+  "frames": 10896,
+  "seconds": 0.2471,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909TOM-HI",
+  "file": "tr909/909tom-hi.wav",
+  "sr": 44100,
+  "frames": 48638,
+  "seconds": 1.1029,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909TOM-LO",
+  "file": "tr909/909tom-lo.wav",
+  "sr": 44100,
+  "frames": 41824,
+  "seconds": 0.9484,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr909",
+  "bank_name": "Roland TR-909",
+  "name": "909TOM-MID",
+  "file": "tr909/909tom-mid.wav",
+  "sr": 44100,
+  "frames": 47662,
+  "seconds": 1.0808,
+  "stereo_source": false
+ },
+ {
+  "bank": "mr12",
+  "bank_name": "Univox Micro Rythmer 12",
+  "name": "MR-12#HHC",
+  "file": "mr12/mr-12-hhc.wav",
+  "sr": 44100,
+  "frames": 1996,
+  "seconds": 0.0453,
+  "stereo_source": false
+ },
+ {
+  "bank": "mr12",
+  "bank_name": "Univox Micro Rythmer 12",
+  "name": "MR-12#HHO",
+  "file": "mr12/mr-12-hho.wav",
+  "sr": 44100,
+  "frames": 18848,
+  "seconds": 0.4274,
+  "stereo_source": false
+ },
+ {
+  "bank": "mr12",
+  "bank_name": "Univox Micro Rythmer 12",
+  "name": "MR-12#KICK",
+  "file": "mr12/mr-12-kick.wav",
+  "sr": 44100,
+  "frames": 15554,
+  "seconds": 0.3527,
+  "stereo_source": false
+ },
+ {
+  "bank": "mr12",
+  "bank_name": "Univox Micro Rythmer 12",
+  "name": "MR-12#SNR",
+  "file": "mr12/mr-12-snr.wav",
+  "sr": 44100,
+  "frames": 8512,
+  "seconds": 0.193,
+  "stereo_source": false
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Metallic 09",
+  "file": "synthetics/metallic-09.wav",
+  "sr": 44100,
+  "frames": 1740,
+  "seconds": 0.0395,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Metallic 16",
+  "file": "synthetics/metallic-16.wav",
+  "sr": 44100,
+  "frames": 417,
+  "seconds": 0.0095,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Static 07",
+  "file": "synthetics/static-07.wav",
+  "sr": 44100,
+  "frames": 3012,
+  "seconds": 0.0683,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Wooden 01",
+  "file": "synthetics/wooden-01.wav",
+  "sr": 44100,
+  "frames": 641,
+  "seconds": 0.0145,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Wooden 02",
+  "file": "synthetics/wooden-02.wav",
+  "sr": 44100,
+  "frames": 590,
+  "seconds": 0.0134,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Wooden 03",
+  "file": "synthetics/wooden-03.wav",
+  "sr": 44100,
+  "frames": 6100,
+  "seconds": 0.1383,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "BD 03",
+  "file": "synthetics/bd-03.wav",
+  "sr": 44100,
+  "frames": 1239,
+  "seconds": 0.0281,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "BD 04",
+  "file": "synthetics/bd-04.wav",
+  "sr": 44100,
+  "frames": 6584,
+  "seconds": 0.1493,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "BD 07",
+  "file": "synthetics/bd-07.wav",
+  "sr": 44100,
+  "frames": 2880,
+  "seconds": 0.0653,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Tokyo Burst bd",
+  "file": "synthetics/tokyo-burst-bd.wav",
+  "sr": 44100,
+  "frames": 22016,
+  "seconds": 0.4992,
+  "stereo_source": false
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Tokyo Deep bd",
+  "file": "synthetics/tokyo-deep-bd.wav",
+  "sr": 44100,
+  "frames": 9083,
+  "seconds": 0.206,
+  "stereo_source": false
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Tokyo Jet bd",
+  "file": "synthetics/tokyo-jet-bd.wav",
+  "sr": 44100,
+  "frames": 18008,
+  "seconds": 0.4083,
+  "stereo_source": false
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Tokyo Space",
+  "file": "synthetics/tokyo-space.wav",
+  "sr": 44100,
+  "frames": 28544,
+  "seconds": 0.6473,
+  "stereo_source": false
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Hizz 06",
+  "file": "synthetics/hizz-06.wav",
+  "sr": 44100,
+  "frames": 15923,
+  "seconds": 0.3611,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Pew 03",
+  "file": "synthetics/pew-03.wav",
+  "sr": 44100,
+  "frames": 7231,
+  "seconds": 0.164,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Boink 02",
+  "file": "synthetics/boink-02.wav",
+  "sr": 44100,
+  "frames": 3417,
+  "seconds": 0.0775,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Boink 04",
+  "file": "synthetics/boink-04.wav",
+  "sr": 44100,
+  "frames": 18944,
+  "seconds": 0.4296,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Blop 01",
+  "file": "synthetics/blop-01.wav",
+  "sr": 44100,
+  "frames": 4096,
+  "seconds": 0.0929,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Blop 02",
+  "file": "synthetics/blop-02.wav",
+  "sr": 44100,
+  "frames": 3108,
+  "seconds": 0.0705,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Click 05",
+  "file": "synthetics/click-05.wav",
+  "sr": 44100,
+  "frames": 1624,
+  "seconds": 0.0368,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Click 06",
+  "file": "synthetics/click-06.wav",
+  "sr": 44100,
+  "frames": 657,
+  "seconds": 0.0149,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Click 07",
+  "file": "synthetics/click-07.wav",
+  "sr": 44100,
+  "frames": 912,
+  "seconds": 0.0207,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Click 08",
+  "file": "synthetics/click-08.wav",
+  "sr": 44100,
+  "frames": 662,
+  "seconds": 0.015,
+  "stereo_source": true
+ },
+ {
+  "bank": "synthetics",
+  "bank_name": "Tokyo Synthetics",
+  "name": "Click 09",
+  "file": "synthetics/click-09.wav",
+  "sr": 44100,
+  "frames": 761,
+  "seconds": 0.0173,
+  "stereo_source": true
+ },
+ {
+  "bank": "acoustic",
+  "bank_name": "Acoustic Percussion",
+  "name": "Tambourine Short",
+  "file": "acoustic/tambourine-short.wav",
+  "sr": 44100,
+  "frames": 6189,
+  "seconds": 0.1403,
+  "stereo_source": false
+ },
+ {
+  "bank": "acoustic",
+  "bank_name": "Acoustic Percussion",
+  "name": "Shaker Short",
+  "file": "acoustic/shaker-short.wav",
+  "sr": 44100,
+  "frames": 5120,
+  "seconds": 0.1161,
+  "stereo_source": false
+ },
+ {
+  "bank": "acoustic",
+  "bank_name": "Acoustic Percussion",
+  "name": "Shaker Tiny",
+  "file": "acoustic/shaker-tiny.wav",
+  "sr": 44100,
+  "frames": 1408,
+  "seconds": 0.0319,
+  "stereo_source": false
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "JCave",
+  "file": "extras/jcave.wav",
+  "sr": 44100,
+  "frames": 109824,
+  "seconds": 2.4903,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Laser",
+  "file": "extras/laser.wav",
+  "sr": 44100,
+  "frames": 73728,
+  "seconds": 1.6718,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Mach3",
+  "file": "extras/mach3.wav",
+  "sr": 44100,
+  "frames": 90112,
+  "seconds": 2.0434,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Silver",
+  "file": "extras/silver.wav",
+  "sr": 44100,
+  "frames": 72192,
+  "seconds": 1.637,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Vibrablib",
+  "file": "extras/vibrablib.wav",
+  "sr": 44100,
+  "frames": 112256,
+  "seconds": 2.5455,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "HeHa",
+  "file": "extras/heha.wav",
+  "sr": 44100,
+  "frames": 60800,
+  "seconds": 1.3787,
+  "stereo_source": false
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "HiHi",
+  "file": "extras/hihi.wav",
+  "sr": 44100,
+  "frames": 86784,
+  "seconds": 1.9679,
+  "stereo_source": false
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Dim Future",
+  "file": "extras/dim-future.wav",
+  "sr": 44100,
+  "frames": 212608,
+  "seconds": 4.821,
+  "stereo_source": false
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Smiling",
+  "file": "extras/smiling.wav",
+  "sr": 44100,
+  "frames": 53120,
+  "seconds": 1.2045,
+  "stereo_source": false
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Ana Strings",
+  "file": "extras/ana-strings.wav",
+  "sr": 44100,
+  "frames": 61056,
+  "seconds": 1.3845,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "BassRec",
+  "file": "extras/bassrec.wav",
+  "sr": 44100,
+  "frames": 25344,
+  "seconds": 0.5747,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Xox",
+  "file": "extras/xox.wav",
+  "sr": 44100,
+  "frames": 32384,
+  "seconds": 0.7343,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Beach",
+  "file": "extras/beach.wav",
+  "sr": 44100,
+  "frames": 229376,
+  "seconds": 5.2013,
+  "stereo_source": true
+ },
+ {
+  "bank": "extras",
+  "bank_name": "Extras",
+  "name": "Narrow",
+  "file": "extras/narrow.wav",
+  "sr": 44100,
+  "frames": 46848,
+  "seconds": 1.0623,
+  "stereo_source": true
+ }
+]
