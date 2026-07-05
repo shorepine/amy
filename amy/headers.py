@@ -932,12 +932,17 @@ def gamma_kit_to_drumkit(kit):
     return out
 
 
-def make_drums_patch(drumkit=None):
+def make_drums_patch(drumkit=None, synth_flags=None):
     if drumkit is None:
         drumkit = DRUMKIT
+    if synth_flags is None:
+        # The Gamma9001 kit patches bake NOTES_VIA_MIDI in so that just loading
+        # the patch is enough (`amy.send(synth=11, patch=386, num_voices=6)`);
+        # the legacy 258 kit keeps its historical flags (callers set their own).
+        synth_flags = amy.SYNTH_FLAGS_NOTES_VIA_MIDI | amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS
     # Set up a bunch of midi_note_cmd mappings for CH10 drums
-    message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
-    message += amy.message(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
+    message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=synth_flags)
+    message += amy.message(synth_flags=synth_flags)
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
         if pcm_preset_number >= 0:
@@ -1002,7 +1007,7 @@ def make_patches(filename):
 
         # do MIDI drums via midi_note_cmd patch (legacy kit over the pcm_tiny ROM
         # set; still the channel-10 default on non-GAMMA9001 builds)
-        num_osc_drums, patch_string  = make_drums_patch()
+        num_osc_drums, patch_string  = make_drums_patch(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
         f.write("\t/* 258: MIDI drums */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_drums)
 
