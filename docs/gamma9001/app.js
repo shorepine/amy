@@ -265,22 +265,26 @@ async function loadPreset(presetIdx) {
   sendSampleToAmy(presetIdx, buf);
 }
 
+function setLoadStatus(text) {
+  document.getElementById("loadstatus").textContent = text;
+  document.getElementById("startlabel").textContent = text;
+}
+
 async function loadAllSamples() {
-  const status = document.getElementById("loadstatus");
   // Kit samples first so the machine is playable immediately.
   for (const ch of state.channels) await loadPreset(ch.sample);
-  status.textContent = "kit ready";
+  setLoadStatus("kit ready");
   let n = 0;
   for (let i = 0; i < manifest.length; i++) {
     if (!loadedPresets.has(i)) {
       await loadPreset(i);
       if (++n % 8 === 0) {
-        status.textContent = `loading samples ${loadedPresets.size}/${manifest.length}`;
+        setLoadStatus(`loading samples ${loadedPresets.size}/${manifest.length}`);
         await new Promise(r => setTimeout(r, 0));
       }
     }
   }
-  status.textContent = `${manifest.length} samples loaded`;
+  setLoadStatus(`${manifest.length} samples loaded`);
 }
 
 // ---------------------------------------------------------------- triggering
@@ -738,7 +742,6 @@ function rebuildUI() {
   document.getElementById("bpm").value = state.bpm;
   document.getElementById("shuffle").value = state.shuffle;
   document.getElementById("shuffleval").textContent = `${state.shuffle}%`;
-  document.getElementById("mastervol").value = Math.round(state.masterVol * 10);
   document.getElementById("loop").checked = state.loop;
   document.getElementById("songname").value = state.name;
   document.getElementById("poslcd").textContent = `${state.pattern + 1}.1`;
@@ -757,26 +760,41 @@ function setLane(lane) {
 function buildFx() {
   const fx = document.getElementById("fxknobs");
   fx.innerHTML = "";
+  // gap: true inserts a group separator before that knob
   const defs = [
     { label: "Reverb", min: 0, max: 1, step: 0.01, reset: 0, key: "reverb", fmt: v => v.toFixed(2) },
     { label: "Liveness", min: 0, max: 1, step: 0.01, reset: 0.85, key: "liveness", fmt: v => v.toFixed(2) },
-    { label: "Chorus", min: 0, max: 1, step: 0.01, reset: 0, key: "chorus", fmt: v => v.toFixed(2) },
-    { label: "Echo", min: 0, max: 1, step: 0.01, reset: 0, key: "echo", fmt: v => v.toFixed(2) },
+    { label: "Chorus", min: 0, max: 1, step: 0.01, reset: 0, key: "chorus", fmt: v => v.toFixed(2), gap: true },
+    { label: "Echo", min: 0, max: 1, step: 0.01, reset: 0, key: "echo", fmt: v => v.toFixed(2), gap: true },
     { label: "Time", min: 20, max: 743, step: 1, reset: 250, key: "echoDelay", fmt: v => `${v}ms` },
     { label: "Feedbk", min: 0, max: 0.95, step: 0.01, reset: 0.3, key: "echoFb", fmt: v => v.toFixed(2) },
     // EQ shelves at AMY's low/mid/high centers, in dB
-    { label: "EQ Lo", min: -15, max: 15, step: 0.5, reset: 0, key: "eqL", fmt: v => `${v > 0 ? "+" : ""}${v}dB` },
+    { label: "EQ Lo", min: -15, max: 15, step: 0.5, reset: 0, key: "eqL", fmt: v => `${v > 0 ? "+" : ""}${v}dB`, gap: true },
     { label: "EQ Mid", min: -15, max: 15, step: 0.5, reset: 0, key: "eqM", fmt: v => `${v > 0 ? "+" : ""}${v}dB` },
     { label: "EQ Hi", min: -15, max: 15, step: 0.5, reset: 0, key: "eqH", fmt: v => `${v > 0 ? "+" : ""}${v}dB` },
+    // master volume lives on state, not state.fx
+    { label: "Volume", min: 0, max: 10, step: 0.1, reset: 1, key: "masterVol", master: true, fmt: v => v.toFixed(1), gap: true },
   ];
   for (const def of defs) {
-    const knob = makeKnob(def,
-      () => state.fx[def.key],
-      v => {
-        state.fx[def.key] = v;
-        if (def.key === "echoDelay") setEchoSync(null);  // manual move unsyncs
-        applyFx();
-      });
+    if (def.gap) {
+      const gap = document.createElement("div");
+      gap.className = "fxgap";
+      fx.appendChild(gap);
+    }
+    const knob = def.master
+      ? makeKnob(def,
+          () => state.masterVol,
+          v => {
+            state.masterVol = v;
+            if (audioOn) amy_send({ volume: v });
+          })
+      : makeKnob(def,
+          () => state.fx[def.key],
+          v => {
+            state.fx[def.key] = v;
+            if (def.key === "echoDelay") setEchoSync(null);  // manual move unsyncs
+            applyFx();
+          });
     fx.appendChild(knob);
     if (def.key === "echoDelay") {
       echoTimeKnob = knob;
@@ -914,14 +932,26 @@ async function boot() {
   if (sharedIn) saveState();   // a loaded share link becomes the local state
 
   const shareBtn = document.getElementById("sharebtn");
-  shareBtn.addEventListener("click", async () => {
-    const url = await makeShareUrl();
-    try {
-      await navigator.clipboard.writeText(url);
+  shareBtn.addEventListener("click", () => {
+    // Safari revokes the user gesture as soon as the handler awaits, which
+    // makes a post-await writeText() throw NotAllowedError. The sanctioned
+    // workaround: synchronously hand the clipboard a ClipboardItem whose
+    // content is a *promise* — the write is authorized now, resolved later.
+    const urlPromise = makeShareUrl();
+    const copied = () => {
       shareBtn.textContent = "Copied!";
       setTimeout(() => { shareBtn.textContent = "Share"; }, 2000);
-    } catch (e) {
-      window.prompt("Copy this link:", url);   // clipboard blocked — manual fallback
+    };
+    const manual = async () => { window.prompt("Copy this link:", await urlPromise); };
+    if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      const item = new ClipboardItem({
+        "text/plain": urlPromise.then(u => new Blob([u], { type: "text/plain" })),
+      });
+      navigator.clipboard.write([item]).then(copied).catch(() =>
+        // e.g. Firefox: no promise-in-ClipboardItem — try the direct path
+        urlPromise.then(u => navigator.clipboard.writeText(u)).then(copied).catch(manual));
+    } else {
+      urlPromise.then(u => navigator.clipboard.writeText(u)).then(copied).catch(manual);
     }
   });
 
@@ -954,17 +984,20 @@ async function boot() {
     window.location.reload();
   });
 
-  document.getElementById("power").addEventListener("click", async function () {
+  // Startup modal: one click starts audio (browsers require a gesture) and
+  // loads the samples, then the machine is fully live.
+  const startModal = document.getElementById("startmodal");
+  startModal.addEventListener("click", async () => {
     if (audioOn) return;
-    this.textContent = "STARTING…";
+    startModal.classList.add("loading");
+    setLoadStatus("starting audio…");
     await amy_js_start();
     audioOn = true;
-    this.textContent = "AUDIO ON";
-    this.classList.add("on");
     amy_send({ volume: state.masterVol });
     applyAllChannelFilters();
     applyFx();
     await loadAllSamples();
+    startModal.classList.add("hidden");
   });
 
   document.getElementById("play").addEventListener("click", () => {
@@ -984,10 +1017,6 @@ async function boot() {
     const v = Math.max(1, Math.min(16, +e.target.value || 16));
     state.patterns[state.pattern].length = v;
     drawSteps();
-  });
-  document.getElementById("mastervol").addEventListener("input", e => {
-    state.masterVol = +e.target.value / 10;
-    if (audioOn) amy_send({ volume: state.masterVol });
   });
   document.getElementById("loop").addEventListener("change", e => { state.loop = e.target.checked; });
   document.querySelectorAll(".lanebtn").forEach(b => {
