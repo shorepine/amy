@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8080", "-d", "docs"],
       "port": 8080
+    },
+    {
+      "name": "gamma9001",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["docs/gamma9001/serve.py"],
+      "port": 8909
     }
   ]
 }

@@ -12,6 +12,7 @@ try:
     live = _amy.live
     _get_synth_commands = _amy.get_synth_commands
     _set_cv_from_osc = _amy.set_cv_from_osc
+    _ticks_ms = _amy.ticks_ms
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
@@ -19,6 +20,7 @@ except (ImportError, AttributeError):
     try:
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
+        _ticks_ms = tulip.amy_ticks_ms
     except (ImportError, AttributeError):
         pass  # Not available (e.g. web build); _get_synth_commands returns []
 
@@ -154,6 +156,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'), ('voices', 'rL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
+    ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source_channel', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
@@ -329,6 +332,9 @@ def inject_midi_bytes(data, usb=0):
     # byte-stream parser, exercising running status and real-time interleaving --
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
+
+def ticks_ms():
+    return _ticks_ms()
 
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)

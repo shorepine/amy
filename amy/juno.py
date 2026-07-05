@@ -150,6 +150,43 @@ def get_juno_patch(patch_number):
   return name, bytes(sysex)
 
 
+# Users complained that some of the Juno patches are just way loud.
+# Trim their overall levels in the patch definitions here.
+_PATCH_GAIN_MODS = {
+    8: 0.2,
+    9: 0.2,
+    12: 0.04,
+    16: 0.04,
+    25: 0.2,
+    28: 0.2,
+    29: 0.2,
+    32: 0.2,
+    37: 0.2,
+    38: 0.04,
+    46: 0.2,
+    48: 0.2,
+    49: 0.2,
+    51: 0.2,
+    53: 0.04,
+    55: 0.2,
+    56: 0.04,
+    60: 0.04,
+    63: 0.2,
+    67: 0.2,
+    68: 0.2,
+    83: 0.2,
+    88: 0.04,
+    91: 0.04,
+    95: 0.04,
+    97: 0.2,
+    101: 0.04,
+    102: 0.04,
+    111: 0.2,
+    113: 0.04,
+    126: 0.04,
+    127: 0.04,
+}
+
 class JunoPatch:
   """Encapsulates information in a Juno Patch."""
   name = ""
@@ -212,8 +249,9 @@ class JunoPatch:
 
   @staticmethod
   def from_patch_number(patch_number):
-    name, sysexbytes = get_juno_patch(patch_number)
-    return JunoPatch.from_sysex(sysexbytes, name, patch_number)
+    patch = JunoPatch()
+    patch.init_from_patch_number(patch_number)
+    return patch
 
   @classmethod
   def from_sysex(cls, sysexbytes, name=None, patch_number=None):
@@ -229,6 +267,9 @@ class JunoPatch:
     self.patch_number = patch_number
     self.name, sysexbytes = get_juno_patch(patch_number)
     self._init_from_sysex(sysexbytes)
+    # Apply manual fixes for patches that users reported were too loud.
+    if patch_number in _PATCH_GAIN_MODS:
+      self.vca_level *= _PATCH_GAIN_MODS[patch_number]
 
   def _init_from_sysex(self, sysexbytes):
     # The first 16 bytes are sliders.
