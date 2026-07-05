@@ -753,6 +753,13 @@ GAMMA_DRUMKIT = [
 # which uses only ROM presets so the default kit works without drums.bin.
 #
 # Machine kits share one GM latin/aux percussion section, GS-style.
+def _kit(core):
+    # dict(base) + update instead of {**a, **b}: this file is frozen into the
+    # Tulip firmware and mpy-cross does not parse dict-display unpacking.
+    kit = dict(GAMMA_SHARED_PERC)
+    kit.update(core)
+    return kit
+
 GAMMA_SHARED_PERC = {
     54: ('acoustic/tambourine-short.wav', 60),
     60: ('percussion/bongo-003.wav', 62),
@@ -775,7 +782,7 @@ GAMMA_SHARED_PERC = {
     81: ('percussion/triangle-002.wav', 60),
 }
 
-GAMMA_KIT_909 = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_909 = _kit({
     35: ('tr909/909bd-lo.wav', 60), 36: ('tr909/909bd.wav', 60),
     37: ('tr909/909rim.wav', 60), 38: ('tr909/909sd.wav', 60),
     39: ('tr909/909clap.wav', 60), 40: ('tr909/909sd-short.wav', 60),
@@ -788,9 +795,9 @@ GAMMA_KIT_909 = {**GAMMA_SHARED_PERC, **{
     53: ('tr909/909ride.wav', 66), 55: ('tr909/909crash.wav', 64),
     56: ('linn9000/cowbell-1.wav', 60), 57: ('tr909/909crash.wav', 57),
     59: ('tr909/909ride.wav', 57),
-}}
+})
 
-GAMMA_KIT_LINN = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_LINN = _kit({
     35: ('linn9000/bassdrum-1.wav', 57), 36: ('linn9000/bassdrum-1.wav', 60),
     37: ('linn9000/rimshoot-1.wav', 60), 38: ('linn9000/snaredrum-1.wav', 60),
     39: ('tr808/tr-808-clap.wav', 60), 40: ('linn9000/snaredrum-1.wav', 57),
@@ -804,9 +811,9 @@ GAMMA_KIT_LINN = {**GAMMA_SHARED_PERC, **{
     55: ('linn9000/cymbal-2.wav', 63), 56: ('linn9000/cowbell-1.wav', 60),
     57: ('linn9000/cymbal-2.wav', 57), 59: ('linn9000/cymbal-2.wav', 69),
     60: ('linn9000/bongo-3.wav', 63), 61: ('linn9000/bongo-3.wav', 57),
-}}
+})
 
-GAMMA_KIT_MR12 = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_MR12 = _kit({
     35: ('mr12/mr-12-kick.wav', 57), 36: ('mr12/mr-12-kick.wav', 60),
     37: ('mr12/mr-12-snr.wav', 66), 38: ('mr12/mr-12-snr.wav', 60),
     39: ('mr12/mr-12-snr.wav', 63), 40: ('mr12/mr-12-snr.wav', 57),
@@ -819,9 +826,9 @@ GAMMA_KIT_MR12 = {**GAMMA_SHARED_PERC, **{
     53: ('mr12/mr-12-hhc.wav', 52), 55: ('mr12/mr-12-hho.wav', 60),
     56: ('linn9000/cowbell-1.wav', 60), 57: ('mr12/mr-12-hho.wav', 52),
     59: ('mr12/mr-12-hho.wav', 67),
-}}
+})
 
-GAMMA_KIT_SYNTHETICS = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_SYNTHETICS = _kit({
     35: ('synthetics/tokyo-deep-bd.wav', 60), 36: ('synthetics/tokyo-jet-bd.wav', 60),
     37: ('synthetics/click-07.wav', 60), 38: ('synthetics/static-07.wav', 60),
     39: ('synthetics/wooden-03.wav', 60), 40: ('synthetics/hizz-06.wav', 60),
@@ -834,9 +841,9 @@ GAMMA_KIT_SYNTHETICS = {**GAMMA_SHARED_PERC, **{
     53: ('synthetics/metallic-16.wav', 66), 55: ('synthetics/metallic-09.wav', 63),
     56: ('synthetics/wooden-01.wav', 60), 57: ('synthetics/metallic-09.wav', 60),
     59: ('synthetics/metallic-16.wav', 55),
-}}
+})
 
-GAMMA_KIT_POWER = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_POWER = _kit({
     # Power Kit roots are their GM notes, so base == root plays untransposed
     35: ('power/power-kick-real.wav', 35), 36: ('power/power-kick-metal.wav', 36),
     37: ('power/power-sidestick.wav', 37), 38: ('power/power-snare.wav', 38),
@@ -850,9 +857,9 @@ GAMMA_KIT_POWER = {**GAMMA_SHARED_PERC, **{
     53: ('power/power-ride-cup.wav', 53), 55: ('power/power-splash.wav', 55),
     56: ('power/power-cowbell.wav', 56), 57: ('power/power-crash.wav', 46),
     59: ('power/power-ride.wav', 48),
-}}
+})
 
-GAMMA_KIT_PERCUSSION = {**GAMMA_SHARED_PERC, **{
+GAMMA_KIT_PERCUSSION = _kit({
     35: ('percussion/noice-kick.wav', 60), 36: ('percussion/noice-kick.wav', 63),
     37: ('percussion/tabla-002.wav', 60), 38: ('percussion/old-snare.wav', 60),
     39: ('percussion/tamp-002.wav', 60), 40: ('percussion/old-snare.wav', 57),
@@ -865,7 +872,7 @@ GAMMA_KIT_PERCUSSION = {**GAMMA_SHARED_PERC, **{
     53: ('percussion/triangle-001.wav', 64), 55: ('percussion/triangle-002.wav', 64),
     56: ('linn9000/cowbell-1.wav', 60), 57: ('percussion/triangle-002.wav', 50),
     59: ('percussion/triangle-001.wav', 57),
-}}
+})
 
 # (kit name, GM map) in program-change order within bank MSB 3. Kit 0 is the
 # tuple-based GAMMA_DRUMKIT (ROM presets only) and is handled specially.
