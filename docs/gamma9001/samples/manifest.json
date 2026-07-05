@@ -1278,5 +1278,75 @@
   "frames": 46848,
   "seconds": 1.0623,
   "stereo_source": true
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Snare 1",
+  "file": "tr808/tr-808-snare-1.wav",
+  "sr": 31250,
+  "frames": 3921,
+  "seconds": 0.1255,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Snare 2",
+  "file": "tr808/tr-808-snare-2.wav",
+  "sr": 31250,
+  "frames": 1858,
+  "seconds": 0.0595,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Snare 3",
+  "file": "tr808/tr-808-snare-3.wav",
+  "sr": 31250,
+  "frames": 4071,
+  "seconds": 0.1303,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Rimshot",
+  "file": "tr808/tr-808-rimshot.wav",
+  "sr": 31250,
+  "frames": 413,
+  "seconds": 0.0132,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Tom Lo",
+  "file": "tr808/tr-808-tom-lo.wav",
+  "sr": 31250,
+  "frames": 12749,
+  "seconds": 0.408,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Tom Hi",
+  "file": "tr808/tr-808-tom-hi.wav",
+  "sr": 31250,
+  "frames": 6671,
+  "seconds": 0.2135,
+  "stereo_source": false
+ },
+ {
+  "bank": "tr808",
+  "bank_name": "Roland TR-808",
+  "name": "TR-808 Cymbal",
+  "file": "tr808/tr-808-cymbal.wav",
+  "sr": 31250,
+  "frames": 17567,
+  "seconds": 0.5621,
+  "stereo_source": false
  }
 ]
