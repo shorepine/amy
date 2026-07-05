@@ -1348,5 +1348,205 @@
   "frames": 17567,
   "seconds": 0.5621,
   "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Real Kick",
+  "file": "power/power-kick-real.wav",
+  "sr": 44100,
+  "frames": 29254,
+  "seconds": 0.6634,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Metal Kick",
+  "file": "power/power-kick-metal.wav",
+  "sr": 44100,
+  "frames": 30686,
+  "seconds": 0.6958,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Side Stick",
+  "file": "power/power-sidestick.wav",
+  "sr": 44100,
+  "frames": 39551,
+  "seconds": 0.8968,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Power Snare",
+  "file": "power/power-snare.wav",
+  "sr": 44100,
+  "frames": 47560,
+  "seconds": 1.0785,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Hand Claps",
+  "file": "power/power-clap.wav",
+  "sr": 44100,
+  "frames": 43042,
+  "seconds": 0.976,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Gated Snare",
+  "file": "power/power-snare-gated.wav",
+  "sr": 44100,
+  "frames": 48439,
+  "seconds": 1.0984,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 1",
+  "file": "power/power-tom-1.wav",
+  "sr": 44100,
+  "frames": 43592,
+  "seconds": 0.9885,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Tight HiHat",
+  "file": "power/power-hh-tight.wav",
+  "sr": 44100,
+  "frames": 44031,
+  "seconds": 0.9984,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 2",
+  "file": "power/power-tom-2.wav",
+  "sr": 44100,
+  "frames": 40836,
+  "seconds": 0.926,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Pedal HiHat",
+  "file": "power/power-hh-pedal.wav",
+  "sr": 44100,
+  "frames": 44543,
+  "seconds": 1.01,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 3",
+  "file": "power/power-tom-3.wav",
+  "sr": 44100,
+  "frames": 43306,
+  "seconds": 0.982,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Open HiHat",
+  "file": "power/power-hh-open.wav",
+  "sr": 44100,
+  "frames": 48895,
+  "seconds": 1.1087,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 4",
+  "file": "power/power-tom-4.wav",
+  "sr": 44100,
+  "frames": 45451,
+  "seconds": 1.0306,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 5",
+  "file": "power/power-tom-5.wav",
+  "sr": 44100,
+  "frames": 66047,
+  "seconds": 1.4977,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Crash Cymbal",
+  "file": "power/power-crash.wav",
+  "sr": 44100,
+  "frames": 126146,
+  "seconds": 2.8605,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Process Tom 6",
+  "file": "power/power-tom-6.wav",
+  "sr": 44100,
+  "frames": 51711,
+  "seconds": 1.1726,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Ride Edge",
+  "file": "power/power-ride.wav",
+  "sr": 44100,
+  "frames": 48758,
+  "seconds": 1.1056,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Ride Cup",
+  "file": "power/power-ride-cup.wav",
+  "sr": 44100,
+  "frames": 37260,
+  "seconds": 0.8449,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Splash Cymbal",
+  "file": "power/power-splash.wav",
+  "sr": 44100,
+  "frames": 42080,
+  "seconds": 0.9542,
+  "stereo_source": false
+ },
+ {
+  "bank": "power",
+  "bank_name": "80s Power Kit",
+  "name": "Cowbell",
+  "file": "power/power-cowbell.wav",
+  "sr": 44100,
+  "frames": 34483,
+  "seconds": 0.7819,
+  "stereo_source": false
  }
 ]
