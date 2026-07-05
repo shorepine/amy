@@ -460,7 +460,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
 }
 
 // Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
-uint16_t amy_parse_transfer_layer_message(char *message) {
+uint16_t amy_parse_transfer_layer_message(char *message, amy_event *e) {
 
     if (message[0] >= '0' && message[0] <= '9') {
         // z: Signal to start loading sample. 
@@ -513,17 +513,21 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         return len;
     }
     else if (cmd == 'S') {
-        // zS: sample from BUS[1] to a memorypcm patch. 
+        // zS: sample from BUS[1] to a memorypcm patch.
         // Params: Preset number,  bus, max length in frames,midinote,loopstart,loopend
         uint32_t sm[6]; // preset, bus, max frames, midinote, loop_start, loopend
         parse_list_uint32_t(message, sm, 6, 0);
-        int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, sm[3], sm[4], sm[5]);
-        start_receiving_sample(sm[2], sm[1], ram);
+        // Allocate (zeroed) preset RAM now, but arm the capture via a delta so
+        // that a scheduled time= on this message is honored -- capturing
+        // starts at event time, not at parse time.
+        pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, AMY_NCHANS, sm[3], sm[4], sm[5]);
+        e->start_sample_preset = sm[0];
+        e->start_sample_bus = sm[1];
         return 1;
     }
     else if (cmd == 'O') {
-        //zO: stop sampling from any bus
-        stop_receiving_sample();
+        //zO: stop sampling from any bus, at event time
+        e->stop_sample = 1;
         return 1;
     }
     else if (cmd == 'D') {
@@ -794,7 +798,7 @@ int amy_parse_message(char * message, int length, amy_event *e) {
             case 'y': e->bus = atoi(arg); break;
             /* Y still available */
             case 'z': {
-                pos += amy_parse_transfer_layer_message(arg);
+                pos += amy_parse_transfer_layer_message(arg, e);
                 break;
             }
             /* Z used for end of message */

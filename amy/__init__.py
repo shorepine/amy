@@ -371,12 +371,18 @@ except ImportError:
     def b64(b):
         return ubinascii.b2a_base64(b)[:-1]
 
-def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60, loopstart=0, loopend=0):
+def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60, loopstart=0, loopend=0, time=None):
     s = "%d,%d,%d,%d,%d,%d" % (preset, source, max_frames, midinote, loopstart, loopend)
-    send(start_sample=s)
+    if time is None:
+        send(start_sample=s)
+    else:
+        send(start_sample=s, time=time)
 
-def stop_sample():
-    send(stop_sample=1)
+def stop_sample(time=None):
+    if time is None:
+        send(stop_sample=1)
+    else:
+        send(stop_sample=1, time=time)
 
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
