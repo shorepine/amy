@@ -28,14 +28,7 @@ body {
 .sub { color: #cabfe4; font-style: italic; }
 .sub a { color: #ffb14d; text-decoration: none; }
 .sub a:hover { text-decoration: underline; }
-#power {
-  margin-left: auto;
-  background: linear-gradient(#ff9d3f, #d96f10); color: #2b1a00;
-  border: 1px solid #8a4d00; border-radius: 5px;
-  font-weight: bold; padding: 6px 14px; cursor: pointer;
-}
-#power.on { background: linear-gradient(#8dff70, #3cb814); border-color: #1f6f00; color: #0c2b00; }
-#loadstatus { color: #ffce8a; font-size: 11px; min-width: 130px; }
+#loadstatus { margin-left: auto; color: #ffce8a; font-size: 11px; }
 #reset {
   background: none; color: #7a6ba3; border: 1px solid #4a3b6d;
   border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 10px;
@@ -265,3 +258,40 @@ body.lane-pitch .step::before {
 .samplebtn:hover { color: #ffb14d; }
 .samplebtn.current { color: #ff8c1a; border-color: #ff8c1a; }
 .samplebtn .dur { color: #7a6ba3; float: right; font-size: 10px; }
+
+/* ------- start & too-small overlays ------- */
+#startmodal {
+  position: fixed; inset: 0; z-index: 50; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #2c2050e6, #17102bf2);
+  backdrop-filter: blur(3px);
+}
+#startbox { text-align: center; pointer-events: none; }
+.biglogo { font-size: 56px; }
+#startlabel {
+  margin-top: 18px; font-size: 18px; color: #ffce8a;
+  border: 1px solid #ffce8a66; border-radius: 8px; display: inline-block;
+  padding: 12px 28px; background: #ffffff10;
+  animation: startpulse 1.6s ease-in-out infinite;
+}
+#startmodal.loading #startlabel { animation: none; }
+@keyframes startpulse { 50% { background: #ffffff2a; } }
+#startmodal.hidden { display: none; }
+
+#toosmall {
+  display: none; position: fixed; inset: 0; z-index: 60;
+  align-items: center; justify-content: center; text-align: center;
+  background: linear-gradient(160deg, #4f3f78, #17102b);
+  padding: 24px;
+}
+#toosmall p { color: #cabfe4; font-size: 14px; line-height: 1.6; }
+@media (max-width: 699px) {
+  #toosmall { display: flex; }
+}
+
+/* effects knob group separators */
+.fxgap {
+  width: 1px; align-self: stretch; margin: 2px 7px;
+  background: #2c2050; box-shadow: 1px 0 0 #ffffff22;
+  flex: none;
+}
