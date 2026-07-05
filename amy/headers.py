@@ -744,6 +744,164 @@ GAMMA_DRUMKIT = [
 ]
 
 
+# ---- Gamma9001 drum kits: patches 384+ (MIDI program change bank MSB 3) ----
+#
+# Each kit is a GM 35-81 map like DRUMKIT, but defined by sample *file* so it
+# survives preset renumbering; files resolve to preset numbers through
+# sounds/gamma9001/manifest.json (tr808 -> baked ROM index, others ->
+# GAMMA9001_PRESET_BASE + drums.bin index). Kit 0 (TR-808) is GAMMA_DRUMKIT,
+# which uses only ROM presets so the default kit works without drums.bin.
+#
+# Machine kits share one GM latin/aux percussion section, GS-style.
+GAMMA_SHARED_PERC = {
+    54: ('acoustic/tambourine-short.wav', 60),
+    60: ('percussion/bongo-003.wav', 62),
+    61: ('percussion/bongo-003.wav', 57),
+    62: ('percussion/african-conga-003.wav', 60),
+    63: ('percussion/conga-001.wav', 63),
+    64: ('percussion/conga-001.wav', 57),
+    65: ('percussion/timbales-001.wav', 60),
+    66: ('percussion/timbales-004.wav', 57),
+    67: ('linn9000/cowbell-1.wav', 64),
+    68: ('linn9000/cowbell-1.wav', 57),
+    69: ('percussion/simple-shaker.wav', 60),
+    70: ('percussion/simple-shaker-002.wav', 60),
+    71: ('percussion/wistle-001.wav', 60),
+    72: ('percussion/wistle-001.wav', 55),
+    75: ('tr808/tr-808-clave.wav', 60),
+    76: ('tr808/tr-808-clave.wav', 64),
+    77: ('tr808/tr-808-clave.wav', 57),
+    80: ('percussion/triangle-001.wav', 60),
+    81: ('percussion/triangle-002.wav', 60),
+}
+
+GAMMA_KIT_909 = {**GAMMA_SHARED_PERC, **{
+    35: ('tr909/909bd-lo.wav', 60), 36: ('tr909/909bd.wav', 60),
+    37: ('tr909/909rim.wav', 60), 38: ('tr909/909sd.wav', 60),
+    39: ('tr909/909clap.wav', 60), 40: ('tr909/909sd-short.wav', 60),
+    41: ('tr909/909tom-lo.wav', 57), 42: ('tr909/909hh.wav', 60),
+    43: ('tr909/909tom-lo.wav', 60), 44: ('tr909/909hh-short.wav', 60),
+    45: ('tr909/909tom-mid.wav', 57), 46: ('tr909/909oh.wav', 60),
+    47: ('tr909/909tom-mid.wav', 60), 48: ('tr909/909tom-hi.wav', 60),
+    49: ('tr909/909crash.wav', 60), 50: ('tr909/909tom-hi.wav', 63),
+    51: ('tr909/909ride.wav', 60), 52: ('tr909/909crash.wav', 54),
+    53: ('tr909/909ride.wav', 66), 55: ('tr909/909crash.wav', 64),
+    56: ('linn9000/cowbell-1.wav', 60), 57: ('tr909/909crash.wav', 57),
+    59: ('tr909/909ride.wav', 57),
+}}
+
+GAMMA_KIT_LINN = {**GAMMA_SHARED_PERC, **{
+    35: ('linn9000/bassdrum-1.wav', 57), 36: ('linn9000/bassdrum-1.wav', 60),
+    37: ('linn9000/rimshoot-1.wav', 60), 38: ('linn9000/snaredrum-1.wav', 60),
+    39: ('tr808/tr-808-clap.wav', 60), 40: ('linn9000/snaredrum-1.wav', 57),
+    41: ('linn9000/tomtom-2.wav', 55), 42: ('linn9000/hihat-closed-3.wav', 60),
+    43: ('linn9000/tomtom-2.wav', 58), 44: ('linn9000/hihat-closed-3.wav', 57),
+    45: ('linn9000/tomtom-2.wav', 60), 46: ('linn9000/hihat-open-2.wav', 60),
+    47: ('linn9000/tomtom-2.wav', 62), 48: ('linn9000/tomtom-2.wav', 64),
+    49: ('linn9000/cymbal-2.wav', 60), 50: ('linn9000/tomtom-2.wav', 67),
+    51: ('linn9000/cymbal-2.wav', 66), 52: ('linn9000/cymbal-2.wav', 54),
+    53: ('linn9000/cowbell-1.wav', 67), 54: ('linn9000/taburine-1.wav', 60),
+    55: ('linn9000/cymbal-2.wav', 63), 56: ('linn9000/cowbell-1.wav', 60),
+    57: ('linn9000/cymbal-2.wav', 57), 59: ('linn9000/cymbal-2.wav', 69),
+    60: ('linn9000/bongo-3.wav', 63), 61: ('linn9000/bongo-3.wav', 57),
+}}
+
+GAMMA_KIT_MR12 = {**GAMMA_SHARED_PERC, **{
+    35: ('mr12/mr-12-kick.wav', 57), 36: ('mr12/mr-12-kick.wav', 60),
+    37: ('mr12/mr-12-snr.wav', 66), 38: ('mr12/mr-12-snr.wav', 60),
+    39: ('mr12/mr-12-snr.wav', 63), 40: ('mr12/mr-12-snr.wav', 57),
+    41: ('mr12/mr-12-kick.wav', 63), 42: ('mr12/mr-12-hhc.wav', 60),
+    43: ('mr12/mr-12-kick.wav', 66), 44: ('mr12/mr-12-hhc.wav', 57),
+    45: ('mr12/mr-12-kick.wav', 69), 46: ('mr12/mr-12-hho.wav', 60),
+    47: ('mr12/mr-12-kick.wav', 72), 48: ('mr12/mr-12-kick.wav', 75),
+    49: ('mr12/mr-12-hho.wav', 55), 50: ('mr12/mr-12-kick.wav', 78),
+    51: ('mr12/mr-12-hho.wav', 64), 52: ('mr12/mr-12-hho.wav', 50),
+    53: ('mr12/mr-12-hhc.wav', 52), 55: ('mr12/mr-12-hho.wav', 60),
+    56: ('linn9000/cowbell-1.wav', 60), 57: ('mr12/mr-12-hho.wav', 52),
+    59: ('mr12/mr-12-hho.wav', 67),
+}}
+
+GAMMA_KIT_SYNTHETICS = {**GAMMA_SHARED_PERC, **{
+    35: ('synthetics/tokyo-deep-bd.wav', 60), 36: ('synthetics/tokyo-jet-bd.wav', 60),
+    37: ('synthetics/click-07.wav', 60), 38: ('synthetics/static-07.wav', 60),
+    39: ('synthetics/wooden-03.wav', 60), 40: ('synthetics/hizz-06.wav', 60),
+    41: ('synthetics/blop-02.wav', 55), 42: ('synthetics/click-05.wav', 60),
+    43: ('synthetics/blop-02.wav', 58), 44: ('synthetics/click-06.wav', 60),
+    45: ('synthetics/blop-02.wav', 61), 46: ('synthetics/pew-03.wav', 60),
+    47: ('synthetics/boink-04.wav', 58), 48: ('synthetics/boink-04.wav', 62),
+    49: ('synthetics/metallic-09.wav', 57), 50: ('synthetics/boink-04.wav', 66),
+    51: ('synthetics/metallic-16.wav', 60), 52: ('synthetics/metallic-09.wav', 52),
+    53: ('synthetics/metallic-16.wav', 66), 55: ('synthetics/metallic-09.wav', 63),
+    56: ('synthetics/wooden-01.wav', 60), 57: ('synthetics/metallic-09.wav', 60),
+    59: ('synthetics/metallic-16.wav', 55),
+}}
+
+GAMMA_KIT_POWER = {**GAMMA_SHARED_PERC, **{
+    # Power Kit roots are their GM notes, so base == root plays untransposed
+    35: ('power/power-kick-real.wav', 35), 36: ('power/power-kick-metal.wav', 36),
+    37: ('power/power-sidestick.wav', 37), 38: ('power/power-snare.wav', 38),
+    39: ('power/power-clap.wav', 39), 40: ('power/power-snare-gated.wav', 40),
+    41: ('power/power-tom-1.wav', 41), 42: ('power/power-hh-tight.wav', 42),
+    43: ('power/power-tom-2.wav', 43), 44: ('power/power-hh-pedal.wav', 44),
+    45: ('power/power-tom-3.wav', 45), 46: ('power/power-hh-open.wav', 46),
+    47: ('power/power-tom-4.wav', 47), 48: ('power/power-tom-5.wav', 48),
+    49: ('power/power-crash.wav', 49), 50: ('power/power-tom-6.wav', 50),
+    51: ('power/power-ride.wav', 51), 52: ('power/power-crash.wav', 44),
+    53: ('power/power-ride-cup.wav', 53), 55: ('power/power-splash.wav', 55),
+    56: ('power/power-cowbell.wav', 56), 57: ('power/power-crash.wav', 46),
+    59: ('power/power-ride.wav', 48),
+}}
+
+GAMMA_KIT_PERCUSSION = {**GAMMA_SHARED_PERC, **{
+    35: ('percussion/noice-kick.wav', 60), 36: ('percussion/noice-kick.wav', 63),
+    37: ('percussion/tabla-002.wav', 60), 38: ('percussion/old-snare.wav', 60),
+    39: ('percussion/tamp-002.wav', 60), 40: ('percussion/old-snare.wav', 57),
+    41: ('percussion/timpani-001.wav', 55), 42: ('percussion/simple-shaker.wav', 60),
+    43: ('percussion/timpani-001.wav', 58), 44: ('percussion/simple-shaker.wav', 57),
+    45: ('percussion/timpani-001.wav', 60), 46: ('percussion/simple-shaker-002.wav', 60),
+    47: ('percussion/tabla-003.wav', 58), 48: ('percussion/tabla-003.wav', 62),
+    49: ('percussion/triangle-002.wav', 55), 50: ('percussion/tabla-003.wav', 66),
+    51: ('percussion/triangle-002.wav', 60), 52: ('percussion/timpani-002.wav', 50),
+    53: ('percussion/triangle-001.wav', 64), 55: ('percussion/triangle-002.wav', 64),
+    56: ('linn9000/cowbell-1.wav', 60), 57: ('percussion/triangle-002.wav', 50),
+    59: ('percussion/triangle-001.wav', 57),
+}}
+
+# (kit name, GM map) in program-change order within bank MSB 3. Kit 0 is the
+# tuple-based GAMMA_DRUMKIT (ROM presets only) and is handled specially.
+GAMMA_KITS = [
+    ('TR-909', GAMMA_KIT_909),
+    ('Linn 9000', GAMMA_KIT_LINN),
+    ('MR-12', GAMMA_KIT_MR12),
+    ('Tokyo Synthetics', GAMMA_KIT_SYNTHETICS),
+    ('Power', GAMMA_KIT_POWER),
+    ('Percussion', GAMMA_KIT_PERCUSSION),
+]
+
+
+def gamma_kit_to_drumkit(kit):
+    """Resolve a {gm_note: (file, base_note)} kit to DRUMKIT-style tuples."""
+    import json
+    manifest = json.load(open('sounds/gamma9001/manifest.json'))
+    file_to_preset = {}
+    rom_i = bin_i = 0
+    for m in manifest:
+        if m['bank'] == GAMMA9001_ROM_BANK:
+            file_to_preset[m['file']] = rom_i
+            rom_i += 1
+        else:
+            file_to_preset[m['file']] = GAMMA9001_PRESET_BASE + bin_i
+            bin_i += 1
+    out = []
+    for note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
+        if note in kit:
+            fname, base = kit[note]
+            out.append((file_to_preset[fname], base))
+        else:
+            out.append((-1, -1))
+    return out
+
+
 def make_drums_patch(drumkit=None):
     if drumkit is None:
         drumkit = DRUMKIT
@@ -775,11 +933,16 @@ def make_patches(filename):
     # Don't make any noise
     amy.override_send = nothing
 
-    TOTAL_NUM_PATCHES = 260
+    # 0-127 Juno, 128-255 DX7, 256 piano, 257 amyboard, 258 legacy GM drums,
+    # 259-383 reserved (NULL), 384-390 Gamma9001 drum kits (MIDI bank MSB 3,
+    # program = kit number).
+    GAMMA_KIT_PATCH_BASE = 384
+    TOTAL_NUM_PATCHES = GAMMA_KIT_PATCH_BASE + 1 + len(GAMMA_KITS)
 
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 and custom patch table\n")
         f.write("#ifndef __PATCHESH\n#define __PATCHESH\n")
+        f.write("#define _PATCHES_NUM_BUILTIN %d\n" % TOTAL_NUM_PATCHES)
         f.write("static const char * const patch_commands[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)
         # Do juno
         for i in range(128):
@@ -807,15 +970,29 @@ def make_patches(filename):
         f.write("\t/* 257: amyboard default */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_amyboard)
 
-        # do MIDI drums via midi_note_cmd patch
+        # do MIDI drums via midi_note_cmd patch (legacy kit over the pcm_tiny ROM
+        # set; still the channel-10 default on non-GAMMA9001 builds)
         num_osc_drums, patch_string  = make_drums_patch()
         f.write("\t/* 258: MIDI drums */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_drums)
 
-        # same, but over the Gamma9001 baked TR-808 ROM bank (GAMMA9001 builds)
+        # 259-383 are reserved so the Gamma9001 drum kits land on their own
+        # MIDI program-change bank: patch = 384 + kit = 128 * MSB(3) + program.
+        f.write("\t/* 259-383: reserved */\n")
+        for i in range(259, GAMMA_KIT_PATCH_BASE):
+            f.write("\tNULL,\n")
+            num_oscs.append(0)
+
+        # kit 0: the baked TR-808 bank (ROM presets only; works without drums.bin)
         num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT)
-        f.write("\t/* 259: MIDI drums (Gamma9001 TR-808 bank) */ \"%s\",\n" % (patch_string))
+        f.write("\t/* %d: drum kit 0 TR-808 (Gamma9001) */ \"%s\",\n" % (GAMMA_KIT_PATCH_BASE, patch_string))
         num_oscs.append(num_osc_drums)
+        # kits 1+: the drums.bin banks
+        for k, (kit_name, kit) in enumerate(GAMMA_KITS):
+            num_osc_drums, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit))
+            f.write("\t/* %d: drum kit %d %s (Gamma9001) */ \"%s\",\n" % (
+                GAMMA_KIT_PATCH_BASE + 1 + k, k + 1, kit_name, patch_string))
+            num_oscs.append(num_osc_drums)
 
         f.write("};\n")
         f.write("const uint16_t patch_oscs[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)

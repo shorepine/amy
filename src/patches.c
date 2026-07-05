@@ -1121,7 +1121,14 @@ void patches_load_patch(amy_event *e) {
         if (AMY_IS_UNSET(patch_number))
             patch_number = instrument_get_patch_number(e->synth);
         if(patch_number < _PATCHES_FIRST_USER_PATCH) {
-            // Built-in patch
+            // Built-in patch. The table has reserved (NULL) gaps -- e.g. 259-383
+            // before the drum kit bank at 384 -- and ends well before the user
+            // range, so check both before dereferencing.
+            if (patch_number >= _PATCHES_NUM_BUILTIN || patch_commands[patch_number] == NULL) {
+                fprintf(stderr, "patch_number %" PRIu16 " is not a defined built-in patch (synth %" PRId32 "), ignored\n",
+                        patch_number, (int32_t)e->synth);
+                return;
+            }
             message = (char*)patch_commands[patch_number];
             oscs_per_voice = patch_oscs[patch_number];
         } else {
