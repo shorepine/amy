@@ -298,7 +298,11 @@ void amy_default_synths() {
     e = amy_default_event();
     e.synth = AMY_MIDI_CHANNEL_DRUMS;  // 10
     e.num_voices = 6;
+#ifdef GAMMA9001
+    e.patch_number = 259;  // GM drums over the Gamma9001 baked TR-808 bank (headers.py GAMMA_DRUMKIT)
+#else
     e.patch_number = 258;  // Set up in headers.py to use midi_note_cmd to match some midi note events to PCM samples
+#endif
     e.synth_flags = SYNTH_FLAGS_NOTES_VIA_MIDI | SYNTH_FLAGS_IGNORE_NOTE_OFFS;  // Ensure note events go via midi_note_cmd
     amy_add_event(&e);
 

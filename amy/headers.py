@@ -672,12 +672,71 @@ DRUMKIT = [
 ]
 
 
-def make_drums_patch():
+# GM drum map for the Gamma9001 baked TR-808 ROM bank (pcm_gamma808.h).
+# Uses ONLY ROM presets 0-18 so channel 10 works even when the drums.bin
+# banks aren't mounted. Preset order/roots from pcm_gamma808.h:
+#  [0-2] BD 1/2/3   [3] clap  [4] clave  [5-7] conga hi/lo/mid  [8] cowbell
+#  [9] CH  [10] OH  [11] shaker  [12-14] snare 1(45)/2(52)/3(41)
+#  [15] rimshot(90) [16] tom lo(61) [17] tom hi(67) [18] cymbal(59)
+GAMMA_DRUMKIT = [
+    (1, 60),    # 35 Acoustic Bass Drum -> BD 2
+    (0, 60),    # 36 Bass Drum 1        -> BD 1
+    (15, 90),   # 37 Side Stick         -> rimshot
+    (12, 45),   # 38 Acoustic Snare     -> snare 1
+    (3, 60),    # 39 Hand Clap          -> clap
+    (14, 41),   # 40 Electric Snare     -> snare 3
+    (16, 56),   # 41 Low Floor Tom      -> tom lo (down)
+    (9, 60),    # 42 Closed Hi Hat      -> CH
+    (16, 59),   # 43 High Floor Tom     -> tom lo (down a bit)
+    (9, 57),    # 44 Pedal Hi-Hat       -> CH (darker)
+    (16, 61),   # 45 Low Tom            -> tom lo (root)
+    (10, 60),   # 46 Open Hi-Hat        -> OH
+    (17, 64),   # 47 Low-Mid Tom        -> tom hi (down)
+    (17, 67),   # 48 Hi Mid Tom         -> tom hi (root)
+    (18, 59),   # 49 Crash Cymbal 1     -> cymbal (root)
+    (17, 70),   # 50 High Tom           -> tom hi (up)
+    (18, 66),   # 51 Ride Cymbal 1      -> cymbal (up, shorter)
+    (18, 54),   # 52 Chinese Cymbal     -> cymbal (down, trashy)
+    (8, 67),    # 53 Ride Bell          -> cowbell (up)
+    (11, 57),   # 54 Tambourine         -> shaker (down)
+    (18, 63),   # 55 Splash Cymbal      -> cymbal (up)
+    (8, 60),    # 56 Cowbell            -> cowbell
+    (18, 57),   # 57 Crash Cymbal 2     -> cymbal (down)
+    (-1, -1),   # 58 Vibraslap
+    (18, 69),   # 59 Ride Cymbal 2      -> cymbal (up more)
+    (5, 65),    # 60 Hi Bongo           -> conga hi (up)
+    (5, 61),    # 61 Low Bongo          -> conga hi (up a little)
+    (7, 60),    # 62 Mute Hi Conga      -> conga mid
+    (5, 60),    # 63 Open Hi Conga      -> conga hi
+    (6, 60),    # 64 Low Conga          -> conga lo
+    (17, 69),   # 65 High Timbale       -> tom hi (up)
+    (16, 63),   # 66 Low Timbale        -> tom lo (up)
+    (8, 64),    # 67 High Agogo         -> cowbell (up)
+    (8, 57),    # 68 Low Agogo          -> cowbell (down)
+    (11, 60),   # 69 Cabasa             -> shaker
+    (11, 62),   # 70 Maracas            -> shaker (up)
+    (-1, -1),   # 71 Short Whistle
+    (-1, -1),   # 72 Long Whistle
+    (-1, -1),   # 73 Short Guiro
+    (-1, -1),   # 74 Long Guiro
+    (4, 60),    # 75 Claves             -> clave
+    (4, 64),    # 76 Hi Wood Block      -> clave (up)
+    (4, 57),    # 77 Low Wood Block     -> clave (down)
+    (-1, -1),   # 78 Mute Cuica
+    (-1, -1),   # 79 Open Cuica
+    (-1, -1),   # 80 Mute Triangle
+    (-1, -1),   # 81 Open Triangle
+]
+
+
+def make_drums_patch(drumkit=None):
+    if drumkit is None:
+        drumkit = DRUMKIT
     # Set up a bunch of midi_note_cmd mappings for CH10 drums
     message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
     message += amy.message(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
-        pcm_preset_number, base_midi_note = DRUMKIT[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
+        pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
         if pcm_preset_number >= 0:
             message += amy.message(
                 midi_note_cmd=(
@@ -701,7 +760,7 @@ def make_patches(filename):
     # Don't make any noise
     amy.override_send = nothing
 
-    TOTAL_NUM_PATCHES = 259
+    TOTAL_NUM_PATCHES = 260
 
     with open(filename, "w") as f:
         f.write("// Automatically generated.\n// DX7 and juno 106 and custom patch table\n")
@@ -736,6 +795,11 @@ def make_patches(filename):
         # do MIDI drums via midi_note_cmd patch
         num_osc_drums, patch_string  = make_drums_patch()
         f.write("\t/* 258: MIDI drums */ \"%s\",\n" % (patch_string))
+        num_oscs.append(num_osc_drums)
+
+        # same, but over the Gamma9001 baked TR-808 ROM bank (GAMMA9001 builds)
+        num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT)
+        f.write("\t/* 259: MIDI drums (Gamma9001 TR-808 bank) */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_drums)
 
         f.write("};\n")

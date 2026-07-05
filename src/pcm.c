@@ -41,6 +41,16 @@ memorypcm_ll_t * memorypcm_ll_start;
 
 #define PCM_AMY_LOG2_SAMPLE_RATE log2f(PCM_AMY_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ)
 
+#ifdef GAMMA9001
+#include "pcm_gamma9001.h"
+// Set by the platform at boot: web links the drums.bin blob in and passes it,
+// ESP32-S3 passes the esp_partition_mmap'd partition. NULL = banks unavailable.
+const int16_t * gamma9001_pcm = NULL;
+void amy_set_gamma9001_pcm(const int16_t * data) {
+    gamma9001_pcm = data;
+}
+#endif
+
 
 // Get either memory preset, file preset or baked in preset for preset number.
 // For ROM presets, fill the caller-provided rom_local and return it.
@@ -56,6 +66,27 @@ memorypcm_preset_t * get_preset_for_preset_number(uint16_t preset_number,
         }
         preset = preset->next;
     }
+
+#ifdef GAMMA9001
+    // Gamma9001 drum banks live at GAMMA9001_PRESET_BASE+, read straight out
+    // of the platform-provided blob (memory presets above may still shadow them).
+    if (preset_number >= GAMMA9001_PRESET_BASE &&
+        preset_number < GAMMA9001_PRESET_BASE + GAMMA9001_NUM_SAMPLES &&
+        gamma9001_pcm != NULL && rom_local != NULL) {
+        const pcm_map_t *g = &gamma9001_map[preset_number - GAMMA9001_PRESET_BASE];
+        memset(rom_local, 0, sizeof(*rom_local));
+        rom_local->sample_ram = (int16_t *)gamma9001_pcm + g->offset;
+        rom_local->length = g->length;
+        rom_local->loopstart = g->loopstart;
+        rom_local->loopend = g->loopend;
+        rom_local->midinote = g->midinote;
+        rom_local->samplerate = GAMMA9001_SAMPLE_RATE;
+        rom_local->log2sr = log2f((float)GAMMA9001_SAMPLE_RATE / ZERO_LOGFREQ_IN_HZ);
+        rom_local->type = AMY_PCM_TYPE_GAMMA;
+        rom_local->channels = 1;
+        return rom_local;
+    }
+#endif
 
     // No memory preset found, so try ROM preset. default to 0 if out of range
     if (preset_number >= pcm_samples) preset_number = 0; 

@@ -100,6 +100,16 @@ extern const uint32_t pcm_wavetable_len;
 #define AMY_PCM_TYPE_ROM 0
 #define AMY_PCM_TYPE_FILE 1
 #define AMY_PCM_TYPE_MEMORY 2
+#define AMY_PCM_TYPE_GAMMA 3
+
+#ifdef GAMMA9001
+// The Gamma9001 drum banks: presets GAMMA9001_PRESET_BASE and up, resolved
+// from a raw int16 blob (drums.bin) that the platform provides at boot --
+// linked into the binary on web, mmapped from a flash partition on ESP32-S3.
+// Until the pointer is set those presets are silently unavailable.
+extern const int16_t * gamma9001_pcm;
+extern void amy_set_gamma9001_pcm(const int16_t * data);
+#endif
 
 // File-streaming buffer size multiplier (in blocks).
 #define PCM_FILE_BUFFER_MULT 8
