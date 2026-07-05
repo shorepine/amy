@@ -325,6 +325,9 @@ def inject_midi_bytes(data, usb=0):
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
 
+def systime():
+    return _amy.systime()
+
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)
     send(load_sample=s)

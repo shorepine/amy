@@ -453,14 +453,15 @@ static inline int isnan_c11(float test)
 
 #define AMY_UNSET_FLOAT nanf("")
 
-#define AMY_UNSET_VALUE(var) _Generic((var), \
+// UNSET for int32_t should be the same as uint32_t.
+#define AMY_UNSET_VALUE(var) _Generic((var),    \
     float: AMY_UNSET_FLOAT, \
+    int32_t: INT32_MIN,   \
     uint32_t: UINT32_MAX, \
     uint16_t: UINT16_MAX, \
     int16_t: SHRT_MAX, \
     uint8_t: UINT8_MAX, \
-    int8_t: SCHAR_MAX, \
-    int32_t: INT_MAX \
+    int8_t: SCHAR_MAX \
 )
 
 #define AMY_UNSET(var) var = AMY_UNSET_VALUE(var)
