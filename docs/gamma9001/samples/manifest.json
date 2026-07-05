@@ -7,7 +7,10 @@
   "sr": 44100,
   "frames": 137664,
   "seconds": 3.1216,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 0,
+  "root": 60,
+  "preset_frames": 68832
  },
  {
   "bank": "tr808",
@@ -17,7 +20,10 @@
   "sr": 44100,
   "frames": 54732,
   "seconds": 1.2411,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 1,
+  "root": 60,
+  "preset_frames": 27366
  },
  {
   "bank": "tr808",
@@ -27,7 +33,10 @@
   "sr": 44100,
   "frames": 36096,
   "seconds": 0.8185,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 2,
+  "root": 60,
+  "preset_frames": 18048
  },
  {
   "bank": "tr808",
@@ -37,7 +46,10 @@
   "sr": 44100,
   "frames": 6416,
   "seconds": 0.1455,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 3,
+  "root": 60,
+  "preset_frames": 3208
  },
  {
   "bank": "tr808",
@@ -47,7 +59,10 @@
   "sr": 44100,
   "frames": 2063,
   "seconds": 0.0468,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 4,
+  "root": 60,
+  "preset_frames": 1032
  },
  {
   "bank": "tr808",
@@ -57,7 +72,10 @@
   "sr": 44100,
   "frames": 6656,
   "seconds": 0.1509,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 5,
+  "root": 60,
+  "preset_frames": 3328
  },
  {
   "bank": "tr808",
@@ -67,7 +85,10 @@
   "sr": 44100,
   "frames": 13568,
   "seconds": 0.3077,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 6,
+  "root": 60,
+  "preset_frames": 6784
  },
  {
   "bank": "tr808",
@@ -77,7 +98,10 @@
   "sr": 44100,
   "frames": 7989,
   "seconds": 0.1812,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 7,
+  "root": 60,
+  "preset_frames": 3995
  },
  {
   "bank": "tr808",
@@ -87,7 +111,10 @@
   "sr": 44100,
   "frames": 15232,
   "seconds": 0.3454,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 8,
+  "root": 60,
+  "preset_frames": 7616
  },
  {
   "bank": "tr808",
@@ -97,7 +124,10 @@
   "sr": 44100,
   "frames": 4420,
   "seconds": 0.1002,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 9,
+  "root": 60,
+  "preset_frames": 2210
  },
  {
   "bank": "tr808",
@@ -107,7 +137,10 @@
   "sr": 44100,
   "frames": 23680,
   "seconds": 0.537,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 10,
+  "root": 60,
+  "preset_frames": 11840
  },
  {
   "bank": "tr808",
@@ -117,7 +150,10 @@
   "sr": 44100,
   "frames": 1510,
   "seconds": 0.0342,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 11,
+  "root": 60,
+  "preset_frames": 755
  },
  {
   "bank": "linn9000",
@@ -127,7 +163,10 @@
   "sr": 44100,
   "frames": 5888,
   "seconds": 0.1335,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 273,
+  "root": 60,
+  "preset_frames": 2944
  },
  {
   "bank": "linn9000",
@@ -137,7 +176,10 @@
   "sr": 44100,
   "frames": 8820,
   "seconds": 0.2,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 274,
+  "root": 60,
+  "preset_frames": 4410
  },
  {
   "bank": "linn9000",
@@ -147,7 +189,10 @@
   "sr": 44100,
   "frames": 10752,
   "seconds": 0.2438,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 275,
+  "root": 60,
+  "preset_frames": 5376
  },
  {
   "bank": "linn9000",
@@ -157,7 +202,10 @@
   "sr": 44100,
   "frames": 54470,
   "seconds": 1.2351,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 276,
+  "root": 60,
+  "preset_frames": 27235
  },
  {
   "bank": "linn9000",
@@ -167,7 +215,10 @@
   "sr": 44100,
   "frames": 3200,
   "seconds": 0.0726,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 277,
+  "root": 60,
+  "preset_frames": 1600
  },
  {
   "bank": "linn9000",
@@ -177,7 +228,10 @@
   "sr": 44100,
   "frames": 20352,
   "seconds": 0.4615,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 278,
+  "root": 60,
+  "preset_frames": 10176
  },
  {
   "bank": "linn9000",
@@ -187,7 +241,10 @@
   "sr": 44100,
   "frames": 6528,
   "seconds": 0.148,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 279,
+  "root": 60,
+  "preset_frames": 3264
  },
  {
   "bank": "linn9000",
@@ -197,7 +254,10 @@
   "sr": 44100,
   "frames": 9088,
   "seconds": 0.2061,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 280,
+  "root": 60,
+  "preset_frames": 4544
  },
  {
   "bank": "linn9000",
@@ -207,7 +267,10 @@
   "sr": 44100,
   "frames": 11648,
   "seconds": 0.2641,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 281,
+  "root": 60,
+  "preset_frames": 5824
  },
  {
   "bank": "linn9000",
@@ -217,7 +280,10 @@
   "sr": 44100,
   "frames": 8448,
   "seconds": 0.1916,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 282,
+  "root": 60,
+  "preset_frames": 4224
  },
  {
   "bank": "percussion",
@@ -227,7 +293,10 @@
   "sr": 44100,
   "frames": 12256,
   "seconds": 0.2779,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 331,
+  "root": 60,
+  "preset_frames": 6128
  },
  {
   "bank": "percussion",
@@ -237,7 +306,10 @@
   "sr": 44100,
   "frames": 13661,
   "seconds": 0.3098,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 332,
+  "root": 60,
+  "preset_frames": 6831
  },
  {
   "bank": "percussion",
@@ -247,7 +319,10 @@
   "sr": 44100,
   "frames": 7925,
   "seconds": 0.1797,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 333,
+  "root": 60,
+  "preset_frames": 3963
  },
  {
   "bank": "percussion",
@@ -257,7 +332,10 @@
   "sr": 44100,
   "frames": 6934,
   "seconds": 0.1572,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 334,
+  "root": 60,
+  "preset_frames": 3467
  },
  {
   "bank": "percussion",
@@ -267,7 +345,10 @@
   "sr": 44100,
   "frames": 9000,
   "seconds": 0.2041,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 335,
+  "root": 60,
+  "preset_frames": 4500
  },
  {
   "bank": "percussion",
@@ -277,7 +358,10 @@
   "sr": 44100,
   "frames": 3928,
   "seconds": 0.0891,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 336,
+  "root": 60,
+  "preset_frames": 1964
  },
  {
   "bank": "percussion",
@@ -287,7 +371,10 @@
   "sr": 44100,
   "frames": 8043,
   "seconds": 0.1824,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 337,
+  "root": 60,
+  "preset_frames": 4022
  },
  {
   "bank": "percussion",
@@ -297,7 +384,10 @@
   "sr": 44100,
   "frames": 9560,
   "seconds": 0.2168,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 338,
+  "root": 60,
+  "preset_frames": 4780
  },
  {
   "bank": "percussion",
@@ -307,7 +397,10 @@
   "sr": 44100,
   "frames": 2482,
   "seconds": 0.0563,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 339,
+  "root": 60,
+  "preset_frames": 1241
  },
  {
   "bank": "percussion",
@@ -317,7 +410,10 @@
   "sr": 44100,
   "frames": 7548,
   "seconds": 0.1712,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 340,
+  "root": 60,
+  "preset_frames": 3774
  },
  {
   "bank": "percussion",
@@ -327,7 +423,10 @@
   "sr": 44100,
   "frames": 7784,
   "seconds": 0.1765,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 341,
+  "root": 60,
+  "preset_frames": 3892
  },
  {
   "bank": "percussion",
@@ -337,7 +436,10 @@
   "sr": 44100,
   "frames": 12610,
   "seconds": 0.2859,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 342,
+  "root": 60,
+  "preset_frames": 6305
  },
  {
   "bank": "percussion",
@@ -347,7 +449,10 @@
   "sr": 44100,
   "frames": 4272,
   "seconds": 0.0969,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 343,
+  "root": 60,
+  "preset_frames": 2136
  },
  {
   "bank": "percussion",
@@ -357,7 +462,10 @@
   "sr": 44100,
   "frames": 4912,
   "seconds": 0.1114,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 344,
+  "root": 60,
+  "preset_frames": 2456
  },
  {
   "bank": "percussion",
@@ -367,7 +475,10 @@
   "sr": 44100,
   "frames": 5984,
   "seconds": 0.1357,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 345,
+  "root": 60,
+  "preset_frames": 2992
  },
  {
   "bank": "percussion",
@@ -377,7 +488,10 @@
   "sr": 44100,
   "frames": 6334,
   "seconds": 0.1436,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 346,
+  "root": 60,
+  "preset_frames": 3167
  },
  {
   "bank": "percussion",
@@ -387,7 +501,10 @@
   "sr": 44100,
   "frames": 5656,
   "seconds": 0.1283,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 347,
+  "root": 60,
+  "preset_frames": 2828
  },
  {
   "bank": "percussion",
@@ -397,7 +514,10 @@
   "sr": 44100,
   "frames": 80564,
   "seconds": 1.8268,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 348,
+  "root": 60,
+  "preset_frames": 40282
  },
  {
   "bank": "percussion",
@@ -407,7 +527,10 @@
   "sr": 44100,
   "frames": 16970,
   "seconds": 0.3848,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 349,
+  "root": 60,
+  "preset_frames": 8485
  },
  {
   "bank": "percussion",
@@ -417,7 +540,10 @@
   "sr": 22050,
   "frames": 6054,
   "seconds": 0.2746,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 350,
+  "root": 60,
+  "preset_frames": 6054
  },
  {
   "bank": "percussion",
@@ -427,7 +553,10 @@
   "sr": 22050,
   "frames": 3952,
   "seconds": 0.1792,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 351,
+  "root": 60,
+  "preset_frames": 3952
  },
  {
   "bank": "percussion",
@@ -437,7 +566,10 @@
   "sr": 44100,
   "frames": 7496,
   "seconds": 0.17,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 352,
+  "root": 60,
+  "preset_frames": 3748
  },
  {
   "bank": "percussion",
@@ -447,7 +579,10 @@
   "sr": 44100,
   "frames": 6728,
   "seconds": 0.1526,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 353,
+  "root": 60,
+  "preset_frames": 3364
  },
  {
   "bank": "percussion",
@@ -457,7 +592,10 @@
   "sr": 44100,
   "frames": 40023,
   "seconds": 0.9076,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 354,
+  "root": 60,
+  "preset_frames": 20012
  },
  {
   "bank": "percussion",
@@ -467,7 +605,10 @@
   "sr": 44100,
   "frames": 10496,
   "seconds": 0.238,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 355,
+  "root": 60,
+  "preset_frames": 5248
  },
  {
   "bank": "percussion",
@@ -477,7 +618,10 @@
   "sr": 44100,
   "frames": 18944,
   "seconds": 0.4296,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 356,
+  "root": 60,
+  "preset_frames": 9472
  },
  {
   "bank": "percussion",
@@ -487,7 +631,10 @@
   "sr": 44100,
   "frames": 51477,
   "seconds": 1.1673,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 357,
+  "root": 60,
+  "preset_frames": 25739
  },
  {
   "bank": "percussion",
@@ -497,7 +644,10 @@
   "sr": 44100,
   "frames": 6297,
   "seconds": 0.1428,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 358,
+  "root": 60,
+  "preset_frames": 3149
  },
  {
   "bank": "percussion",
@@ -507,7 +657,10 @@
   "sr": 44100,
   "frames": 6874,
   "seconds": 0.1559,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 359,
+  "root": 60,
+  "preset_frames": 3437
  },
  {
   "bank": "percussion",
@@ -517,7 +670,10 @@
   "sr": 44100,
   "frames": 7843,
   "seconds": 0.1778,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 360,
+  "root": 60,
+  "preset_frames": 3922
  },
  {
   "bank": "percussion",
@@ -527,7 +683,10 @@
   "sr": 44100,
   "frames": 9673,
   "seconds": 0.2193,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 361,
+  "root": 60,
+  "preset_frames": 4837
  },
  {
   "bank": "percussion",
@@ -537,7 +696,10 @@
   "sr": 44100,
   "frames": 5832,
   "seconds": 0.1322,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 362,
+  "root": 60,
+  "preset_frames": 2916
  },
  {
   "bank": "percussion",
@@ -547,7 +709,10 @@
   "sr": 22050,
   "frames": 5645,
   "seconds": 0.256,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 363,
+  "root": 60,
+  "preset_frames": 5645
  },
  {
   "bank": "percussion",
@@ -557,7 +722,10 @@
   "sr": 44100,
   "frames": 14516,
   "seconds": 0.3292,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 364,
+  "root": 60,
+  "preset_frames": 7258
  },
  {
   "bank": "percussion",
@@ -567,7 +735,10 @@
   "sr": 22050,
   "frames": 7248,
   "seconds": 0.3287,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 365,
+  "root": 60,
+  "preset_frames": 7248
  },
  {
   "bank": "percussion",
@@ -577,7 +748,10 @@
   "sr": 22050,
   "frames": 2334,
   "seconds": 0.1059,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 366,
+  "root": 60,
+  "preset_frames": 2334
  },
  {
   "bank": "percussion",
@@ -587,7 +761,10 @@
   "sr": 22050,
   "frames": 4572,
   "seconds": 0.2073,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 367,
+  "root": 60,
+  "preset_frames": 4572
  },
  {
   "bank": "percussion",
@@ -597,7 +774,10 @@
   "sr": 22050,
   "frames": 5901,
   "seconds": 0.2676,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 368,
+  "root": 60,
+  "preset_frames": 5901
  },
  {
   "bank": "percussion",
@@ -607,7 +787,10 @@
   "sr": 22050,
   "frames": 22716,
   "seconds": 1.0302,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 369,
+  "root": 60,
+  "preset_frames": 22716
  },
  {
   "bank": "percussion",
@@ -617,7 +800,10 @@
   "sr": 22050,
   "frames": 45478,
   "seconds": 2.0625,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 370,
+  "root": 60,
+  "preset_frames": 45478
  },
  {
   "bank": "percussion",
@@ -627,7 +813,10 @@
   "sr": 22050,
   "frames": 4046,
   "seconds": 0.1835,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 371,
+  "root": 60,
+  "preset_frames": 4046
  },
  {
   "bank": "percussion",
@@ -637,7 +826,10 @@
   "sr": 22050,
   "frames": 10728,
   "seconds": 0.4865,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 372,
+  "root": 60,
+  "preset_frames": 10728
  },
  {
   "bank": "percussion",
@@ -647,7 +839,10 @@
   "sr": 44100,
   "frames": 9673,
   "seconds": 0.2193,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 373,
+  "root": 60,
+  "preset_frames": 4837
  },
  {
   "bank": "percussion",
@@ -657,7 +852,10 @@
   "sr": 22050,
   "frames": 2314,
   "seconds": 0.1049,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 374,
+  "root": 60,
+  "preset_frames": 2314
  },
  {
   "bank": "tr909",
@@ -667,7 +865,10 @@
   "sr": 44100,
   "frames": 37777,
   "seconds": 0.8566,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 256,
+  "root": 60,
+  "preset_frames": 18889
  },
  {
   "bank": "tr909",
@@ -677,7 +878,10 @@
   "sr": 44100,
   "frames": 47191,
   "seconds": 1.0701,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 257,
+  "root": 60,
+  "preset_frames": 23596
  },
  {
   "bank": "tr909",
@@ -687,7 +891,10 @@
   "sr": 44100,
   "frames": 42359,
   "seconds": 0.9605,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 258,
+  "root": 60,
+  "preset_frames": 21180
  },
  {
   "bank": "tr909",
@@ -697,7 +904,10 @@
   "sr": 44100,
   "frames": 42651,
   "seconds": 0.9671,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 259,
+  "root": 60,
+  "preset_frames": 21326
  },
  {
   "bank": "tr909",
@@ -707,7 +917,10 @@
   "sr": 44100,
   "frames": 5960,
   "seconds": 0.1351,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 260,
+  "root": 60,
+  "preset_frames": 2980
  },
  {
   "bank": "tr909",
@@ -717,7 +930,10 @@
   "sr": 44100,
   "frames": 9742,
   "seconds": 0.2209,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 261,
+  "root": 60,
+  "preset_frames": 4871
  },
  {
   "bank": "tr909",
@@ -727,7 +943,10 @@
   "sr": 44100,
   "frames": 2682,
   "seconds": 0.0608,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 262,
+  "root": 60,
+  "preset_frames": 1341
  },
  {
   "bank": "tr909",
@@ -737,7 +956,10 @@
   "sr": 44100,
   "frames": 23418,
   "seconds": 0.531,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 263,
+  "root": 60,
+  "preset_frames": 11709
  },
  {
   "bank": "tr909",
@@ -747,7 +969,10 @@
   "sr": 44100,
   "frames": 23432,
   "seconds": 0.5313,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 264,
+  "root": 60,
+  "preset_frames": 11716
  },
  {
   "bank": "tr909",
@@ -757,7 +982,10 @@
   "sr": 44100,
   "frames": 17509,
   "seconds": 0.397,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 265,
+  "root": 60,
+  "preset_frames": 8755
  },
  {
   "bank": "tr909",
@@ -767,7 +995,10 @@
   "sr": 44100,
   "frames": 46729,
   "seconds": 1.0596,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 266,
+  "root": 60,
+  "preset_frames": 23365
  },
  {
   "bank": "tr909",
@@ -777,7 +1008,10 @@
   "sr": 44100,
   "frames": 34581,
   "seconds": 0.7841,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 267,
+  "root": 60,
+  "preset_frames": 17291
  },
  {
   "bank": "tr909",
@@ -787,7 +1021,10 @@
   "sr": 44100,
   "frames": 11318,
   "seconds": 0.2566,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 268,
+  "root": 60,
+  "preset_frames": 5659
  },
  {
   "bank": "tr909",
@@ -797,7 +1034,10 @@
   "sr": 44100,
   "frames": 10896,
   "seconds": 0.2471,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 269,
+  "root": 60,
+  "preset_frames": 5448
  },
  {
   "bank": "tr909",
@@ -807,7 +1047,10 @@
   "sr": 44100,
   "frames": 48638,
   "seconds": 1.1029,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 270,
+  "root": 60,
+  "preset_frames": 24319
  },
  {
   "bank": "tr909",
@@ -817,7 +1060,10 @@
   "sr": 44100,
   "frames": 41824,
   "seconds": 0.9484,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 271,
+  "root": 60,
+  "preset_frames": 20912
  },
  {
   "bank": "tr909",
@@ -827,7 +1073,10 @@
   "sr": 44100,
   "frames": 47662,
   "seconds": 1.0808,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 272,
+  "root": 60,
+  "preset_frames": 23831
  },
  {
   "bank": "mr12",
@@ -837,7 +1086,10 @@
   "sr": 44100,
   "frames": 1996,
   "seconds": 0.0453,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 283,
+  "root": 60,
+  "preset_frames": 998
  },
  {
   "bank": "mr12",
@@ -847,7 +1099,10 @@
   "sr": 44100,
   "frames": 18848,
   "seconds": 0.4274,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 284,
+  "root": 60,
+  "preset_frames": 9424
  },
  {
   "bank": "mr12",
@@ -857,7 +1112,10 @@
   "sr": 44100,
   "frames": 15554,
   "seconds": 0.3527,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 285,
+  "root": 60,
+  "preset_frames": 7777
  },
  {
   "bank": "mr12",
@@ -867,7 +1125,10 @@
   "sr": 44100,
   "frames": 8512,
   "seconds": 0.193,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 286,
+  "root": 60,
+  "preset_frames": 4256
  },
  {
   "bank": "synthetics",
@@ -877,7 +1138,10 @@
   "sr": 44100,
   "frames": 1740,
   "seconds": 0.0395,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 287,
+  "root": 60,
+  "preset_frames": 870
  },
  {
   "bank": "synthetics",
@@ -887,7 +1151,10 @@
   "sr": 44100,
   "frames": 417,
   "seconds": 0.0095,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 288,
+  "root": 60,
+  "preset_frames": 209
  },
  {
   "bank": "synthetics",
@@ -897,7 +1164,10 @@
   "sr": 44100,
   "frames": 3012,
   "seconds": 0.0683,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 289,
+  "root": 60,
+  "preset_frames": 1506
  },
  {
   "bank": "synthetics",
@@ -907,7 +1177,10 @@
   "sr": 44100,
   "frames": 641,
   "seconds": 0.0145,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 290,
+  "root": 60,
+  "preset_frames": 321
  },
  {
   "bank": "synthetics",
@@ -917,7 +1190,10 @@
   "sr": 44100,
   "frames": 590,
   "seconds": 0.0134,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 291,
+  "root": 60,
+  "preset_frames": 295
  },
  {
   "bank": "synthetics",
@@ -927,7 +1203,10 @@
   "sr": 44100,
   "frames": 6100,
   "seconds": 0.1383,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 292,
+  "root": 60,
+  "preset_frames": 3050
  },
  {
   "bank": "synthetics",
@@ -937,7 +1216,10 @@
   "sr": 44100,
   "frames": 1239,
   "seconds": 0.0281,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 293,
+  "root": 60,
+  "preset_frames": 620
  },
  {
   "bank": "synthetics",
@@ -947,7 +1229,10 @@
   "sr": 44100,
   "frames": 6584,
   "seconds": 0.1493,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 294,
+  "root": 60,
+  "preset_frames": 3292
  },
  {
   "bank": "synthetics",
@@ -957,7 +1242,10 @@
   "sr": 44100,
   "frames": 2880,
   "seconds": 0.0653,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 295,
+  "root": 60,
+  "preset_frames": 1440
  },
  {
   "bank": "synthetics",
@@ -967,7 +1255,10 @@
   "sr": 44100,
   "frames": 22016,
   "seconds": 0.4992,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 296,
+  "root": 60,
+  "preset_frames": 11008
  },
  {
   "bank": "synthetics",
@@ -977,7 +1268,10 @@
   "sr": 44100,
   "frames": 9083,
   "seconds": 0.206,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 297,
+  "root": 60,
+  "preset_frames": 4542
  },
  {
   "bank": "synthetics",
@@ -987,7 +1281,10 @@
   "sr": 44100,
   "frames": 18008,
   "seconds": 0.4083,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 298,
+  "root": 60,
+  "preset_frames": 9004
  },
  {
   "bank": "synthetics",
@@ -997,7 +1294,10 @@
   "sr": 44100,
   "frames": 28544,
   "seconds": 0.6473,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 299,
+  "root": 60,
+  "preset_frames": 14272
  },
  {
   "bank": "synthetics",
@@ -1007,7 +1307,10 @@
   "sr": 44100,
   "frames": 15923,
   "seconds": 0.3611,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 300,
+  "root": 60,
+  "preset_frames": 7962
  },
  {
   "bank": "synthetics",
@@ -1017,7 +1320,10 @@
   "sr": 44100,
   "frames": 7231,
   "seconds": 0.164,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 301,
+  "root": 60,
+  "preset_frames": 3616
  },
  {
   "bank": "synthetics",
@@ -1027,7 +1333,10 @@
   "sr": 44100,
   "frames": 3417,
   "seconds": 0.0775,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 302,
+  "root": 60,
+  "preset_frames": 1709
  },
  {
   "bank": "synthetics",
@@ -1037,7 +1346,10 @@
   "sr": 44100,
   "frames": 18944,
   "seconds": 0.4296,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 303,
+  "root": 60,
+  "preset_frames": 9472
  },
  {
   "bank": "synthetics",
@@ -1047,7 +1359,10 @@
   "sr": 44100,
   "frames": 4096,
   "seconds": 0.0929,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 304,
+  "root": 60,
+  "preset_frames": 2048
  },
  {
   "bank": "synthetics",
@@ -1057,7 +1372,10 @@
   "sr": 44100,
   "frames": 3108,
   "seconds": 0.0705,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 305,
+  "root": 60,
+  "preset_frames": 1554
  },
  {
   "bank": "synthetics",
@@ -1067,7 +1385,10 @@
   "sr": 44100,
   "frames": 1624,
   "seconds": 0.0368,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 306,
+  "root": 60,
+  "preset_frames": 812
  },
  {
   "bank": "synthetics",
@@ -1077,7 +1398,10 @@
   "sr": 44100,
   "frames": 657,
   "seconds": 0.0149,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 307,
+  "root": 60,
+  "preset_frames": 329
  },
  {
   "bank": "synthetics",
@@ -1087,7 +1411,10 @@
   "sr": 44100,
   "frames": 912,
   "seconds": 0.0207,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 308,
+  "root": 60,
+  "preset_frames": 456
  },
  {
   "bank": "synthetics",
@@ -1097,7 +1424,10 @@
   "sr": 44100,
   "frames": 662,
   "seconds": 0.015,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 309,
+  "root": 60,
+  "preset_frames": 331
  },
  {
   "bank": "synthetics",
@@ -1107,7 +1437,10 @@
   "sr": 44100,
   "frames": 761,
   "seconds": 0.0173,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 310,
+  "root": 60,
+  "preset_frames": 381
  },
  {
   "bank": "acoustic",
@@ -1117,7 +1450,10 @@
   "sr": 44100,
   "frames": 6189,
   "seconds": 0.1403,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 375,
+  "root": 60,
+  "preset_frames": 3095
  },
  {
   "bank": "acoustic",
@@ -1127,7 +1463,10 @@
   "sr": 44100,
   "frames": 5120,
   "seconds": 0.1161,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 376,
+  "root": 60,
+  "preset_frames": 2560
  },
  {
   "bank": "acoustic",
@@ -1137,7 +1476,10 @@
   "sr": 44100,
   "frames": 1408,
   "seconds": 0.0319,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 377,
+  "root": 60,
+  "preset_frames": 704
  },
  {
   "bank": "extras",
@@ -1147,7 +1489,10 @@
   "sr": 44100,
   "frames": 109824,
   "seconds": 2.4903,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 378,
+  "root": 60,
+  "preset_frames": 54912
  },
  {
   "bank": "extras",
@@ -1157,7 +1502,10 @@
   "sr": 44100,
   "frames": 73728,
   "seconds": 1.6718,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 379,
+  "root": 60,
+  "preset_frames": 36864
  },
  {
   "bank": "extras",
@@ -1167,7 +1515,10 @@
   "sr": 44100,
   "frames": 90112,
   "seconds": 2.0434,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 380,
+  "root": 60,
+  "preset_frames": 45056
  },
  {
   "bank": "extras",
@@ -1177,7 +1528,10 @@
   "sr": 44100,
   "frames": 72192,
   "seconds": 1.637,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 381,
+  "root": 60,
+  "preset_frames": 36096
  },
  {
   "bank": "extras",
@@ -1187,7 +1541,10 @@
   "sr": 44100,
   "frames": 112256,
   "seconds": 2.5455,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 382,
+  "root": 60,
+  "preset_frames": 56128
  },
  {
   "bank": "extras",
@@ -1197,7 +1554,10 @@
   "sr": 44100,
   "frames": 60800,
   "seconds": 1.3787,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 383,
+  "root": 60,
+  "preset_frames": 30400
  },
  {
   "bank": "extras",
@@ -1207,7 +1567,10 @@
   "sr": 44100,
   "frames": 86784,
   "seconds": 1.9679,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 384,
+  "root": 60,
+  "preset_frames": 43392
  },
  {
   "bank": "extras",
@@ -1217,7 +1580,10 @@
   "sr": 44100,
   "frames": 212608,
   "seconds": 4.821,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 385,
+  "root": 60,
+  "preset_frames": 106304
  },
  {
   "bank": "extras",
@@ -1227,7 +1593,10 @@
   "sr": 44100,
   "frames": 53120,
   "seconds": 1.2045,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 386,
+  "root": 60,
+  "preset_frames": 26560
  },
  {
   "bank": "extras",
@@ -1237,7 +1606,10 @@
   "sr": 44100,
   "frames": 61056,
   "seconds": 1.3845,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 387,
+  "root": 60,
+  "preset_frames": 30528
  },
  {
   "bank": "extras",
@@ -1247,7 +1619,10 @@
   "sr": 44100,
   "frames": 25344,
   "seconds": 0.5747,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 388,
+  "root": 60,
+  "preset_frames": 12672
  },
  {
   "bank": "extras",
@@ -1257,7 +1632,10 @@
   "sr": 44100,
   "frames": 32384,
   "seconds": 0.7343,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 389,
+  "root": 60,
+  "preset_frames": 16192
  },
  {
   "bank": "extras",
@@ -1267,7 +1645,10 @@
   "sr": 44100,
   "frames": 229376,
   "seconds": 5.2013,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 390,
+  "root": 60,
+  "preset_frames": 114688
  },
  {
   "bank": "extras",
@@ -1277,7 +1658,10 @@
   "sr": 44100,
   "frames": 46848,
   "seconds": 1.0623,
-  "stereo_source": true
+  "stereo_source": true,
+  "preset": 391,
+  "root": 60,
+  "preset_frames": 23424
  },
  {
   "bank": "tr808",
@@ -1287,7 +1671,10 @@
   "sr": 31250,
   "frames": 3921,
   "seconds": 0.1255,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 12,
+  "root": 45,
+  "preset_frames": 2767
  },
  {
   "bank": "tr808",
@@ -1297,7 +1684,10 @@
   "sr": 31250,
   "frames": 1858,
   "seconds": 0.0595,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 13,
+  "root": 52,
+  "preset_frames": 1312
  },
  {
   "bank": "tr808",
@@ -1307,7 +1697,10 @@
   "sr": 31250,
   "frames": 4071,
   "seconds": 0.1303,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 14,
+  "root": 41,
+  "preset_frames": 2873
  },
  {
   "bank": "tr808",
@@ -1317,7 +1710,10 @@
   "sr": 31250,
   "frames": 413,
   "seconds": 0.0132,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 15,
+  "root": 90,
+  "preset_frames": 292
  },
  {
   "bank": "tr808",
@@ -1327,7 +1723,10 @@
   "sr": 31250,
   "frames": 12749,
   "seconds": 0.408,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 16,
+  "root": 61,
+  "preset_frames": 8996
  },
  {
   "bank": "tr808",
@@ -1337,7 +1736,10 @@
   "sr": 31250,
   "frames": 6671,
   "seconds": 0.2135,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 17,
+  "root": 67,
+  "preset_frames": 4708
  },
  {
   "bank": "tr808",
@@ -1347,7 +1749,10 @@
   "sr": 31250,
   "frames": 17567,
   "seconds": 0.5621,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 18,
+  "root": 59,
+  "preset_frames": 12396
  },
  {
   "bank": "power",
@@ -1357,7 +1762,10 @@
   "sr": 44100,
   "frames": 29254,
   "seconds": 0.6634,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 311,
+  "root": 35,
+  "preset_frames": 14627
  },
  {
   "bank": "power",
@@ -1367,7 +1775,10 @@
   "sr": 44100,
   "frames": 30686,
   "seconds": 0.6958,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 312,
+  "root": 36,
+  "preset_frames": 15343
  },
  {
   "bank": "power",
@@ -1377,7 +1788,10 @@
   "sr": 44100,
   "frames": 39551,
   "seconds": 0.8968,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 313,
+  "root": 37,
+  "preset_frames": 19776
  },
  {
   "bank": "power",
@@ -1387,7 +1801,10 @@
   "sr": 44100,
   "frames": 47560,
   "seconds": 1.0785,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 314,
+  "root": 38,
+  "preset_frames": 23780
  },
  {
   "bank": "power",
@@ -1397,7 +1814,10 @@
   "sr": 44100,
   "frames": 43042,
   "seconds": 0.976,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 315,
+  "root": 39,
+  "preset_frames": 21521
  },
  {
   "bank": "power",
@@ -1407,7 +1827,10 @@
   "sr": 44100,
   "frames": 48439,
   "seconds": 1.0984,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 316,
+  "root": 40,
+  "preset_frames": 24220
  },
  {
   "bank": "power",
@@ -1417,7 +1840,10 @@
   "sr": 44100,
   "frames": 43592,
   "seconds": 0.9885,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 317,
+  "root": 41,
+  "preset_frames": 21796
  },
  {
   "bank": "power",
@@ -1427,7 +1853,10 @@
   "sr": 44100,
   "frames": 44031,
   "seconds": 0.9984,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 318,
+  "root": 42,
+  "preset_frames": 22016
  },
  {
   "bank": "power",
@@ -1437,7 +1866,10 @@
   "sr": 44100,
   "frames": 40836,
   "seconds": 0.926,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 319,
+  "root": 43,
+  "preset_frames": 20418
  },
  {
   "bank": "power",
@@ -1447,7 +1879,10 @@
   "sr": 44100,
   "frames": 44543,
   "seconds": 1.01,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 320,
+  "root": 44,
+  "preset_frames": 22272
  },
  {
   "bank": "power",
@@ -1457,7 +1892,10 @@
   "sr": 44100,
   "frames": 43306,
   "seconds": 0.982,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 321,
+  "root": 45,
+  "preset_frames": 21653
  },
  {
   "bank": "power",
@@ -1467,7 +1905,10 @@
   "sr": 44100,
   "frames": 48895,
   "seconds": 1.1087,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 322,
+  "root": 46,
+  "preset_frames": 24448
  },
  {
   "bank": "power",
@@ -1477,7 +1918,10 @@
   "sr": 44100,
   "frames": 45451,
   "seconds": 1.0306,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 323,
+  "root": 47,
+  "preset_frames": 22726
  },
  {
   "bank": "power",
@@ -1487,7 +1931,10 @@
   "sr": 44100,
   "frames": 66047,
   "seconds": 1.4977,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 324,
+  "root": 48,
+  "preset_frames": 33024
  },
  {
   "bank": "power",
@@ -1497,7 +1944,10 @@
   "sr": 44100,
   "frames": 126146,
   "seconds": 2.8605,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 325,
+  "root": 49,
+  "preset_frames": 63073
  },
  {
   "bank": "power",
@@ -1507,7 +1957,10 @@
   "sr": 44100,
   "frames": 51711,
   "seconds": 1.1726,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 326,
+  "root": 50,
+  "preset_frames": 25856
  },
  {
   "bank": "power",
@@ -1517,7 +1970,10 @@
   "sr": 44100,
   "frames": 48758,
   "seconds": 1.1056,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 327,
+  "root": 51,
+  "preset_frames": 24379
  },
  {
   "bank": "power",
@@ -1527,7 +1983,10 @@
   "sr": 44100,
   "frames": 37260,
   "seconds": 0.8449,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 328,
+  "root": 53,
+  "preset_frames": 18630
  },
  {
   "bank": "power",
@@ -1537,7 +1996,10 @@
   "sr": 44100,
   "frames": 42080,
   "seconds": 0.9542,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 329,
+  "root": 55,
+  "preset_frames": 21040
  },
  {
   "bank": "power",
@@ -1547,6 +2009,9 @@
   "sr": 44100,
   "frames": 34483,
   "seconds": 0.7819,
-  "stereo_source": false
+  "stereo_source": false,
+  "preset": 330,
+  "root": 56,
+  "preset_frames": 17242
  }
 ]

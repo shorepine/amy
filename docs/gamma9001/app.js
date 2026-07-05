@@ -27,8 +27,7 @@ const DEFAULT_KIT = [
   "tr909/909hh.wav", "tr909/909oh.wav", "tr808/tr-808-cowbell.wav", "tr909/909ride.wav",
 ];
 
-let manifest = [];             // manifest.json entries; index == AMY preset number
-let loadedPresets = new Set(); // preset indices already transferred into AMY
+let manifest = [];             // manifest.json entries; .preset == baked AMY preset number
 let audioOn = false;
 
 function newPattern() {
@@ -224,80 +223,29 @@ function loadSongState(payload) {
   return true;
 }
 
-// ---------------------------------------------------------------- sample loading
-
-function wavDataChunk(buf) {
-  const dv = new DataView(buf);
-  let off = 12; // past RIFF....WAVE
-  while (off + 8 <= dv.byteLength) {
-    const id = String.fromCharCode(dv.getUint8(off), dv.getUint8(off + 1), dv.getUint8(off + 2), dv.getUint8(off + 3));
-    const sz = dv.getUint32(off + 4, true);
-    if (id === "data") return new Uint8Array(buf, off + 8, sz);
-    off += 8 + sz + (sz & 1);
-  }
-  throw new Error("no data chunk in wav");
-}
-
-function b64chunk(bytes) {
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s);
-}
-
-// Transfer one sample into an AMY memorypcm preset. The header message plus all
-// base64 chunks are sent in one synchronous loop: nothing else may talk to AMY
-// mid-transfer, so no awaits in here.
-function sendSampleToAmy(presetIdx, wavBuf) {
-  const entry = manifest[presetIdx];
-  const data = wavDataChunk(wavBuf);
-  const frames = data.length >> 1;
-  amy_send({ load_sample: `${presetIdx},${frames},${entry.sr},60,0,0` });
-  for (let i = 0; i < data.length; i += 188) {
-    amy_add_message(b64chunk(data.subarray(i, Math.min(i + 188, data.length))));
-  }
-  loadedPresets.add(presetIdx);
-}
-
-async function loadPreset(presetIdx) {
-  if (loadedPresets.has(presetIdx)) return;
-  const entry = manifest[presetIdx];
-  const buf = await (await fetch("samples/" + entry.file)).arrayBuffer();
-  if (loadedPresets.has(presetIdx)) return; // raced with another load
-  sendSampleToAmy(presetIdx, buf);
-}
+// ---------------------------------------------------------------- triggering
+//
+// All 155 samples are baked into the AMY wasm as Gamma9001 bank presets (the
+// TR-808 bank as ROM presets 0-18, the rest in the linked drums.bin at 256+),
+// so there's nothing to load: the manifest's `preset` field (synced from
+// sounds/gamma9001/manifest.json by sync_presets.py) addresses them directly.
 
 function setLoadStatus(text) {
   document.getElementById("loadstatus").textContent = text;
   document.getElementById("startlabel").textContent = text;
 }
 
-async function loadAllSamples() {
-  // Kit samples first so the machine is playable immediately.
-  for (const ch of state.channels) await loadPreset(ch.sample);
-  setLoadStatus("kit ready");
-  let n = 0;
-  for (let i = 0; i < manifest.length; i++) {
-    if (!loadedPresets.has(i)) {
-      await loadPreset(i);
-      if (++n % 8 === 0) {
-        setLoadStatus(`loading samples ${loadedPresets.size}/${manifest.length}`);
-        await new Promise(r => setTimeout(r, 0));
-      }
-    }
-  }
-  setLoadStatus(`${manifest.length} samples loaded`);
-}
-
-// ---------------------------------------------------------------- triggering
-
 function triggerChannel(ch, time, stepVel, stepPitch, accent) {
   const c = state.channels[ch];
+  const m = manifest[c.sample];
   const vel = c.vol * (stepVel ?? 1) * (accent ? ACCENT_GAIN : 1.0);
   const ev = {
     osc: OSC_BASE + ch,
     wave: AMY.PCM,
-    preset: c.sample,
-    note: 60 + c.pitch + (stepPitch ?? 0),
+    preset: m.preset,
+    // each preset's root note plays it untransposed (the 808 SoundFont extras
+    // and the Power Kit have non-60 roots)
+    note: m.root + c.pitch + (stepPitch ?? 0),
     pan: c.pan,
     vel: vel,
   };
@@ -307,8 +255,9 @@ function triggerChannel(ch, time, stepVel, stepPitch, accent) {
     // Start playback partway into the sample. pcm_note_on resets phase to 0, so
     // this must land as a separate delta *after* the note-on; AMY's queue keeps
     // insertion order for equal timestamps, so a second message at the same
-    // time does exactly that.
-    const startFrame = Math.floor(c.offset * manifest[c.sample].frames);
+    // time does exactly that. preset_frames is the 22050 Hz frame count of the
+    // baked preset (the manifest's `frames` is the original native-rate count).
+    const startFrame = Math.floor(c.offset * m.preset_frames);
     const ph = { osc: OSC_BASE + ch, phase: startFrame / PCM_PHASE_DENOM };
     if (time !== undefined) ph.time = time;
     amy_send(ph);
@@ -913,8 +862,7 @@ function drawPicker() {
       b.className = "samplebtn";
       b.dataset.idx = idx;
       b.innerHTML = `${m.name}<span class="dur">${m.seconds.toFixed(2)}s</span>`;
-      b.addEventListener("click", async () => {
-        await loadPreset(idx);
+      b.addEventListener("click", () => {
         state.channels[pickerChannel].sample = idx;
         document.querySelectorAll(".soundname")[pickerChannel].textContent = m.name;
         markPickerCurrent();
@@ -949,6 +897,9 @@ function defaultPattern() {
 
 async function boot() {
   manifest = await (await fetch("samples/manifest.json")).json();
+  if (manifest.length && manifest[0].preset === undefined) {
+    console.warn("manifest has no preset numbers - run docs/gamma9001/sync_presets.py");
+  }
   DEFAULT_KIT.forEach((file, ch) => {
     const idx = manifest.findIndex(m => m.file === file);
     if (idx >= 0) state.channels[ch].sample = idx;
@@ -1030,8 +981,8 @@ async function boot() {
     window.location.reload();
   });
 
-  // Startup modal: one click starts audio (browsers require a gesture) and
-  // loads the samples, then the machine is fully live.
+  // Startup modal: one click starts audio (browsers require a gesture); the
+  // samples are baked into the AMY wasm, so the machine is live immediately.
   const startModal = document.getElementById("startmodal");
   startModal.addEventListener("click", async () => {
     if (audioOn) return;
@@ -1042,7 +993,7 @@ async function boot() {
     amy_send({ volume: state.masterVol });
     applyAllChannelFilters();
     applyFx();
-    await loadAllSamples();
+    setLoadStatus(`${manifest.length} sounds on board`);
     startModal.classList.add("hidden");
   });
 
