@@ -851,44 +851,89 @@ function refreshEchoSync() {
 
 // ---------------------------------------------------------------- sound picker
 
+// The curated drum-machine banks, in display order. Anything in the manifest
+// with a bank outside this list lands in the "Other" section at the bottom.
+const PICKER_BANKS = [
+  ["tr909", "Roland TR-909"],
+  ["tr808", "Roland TR-808"],
+  ["linn9000", "Linn 9000"],
+  ["mr12", "Univox Micro Rythmer 12"],
+  ["synthetics", "Tokyo Synthetics"],
+  ["power", "80s Power Kit"],
+  ["percussion", "Percussion"],
+];
+const OTHER_BANK = "__other";
+
 let pickerChannel = 0;
-let pickerBank = null;
+
+function pickerBankOf(m) {
+  return PICKER_BANKS.some(([id]) => id === m.bank) ? m.bank : OTHER_BANK;
+}
 
 function openPicker(ch) {
   pickerChannel = ch;
-  pickerBank = manifest[state.channels[ch].sample].bank;
   document.getElementById("picker").classList.remove("hidden");
   drawPicker();
+  // start scrolled to the selected sample's section
+  const cur = document.querySelector("#pickerlist .samplebtn.current");
+  if (cur) cur.closest(".banksection").scrollIntoView({ block: "start" });
+}
+
+function markPickerCurrent() {
+  const curIdx = state.channels[pickerChannel].sample;
+  document.querySelectorAll("#pickerlist .samplebtn").forEach(b =>
+    b.classList.toggle("current", +b.dataset.idx === curIdx));
+  const curBank = pickerBankOf(manifest[curIdx]);
+  document.querySelectorAll("#pickerbanks .bankbtn").forEach(b =>
+    b.classList.toggle("current", b.dataset.bank === curBank));
 }
 
 function drawPicker() {
-  const banks = [];
-  for (const m of manifest) if (!banks.includes(m.bank)) banks.push(m.bank);
+  const sections = PICKER_BANKS.concat([[OTHER_BANK, "Other"]]);
   const bankHolder = document.getElementById("pickerbanks");
   bankHolder.innerHTML = "";
-  for (const bank of banks) {
-    const b = document.createElement("button");
-    b.className = "bankbtn" + (bank === pickerBank ? " current" : "");
-    b.textContent = manifest.find(m => m.bank === bank).bank_name;
-    b.addEventListener("click", () => { pickerBank = bank; drawPicker(); });
-    bankHolder.appendChild(b);
-  }
   const list = document.getElementById("pickerlist");
   list.innerHTML = "";
-  manifest.forEach((m, idx) => {
-    if (m.bank !== pickerBank) return;
-    const b = document.createElement("button");
-    b.className = "samplebtn" + (idx === state.channels[pickerChannel].sample ? " current" : "");
-    b.innerHTML = `${m.name}<span class="dur">${m.seconds.toFixed(2)}s</span>`;
-    b.addEventListener("click", async () => {
-      await loadPreset(idx);
-      state.channels[pickerChannel].sample = idx;
-      document.querySelectorAll(".soundname")[pickerChannel].textContent = m.name;
-      drawPicker();
-      if (audioOn) triggerChannel(pickerChannel);
-    });
-    list.appendChild(b);
-  });
+  for (const [bankId, bankName] of sections) {
+    const entries = [];
+    manifest.forEach((m, idx) => { if (pickerBankOf(m) === bankId) entries.push([m, idx]); });
+    if (!entries.length) continue;
+
+    const section = document.createElement("div");
+    section.className = "banksection";
+    section.dataset.bank = bankId;
+    const header = document.createElement("div");
+    header.className = "bankheader";
+    header.textContent = bankName;
+    section.appendChild(header);
+    const grid = document.createElement("div");
+    grid.className = "bankgrid";
+    for (const [m, idx] of entries) {
+      const b = document.createElement("button");
+      b.className = "samplebtn";
+      b.dataset.idx = idx;
+      b.innerHTML = `${m.name}<span class="dur">${m.seconds.toFixed(2)}s</span>`;
+      b.addEventListener("click", async () => {
+        await loadPreset(idx);
+        state.channels[pickerChannel].sample = idx;
+        document.querySelectorAll(".soundname")[pickerChannel].textContent = m.name;
+        markPickerCurrent();
+        if (audioOn) triggerChannel(pickerChannel);
+      });
+      grid.appendChild(b);
+    }
+    section.appendChild(grid);
+    list.appendChild(section);
+
+    // top button jumps to the section
+    const jump = document.createElement("button");
+    jump.className = "bankbtn";
+    jump.dataset.bank = bankId;
+    jump.textContent = bankName;
+    jump.addEventListener("click", () => section.scrollIntoView({ block: "start", behavior: "smooth" }));
+    bankHolder.appendChild(jump);
+  }
+  markPickerCurrent();
 }
 
 // ---------------------------------------------------------------- boot
