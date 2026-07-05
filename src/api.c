@@ -263,12 +263,24 @@ void amy_add_event(amy_event *e) {
 // defined in midi_mappings.c
 extern void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex);
 #ifdef __EMSCRIPTEN__
+#ifdef GAMMA9001
+// The Gamma9001 drums.bin blob, linked into the wasm (build/drums_bin.c).
+extern const int16_t gamma9001_pcm_data[];
+#endif
+
+static void amy_web_setup_gamma9001() {
+#ifdef GAMMA9001
+    amy_set_gamma9001_pcm(gamma9001_pcm_data);
+#endif
+}
+
 void amy_start_web() {
     // a shim for web AMY, as it's annoying to build structs in js
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 1;
     amy_config.features.startup_bleep = 1;
+    amy_web_setup_gamma9001();
     amy_start(amy_config);
 }
 
@@ -277,6 +289,7 @@ void amy_start_web_no_synths() {
     amy_config_t amy_config = amy_default_config();
     amy_config.midi = AMY_MIDI_IS_WEBMIDI;
     amy_config.features.default_synths = 0;
+    amy_web_setup_gamma9001();
     amy_start(amy_config);
 }
 #endif
