@@ -12,6 +12,7 @@ try:
     live = _amy.live
     _get_synth_commands = _amy.get_synth_commands
     _set_cv_from_osc = _amy.set_cv_from_osc
+    _ticks_ms = _amy.ticks_ms
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
@@ -19,6 +20,7 @@ except (ImportError, AttributeError):
     try:
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
+        _ticks_ms = tulip.amy_ticks_ms
     except (ImportError, AttributeError):
         pass  # Not available (e.g. web build); _get_synth_commands returns []
 
@@ -325,8 +327,8 @@ def inject_midi_bytes(data, usb=0):
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
 
-def systime():
-    return _amy.systime()
+def ticks_ms():
+    return _ticks_ms()
 
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)

@@ -542,14 +542,14 @@ class TestJunoPatch(AmyTest):
 
 
 class TestJunoClip(AmyTest):
-  """Juno patch that clips."""
+  """Juno patch that used to clip until we trimmed the volumes in #802.  Now run with vel=5."""
 
   def run(self):
     amy.send(time=0, voices="0,1,2,3", patch=9)
-    amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=50, voices="1", note=57, vel=1)
-    amy.send(time=50, voices="2", note=55, vel=1)
-    amy.send(time=50, voices="3", note=52, vel=1)
+    amy.send(time=50, voices="0", note=60, vel=5)
+    amy.send(time=50, voices="1", note=57, vel=5)
+    amy.send(time=50, voices="2", note=55, vel=5)
+    amy.send(time=50, voices="3", note=52, vel=5)
     amy.send(time=800, voices="0", vel=0)
     amy.send(time=800, voices="1", vel=0)
     amy.send(time=800, voices="2", vel=0)

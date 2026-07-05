@@ -288,7 +288,7 @@ static PyObject *set_cv_from_osc_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-static PyObject *amy_systime_wrapper(PyObject *self, PyObject *args) {
+static PyObject *amy_ticks_ms_wrapper(PyObject *self, PyObject *args) {
     return Py_BuildValue("i", amy_sysclock());
 }
 
@@ -304,7 +304,7 @@ static PyMethodDef c_amyMethods[] = {
     {"inject_midi_bytes", inject_midi_bytes_wrapper, METH_VARARGS, "Inject a raw MIDI byte stream through the parser"},
     {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
     {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
-    {"systime", amy_systime_wrapper, METH_VARARGS, "Read AMY millisecond clock"},
+    {"ticks_ms", amy_ticks_ms_wrapper, METH_VARARGS, "Read AMY millisecond clock"},
     { NULL, NULL, 0, NULL }
 };
 
