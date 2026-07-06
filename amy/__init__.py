@@ -3,7 +3,7 @@ from .constants import *
 from . import examples
 import collections
 import time
-def _get_synth_commands_stub(synth):
+def _get_synth_commands_stub(synth, include_fx=False):
     return []
 
 _get_synth_commands = _get_synth_commands_stub
