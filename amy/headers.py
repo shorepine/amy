@@ -717,8 +717,8 @@ DRUMKIT = [
 #  [9] CH  [10] OH  [11] shaker  [12-14] snare 1(45)/2(52)/3(41)
 #  [15] rimshot(90) [16] tom lo(61) [17] tom hi(67) [18] cymbal(59)
 GAMMA_DRUMKIT = [
-    (1, 60),    # 35 Acoustic Bass Drum -> BD 2
-    (0, 60),    # 36 Bass Drum 1        -> BD 1
+    (0, 60),    # 35 Acoustic Bass Drum -> BD 1 (the long 3s boom)
+    (2, 60),    # 36 Bass Drum 1        -> BD 3 (short + punchy, closest to the old kit's kick)
     (15, 90),   # 37 Side Stick         -> rimshot
     (12, 45),   # 38 Acoustic Snare     -> snare 1
     (3, 60),    # 39 Hand Clap          -> clap
@@ -909,6 +909,34 @@ GAMMA_KITS = [
 ]
 
 
+_GAMMA_PRESET_RMS = None
+
+def _gamma_preset_rms():
+    """preset number -> loudest-100ms RMS in dBFS, for kit level balancing."""
+    global _GAMMA_PRESET_RMS
+    if _GAMMA_PRESET_RMS is not None:
+        return _GAMMA_PRESET_RMS
+    import json, math
+    manifest = json.load(open('sounds/gamma9001/manifest.json'))
+    table = {}
+    rom_i = bin_i = 0
+    for m in manifest:
+        preset = rom_i if m['bank'] == GAMMA9001_ROM_BANK else GAMMA9001_PRESET_BASE + bin_i
+        if m['bank'] == GAMMA9001_ROM_BANK:
+            rom_i += 1
+        else:
+            bin_i += 1
+        d = _read_wav_mono16('sounds/gamma9001/' + m['file'])
+        x = np.asarray(d, dtype=np.float32) / 32768.0
+        n = 2205  # 100ms at 22050
+        if len(x) < n:
+            x = np.pad(x, (0, n - len(x)))
+        env = np.convolve(x * x, np.ones(n) / n, mode='valid')
+        table[preset] = 20.0 * math.log10(float(np.sqrt(env.max())) + 1e-9)
+    _GAMMA_PRESET_RMS = table
+    return table
+
+
 def gamma_kit_to_drumkit(kit):
     """Resolve a {gm_note: (file, base_note)} kit to DRUMKIT-style tuples."""
     import json
@@ -932,7 +960,7 @@ def gamma_kit_to_drumkit(kit):
     return out
 
 
-def make_drums_patch(drumkit=None, synth_flags=None):
+def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
     if drumkit is None:
         drumkit = DRUMKIT
     if synth_flags is None:
@@ -943,9 +971,27 @@ def make_drums_patch(drumkit=None, synth_flags=None):
     # Set up a bunch of midi_note_cmd mappings for CH10 drums
     message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=synth_flags)
     message += amy.message(synth_flags=synth_flags)
+    # Level balancing for the Gamma9001 kits: the source samples were never
+    # level-matched as a kit (the Koblo kick is a full-scale 3s boom, the hats
+    # 6-8 dB quieter than the old set), so bake a per-note amp into each
+    # mapping that lands every voice at a consistent loudness target.
+    rms_table = _gamma_preset_rms() if balance else {}
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
         if pcm_preset_number >= 0:
+            kwargs = {}
+            rms = rms_table.get(pcm_preset_number)
+            if rms is not None:
+                # kicks louder than the rest; toms in between
+                if midi_note in (35, 36):
+                    target = -8.0
+                elif midi_note in (41, 43, 45, 47, 48, 50):
+                    target = -11.0
+                else:
+                    target = -14.0
+                gain = 10.0 ** ((target - rms) / 20.0)
+                gain = min(3.0, max(0.33, gain))
+                kwargs['amp'] = round(5.0 * gain, 2)
             message += amy.message(
                 midi_note_cmd=(
                     ("%d,0,0,1,0," % midi_note)
@@ -953,7 +999,8 @@ def make_drums_patch(drumkit=None, synth_flags=None):
                         synth=8888,
                         preset=pcm_preset_number,
                         note=base_midi_note,
-                        vel=9999
+                        vel=9999,
+                        **kwargs
                     ).replace('8888', '%i').replace('9999', '%v')
                 )
             )
@@ -1019,12 +1066,12 @@ def make_patches(filename):
             num_oscs.append(0)
 
         # kit 0: the baked TR-808 bank (ROM presets only; works without drums.bin)
-        num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT)
+        num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
         f.write("\t/* %d: drum kit 0 TR-808 (Gamma9001) */ \"%s\",\n" % (GAMMA_KIT_PATCH_BASE, patch_string))
         num_oscs.append(num_osc_drums)
         # kits 1+: the drums.bin banks
         for k, (kit_name, kit) in enumerate(GAMMA_KITS):
-            num_osc_drums, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit))
+            num_osc_drums, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit), balance=True)
             f.write("\t/* %d: drum kit %d %s (Gamma9001) */ \"%s\",\n" % (
                 GAMMA_KIT_PATCH_BASE + 1 + k, k + 1, kit_name, patch_string))
             num_oscs.append(num_osc_drums)
