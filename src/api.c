@@ -182,9 +182,6 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->reverb_damping);
     AMY_UNSET(e->reverb_xover_hz);
     AMY_UNSET(e->oscs_per_voice);
-    AMY_UNSET(e->start_sample_preset);
-    AMY_UNSET(e->start_sample_bus);
-    AMY_UNSET(e->stop_sample);
 }
 
 
