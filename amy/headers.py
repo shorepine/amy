@@ -1050,10 +1050,19 @@ def make_patches(filename):
         f.write("\t/* 257: amyboard default */ \"%s\",\n" % (patch_string))
         num_oscs.append(num_osc_amyboard)
 
-        # do MIDI drums via midi_note_cmd patch (legacy kit over the pcm_tiny ROM
-        # set; still the channel-10 default on non-GAMMA9001 builds)
+        # do MIDI drums via midi_note_cmd patch. The preset numbers baked into
+        # this string index the compiled-in ROM sample set, which is
+        # build-conditional (amy.c: pcm_gamma808.h under GAMMA9001, else
+        # pcm_tiny.h) -- so emit a matching 258 for each ROM. The GAMMA9001
+        # variant reuses kit 384's GM map but keeps 258's historical flags
+        # (no baked NOTES_VIA_MIDI; callers set their own).
         num_osc_drums, patch_string  = make_drums_patch(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
-        f.write("\t/* 258: MIDI drums */ \"%s\",\n" % (patch_string))
+        _, gamma_patch_string = make_drums_patch(GAMMA_DRUMKIT, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS, balance=True)
+        f.write("#ifdef GAMMA9001\n")
+        f.write("\t/* 258: MIDI drums (gamma808 ROM) */ \"%s\",\n" % (gamma_patch_string))
+        f.write("#else\n")
+        f.write("\t/* 258: MIDI drums (pcm_tiny ROM) */ \"%s\",\n" % (patch_string))
+        f.write("#endif\n")
         num_oscs.append(num_osc_drums)
 
         # 259-383 are reserved so the Gamma9001 drum kits land on their own
