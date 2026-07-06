@@ -445,6 +445,9 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->file_handle = 0;
     memory_preset->type = AMY_PCM_TYPE_MEMORY;
     memory_preset->sample_ram = (int16_t *)(((uint8_t *)memory_preset) + sizeof(memorypcm_preset_t));
+    // Zero the sample RAM so any region not (yet) filled in -- e.g. a bus
+    // capture stopped before max_frames -- plays back as silence, not heap noise.
+    memset(memory_preset->sample_ram, 0, length * channels * sizeof(int16_t));
     if(loopend == 0) {  // loop whole sample
         memory_preset->loopend = memory_preset->length-1;
     } else {
@@ -452,6 +455,22 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     }
     new_preset_pointer->preset = memory_preset;
     return memory_preset->sample_ram;
+}
+
+// Arm a bus capture (zS) into a memory preset created earlier by pcm_load.
+// Called from play_delta so start_sample honors its scheduled event time.
+void pcm_arm_sample_capture(uint16_t preset_number, uint8_t bus) {
+    memorypcm_ll_t *preset = memorypcm_ll_start;
+    while(preset != NULL) {
+        if(preset->preset_number == preset_number &&
+           preset->preset->type == AMY_PCM_TYPE_MEMORY &&
+           preset->preset->sample_ram != NULL) {
+            start_receiving_sample(preset->preset->length, bus, preset->preset->sample_ram);
+            return;
+        }
+        preset = preset->next;
+    }
+    fprintf(stderr, "start_sample: no memory preset %d to capture into\n", preset_number);
 }
 
 void pcm_unload_preset(uint16_t preset_number) {

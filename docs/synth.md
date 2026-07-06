@@ -414,6 +414,8 @@ amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play ba
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
 
+`start_sample` and `stop_sample` accept an optional `time=` like other AMY messages, so you can schedule the capture window on the AMY timeline; without it, sampling starts (or stops) as soon as the message is processed. The preset's sample memory is allocated and zeroed when the message is parsed, so a capture stopped before `max_frames` plays back its unfilled remainder as silence.
+
 
 
 
