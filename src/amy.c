@@ -3,7 +3,6 @@
 
 #include "amy.h"
 #include "delay.h"
-#include "transfer.h"  // for stop_receiving_sample
 
 #ifdef AMY_DEBUG
 
@@ -667,12 +666,6 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_F(reverb_xover_hz, REVERB_XOVER_HZ)
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
-    if(AMY_IS_SET(e->start_sample_preset)) {
-        d.param = START_SAMPLE;
-        d.data.i = e->start_sample_preset | ((uint32_t)e->start_sample_bus << 16);
-        add_delta_to_queue(&d, queue);
-    }
-    EVENT_TO_DELTA_I(stop_sample, STOP_SAMPLE)
 
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
         EVENT_TO_DELTA_F(volume[bus], VOLUME_BASE + bus)
@@ -1396,8 +1389,6 @@ void play_delta(struct delta *d) {
     if(d->param == REVERB_LIVENESS) config_reverb(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     if(d->param == REVERB_DAMPING) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
     if(d->param == REVERB_XOVER_HZ) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
-    if(d->param == START_SAMPLE) pcm_arm_sample_capture(d->data.i & 0xffff, (d->data.i >> 16) & 0xff);
-    if(d->param == STOP_SAMPLE) stop_receiving_sample();
 
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.

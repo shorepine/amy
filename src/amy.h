@@ -391,9 +391,7 @@ enum params{
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
     BUS,
-    START_SAMPLE,               // data.i packs preset (low 16) | bus (high 8)
-    STOP_SAMPLE,
-    NO_PARAM                    // 212
+    NO_PARAM                    // 210
 };
 
 ///////////////////////////////////////
@@ -575,11 +573,6 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
-    // Bus sampling (zS/zO). event only. The preset RAM is allocated at parse
-    // time, but capture is armed by a delta so it honors the event time.
-    uint16_t start_sample_preset;
-    uint8_t start_sample_bus;
-    uint8_t stop_sample;
 } amy_event;
 
 // This is the state of each oscillator, set by the sequencer from deltas
@@ -1135,7 +1128,6 @@ extern const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint
 extern int pcm_load_file();
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
-extern void pcm_arm_sample_capture(uint16_t preset_number, uint8_t bus);
 
 // filters
 extern void filters_init(uint8_t bus);

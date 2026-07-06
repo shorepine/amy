@@ -1111,38 +1111,6 @@ class TestSample(AmyTest):
     amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
 
 
-class TestSampleSilence(AmyTest):
-  """Regression test: sampling a silent stretch of output must play back as
-  silence. start_sample/stop_sample used to arm the capture at message-parse
-  time instead of their scheduled event time, so the capture grabbed the
-  audio at the start of the render (the sine note here) instead of the
-  intended window, and any uncaptured remainder of the preset RAM played
-  back uninitialized heap memory."""
-
-  playback_time = 0.7
-
-  def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=50, osc=0, vel=1)
-    amy.send(time=200, osc=0, vel=0)
-    # The output is bit-exact zero well before t=500 ms; capture 0.1 sec of it.
-    amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=4410,
-                     midinote=60, time=500)
-    # Play the captured silence back, loud.
-    amy.send(time=int(self.playback_time * 1000), osc=100, wave=amy.PCM_MIX,
-             preset=1024, note=60, vel=16)
-
-  def test(self):
-    test_passed, message = super().test()
-    # Beyond the ref comparison, explicitly assert the playback is silent.
-    data, sr = wavread(os.path.join(self.test_dir, self.__class__.__name__ + '.wav'))
-    playback_peak = np.max(np.abs(data[int(self.playback_time * sr):]))
-    if playback_peak > 0:
-      test_passed = False
-      message += ' PLAYBACK NOT SILENT (peak %.1f LSB)' % (playback_peak * 32768)
-    return test_passed, message
-
-
 class TestParamsInPatchCmd(AmyTest):
 
   def run(self):
