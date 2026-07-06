@@ -307,14 +307,13 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(synth_delay_ms, "synth_delay_ms", "id");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _EPRINT_I(to_synth, "to_synth", "it");  // For moving setup between synth numbers.
     _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
-    _EPRINT_I(note_source, "note_source", "iM");  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
+    _EPRINT_I(note_source_channel, "note_source_channel", "iM");  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
     _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
     _EPRINT_I(num_voices, "num_voices", "iv");
     _EPRINT_I(oscs_per_voice, "oscs_per_voice", "in");
     _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
-    _EPRINT_I(note_source, "note_source", "??");  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
@@ -382,14 +381,13 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET(synth_delay_ms);  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _RET_TRUE_IF_SET(to_synth);  // For moving setup between synth numbers.
     _RET_TRUE_IF_SET(grab_midi_notes);  // To enable/disable automatic MIDI note-on/off generating note-on/off.
-    _RET_TRUE_IF_SET(note_source);  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
+    _RET_TRUE_IF_SET(note_source_channel);  // Marks synth as MIDI-driven, so note-on events aren't echo'd to output MIDI.
     _RET_TRUE_IF_SET(pedal);  // MIDI pedal value.
     _RET_TRUE_IF_SET(num_voices);
     _RET_TRUE_IF_SET(oscs_per_voice);
     _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
     //_RET_TRUE_IF_SET(status, "status");
-    _RET_TRUE_IF_SET(note_source);  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
     _RET_TRUE_IF_SET(reset_osc);
     // Global effects
     bool is_empty = true;
@@ -453,7 +451,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(chained_osc, CHAINED_OSC)
       _CASE_I(reset_osc, RESET_OSC)
       _CASE_I(mod_source, MOD_SOURCE)
-      _CASE_I(note_source, NOTE_SOURCE)
+      _CASE_I(note_source_channel, NOTE_SOURCE_CHANNEL)
       _CASE_I(filter_type, FILTER_TYPE)
       _CASE_I(algorithm, ALGORITHM)
       _CASE_F(eq_l, EQ_L)
@@ -743,29 +741,20 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
-    uint16_t start = 0;
     //fprintf(stderr, "parse_patch_string: message %s\n", message);
-    while(strlen(message + start)) {
-      amy_event patch_event = amy_default_event();
-      if (message[start] == 'i') {
-          if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
-          // It's a synth-layer message, it needs a synth defined.
-          patch_event.synth = synth;
-      }
-      int num_used = amy_parse_message(message + start, strlen(message + start), &patch_event);
-      //{
-      //  char sub_message[256];
-      //  strncpy(sub_message, message + start, num_used);
-      //  sub_message[num_used]= 0;
-      //  fprintf(stderr, "parse_patch_string: sub_message %s\n", sub_message);
-      //}
-      start += num_used;
-      amy_process_event(&patch_event);
-      patch_event.time = time;
-      if(patch_event.status == EVENT_SCHEDULED) {
-	amy_event_to_deltas_queue(&patch_event, base_osc, queue);
-      }
-    }
+    amy_event e;
+    size_t pos = 0;
+    do {
+        amy_clear_event(&e);
+        e.time = time;
+        if (message[pos] == 'i') {
+            if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
+            // It's a synth-layer message, it needs a synth defined.
+            e.synth = synth;
+        }
+        pos = yield_event_from_message(message, &e, pos);
+        if (pos > 0) amy_event_to_deltas_queue(&e, base_osc, queue);
+    } while (pos > 0);
 }
 
 // So emscripten knows how big to make this struct.
@@ -965,12 +954,13 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     AMY_UNSET(e->patch_number);
     int32_t instrument = e->synth;
     int synth_flags = 0;
-    if (AMY_IS_SET(e->synth))  synth_flags = instrument_get_flags(e->synth);
+    uint8_t synth = e->synth;
     AMY_UNSET(e->synth);
+    if (AMY_IS_SET(synth))  synth_flags = instrument_get_flags(synth);
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // Should we invoke MIDI note-on cmd rules?
-    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source != NOTE_SOURCE_MIDI)) {
+    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source_channel != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));

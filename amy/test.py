@@ -1503,6 +1503,33 @@ class TestGrabMidiNotes(AmyTest):
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
 
 
+def send_midi(time=0, synth=1, note=60, vel=0):
+  """Wrap inject_midi with an amy.send-like interface."""
+  amy.inject_midi(time, 0x90 + (synth - 1), note, min(127, int(round(vel * 127))))
+
+
+class TestMidiNoteCmd(AmyTest):
+  """midi_note_cmd sets a particular command for a particular midi note."""
+
+  def run(self):
+    amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
+    amy.send(time=0, synth=10, num_voices=4, patch=258, synth_flags=3)  # MIDI drums
+    # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
+    amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
+    # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)
+    amy.send(time=0, synth=2, midi_note_cmd='-1,0,0,1,0,' + amy.message(synth=1, note='%n', vel='%v'))
+    # Note 63 should play as normal, note 64 should cause cowbell.
+    send_midi(time=100, synth=1, note=63, vel=1)
+    send_midi(time=200, synth=1, note=64, vel=1)
+    send_midi(time=300, synth=1, note=63, vel=0)
+    send_midi(time=400, synth=1, note=64, vel=0)
+    # Notes to synth 2 should play on synth 1, including further forwarding to synth 10 (as above).
+    send_midi(time=500, synth=2, note=63, vel=1)
+    send_midi(time=600, synth=2, note=64, vel=1)
+    send_midi(time=700, synth=2, note=63, vel=0)
+    send_midi(time=800, synth=2, note=64, vel=0)
+
+
 class TestTranceGlitch(AmyTest):
   """Investigating a glitch that occurs in 'Emo Trance Backbeat' on AMYboard World."""
 

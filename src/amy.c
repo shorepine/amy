@@ -645,7 +645,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
     EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
     EVENT_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
-    EVENT_TO_DELTA_I(note_source, NOTE_SOURCE)
+    EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
     EVENT_TO_DELTA_F(eq_l, EQ_L)
@@ -768,7 +768,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->bus = AMY_DEFAULT_BUS;
     psynth->wave = SINE;
     AMY_UNSET(psynth->preset);
-    AMY_UNSET(psynth->note_source);
+    AMY_UNSET(psynth->note_source_channel);
     AMY_UNSET(psynth->midi_note);
     psynth->velocity = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->amp_coefs[j] = 0;
@@ -1250,7 +1250,7 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
-    DELTA_TO_SYNTH_I(NOTE_SOURCE, note_source)
+    DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
     if (d->param == PRESET) {
@@ -1878,29 +1878,6 @@ void amy_block_processed(void) {
         amy_global.config.amy_external_block_done_hook();
     }
 #endif
-}
-
-void amy_process_event(amy_event *e) {
-    peek_stack("process_event");
-    if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
-        uint8_t added = sequencer_add_event(e);
-        (void)added; // we don't need to do anything with this info at this time
-        e->status = EVENT_SEQUENCE;
-    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
-        // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
-        patches_reset_patch(e->patch_number);
-        AMY_UNSET(e->reset_osc);
-    } else {
-        // if time is set, play then
-        // if time and latency is set, play in time + latency
-        // if time is not set, play now
-        // if time is not set + latency is set, play in latency
-        uint32_t playback_time = amy_sysclock();
-        if(AMY_IS_SET(e->time)) playback_time = e->time;
-        playback_time += amy_global.latency_ms;
-        e->time = playback_time;
-        e->status = EVENT_SCHEDULED;
-    }
 }
 
 int16_t * amy_fill_buffer() {

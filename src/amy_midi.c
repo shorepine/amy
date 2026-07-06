@@ -55,8 +55,8 @@ static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t syse
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
     //fprintf(stderr, "amy_send_midi_note_on: osc %d source %d note %.1f vel %.3f\n",
-    //        osc, synth[osc]->note_source, synth[osc]->midi_note, synth[osc]->velocity);
-    if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
+    //        osc, synth[osc]->note_source_channel, synth[osc]->midi_note, synth[osc]->velocity);
+    if(AMY_IS_UNSET(synth[osc]->note_source_channel)) {
         uint8_t bytes[3];
         bytes[0] = 0x90;
         bytes[1] = (uint8_t)roundf(synth[osc]->midi_note);
@@ -68,7 +68,7 @@ void amy_send_midi_note_on(uint16_t osc) {
 // Send a MIDI note off OUT
 void amy_send_midi_note_off(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
-    if(synth[osc]->note_source != NOTE_SOURCE_MIDI) {
+    if(AMY_IS_UNSET(synth[osc]->note_source_channel)) {
         uint8_t bytes[3];
         // Send note-off as a note-on with vel 0.
         bytes[0] = 0x90;
@@ -89,7 +89,7 @@ void amy_received_program_change(uint8_t channel, uint8_t program, uint32_t time
     amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
+    e.note_source_channel = channel;
     // MIDI patches are in blocks of 128, potentially set by an earlier CC0.
     int bank_number = instrument_bank_number(channel);
     if (bank_number < 0) {
@@ -115,7 +115,7 @@ void amy_received_pedal(uint8_t channel, uint8_t value, uint32_t time) {
     amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
+    e.note_source_channel = channel;
     e.pedal = value;
     amy_add_event(&e);
 }
@@ -124,7 +124,7 @@ void amy_received_all_notes_off(uint8_t channel, uint32_t time) {
     amy_event e = amy_default_event();
     e.time = time;
     e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
+    e.note_source_channel = channel;
     // All notes off is indicated by vel = 0 and note = 0
     e.velocity = 0;
     e.midi_note = 0;
@@ -136,7 +136,7 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
     e.time = time;
     // Currently, pitch bend is global and not applied per-channel, but preserve the info.
     e.synth = channel;
-    e.note_source = NOTE_SOURCE_MIDI;
+    e.note_source_channel = channel;
     // The integer range is -8192 to 8191, the float range is -1/6th to +1/6th,
     // units are octaves, so +/- 2 semitones.
     e.pitch_bend = ((float)(((int)((high_byte << 7) | low_byte)) - 8192)) / (6.0f * 8192.0f);

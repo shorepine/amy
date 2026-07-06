@@ -301,9 +301,6 @@ enum coefs{
 #define EVENT_TRANSFER_DATA 2
 #define EVENT_SEQUENCE 3
 
-// note_source values
-#define NOTE_SOURCE_MIDI 1
-
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
 #define ENVELOPE_LINEAR 1
@@ -379,7 +376,7 @@ enum params{
     EG0_TYPE, EG1_TYPE,                  // 204, 205
     CLONE_OSC,                           // 206
     RESET_OSC,                           // 207
-    NOTE_SOURCE,                         // 208
+    NOTE_SOURCE_CHANNEL,                 // 208
     ECHO_LEVEL,
     ECHO_DELAY_MS,
     ECHO_MAX_DELAY_MS,
@@ -559,7 +556,7 @@ typedef struct amy_event {
     uint32_t sequence[3]; // tick, period, tag
     //
     uint8_t status;
-    uint8_t note_source;  // .. to mark note on/offs that come from MIDI so we don't send them back out again.
+    uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
     // Global effects
     uint8_t bus;  // Which bus this osc ends up on / Prefix for global FX params
@@ -585,7 +582,7 @@ struct synthinfo {
     uint8_t bus;  // Which bus this osc ends up on
     uint16_t wave;
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
-    uint8_t note_source;  // Was the most recent note on/off received e.g. from MIDI?
+    uint8_t note_source_channel;  // Was the most recent note on/off received from a MIDI channel?
     float midi_note;
     float velocity;
     float amp_coefs[NUM_COMBO_COEFS];
@@ -935,7 +932,8 @@ void amy_add_message(char *message);
 // sysex source, so file transfer routing (transfer_flag) applies.
 void amy_add_message_from_sysex(char *message);
 void amy_add_event(amy_event *e);
-int amy_parse_message(char * message, int length, amy_event *e);
+size_t yield_event_from_message(char *message, amy_event *e, size_t pos);
+int amy_parse_message(char * message, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
 
@@ -962,7 +960,6 @@ void amy_start_web_no_synths();
 
 
 // external functions
-void amy_process_event(amy_event *e);
 void amy_restart();
 void amy_reset_oscs();
 void amy_print_devices();

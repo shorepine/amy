@@ -3,7 +3,7 @@ from .constants import *
 from . import examples
 import collections
 import time
-def _get_synth_commands_stub(synth):
+def _get_synth_commands_stub(synth, include_fx=False):
     return []
 
 _get_synth_commands = _get_synth_commands_stub
@@ -56,6 +56,9 @@ def millis():
 # https://github.com/micropython/micropython/pull/8905
 def trunc(number):
     if type(number) == str:
+        if number and number[0] == '%':
+            # Allow token placeholders through (e.g. for building midi_note_cmds)
+            return number
         if number.strip() == '':
             return ''
         number = float(number)
@@ -136,6 +139,9 @@ def parse_list_or_comma_string(obj):
 
 def str_of_int(arg):
     """Cast arg to an int, but then convert it to a str for the wire string."""
+    if type(arg) == str and arg and arg[0] == '%':
+        # Allow token placeholders through (e.g. for building midi_note_cmds)
+        return arg
     return str(int(arg))
 
 
@@ -152,7 +158,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
     ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
-    ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source', 'iMI'), ('synth_delay', 'idI'),
+    ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source_channel', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('bus', 'yI'),
