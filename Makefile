@@ -106,9 +106,14 @@ timing: amy-module
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
 
-build/amy.js: $(TARGET)
+# The web build carries the Gamma9001 drum banks: drums.bin is generated from
+# sounds/gamma9001/ and linked straight into the wasm as gamma9001_pcm_data.
+build/drums_bin.c: sounds/gamma9001/manifest.json amy/headers.py
+	$(PYTHON) -m amy.headers gamma9001
+
+build/amy.js: $(TARGET) build/drums_bin.c
 	mkdir -p build
-	emcc $(SOURCES) $(CFLAGS) $(EMSCRIPTEN_OPTIONS) -O3 -o $@
+	emcc $(SOURCES) build/drums_bin.c $(CFLAGS) -DGAMMA9001 $(EMSCRIPTEN_OPTIONS) -O3 -o $@
 
 build/amy_api.generated.js: scripts/gen_amy_js_api.py amy/__init__.py src/patches.h
 	mkdir -p build

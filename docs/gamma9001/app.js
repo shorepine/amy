@@ -17,6 +17,7 @@ const EXAMPLE_SONGS = [
   { name: "Boom Bap", data: "1xVVNj9owEP0r1TtPwIGFDT6uqqqH9lSpF8TBZCebqI4dbCftCvHfKwcUwars0pVgNcrHeF7evIwzky06dr6yBjIlrJsaciEIvmyLQjPk3YxQKx_Y_bS6xzQqBHYGUhC0tQ1kcC0TavvIkEOY4K15glyuCHmpjGHtIZdbeFU3kRnBZSIbB5dkIkvWyvvk0bV1Mh39Vh0ITRXyEjKZxJQx3WhG6KIIMcoItig8h15F3gZbFJDpXAhBcOwj5p5Qt4EhC6U9RznaHpwdHcnQlTELIcTYG-W4l5CeShBXVnBSiLIqVUhybT0_npNxdysZtmHzgbXIrXlSSV2dLcT9VTQ07PLWx6YY-yquJb5Uv9h9ZCW0am6bfmgLV9W-tDbcoitWw3g5zArI5XJC4sjSo3NvK1qexl5iIyI9eGeOI45_WzogzuS4gOM1RHoxx4oQ5_Cc0MXipPSq9a_-FkKMFhR3Me7N_nrsz_-bU4zmF-V9P2JQdQFL_KZipd6_OddATF5EkumNhax2b1Gg-AO5heOO3Tp2bkrQVceGfd_I2Sz-2a1rfd_tnJd2uPnMWj1DTmYH_0tPMN07P55NDmlarQm8-QYZ1zff9w9vvkKKHcGoOo6hB2vrTw-qwe4v" },
   { name: "Linn Pop", data: "11VVRi9swDP4rQ89KZ6fr3c7PY-zhBoPBXkIfnFRZAraVs53cSul_H86FEo72Wu44uiGMI_RZ-izJyg4G8qFlB0oilJ0FJWWOEJq-rg2BEghWh0j-F5sR0-kYybvRYpg7UNH3hGB5Q6AOZoTA7jeoYo1QNdo5MgFUsYOgbZccg2mduxNCfCx1CBvf20wuHvUACF0bq2YM0OkUaLFCGFJ4sfiMwHUdKI7mqo9c16DkjRACwVNImFsE20cCVWsTKBExPCl7PEYgOO3pqgyattExqwwH2mTLq5LgjlyWX4lC1GXvW0enC7F8XwIVP5ZkzNUaIbKNbE_n__adr7-1pTaXlP_T6o3x14dRMs0FUEWRoziInNZM1ljMreIZ-gkhZ2ePrJmP4yInhHwWabaf9fEyQl7oY42QZu4NwpCSI_FFGa9-DpH6JpXx1P4an_8GIvVTytJbCvP_IJaY5Zf10P5cFKj_gNqBp4F8OY7YFYJpB3IUxld8l_7g7PswvnSqGj58fCGjt6Dy1aR_LacZnZSfW1eBcr0xCPRw_3To4fu0fwMl9ghO2zSB7lvnPvzgDvZ_AQ" },
   { name: "Tokyo Electro", data: "13VZRj9MwDP4ryM_uSHrtusszIB7gCcTL1Iesc2lZ2vSarLCb9t9Rumh312PlBhuTkBU5rr_YjmOn2UJHrSl1DYIjLJoKBI8YginWea4IBEOopLHUftGqxzTSWmrrXqO0bkDYdk0IlV4SCDC6_gq4Z2LOkCFPEbJC1jUpA2K-BSOrRvXYTW0LsmVmXlu92ujgG9lgsZx8lx0gNKXNit5NI527SYzQuSDYZIag89yQ7dXZ2uo8B8GnjDGElozDJAjV2hKIXCpDLiKlvbDDXwexWAYsupr3TJXZKmDxsQDCy-9f6SZg4R9nYHZwf3O686K8vw_Y9Grpr8hKpcosYLfHYkgufwK6rFfXLEJjpXU5SC4fQXq4S_y1AGI-D5H1xD0fyCnOGY6SR_CBnUf8YIMP1vIjNp7pT4jjd4iROJGlKYK7dKcInUsOx1FK8T9DsEnk5ZGZS1LjsnOeA3mgyPPE8yB-BHHCEwpuz14bf4tI-yY_1lX8YbzIG3-6ZjgusqdhB4Yv7t3RvBy66qx1E_qaiX3NuILgfXbCf14UQTJQxScYSXfjPiD_AWILLXXULvbvwLKjmkx_5c9i99zT7dr0KsoK7T7fxPv5G1JyA4KzZC-_cxYmkdd-2tQZiAiB7j7sl9999Pw9CLZDqGXlflmf3Xvx1VtFmW017H4C" },
+  { name: "Power Ballad", data: "1xVXBauMwEP2VZc5jr-XW6UbHZSk9tLCwsBfjg-qMY1NZciXZ3RLy74sUN6Q0iQuhCYNlDXp676HxyCsYyNhGK-AMQYmWgMNv_ULm208hpVgAwmPXAp_PEGzdV5Uk4AlCK6wj81fLsLETzpFRYUVq3QF3pieEVi884dsygtVqCTwvEMpaKEXSAs9XYEXbyYD00t_DGD015VNkSMj4RQyA0DWurINEJ7xUnCEM3kAS_0DQVWXJheWyd7qqgLNZkiQIhqzH3CC0vSPglZCWvBWpx2SNByxYJQxdWD5aCkeLy5lwuo3Sy8pfX06-riPXLGt3yMHsHA50R-qQgesvN1AaYevpCmQnyhfba2S8E4DneYrJTrCdMUSB-dv8PXKb7yD2BZtAsE9wJMgKzNmIPvDs4WDv85HjSBQFgr9v_TfnD4fh0QiEpyB8vU5n2SCSeB4YszBOzvdw-l77yHozoey_Kn9Wxws4XeLzIKKrMxkp1lMUUP0DvgJDA5lH37spgmwGUmRDK8_9L1yb3oZ2p7LW28kvkuIVeJqN-W3Yf7VJ_ryqErjqpUSg53vgqX8_bDY_3wFncbZe_wc" },
   { name: "Conga Jam", data: "1vVVNb5wwEP0r1ZyHrWF3k5Wvjaqqak6RekEcDB0WFGMT25BGq_3vlVmyYT8gPYQIgRn7-c3TMzPsoCVjS62AhwhpXQEP2QrBFk2eSwLOECphHZnfWnaYWjhHRnUrUusauDMNIVT6DwE_LiNYrbbA4wQhK4RSJC3weAdWVLXskGSyxvrcXzOttiJgLFw8ixYQ6tJlRZehFj7TYrlGaL0Attgg6Dy35Lr1rHE6z4GHN4wxBEPWY24RqsYR8FxIS16K1H2wx-sSUq22OmBsOSbhdm4FTqRy0oTV7Ca4skqFJDul4mZuEbb0c4EtxCOZMRXzW2FKobaSpqyIZlchclNmQgWvBRKNSdnMreS5tG7ajY8zIzl2mb5lAI_jCBkyDAfPt5EhSzA-Xx-iwh4x2HHJ0nOcMQ9nEozDN8Zr94BjhOsK4kzXVcQJLkkQfDv2xejNCXHy6mR_BsKfK1uscGx8n9N_Rx-n7JjTG1Z7pw42BtGJq4PoxPvlhf9-48XxrM9hEwf4mYhg9R8kyf69LJD_Bb4DQy2Z9LXvybIlRbar5c3a_-O1aWxX8JQV-vhyR1K8AI_Wffy9Y1gegocXlQFXjZQI9PTrsOnpvh9_AGd7BCUq34u--Rb45aeoYP8P" },
 ];
 
@@ -26,8 +27,7 @@ const DEFAULT_KIT = [
   "tr909/909hh.wav", "tr909/909oh.wav", "tr808/tr-808-cowbell.wav", "tr909/909ride.wav",
 ];
 
-let manifest = [];             // manifest.json entries; index == AMY preset number
-let loadedPresets = new Set(); // preset indices already transferred into AMY
+let manifest = [];             // manifest.json entries; .preset == baked AMY preset number
 let audioOn = false;
 
 function newPattern() {
@@ -223,80 +223,29 @@ function loadSongState(payload) {
   return true;
 }
 
-// ---------------------------------------------------------------- sample loading
-
-function wavDataChunk(buf) {
-  const dv = new DataView(buf);
-  let off = 12; // past RIFF....WAVE
-  while (off + 8 <= dv.byteLength) {
-    const id = String.fromCharCode(dv.getUint8(off), dv.getUint8(off + 1), dv.getUint8(off + 2), dv.getUint8(off + 3));
-    const sz = dv.getUint32(off + 4, true);
-    if (id === "data") return new Uint8Array(buf, off + 8, sz);
-    off += 8 + sz + (sz & 1);
-  }
-  throw new Error("no data chunk in wav");
-}
-
-function b64chunk(bytes) {
-  let s = "";
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s);
-}
-
-// Transfer one sample into an AMY memorypcm preset. The header message plus all
-// base64 chunks are sent in one synchronous loop: nothing else may talk to AMY
-// mid-transfer, so no awaits in here.
-function sendSampleToAmy(presetIdx, wavBuf) {
-  const entry = manifest[presetIdx];
-  const data = wavDataChunk(wavBuf);
-  const frames = data.length >> 1;
-  amy_send({ load_sample: `${presetIdx},${frames},${entry.sr},60,0,0` });
-  for (let i = 0; i < data.length; i += 188) {
-    amy_add_message(b64chunk(data.subarray(i, Math.min(i + 188, data.length))));
-  }
-  loadedPresets.add(presetIdx);
-}
-
-async function loadPreset(presetIdx) {
-  if (loadedPresets.has(presetIdx)) return;
-  const entry = manifest[presetIdx];
-  const buf = await (await fetch("samples/" + entry.file)).arrayBuffer();
-  if (loadedPresets.has(presetIdx)) return; // raced with another load
-  sendSampleToAmy(presetIdx, buf);
-}
+// ---------------------------------------------------------------- triggering
+//
+// All 155 samples are baked into the AMY wasm as Gamma9001 bank presets (the
+// TR-808 bank as ROM presets 0-18, the rest in the linked drums.bin at 256+),
+// so there's nothing to load: the manifest's `preset` field (synced from
+// sounds/gamma9001/manifest.json by sync_presets.py) addresses them directly.
 
 function setLoadStatus(text) {
   document.getElementById("loadstatus").textContent = text;
   document.getElementById("startlabel").textContent = text;
 }
 
-async function loadAllSamples() {
-  // Kit samples first so the machine is playable immediately.
-  for (const ch of state.channels) await loadPreset(ch.sample);
-  setLoadStatus("kit ready");
-  let n = 0;
-  for (let i = 0; i < manifest.length; i++) {
-    if (!loadedPresets.has(i)) {
-      await loadPreset(i);
-      if (++n % 8 === 0) {
-        setLoadStatus(`loading samples ${loadedPresets.size}/${manifest.length}`);
-        await new Promise(r => setTimeout(r, 0));
-      }
-    }
-  }
-  setLoadStatus(`${manifest.length} samples loaded`);
-}
-
-// ---------------------------------------------------------------- triggering
-
 function triggerChannel(ch, time, stepVel, stepPitch, accent) {
   const c = state.channels[ch];
+  const m = manifest[c.sample];
   const vel = c.vol * (stepVel ?? 1) * (accent ? ACCENT_GAIN : 1.0);
   const ev = {
     osc: OSC_BASE + ch,
     wave: AMY.PCM,
-    preset: c.sample,
-    note: 60 + c.pitch + (stepPitch ?? 0),
+    preset: m.preset,
+    // each preset's root note plays it untransposed (the 808 SoundFont extras
+    // and the Power Kit have non-60 roots)
+    note: m.root + c.pitch + (stepPitch ?? 0),
     pan: c.pan,
     vel: vel,
   };
@@ -306,8 +255,9 @@ function triggerChannel(ch, time, stepVel, stepPitch, accent) {
     // Start playback partway into the sample. pcm_note_on resets phase to 0, so
     // this must land as a separate delta *after* the note-on; AMY's queue keeps
     // insertion order for equal timestamps, so a second message at the same
-    // time does exactly that.
-    const startFrame = Math.floor(c.offset * manifest[c.sample].frames);
+    // time does exactly that. preset_frames is the 22050 Hz frame count of the
+    // baked preset (the manifest's `frames` is the original native-rate count).
+    const startFrame = Math.floor(c.offset * m.preset_frames);
     const ph = { osc: OSC_BASE + ch, phase: startFrame / PCM_PHASE_DENOM };
     if (time !== undefined) ph.time = time;
     amy_send(ph);
@@ -850,44 +800,88 @@ function refreshEchoSync() {
 
 // ---------------------------------------------------------------- sound picker
 
+// The curated drum-machine banks, in display order. Anything in the manifest
+// with a bank outside this list lands in the "Other" section at the bottom.
+const PICKER_BANKS = [
+  ["tr909", "Roland TR-909"],
+  ["tr808", "Roland TR-808"],
+  ["linn9000", "Linn 9000"],
+  ["mr12", "Univox Micro Rythmer 12"],
+  ["synthetics", "Tokyo Synthetics"],
+  ["power", "80s Power Kit"],
+  ["percussion", "Percussion"],
+];
+const OTHER_BANK = "__other";
+
 let pickerChannel = 0;
-let pickerBank = null;
+
+function pickerBankOf(m) {
+  return PICKER_BANKS.some(([id]) => id === m.bank) ? m.bank : OTHER_BANK;
+}
 
 function openPicker(ch) {
   pickerChannel = ch;
-  pickerBank = manifest[state.channels[ch].sample].bank;
   document.getElementById("picker").classList.remove("hidden");
   drawPicker();
+  // start scrolled to the selected sample's section
+  const cur = document.querySelector("#pickerlist .samplebtn.current");
+  if (cur) cur.closest(".banksection").scrollIntoView({ block: "start" });
+}
+
+function markPickerCurrent() {
+  const curIdx = state.channels[pickerChannel].sample;
+  document.querySelectorAll("#pickerlist .samplebtn").forEach(b =>
+    b.classList.toggle("current", +b.dataset.idx === curIdx));
+  const curBank = pickerBankOf(manifest[curIdx]);
+  document.querySelectorAll("#pickerbanks .bankbtn").forEach(b =>
+    b.classList.toggle("current", b.dataset.bank === curBank));
 }
 
 function drawPicker() {
-  const banks = [];
-  for (const m of manifest) if (!banks.includes(m.bank)) banks.push(m.bank);
+  const sections = PICKER_BANKS.concat([[OTHER_BANK, "Other"]]);
   const bankHolder = document.getElementById("pickerbanks");
   bankHolder.innerHTML = "";
-  for (const bank of banks) {
-    const b = document.createElement("button");
-    b.className = "bankbtn" + (bank === pickerBank ? " current" : "");
-    b.textContent = manifest.find(m => m.bank === bank).bank_name;
-    b.addEventListener("click", () => { pickerBank = bank; drawPicker(); });
-    bankHolder.appendChild(b);
-  }
   const list = document.getElementById("pickerlist");
   list.innerHTML = "";
-  manifest.forEach((m, idx) => {
-    if (m.bank !== pickerBank) return;
-    const b = document.createElement("button");
-    b.className = "samplebtn" + (idx === state.channels[pickerChannel].sample ? " current" : "");
-    b.innerHTML = `${m.name}<span class="dur">${m.seconds.toFixed(2)}s</span>`;
-    b.addEventListener("click", async () => {
-      await loadPreset(idx);
-      state.channels[pickerChannel].sample = idx;
-      document.querySelectorAll(".soundname")[pickerChannel].textContent = m.name;
-      drawPicker();
-      if (audioOn) triggerChannel(pickerChannel);
-    });
-    list.appendChild(b);
-  });
+  for (const [bankId, bankName] of sections) {
+    const entries = [];
+    manifest.forEach((m, idx) => { if (pickerBankOf(m) === bankId) entries.push([m, idx]); });
+    if (!entries.length) continue;
+
+    const section = document.createElement("div");
+    section.className = "banksection";
+    section.dataset.bank = bankId;
+    const header = document.createElement("div");
+    header.className = "bankheader";
+    header.textContent = bankName;
+    section.appendChild(header);
+    const grid = document.createElement("div");
+    grid.className = "bankgrid";
+    for (const [m, idx] of entries) {
+      const b = document.createElement("button");
+      b.className = "samplebtn";
+      b.dataset.idx = idx;
+      b.innerHTML = `${m.name}<span class="dur">${m.seconds.toFixed(2)}s</span>`;
+      b.addEventListener("click", () => {
+        state.channels[pickerChannel].sample = idx;
+        document.querySelectorAll(".soundname")[pickerChannel].textContent = m.name;
+        markPickerCurrent();
+        if (audioOn) triggerChannel(pickerChannel);
+      });
+      grid.appendChild(b);
+    }
+    section.appendChild(grid);
+    list.appendChild(section);
+
+    // top button jumps to the section
+    const jump = document.createElement("button");
+    jump.className = "bankbtn";
+    jump.dataset.bank = bankId;
+    jump.textContent = bankName;
+    jump.addEventListener("click", () => section.scrollIntoView({ block: "start", behavior: "smooth" }));
+    bankHolder.appendChild(jump);
+  }
+  markPickerCurrent();
 }
 
 // ---------------------------------------------------------------- boot
@@ -903,6 +897,9 @@ function defaultPattern() {
 
 async function boot() {
   manifest = await (await fetch("samples/manifest.json")).json();
+  if (manifest.length && manifest[0].preset === undefined) {
+    console.warn("manifest has no preset numbers - run docs/gamma9001/sync_presets.py");
+  }
   DEFAULT_KIT.forEach((file, ch) => {
     const idx = manifest.findIndex(m => m.file === file);
     if (idx >= 0) state.channels[ch].sample = idx;
@@ -984,8 +981,8 @@ async function boot() {
     window.location.reload();
   });
 
-  // Startup modal: one click starts audio (browsers require a gesture) and
-  // loads the samples, then the machine is fully live.
+  // Startup modal: one click starts audio (browsers require a gesture); the
+  // samples are baked into the AMY wasm, so the machine is live immediately.
   const startModal = document.getElementById("startmodal");
   startModal.addEventListener("click", async () => {
     if (audioOn) return;
@@ -996,7 +993,7 @@ async function boot() {
     amy_send({ volume: state.masterVol });
     applyAllChannelFilters();
     applyFx();
-    await loadAllSamples();
+    setLoadStatus(`${manifest.length} sounds on board`);
     startModal.classList.add("hidden");
   });
 

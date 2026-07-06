@@ -245,10 +245,14 @@ body.lane-pitch .step::before {
   border-radius: 3px; padding: 4px 10px; cursor: pointer; font-size: 11px;
 }
 .bankbtn.current { background: linear-gradient(#ffa040, #e07314); color: #2b1a00; font-weight: bold; }
-#pickerlist {
-  overflow-y: auto; padding: 4px 14px 14px;
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+#pickerlist { overflow-y: auto; padding: 4px 14px 14px; }
+.banksection { margin-bottom: 12px; }
+.bankheader {
+  font-family: Georgia, serif; font-style: italic; font-weight: bold;
+  font-size: 15px; color: #fff; text-shadow: 0 1px 4px #0008;
+  border-bottom: 1px solid #ffffff2a; margin-bottom: 5px; padding-bottom: 2px;
 }
+.bankgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .samplebtn {
   background: #17102b; color: #fff; border: 1px solid #0c0620; border-radius: 3px;
   font-family: "Courier New", monospace; font-size: 12px; text-align: left;

@@ -76,7 +76,13 @@ void amy_profiles_print() {}
 
 
 // Use the tiny built-in PCM set by default across platforms.
+#ifdef GAMMA9001
+// The Gamma9001 builds (Tulip, AMYboard, web) bake the full TR-808 bank as
+// their ROM set; the other Gamma9001 banks stream from gamma9001_pcm (pcm.c).
+#include "pcm_gamma808.h"
+#else
 #include "pcm_tiny.h"
+#endif
 
 #include "clipping_lookup_table.h"
 
