@@ -142,7 +142,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->eg_type[0]);
     AMY_UNSET(e->eg_type[1]);
     AMY_UNSET(e->reset_osc);
-    AMY_UNSET(e->note_source);
+    AMY_UNSET(e->note_source_channel);
     for (int i = 0; i < MAX_ALGO_OPS; ++i) {
         AMY_UNSET(e->algo_source[i]);
     }
@@ -228,17 +228,13 @@ bool amy_parsing_from_sysex = false;
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
     peek_stack("add_message");
-    amy_event e; // = amy_default_event();
-    // Parse the wire string into an event
-    int length = strlen(message);
-    char *remains = message;
-    while(length > 0) {
+    amy_event e;
+    size_t pos = 0;
+    do {
         amy_clear_event(&e);
-	int pos = amy_parse_message(remains, length, &e);
-	amy_add_event(&e);
-	remains += pos;
-	length -= pos;
-    }
+        pos = yield_event_from_message(message, &e, pos);
+        if (pos > 0)  amy_add_event(&e);
+    } while(pos > 0);
 }
 
 // Like amy_add_message but marks the message as coming from an external
@@ -250,12 +246,28 @@ void amy_add_message_from_sysex(char *message) {
 }
 
 // given an event play / schedule the event directly (C API)
+// diverts sequeuncer events, and handles special-case reset.
 void amy_add_event(amy_event *e) {
     peek_stack("add_event");
-    // amy_process_event snarfs scheduler events and (with bizarre specificity) patch reset events, for others it makes sure e->time is set, then marks as EVENT_SCHEDULED
-    amy_process_event(e);
-    // Do not "play" events that are not sent directly to the AMY synthesizer, e.g. sequencer events or stored patches
-    if(e->status == EVENT_SCHEDULED) {
+    // was amy_process_event
+    if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
+        uint8_t added = sequencer_add_event(e);
+        (void)added; // we don't need to do anything with this info at this time
+        e->status = EVENT_SEQUENCE;
+    } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
+        // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
+        patches_reset_patch(e->patch_number);
+        AMY_UNSET(e->reset_osc);
+    } else {
+        // if time is set, play then
+        // if time and latency is set, play in time + latency
+        // if time is not set, play now
+        // if time is not set + latency is set, play in latency
+        uint32_t playback_time = amy_sysclock();
+        if(AMY_IS_SET(e->time)) playback_time = e->time;
+        playback_time += amy_global.latency_ms;
+        e->time = playback_time;
+        e->status = EVENT_SCHEDULED;
         amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
