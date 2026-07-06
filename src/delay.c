@@ -283,6 +283,31 @@ void deinit_stereo_reverb(reverb_params_t *rev) {
     }
 }
 
+// Cache one delay line's state in locals for the reverb loop, the same way
+// delay_line_in_out() hoists its line's state.  DEL_IN/DEL_OUT re-read
+// samples/next_in/fixed_delay/len through the struct pointer on every call;
+// with ten delay lines interleaved per sample that redundant traffic is a
+// measurable fraction of the loop, and on platforms that place delay lines
+// in external RAM the struct headers are slow to touch.
+//
+// `##` is the standard (C89) preprocessor token-pasting operator: it joins
+// the macro argument P with the suffix into one identifier at compile time.
+// So DL_LOAD(e1, rev->ref_1) declares four ordinary locals named e1_s
+// (samples pointer), e1_m (index mask = len-1), e1_n (next_in write index),
+// e1_f (fixed_delay read offset), and DL_WRITE(e1, x)/DL_READ(e1) refer to
+// those same locals.  This gives each of the ten lines its own distinct
+// scalars (which the compiler can keep in registers) without hand-writing
+// forty declarations.  The names are generated at compile time, so a wrong
+// prefix is an "undeclared identifier" error, never a silent wrong-line bug.
+// Only next_in changes inside the loop; it is written back after the loop.
+#define DL_LOAD(P, LINE)                        \
+    SAMPLE *P##_s = (LINE)->samples;            \
+    int P##_m = (LINE)->len - 1;                \
+    int P##_n = (LINE)->next_in;                \
+    int P##_f = (LINE)->fixed_delay
+#define DL_WRITE(P, val) do { P##_s[P##_n] = (val); P##_n = (P##_n + 1) & P##_m; } while (0)
+#define DL_READ(P)       (P##_s[(P##_n - P##_f) & P##_m])
+
 void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_out, SAMPLE *l_out, int n_samples, SAMPLE level) {
     // Stereo reverb.  *{r,l}_in each point to n_samples input samples.
     // n_samples are written to {r,l}_out.
@@ -290,6 +315,24 @@ void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_o
     // https://github.com/duvtedudug/Pure-Data/blob/master/extra/rev2%7E.pd
     // an instance of the Stautner-Puckette multichannel reverberator from
     // https://www.ee.columbia.edu/~dpwe/e4896/papers/StautP82-reverb.pdf
+
+
+    // Early-reflection lines e1..e6, reverb delay lines dl1..dl4.
+    DL_LOAD(e1, rev->ref_1);
+    DL_LOAD(e2, rev->ref_2);
+    DL_LOAD(e3, rev->ref_3);
+    DL_LOAD(e4, rev->ref_4);
+    DL_LOAD(e5, rev->ref_5);
+    DL_LOAD(e6, rev->ref_6);
+    DL_LOAD(dl1, rev->delay_1);
+    DL_LOAD(dl2, rev->delay_2);
+    DL_LOAD(dl3, rev->delay_3);
+    DL_LOAD(dl4, rev->delay_4);
+
+    SAMPLE lpfcoef = rev->lpfcoef, lpfgain = rev->lpfgain, liveness = rev->liveness;
+    SAMPLE f1state = rev->f1state, f2state = rev->f2state;
+    SAMPLE f3state = rev->f3state, f4state = rev->f4state;
+
     while(n_samples--) {
         // Early echo reflections.
         SAMPLE in_r = *r_in++;
@@ -300,56 +343,72 @@ void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_o
         r_acc = MUL0_SS(F2S(0.0625f), in_r);
         l_acc = MUL0_SS(F2S(0.0625f), in_l);
 
-        DEL_IN(rev->ref_1, l_acc);
-        SAMPLE d_out = DEL_OUT(rev->ref_1, 0);
+        DL_WRITE(e1, l_acc);
+        SAMPLE d_out = DL_READ(e1);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
-        DEL_IN(rev->ref_2, l_acc);
-        d_out = DEL_OUT(rev->ref_2, 0);
+        DL_WRITE(e2, l_acc);
+        d_out = DL_READ(e2);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
-        DEL_IN(rev->ref_3, l_acc);
-        d_out = DEL_OUT(rev->ref_3, 0);
+        DL_WRITE(e3, l_acc);
+        d_out = DL_READ(e3);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
-        DEL_IN(rev->ref_4, l_acc);
-        d_out = DEL_OUT(rev->ref_4, 0);
+        DL_WRITE(e4, l_acc);
+        d_out = DL_READ(e4);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
-        DEL_IN(rev->ref_5, l_acc);
-        d_out = DEL_OUT(rev->ref_5, 0);
+        DL_WRITE(e5, l_acc);
+        d_out = DL_READ(e5);
         l_acc = r_acc - d_out;
         r_acc += d_out;
 
-        DEL_IN(rev->ref_6, l_acc);
-        l_acc = DEL_OUT(rev->ref_6, 0);
-        
-        
+        DL_WRITE(e6, l_acc);
+        l_acc = DL_READ(e6);
+
+
         // Reverb delays & matrix.
-        SAMPLE d1 = DEL_OUT(rev->delay_1, 0);
-        d1 = LPF(d1, &rev->f1state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        SAMPLE d1 = DL_READ(dl1);
+        d1 = LPF(d1, &f1state, lpfcoef, lpfgain, liveness);
         d1 += r_acc;
         *r_out++ = in_r + MUL8_SS(level, d1);
 
-        SAMPLE d2 = DEL_OUT(rev->delay_2, 0);
-        d2 = LPF(d2, &rev->f2state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        SAMPLE d2 = DL_READ(dl2);
+        d2 = LPF(d2, &f2state, lpfcoef, lpfgain, liveness);
         d2 += l_acc;
         if (l_out != NULL)  *l_out++ = in_l + MUL8_SS(level, d2);
 
-        SAMPLE d3 = DEL_OUT(rev->delay_3, 0);
-        d3 = LPF(d3, &rev->f3state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        SAMPLE d3 = DL_READ(dl3);
+        d3 = LPF(d3, &f3state, lpfcoef, lpfgain, liveness);
 
-        SAMPLE d4 = DEL_OUT(rev->delay_4, 0);
-        d4 = LPF(d4, &rev->f4state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        SAMPLE d4 = DL_READ(dl4);
+        d4 = LPF(d4, &f4state, lpfcoef, lpfgain, liveness);
 
         // Mixing and feedback.
-        DEL_IN(rev->delay_1, d1 + d2 + d3 + d4);
-        DEL_IN(rev->delay_2, d1 - d2 + d3 - d4);
-        DEL_IN(rev->delay_3, d1 + d2 - d3 - d4);
-        DEL_IN(rev->delay_4, d1 - d2 - d3 + d4);
+        DL_WRITE(dl1, d1 + d2 + d3 + d4);
+        DL_WRITE(dl2, d1 - d2 + d3 - d4);
+        DL_WRITE(dl3, d1 + d2 - d3 - d4);
+        DL_WRITE(dl4, d1 - d2 - d3 + d4);
     }
+
+    // Write back the advanced write indices and the filter state.
+    rev->ref_1->next_in = e1_n;
+    rev->ref_2->next_in = e2_n;
+    rev->ref_3->next_in = e3_n;
+    rev->ref_4->next_in = e4_n;
+    rev->ref_5->next_in = e5_n;
+    rev->ref_6->next_in = e6_n;
+    rev->delay_1->next_in = dl1_n;
+    rev->delay_2->next_in = dl2_n;
+    rev->delay_3->next_in = dl3_n;
+    rev->delay_4->next_in = dl4_n;
+    rev->f1state = f1state;
+    rev->f2state = f2state;
+    rev->f3state = f3state;
+    rev->f4state = f4state;
 }
