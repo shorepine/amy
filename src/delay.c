@@ -139,12 +139,12 @@ static inline void DEL_IN(delay_line_t *delay_line, SAMPLE val) {
     delay_line->next_in &= (delay_line->len - 1);
 }
 
-static inline SAMPLE LPF(SAMPLE samp, SAMPLE state, SAMPLE lpcoef, SAMPLE lpgain, SAMPLE gain) {
+static inline SAMPLE LPF(SAMPLE samp, SAMPLE *state, SAMPLE lpcoef, SAMPLE lpgain, SAMPLE gain) {
     // 1-pole lowpass filter (exponential smoothing).
     // Smoothing. lpcoef=1 => no smoothing; lpcoef=0.001 => much smoothing.
-    state += SMULR6(lpcoef, samp - state);
+    *state += SMULR6(lpcoef, samp - *state);
     // Cross-fade between smoothed and original.  lpgain=0 => all smoothed, 1 => all dry.
-    return SMULR6(SHIFTR(gain, 1), state + SMULR6(lpgain, samp - state));
+    return SMULR6(SHIFTR(gain, 1), *state + SMULR6(lpgain, samp - *state));
 }
 
 void delay_line_in_out_fixed_delay(SAMPLE *in, SAMPLE *out, int n_samples, int delay_samples, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level, SAMPLE filter_coef) {
@@ -331,20 +331,20 @@ void stereo_reverb(reverb_params_t *rev, SAMPLE *r_in, SAMPLE *l_in, SAMPLE *r_o
         
         // Reverb delays & matrix.
         SAMPLE d1 = DEL_OUT(rev->delay_1, 0);
-        d1 = LPF(d1, rev->f1state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        d1 = LPF(d1, &rev->f1state, rev->lpfcoef, rev->lpfgain, rev->liveness);
         d1 += r_acc;
         *r_out++ = in_r + MUL8_SS(level, d1);
 
         SAMPLE d2 = DEL_OUT(rev->delay_2, 0);
-        d2 = LPF(d2, rev->f2state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        d2 = LPF(d2, &rev->f2state, rev->lpfcoef, rev->lpfgain, rev->liveness);
         d2 += l_acc;
         if (l_out != NULL)  *l_out++ = in_l + MUL8_SS(level, d2);
 
         SAMPLE d3 = DEL_OUT(rev->delay_3, 0);
-        d3 = LPF(d3, rev->f3state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        d3 = LPF(d3, &rev->f3state, rev->lpfcoef, rev->lpfgain, rev->liveness);
 
         SAMPLE d4 = DEL_OUT(rev->delay_4, 0);
-        d4 = LPF(d4, rev->f4state, rev->lpfcoef, rev->lpfgain, rev->liveness);
+        d4 = LPF(d4, &rev->f4state, rev->lpfcoef, rev->lpfgain, rev->liveness);
 
         // Mixing and feedback.
         DEL_IN(rev->delay_1, d1 + d2 + d3 + d4);
