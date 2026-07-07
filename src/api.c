@@ -395,21 +395,36 @@ void amy_overload_failsafe() {
     amy_event e = amy_default_event();
     e.reset_osc = RESET_ALL_NOTES | RESET_ALL_OSCS | RESET_SEQUENCER;
     amy_add_event(&e);
-    // Descending bleep (the startup bleep rises), scheduled after the reset.
+    // "doot doot doot doot BLAWWW" -- a descending minor arpeggio then a held
+    // minor chord, distinct from the startup bleep, so the user knows AMY hit
+    // its limit and stopped on purpose.  Scheduled after the reset plays.
     uint32_t start = amy_sysclock() + 50;
     e = amy_default_event();
     e.osc = AMY_OSCS - 1;
     e.wave = SINE;
-    e.velocity = 0.5f;
-    float freqs[] = {880, 587, 440};
-    for (int i = 0; i < 3; i++) {
-        e.time = start + i * 150;
-        e.freq_coefs[COEF_CONST] = freqs[i];
+    float doots[] = {880.00f, 659.26f, 523.25f, 440.00f};  // A5 E5 C5 A4
+    for (int i = 0; i < 4; i++) {
+        e.time = start + i * 160;
+        e.freq_coefs[COEF_CONST] = doots[i];
+        e.velocity = 1.0f;
+        amy_add_event(&e);
+        e.time += 110;
+        e.velocity = 0;
         amy_add_event(&e);
     }
-    e.time = start + 450;
-    e.velocity = 0;
-    amy_add_event(&e);
+    float chord[] = {220.00f, 261.63f, 329.63f};  // A minor: A3 C4 E4
+    for (int i = 0; i < 3; i++) {
+        e = amy_default_event();
+        e.osc = AMY_OSCS - 1 - i;
+        e.wave = SAW_DOWN;
+        e.freq_coefs[COEF_CONST] = chord[i];
+        e.time = start + 4 * 160;
+        e.velocity = 0.5f;
+        amy_add_event(&e);
+        e.time += 800;
+        e.velocity = 0;
+        amy_add_event(&e);
+    }
     if (amy_global.config.amy_external_overload_hook != NULL)
         amy_global.config.amy_external_overload_hook(load);
     // Start the load measure over so we don't re-trip while recovering.
