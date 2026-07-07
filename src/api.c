@@ -395,9 +395,9 @@ void amy_overload_failsafe() {
     amy_event e = amy_default_event();
     e.reset_osc = RESET_ALL_NOTES | RESET_ALL_OSCS | RESET_SEQUENCER;
     amy_add_event(&e);
-    // "doot doot doot doot BLAWWW" -- a descending minor arpeggio then a held
-    // minor chord, distinct from the startup bleep, so the user knows AMY hit
-    // its limit and stopped on purpose.  Scheduled after the reset plays.
+    // "doot doot doot doot" -- a descending minor arpeggio, distinct from the
+    // startup bleep, so the user knows AMY hit its limit and stopped on
+    // purpose.  Scheduled after the reset plays.
     uint32_t start = amy_sysclock() + 50;
     e = amy_default_event();
     e.osc = AMY_OSCS - 1;
@@ -409,19 +409,6 @@ void amy_overload_failsafe() {
         e.velocity = 1.0f;
         amy_add_event(&e);
         e.time += 110;
-        e.velocity = 0;
-        amy_add_event(&e);
-    }
-    float chord[] = {220.00f, 261.63f, 329.63f};  // A minor: A3 C4 E4
-    for (int i = 0; i < 3; i++) {
-        e = amy_default_event();
-        e.osc = AMY_OSCS - 1 - i;
-        e.wave = SAW_DOWN;
-        e.freq_coefs[COEF_CONST] = chord[i];
-        e.time = start + 4 * 160;
-        e.velocity = 0.5f;
-        amy_add_event(&e);
-        e.time += 800;
         e.velocity = 0;
         amy_add_event(&e);
     }
