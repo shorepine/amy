@@ -212,8 +212,11 @@ output_sample_type * amy_simple_fill_buffer() {
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
 uint32_t amy_sysclock() {
-    // Time is returned in integer milliseconds.  uint32_t rollover is 49.7 days.
-    return (uint32_t)((amy_global.total_blocks * AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE) * 1000);
+    // Time is returned in integer milliseconds; wraps at 2^32 ms = 49.7 days.
+    // Integer math: computing this through float quantizes the clock once
+    // total samples exceed the 24-bit mantissa (~6 min at 48 kHz), and the
+    // u32 samples-domain multiply wrapped after 2^32 samples (~25 h).
+    return (uint32_t)(((uint64_t)amy_global.total_blocks * (AMY_BLOCK_SIZE * 1000u)) / AMY_SAMPLE_RATE);
 }
 
 
