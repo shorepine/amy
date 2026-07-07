@@ -4,6 +4,30 @@
 #include "amy.h"
 #include "delay.h"
 
+// A microsecond wall clock, used for the per-block render load measure and (under
+// AMY_DEBUG) the profiler.
+#ifdef ESP_PLATFORM
+#include "esp_timer.h"
+int64_t amy_get_us() { return esp_timer_get_time(); }
+#elif defined PICO_ON_DEVICE
+#include "pico/time.h"
+int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
+#elif defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+int64_t amy_get_us() {
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (int64_t)(count.QuadPart * 1000000LL / freq.QuadPart);
+}
+#else
+#include <sys/time.h>
+int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_sec*(uint64_t)1000000+tv.tv_usec; }
+#endif
+
 #ifdef AMY_DEBUG
 
 const char* profile_tag_name(enum itags tag) {
@@ -44,28 +68,7 @@ const char* profile_tag_name(enum itags tag) {
 struct profile profiles[NO_TAG];
 uint64_t profile_start_us = 0;
 
-#ifdef ESP_PLATFORM
-#include "esp_timer.h"
-int64_t amy_get_us() { return esp_timer_get_time(); }
-#elif defined PICO_ON_DEVICE
-int64_t amy_get_us() { return to_us_since_boot(get_absolute_time()); }
-#elif defined(_WIN32)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-int64_t amy_get_us() {
-    LARGE_INTEGER freq, count;
-    QueryPerformanceFrequency(&freq);
-    QueryPerformanceCounter(&count);
-    return (int64_t)(count.QuadPart * 1000000LL / freq.QuadPart);
-}
-#else
-#include <sys/time.h>
-int64_t amy_get_us() { struct timeval tv; gettimeofday(&tv,NULL); return tv.tv_sec*(uint64_t)1000000+tv.tv_usec; }
-#endif
-
-void amy_profiles_init() { 
+void amy_profiles_init() {
     for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_INIT(i) } 
 } 
 void amy_profiles_print() { for(uint8_t i=0;i<NO_TAG;i++) { AMY_PROFILE_PRINT(i) } amy_profiles_init(); }
@@ -453,6 +456,8 @@ int8_t global_init(amy_config_t c) {
     amy_global.debug_flag = 0;
     amy_global.highest_bus = 0;
     amy_global.hpf_state = 0;
+    amy_global.render_load = 0;
+    amy_global.overload_count = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
