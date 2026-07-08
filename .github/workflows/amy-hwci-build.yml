@@ -73,8 +73,11 @@ jobs:
           key: arduino15-esp32-${{ env.ESP32_CORE }}
 
       - name: Install the esp32 arduino core
+        # --overwrite: a warm ~/.arduino15 cache already contains the config
+        # file from the run that saved it, and a plain `config init` hard-fails
+        # on it (bit the second build of PR #830).
         run: |
-          arduino-cli config init --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli config init --overwrite --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install esp32:esp32@${{ env.ESP32_CORE }}
 
