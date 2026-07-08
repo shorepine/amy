@@ -1,0 +1,86 @@
+name: AMY HW CI build
+
+# Cloud half of AMY's hardware CI. Builds THIS PR's AMY into the fixed
+# LoadTestChord test sketch (tools/arduino_loadsweep: 8-voice Juno patch,
+# one held note every 2 s until an 8-note chord), with src/i2s.c patched to
+# print `RENDER_LOAD ms=<ms> load=<0..1>` on the debug UART at 2 Hz, and
+# uploads the firmware as an artifact. "AMY HW CI" (amy-hwci.yml) then
+# chains off this run via workflow_run and flashes it on the self-hosted
+# AMYboard bench Pi.
+#
+# The build runs here (ubuntu-latest, cached esp32 core) and NOT on the Pi so
+# the bench stays a dumb flash-and-listen box: even for a fork PR this job is
+# safe (sandboxed, no secrets), and the bench workflow's same-repo gate
+# decides whether the artifact ever reaches hardware.
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'                                   # only src/ is compiled into firmware
+      - 'tools/arduino_loadsweep/**'
+      - '.github/workflows/amy-hwci-build.yml'
+      - '.github/workflows/amy-hwci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amy-hwci-build-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true                         # a new push supersedes the prior build
+
+env:
+  ESP32_CORE: 3.3.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch the 2 Hz render-load print into src/i2s.c
+        run: python3 tools/arduino_loadsweep/patch_render_load.py src/i2s.c
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache the esp32 arduino core
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino15-esp32-${{ env.ESP32_CORE }}
+
+      - name: Install the esp32 arduino core
+        run: |
+          arduino-cli config init --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@${{ env.ESP32_CORE }}
+
+      - name: Build LoadTestChord against this PR's AMY
+        # -O2 forced for the same reason as sweep.py: comparable numbers no
+        # matter what optimize pragma the tree carries.
+        run: |
+          arduino-cli compile --fqbn esp32:esp32:amyboard \
+            --library "$PWD" \
+            --build-property compiler.optimization_flags=-O2 \
+            --build-path "$PWD/build" \
+            tools/arduino_loadsweep/LoadTestChord
+
+      - name: Assemble the firmware artifact
+        # Everything measure.py needs to flash, self-contained: the three
+        # sketch bins plus the core's boot_app0.bin (the bench has esptool but
+        # no arduino core), and ctx.json telling the bench which PR to comment
+        # on.
+        run: |
+          set -euo pipefail
+          mkdir fw
+          cp build/*.ino.bin build/*.ino.bootloader.bin build/*.ino.partitions.bin fw/
+          cp "$(ls ~/.arduino15/packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin | tail -1)" fw/
+          echo '{"pr": ${{ github.event.pull_request.number || 0 }}, "sha": "${{ github.event.pull_request.head.sha || github.sha }}"}' > fw/ctx.json
+          ls -l fw
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amy-hwci-fw
+          path: fw
+          retention-days: 7
