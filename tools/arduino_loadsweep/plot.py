@@ -54,8 +54,11 @@ def main():
     tmax = max((r[0] for c in commits for r in c["rows"]), default=20) + 1
     colors = cm.viridis(np.linspace(0.05, 0.95, n))
 
-    fig = plt.figure(figsize=(15, 18))
-    gs = fig.add_gridspec(3, 1, height_ratios=[1.1, 1.8, 0.9], hspace=0.35)
+    # size the small-multiples band by row count so titles never collide
+    sm_rows = int(np.ceil(n / 6))
+    fig = plt.figure(figsize=(15, 10 + 2.2 * sm_rows))
+    gs = fig.add_gridspec(3, 1, height_ratios=[4.5, 2.0 * sm_rows, 3.5],
+                          hspace=0.30)
 
     # overlay
     ax = fig.add_subplot(gs[0])
@@ -78,8 +81,8 @@ def main():
 
     # small multiples
     cols = 6
-    rows_n = int(np.ceil(n / cols))
-    sub = gs[1].subgridspec(rows_n, cols, hspace=0.6, wspace=0.25)
+    rows_n = sm_rows
+    sub = gs[1].subgridspec(rows_n, cols, hspace=1.0, wspace=0.25)
     for i, (c, col) in enumerate(zip(commits, colors)):
         axs = fig.add_subplot(sub[i // cols, i % cols])
         t = [r[0] for r in c["rows"]]
