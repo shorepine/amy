@@ -90,7 +90,7 @@ def upload(build_dir, port, baud):
                          "boot_app0.bin")
     app = glob.glob(os.path.join(build_dir, "*.ino.bin"))
     if not app:
-        return f"no .ino.bin in {build_dir}"
+        return f"no .ino.bin in {build_dir} - did you arduino-cli compile?"
     base = app[0][:-len(".bin")]
     cmd = [esptool, "--chip", "esp32s3", "--port", port, "--baud", str(baud),
            "--before", "default-reset", "--after", "hard-reset",
@@ -173,6 +173,7 @@ def main():
             meta["upload_tail"] = err
             json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"),
                       indent=1)
+            print(err)
             sys.exit("[flash] upload failed twice")
 
         time.sleep(1.0)   # let esptool's post-flash reset settle before re-open
