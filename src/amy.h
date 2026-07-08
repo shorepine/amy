@@ -437,13 +437,17 @@ extern uint64_t profile_start_us;
     }
 
 extern struct profile profiles[NO_TAG];
-extern int64_t amy_get_us();
 
 #else
 #define AMY_PROFILE_START(tag)
 #define AMY_PROFILE_STOP(tag)
 
 #endif // AMY_DEBUG
+
+extern int64_t amy_get_us();
+
+// Wall-clock duration of one render block, for computing render load.
+#define AMY_BLOCK_US ((uint32_t)((AMY_BLOCK_SIZE * 1000000ULL) / AMY_SAMPLE_RATE))
 
 extern void amy_profiles_init();
 extern void amy_profiles_print();
@@ -734,6 +738,15 @@ typedef struct  {
     void (*amy_external_update_file_hook)(const char *filename);
     void (*amy_external_exec_hook)(const char *code);
     void (*amy_external_reboot_hook)(uint8_t mode);
+    // Called (from the render task -- set a flag and return quickly) when the
+    // overload failsafe trips.  AMY has already silenced and reset itself.
+    void (*amy_external_overload_hook)(float load);
+
+    // CPU overload failsafe (see amy_overload_check).  When the smoothed render
+    // load stays at/above overload_threshold for overload_ms, AMY resets itself
+    // and plays a bleep rather than wedging the host.  Set threshold to 0 to disable.
+    float overload_threshold;
+    uint16_t overload_ms;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -828,6 +841,9 @@ typedef struct global_state {
     uint32_t total_samples;
     float time;
     uint8_t debug_flag;
+    // Smoothed fraction of real time spent rendering (0..1); see amy_overload_check.
+    float render_load;
+    uint16_t overload_count;  // Consecutive over-threshold blocks.
     // How many buses do we actually have to process?
     uint8_t highest_bus;
     SAMPLE hpf_state;
@@ -878,6 +894,8 @@ extern output_sample_type * amy_external_in_block;
 
 int8_t global_init(amy_config_t c);
 void global_deinit();
+void amy_grab_lock();
+void amy_release_lock();
 void amy_deltas_reset();
 void add_delta_to_queue(struct delta *d, struct delta **queue);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
@@ -948,6 +966,10 @@ amy_config_t amy_default_config();
 void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
+// CPU overload detection: platform render loops call this once per block.
+void amy_overload_check(uint32_t busy_us, uint32_t period_us);
+void amy_overload_failsafe();
+float amy_get_render_load();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);

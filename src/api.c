@@ -30,6 +30,15 @@ amy_config_t amy_default_config() {
     c.amy_external_fseek_hook = NULL;
     c.amy_external_fclose_hook = NULL;
     c.amy_external_file_transfer_done_hook = NULL;
+    c.amy_external_update_file_hook = NULL;
+    c.amy_external_exec_hook = NULL;
+    c.amy_external_reboot_hook = NULL;
+    c.amy_external_overload_hook = NULL;
+
+    // Trip the overload failsafe when the smoothed render load sits at/above
+    // threshold for this long.  Threshold 0 disables the failsafe.
+    c.overload_threshold = 0.98f;
+    c.overload_ms = 250;
 
     c.midi = AMY_MIDI_IS_NONE;
     c.audio = AMY_AUDIO_IS_NONE;
@@ -367,6 +376,67 @@ void amy_bleep(uint32_t start) {
     e.velocity = 0;
     e.pan_coefs[COEF_CONST] = 0.5;  // Restore default pan to osc.
     amy_add_event(&e);
+}
+
+float amy_get_render_load() {
+    return amy_global.render_load;
+}
+
+// CPU overload failsafe: silence and reset the synth so the host stays responsive,
+// then play a descending bleep so the user knows AMY stopped on purpose.
+void amy_overload_failsafe() {
+    float load = amy_global.render_load;
+    fprintf(stderr, "AMY: CPU overload (render load %.2f), resetting synth\n", load);
+    // Drop everything scheduled first -- an overloaded delta queue can hold
+    // hundreds of pending events that would re-wedge us as they play out.
+    amy_grab_lock();
+    amy_deltas_reset();
+    amy_release_lock();
+    amy_event e = amy_default_event();
+    e.reset_osc = RESET_ALL_NOTES | RESET_ALL_OSCS | RESET_SEQUENCER;
+    amy_add_event(&e);
+    // "doot doot doot doot" -- a descending minor arpeggio, distinct from the
+    // startup bleep, so the user knows AMY hit its limit and stopped on
+    // purpose.  Scheduled after the reset plays.
+    uint32_t start = amy_sysclock() + 50;
+    e = amy_default_event();
+    e.osc = AMY_OSCS - 1;
+    e.wave = SINE;
+    float doots[] = {880.00f, 659.26f, 523.25f, 440.00f};  // A5 E5 C5 A4
+    for (int i = 0; i < 4; i++) {
+        e.time = start + i * 160;
+        e.freq_coefs[COEF_CONST] = doots[i];
+        e.velocity = 1.0f;
+        amy_add_event(&e);
+        e.time += 110;
+        e.velocity = 0;
+        amy_add_event(&e);
+    }
+    if (amy_global.config.amy_external_overload_hook != NULL)
+        amy_global.config.amy_external_overload_hook(load);
+    // Start the load measure over so we don't re-trip while recovering.
+    amy_global.render_load = 0;
+    amy_global.overload_count = 0;
+}
+
+// Called by platform render loops once per block: busy_us is the time spent
+// rendering the block, period_us is the block's total wall time (busy plus time
+// blocked waiting on audio output).  Keeps a smoothed load estimate in
+// amy_global.render_load and trips the failsafe when it stays pinned at/above
+// config.overload_threshold for config.overload_ms.
+void amy_overload_check(uint32_t busy_us, uint32_t period_us) {
+    if (period_us == 0) return;
+    float load = (float)busy_us / (float)period_us;
+    amy_global.render_load += 0.05f * (load - amy_global.render_load);
+    if (amy_global.config.overload_threshold <= 0) return;
+    if (amy_global.render_load >= amy_global.config.overload_threshold) {
+        uint32_t trip_blocks = ((uint32_t)amy_global.config.overload_ms * AMY_SAMPLE_RATE) / (AMY_BLOCK_SIZE * 1000);
+        if (++amy_global.overload_count > trip_blocks) {
+            amy_overload_failsafe();
+        }
+    } else {
+        amy_global.overload_count = 0;
+    }
 }
 
 // Schedule a bleep now using default bleep synth (0)
