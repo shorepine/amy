@@ -967,7 +967,9 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         bytes[1] = 0x7F & (uint8_t)(e->midi_note);
         bytes[2] = (uint8_t) MIN(127, 127.1f * e->velocity);
         //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
-        midi_msg_handler(bytes, 3, /* is_sysex */ 0, e->time);
+        // Pass the target queue through: if this event is being stored (e.g. it came
+        // from sequencer_add_event), its deltas must land in that queue, not play now.
+        midi_msg_handler_to_queue(bytes, 3, /* is_sysex */ 0, e->time, queue);
     } else {
         // for each voice, send the event to the base osc (+ e->osc if given)
         for(uint8_t i = 0; i < num_voices; i++) {

@@ -1010,6 +1010,9 @@ extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
 extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
+// As midi_msg_handler, but any events produced by the mapping are converted to deltas
+// on `queue` instead of being played, unless queue is NULL or the global delta queue.
+extern void midi_msg_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, struct delta **queue);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
 #ifdef __EMSCRIPTEN__
