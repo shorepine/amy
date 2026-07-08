@@ -8,6 +8,11 @@ name: AMY HW CI build
 # chains off this run via workflow_run and flashes it on the self-hosted
 # AMYboard bench Pi.
 #
+# PR builds also produce a BASELINE firmware — the same sketch built against
+# the merge ref's first parent (the current main tip the PR firmware was
+# merged with) — under fw/base/. The bench measures both back-to-back so the
+# PR comment shows before/after load and the delta the PR itself causes.
+#
 # The build runs here (ubuntu-latest, cached esp32 core) and NOT on the Pi so
 # the bench stays a dumb flash-and-listen box: even for a fork PR this job is
 # safe (sandboxed, no secrets), and the bench workflow's same-repo gate
@@ -38,9 +43,26 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2          # the merge commit AND its parents (baseline tree)
 
-      - name: Patch the 2 Hz render-load print into src/i2s.c
-        run: python3 tools/arduino_loadsweep/patch_render_load.py src/i2s.c
+      - name: Stage the baseline tree (the merge ref's first parent)
+        id: base
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          BASE_SHA=$(git rev-parse HEAD^1)
+          git worktree add ../base "$BASE_SHA"
+          echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "baseline: $BASE_SHA"
+
+      - name: Patch the 2 Hz render-load print into src/i2s.c (both trees)
+        run: |
+          set -euo pipefail
+          python3 tools/arduino_loadsweep/patch_render_load.py src/i2s.c
+          if [ -d ../base ]; then
+            python3 tools/arduino_loadsweep/patch_render_load.py ../base/src/i2s.c
+          fi
 
       - uses: arduino/setup-arduino-cli@v2
 
@@ -56,28 +78,43 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp32:esp32@${{ env.ESP32_CORE }}
 
-      - name: Build LoadTestChord against this PR's AMY
+      - name: Build LoadTestChord against this PR's AMY (and the baseline)
         # -O2 forced for the same reason as sweep.py: comparable numbers no
-        # matter what optimize pragma the tree carries.
+        # matter what optimize pragma the tree carries. Both builds use the
+        # PR's copy of the sketch (the test fixture) — only the AMY library
+        # differs.
         run: |
+          set -euo pipefail
           arduino-cli compile --fqbn esp32:esp32:amyboard \
             --library "$PWD" \
             --build-property compiler.optimization_flags=-O2 \
             --build-path "$PWD/build" \
             tools/arduino_loadsweep/LoadTestChord
+          if [ -d ../base ]; then
+            arduino-cli compile --fqbn esp32:esp32:amyboard \
+              --library "$(cd ../base && pwd)" \
+              --build-property compiler.optimization_flags=-O2 \
+              --build-path "$PWD/build-base" \
+              tools/arduino_loadsweep/LoadTestChord
+          fi
 
       - name: Assemble the firmware artifact
         # Everything measure.py needs to flash, self-contained: the three
         # sketch bins plus the core's boot_app0.bin (the bench has esptool but
         # no arduino core), and ctx.json telling the bench which PR to comment
-        # on.
+        # on. PR bins live at fw/ top level, the merge-base build under
+        # fw/base/ — each dir is a complete measure.py build_dir.
         run: |
           set -euo pipefail
           mkdir fw
-          cp build/*.ino.bin build/*.ino.bootloader.bin build/*.ino.partitions.bin fw/
-          cp "$(ls ~/.arduino15/packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin | tail -1)" fw/
-          echo '{"pr": ${{ github.event.pull_request.number || 0 }}, "sha": "${{ github.event.pull_request.head.sha || github.sha }}"}' > fw/ctx.json
-          ls -l fw
+          BOOT_APP0="$(ls ~/.arduino15/packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin | tail -1)"
+          cp build/*.ino.bin build/*.ino.bootloader.bin build/*.ino.partitions.bin "$BOOT_APP0" fw/
+          if [ -d build-base ]; then
+            mkdir fw/base
+            cp build-base/*.ino.bin build-base/*.ino.bootloader.bin build-base/*.ino.partitions.bin "$BOOT_APP0" fw/base/
+          fi
+          echo '{"pr": ${{ github.event.pull_request.number || 0 }}, "sha": "${{ github.event.pull_request.head.sha || github.sha }}", "base_sha": "${{ steps.base.outputs.sha }}"}' > fw/ctx.json
+          ls -lR fw
 
       - uses: actions/upload-artifact@v4
         with:
