@@ -26,7 +26,7 @@ import subprocess
 import sys
 import time
 
-RL = re.compile(r"RENDER_LOAD ms=(\d+) load=([\d.]+)")
+RL = re.compile(r"RENDER_LOAD ms=(\d+) render_us=([\d.]+)")
 NOTE = re.compile(r"NOTE i=(\d+) note=(\d+) ms=(\d+)")
 # A power-on reset or ROM-bootloader entry mid-capture means someone else
 # pulsed the board's reset lines (another harness sharing the bench) — the
@@ -212,7 +212,7 @@ def main():
     for ts, line in lines:
         m = RL.search(line)
         if m:
-            rows.append((round(ts, 3), int(m.group(1)), float(m.group(2))))
+            rows.append((round(ts, 3), int(m.group(1)), int(m.group(2))))
         m = NOTE.search(line)
         if m:
             notes.append({"t_s": round(ts, 3), "i": int(m.group(1)),
@@ -232,13 +232,13 @@ def main():
         meta["load_max"] = max(r[2] for r in rows)
         meta["last_sample_t"] = rows[-1][0]
         final = [r[2] for r in rows if r[0] >= args.seconds - 3.0]
-        meta["load_final"] = round(sum(final) / len(final), 4) if final else None
+        meta["load_final"] = round(sum(final) / len(final)) if final else None
         if rows[-1][0] < args.seconds - 3.0:
             meta["serial_died_early"] = True   # prints stopped: crash/wedge
     else:
         meta["errors"].append("no RENDER_LOAD lines captured")
     print(f"[result] {len(rows)} samples, {len(notes)} notes, "
-          f"max={meta.get('load_max')}, final={meta.get('load_final')}"
+          f"max={meta.get('load_max')}, final={meta.get('load_final')} us"
           f"{'  DIED EARLY' if meta.get('serial_died_early') else ''}")
 
     json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"), indent=1)

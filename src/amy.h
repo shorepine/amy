@@ -740,13 +740,13 @@ typedef struct  {
     void (*amy_external_reboot_hook)(uint8_t mode);
     // Called (from the render task -- set a flag and return quickly) when the
     // overload failsafe trips.  AMY has already silenced and reset itself.
-    void (*amy_external_overload_hook)(float load);
+    void (*amy_external_overload_hook)(uint32_t load_us);
 
-    // CPU overload failsafe (see amy_overload_check).  When the smoothed render
-    // load stays at/above overload_threshold for overload_ms, AMY resets itself
+    // CPU overload failsafe (see amy_overload_check).  When the smoothed us-per-render
+    // stays at/above overload_threshold_us for overload_blocks, AMY resets itself
     // and plays a bleep rather than wedging the host.  Set threshold to 0 to disable.
-    float overload_threshold;
-    uint16_t overload_ms;
+    uint32_t overload_threshold_us;
+    uint16_t overload_blocks;
 
     // pins for MCU platforms
     int8_t i2s_lrc;
@@ -841,8 +841,8 @@ typedef struct global_state {
     uint32_t total_samples;
     float time;
     uint8_t debug_flag;
-    // Smoothed fraction of real time spent rendering (0..1); see amy_overload_check.
-    float render_load;
+    // Smoothed microseconds per render call.
+    uint32_t render_us;
     uint16_t overload_count;  // Consecutive over-threshold blocks.
     // How many buses do we actually have to process?
     uint8_t highest_bus;
@@ -969,7 +969,7 @@ uint32_t amy_sysclock();
 // CPU overload detection: platform render loops call this once per block.
 void amy_overload_check(uint32_t busy_us, uint32_t period_us);
 void amy_overload_failsafe();
-float amy_get_render_load();
+uint32_t amy_get_render_us();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);

@@ -312,7 +312,14 @@ void esp_read_i2s_input() {
     }
 }
 
-// Make AMY's FABT run forever , as a FreeRTOS task
+
+#ifdef ARDUINO_SPEEDTEST
+#include "esp_timer.h"
+//#include <stdio.h>
+
+static int64_t _rl_last_print = 0;
+#endif /* ARDUINO_SPEEDTEST */
+
 void esp_fill_audio_buffer_task() {
     while(1) {
         int64_t t;
@@ -353,6 +360,17 @@ void esp_fill_audio_buffer_task() {
         // When rendering keeps up, this task spends most of each block parked in the
         // i2s DMA write (or the update-sync wait) above, which is when lower-priority
         // tasks on this core get to run.
+
+#ifdef ARDUINO_SPEEDTEST
+        { int64_t _rl_now = esp_timer_get_time();
+          if (_rl_now - _rl_last_print > 500000) {
+              _rl_last_print = _rl_now;
+              amy_global.config.overload_threshold_us = 0;  /* no failsafe during measurement */
+              fprintf(stderr, "RENDER_LOAD ms=%lu render_us=%lu\n",
+                      (unsigned long)(_rl_now/1000), amy_global.render_us);
+              fflush(stderr);
+          } }
+#endif /* ARDUINO_SPEEDTEST */
         amy_overload_check(busy_us, busy_us + blocked_us);
         // If the audio output didn't block at all, we're past overloaded, and this
         // max-priority task would starve everything else on this core (USB, MIDI,

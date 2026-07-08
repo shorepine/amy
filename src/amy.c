@@ -456,7 +456,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.debug_flag = 0;
     amy_global.highest_bus = 0;
     amy_global.hpf_state = 0;
-    amy_global.render_load = 0;
+    amy_global.render_us = 0;
     amy_global.overload_count = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
