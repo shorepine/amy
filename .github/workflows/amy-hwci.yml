@@ -104,7 +104,25 @@ jobs:
           fi
           echo "PR=$PR" >> "$GITHUB_ENV"
 
-      - name: Flash + capture 20 s of render load
+      - name: Flash + capture the merge-base baseline (before)
+        # A failed baseline never fails CI — the report just loses its
+        # before/Δ columns. `|| true` rather than continue-on-error so the
+        # step shows green unless the runner itself breaks.
+        if: hashFiles('fw/base/*.ino.bin') != ''
+        run: |
+          set -o pipefail
+          mkdir -p out-base
+          BASE_SHA=$(python3 -c 'import json; print(json.load(open("fw/ctx.json")).get("base_sha", ""))')
+          ~/hwci-venv/bin/python tools/arduino_loadsweep/measure.py fw/base \
+            --out out-base \
+            --port /dev/amyboard-dongle \
+            --esptool ~/hwci-venv/bin/esptool \
+            --seconds 20 \
+            --label "pr${PR}-base" \
+            --meta "{\"pr\": ${PR}, \"sha\": \"${BASE_SHA}\"}" \
+            2>&1 | tee out-base/run.log || true
+
+      - name: Flash + capture 20 s of render load (this PR)
         id: measure
         continue-on-error: true   # the verdict is hwci_report.py's, below
         env:
@@ -126,7 +144,9 @@ jobs:
         continue-on-error: true   # gate at the end, after commenting
         run: |
           mkdir -p out
-          python3 tools/arduino_loadsweep/hwci_report.py out | tee report.md
+          BASE_ARG=""
+          [ -d fw/base ] && BASE_ARG="--base out-base"
+          python3 tools/arduino_loadsweep/hwci_report.py out $BASE_ARG | tee report.md
 
       - name: Upload artifacts (serial log, load trace, report)
         if: always()
@@ -139,6 +159,10 @@ jobs:
             out/load.csv
             out/meta.json
             out/run.log
+            out-base/serial.log
+            out-base/load.csv
+            out-base/meta.json
+            out-base/run.log
             report.md
 
       - name: Comment results on the PR
@@ -156,7 +180,7 @@ jobs:
               marker,
               '### 🎛️ AMY HW CI (AMYboard bench)',
               '',
-              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows.",
+              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
               '',
               report,
               '',
