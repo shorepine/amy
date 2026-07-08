@@ -1,0 +1,180 @@
+name: AMY HW CI
+
+# Hardware half of AMY's CI, replacing the old cross-repo dispatch to the
+# tulipcc bench: flash THIS PR's LoadTestChord firmware (built and uploaded as
+# an artifact by "AMY HW CI build") onto the physical AMYboard on the
+# self-hosted bench Pi (amyboardci), capture 20 s of its debug UART while the
+# sketch stacks up an 8-note held Juno chord, and comment the measured render
+# load at each chord size back on the PR.
+#
+# PASS/FAIL semantics: FAIL means only that the bench COULD NOT RUN the test
+# (flash/serial failure, board crash, capture interference). The load values
+# are informational — no audio compare, no load threshold. Regression hunting
+# across commits is tools/arduino_loadsweep's sweep.py/plot.py job, not
+# per-PR CI's.
+#
+# SECURITY: the bench is a self-hosted Pi and this repo is public, so fork
+# code must never reach it. This workflow chains off the build via
+# workflow_run — meaning the version that executes is always MAIN's copy, a
+# fork PR can't edit it — and the job gate requires the triggering build to
+# have run same-repo (maintainer branches only). To bench a fork PR, a
+# maintainer pushes its changes to a shorepine/amy branch, or uses this
+# workflow's workflow_dispatch after eyeballing the code.
+
+on:
+  workflow_run:
+    workflows: ["AMY HW CI build"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to bench (needs a successful 'AMY HW CI build' run at its head SHA)"
+        required: true
+
+permissions:
+  contents: read
+  actions: read            # download the firmware artifact from the build run
+  pull-requests: write
+  issues: write            # delete the previous comment so each run re-notifies
+
+concurrency:
+  group: amy-hwci-bench          # one physical board → serialize every run
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.event == 'pull_request')
+    runs-on: [self-hosted, amyboard-hwci]
+    timeout-minutes: 20
+    steps:
+      - name: Resolve the build run + head SHA
+        id: ctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner, repo = context.repo.repo;
+            let sha, buildRunId, pr = '';
+            if (context.eventName === 'workflow_dispatch') {
+              pr = String(Number(context.payload.inputs.pr));
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: Number(pr) });
+              sha = data.head.sha;
+              const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner, repo, head_sha: sha, per_page: 50 });
+              const build = runs.workflow_runs.find(
+                r => r.name === 'AMY HW CI build' && r.conclusion === 'success');
+              if (!build) {
+                core.setFailed(`No successful 'AMY HW CI build' run for ${sha}; push the PR (or wait for the build) first.`);
+                return;
+              }
+              buildRunId = build.id;
+            } else {
+              const run = context.payload.workflow_run;
+              sha = run.head_sha;
+              buildRunId = run.id;      // PR number comes from the artifact's ctx.json
+            }
+            core.setOutput('pr', pr);
+            core.setOutput('sha', sha);
+            core.setOutput('build_run_id', String(buildRunId));
+            core.info(`bench: pr=${pr || '(from ctx.json)'} @ ${sha} (build run ${buildRunId})`);
+
+      # The harness scripts (measure.py, hwci_report.py) at the PR's own SHA —
+      # same-repo gated above, so this is maintainer code.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ctx.outputs.sha }}
+
+      - name: Download this PR's firmware (built by the build run)
+        uses: actions/download-artifact@v4
+        with:
+          name: amy-hwci-fw
+          path: fw
+          run-id: ${{ steps.ctx.outputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the PR to comment on
+        run: |
+          set -euo pipefail
+          PR="${{ steps.ctx.outputs.pr }}"
+          if [ -z "$PR" ]; then
+            PR=$(python3 -c 'import json; pr=int(json.load(open("fw/ctx.json"))["pr"]); assert pr > 0; print(pr)')
+          fi
+          echo "PR=$PR" >> "$GITHUB_ENV"
+
+      - name: Flash + capture 20 s of render load
+        id: measure
+        continue-on-error: true   # the verdict is hwci_report.py's, below
+        env:
+          SHA: ${{ steps.ctx.outputs.sha }}
+        run: |
+          set -o pipefail
+          mkdir -p out
+          ~/hwci-venv/bin/python tools/arduino_loadsweep/measure.py fw \
+            --out out \
+            --port /dev/amyboard-dongle \
+            --esptool ~/hwci-venv/bin/esptool \
+            --seconds 20 \
+            --label "pr${PR}" \
+            --meta "{\"pr\": ${PR}, \"sha\": \"${SHA}\"}" \
+            2>&1 | tee out/run.log
+
+      - name: Build the report + verdict
+        id: report
+        continue-on-error: true   # gate at the end, after commenting
+        run: |
+          mkdir -p out
+          python3 tools/arduino_loadsweep/hwci_report.py out | tee report.md
+
+      - name: Upload artifacts (serial log, load trace, report)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-hwci-pr${{ env.PR }}
+          if-no-files-found: warn
+          path: |
+            out/serial.log
+            out/load.csv
+            out/meta.json
+            out/run.log
+            report.md
+
+      - name: Comment results on the PR
+        if: always() && env.PR != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try { report = fs.readFileSync('report.md', 'utf8').trim(); }
+            catch (e) { report = '❌ **FAIL** — the bench run died before producing a report.'; }
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- amy-hwci -->';
+            const body = [
+              marker,
+              '### 🎛️ AMY HW CI (AMYboard bench)',
+              '',
+              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows.",
+              '',
+              report,
+              '',
+              `**[⬇️ Artifacts: serial log · load trace · report](${runUrl})**`,
+              '',
+              '<sub>Self-hosted bench (amyboardci). FAIL means only that the test could not run — the load values are informational, with no threshold and no audio compare. See `tools/arduino_loadsweep/`.</sub>',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const pr = Number(process.env.PR);
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: pr });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            // Post fresh then delete the old one: GitHub only notifies on NEW
+            // comments, and this keeps exactly one on the thread.
+            await github.rest.issues.createComment({ owner, repo, issue_number: pr, body });
+            if (existing) await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+
+      - name: Mark the job failed if the test couldn't run
+        if: always()
+        run: |
+          echo "measure: ${{ steps.measure.outcome }}    report: ${{ steps.report.outcome }}"
+          [ "${{ steps.report.outcome }}" = "success" ]

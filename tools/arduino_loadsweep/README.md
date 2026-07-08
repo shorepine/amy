@@ -54,6 +54,15 @@ list and exit), `--seconds`, `--work`.
 Two consecutive flash failures abort the sweep on the assumption the bench
 (not the code) is broken; rerunning resumes where it left off.
 
+## PR hardware CI
+
+The same sketch + patch + `measure.py` also power AMY's per-PR hardware CI
+(`.github/workflows/amy-hwci-build.yml` builds the firmware in the cloud;
+`amy-hwci.yml` flashes it on the self-hosted bench Pi and comments the
+render load at each chord size on the PR, formatted by `hwci_report.py`).
+CI **FAIL means only that the test couldn't run** — load values are
+informational there; regression *hunting* is this sweep's job.
+
 ## Sharing the bench
 
 `measure.py` serializes bench access so multiple harnesses (e.g. this sweep

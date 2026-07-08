@@ -34,7 +34,8 @@ NOTE = re.compile(r"NOTE i=(\d+) note=(\d+) ms=(\d+)")
 # commit under test crashing, which is a result (flagged board_crashed).
 RESET_SIG = re.compile(r"rst:0x1 |waiting for download")
 CRASH_SIG = re.compile(r"Guru Meditation|panic'ed|rst:0x[0-9a-f]+ \((?!POWERON)")
-ARDUINO15 = os.path.expanduser("~/Library/Arduino15")
+ARDUINO15 = os.path.expanduser(
+    "~/Library/Arduino15" if sys.platform == "darwin" else "~/.arduino15")
 BENCH_LOCK = "/tmp/amyboard-bench.lock"
 
 
@@ -56,9 +57,12 @@ def acquire_bench(port, timeout_s=900):
             got_lock = True
         except OSError:
             pass
-        holders = subprocess.run(
-            ["lsof", "-t", port, port.replace("/cu.", "/tty.")],
-            capture_output=True, text=True).stdout.strip()
+        try:
+            holders = subprocess.run(
+                ["lsof", "-t", port, port.replace("/cu.", "/tty.")],
+                capture_output=True, text=True).stdout.strip()
+        except FileNotFoundError:      # no lsof on this bench: flock only
+            holders = ""
         if got_lock and not holders:
             if waited:
                 print("[bench] free, proceeding")
@@ -84,10 +88,16 @@ def find_one(pattern, what):
     return cands[-1]
 
 
-def upload(build_dir, port, baud):
-    esptool = find_one("packages/esp32/tools/esptool_py/*/esptool", "esptool")
-    boot_app0 = find_one("packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin",
-                         "boot_app0.bin")
+def upload(build_dir, port, baud, esptool=None):
+    esptool = esptool or find_one("packages/esp32/tools/esptool_py/*/esptool",
+                                  "esptool")
+    # boot_app0.bin normally comes from the installed esp32 core, but a CI
+    # firmware artifact built elsewhere ships its own copy in the build dir.
+    boot_app0 = os.path.join(build_dir, "boot_app0.bin")
+    if not os.path.exists(boot_app0):
+        boot_app0 = find_one(
+            "packages/esp32/hardware/esp32/*/tools/partitions/boot_app0.bin",
+            "boot_app0.bin")
     app = glob.glob(os.path.join(build_dir, "*.ino.bin"))
     if not app:
         return f"no .ino.bin in {build_dir} - did you arduino-cli compile?"
@@ -150,6 +160,9 @@ def main():
     ap.add_argument("--port", default="/dev/cu.usbserial-A5069RR4",
                     help="debug-UART dongle (flash + stderr console)")
     ap.add_argument("--flash-baud", type=int, default=921600)
+    ap.add_argument("--esptool", default=None,
+                    help="esptool command (default: newest in the arduino15 "
+                         "esp32 core)")
     ap.add_argument("--baud", type=int, default=115200, help="console baud")
     ap.add_argument("--seconds", type=float, default=20.0)
     ap.add_argument("--label", default=None)
@@ -167,7 +180,7 @@ def main():
 
     lines = None
     for attempt in (1, 2):
-        err = upload(args.build_dir, args.port, args.flash_baud)
+        err = upload(args.build_dir, args.port, args.flash_baud, args.esptool)
         if err:
             meta["errors"].append("upload failed")
             meta["upload_tail"] = err
