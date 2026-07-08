@@ -250,7 +250,7 @@ class JunoPatch:
   @staticmethod
   def from_patch_number(patch_number):
     patch = JunoPatch()
-    patch.init_from_patch_number(patch_number)
+    patch._init_from_patch_number(patch_number)
     return patch
 
   @classmethod
