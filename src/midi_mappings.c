@@ -262,24 +262,16 @@ void midi_msg_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, 
                 offset = strlen(message);
             }
             substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
-            if (queue == NULL || queue == &amy_global.delta_queue) {
-                // Live dispatch: amy_add_message -> amy_add_event applies the usual
-                // time/latency scheduling semantics.
-                amy_add_message(message);
-            } else {
-                // The caller is building a stored delta list (a sequenced note on a
-                // SYNTH_FLAGS_NOTES_VIA_MIDI synth, or a patch definition): parse the
-                // mapped message into deltas on the caller's queue instead of playing
-                // it now.  The iM marker above stops the events re-entering the
-                // mapping when they resolve to voices.
-                amy_event e;
-                size_t pos = 0;
-                do {
-                    amy_clear_event(&e);
-                    pos = yield_event_from_message(message, &e, pos);
-                    if (pos > 0) amy_event_to_deltas_queue(&e, 0, queue);
-                } while (pos > 0);
-            }
+            // Handle writing the deltas to the queue (rather than letting add_message do it) so we can specify the queue.
+            // This means that wire command templates that attempt to setup sequencer events will not work.
+            if (queue == NULL)  queue = &amy_global.delta_queue;
+            amy_event e;
+            size_t pos = 0;
+            do {
+                amy_clear_event(&e);
+                pos = yield_event_from_message(message, &e, pos);
+                if (pos > 0) amy_event_to_deltas_queue(&e, 0, queue);
+            } while (pos > 0);
         }
     }
 }

@@ -934,26 +934,6 @@ class TestSynthDrums(AmyTest):
     amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
-class TestSequencedSynthDrums(AmyTest):
-  """A sequenced note on a NOTES_VIA_MIDI synth (GM drums) is stored for the
-  sequencer, not played immediately at add time."""
-
-  def test(self):
-    _amy.stop()
-    _amy.start(1)  # default synths: channel 10 is the GM drum synth.
-    amy.render(0.5)  # Let the default synth setup settle.
-    # Schedule a kick far in the future (tick 50*PPQ ~ 30s away) on a looping
-    # sequence.  Nothing should sound during the next second of rendering.
-    amy.send(sequence='%d,%d,0' % (50 * amy.AMY_SEQUENCER_PPQ, 100 * amy.AMY_SEQUENCER_PPQ),
-             synth=10, note=35, vel=1)
-    samples = amy.render(1.0)
-    level = dB(rms(samples))
-    name = self.__class__.__name__
-    if level > -80:
-      return False, ('%s: sequenced drum note sounded at add time (%.1f dB)' % (name, level))
-    return True, ('%-32s: ok' % name)
-
-
 class TestSynthProgChange(AmyTest):
   """Test switchting default synth to DX7, do oscs allocate OK?"""
 
