@@ -963,8 +963,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     if (AMY_IS_SET(e->velocity)
         && AMY_IS_SET(e->midi_note)
         && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI)
-        && (e->note_source_channel != synth)
-        && queue == &amy_global.delta_queue) {
+        && (e->note_source_channel != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));

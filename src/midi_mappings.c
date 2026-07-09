@@ -272,6 +272,7 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sys
             amy_event e;
             size_t pos = 0;
             do {
+                // Layer each parsed event on top of the caller's base event, if any.
                 if (base_event) e = *base_event;
                 else amy_clear_event(&e);
                 pos = yield_event_from_message(message, &e, pos);
