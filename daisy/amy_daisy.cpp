@@ -7,7 +7,6 @@
 extern "C" {
     #include "amy.h"
     #include "examples.h"
-    extern void sequencer_check_and_fill();
 }
 
 using namespace daisy;
@@ -122,32 +121,6 @@ void HandleMidiMessage(MidiEvent m) {
     }
 }
 
-void sequencer_timer_callback(void* arg) {
-    sequencer_check_and_fill();
-}
-
-void init_sequencer() {
-    // Platform support of sequencer is to call sequencer_check_and_fill() every 0.5 ms.
-    TimerHandle         tim5;
-    TimerHandle::Config tim_cfg;
-
-    /** TIM5 with IRQ enabled */
-    tim_cfg.periph     = TimerHandle::Config::Peripheral::TIM_5;
-    tim_cfg.enable_irq = true;
-
-    /** Configure frequency (2000Hz) */
-    auto tim_target_freq = 2000;
-    auto tim_base_freq   = System::GetPClk2Freq();
-    tim_cfg.period       = tim_base_freq / tim_target_freq;
-
-    /** Initialize timer */
-    tim5.Init(tim_cfg);
-    tim5.SetCallback(sequencer_timer_callback);
-
-    /** Start the timer, and generate callbacks at the end of each period */
-    tim5.Start();
-}
-
 int main(void)
 {
     // Configure and Initialize the Daisy Seed
@@ -172,10 +145,7 @@ int main(void)
     // Initialize Amy
     amy_config_t amy_config = amy_default_config();
     amy_config.features.startup_bleep = 1; 
-    amy_start(amy_config); // initializes amy 
-
-    // Start the sequencer timer for AMY.
-    init_sequencer();
+    amy_start(amy_config); // initializes amy
 
     //example_sequencer_drums_synth(1000);
     //event_polyphony(0, 0);
