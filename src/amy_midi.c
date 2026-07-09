@@ -161,7 +161,8 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status_byte == 0xFA) { if(external_midi_sync_enabled) sequencer_midi_start(); }
         else if(status_byte == 0xFC) { if(external_midi_sync_enabled) sequencer_midi_stop(); }
     }
-    midi_msg_handler(data, len, sysex, time);
+    amy_event e = amy_default_event();
+    midi_message_handler(data, len, sysex, time, &e);
 
     // Also send the external hooks if set
     if(amy_global.config.amy_external_midi_input_hook != NULL) {

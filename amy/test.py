@@ -934,6 +934,24 @@ class TestSynthDrums(AmyTest):
     amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
+class TestSynthDrumsPanning(AmyTest):
+  """Test synth-level note translation propagates other fields."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.send(time=100, synth=10, note=50, vel=1, pan=0.95)
+    amy.send(time=200, synth=10, note=50, vel=1, pan=0.85)
+    amy.send(time=300, synth=10, note=47, vel=1, pan=0.7)
+    amy.send(time=400, synth=10, note=47, vel=1, pan=0.55)
+    amy.send(time=500, synth=10, note=45, vel=1, pan=0.45)
+    amy.send(time=600, synth=10, note=45, vel=1, pan=0.3)
+    amy.send(time=700, synth=10, note=41, vel=1, pan=0.15)
+    amy.send(time=800, synth=10, note=41, vel=1, pan=0.05)
+
+
 class TestSynthProgChange(AmyTest):
   """Test switchting default synth to DX7, do oscs allocate OK?"""
 
@@ -1554,6 +1572,36 @@ class TestPatch32Glitch(AmyTest):
     amy.send(time=600, synth=2, note=71, vel=0)
     amy.send(time=700, synth=2, note=71, vel=1)
     amy.send(time=800, synth=2, note=71, vel=0)
+
+
+class TestSequencer(AmyTest):
+  """Sequenced notes.  DOES NOT WORK at present, see #849."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+    print("This test should NOT generate silence, but need to fix #849.")
+
+  def run(self):
+    amy.send(time=100, sequence='20,24,0', synth=1, note=64, vel=1)
+
+
+class TestSequencedSynthDrums(AmyTest):
+  """Test that sequencer works even for notes being interpreted as NOTES_VIA_MIDI (it didn't at first)."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+    print("This test should NOT generate silence, but need to fix #849.")
+
+  def run(self):
+    # We really want the sequencer to work on the SYNTH_FLAGS_NOTES_VIA_MIDI synth 10...
+    #amy.send(time=100, sequence='20,24,0', synth=10, note=38, vel=1)
+    # It doesn't, so for now simulate what it should sound like without SYNTH_FLAGS_NOTES_VIA_MIDI
+    amy.send(time=0, synth=10, num_voices=4, oscs_per_voice=1)
+    # (2, 45),   # 38 Acoustic Snare     -> 808-SNR 4
+    amy.send(time=0, synth=10, wave=amy.PCM, preset=2)
+    amy.send(time=100, sequence='20,24,0', synth=10, note=45, vel=1)
 
 
 def main(argv):

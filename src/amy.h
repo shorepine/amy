@@ -1009,7 +1009,7 @@ extern void midi_mappings_init();
 extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
 extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
-extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
+extern void midi_message_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
 #ifdef __EMSCRIPTEN__

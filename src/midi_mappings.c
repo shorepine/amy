@@ -234,8 +234,12 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
     if (n_remain > (int)strlen(src)) strcpy(dest, src);
 }
 
-void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
+void midi_message_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event) {
     //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
+    //char s[1024];
+    //sprint_event(base_event, s, 1024, /* wirecode */ false);
+    //fprintf(stderr, "event: %s\n", s);
+    //
     uint8_t status = bytes[0] & 0xF0;
     uint8_t channel = (bytes[0] & 0x0F) + 1;
     if (status == 0xB0
@@ -262,7 +266,16 @@ void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t 
                 offset = strlen(message);
             }
             substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
-            amy_add_message(message);
+            //amy_add_message(message);
+            {
+                amy_event e;
+                size_t pos = 0;
+                do {
+                    e = *base_event;
+                    pos = yield_event_from_message(message, &e, pos);
+                    if (pos > 0)  amy_add_event(&e);
+                } while(pos > 0);
+            }
         }
     }
 }
