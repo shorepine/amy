@@ -234,7 +234,7 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
     if (n_remain > (int)strlen(src)) strcpy(dest, src);
 }
 
-void midi_message_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event) {
+void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue) {
     //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
     //char s[1024];
     //sprint_event(base_event, s, 1024, /* wirecode */ false);
@@ -266,16 +266,21 @@ void midi_message_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint3
                 offset = strlen(message);
             }
             substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
-            //amy_add_message(message);
-            {
-                amy_event e;
-                size_t pos = 0;
-                do {
-                    e = *base_event;
-                    pos = yield_event_from_message(message, &e, pos);
-                    if (pos > 0)  amy_add_event(&e);
-                } while(pos > 0);
-            }
+            // Handle writing the deltas to the queue (rather than letting add_message do it) so we can specify the queue.
+            // This means that wire command templates that attempt to setup sequencer events will not work.
+            if (queue == NULL)  queue = &amy_global.delta_queue;
+            amy_event e;
+            size_t pos = 0;
+            do {
+                // Layer each parsed event on top of the caller's base event.
+                e = *base_event;
+                pos = yield_event_from_message(message, &e, pos);
+                if (pos > 0) amy_event_to_deltas_queue(&e, 0, queue);
+            } while (pos > 0);
         }
     }
+}
+
+void midi_message_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event) {
+    midi_message_handler_to_queue(bytes, len, is_sysex, time, base_event, NULL);
 }

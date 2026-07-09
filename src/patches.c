@@ -963,8 +963,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     if (AMY_IS_SET(e->velocity)
         && AMY_IS_SET(e->midi_note)
         && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI)
-        && (e->note_source_channel != synth)
-        && queue == &amy_global.delta_queue) {
+        && (e->note_source_channel != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));
@@ -974,7 +973,9 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
         AMY_UNSET(e->midi_note);
         AMY_UNSET(e->velocity);
-        midi_message_handler(bytes, 3, /* is_sysex */ 0, e->time, e);
+        // Pass the target queue through: if this event is being stored (e.g. it came
+        // from sequencer_add_event), its deltas must land in that queue, not play now.
+        midi_message_handler_to_queue(bytes, 3, /* is_sysex */ 0, e->time, e, queue);
     } else {
         // for each voice, send the event to the base osc (+ e->osc if given)
         for(uint8_t i = 0; i < num_voices; i++) {
