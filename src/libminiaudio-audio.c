@@ -39,11 +39,11 @@ uint16_t leftover_samples = 0;
 #include <emscripten.h>
 float amy_web_cv_1 = 0;
 float amy_web_cv_2 = 0;
-extern void sequencer_check_and_fill();
 void main_loop__em()
 {
-    // We call repeatedly here to fill the sequencer, for webassembly (no threads)
-    sequencer_check_and_fill();
+    // Ticks are counted in the render loop (AudioWorklet thread); replay them
+    // to the page's amy_sequencer_js_hook from the main thread here.
+    sequencer_check_and_call_js_hook();
     amy_web_cv_1 = EM_ASM_DOUBLE({ 
         if(typeof cv_1_voltage != 'undefined') { return cv_1_voltage; } else { return 0; }
     });

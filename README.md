@@ -58,7 +58,7 @@ AMY supports
  * Control of overall gain and 3-band EQ
  * 300+ built in preset patches for PCM, DX7, piano and Juno-6
  * A front end for DX7 and Juno-6 SYSEX patches and conversion setup commands 
- * Built-in event clock and pattern sequencer, using hardware real time timers on microcontrollers
+ * Built-in event clock and pattern sequencer, clocked by rendered samples so it works in real-time and offline rendering
  * Multi-core (including microcontrollers) for rendering if available
  * File transfer to the host 
 

@@ -985,6 +985,12 @@ void ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
 
 // the synth object keeps held state, whereas deltas are only deltas/changes
 int8_t oscs_init() {
+    // Reset the sample clock before anything (like sequencer_init) anchors
+    // timing against amy_sysclock() -- on a restart it still holds the
+    // previous session's time.
+    amy_global.total_blocks = 0;
+    amy_global.total_samples = 0;
+    amy_global.time = 0;
     if(amy_global.config.ks_oscs>0)
         ks_init();
     algo_init();
@@ -1027,10 +1033,7 @@ int8_t oscs_init() {
         amy_external_in_block[i] = 0;
     }
 
-    amy_global.total_blocks = 0;
-    amy_global.total_samples = 0;
-    amy_global.time = 0;
-    //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n", 
+    //printf("AMY online with %d oscillators, %d block size, %d cores, %d channels, %d pcm samples\n",
     //    AMY_OSCS, AMY_BLOCK_SIZE, AMY_CORES, AMY_NCHANS, pcm_samples);
     return 0;
 }
@@ -1845,6 +1848,9 @@ void amy_execute_delta() {
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
+    // Advance the sequencer on AMY (sample) time and queue any due sequence
+    // events, so sequencing works in any rendering context, real-time or not.
+    sequencer_check_and_fill();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
 

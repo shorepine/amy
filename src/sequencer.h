@@ -11,6 +11,10 @@ void sequencer_reset();
 void sequencer_debug();
 
 void sequencer_recompute();
+void sequencer_check_and_fill();  // called once per block from amy_execute_deltas()
+#ifdef __EMSCRIPTEN__
+void sequencer_check_and_call_js_hook();  // called from the browser main loop
+#endif
 uint8_t sequencer_add_event(amy_event *e);
 void sequencer_midi_clock_tick();
 void sequencer_midi_start();

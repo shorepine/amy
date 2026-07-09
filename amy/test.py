@@ -1575,12 +1575,11 @@ class TestPatch32Glitch(AmyTest):
 
 
 class TestSequencer(AmyTest):
-  """Sequenced notes.  DOES NOT WORK at present, see #849."""
+  """Sequenced notes on a default synth, fired periodically."""
 
   def __init__(self):
     super().__init__()
     self.default_synths = True
-    print("This test should NOT generate silence, but need to fix #849.")
 
   def run(self):
     amy.send(time=100, sequence='20,24,0', synth=1, note=64, vel=1)
@@ -1592,16 +1591,26 @@ class TestSequencedSynthDrums(AmyTest):
   def __init__(self):
     super().__init__()
     self.default_synths = True
-    print("This test should NOT generate silence, but need to fix #849.")
 
   def run(self):
-    # We really want the sequencer to work on the SYNTH_FLAGS_NOTES_VIA_MIDI synth 10...
-    #amy.send(time=100, sequence='20,24,0', synth=10, note=38, vel=1)
-    # It doesn't, so for now simulate what it should sound like without SYNTH_FLAGS_NOTES_VIA_MIDI
-    amy.send(time=0, synth=10, num_voices=4, oscs_per_voice=1)
-    # (2, 45),   # 38 Acoustic Snare     -> 808-SNR 4
-    amy.send(time=0, synth=10, wave=amy.PCM, preset=2)
-    amy.send(time=100, sequence='20,24,0', synth=10, note=45, vel=1)
+    # The sequencer working on the SYNTH_FLAGS_NOTES_VIA_MIDI synth 10 (38 = Acoustic Snare).
+    amy.send(time=100, sequence='20,24,0', synth=10, note=38, vel=1)
+
+
+class TestSequencerOsc(AmyTest):
+  """Sequenced osc events fire on AMY (sample) time, even in offline rendering.
+
+  At the default 108 bpm and 48 PPQ, one sequencer tick is ~11.6 ms, so one
+  second of rendering covers 86 ticks."""
+
+  def run(self):
+    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
+    # Absolute-tick events: note on at tick 20 (~231 ms), off at tick 40 (~463 ms).
+    amy.send(osc=0, vel=1, sequence="20,0,1")
+    amy.send(osc=0, vel=0, sequence="40,0,2")
+    # Periodic event: a lower note every 60 ticks, lands once at ~694 ms.
+    amy.send(osc=1, wave=amy.SINE, freq=500, vel=1, sequence="0,60,3")
+    amy.send(time=900, osc=1, vel=0)
 
 
 def main(argv):

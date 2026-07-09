@@ -20,11 +20,11 @@ int32_t highest_tag = -1;
 static volatile bool sequencer_running = true;
 static volatile bool sequencer_external_clock = false;
 
-// Declared per-platform below.
-void _sequencer_start();
-void _sequencer_stop();
-
 void sequencer_init(int max_sequencer_tags) {
+    // These are statics, so a stop/start of AMY within one process needs them
+    // put back to their boot state (internal clock, running).
+    sequencer_running = true;
+    sequencer_external_clock = false;
     max_sequences = max_sequencer_tags;
     sequences = (struct sequence_info_t *)malloc_caps(max_sequences * sizeof(struct sequence_info_t),
                                                       amy_global.config.ram_caps_synth);
@@ -34,9 +34,7 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].period = 0;
     }
     // We are read to go.
-    //sequencer_start();
     sequencer_recompute();
-    _sequencer_start();
 }
 
 void sequencer_reset() {
@@ -53,9 +51,9 @@ void sequencer_reset() {
 }
 
 void sequencer_deinit() {
-    _sequencer_stop();
     sequencer_reset();
     if (sequences != NULL) free(sequences);
+    sequences = NULL;  // sequencer_check_and_fill guards on this
     max_sequences = 0;
 }
 
@@ -103,18 +101,37 @@ static void sequencer_process_tick(void) {
             }
         }
     }
-    // call the right hook:
-#ifdef __EMSCRIPTEN__
-    EM_ASM({
-        if(typeof amy_sequencer_js_hook === 'function') {
-            amy_sequencer_js_hook($0);
-        }
-    }, amy_global.sequencer_tick_count);
-#endif
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
         amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
     }
 }
+
+#ifdef __EMSCRIPTEN__
+// On the web, ticks are counted in the render loop, which runs in the
+// AudioWorklet thread -- EM_ASM there can't reach the page's JS, where
+// amy_sequencer_js_hook is defined. The emscripten main loop calls this from
+// the browser main thread to replay elapsed ticks to the hook.
+void sequencer_check_and_call_js_hook() {
+    static uint32_t last_reported_tick = 0;
+    uint32_t tick = amy_global.sequencer_tick_count;
+    if (tick < last_reported_tick) last_reported_tick = tick;  // sequencer was reset
+    // If we're more than a second of ticks behind (e.g. the page was
+    // backgrounded and the main loop paused), skip ahead rather than firing a
+    // burst of stale hook calls.
+    if (amy_global.us_per_tick > 0) {
+        uint32_t ticks_per_sec = 1000000 / amy_global.us_per_tick;
+        if (tick - last_reported_tick > ticks_per_sec) last_reported_tick = tick - ticks_per_sec;
+    }
+    while (last_reported_tick < tick) {
+        ++last_reported_tick;
+        EM_ASM({
+            if(typeof amy_sequencer_js_hook === 'function') {
+                amy_sequencer_js_hook($0);
+            }
+        }, last_reported_tick);
+    }
+}
+#endif
 
 void sequencer_midi_start() {
     // MIDI "Start" restarts the sequencer.
@@ -185,7 +202,11 @@ uint8_t sequencer_add_event(amy_event *e) {
 }
 
 
+// Called once per block from amy_execute_deltas(). Ticks are decided against
+// amy_sysclock(), which counts rendered samples, so the sequencer advances on
+// AMY time in any rendering context (live, offline, tests).
 void sequencer_check_and_fill() {
+    if (sequences == NULL) return;  // sequencer_init hasn't run
     if (!sequencer_running || sequencer_external_clock) return;
     // If we've fallen behind by more than 1 second (e.g. sequencer was stopped
     // and restarted, or a long blocking operation occurred), skip ahead instead
@@ -200,96 +221,3 @@ void sequencer_check_and_fill() {
         amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + (uint64_t)amy_global.us_per_tick;
     }
 }
-
-///// Sequencers per platform
-
-#ifdef ESP_PLATFORM
-// ESP: do it with hardware timer
-#include "esp_timer.h"
-esp_timer_handle_t periodic_timer = NULL;
-
-static void sequencer_timer_callback(void* arg) {
-    sequencer_check_and_fill();
-}
-
-void _sequencer_start() {
-    const esp_timer_create_args_t periodic_timer_args = {
-            .callback = &sequencer_timer_callback,
-            //.dispatch_method = ESP_TIMER_ISR,
-            .name = "sequencer"
-    };
-    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-    // 500us = 0.5ms
-    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, 500));
-}
-
-void _sequencer_stop() {
-    if (periodic_timer) {
-        ESP_ERROR_CHECK(esp_timer_stop(periodic_timer));
-        ESP_ERROR_CHECK(esp_timer_delete(periodic_timer));
-        periodic_timer = NULL;
-    }
-}
-
-#elif defined(PICO_RP2350) || defined(PICO_RP2040)
-// pico: do it with a hardware timer
-
-#include "pico/time.h"
-repeating_timer_t pico_sequencer_timer;
-
-static bool sequencer_timer_callback(repeating_timer_t *rt) {
-    sequencer_check_and_fill();
-    return true;
-}
-
-void _sequencer_start() {
-    add_repeating_timer_us(-500, sequencer_timer_callback, NULL, &pico_sequencer_timer);
-}
-
-void _sequencer_stop() {
-    cancel_repeating_timer(&pico_sequencer_timer);
-}
-
-#elif defined _POSIX_THREADS
-#include <pthread.h>
-
-static volatile bool sequencer_thread_should_exit = false;
-
-// posix: threads
-void * sequencer_thread(void *vargs) {
-    // Loop forever, checking for time and sleeping
-    while(!sequencer_thread_should_exit) {
-        sequencer_check_and_fill();            
-        // 500000ns = 500us = 0.5ms
-        nanosleep((const struct timespec[]){{0, 500000L}}, NULL);
-    }
-    return NULL;
-}
-pthread_t sequencer_thread_id;
-void _sequencer_start() {
-    sequencer_thread_should_exit = false;
-    pthread_create(&sequencer_thread_id, NULL, sequencer_thread, NULL);
-}
-void _sequencer_stop() {
-    //pthread_cancel(sequencer_thread_id);
-    sequencer_thread_should_exit = true;
-}
-
-#elif defined AMY_DAISY
-void _sequencer_start() {
-    // Set up in DaisyMain.cc
-}
-void _sequencer_stop() {
-    // Not supported on Daisy.
-}
-
-#else
-
-void _sequencer_start() {
-    fprintf(stderr, "No sequencer support for this chip / platform\n");
-}
-void _sequencer_stop() {
-    fprintf(stderr, "No sequencer support for this chip / platform\n");
-}
-
-#endif
