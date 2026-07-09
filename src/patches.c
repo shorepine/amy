@@ -960,16 +960,22 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // Should we invoke MIDI note-on cmd rules?
-    if (AMY_IS_SET(e->velocity) && AMY_IS_SET(e->midi_note) && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI) && (e->note_source_channel != synth)) {
+    if (AMY_IS_SET(e->velocity)
+        && AMY_IS_SET(e->midi_note)
+        && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI)
+        && (e->note_source_channel != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));
         bytes[1] = 0x7F & (uint8_t)(e->midi_note);
         bytes[2] = (uint8_t) MIN(127, 127.1f * e->velocity);
         //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
+        // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
+        AMY_UNSET(e->midi_note);
+        AMY_UNSET(e->velocity);
         // Pass the target queue through: if this event is being stored (e.g. it came
         // from sequencer_add_event), its deltas must land in that queue, not play now.
-        midi_msg_handler_to_queue(bytes, 3, /* is_sysex */ 0, e->time, queue);
+        midi_message_handler_to_queue(bytes, 3, /* is_sysex */ 0, e->time, e, queue);
     } else {
         // for each voice, send the event to the base osc (+ e->osc if given)
         for(uint8_t i = 0; i < num_voices; i++) {

@@ -234,8 +234,12 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
     if (n_remain > (int)strlen(src)) strcpy(dest, src);
 }
 
-void midi_msg_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, struct delta **queue) {
+void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue) {
     //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
+    //char s[1024];
+    //sprint_event(base_event, s, 1024, /* wirecode */ false);
+    //fprintf(stderr, "event: %s\n", s);
+    //
     uint8_t status = bytes[0] & 0xF0;
     uint8_t channel = (bytes[0] & 0x0F) + 1;
     if (status == 0xB0
@@ -268,7 +272,9 @@ void midi_msg_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, 
             amy_event e;
             size_t pos = 0;
             do {
-                amy_clear_event(&e);
+                // Layer each parsed event on top of the caller's base event, if any.
+                if (base_event) e = *base_event;
+                else amy_clear_event(&e);
                 pos = yield_event_from_message(message, &e, pos);
                 if (pos > 0) amy_event_to_deltas_queue(&e, 0, queue);
             } while (pos > 0);
@@ -277,5 +283,5 @@ void midi_msg_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, 
 }
 
 void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
-    midi_msg_handler_to_queue(bytes, len, is_sysex, time, NULL);
+    midi_message_handler_to_queue(bytes, len, is_sysex, time, NULL, NULL);
 }
