@@ -194,11 +194,9 @@ void interp_partials_note_on(uint16_t osc) {
     // access below reads past the end of the pitches/num_harmonics/harmonics tables.
     if (midi_vel < partials_voice->velocities[0]) midi_vel = partials_voice->velocities[0];
     if (midi_vel > partials_voice->velocities[partials_voice->num_velocities - 1]) midi_vel = partials_voice->velocities[partials_voice->num_velocities - 1];
-    if (midi_note < partials_voice->pitches[0]) midi_note = partials_voice->pitches[0];
-    if (midi_note > partials_voice->pitches[partials_voice->num_pitches - 1]) midi_note = partials_voice->pitches[partials_voice->num_pitches - 1];
     // Find the lower bound pitch/velocity indices.
     uint8_t pitch_index = 0, vel_index = 0;
-    while(pitch_index < partials_voice->num_pitches - 1
+    while(pitch_index < partials_voice->num_pitches - 2
           && partials_voice->pitches[pitch_index + 1] < midi_note)
         ++pitch_index;
     while(vel_index < partials_voice->num_velocities - 1
