@@ -196,7 +196,7 @@ void interp_partials_note_on(uint16_t osc) {
     if (midi_vel > partials_voice->velocities[partials_voice->num_velocities - 1]) midi_vel = partials_voice->velocities[partials_voice->num_velocities - 1];
     // Find the lower bound pitch/velocity indices.
     uint8_t pitch_index = 0, vel_index = 0;
-    while(pitch_index < partials_voice->num_pitches - 2
+    while(pitch_index < partials_voice->num_pitches - 2   // We're going to inspect pitch_index + 1, so make sure that's in the table.
           && partials_voice->pitches[pitch_index + 1] < midi_note)
         ++pitch_index;
     while(vel_index < partials_voice->num_velocities - 1
