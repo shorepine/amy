@@ -189,12 +189,14 @@ void interp_partials_note_on(uint16_t osc) {
     const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
     float midi_note = synth[osc]->midi_note;
     float midi_vel = (int)roundf(synth[osc]->velocity * 127.f);
-    // Clip
+    // Clip velocity to the range covered by the tables.  Pitch is deliberately not clipped:
+    // notes outside the table range are linearly extrapolated from the edge rows (pitch_alpha
+    // outside [0, 1]); the index search below is bounded so table reads stay in range.
     if (midi_vel < partials_voice->velocities[0]) midi_vel = partials_voice->velocities[0];
     if (midi_vel > partials_voice->velocities[partials_voice->num_velocities - 1]) midi_vel = partials_voice->velocities[partials_voice->num_velocities - 1];
     // Find the lower bound pitch/velocity indices.
     uint8_t pitch_index = 0, vel_index = 0;
-    while(pitch_index < partials_voice->num_pitches - 1
+    while(pitch_index < partials_voice->num_pitches - 2   // We're going to inspect pitch_index + 1, so make sure that's in the table.
           && partials_voice->pitches[pitch_index + 1] < midi_note)
         ++pitch_index;
     while(vel_index < partials_voice->num_velocities - 1

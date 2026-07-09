@@ -252,6 +252,30 @@ class TestInterpPartialsRetrigger(AmyTest):
     amy.send(time=850, osc=100, vel=0)
 
 
+class TestInterpPartialsOutOfRange(AmyTest):
+  """Notes above the top of the piano pitch table (MIDI 104) used to read out of
+  bounds, which could permanently silence all AMY output.  They now extrapolate
+  from the table edge, and in-range notes played afterwards must still sound.
+  The out-of-range notes are quiet (vel=0.1) because extrapolated envelopes
+  amplify cross-platform libm float differences; what matters here is that the
+  out-of-range path runs, not how it sounds."""
+
+  def run(self):
+    amy.send(time=0, reset=amy.RESET_SYNTHS)
+    amy.send(time=0, synth=1, num_voices=6, patch=256)
+    t = 50
+    for i in range(4):
+      amy.send(time=t, synth=1, note=60 + i, vel=0.7)
+      for note in (108, 112, 115):
+        amy.send(time=t + 50, synth=1, note=note, vel=0.1)
+        amy.send(time=t + 150, synth=1, note=note, vel=0)
+      amy.send(time=t + 150, synth=1, note=60 + i, vel=0)
+      t += 200
+    # This final in-range note went permanently silent when the out-of-range
+    # notes above read past the end of the tables.
+    amy.send(time=t, synth=1, note=60, vel=1)
+
+
 class TestSineEnv(AmyTest):
 
   def run(self):
