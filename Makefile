@@ -105,7 +105,7 @@ timing: amy-module
 
 speedtest:
 	echo "Compiling LoadTestChord.ino..."
-	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "build.defines=\"-DARDUINO_SPEEDTEST\"" --verbose tools/arduino_loadsweep/LoadTestChord
+	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --verbose tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
 	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
 
