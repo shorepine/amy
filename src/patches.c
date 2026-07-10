@@ -692,18 +692,18 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", instr_num, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
-    int first_osc_state_val = 0;
-    int last_osc_state_val = num_oscs;
-    // Bus is specified in set_event_for_bus_fx, no need to include here.
-    if (flags != 0 /* || bus != 0 */) {
-        ++first_osc_state_val;
-        ++last_osc_state_val;
-        if (state_val == 0) {
-            if (flags != 0)  event->synth_flags = flags;
-            //if (bus != 0)  event->bus = bus;
-        }
-    }
-    if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
+    // Always use first output (state val 0) as preamble.
+    int first_osc_state_val = 1;
+    int last_osc_state_val = num_oscs + 1;
+    if (state_val == 0) {
+    // Always emit a preamble with num_voices and oscs_per_voice
+    // We could include the patch but we don't, because we're going to set the values by hand.
+        event->num_voices = instrument_get_num_voices(instr_num, NULL);
+        event->oscs_per_voice = instrument_get_oscs_per_voice(instr_num);
+        if (flags != 0)  event->synth_flags = flags;
+        // Bus is specified in set_event_for_bus_fx, no need to include here.
+        //if (bus != 0)  event->bus = bus;
+    } else if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
         event->osc = state_val - first_osc_state_val;
         //fprintf(stderr, "2 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d last_osc_state_val %d\n",
         //    base_osc, event->osc, state_val, first_osc_state_val, last_osc_state_val);
