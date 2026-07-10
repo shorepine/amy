@@ -76,6 +76,7 @@ void sequencer_recompute() {
 
 static void sequencer_process_tick(void) {
     amy_global.sequencer_tick_count++;
+    midi_clock_out_tick();  // no-op unless in AMY_MIDI_SYNC_SEND mode
     // Scan through LL looking for matches
     for (int32_t tag = 0; tag <= highest_tag; ++tag) {
         if (sequences[tag].deltas != NULL) {
@@ -146,10 +147,12 @@ void sequencer_midi_start() {
     // catch up all the ticks that elapsed while stopped.
     amy_global.next_amy_tick_us = (uint64_t)amy_sysclock() * 1000L;
     sequencer_running = true;
+    midi_clock_out_start();  // tell downstream slaves, if we're the clock master
 }
 
 void sequencer_midi_stop() {
     sequencer_running = false;
+    midi_clock_out_stop();  // tell downstream slaves, if we're the clock master
 }
 
 void sequencer_midi_clock_tick() {
@@ -209,7 +212,11 @@ uint8_t sequencer_add_event(amy_event *e) {
 // AMY time in any rendering context (live, offline, tests).
 void sequencer_check_and_fill() {
     if (sequences == NULL) return;  // sequencer_init hasn't run
-    if (!sequencer_running || sequencer_external_clock) return;
+    if (sequencer_external_clock) return;
+    // When we're the MIDI clock master, realtime clock keeps flowing even while
+    // the transport is stopped so slaves stay tempo-locked; otherwise a stopped
+    // sequencer has nothing to do.
+    if (!sequencer_running && !midi_clock_out_enabled()) return;
     // If we've fallen behind by more than 1 second (e.g. sequencer was stopped
     // and restarted, or a long blocking operation occurred), skip ahead instead
     // of processing hundreds of backed-up ticks at once.
@@ -219,7 +226,8 @@ void sequencer_check_and_fill() {
     }
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
     while(now_us >= amy_global.next_amy_tick_us) {
-        sequencer_process_tick();
+        if (sequencer_running) sequencer_process_tick();
+        else midi_clock_out_tick();  // transport stopped: clock only, no sequence events
         amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + (uint64_t)amy_global.us_per_tick;
     }
 }

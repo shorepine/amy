@@ -622,11 +622,13 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
     }
     else if (cmd == 'C') {
         // zC: external MIDI clock sync. zC1 makes the sequencer follow incoming
-        // MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); zC0 (the default)
-        // ignores them and uses the internal clock. Same switch as the C API's
-        // amy_external_midi_sync(), reachable over the wire so hosts that only
-        // speak the wire protocol (web builds, sysex) can flip it.
-        amy_external_midi_sync(atoi(message) ? 1 : 0);
+        // MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); zC2 makes AMY the
+        // clock master, sending those messages out (0xF8 at 24 PPQ from the
+        // internal tempo, 0xFA/0xFC on transport start/stop); zC0 (the default)
+        // neither follows nor sends and uses the internal clock. Same switch as
+        // the C API's amy_external_midi_sync(), reachable over the wire so hosts
+        // that only speak the wire protocol (web builds, sysex) can flip it.
+        amy_external_midi_sync((uint8_t)atoi(message));
         return 1;
     }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
