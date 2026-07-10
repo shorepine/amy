@@ -14,6 +14,7 @@ src/amy.egg-info/
 amy.egg-info/
 build/
 venv/
+load/
 
 
 # Prerequisites
