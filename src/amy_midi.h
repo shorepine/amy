@@ -44,13 +44,17 @@ extern uint8_t *sysex_buffer;
 // Only AMYBOARD creates and reads these slots (see parse_sysex()): the ring
 // exists for the SPSS z* sketch-transfer bursts over USB-gadget MIDI, which
 // only AMYboard receives. Size the ring to 0 everywhere else so we don't
-// malloc SYSEX_COPY_SLOTS x MAX_SYSEX_BYTES (32 x 16KB = 512KB): that alone
-// would exhaust e.g. the rp2350's 520KB of SRAM, and on Tulip ESP32-S3 it ate
-// a third of the free SPIRAM. With 0 slots, parse_sysex() finds a NULL slot
-// and the scheduled callback ACKs SPSS messages without processing them;
-// non-SPSS sysex is unaffected.
+// malloc SYSEX_COPY_SLOTS x MAX_SYSEX_BYTES: that alone would exhaust e.g.
+// the rp2350's 520KB of SRAM, and on Tulip ESP32-S3 it ate a third of the
+// free SPIRAM. With 0 slots, parse_sysex() finds a NULL slot and the
+// scheduled callback ACKs SPSS messages without processing them; non-SPSS
+// sysex is unaffected.
+// 8 slots (128KB SPIRAM) is enough on AMYboard: the sender is flow-controlled
+// (the ACK is sent only after a slot is drained, see parse_sysex()), so it
+// can never run more than the ring depth ahead. 32 slots cost 512KB of
+// SPIRAM better spent on memorypcm samples.
 #if defined(AMYBOARD)
-#define SYSEX_COPY_SLOTS 32
+#define SYSEX_COPY_SLOTS 8
 #else
 #define SYSEX_COPY_SLOTS 0
 #endif
