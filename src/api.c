@@ -382,14 +382,13 @@ void amy_bleep(uint32_t start) {
 }
 
 float amy_get_render_load() {
-    return amy_global.render_load;
+    return amy_global.render_us;
 }
 
 // CPU overload failsafe: silence and reset the synth so the host stays responsive,
 // then play a descending bleep so the user knows AMY stopped on purpose.
 void amy_overload_failsafe() {
-    float load = amy_global.render_load;
-    fprintf(stderr, "AMY: CPU overload (render load %.2f), resetting synth\n", load);
+    fprintf(stderr, "AMY: CPU overload (render %d us), resetting synth\n", amy_global.render_us);
     // Drop everything scheduled first -- an overloaded delta queue can hold
     // hundreds of pending events that would re-wedge us as they play out.
     amy_grab_lock();
@@ -416,25 +415,21 @@ void amy_overload_failsafe() {
         amy_add_event(&e);
     }
     if (amy_global.config.amy_external_overload_hook != NULL)
-        amy_global.config.amy_external_overload_hook(load);
+        amy_global.config.amy_external_overload_hook(amy_global.render_us / ((float)AMY_BLOCK_US));
     // Start the load measure over so we don't re-trip while recovering.
-    amy_global.render_load = 0;
+    amy_global.render_us = 0;
     amy_global.overload_count = 0;
 }
 
 // Called by platform render loops once per block: busy_us is the time spent
-// rendering the block, period_us is the block's total wall time (busy plus time
-// blocked waiting on audio output).  Keeps a smoothed load estimate in
-// amy_global.render_load and trips the failsafe when it stays pinned at/above
-// config.overload_threshold for config.overload_ms.
-void amy_overload_check(uint32_t busy_us, uint32_t period_us) {
-    if (period_us == 0) return;
-    float load = (float)busy_us / (float)period_us;
-    amy_global.render_load += 0.05f * (load - amy_global.render_load);
-    if (amy_global.config.overload_threshold <= 0) return;
-    if (amy_global.render_load >= amy_global.config.overload_threshold) {
-        uint32_t trip_blocks = ((uint32_t)amy_global.config.overload_ms * AMY_SAMPLE_RATE) / (AMY_BLOCK_SIZE * 1000);
-        if (++amy_global.overload_count > trip_blocks) {
+// rendering the block.  Keeps a smoothed load estimate in
+// amy_global.render_us and trips the failsafe when it stays pinned at/above
+// amy_global.overload_threshold_us for amy_global.overload_blocks blocks.
+void amy_overload_check(uint32_t render_us) {
+    amy_global.render_us += (render_us - amy_global.render_us) >> 5;  // 0.03125 * delta,
+    if (amy_global.overload_threshold_us <= 0) return;
+    if (amy_global.render_us >= amy_global.overload_threshold_us) {
+        if (++amy_global.overload_count > amy_global.overload_blocks) {
             amy_overload_failsafe();
         }
     } else {

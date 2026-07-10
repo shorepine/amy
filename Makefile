@@ -104,10 +104,8 @@ timing: amy-module
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
 speedtest:
-	echo "Patching src/i2s.c..."
-	python tools/arduino_loadsweep/patch_render_load.py src/i2s.c
 	echo "Compiling LoadTestChord.ino..."
-	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build tools/arduino_loadsweep/LoadTestChord
+	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
 	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
 

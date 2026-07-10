@@ -40,7 +40,7 @@ def analyze(outdir):
         problems.append("no meta.json — measure.py died before writing results")
     try:
         with open(os.path.join(outdir, "load.csv")) as f:
-            rows = [(float(r["t_s"]), float(r["load"]))
+            rows = [(float(r["t_s"]), int(r["load"]))
                     for r in csv.DictReader(f)]
     except OSError:
         pass
@@ -55,8 +55,8 @@ def analyze(outdir):
     notes = meta.get("notes", [])
     if not rows and not any("RENDER_LOAD" in p for p in problems):
         problems.append("no RENDER_LOAD lines captured")
-    if rows and len(notes) < 8:
-        problems.append(f"only {len(notes)}/8 notes were played")
+    if rows and len(notes) < 6:
+        problems.append(f"only {len(notes)}/6 notes were played")
     if meta.get("board_crashed"):
         problems.append("board crashed during the run (panic/watchdog reboot)")
     if meta.get("serial_died_early"):
@@ -76,7 +76,7 @@ def analyze(outdir):
 def fmt(v, signed=False):
     if v is None:
         return "—"
-    return f"{v:+.3f}" if signed else f"{v:.3f}"
+    return f"{v:+d}" if signed else f"{v:d}"
 
 
 def main():

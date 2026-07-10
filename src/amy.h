@@ -841,9 +841,6 @@ typedef struct global_state {
     uint32_t total_samples;
     float time;
     uint8_t debug_flag;
-    // Smoothed fraction of real time spent rendering (0..1); see amy_overload_check.
-    float render_load;
-    uint16_t overload_count;  // Consecutive over-threshold blocks.
     // How many buses do we actually have to process?
     uint8_t highest_bus;
     SAMPLE hpf_state;
@@ -867,6 +864,13 @@ typedef struct global_state {
 
     // Final output mix
     float bus_gain[AMY_NUM_BUSES];
+
+    // Smoothed microseconds per render execution.
+    uint32_t render_us;
+    uint16_t overload_count;  // Consecutive over-threshold blocks.
+    // Precomputed overload thresholds
+    uint32_t overload_threshold_us;
+    uint16_t overload_blocks;
 } global_state_t;
 
 
@@ -967,7 +971,7 @@ void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
 // CPU overload detection: platform render loops call this once per block.
-void amy_overload_check(uint32_t busy_us, uint32_t period_us);
+void amy_overload_check(uint32_t render_us);
 void amy_overload_failsafe();
 float amy_get_render_load();
 int amy_get_output_buffer(output_sample_type * samples);
