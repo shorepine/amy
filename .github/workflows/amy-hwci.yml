@@ -9,9 +9,7 @@ name: AMY HW CI
 #
 # PASS/FAIL semantics: FAIL means only that the bench COULD NOT RUN the test
 # (flash/serial failure, board crash, capture interference). The load values
-# are informational — no audio compare, no load threshold. Regression hunting
-# across commits is tools/arduino_loadsweep's sweep.py/plot.py job, not
-# per-PR CI's.
+# are informational — no audio compare, no load threshold. 
 #
 # SECURITY: the bench is a self-hosted Pi and this repo is public, so fork
 # code must never reach it. This workflow chains off the build via

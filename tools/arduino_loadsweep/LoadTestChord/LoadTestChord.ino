@@ -48,11 +48,11 @@ void loop() {
   amy_update();
 
   // Every 2 seconds: amy.send(synth=1, note=40+(i*2), vel=0.2), held forever.
-  if (note_i < 8 && millis() - last_note_ms >= 2000) {
+  if (note_i < 6 && millis() - last_note_ms >= 2000) {
     last_note_ms = millis();
     amy_event e = amy_default_event();
     e.synth = 1;
-    e.midi_note = 40 + (note_i * 2);
+    e.midi_note = 40 + (note_i * 3);
     e.velocity = 0.2f;
     amy_add_event(&e);
     fprintf(stderr, "NOTE i=%d note=%d ms=%lu\n",

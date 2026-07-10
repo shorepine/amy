@@ -1,9 +1,10 @@
 name: AMY HW CI build
 
 # Cloud half of AMY's hardware CI. Builds THIS PR's AMY into the fixed
-# LoadTestChord test sketch (tools/arduino_loadsweep: 8-voice Juno patch,
-# one held note every 2 s until an 8-note chord), with src/i2s.c patched to
-# print `RENDER_LOAD ms=<ms> load=<0..1>` on the debug UART at 2 Hz, and
+# LoadTestChord test sketch (tools/arduino_loadsweep: 6-voice Juno patch,
+# one held note every 2 s until a 6-note chord), compiled with -DARDUINO_SPEEDTEST
+# to make src/i2s.c print `RENDER_LOAD ms=<ms> render_us=<microseconds`
+# on the debug UART at 2 Hz, and
 # uploads the firmware as an artifact. "AMY HW CI" (amy-hwci.yml) then
 # chains off this run via workflow_run and flashes it on the self-hosted
 # AMYboard bench Pi.
@@ -56,14 +57,6 @@ jobs:
           echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
           echo "baseline: $BASE_SHA"
 
-      - name: Patch the 2 Hz render-load print into src/i2s.c (both trees)
-        run: |
-          set -euo pipefail
-          python3 tools/arduino_loadsweep/patch_render_load.py src/i2s.c
-          if [ -d ../base ]; then
-            python3 tools/arduino_loadsweep/patch_render_load.py ../base/src/i2s.c
-          fi
-
       - uses: arduino/setup-arduino-cli@v2
 
       - name: Cache the esp32 arduino core
@@ -91,12 +84,14 @@ jobs:
           arduino-cli compile --fqbn esp32:esp32:amyboard \
             --library "$PWD" \
             --build-property compiler.optimization_flags=-O2 \
+            --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" \
             --build-path "$PWD/build" \
             tools/arduino_loadsweep/LoadTestChord
           if [ -d ../base ]; then
             arduino-cli compile --fqbn esp32:esp32:amyboard \
               --library "$(cd ../base && pwd)" \
               --build-property compiler.optimization_flags=-O2 \
+              --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" \
               --build-path "$PWD/build-base" \
               tools/arduino_loadsweep/LoadTestChord
           fi
