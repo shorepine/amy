@@ -395,11 +395,13 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET(oscs_per_voice);
     _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
+    _RET_TRUE_IF_SET(bus);
+    //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);
     // Global effects
     bool is_empty = true;
-    is_empty &= AMY_IS_UNSET(e->bus);
+    //is_empty &= AMY_IS_UNSET(e->bus);
     for (int b = 0; b < AMY_NUM_BUSES; ++b) is_empty &= _TRUE_IF_F_UNSET(e->volume[b]);
     is_empty &= _TRUE_IF_5_F_UNSET(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     is_empty &= _TRUE_IF_5_F_UNSET(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef);
@@ -948,23 +950,15 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         if (!addresses_oscs) {
             if (!is_empty) {
                 // does contain FX-facing events, must strip instr/voices, set bus.
-                if (AMY_IS_SET(e->synth)) {
-                    if (AMY_IS_SET(e->bus)) {
-                        // We are setting the bus for this synth.
-                        instrument_set_bus(e->synth, e->bus);
-                        addresses_oscs = true;  // Make sure the bus gets set for all the oscs too.
-                    } else {
-                        // We infer the current bus for this synth.
-                        e->bus = instrument_get_bus(e->synth);
-                    }
+                if (AMY_IS_SET(e->synth) && AMY_IS_UNSET(e->bus)) {
+                    // We infer the current bus for this synth.
+                    e->bus = instrument_get_bus(e->synth);
                 }
-                if (!addresses_oscs) {  // May have been changed
-                    AMY_UNSET(e->synth);
-                    AMY_UNSET(e->voices[0]);
-                    amy_event_to_deltas_queue(e, 0 /* base_osc, should be ignored */, queue);
-                }
+                AMY_UNSET(e->synth);
+                AMY_UNSET(e->voices[0]);
+                amy_event_to_deltas_queue(e, 0 /* base_osc, should be ignored */, queue);
             }
-            if (!addresses_oscs)  return;  // Early exit.
+            return;  // Early exit.
         }
     }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
