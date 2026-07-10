@@ -438,6 +438,10 @@ void buses_reset() {
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
+    // Precompute implications of overload thresholds.
+    amy_global.overload_threshold_us = (uint32_t)(c.overload_threshold * ((float)AMY_BLOCK_US));
+    amy_global.overload_blocks = (uint16_t)(c.overload_ms * 1000.f / ((float)AMY_BLOCK_US));
+
     amy_global.i2s_is_in_background = 0;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
@@ -456,7 +460,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.debug_flag = 0;
     amy_global.highest_bus = 0;
     amy_global.hpf_state = 0;
-    amy_global.render_load = 0;
+    amy_global.render_us = 0;
     amy_global.overload_count = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;

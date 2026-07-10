@@ -378,7 +378,7 @@ void esp_fill_audio_buffer_task() {
         // When rendering keeps up, this task spends most of each block parked in the
         // i2s DMA write (or the update-sync wait) above, which is when lower-priority
         // tasks on this core get to run.
-        amy_overload_check(busy_us, busy_us + blocked_us);
+        amy_overload_check(busy_us);
         // If the audio output didn't block at all, we're past overloaded, and this
         // max-priority task would starve everything else on this core (USB, MIDI,
         // the host app).  Audio is already breaking up, so give the rest of the
@@ -454,7 +454,7 @@ int16_t *amy_render_audio() {
         int64_t t0 = amy_get_us();
         esp_render_on_cores();
         buf = amy_fill_buffer();
-        amy_overload_check((uint32_t)(amy_get_us() - t0), AMY_BLOCK_US);
+        amy_overload_check((uint32_t)(amy_get_us() - t0));
     }
     return buf;
 }
@@ -544,7 +544,7 @@ int16_t *amy_render_audio() {
 #endif
         amy_render(0, AMY_OSCS, 0);
     int16_t *block = amy_fill_buffer();
-    amy_overload_check((uint32_t)(amy_get_us() - t0), AMY_BLOCK_US);
+    amy_overload_check((uint32_t)(amy_get_us() - t0));
     return block;
 }
 
@@ -673,7 +673,7 @@ int16_t *amy_render_audio() {
     int64_t t0 = amy_get_us();
     amy_render(0, AMY_OSCS, 0);
     int16_t *block = amy_fill_buffer();
-    amy_overload_check((uint32_t)(amy_get_us() - t0), AMY_BLOCK_US);
+    amy_overload_check((uint32_t)(amy_get_us() - t0));
     return block;
 }
 
