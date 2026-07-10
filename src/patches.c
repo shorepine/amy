@@ -282,7 +282,6 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
     _EPRINT_F(trigger_phase, "phase", "P");
-    _EPRINT_F_SEQ(volume, "volume", AMY_NUM_BUSES, "V");  // NOT osc-dep
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
     _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
     _EPRINT_I(latency_ms, "latency_ms", "N");  // NOT osc-dep
@@ -316,6 +315,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     //_EPRINT_I(status, "status");
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
+    _EPRINT_I(bus, "bus", "y");
+    _EPRINT_F_SEQ(volume, "volume", AMY_NUM_BUSES, "V");
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
     _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
@@ -325,6 +326,12 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
 
     assert( ((size_t)(s - s_entry)) < len);  // if we corrupted memory, at least we'll abort.
     return s - s_entry;
+}
+
+void fprintf_event_stderr(amy_event *e) {
+    char s[1024];
+    sprint_event(e, s, 1024, /* wirecode */ false);
+    fprintf(stderr, "%s\n", s);
 }
 
 #define _RET_TRUE_IF_SET(FIELD) if (AMY_IS_SET(e->FIELD)) return true;
@@ -337,6 +344,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         _RET_TRUE_IF_SET_SEQ(TFIELD, MAX_BPS)        \
         _RET_TRUE_IF_SET_SEQ(VFIELD, MAX_BPS)        \
     }
+#define _TRUE_IF_F_UNSET(VAL1)  \
+    AMY_IS_UNSET((float)(VAL1))
 #define _TRUE_IF_5_F_UNSET(VAL1, VAL2, VAL3, VAL4, VAL5)  \
     (AMY_IS_UNSET((float)(VAL1)) && AMY_IS_UNSET((float)(VAL2)) && AMY_IS_UNSET((float)(VAL3)) && AMY_IS_UNSET((float)(VAL4)) && AMY_IS_UNSET((float)(VAL5)))
 
@@ -356,7 +365,6 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET_COEF(pan_coefs);
     _RET_TRUE_IF_SET(feedback);
     _RET_TRUE_IF_SET(trigger_phase);
-    _RET_TRUE_IF_SET_SEQ(volume, AMY_NUM_BUSES);  // NOT osc-dep
     _RET_TRUE_IF_SET(pitch_bend);  // NOT osc-dep
     _RET_TRUE_IF_SET(tempo);  // NOT osc-dep
     _RET_TRUE_IF_SET(latency_ms);  // NOT osc-dep
@@ -387,10 +395,14 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET(oscs_per_voice);
     _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
+    _RET_TRUE_IF_SET(bus);
+    //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);
     // Global effects
     bool is_empty = true;
+    //is_empty &= AMY_IS_UNSET(e->bus);
+    for (int b = 0; b < AMY_NUM_BUSES; ++b) is_empty &= _TRUE_IF_F_UNSET(e->volume[b]);
     is_empty &= _TRUE_IF_5_F_UNSET(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     is_empty &= _TRUE_IF_5_F_UNSET(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef);
     is_empty &= _TRUE_IF_5_F_UNSET(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT);
@@ -473,6 +485,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(eg_type[0], EG0_TYPE)
       _CASE_I(eg_type[1], EG1_TYPE)
       _CASE_F(velocity, VELOCITY)
+      _CASE_I(bus, BUS)
     default:  // blocks, not handled by case
       _TEST_COEFS(amp_coefs, AMP)
       _TEST_FREQ_COEFS(freq_coefs, FREQ)
@@ -625,8 +638,8 @@ void set_event_for_bus_fx(amy_event *event, uint8_t bus, global_state_t *state) 
     // Always emit all FX fields so saved patches are fully self-describing.
     // Set the bus
     event->bus = bus;
-    // Volume for this bus alone.
-    event->volume[bus] = state->volume[bus];
+    // Volume for this bus alone, confusingly sits in slot 0 because bus=X volume=Y writes volume[X] = Y.
+    event->volume[0] = state->volume[bus];
     // EQ
     event->eq_l = lin_to_db(S2F(state->bus[bus]->eq.eq[0]));
     event->eq_m = lin_to_db(S2F(state->bus[bus]->eq.eq[1]));
@@ -673,6 +686,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
         return NULL;  // instrument not allocated.
     }
     uint32_t flags = instrument_get_flags(instr_num);
+    //uint8_t bus = instrument_get_bus(instr_num);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = num_oscs_for_voice(voice);
@@ -680,16 +694,18 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_events(%d) voice=%d num_oscs=%d state_val=%d\n", instr_num, voice, num_oscs, (int)state_val);
     amy_clear_event(event);
-    int first_osc_state_val = 0;
-    int last_osc_state_val = num_oscs;
-    if (flags != 0) {
-        ++first_osc_state_val;
-        ++last_osc_state_val;
-        if (state_val == 0) {
-            event->synth_flags = flags;
-        }
-    }
-    if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
+    // Always use first output (state val 0) as preamble.
+    int first_osc_state_val = 1;
+    int last_osc_state_val = num_oscs + 1;
+    if (state_val == 0) {
+    // Always emit a preamble with num_voices and oscs_per_voice
+    // We could include the patch but we don't, because we're going to set the values by hand.
+        event->num_voices = instrument_get_num_voices(instr_num, NULL);
+        event->oscs_per_voice = instrument_get_oscs_per_voice(instr_num);
+        if (flags != 0)  event->synth_flags = flags;
+        // Bus is specified in set_event_for_bus_fx, no need to include here.
+        //if (bus != 0)  event->bus = bus;
+    } else if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
         event->osc = state_val - first_osc_state_val;
         //fprintf(stderr, "2 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d last_osc_state_val %d\n",
         //    base_osc, event->osc, state_val, first_osc_state_val, last_osc_state_val);
@@ -697,7 +713,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
     } else if (include_fx && (state_val == last_osc_state_val)) {
         // optional final event contains the global/bus settings (volume, eq, chorus, echo, reverb).
         // The bus is determined by the bus value on the base_osc, probably OK.
-        set_event_for_bus_fx(event, synth[base_osc]->bus, &amy_global);
+        set_event_for_bus_fx(event, instrument_get_bus(instr_num), &amy_global);
     }
     ++state_val;
     if (state_val == last_osc_state_val + (include_fx ? 1 : 0))  state_val = 0;  // Indicate this is the final event.
@@ -930,10 +946,12 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     peek_stack("has_voices");
     {
         bool is_empty = true;
-        if (!event_addresses_oscs(e, &is_empty)) {
+        bool addresses_oscs = event_addresses_oscs(e, &is_empty);
+        if (!addresses_oscs) {
             if (!is_empty) {
                 // does contain FX-facing events, must strip instr/voices, set bus.
-                if (AMY_IS_UNSET(e->bus) && AMY_IS_SET(e->synth)) {
+                if (AMY_IS_SET(e->synth) && AMY_IS_UNSET(e->bus)) {
+                    // We infer the current bus for this synth.
                     e->bus = instrument_get_bus(e->synth);
                 }
                 AMY_UNSET(e->synth);

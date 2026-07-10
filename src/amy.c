@@ -584,13 +584,19 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // If this is a bus-directed event, use d->osc to store the bus number instead.
     bool bus_directed_command = false;
-    if (AMY_IS_SET(e->eq_l) || AMY_IS_SET(e->eq_m) || AMY_IS_SET(e->eq_h)
+    bool any_volume_set = false;
+    for (int b = 0; b < AMY_NUM_BUSES; ++b) {
+        any_volume_set |= AMY_IS_SET(e->volume[b]);
+    }
+    if (any_volume_set
+        || AMY_IS_SET(e->eq_l) || AMY_IS_SET(e->eq_m) || AMY_IS_SET(e->eq_h)
         || AMY_IS_SET(e->echo_level) || AMY_IS_SET(e->echo_delay_ms) || AMY_IS_SET(e->echo_max_delay_ms) || AMY_IS_SET(e->echo_feedback) || AMY_IS_SET(e->echo_filter_coef)
         || AMY_IS_SET(e->chorus_level) || AMY_IS_SET(e->chorus_max_delay) || AMY_IS_SET(e->chorus_lfo_freq) || AMY_IS_SET(e->chorus_depth) 
         || AMY_IS_SET(e->reverb_level) || AMY_IS_SET(e->reverb_liveness) || AMY_IS_SET(e->reverb_damping) || AMY_IS_SET(e->reverb_xover_hz)) {
         if (AMY_IS_SET(e->osc))  fprintf(stderr, "** osc %d specific for bus-directed command, ignoring\n", e->osc);  // Can't at this moment be more specific about which command.
-        // Store the target bus in d.osc.
-        d.osc = AMY_IS_SET(e->bus) ? e->bus : AMY_DEFAULT_BUS;
+        // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
+        d.osc = AMY_IS_SET(e->bus) ? e->bus :
+            ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS);
         bus_directed_command = true;
         if (d.osc > amy_global.highest_bus) amy_global.highest_bus = d.osc;
     } else {
@@ -626,10 +632,14 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     }
 
     // Everything else only added to queue if set
+    int bus = 0;
     if (!bus_directed_command) {
         EVENT_TO_DELTA_I(bus, BUS)
-        if (AMY_IS_SET(e->bus) && e->bus > amy_global.highest_bus)
-            amy_global.highest_bus = e->bus;
+        if (AMY_IS_SET(e->bus)) {
+            bus = e->bus;
+            if(bus > amy_global.highest_bus)
+                amy_global.highest_bus = e->bus;
+        }
     }
     EVENT_TO_DELTA_I(wave, WAVE)
     EVENT_TO_DELTA_I(preset, PRESET)
@@ -672,8 +682,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
 
-    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
-        EVENT_TO_DELTA_F(volume[bus], VOLUME_BASE + bus)
+    for (int b = bus; b < AMY_NUM_BUSES; ++b)
+        EVENT_TO_DELTA_F(volume[b], VOLUME_BASE + b)  // Even though the actual volume param being set depends on bus, we set the relative DELTA here, and add bus in play_delta().
 
     bool algo_ops_set = false;
     for (int i = 0; i < MAX_ALGO_OPS; ++i) {
@@ -1377,7 +1387,7 @@ void play_delta(struct delta *d) {
     }
     // for global changes, just make the change, no need to update the per-osc synth
     uint8_t bus = d->osc;  // We assume d.osc was hijacked in amy_event_to_deltas_queue
-    if(d->param >= VOLUME_BASE && d->param < (VOLUME_BASE + AMY_NUM_BUSES)) amy_global.volume[d->param - VOLUME_BASE] = d->data.f;
+    if(d->param >= VOLUME_BASE && (d->param - VOLUME_BASE + bus) < AMY_NUM_BUSES) amy_global.volume[d->param - VOLUME_BASE + bus] = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
     if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
     if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
