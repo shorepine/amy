@@ -447,7 +447,7 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
     return num_voices_turned_off;
 }
 
-uint8_t instrument_get_bus(int instrument_number) {
+int instrument_get_bus(int instrument_number) {
     if (!instrument_number_exists(instrument_number, "get_bus")) return -1;
     struct instrument_info *instrument = instruments[instrument_number];
     return instrument->bus;

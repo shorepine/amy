@@ -1103,7 +1103,7 @@ extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 extern void instrument_set_flags(int instrument_number, uint32_t flags);
-extern uint8_t instrument_get_bus(int instrument_number);
+extern int instrument_get_bus(int instrument_number);
 extern void instrument_set_bus(int instrument_number, uint8_t bus);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);
