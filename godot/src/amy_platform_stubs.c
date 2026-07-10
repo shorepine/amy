@@ -28,7 +28,12 @@ void amy_send_midi_note_off(uint8_t channel, uint8_t note, uint8_t velocity) {
 // Called from parse.c zD handler; no MIDI output on Godot so this is a no-op.
 void midi_out(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
 // Called from parse.c zC handler; no MIDI input on Godot so this is a no-op.
-void amy_external_midi_sync(uint8_t enabled) { (void)enabled; }
+void amy_external_midi_sync(uint8_t mode) { (void)mode; }
+// Called from sequencer.c; no MIDI output on Godot so clock out stays off.
+uint8_t midi_clock_out_enabled(void) { return 0; }
+void midi_clock_out_tick(void) {}
+void midi_clock_out_start(void) {}
+void midi_clock_out_stop(void) {}
 
 // --- examples.c stubs ---
 void delay_ms(uint32_t ms) { (void)ms; }

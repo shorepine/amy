@@ -420,7 +420,12 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 
 // --- MIDI stubs (amy_midi.c / macos_midi.m) ---
 void midi_out(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
-void amy_external_midi_sync(uint8_t enabled) { (void)enabled; }
+void amy_external_midi_sync(uint8_t mode) { (void)mode; }
+// Called from sequencer.c; no MIDI output on Godot so clock out stays off.
+uint8_t midi_clock_out_enabled(void) { return 0; }
+void midi_clock_out_tick(void) {}
+void midi_clock_out_start(void) {}
+void midi_clock_out_stop(void) {}
 void midi_local(uint8_t *bytes, uint16_t len) { (void)bytes; (void)len; }
 void run_midi(void) {}
 void stop_midi(void) {}

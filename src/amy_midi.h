@@ -15,7 +15,22 @@
 void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb);
 void amy_process_single_midi_byte(uint8_t byte, uint8_t from_web_or_usb);
 void amy_external_midi_output(uint8_t * data, uint32_t len);
-void amy_external_midi_sync(uint8_t enabled);
+
+// Modes for amy_external_midi_sync() (wire command zC / external_midi_sync=).
+#define AMY_MIDI_SYNC_OFF 0     // internal clock; ignore and don't send realtime messages (default)
+#define AMY_MIDI_SYNC_FOLLOW 1  // sequencer follows incoming 0xF8/0xFA/0xFC
+#define AMY_MIDI_SYNC_SEND 2    // sequencer sends 0xF8/0xFA/0xFC (AMY is the clock master)
+void amy_external_midi_sync(uint8_t mode);
+
+// MIDI clock out, driven by the sequencer when in AMY_MIDI_SYNC_SEND mode.
+// Stubbed in godot/src/amy_platform_stubs.c (amy_midi.c is excluded there).
+uint8_t midi_clock_out_enabled();
+void midi_clock_out_tick();
+void midi_clock_out_start();
+void midi_clock_out_stop();
+#ifdef __EMSCRIPTEN__
+void midi_clock_out_flush();  // called from the browser main loop
+#endif
 
 
 #define MAX_MIDI_BYTES_TO_PARSE 1024

@@ -44,6 +44,9 @@ void main_loop__em()
     // Ticks are counted in the render loop (AudioWorklet thread); replay them
     // to the page's amy_sequencer_js_hook from the main thread here.
     sequencer_check_and_call_js_hook();
+    // Same story for outgoing MIDI realtime clock: the worklet queues the
+    // bytes, and only the main thread can reach the page's midiOutputDevice.
+    midi_clock_out_flush();
     amy_web_cv_1 = EM_ASM_DOUBLE({ 
         if(typeof cv_1_voltage != 'undefined') { return cv_1_voltage; } else { return 0; }
     });

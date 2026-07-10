@@ -32,13 +32,77 @@ extern void mp_usbd_task(void);
 uint8_t current_midi_message[3] = {0,0,0};
 uint8_t midi_message_slot = 0;
 uint8_t sysex_flag = 0;
-static uint8_t external_midi_sync_enabled = 0;
+static uint8_t external_midi_sync_mode = AMY_MIDI_SYNC_OFF;
 
-void amy_external_midi_sync(uint8_t enabled) {
-    external_midi_sync_enabled = enabled ? 1 : 0;
-    // Turning sync off must restore internal clocking, otherwise the sequencer
-    // stays latched to a (now silent) external clock and never ticks again.
-    if (!external_midi_sync_enabled) sequencer_external_clock_disable();
+void amy_external_midi_sync(uint8_t mode) {
+    if (mode > AMY_MIDI_SYNC_SEND) mode = AMY_MIDI_SYNC_SEND;
+    external_midi_sync_mode = mode;
+    // Any mode other than "follow" must restore internal clocking, otherwise
+    // the sequencer stays latched to a (now silent) external clock and never
+    // ticks again.
+    if (mode != AMY_MIDI_SYNC_FOLLOW) sequencer_external_clock_disable();
+}
+
+// --- MIDI realtime clock OUT (AMY as clock master, AMY_MIDI_SYNC_SEND) ---
+
+// Counts sequencer ticks (AMY_SEQUENCER_PPQ) down to MIDI clock rate
+// (MIDI_SEQUENCER_PPQ, 24 PPQ).
+static uint8_t clock_out_phase = 0;
+
+#ifdef __EMSCRIPTEN__
+// The sequencer ticks in the AudioWorklet render thread, but midi_out()'s
+// EM_ASM can only reach the page's midiOutputDevice from the browser main
+// thread (the same constraint as amy_sequencer_js_hook). Queue realtime bytes
+// here and flush them from main_loop__em().
+#define CLOCK_OUT_QUEUE_LEN 64
+static volatile uint8_t clock_out_queue[CLOCK_OUT_QUEUE_LEN];
+static volatile uint8_t clock_out_write = 0;
+static volatile uint8_t clock_out_read = 0;
+
+void midi_clock_out_flush() {
+    while (clock_out_read != clock_out_write) {
+        uint8_t byte = clock_out_queue[clock_out_read];
+        clock_out_read = (clock_out_read + 1) % CLOCK_OUT_QUEUE_LEN;
+        midi_out(&byte, 1);
+    }
+}
+#endif
+
+static void midi_realtime_out(uint8_t byte) {
+#ifdef __EMSCRIPTEN__
+    uint8_t next = (clock_out_write + 1) % CLOCK_OUT_QUEUE_LEN;
+    if (next == clock_out_read) return;  // queue full; drop rather than block audio
+    clock_out_queue[clock_out_write] = byte;
+    clock_out_write = next;
+#else
+    midi_out(&byte, 1);
+#endif
+}
+
+uint8_t midi_clock_out_enabled() {
+    return external_midi_sync_mode == AMY_MIDI_SYNC_SEND;
+}
+
+// Called once per sequencer tick while on the internal clock; emits MIDI
+// Timing Clock (0xF8) at 24 PPQ, i.e. every AMY_SEQUENCER_PPQ/MIDI_SEQUENCER_PPQ
+// ticks. The sequencer keeps calling this while the transport is stopped so
+// downstream slaves stay tempo-locked between Start messages.
+void midi_clock_out_tick() {
+    if (!midi_clock_out_enabled()) return;
+    if (clock_out_phase == 0) midi_realtime_out(0xF8);
+    clock_out_phase = (clock_out_phase + 1) % (AMY_SEQUENCER_PPQ / MIDI_SEQUENCER_PPQ);
+}
+
+void midi_clock_out_start() {
+    if (!midi_clock_out_enabled()) return;
+    // The first clock after Start marks the downbeat for slaves.
+    clock_out_phase = 0;
+    midi_realtime_out(0xFA);
+}
+
+void midi_clock_out_stop() {
+    if (!midi_clock_out_enabled()) return;
+    midi_realtime_out(0xFC);
 }
 
 #if 0
@@ -156,10 +220,10 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
         else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
         else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
         // MIDI transport (Start/Stop) only drives the sequencer when the user
-        // has opted into external sync; otherwise a connected DAW's transport
-        // would hijack the AMYboard's own internal sequence.
-        else if(status_byte == 0xFA) { if(external_midi_sync_enabled) sequencer_midi_start(); }
-        else if(status_byte == 0xFC) { if(external_midi_sync_enabled) sequencer_midi_stop(); }
+        // has opted into following external sync; otherwise a connected DAW's
+        // transport would hijack the AMYboard's own internal sequence.
+        else if(status_byte == 0xFA) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_start(); }
+        else if(status_byte == 0xFC) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_stop(); }
     }
     midi_message_handler_to_queue(data, len, sysex, time, NULL, NULL);
 
@@ -179,7 +243,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
 
 
 void midi_clock_received() {
-    if (external_midi_sync_enabled) {
+    if (external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) {
         sequencer_midi_clock_tick();
     }
 }
