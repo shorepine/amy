@@ -388,7 +388,7 @@ float amy_get_render_load() {
 // CPU overload failsafe: silence and reset the synth so the host stays responsive,
 // then play a descending bleep so the user knows AMY stopped on purpose.
 void amy_overload_failsafe() {
-    fprintf(stderr, "AMY: CPU overload (render %d us), resetting synth\n", amy_global.render_us);
+    fprintf(stderr, "AMY: CPU overload (render " PRIu32 " us > " PRIu32 " threshold), resetting synth\n", amy_global.render_us, amy_global.overload_threshold_us);
     // Drop everything scheduled first -- an overloaded delta queue can hold
     // hundreds of pending events that would re-wedge us as they play out.
     amy_grab_lock();
@@ -426,7 +426,9 @@ void amy_overload_failsafe() {
 // amy_global.render_us and trips the failsafe when it stays pinned at/above
 // amy_global.overload_threshold_us for amy_global.overload_blocks blocks.
 void amy_overload_check(uint32_t render_us) {
-    amy_global.render_us += (render_us - amy_global.render_us) >> 5;  // 0.03125 * delta,
+    amy_global.render_us = (uint32_t)(((int32_t)amy_global.render_us)
+                                      + ((((int32_t)render_us)
+                                          - ((int32_t)amy_global.render_us)) >> 5));  // 0.03125 * delta
     if (amy_global.overload_threshold_us <= 0) return;
     if (amy_global.render_us >= amy_global.overload_threshold_us) {
         if (++amy_global.overload_count > amy_global.overload_blocks) {
