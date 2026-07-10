@@ -68,7 +68,9 @@ void sequencer_debug() {
 }
 
 void sequencer_recompute() {
-    amy_global.us_per_tick = (uint32_t) (1000000.0 / ((amy_global.tempo/60.0) * (float)AMY_SEQUENCER_PPQ));    
+    // 60000000 us/min / (bpm * ticks per beat); keep it single-precision -
+    // unsuffixed double literals pull in software double emulation on 32-bit.
+    amy_global.us_per_tick = (uint32_t) (60000000.0f / (amy_global.tempo * (float)AMY_SEQUENCER_PPQ));
     amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
 }
 
@@ -216,7 +218,7 @@ void sequencer_check_and_fill() {
         amy_global.next_amy_tick_us = now_us;
     }
     // The while is in case the timer fires later than a tick; (on esp this would be due to SPI or wifi ops)
-    while(amy_sysclock()  >= (uint32_t)(amy_global.next_amy_tick_us / 1000L)) {
+    while(now_us >= amy_global.next_amy_tick_us) {
         sequencer_process_tick();
         amy_global.next_amy_tick_us = amy_global.next_amy_tick_us + (uint64_t)amy_global.us_per_tick;
     }
