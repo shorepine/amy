@@ -1212,6 +1212,31 @@ class TestCopyingSynthConfig(AmyTest):
     amy.send(time=1900, synth=3, note=67, vel=0)
 
 
+class TestGetSynthCommandsGetsBus(AmyTest):
+
+  def test(self):
+    _amy.stop()
+    _amy.start(0)
+    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=500)
+    amy.send(time=0, bus=2, volume=0.1)
+    amy.send(time=0, synth=1, bus=2)
+    amy.send(time=0, synth=1, echo=0.5)
+    amy.render(1)  # Let the events execute.
+    commands = amy.get_synth_commands(1)
+    expected = """v0f110.000c1Z
+v1w3f500.000Z
+y2V0.100x0.000,0.000,0.000M0.500,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
+    if commands != expected:
+      is_ok = False
+      message = self.__class__.__name__ + ': get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+    else:
+      is_ok = True
+      message = self.__class__.__name__ + ' : ok'
+    return is_ok, message
+
+
 class TestGetSynthCommandsGetsMidiCcs(AmyTest):
 
   def test(self):
@@ -1226,15 +1251,15 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
     commands = amy.get_synth_commands(1)
     expected = """v0f110.000c1Z
 v1w3f500.000Z
-V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
+y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic5,0,0.000,10.000,0.000,helloZ
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
     if commands != expected:
       is_ok = False
-      message = 'TestGetSynthCommandsGetsMidiCcs: get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+      message = self.__class__.__name__ + ': get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
     else:
       is_ok = True
-      message = 'TestGetSynthCommandsGetsMidiCcs : ok'
+      message = self.__class__.__name__ + ' : ok'
     return is_ok, message
 
 
@@ -1255,13 +1280,13 @@ class TestClearMidiCCs(AmyTest):
     commands = amy.get_synth_commands(1)
     expected = """v0f999.000c1Z
 v1w3f500.000Z
-V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
+y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
     if commands != expected:
       is_ok = False
-      message = 'TestClearMidiCcs : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+      message = self.__class__.__name__ + ' : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
     else:
       is_ok = True
-      message = 'TestClearMidiCcs : ok'
+      message = self.__class__.__name__ + ' : ok'
     return is_ok, message
 
 class TestClearOneMidiCC(AmyTest):
@@ -1280,14 +1305,14 @@ class TestClearOneMidiCC(AmyTest):
     commands = amy.get_synth_commands(1)
     expected = """v0f999.000c1Z
 v1w3f500.000Z
-V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
+y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
 ic10,1,1.000,100.000,1.000,i%id%vZ"""
     if commands != expected:
       is_ok = False
-      message = 'TestClearOneMidiCC : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+      message = self.__class__.__name__ + ' : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
     else:
       is_ok = True
-      message = 'TestClearOneMidiCC : ok'
+      message = self.__class__.__name__ + ' : ok'
     return is_ok, message
 
 
@@ -1376,7 +1401,9 @@ class TestBuses(AmyTest):
   def run(self):
     amy.send(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
     amy.send(time=0, bus=0, reverb=1, echo=0)
-    amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
+    #amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
+    amy.send(time=0, synth=2, num_voices=4, patch=22)
+    amy.send(time=0, synth=2, bus=1, pan=0.8)
     amy.send(time=0, bus=1, reverb=0, echo='1,100,,0.5,0.5')
     amy.send(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
     amy.send(time=100, synth=1, note=60, vel=5)
