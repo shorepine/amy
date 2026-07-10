@@ -2,20 +2,22 @@
 """Turn measure.py output dirs into the AMY HW CI markdown report + verdict.
 
 Reads <outdir>/{meta.json,load.csv} written by measure.py after a LoadTestChord
-run (one held Juno note added every 2 s until an 8-note chord) and prints a
-markdown report to stdout: the smoothed render load at each chord size, plus
-the settled full-chord load.  With --base <dir> (a second measure.py run of
-the same sketch built against the PR's merge base) the table gains
-before/after columns and a delta, so the PR's own load cost is visible
+run (one held Juno note added every 2 s until the full chord) and prints a
+markdown report to stdout: the smoothed render cost at each chord size, plus
+the settled full-chord value.  Measurements are either a 0..1 load fraction
+(patch_render_load.py-era builds) or microseconds per block
+(-DARDUINO_SPEEDTEST builds); meta.json's "unit" says which.  With --base
+<dir> (a second measure.py run of the same sketch built against the PR's
+merge base) the table gains before/after columns and a delta — omitted if
+the two runs measured in different units — so the PR's own cost is visible
 directly.
 
 Exit code is the HW CI verdict for the PR run only: 0 if the test RAN
-(flashed, all 8 notes were sent, load samples arrived for the whole capture),
+(flashed, the chord was sent, samples arrived for the whole capture),
 1 if it couldn't run (flash/serial failure, board crash/wedge, capture
 interference).  A failed BASELINE run never fails CI — it's reported and the
-table falls back to PR-only columns.  The load VALUES never gate either —
-they're informational; regression hunting across commits is
-sweep.py/plot.py's job, not per-PR CI's.
+table falls back to PR-only columns.  The measured VALUES never gate either —
+they're informational.
 
 Usage: hwci_report.py <outdir> [--base <outdir>]
 """
@@ -55,8 +57,8 @@ def analyze(outdir):
     notes = meta.get("notes", [])
     if not rows and not any("RENDER_LOAD" in p for p in problems):
         problems.append("no RENDER_LOAD lines captured")
-    if rows and len(notes) < 8:
-        problems.append(f"only {len(notes)}/8 notes were played")
+    if rows and len(notes) < 6:   # the sketch plays 6 notes (was 8 pre-#866)
+        problems.append(f"only {len(notes)} notes were played (expected >= 6)")
     if meta.get("board_crashed"):
         problems.append("board crashed during the run (panic/watchdog reboot)")
     if meta.get("serial_died_early"):
@@ -70,12 +72,15 @@ def analyze(outdir):
         if window:
             loads[n["i"]] = window[-1]
     return {"meta": meta, "rows": rows, "notes": notes, "loads": loads,
+            "unit": meta.get("unit", "load"),
             "problems": list(dict.fromkeys(problems))}
 
 
-def fmt(v, signed=False):
+def fmt(v, unit="load", signed=False):
     if v is None:
         return "—"
+    if unit == "render_us":
+        return f"{v:+,.0f}" if signed else f"{v:,.0f}"
     return f"{v:+.3f}" if signed else f"{v:.3f}"
 
 
@@ -93,7 +98,10 @@ def main():
 
     base_sha = (base or {}).get("meta", {}).get("sha", "")
     base_col = f"main @ {base_sha[:7]}" if base_sha else "before"
-    with_base = bool(base and base["loads"])
+    unit = pr["unit"]
+    unit_label = "render µs/block" if unit == "render_us" else "render load"
+    units_differ = bool(base and base["loads"] and base["unit"] != unit)
+    with_base = bool(base and base["loads"] and not units_differ)
 
     lines = []
     if pr["rows"] and pr["notes"]:
@@ -101,7 +109,7 @@ def main():
             lines += [f"| notes held | {base_col} | this PR | Δ |",
                       "|---:|---:|---:|---:|"]
         else:
-            lines += ["| notes held | render load |", "|---:|---:|"]
+            lines += [f"| notes held | {unit_label} |", "|---:|---:|"]
         for n in pr["notes"]:
             after = pr["loads"].get(n["i"])
             row = [str(n["i"] + 1)]
@@ -109,24 +117,31 @@ def main():
                 before = base["loads"].get(n["i"])
                 delta = (after - before
                          if after is not None and before is not None else None)
-                row += [fmt(before), fmt(after), fmt(delta, signed=True)]
+                row += [fmt(before, unit), fmt(after, unit),
+                        fmt(delta, unit, signed=True)]
             else:
-                row += [fmt(after)]
+                row += [fmt(after, unit)]
             lines.append("| " + " | ".join(row) + " |")
 
         final = pr["meta"].get("load_final")
         maxl = pr["meta"].get("load_max")
         lines.append("")
-        headline = f"**Full chord settled load: {fmt(final)}"
+        headline = f"**Full chord settled {unit_label}: {fmt(final, unit)}"
         if with_base:
             bfinal = base["meta"].get("load_final")
             bdelta = (final - bfinal
                       if final is not None and bfinal is not None else None)
-            headline += (f" (was {fmt(bfinal)}, Δ {fmt(bdelta, signed=True)})")
-        headline += (f"** (peak {fmt(maxl)}, "
+            headline += (f" (was {fmt(bfinal, unit)}, "
+                         f"Δ {fmt(bdelta, unit, signed=True)})")
+        headline += (f"** (peak {fmt(maxl, unit)}, "
                      f"{pr['meta'].get('n_samples', 0)} samples)")
         lines.append(headline)
 
+    if units_differ:
+        lines += ["", "_Baseline was measured in different units "
+                  f"({base['unit']} vs {unit}) — before/Δ omitted. "
+                  "Merge main into this branch to rebuild the baseline "
+                  "with matching instrumentation._"]
     if base and base["problems"]:
         lines += ["", "_Baseline run "
                   + ("had problems" if base["loads"] else "unavailable")

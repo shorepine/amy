@@ -4,8 +4,8 @@ name: AMY HW CI
 # tulipcc bench: flash THIS PR's LoadTestChord firmware (built and uploaded as
 # an artifact by "AMY HW CI build") onto the physical AMYboard on the
 # self-hosted bench Pi (amyboardci), capture 20 s of its debug UART while the
-# sketch stacks up an 8-note held Juno chord, and comment the measured render
-# load at each chord size back on the PR.
+# sketch stacks up a held Juno chord, and comment the measured render cost
+# at each chord size back on the PR.
 #
 # PASS/FAIL semantics: FAIL means only that the bench COULD NOT RUN the test
 # (flash/serial failure, board crash, capture interference). The load values
@@ -184,7 +184,7 @@ jobs:
               marker,
               '### 🎛️ AMY HW CI (AMYboard bench)',
               '',
-              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
+              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render cost as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
               '',
               report,
               '',

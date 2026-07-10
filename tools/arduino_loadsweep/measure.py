@@ -8,9 +8,11 @@ makes arduino-cli hop to the board's native USB port instead of the dongle.
 The dongle's DTR/RTS lines drive the board's auto-reset circuit, so esptool
 enters the ROM bootloader by itself (no BOOT/RST pressing) and recovers a
 wedged board.  After flashing, pulses RTS to restart the board at a known
-t=0, then tails the same UART for the `RENDER_LOAD ms=<ms> load=<0..1>`
-lines that patch_render_load.py adds and the `NOTE i=<n> ...` markers the
-sketch prints.  Writes <out>/{load.csv,serial.log,meta.json}.
+t=0, then tails the same UART for the RENDER_LOAD lines — either
+`RENDER_LOAD ms=<ms> load=<0..1>` (patch_render_load.py-era builds) or
+`RENDER_LOAD ms=<ms> render_us=<µs>` (-DARDUINO_SPEEDTEST builds) — and the
+`NOTE i=<n> ...` markers the sketch prints.  Which unit was seen is recorded
+as meta.json's "unit".  Writes <out>/{load.csv,serial.log,meta.json}.
 
 A wedged/crashed board (prints stop early) is flagged in meta.json as
 serial_died_early; the next run's esptool handshake recovers it via DTR/RTS.
@@ -26,7 +28,7 @@ import subprocess
 import sys
 import time
 
-RL = re.compile(r"RENDER_LOAD ms=(\d+) load=([\d.]+)")
+RL = re.compile(r"RENDER_LOAD ms=(\d+) (load|render_us)=([\d.]+)")
 NOTE = re.compile(r"NOTE i=(\d+) note=(\d+) ms=(\d+)")
 # A power-on reset or ROM-bootloader entry mid-capture means someone else
 # pulsed the board's reset lines (another harness sharing the bench) — the
@@ -157,7 +159,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("build_dir", help="arduino-cli --build-path output dir")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--port", default="/dev/cu.usbserial-A5069RR4",
+    ap.add_argument("--port", default="/dev/cu.usbserial-0001",
                     help="debug-UART dongle (flash + stderr console)")
     ap.add_argument("--flash-baud", type=int, default=921600)
     ap.add_argument("--esptool", default=None,
@@ -208,11 +210,15 @@ def main():
         for ts, line in lines:
             f.write(f"{ts:8.3f} {line}\n")
 
-    rows, notes = [], []
+    rows, notes, units = [], [], set()
     for ts, line in lines:
         m = RL.search(line)
         if m:
-            rows.append((round(ts, 3), int(m.group(1)), float(m.group(2))))
+            units.add(m.group(2))
+            v = float(m.group(3))
+            if m.group(2) == "render_us":
+                v = int(v)
+            rows.append((round(ts, 3), int(m.group(1)), v))
         m = NOTE.search(line)
         if m:
             notes.append({"t_s": round(ts, 3), "i": int(m.group(1)),
@@ -225,6 +231,11 @@ def main():
 
     meta["n_samples"] = len(rows)
     meta["notes"] = notes
+    if len(units) == 1:
+        meta["unit"] = units.pop()
+    elif units:
+        meta["unit"] = "mixed"
+        meta["errors"].append("mixed RENDER_LOAD units in one capture")
     if any(CRASH_SIG.search(l) and ts > 2.0 for ts, l in lines):
         meta["board_crashed"] = True
         print("[result] board CRASHED during run (panic/watchdog reboot)")
@@ -232,7 +243,12 @@ def main():
         meta["load_max"] = max(r[2] for r in rows)
         meta["last_sample_t"] = rows[-1][0]
         final = [r[2] for r in rows if r[0] >= args.seconds - 3.0]
-        meta["load_final"] = round(sum(final) / len(final), 4) if final else None
+        if not final:
+            meta["load_final"] = None
+        elif meta.get("unit") == "render_us":
+            meta["load_final"] = round(sum(final) / len(final))
+        else:
+            meta["load_final"] = round(sum(final) / len(final), 4)
         if rows[-1][0] < args.seconds - 3.0:
             meta["serial_died_early"] = True   # prints stopped: crash/wedge
     else:

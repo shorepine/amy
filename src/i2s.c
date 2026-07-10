@@ -313,6 +313,14 @@ void esp_read_i2s_input() {
 }
 
 // Make AMY's FABT run forever , as a FreeRTOS task
+
+#ifdef ARDUINO_SPEEDTEST
+#include "esp_timer.h"
+#include <stdio.h>
+static int64_t _rl_last_print = 0;
+static int32_t _rl_render_us = 0;
+#endif // ARDUINO_SPEEDTEST
+
 void esp_fill_audio_buffer_task() {
     while(1) {
         int64_t t;
@@ -324,6 +332,9 @@ void esp_fill_audio_buffer_task() {
             blocked_us += (uint32_t)(amy_get_us() - t);
 	}
         t = amy_get_us();
+#ifdef ARDUINO_SPEEDTEST
+        int64_t _rl_start_t = esp_timer_get_time();
+#endif // ARDUINO_SPEEDTEST
         // Get ready to render
         amy_execute_deltas();
 
@@ -340,6 +351,19 @@ void esp_fill_audio_buffer_task() {
         // Notify amy_update() that a block is ready (so it can return from amy_render_audio).
         if (amy_update_handle)
             xTaskNotifyGive(amy_update_handle);  // to amy_render_audio
+
+#ifdef ARDUINO_SPEEDTEST
+        {
+            int64_t _rl_now = esp_timer_get_time();
+            int32_t _rl_render_us_unsmooth = (int32_t)(_rl_now - _rl_start_t);
+            _rl_render_us += (_rl_render_us_unsmooth - _rl_render_us) >> 5;  // 0.03125 * delta, settle time ~30 steps
+            if (_rl_now - _rl_last_print > 500000) {
+                _rl_last_print = _rl_now;
+                fprintf(stderr, "RENDER_LOAD ms=%lu render_us=%d\n", (unsigned long)(_rl_now/1000), _rl_render_us);
+                fflush(stderr);
+            }
+        }
+#endif // ARDUINO_SPEEDTEST
 
         t = amy_get_us();
         if (AMY_HAS_I2S) {
