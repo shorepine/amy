@@ -123,7 +123,7 @@ def main():
         final = pr["meta"].get("render_us_final")
         maxl = pr["meta"].get("render_us_max")
         lines.append("")
-        headline = f"**Full chord settled render microseconds: {fmt(final)}"
+        headline = f"**Full chord settled render &mu;s: {fmt(final)}"
         if with_base:
             bfinal = base["meta"].get("render_us_final")
             bdelta = ((final - bfinal) / bfinal
