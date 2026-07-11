@@ -929,6 +929,8 @@ float map_01_to_60dBf(float log);
 
 SAMPLE log2_lut(SAMPLE x);
 SAMPLE exp2_lut(SAMPLE x);
+SAMPLE sin_lut(SAMPLE x);
+SAMPLE cos_lut(SAMPLE x);
 
 
 float atoff(const char *s);

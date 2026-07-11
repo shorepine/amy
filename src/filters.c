@@ -2,8 +2,15 @@
 #include "assert.h"
 
 #ifndef M_PI
-    #define M_PI 3.14159265358979323846
+    #define M_PI 3.14159265358979323846f
 #endif
+
+//#define sin2pi(x) sinf(2 * M_PI * x)
+//#define cos2pi(x) cosf(2 * M_PI * x)
+
+#define sin2pi(x) (S2F(sin_lut(F2S(x))))
+#define cos2pi(x) (S2F(cos_lut(F2S(x))))
+
 
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
 #define LOWEST_RATIO 0.0001
@@ -37,10 +44,15 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    w0 = MAX(0.01, w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //w0 = MAX(0.01f, w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    w0 = MAX(0.01f / (2 * M_PI) , w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
     // sin w0 / (2 Q) < 1
     // => sin w0 < 2 Q
