@@ -304,15 +304,6 @@ SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int resultdrop, int bnhea
     return result;
 }
 
-static inline SAMPLE top16SMUL_after_a_live(SAMPLE a_processed, SAMPLE b, int resultdrop) {
-    // Like top16SMUL_after_a, but measures b's actual headroom here instead of
-    // trusting a bound precomputed at block start. Needed for the filter state
-    // terms: the state can grow far beyond the block-start allowance within one
-    // block (e.g. resonance ringing up as the cutoff sweeps toward the signal),
-    // and an under-shifted b overflows the 32-bit product.
-    return top16SMUL_after_a(a_processed, b, resultdrop, nheadroom16(b));
-}
-
 #else // !AMY_USE_FIXEDPOINT
 
 // Sidestep all this logic for SAMPLE == float.
@@ -327,10 +318,6 @@ SAMPLE top16SMUL_a_part(SAMPLE a, int *p_adropped) {
 }
 
 SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped_unused, int bheadroom_unused) {
-    return a_processed * b;
-}
-
-static inline SAMPLE top16SMUL_after_a_live(SAMPLE a_processed, SAMPLE b, int resultdrop_unused) {
     return a_processed * b;
 }
 
@@ -361,20 +348,22 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_once(const SAMPLE *input, SAMPLE *output, i
     SAMPLE x2 = w[1];
     SAMPLE y1 = w[2];
     SAMPLE y2 = w[3];
-    int abits, bbits, ebits, fbits;
+    SAMPLE state_max = scan_max(w, 4);
+    int abits, bbits, cbits, ebits, fbits;
     SAMPLE a = top16SMUL_a_part(coef[0], &abits);
     SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
     SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
     bbits = nheadroom16(max_val);
+    cbits = nheadroom16(SHIFTL(MAX(SHIFTL(state_max, 1), max_val), 2));
     SAMPLE max_out = 0;
     for (int i = 0 ; i < len ; i++) {
         SAMPLE x0 = top16SMUL_after_a(a, input[i], abits, bbits);  // headroom(input[i]);
         SAMPLE w0 = x0 + SHIFTL(x1, 1) + x2;
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
         y0 = y0
-            - top16SMUL_after_a_live(e, y1, ebits)
-            + top16SMUL_after_a_live(f, y2, fbits);
+            - top16SMUL_after_a(e, y1, ebits, cbits)
+            + top16SMUL_after_a(f, y2, fbits, cbits);
         x2 = x1;
         x1 = x0;
         y2 = y1;
@@ -408,12 +397,14 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
     SAMPLE y2 = w[3];
     SAMPLE v1 = w[4];
     SAMPLE v2 = w[5];
-    int abits, bbits, ebits, fbits;
+    SAMPLE state_max = scan_max(w, 6);
+    int abits, bbits, cbits, ebits, fbits;
     SAMPLE a = top16SMUL_a_part(coef[0], &abits);
     SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
     SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
     bbits = nheadroom16(max_val);
+    cbits = nheadroom16(SHIFTL(MAX(SHIFTL(state_max, 1), max_val), 2));
     SAMPLE max_out = 0;
     for (int i = 0 ; i < len ; i++) {
         SAMPLE x0, w0, v0;
@@ -421,14 +412,14 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, 
         w0 = x0 + SHIFTL(x1, 1) + x2;
         v0 = w0 + SHIFTL(v1, 1) - v2;
         v0 = v0
-            - top16SMUL_after_a_live(e, v1, ebits)
-            + top16SMUL_after_a_live(f, v2, fbits);
+            - top16SMUL_after_a(e, v1, ebits, cbits)
+            + top16SMUL_after_a(f, v2, fbits, cbits);
         w0 = v0 + SHIFTL(v1, 1) + v2;
-        w0 = top16SMUL_after_a_live(a, w0, abits);
+        w0 = top16SMUL_after_a(a, w0, abits, cbits);
         SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
         y0 = y0
-            - top16SMUL_after_a_live(e, y1, ebits)
-            + top16SMUL_after_a_live(f, y2, fbits);
+            - top16SMUL_after_a(e, y1, ebits, cbits)
+            + top16SMUL_after_a(f, y2, fbits, cbits);
         x2 = x1;
         x1 = x0;
         v2 = v1;
