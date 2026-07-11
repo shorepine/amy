@@ -1184,8 +1184,6 @@ def generate_all():
     sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
     #write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
     write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
-    # Longer quarter-sine table
-    write_table_to_h('src/cos_table.h', cos_quarter_257, cos_lut(1024, np.ones(1))[:257])
 
     # log2/exp2 LUTs
     make_log2_exp2_luts('src/log2_exp2_fxpt_lutable.h')
