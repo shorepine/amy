@@ -1611,7 +1611,7 @@ class TestTranceGlitch(AmyTest):
     amy.send(time=0, synth=2, patch=55, num_voices=6)
     #for n in [40, 43, 47, 52, 55]:
     for n in [52]:
-      amy.send(time=100, synth=2, note=n, vel=0.55)
+      amy.send(time=100, synth=2, note=n, vel=2.75)
 
 
 class TestPatch32Glitch(AmyTest):
