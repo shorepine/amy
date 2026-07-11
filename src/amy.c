@@ -493,16 +493,21 @@ float logfreq_of_freq(float freq) {
     //if (freq==0) return ZERO_HZ_LOG_VAL;
     // Actually, special-case zero to mean middle C, for convenience.
     if (freq==0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ).
-    return log2f(freq / ZERO_LOGFREQ_IN_HZ);
+    //return log2f(freq / ZERO_LOGFREQ_IN_HZ);
+    return 2.0f + S2F(log2_lut(F2S(freq / (4 * ZERO_LOGFREQ_IN_HZ))));
 }
 
 float freq_of_logfreq(float logfreq) {
     if (logfreq==ZERO_HZ_LOG_VAL) return 0;
-    return ZERO_LOGFREQ_IN_HZ * exp2f(logfreq);
+    //return ZERO_LOGFREQ_IN_HZ * exp2f(logfreq);
+    // Use fixed-point, but max val is 256 (which is 112 kHz after multiplying by 440), so scale down by 4.
+    return (4 * ZERO_LOGFREQ_IN_HZ) * S2F(exp2_lut(F2S(logfreq - 2.0f)));
 }
 
 float freq_for_midi_note(float midi_note) {
-    return 440.0f*powf(2.f, (midi_note - 69.0f) / 12.0f);
+    //return 440.0f*powf(2.f, (midi_note - 69.0f) / 12.0f);
+    //return 440.0f * exp2f((midi_note - 69.0f) / 12.0f);
+    return 440.0f * S2F(exp2_lut(F2S((midi_note - 69.0f) / 12.0f)));
 }
 
 float logfreq_for_midi_note(float midi_note) {
