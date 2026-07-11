@@ -106,9 +106,13 @@ int8_t dsps_biquad_gen_hpf_f32(SAMPLE *coeffs, float f, float qFactor)
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
 
     float b0 = (1 + c) / 2;
@@ -136,9 +140,13 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
 
     float b0 = s / 2;
