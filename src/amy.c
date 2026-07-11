@@ -1966,6 +1966,9 @@ int16_t * amy_fill_buffer() {
                 }
             }
         }
+        if(amy_global.config.amy_external_bus_dsp_hook != NULL) {
+            amy_global.config.amy_external_bus_dsp_hook(bus, fbl[0][bus], AMY_BLOCK_SIZE);
+        }
     }  // end of per-bus FX
     // global volume is supposed to max out at 10, so scale by 0.1.
     SAMPLE volume_scale[AMY_NUM_BUSES];

@@ -20,6 +20,7 @@ amy_config_t amy_default_config() {
 
     c.write_samples_fn = NULL;
     c.amy_external_render_hook = NULL;
+    c.amy_external_bus_dsp_hook = NULL;
     c.amy_external_coef_hook = NULL;
     c.amy_external_block_done_hook = NULL;
     c.amy_external_midi_input_hook = NULL;
