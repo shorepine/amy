@@ -434,6 +434,12 @@ def create_log2_lut(npts):
     return make_table(0, 1, log2_int16_fn, table_size=npts, dtype=np.int16)
 
 
+def create_qsin_lut(npts):
+    # Note: we store as -sin(x) so we can reach 1.0.
+    qsin_int16_fn = lambda x: np.round(-32768.0 * (np.sin(x * np.pi / 2)))
+    return make_table(0, 1, qsin_int16_fn, table_size=npts, dtype=np.int16)
+
+
 def write_lutset_to_h(filename, variable_base, lutset):
     """Savi out a lutset as a C-compatible header file."""
     num_luts = len(lutset)
@@ -557,6 +563,7 @@ def make_log2_exp2_luts(filename):
         # Define the content of the individual tables.
         write_fxpt_lutable(f, create_log2_lut(257), 'log2_fxpt_lutable')
         write_fxpt_lutable(f, create_exp2_lut(257), 'exp2_fxpt_lutable')
+        write_fxpt_lutable(f, create_qsin_lut(257), 'qsin_fxpt_lutable')
         f.write("\n")
         f.write("#endif // LUTSET_x_DEFINED\n")
     print("wrote", filename)

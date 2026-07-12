@@ -151,8 +151,92 @@ typedef int32_t s16_15; // s16.15 general
 #define S_FRAC_OF_S(S, B) (((S) & ((1 << (S_FRAC_BITS - (B))) - 1)) << (B))
 
 // Convert between SAMPLE and float
-#define S2F(s) ((float)(s) / (float)(1 << S_FRAC_BITS))
-#define F2S(f) (SAMPLE)((f) * (float)(1 << S_FRAC_BITS))
+
+#define S2F_orig(s) ((float)(s) / (float)(1 << S_FRAC_BITS))
+#define F2S_orig(f) (SAMPLE)((f) * (float)(1 << S_FRAC_BITS))
+
+
+// Non-FPU S2F/F2S
+// Define the union
+typedef union {
+    float f;
+    uint32_t u;
+} float_cast;
+
+static inline float S2F_nofpu(SAMPLE s) {
+    if (s == 0) return 0.0f;
+
+    // 1. Extract and handle the sign
+    uint32_t sign = (s < 0) ? 0x80000000 : 0x00000000;
+    uint32_t abs_val = (s < 0) ? -s : s;
+
+    // 2. Count leading zeros to find the exponent
+    // __builtin_clz finds the position of the first set bit
+    int leading_zeros = __builtin_clz(abs_val);
+    int shift = leading_zeros - 8;
+
+    // 3. Align mantissa and calculate biased exponent
+    uint32_t mantissa;
+    int32_t biased_exponent = 127 - shift;
+
+    if (shift >= 0) {
+        mantissa = (abs_val << shift) & 0x007FFFFF;
+    } else {
+        mantissa = (abs_val >> (-shift)) & 0x007FFFFF;
+    }
+
+    // 4. Combine into final IEEE 754 bit pattern
+    float_cast num;
+    num.u = sign | (biased_exponent << 23) | mantissa;
+    return num.f;
+}
+
+static inline SAMPLE F2S_nofpu(float f) {
+    // 1. Interpret float bits as an unsigned 32-bit integer
+    float_cast num;
+    num.f = f;
+    uint32_t bits = num.u;
+
+    // 2. Extract sign, biased exponent, and mantissa
+    uint32_t sign     = bits >> 31;
+    int32_t  exponent = (int32_t)((bits >> 23) & 0xFF) - 127;
+    uint32_t mantissa = bits & 0x7FFFFF;
+
+    int32_t fixed_point;
+
+    // 3. Handle special cases
+    if (exponent == 128) {  // Can skip
+        // Infinity or NaN -> Saturation to max/min limits
+        return sign ? INT32_MIN : INT32_MAX;
+    }
+
+    // Segfault if you comment this out
+    if (exponent < -23) {
+        // Underflow: number is too small to represent in Q8.23
+        return 0;
+    }
+
+    // 4. Restore the implicit leading 1 bit for normalized numbers
+    // For denormalized numbers (exponent == -127), the leading bit is 0
+    uint32_t value = (exponent == -127) ? mantissa : (mantissa | 0x800000);
+
+    // 5. Align the binary point to the 23rd fractional position
+    // Since the float mantissa inherently occupies the lower 23 bits,
+    // an exponent of 0 requires exactly 0 shifting.
+    if (exponent >= 0) {
+        // Ensure shifting left won't overflow the 32-bit boundary safely (can skip)
+        if (exponent > 7) return sign ? INT32_MIN : INT32_MAX; // Overflow protection
+        fixed_point = (int32_t)(value << exponent);
+    } else {
+        fixed_point = (int32_t)(value >> (-exponent));
+    }
+
+    // 6. Apply two's complement if the sign bit was negative
+    return sign ? -fixed_point : fixed_point;
+}
+// _orig is faster than _nofpu on ESP32 "make speedtest" (4352 vs 4245 us for 6 Juno 1's).
+#define F2S(f) F2S_orig(f)
+#define S2F(s) S2F_orig(s)
 
 // Convert between GENFXP and float
 #define G2F(s) ((float)(s) / (float)(1 << G_FRAC_BITS))
@@ -161,8 +245,8 @@ typedef int32_t s16_15; // s16.15 general
 // Convert between PHASOR and float
 // 1 << P_FRAC_BITS is 1 << 31 which actually flips to (-2^31).
 // So make the constant one less and do the last power of 2 in float.
-#define P2F(s) ((float)(s) / (2.0 * (float)(1 << (P_FRAC_BITS - 1))))
-#define F2P(f) ((PHASOR)((f) * 2.0 * (float)(1 << (P_FRAC_BITS - 1))))
+#define P2F(s) ((float)(s) / (2.0f * (float)(1 << (P_FRAC_BITS - 1))))
+#define F2P(f) ((PHASOR)((f) * 2.0f * (float)(1 << (P_FRAC_BITS - 1))))
 
 // Fixed-point multiply routines
 

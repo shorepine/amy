@@ -2,11 +2,18 @@
 #include "assert.h"
 
 #ifndef M_PI
-    #define M_PI 3.14159265358979323846
+    #define M_PI 3.14159265358979323846f
 #endif
 
+//#define sin2pi(x) sinf(2 * M_PI * x)
+//#define cos2pi(x) cosf(2 * M_PI * x)
+
+#define sin2pi(x) (S2F(sin_lut(F2S(x))))
+#define cos2pi(x) (S2F(cos_lut(F2S(x))))
+
+
 // Filters tend to get weird under this ratio -- this corresponds to 4.4Hz 
-#define LOWEST_RATIO 0.0001
+#define LOWEST_RATIO 0.0001f
 
 #define FILT_NUM_DELAYS  4    // Need 4 memories for DFI filters, if used (only 2 for DFII).
 
@@ -29,18 +36,23 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
     //qFactor = sqrtf(qFactor);
     
-    if (qFactor < 0.51) {
-        qFactor = 0.51;
+    if (qFactor < 0.51f) {
+        qFactor = 0.51f;
     }
-    if (f > 0.45) {
-        f = 0.45;
+    if (f > 0.45f) {
+        f = 0.45f;
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    w0 = MAX(0.01, w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //w0 = MAX(0.01f, w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    w0 = MAX(0.01f / (2 * (float)M_PI) , w0);  // so f >= Fs * 0.01 / (2 pi) = 70.2 Hz
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
     // sin w0 / (2 Q) < 1
     // => sin w0 < 2 Q
@@ -59,7 +71,7 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     if (false && a2 > 0) { 
         printf("before: r %f a %f %f %f\n", sqrtf(a2 / a0), a0, a1, a2);
         // Limit how close complex poles can get to the unit circle.
-        r = MIN(0.99, sqrtf(a2 / a0));
+        r = MIN(0.99f, sqrtf(a2 / a0));
         float alphadash = (1 - r * r) / (1 + r * r);
         float cosww = c / sqrtf(1 - alphadash * alphadash);
         if (fabs(cosww) < 1.0) {
@@ -86,17 +98,21 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
 
 int8_t dsps_biquad_gen_hpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
-    if (qFactor <= 0.0001) {
-        qFactor = 0.0001;
+    if (qFactor <= 0.0001f) {
+        qFactor = 0.0001f;
     }
-    if (f > 0.45) {
-        f = 0.45;
+    if (f > 0.45f) {
+        f = 0.45f;
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
 
     float b0 = (1 + c) / 2;
@@ -116,17 +132,21 @@ int8_t dsps_biquad_gen_hpf_f32(SAMPLE *coeffs, float f, float qFactor)
 
 int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 {
-    if (qFactor <= 0.0001) {
-        qFactor = 0.0001;
+    if (qFactor <= 0.0001f) {
+        qFactor = 0.0001f;
     }
-    if (f > 0.45) {
-        f = 0.45;
+    if (f > 0.45f) {
+        f = 0.45f;
     }
     float Fs = 1;
 
-    float w0 = 2 * M_PI * f / Fs;
-    float c = cosf(w0);
-    float s = sinf(w0);
+    //float w0 = 2 * M_PI * f / Fs;
+    //float c = cosf(w0);
+    //float s = sinf(w0);
+    float w0 = f / Fs;
+    float c = cos2pi(w0);
+    float s = sin2pi(w0);
+
     float alpha = s / (2 * qFactor);
 
     float b0 = s / 2;

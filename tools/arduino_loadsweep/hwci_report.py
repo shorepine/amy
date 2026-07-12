@@ -79,6 +79,12 @@ def fmt(v, signed=False):
     return f"{v:+d}" if signed else f"{v:d}"
 
 
+def fmtpct(v, signed=False):
+    if v is None:
+        return "—%"
+    return f"{100 * v:+.1f}%" if signed else f"{100 * v:+.1f}%"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("outdir", help="measure.py output dir for the PR build")
@@ -101,7 +107,7 @@ def main():
             lines += [f"| notes held | {base_col} | this PR | Δ |",
                       "|---:|---:|---:|---:|"]
         else:
-            lines += ["| notes held | render load |", "|---:|---:|"]
+            lines += ["| notes held | render &mu;s |", "|---:|---:|"]
         for n in pr["notes"]:
             after = pr["loads"].get(n["i"])
             row = [str(n["i"] + 1)]
@@ -114,15 +120,15 @@ def main():
                 row += [fmt(after)]
             lines.append("| " + " | ".join(row) + " |")
 
-        final = pr["meta"].get("load_final")
-        maxl = pr["meta"].get("load_max")
+        final = pr["meta"].get("render_us_final")
+        maxl = pr["meta"].get("render_us_max")
         lines.append("")
-        headline = f"**Full chord settled load: {fmt(final)}"
+        headline = f"**Full chord settled render &mu;s: {fmt(final)}"
         if with_base:
-            bfinal = base["meta"].get("load_final")
-            bdelta = (final - bfinal
+            bfinal = base["meta"].get("render_us_final")
+            bdelta = ((final - bfinal) / bfinal
                       if final is not None and bfinal is not None else None)
-            headline += (f" (was {fmt(bfinal)}, Δ {fmt(bdelta, signed=True)})")
+            headline += (f" (was {fmt(bfinal)}, Δ {fmtpct(bdelta, signed=True)})")
         headline += (f"** (peak {fmt(maxl)}, "
                      f"{pr['meta'].get('n_samples', 0)} samples)")
         lines.append(headline)

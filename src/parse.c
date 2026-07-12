@@ -300,7 +300,7 @@ void parse_voices(char *message, uint16_t *vals) {
 uint32_t ms_to_samples(uint32_t ms) {
     uint32_t samps = 0;
     if (AMY_IS_UNSET(ms)) return AMY_UNSET_VALUE(samps);
-    samps = (uint32_t)(((float)ms / 1000.0) * (float)AMY_SAMPLE_RATE);
+    samps = (uint32_t)(((float)ms / 1000.0f) * (float)AMY_SAMPLE_RATE);
     return samps;
 }
 
