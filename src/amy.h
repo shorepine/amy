@@ -975,6 +975,7 @@ uint32_t amy_sysclock();
 // CPU overload detection: platform render loops call this once per block.
 void amy_overload_check(uint32_t render_us);
 void amy_overload_failsafe();
+void amy_set_render_load_threshold(float threshold);
 float amy_get_render_load();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);

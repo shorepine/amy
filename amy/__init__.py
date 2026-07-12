@@ -13,6 +13,8 @@ try:
     _get_synth_commands = _amy.get_synth_commands
     _set_cv_from_osc = _amy.set_cv_from_osc
     _ticks_ms = _amy.ticks_ms
+    _render_load = _amy.render_load
+    _set_render_load_threshold = _amy.set_render_load_threshold
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
@@ -21,6 +23,8 @@ except (ImportError, AttributeError):
         import tulip
         _get_synth_commands = tulip.amy_get_synth_commands
         _ticks_ms = tulip.amy_ticks_ms
+        _render_load = tulip.amy_render_load
+        _set_render_load_threshold = tulip.amy_set_render_load_threshold
     except (ImportError, AttributeError):
         pass  # Not available (e.g. web build); _get_synth_commands returns []
 
@@ -584,3 +588,12 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
 """
 def set_cv_from_osc(cv, osc):
     _set_cv_from_osc(cv, osc)
+
+"""
+    Render load tracking
+"""
+def render_load():
+    return _render_load()
+
+def set_render_load_threshold(t):
+    _set_render_load_threshold(t)

@@ -382,7 +382,8 @@ void amy_bleep(uint32_t start) {
 }
 
 float amy_get_render_load() {
-    return amy_global.render_us;
+    // Return the current CPU load proportion.
+    return amy_global.render_us / ((float)AMY_BLOCK_US);
 }
 
 // CPU overload failsafe: silence and reset the synth so the host stays responsive,
@@ -415,7 +416,7 @@ void amy_overload_failsafe() {
         amy_add_event(&e);
     }
     if (amy_global.config.amy_external_overload_hook != NULL)
-        amy_global.config.amy_external_overload_hook(amy_global.render_us / ((float)AMY_BLOCK_US));
+        amy_global.config.amy_external_overload_hook(amy_get_render_load());
     // Start the load measure over so we don't re-trip while recovering.
     amy_global.render_us = 0;
     amy_global.overload_count = 0;
@@ -438,6 +439,13 @@ void amy_overload_check(uint32_t render_us) {
         amy_global.overload_count = 0;
     }
 }
+
+void amy_set_render_load_threshold(float threshold) {
+    // Dynamically adjust the overload threshold.
+    amy_global.config.overload_threshold = threshold;
+    amy_global.overload_threshold_us = (uint32_t)(threshold * ((float)AMY_BLOCK_US));
+}
+
 
 // Schedule a bleep now using default bleep synth (0)
 void amy_bleep_synth(uint32_t start) {

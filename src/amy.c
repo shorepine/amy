@@ -429,17 +429,20 @@ void bus_reset(uint8_t bus) {
     if (AMY_HAS_ECHO)   config_echo(bus, S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
 }
 
+
 void buses_reset() {
     for (int i = 0; i < AMY_NUM_BUSES; ++i) {
         bus_reset(i);
     }
 }
 
+
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
     // Precompute implications of overload thresholds.
-    amy_global.overload_threshold_us = (uint32_t)(c.overload_threshold * ((float)AMY_BLOCK_US));
+    //amy_global.overload_threshold_us = (uint32_t)(c.overload_threshold * ((float)AMY_BLOCK_US));
+    amy_set_render_load_threshold(c.overload_threshold);
     amy_global.overload_blocks = (uint16_t)(c.overload_ms * 1000.f / ((float)AMY_BLOCK_US));
 
     amy_global.i2s_is_in_background = 0;
