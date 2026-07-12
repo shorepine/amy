@@ -205,7 +205,7 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 
 // D is how close the sample gets to the clip limit before the nonlinearity engages.  
 // So D=0.1 means output is linear for -0.9..0.9, then starts clipping.
-#define CLIP_D 0.1
+#define CLIP_D 0.1f
 
 #define MAX_VOLUME 11.0
 
@@ -232,12 +232,12 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 typedef int16_t output_sample_type;
 
 // Magic value for "0 Hz" in log-scale.
-#define ZERO_HZ_LOG_VAL -99.0
+#define ZERO_HZ_LOG_VAL -99.0f
 // Frequency of Midi note 0, used to make logfreq scales.
 // Have 0 be midi 69, A4, 440.0
-#define ZERO_LOGFREQ_IN_HZ 440.0  // 261.63
+#define ZERO_LOGFREQ_IN_HZ 440.0f  // 261.63
 #define ZERO_MIDI_NOTE 69  // 60
-#define MIN_FILTER_LOGFREQ -2.75  // -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
+#define MIN_FILTER_LOGFREQ -2.75f  // -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
 
 #define NUM_COMBO_COEFS 9  // 9 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend, ext0, ext1
 enum coefs{

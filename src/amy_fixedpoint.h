@@ -245,8 +245,8 @@ static inline SAMPLE F2S_nofpu(float f) {
 // Convert between PHASOR and float
 // 1 << P_FRAC_BITS is 1 << 31 which actually flips to (-2^31).
 // So make the constant one less and do the last power of 2 in float.
-#define P2F(s) ((float)(s) / (2.0 * (float)(1 << (P_FRAC_BITS - 1))))
-#define F2P(f) ((PHASOR)((f) * 2.0 * (float)(1 << (P_FRAC_BITS - 1))))
+#define P2F(s) ((float)(s) / (2.0f * (float)(1 << (P_FRAC_BITS - 1))))
+#define F2P(f) ((PHASOR)((f) * 2.0f * (float)(1 << (P_FRAC_BITS - 1))))
 
 // Fixed-point multiply routines
 
