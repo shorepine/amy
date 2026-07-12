@@ -263,7 +263,7 @@ void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, f
     amy_global.bus[bus]->echo.level = F2S(level);
     amy_global.bus[bus]->echo.delay_samples = delay_samples;
     // Filter is IIR [1, filter_coef] normalized for filter_coef > 0 (LPF), or FIR [1, filter_coef] normalized for filter_coef < 0 (HPF).
-    if (filter_coef > 0.99)  filter_coef = 0.99;  // Avoid unstable filters.
+    if (filter_coef > 0.99f)  filter_coef = 0.99f;  // Avoid unstable filters.
     amy_global.bus[bus]->echo.filter_coef = F2S(filter_coef);
     // FIR filter potentially has gain > 1 for high frequencies, so discount the loop feedback to stop things exploding.
     if (filter_coef < 0)  feedback /= 1.f - filter_coef;
@@ -1598,7 +1598,7 @@ void hold_and_modify(uint16_t osc) {
     float filter_logfreq = combine_controls(ctrl_inputs, synth[osc]->filter_logfreq_coefs);
     if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
     if (AMY_IS_SET(msynth[osc]->last_filter_logfreq)) {
-        #define MAX_DELTA_FILTER_LOGFREQ_DOWN 3.0
+        #define MAX_DELTA_FILTER_LOGFREQ_DOWN 3.0f
         float last_logfreq = msynth[osc]->last_filter_logfreq;
         if (filter_logfreq < (last_logfreq - (MAX_DELTA_FILTER_LOGFREQ_DOWN / synth[osc]->resonance))) {
             // Filter cutoff downward slew-rate limit.

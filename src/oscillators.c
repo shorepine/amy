@@ -49,7 +49,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
         // proportionately.
         float interp_bandwidth = lut_bandwidth * lut_hop;
         //printf("period=%f freq=%f lut_size=%d interp_bandwidth=%f\n", period, ((float)AMY_SAMPLE_RATE)/period, lut_size, interp_bandwidth);
-        if (interp_bandwidth < 0.9) {
+        if (interp_bandwidth < 0.9f) {
             // No aliasing, even with a 10% buffer (i.e., 19.8 kHz).
             break;
         }
@@ -316,7 +316,7 @@ void pulse_mod_trigger(uint16_t osc) {
 SAMPLE compute_mod_pulse(uint16_t osc) {
     // do BW pulse gen at SR=44100/64
     SAMPLE sample;
-    if(msynth[osc]->duty < 0.001f || msynth[osc]->duty > 0.999) msynth[osc]->duty = 0.5;
+    if(msynth[osc]->duty < 0.001f || msynth[osc]->duty > 0.999f) msynth[osc]->duty = 0.5;
     if(synth[osc]->phase >= F2P(msynth[osc]->duty)) {
         sample = F2S(1.0f);
     } else {
