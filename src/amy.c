@@ -1810,7 +1810,14 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 handled = amy_global.config.amy_external_render_hook(osc, per_osc_fb[core][bus], AMY_BLOCK_SIZE);
             } else {
                 #ifdef __EMSCRIPTEN__
-                // TODO -- pass the buffer to a JS shim using the new bytes support, we could use this to visualize CV output
+                // Web version of the render hook: a JS function (in the same
+                // audio worklet as this module) may replace this osc's buffer,
+                // e.g. with a runtime-compiled user oscillator. Returns 1 if
+                // handled (osc skips the normal mix), like the native hook.
+                handled = EM_ASM_INT({
+                    if (typeof amy_render_js_hook === 'function') return amy_render_js_hook($0, $1, $2);
+                    return 0;
+                }, osc, per_osc_fb[core][bus], AMY_BLOCK_SIZE);
                 #endif
             }
             // only mix the audio in if the external hook did not handle it
@@ -1974,6 +1981,13 @@ int16_t * amy_fill_buffer() {
         if(amy_global.config.amy_external_bus_postprocess_hook != NULL) {
             amy_global.config.amy_external_bus_postprocess_hook(bus, fbl[0][bus], AMY_BLOCK_SIZE);
         }
+        #ifdef __EMSCRIPTEN__
+        // Web version of the bus postprocess hook (see the hooks table in
+        // docs/api.md): a JS function may process the bus buffer in place.
+        EM_ASM({
+            if (typeof amy_bus_postprocess_js_hook === 'function') amy_bus_postprocess_js_hook($0, $1, $2);
+        }, bus, fbl[0][bus], AMY_BLOCK_SIZE);
+        #endif
     }  // end of per-bus FX
     // global volume is supposed to max out at 10, so scale by 0.1.
     SAMPLE volume_scale[AMY_NUM_BUSES];
