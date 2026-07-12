@@ -728,7 +728,9 @@ typedef struct  {
     // Called (from the render task) at the end of each bus' effects chain, after
     // EQ/chorus/echo/reverb but before buses are mixed to the output.  buf is
     // AMY_NCHANS sequential (non-interleaved) channel blocks of len SAMPLEs each.
-    void (*amy_external_bus_dsp_hook)(uint8_t bus, SAMPLE *buf, uint16_t len);
+    // Fires for each bus from 0 up to the highest bus activated so far (which
+    // can grow dynamically as buses are touched).
+    void (*amy_external_bus_postprocess_hook)(uint8_t bus, SAMPLE *buf, uint16_t len);
     float (*amy_external_coef_hook)(uint16_t channel);
     void (*amy_external_block_done_hook)(void);
     void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);

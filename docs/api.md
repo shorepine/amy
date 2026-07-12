@@ -22,6 +22,11 @@ amy_add_event(amy_event *e);
 amy_add_message(char *message);
 ```
 
+Two sample types appear in this API: `output_sample_type` is a final
+interleaved audio sample, an `int16_t`; `SAMPLE` is AMY's internal sample
+format, S8.23 fixed point in an `int32_t` (so 1.0 is `1<<23` — see
+`src/amy_fixedpoint.h`).
+
 Get and set external audio buffers:
 ```c
 
@@ -174,7 +179,7 @@ Hook fields in `amy_config_t`:
 | Hook | Signature | Used by | Description |
 | ---- | --------- | ------- | ----------- |
 | `amy_external_render_hook` | `uint8_t (uint16_t osc, SAMPLE *buf, uint16_t len)` | — | Custom oscillator renderer for redirecting the output waveforms on an osc-by-osc level. Return 1 if handled, in which case that osc does not contribute to the normal output. |
-| `amy_external_bus_dsp_hook` | `void (uint8_t bus, SAMPLE *buf, uint16_t len)` | — | Custom effect processing, called at the end of each bus' effects chain (after EQ/chorus/echo/reverb), before buses are mixed to the output. `buf` is `AMY_NCHANS` sequential (non-interleaved) channel blocks of `len` SAMPLEs each; modify it in place. |
+| `amy_external_bus_postprocess_hook` | `void (uint8_t bus, SAMPLE *buf, uint16_t len)` | — | Custom effect processing, called at the end of each bus' effects chain (after EQ/chorus/echo/reverb), before buses are mixed to the output. `buf` is `AMY_NCHANS` sequential (non-interleaved) channel blocks of `len` `SAMPLE`s (S8.23 in `int32_t`, see above) each; modify it in place. Called every block for each bus from 0 up to the highest bus activated so far — so bus 0 is always processed, but a hook installed for bus 2 only starts firing once something (an osc assignment, a bus FX setting) has touched bus 2. |
 | `amy_external_coef_hook` | `float (uint16_t channel)` | — | Provide external coefficient values (e.g. CV input). |
 | `amy_external_block_done_hook` | `void (void)` | — | Called after each audio block is rendered. |
 | `amy_external_midi_input_hook` | `void (uint8_t *bytes, uint16_t len, uint8_t is_sysex)` | — | Called when MIDI bytes are received. |
