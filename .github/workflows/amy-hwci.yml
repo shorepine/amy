@@ -182,13 +182,13 @@ jobs:
               marker,
               '### 🎛️ AMY HW CI (AMYboard bench)',
               '',
-              "Flashed this PR's AMY (LoadTestChord: 8-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
+              "Flashed this PR's AMY (LoadTestChord: 6-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
               '',
               report,
               '',
               `**[⬇️ Artifacts: serial log · load trace · report](${runUrl})**`,
               '',
-              '<sub>Self-hosted bench (amyboardci). FAIL means only that the test could not run — the load values are informational, with no threshold and no audio compare. See `tools/arduino_loadsweep/`.</sub>',
+                '<sub>Self-hosted bench (amyboardci). FAIL means only that the test could not run — the load values are informational, with no threshold and no audio compare. See `tools/arduino_loadsweep/`.</sub>',
             ].join('\n');
             const { owner, repo } = context.repo;
             const pr = Number(process.env.PR);
