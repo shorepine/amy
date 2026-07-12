@@ -1813,7 +1813,24 @@ void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 handled = amy_global.config.amy_external_render_hook(osc, per_osc_fb[core][bus], AMY_BLOCK_SIZE);
             } else {
                 #ifdef __EMSCRIPTEN__
-                // TODO -- pass the buffer to a JS shim using the new bytes support, we could use this to visualize CV output
+                // Web version of the render hook: a JS function (in the same
+                // audio worklet as this module) may replace this osc's buffer,
+                // e.g. with a runtime-compiled user oscillator. Returns 1 if
+                // handled (osc skips the normal mix), like the native hook.
+                // JS can't reach msynth, so pass the osc's current pitch (as a
+                // phase increment in cycles/sample, tracking bend/portamento)
+                // and envelope level (0..1); Module is this AudioWorklet
+                // scope's instance. The pitch math only runs if the hook is
+                // installed (the typeof probe is cheap, every osc pays it).
+                if (EM_ASM_INT({ return typeof amy_render_js_hook === 'function' ? 1 : 0; })) {
+                    handled = EM_ASM_INT({
+                        // (see the bus postprocess hook about wasmMemory)
+                        if (!Module.wasmMemory) Module.wasmMemory = wasmMemory;
+                        return amy_render_js_hook($0, $1, $2, $3, $4, Module);
+                    }, osc, per_osc_fb[core][bus], AMY_BLOCK_SIZE,
+                       (double)(freq_of_logfreq(msynth[osc]->logfreq) / (float)AMY_SAMPLE_RATE),
+                       (double)msynth[osc]->amp);
+                }
                 #endif
             }
             // only mix the audio in if the external hook did not handle it
@@ -1974,6 +1991,24 @@ int16_t * amy_fill_buffer() {
                 }
             }
         }
+        if(amy_global.config.amy_external_bus_postprocess_hook != NULL) {
+            amy_global.config.amy_external_bus_postprocess_hook(bus, fbl[0][bus], AMY_BLOCK_SIZE);
+        }
+        #ifdef __EMSCRIPTEN__
+        // Web version of the bus postprocess hook (see the hooks table in
+        // docs/api.md): a JS function may process the bus buffer in place
+        // (buf is nchans sequential channel blocks of len samples). Runs on
+        // the AudioWorklet thread; Module is this scope's instance (its
+        // wasmMemory/exports let hook JS reach this module's memory).
+        EM_ASM({
+            if (typeof amy_bus_postprocess_js_hook === 'function') {
+                // In worker/worklet scopes the glue never attaches the
+                // wasmMemory runtime export to Module; hook JS needs it.
+                if (!Module.wasmMemory) Module.wasmMemory = wasmMemory;
+                amy_bus_postprocess_js_hook($0, $1, $2, $3, Module);
+            }
+        }, bus, fbl[0][bus], AMY_BLOCK_SIZE, AMY_NCHANS);
+        #endif
     }  // end of per-bus FX
     // global volume is supposed to max out at 10, so scale by 0.1.
     SAMPLE volume_scale[AMY_NUM_BUSES];
