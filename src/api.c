@@ -213,6 +213,22 @@ void amy_set_external_input_buffer(output_sample_type * samples) {
     for(uint16_t i=0;i<AMY_BLOCK_SIZE*AMY_NCHANS;i++) amy_external_in_block[i] = samples[i];
 }
 
+// Opaque pointer for the embedder's external hooks. AMY never reads it; it
+// exists so code on both sides of a hook can rendezvous on shared state. On
+// web (both functions are exported) the page's JS and the AudioWorklet's js
+// hooks run in separate scopes that share only this module's linear memory:
+// the page allocates a control block with _malloc, stores it here, and the
+// worklet-side hook JS finds it via Module._amy_get_external_hook_context().
+static void *amy_external_hook_context = NULL;
+
+void amy_set_external_hook_context(void *context) {
+    amy_external_hook_context = context;
+}
+
+void *amy_get_external_hook_context(void) {
+    return amy_external_hook_context;
+}
+
 output_sample_type * amy_simple_fill_buffer() {
     amy_execute_deltas();
     amy_render(0, AMY_OSCS, 0);

@@ -196,6 +196,27 @@ Hook fields in `amy_config_t`:
 
 All hook fields default to `NULL` in `amy_default_config()`.
 
+### JS hook variants (web build)
+
+On web, AMY renders inside an AudioWorklet, so the render and bus-postprocess
+hooks have JS variants: define a global function in the AudioWorklet scope
+(i.e. in JS loaded as part of `amy.js`, which the worklet also evaluates) and
+AMY calls it per block. Pointers arrive as byte offsets into the module's
+linear memory; `module` is the worklet scope's Emscripten `Module` instance,
+whose `wasmMemory` and exports (`_cos_lut`, `_malloc`, ...) let hook JS read
+the buffers or instantiate further wasm sharing AMY's memory.
+
+| JS global | Signature | Description |
+| --------- | --------- | ----------- |
+| `amy_render_js_hook` | `(osc, buf, len, phase_inc, amp, module) -> handled` | Web version of `amy_external_render_hook`. `phase_inc` is the osc's current pitch as a phase increment in cycles/sample (tracks bend/portamento), `amp` its envelope level 0..1. Return 1 if the osc was handled (skips the normal mix), 0 to let AMY mix `buf` (with pan) as usual. |
+| `amy_bus_postprocess_js_hook` | `(bus, buf, len, nchans, module)` | Web version of `amy_external_bus_postprocess_hook`: process the bus buffer (`nchans` sequential channel blocks of `len` S8.23 samples) in place. |
+
+Because the page's JS and the worklet's hook JS run in separate scopes sharing
+only linear memory, `amy_set_external_hook_context(void *)` /
+`amy_get_external_hook_context()` (both exported on web) hold one opaque
+pointer for embedders: the page `_malloc`s a control block and stores it, and
+worklet hook JS finds it via `module._amy_get_external_hook_context()`.
+
 
 ## `amy_event`, `amy.send`, and `amy_send` API:
 

@@ -985,6 +985,11 @@ float amy_get_render_load();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);
+// Opaque embedder pointer for external-hook rendezvous (see api.c); AMY
+// never touches it. Exported on web so page JS and worklet js hooks can
+// share a control block in this module's linear memory.
+void amy_set_external_hook_context(void *context);
+void *amy_get_external_hook_context(void);
 
 
 #ifdef __EMSCRIPTEN__
