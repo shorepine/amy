@@ -60,7 +60,7 @@ HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 PYTHONS = $(wildcard *.py)
 
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
-	cat src/amy.h  | sed -e 's@^//.*@@' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([.0-9]\)f\([ 	]\|$$\)/\1\2/' | awk '{print $$2 "=" $$3}' > amy/constants.py
+	cat src/amy.h  | sed -e 's@^//.*@@' | tr '\t' ' ' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([-0-9][0-9]*\.[0-9]*\)f.*/\1/' | awk '{print $$2 "=" $$3}' > amy/constants.py
 	${PYTHON} -m amy.headers
 
 %.o: %.c $(HEADERS) src/patches.h

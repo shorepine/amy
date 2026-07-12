@@ -292,6 +292,18 @@ static PyObject *amy_ticks_ms_wrapper(PyObject *self, PyObject *args) {
     return Py_BuildValue("i", amy_sysclock());
 }
 
+static PyObject *amy_get_render_load_wrapper(PyObject *self, PyObject *args) {
+    return Py_BuildValue("f", amy_get_render_load());
+}
+
+static PyObject *amy_set_render_load_threshold_wrapper(PyObject *self, PyObject *args) {
+    if (!(PyTuple_Size(args) == 1)) return NULL;
+    float threshold;
+    if (!PyArg_ParseTuple(args, "f", &threshold)) return NULL;
+    amy_set_render_load_threshold(threshold);
+    return Py_None;
+}
+
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
     {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
@@ -305,6 +317,8 @@ static PyMethodDef c_amyMethods[] = {
     {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
     {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
     {"ticks_ms", amy_ticks_ms_wrapper, METH_VARARGS, "Read AMY millisecond clock"},
+    {"render_load", amy_get_render_load_wrapper, METH_VARARGS, "Read current render load fraction"},
+    {"set_render_load_threshold", amy_set_render_load_threshold_wrapper, METH_VARARGS, "Set the fraction of CPU at which to trigger overload failsafe"},
     { NULL, NULL, 0, NULL }
 };
 
