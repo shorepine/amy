@@ -264,11 +264,14 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Return is how many chrs written to s.  Will abort if it overruns.
     char *s_entry = s;
     if (!wirecode) {
-        snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%" PRIu16 "): ", e->time, e->osc);
+        // %u, not PRIu16: PRIu16 is "%hu", which MicroPython's internal printf
+        // (mp_vprintf) doesn't support — it asserts on the 'h' length modifier
+        // in ports that override snprintf (MICROPY_USE_INTERNAL_PRINTF).
+        snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%u): ", e->time, (unsigned)e->osc);
         s += strlen(s);
     } else {
         if (AMY_IS_SET(e->time)) { snprintf(s, len - (size_t)(s - s_entry), "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
-        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%" PRIu16, (int16_t)e->osc); s += strlen(s); }
+        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%u", (unsigned)e->osc); s += strlen(s); }
     }
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
