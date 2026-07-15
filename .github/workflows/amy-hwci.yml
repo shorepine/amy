@@ -3,10 +3,12 @@ name: AMY HW CI
 # Hardware half of AMY's CI, replacing the old cross-repo dispatch to the
 # tulipcc bench: flash THIS PR's LoadTestChord firmware (built and uploaded as
 # an artifact by "AMY HW CI build") onto the physical AMYboard on the
-# self-hosted bench Pi (amyboardci), capture three 20 s runs of its debug
-# UART (flash once, reset between runs) while the
+# self-hosted bench Pi (amyboardci), capture 20 s of its debug UART while the
 # sketch stacks up an 8-note held Juno chord, and comment the measured render
-# load at each chord size — averaged across the runs — back on the PR.
+# load at each chord size back on the PR. (measure.py can average several
+# resets of one flash via --runs, but a 3x trial showed run-to-run spread of
+# only ±1-2 µs — the ±30 µs no-op deltas are per-BINARY layout jitter that
+# averaging can't remove — so CI captures once.)
 #
 # PASS/FAIL semantics: FAIL means only that the bench COULD NOT RUN the test
 # (flash/serial failure, board crash, capture interference). The load values
@@ -120,12 +122,11 @@ jobs:
             --port /dev/amyboard-dongle \
             --esptool ~/hwci-venv/bin/esptool \
             --seconds 20 \
-            --runs 3 \
             --label "pr${PR}-base" \
             --meta "{\"pr\": ${PR}, \"sha\": \"${BASE_SHA}\"}" \
             2>&1 | tee out-base/run.log || true
 
-      - name: Flash + capture 3 x 20 s of render load (this PR)
+      - name: Flash + capture 20 s of render load (this PR)
         id: measure
         continue-on-error: true   # the verdict is hwci_report.py's, below
         env:
@@ -138,7 +139,6 @@ jobs:
             --port /dev/amyboard-dongle \
             --esptool ~/hwci-venv/bin/esptool \
             --seconds 20 \
-            --runs 3 \
             --label "pr${PR}" \
             --meta "{\"pr\": ${PR}, \"sha\": \"${SHA}\"}" \
             2>&1 | tee out/run.log
@@ -185,7 +185,7 @@ jobs:
               marker,
               '### 🎛️ AMY HW CI (AMYboard bench)',
               '',
-              "Flashed this PR's AMY (LoadTestChord: 6-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost. Each build is flashed once and captured 3 times (board reset between runs); the numbers are per-run means.",
+              "Flashed this PR's AMY (LoadTestChord: 6-voice Juno `patch=1`, one held note every 2 s) onto the physical AMYboard and measured the smoothed render load as the chord grows — back-to-back with the same sketch built at the PR's merge base, so Δ is this PR's own cost.",
               '',
               report,
               '',
