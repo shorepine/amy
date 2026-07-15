@@ -47,9 +47,12 @@ Two consecutive flash failures abort the sweep on the assumption the bench
 The same sketch + `measure.py` also power AMY's per-PR hardware CI
 (`.github/workflows/amy-hwci-build.yml` builds the firmware in the cloud —
 the PR *and* a baseline at its merge base; `amy-hwci.yml` flashes both
-back-to-back on the self-hosted bench Pi — each with `--runs 3`, so every
-number is a 3-run mean — and comments a before/after/Δ
+back-to-back on the self-hosted bench Pi and comments a before/after/Δ
 load table on the PR, formatted by `hwci_report.py`).
+CI captures each build once: a `--runs 3` trial (PR #897 benching #896)
+showed run-to-run spread of only ±1–2 µs within one binary, while the
+~±30 µs deltas seen on no-op PRs persisted across every run — they're
+per-binary code-layout jitter, which averaging resets can't remove.
 CI **FAIL means only that the PR's test couldn't run** — load values and a
 failed baseline are informational there; regression *hunting* is this
 sweep's job.
