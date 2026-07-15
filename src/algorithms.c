@@ -174,26 +174,23 @@ void algo_note_on(uint16_t osc, float freq) {
     }
 }
 
-SAMPLE *** scratch;
+// One contiguous allocation of AMY_CORES * 3 sample blocks (BUS_ONE, BUS_TWO,
+// SCRATCH per core), replacing a pointer-array-of-pointer-arrays. One malloc
+// instead of 1 + AMY_CORES * 4, and render_algo() reaches its buffers with
+// constant offsets instead of two dependent pointer loads.
+SAMPLE * scratch;
+
+#define SCRATCH_BLOCKS_PER_CORE 3
 
 void algo_deinit() {
-    for(uint16_t i=0;i<AMY_CORES;i++) {
-        for(uint16_t j=0;j<3;j++) free(scratch[i][j]);
-        free(scratch[i]);
-    }
     free(scratch);
 }
 
 void algo_init() {
-    scratch = malloc_caps(sizeof(SAMPLE**)*AMY_CORES, amy_global.config.ram_caps_fbl);
-    for(uint16_t i=0;i<AMY_CORES;i++) {
-        scratch[i] = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
-        for(uint16_t j=0;j<3;j++) {
-            // 16-byte aligned so zero()/copy() take the ESP32-S3 PIE vector path.
-            scratch[i][j] = malloc_caps_block(sizeof(SAMPLE)*AMY_BLOCK_SIZE, amy_global.config.ram_caps_fbl);
-        }
-    }
-
+    // 16-byte aligned so zero()/copy() take the ESP32-S3 PIE vector path; each
+    // block stays aligned because AMY_BLOCK_SIZE*sizeof(SAMPLE) is a multiple of 16.
+    scratch = malloc_caps_block(sizeof(SAMPLE)*AMY_BLOCK_SIZE*SCRATCH_BLOCKS_PER_CORE*AMY_CORES,
+                                amy_global.config.ram_caps_fbl);
 }
 
 SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
@@ -204,12 +201,12 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     SAMPLE* in_buf;
     SAMPLE* out_buf = NULL;
 
-    SAMPLE* const BUS_ONE = scratch[core][0];
-    SAMPLE* const BUS_TWO = scratch[core][1];
-    SAMPLE* const SCRATCH = scratch[core][2];
+    SAMPLE* const BUS_ONE = scratch + (SCRATCH_BLOCKS_PER_CORE * core) * AMY_BLOCK_SIZE;
+    SAMPLE* const BUS_TWO = BUS_ONE + AMY_BLOCK_SIZE;
+    SAMPLE* const SCRATCH = BUS_TWO + AMY_BLOCK_SIZE;
 
-    //for (int i = 0; i < 3; ++i)
-    //    zero(scratch[core][i]);
+    //for (int i = 0; i < SCRATCH_BLOCKS_PER_CORE; ++i)
+    //    zero(BUS_ONE + i * AMY_BLOCK_SIZE);
     
     SAMPLE amp = SHIFTR(F2S(msynth[osc]->amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
