@@ -43,6 +43,7 @@ static uint8_t midi_status_len(uint8_t status) {
 
 
 void midi_out(uint8_t * bytes, uint16_t len) {
+    midi_out_external_hook(bytes, len);
     if (@available(macOS 11, *))  {
         MIDIPacketList pl;
         MIDIPacket *p;

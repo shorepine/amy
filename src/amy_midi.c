@@ -445,6 +445,16 @@ void amy_external_midi_output(uint8_t * data, uint32_t len) {
     midi_out(data, len);
 }
 
+// Deliver outgoing MIDI bytes to the host's output hook, if set. Every
+// midi_out() implementation (including host-owned ones like macos_midi.m)
+// calls this first, so the hook sees everything AMY sends even when no
+// device interface is configured in amy_global.config.midi.
+void midi_out_external_hook(uint8_t * bytes, uint16_t len) {
+    if(amy_global.config.amy_external_midi_output_hook != NULL) {
+        amy_global.config.amy_external_midi_output_hook(bytes, len);
+    }
+}
+
 
 ///// Per platform MIDI in and out stuff
 ///////////////////////////////////////////////
@@ -459,6 +469,7 @@ void stop_midi() {
 }
 
 void midi_out(uint8_t * bytes, uint16_t len) {
+    midi_out_external_hook(bytes, len);
     EM_ASM(
             if(midiOutputDevice != null) {
                 midiOutputDevice.send(HEAPU8.subarray($0, $0 + $1));
@@ -709,6 +720,7 @@ void run_midi() {
 #endif
 
 void midi_out(uint8_t * bytes, uint16_t len) {
+    midi_out_external_hook(bytes, len);
 
 // Is there USB gadget midi? Send it
 #if defined TUD_USB_GADGET

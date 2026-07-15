@@ -24,6 +24,7 @@ amy_config_t amy_default_config() {
     c.amy_external_coef_hook = NULL;
     c.amy_external_block_done_hook = NULL;
     c.amy_external_midi_input_hook = NULL;
+    c.amy_external_midi_output_hook = NULL;
     c.amy_external_sequencer_hook = NULL;
     c.amy_external_fopen_hook = NULL;
     c.amy_external_fwrite_hook = NULL;
