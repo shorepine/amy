@@ -12,6 +12,13 @@ t=0, then tails the same UART for the `RENDER_LOAD ms=<ms> load=<0..1>`
 lines that patch_render_load.py adds and the `NOTE i=<n> ...` markers the
 sketch prints.  Writes <out>/{load.csv,serial.log,meta.json}.
 
+With --runs N (default 1) the board is flashed ONCE, then reset and
+re-captured N times, to average out run-to-run noise.  Run 1 writes
+load.csv/serial.log as before; runs 2..N add loadK.csv/serialK.log.
+meta.json gains a "runs" list with each run's stats, and the top-level
+render_us_final/render_us_max/n_samples become the cross-run mean / max /
+total over the clean (non-interfered) runs.
+
 A wedged/crashed board (prints stop early) is flagged in meta.json as
 serial_died_early; the next run's esptool handshake recovers it via DTR/RTS.
 Requires pyserial and an installed esp32:esp32 arduino core (for esptool).
@@ -165,6 +172,9 @@ def main():
                          "esp32 core)")
     ap.add_argument("--baud", type=int, default=115200, help="console baud")
     ap.add_argument("--seconds", type=float, default=20.0)
+    ap.add_argument("--runs", type=int, default=1,
+                    help="capture runs to average: flash once, then reset "
+                         "the board and re-capture this many times")
     ap.add_argument("--label", default=None)
     ap.add_argument("--meta", default=None,
                     help="JSON string of extra fields for meta.json")
@@ -178,8 +188,7 @@ def main():
 
     acquire_bench(args.port)
 
-    lines = None
-    for attempt in (1, 2):
+    def flash_or_die():
         err = upload(args.build_dir, args.port, args.flash_baud, args.esptool)
         if err:
             meta["errors"].append("upload failed")
@@ -188,61 +197,96 @@ def main():
                       indent=1)
             print(err)
             sys.exit("[flash] upload failed twice")
-
         time.sleep(1.0)   # let esptool's post-flash reset settle before re-open
-        print(f"[capture] {args.seconds:.0f}s on {args.port}")
-        lines = capture(args.port, args.baud, args.seconds)
-        if not any(RESET_SIG.search(l) and ts > 2.0 for ts, l in lines):
-            break
-        print("[capture] board was reset mid-capture (external interference?)"
-              f" — {'retrying' if attempt == 1 else 'giving up'}")
-        meta["errors"].append(f"interference on attempt {attempt}")
-    else:
-        with open(os.path.join(args.out, "serial.log"), "w") as f:
+
+    flash_or_die()
+
+    runs = []
+    for k in range(args.runs):
+        tag = "" if k == 0 else str(k + 1)
+        run = {"run": k + 1, "load_csv": f"load{tag}.csv",
+               "serial_log": f"serial{tag}.log", "errors": []}
+        for attempt in (1, 2):
+            print(f"[capture] run {k + 1}/{args.runs}: "
+                  f"{args.seconds:.0f}s on {args.port}")
+            lines = capture(args.port, args.baud, args.seconds)
+            if not any(RESET_SIG.search(l) and ts > 2.0 for ts, l in lines):
+                break
+            print("[capture] board was reset mid-capture (external "
+                  "interference?) — "
+                  f"{'retrying' if attempt == 1 else 'giving up'}")
+            run["errors"].append(f"interference on attempt {attempt}")
+            if attempt == 1:
+                flash_or_die()   # the interferer may have reflashed the board
+        # A doubly-interfered run's trace is invalid: keep its logs but drop
+        # it from the averages (hwci_report still surfaces the errors).
+        run["interfered"] = "interference on attempt 2" in run["errors"]
+
+        with open(os.path.join(args.out, run["serial_log"]), "w") as f:
             for ts, line in lines:
                 f.write(f"{ts:8.3f} {line}\n")
-        json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"), indent=1)
-        sys.exit("[capture] interference on both attempts")
 
-    with open(os.path.join(args.out, "serial.log"), "w") as f:
+        rows, notes = [], []
         for ts, line in lines:
-            f.write(f"{ts:8.3f} {line}\n")
+            m = RL.search(line)
+            if m:
+                rows.append((round(ts, 3), int(m.group(1)), int(m.group(2))))
+            m = NOTE.search(line)
+            if m:
+                notes.append({"t_s": round(ts, 3), "i": int(m.group(1)),
+                              "note": int(m.group(2)),
+                              "board_ms": int(m.group(3))})
 
-    rows, notes = [], []
-    for ts, line in lines:
-        m = RL.search(line)
-        if m:
-            rows.append((round(ts, 3), int(m.group(1)), int(m.group(2))))
-        m = NOTE.search(line)
-        if m:
-            notes.append({"t_s": round(ts, 3), "i": int(m.group(1)),
-                          "note": int(m.group(2)), "board_ms": int(m.group(3))})
+        with open(os.path.join(args.out, run["load_csv"]), "w",
+                  newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["t_s", "board_ms", "load"])
+            w.writerows(rows)
 
-    with open(os.path.join(args.out, "load.csv"), "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["t_s", "board_ms", "load"])
-        w.writerows(rows)
+        run["n_samples"] = len(rows)
+        run["notes"] = notes
+        if any(CRASH_SIG.search(l) and ts > 2.0 for ts, l in lines):
+            run["board_crashed"] = True
+            print("[result] board CRASHED during run (panic/watchdog reboot)")
+        if rows:
+            run["render_us_max"] = max(r[2] for r in rows)
+            run["last_sample_t"] = rows[-1][0]
+            final = [r[2] for r in rows if r[0] >= args.seconds - 3.0]
+            run["render_us_final"] = (round(sum(final) / len(final))
+                                      if final else None)
+            if rows[-1][0] < args.seconds - 3.0:
+                run["serial_died_early"] = True   # prints stopped: crash/wedge
+        else:
+            run["errors"].append("no RENDER_LOAD lines captured")
+        print(f"[result] run {k + 1}: {len(rows)} samples, {len(notes)} notes,"
+              f" max={run.get('render_us_max')},"
+              f" final={run.get('render_us_final')}"
+              f"{'  DIED EARLY' if run.get('serial_died_early') else ''}")
+        runs.append(run)
 
-    meta["n_samples"] = len(rows)
-    meta["notes"] = notes
-    if any(CRASH_SIG.search(l) and ts > 2.0 for ts, l in lines):
+    # Top-level fields keep their single-run meaning, now over the clean runs:
+    # mean final, max peak, total samples, first good run's note markers.
+    meta["runs"] = runs
+    good = [r for r in runs if not r["interfered"]]
+    meta["notes"] = next((r["notes"] for r in good if r["notes"]), [])
+    meta["n_samples"] = sum(r["n_samples"] for r in good)
+    for key, agg in (("render_us_max", max),
+                     ("render_us_final", lambda v: round(sum(v) / len(v)))):
+        vals = [r[key] for r in good if r.get(key) is not None]
+        meta[key] = agg(vals) if vals else None
+    if any(r.get("board_crashed") for r in runs):
         meta["board_crashed"] = True
-        print("[result] board CRASHED during run (panic/watchdog reboot)")
-    if rows:
-        meta["render_us_max"] = max(r[2] for r in rows)
-        meta["last_sample_t"] = rows[-1][0]
-        final = [r[2] for r in rows if r[0] >= args.seconds - 3.0]
-        meta["render_us_final"] = round(sum(final) / len(final)) if final else None
-        if rows[-1][0] < args.seconds - 3.0:
-            meta["serial_died_early"] = True   # prints stopped: crash/wedge
-    else:
-        meta["errors"].append("no RENDER_LOAD lines captured")
-    print(f"[result] {len(rows)} samples, {len(notes)} notes, "
-          f"max={meta.get('render_us_max')}, final={meta.get('render_us_final')}"
-          f"{'  DIED EARLY' if meta.get('serial_died_early') else ''}")
+    if any(r.get("serial_died_early") for r in runs):
+        meta["serial_died_early"] = True
+    meta["errors"] += [e if args.runs == 1 else f"run {r['run']}: {e}"
+                       for r in runs for e in r["errors"]]
+    if args.runs > 1:
+        finals = [str(r.get("render_us_final")) for r in good]
+        print(f"[result] mean final over {len(good)} clean runs: "
+              f"{meta['render_us_final']}  ({'/'.join(finals) or '-'})")
 
     json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"), indent=1)
-    return 0 if rows else 1
+    return 0 if all(r["n_samples"] and not r["interfered"] for r in runs) else 1
 
 
 if __name__ == "__main__":
