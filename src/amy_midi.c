@@ -467,7 +467,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 }
 #endif
 
-#if !defined(MACOS) && !defined(__EMSCRIPTEN__) // this code is for NOT macos desktop , which is in macos_midi.m
+#if !defined(AMY_HOST_MIDI) && !defined(__EMSCRIPTEN__) // device layer: skipped when the host owns MIDI (AMY_HOST_MIDI — macos desktop via macos_midi.m, VCV plugin, etc; see amy_midi.h)
 
 // "run_midi" sets up MIDI on MCU platforms
 

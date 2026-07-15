@@ -111,8 +111,10 @@ void amy_print_devices() {
 }
 
 
-// I've seen frame counts as big as 1440, I think *8 is enough room (2048)
-#define OUTPUT_RING_FRAMES (AMY_BLOCK_SIZE*8)
+// I've seen frame counts as big as 1440. *16 leaves room for the larger
+// Windows ring lead (see miniaudio_init) needed when the device period isn't
+// a multiple of AMY_BLOCK_SIZE.
+#define OUTPUT_RING_FRAMES (AMY_BLOCK_SIZE*16)
 #define OUTPUT_RING_LENGTH (OUTPUT_RING_FRAMES*AMY_NCHANS)
 
 
@@ -159,7 +161,6 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
             if(ring_read_ptr == OUTPUT_RING_LENGTH ) ring_read_ptr = 0;
         }
     }
-
 }
 
 
@@ -181,7 +182,15 @@ amy_err_t miniaudio_init() {
     //fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
     //        AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
 
+#ifdef _WIN32
+    // Experiment: prefer DirectSound over WASAPI. The stream itself measures
+    // clean (no ring starvation, callbacks well under budget) yet output
+    // crackles on some devices/VMs — try the other Windows device path.
+    ma_backend win_backends[] = { ma_backend_dsound, ma_backend_wasapi, ma_backend_winmm };
+    if (ma_context_init(win_backends, 3, NULL, &context) != MA_SUCCESS) {
+#else
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
+#endif
         printf("Failed to setup context for device list.\n");
         exit(1);
     }
@@ -189,7 +198,7 @@ amy_err_t miniaudio_init() {
         printf("Failed to get device list.\n");
         exit(1);
     }
-    
+
     if(AMY_HAS_AUDIO_IN) {
         if (amy_global.config.playback_device_id >= (int32_t)playbackCount || amy_global.config.capture_device_id >= (int32_t)captureCount) {
             printf("invalid device\n");
@@ -231,19 +240,48 @@ amy_err_t miniaudio_init() {
     deviceConfig.pUserData         = _custom;
 
     // Force miniaudio's callback to be the same size as AMY. This helps us not loop too many fill_buffer calls
+#ifdef _WIN32
+    // WASAPI in shared mode (esp. under a VM / emulation) glitches with a
+    // single tiny 256-frame period. Let WASAPI align to its own quantum with
+    // a generous ms-based buffer split into several periods instead of
+    // forcing a frame count.
+    deviceConfig.periodSizeInMilliseconds = 20;
+    deviceConfig.periods = 4;
+#else
     deviceConfig.periodSizeInFrames = AMY_BLOCK_SIZE;
+#endif
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {
         printf("Failed to open playback device.\n");
         exit(1);
     }
 
+#ifdef _WIN32
+    // The device period (e.g. 882 or 1323 frames) is usually NOT a multiple
+    // of AMY_BLOCK_SIZE (256). The output ring writes in 256-frame bursts but
+    // the device reads `period` frames per callback, so the read/write gap
+    // oscillates by ~one block around the initial lead; the stock 1-block
+    // lead dips to zero -> underrun crackle. Lead by enough blocks to cover
+    // the negotiated period plus margin. Must be set BEFORE the device starts
+    // or the first callbacks run with the short lead and crackle at startup.
+    // (mac/linux force period==256, so the gap is constant there and the
+    // 1-block default is fine.)
+    {
+        uint32_t p = device.playback.internalPeriodSizeInFrames;
+        uint32_t lead_blocks = (p + AMY_BLOCK_SIZE - 1) / AMY_BLOCK_SIZE + 2;
+        uint32_t lead = lead_blocks * AMY_BLOCK_SIZE * AMY_NCHANS;
+        if (lead >= OUTPUT_RING_LENGTH) lead = AMY_BLOCK_SIZE * 3 * AMY_NCHANS;
+        ring_write_ptr = (uint16_t)lead;
+    }
+#endif
+    // Zero the ring before the device starts pulling from it.
+    for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
+
     if (ma_device_start(&device) != MA_SUCCESS) {
         printf("Failed to start playback device.\n");
         ma_device_uninit(&device);
         exit(1);
     }
-    for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
     return AMY_OK;
 }
 
