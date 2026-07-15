@@ -174,23 +174,25 @@ void algo_note_on(uint16_t osc, float freq) {
     }
 }
 
-SAMPLE *** scratch;
+SAMPLE ** scratch;
 
 void algo_deinit() {
-    for(uint16_t i=0;i<AMY_CORES;i++) {
-        for(uint16_t j=0;j<3;j++) free(scratch[i][j]);
-        free(scratch[i]);
-    }
+    //for(uint16_t i=0;i<AMY_CORES;i++) {
+    //    for(uint16_t j=0;j<3;j++) free(scratch[i][j]);
+    //    free(scratch[i]);
+    //}
+    free(scratch[0]);
     free(scratch);
 }
 
 void algo_init() {
-    scratch = malloc_caps(sizeof(SAMPLE**)*AMY_CORES, amy_global.config.ram_caps_fbl);
-    for(uint16_t i=0;i<AMY_CORES;i++) {
-        scratch[i] = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
-        for(uint16_t j=0;j<3;j++) {
-            // 16-byte aligned so zero()/copy() take the ESP32-S3 PIE vector path.
-            scratch[i][j] = malloc_caps_block(sizeof(SAMPLE)*AMY_BLOCK_SIZE, amy_global.config.ram_caps_fbl);
+    scratch = malloc_caps(sizeof(SAMPLE**) * AMY_CORES * 3, amy_global.config.ram_caps_fbl);
+    // 16-byte aligned so zero()/copy() take the ESP32-S3 PIE vector path.
+    SAMPLE *mem = malloc_caps_block(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_CORES * 3, amy_global.config.ram_caps_fbl);
+    for(uint16_t i = 0; i < AMY_CORES; i++) {
+        for(uint16_t j = 0; j < 3; j++) {
+            scratch[i * AMY_CORES + j] = mem;
+            mem += AMY_BLOCK_SIZE;
         }
     }
 
@@ -204,12 +206,12 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
     SAMPLE* in_buf;
     SAMPLE* out_buf = NULL;
 
-    SAMPLE* const BUS_ONE = scratch[core][0];
-    SAMPLE* const BUS_TWO = scratch[core][1];
-    SAMPLE* const SCRATCH = scratch[core][2];
+    SAMPLE* const BUS_ONE = scratch[core * AMY_CORES];
+    SAMPLE* const BUS_TWO = scratch[core * AMY_CORES + 1];
+    SAMPLE* const SCRATCH = scratch[core * AMY_CORES + 2];
 
     //for (int i = 0; i < 3; ++i)
-    //    zero(scratch[core][i]);
+    //    zero(scratch[core * AMY_CORES + i]);
     
     SAMPLE amp = SHIFTR(F2S(msynth[osc]->amp), 2);  // Arbitrarily divide FM voice output by 4 to make it more in line with other oscs.
     for(uint8_t op=0;op<MAX_ALGO_OPS;op++) {
