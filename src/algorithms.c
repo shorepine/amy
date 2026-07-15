@@ -74,13 +74,51 @@ const struct FmAlgorithm algorithms[33] = {
 
 // a = 0
 static inline void zero(SAMPLE* a) {
-    bzero((void *)a, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+    const size_t nbytes = AMY_BLOCK_SIZE * sizeof(SAMPLE);
+#if defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)
+    // ESP32-S3 PIE: clear the FM-operator scratch block with a 128-bit vector
+    // store loop. This block clear/copy is the render path's one real PIE win
+    // (~10% on a 6-op FM voice); nothing else in AMY vectorizes (int32 SAMPLE has
+    // no 32-bit vector multiply, oscillators gather, filters recur). The scratch
+    // is 16-byte aligned (malloc_caps_block in algo_init) and nbytes is a compile
+    // -time multiple of 16, so the guard passes; anything unaligned falls to bzero.
+    if ((((uintptr_t)a | nbytes) & 15u) == 0) {
+        void *pp = a;  // ee.vst.128.ip post-increments the address register
+        __asm__ volatile(
+            "ee.xorq q0, q0, q0\n\t"
+            "loopnez %1, .Lamy_zero%=\n\t"
+            "ee.vst.128.ip q0, %0, 16\n"
+            ".Lamy_zero%=:"
+            : "+&r"(pp)
+            : "r"(nbytes / 16)
+            : "memory");
+        return;
+    }
+#endif
+    bzero((void *)a, nbytes);
 }
 
 
-// b = a 
+// b = a
 static inline void copy(SAMPLE* a, SAMPLE* b) {
-    bcopy((void *)a, (void *)b, AMY_BLOCK_SIZE * sizeof(SAMPLE));
+    const size_t nbytes = AMY_BLOCK_SIZE * sizeof(SAMPLE);
+#if defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)
+    // ESP32-S3 PIE: copy the block with paired 128-bit vector load/store (see zero()).
+    if ((((uintptr_t)a | (uintptr_t)b | nbytes) & 15u) == 0) {
+        const void *s = a;
+        void *d = b;
+        __asm__ volatile(
+            "loopnez %2, .Lamy_copy%=\n\t"
+            "ee.vld.128.ip q0, %1, 16\n\t"
+            "ee.vst.128.ip q0, %0, 16\n"
+            ".Lamy_copy%=:"
+            : "+&r"(d), "+&r"(s)
+            : "r"(nbytes / 16)
+            : "memory");
+        return;
+    }
+#endif
+    bcopy((void *)a, (void *)b, nbytes);
 }
 
 SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
@@ -143,7 +181,8 @@ void algo_init() {
     for(uint16_t i=0;i<AMY_CORES;i++) {
         scratch[i] = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
         for(uint16_t j=0;j<3;j++) {
-            scratch[i][j] = malloc_caps(sizeof(SAMPLE)*AMY_BLOCK_SIZE, amy_global.config.ram_caps_fbl);
+            // 16-byte aligned so zero()/copy() take the ESP32-S3 PIE vector path.
+            scratch[i][j] = malloc_caps_block(sizeof(SAMPLE)*AMY_BLOCK_SIZE, amy_global.config.ram_caps_fbl);
         }
     }
 

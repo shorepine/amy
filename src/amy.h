@@ -924,6 +924,7 @@ float portamento_ms_to_alpha(uint16_t portamento_ms);
 uint16_t alpha_to_portamento_ms(float alpha);
 int8_t check_init(amy_err_t (*fn)(), const char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
+void * malloc_caps_block(uint32_t size, uint32_t flags);
 void config_reverb(uint8_t bus, float level, float liveness, float damping, float xover_hz);
 void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
