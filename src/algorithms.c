@@ -82,6 +82,14 @@ static inline void zero(SAMPLE* a) {
     // no 32-bit vector multiply, oscillators gather, filters recur). The scratch
     // is 16-byte aligned (malloc_caps_block in algo_init) and nbytes is a compile
     // -time multiple of 16, so the guard passes; anything unaligned falls to bzero.
+    //
+    // The aligned inner loop is the same one esp-dsp uses in dsps_memset_aes3.S /
+    // dsps_memcpy_aes3.S (Apache-2.0) - credit there for the approach. This is not
+    // a clean-room copy of those kernels, though: it carries none of their scalar
+    // head/tail machinery for unaligned buffers (which is most of their length),
+    // taking the vector path only for whole aligned blocks and deferring anything
+    // else to libc. Written compactly as original code (no lines copied), so it
+    // needs no separate .S file and keeps this source MIT with no vendored asm.
     if ((((uintptr_t)a | nbytes) & 15u) == 0) {
         void *pp = a;  // ee.vst.128.ip post-increments the address register
         __asm__ volatile(
