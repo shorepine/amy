@@ -23,6 +23,11 @@ The root-level amy/Makefile has a `speedtest` rule that:
  * Write `results/<idx>_<date>_<sha>/` with `load.csv`, `serial.log`,
    `meta.json`.
 
+`measure.py --runs N` flashes once, then resets the board and re-captures N
+times (`loadK.csv`/`serialK.log` for runs 2+); `meta.json` records per-run
+stats under `runs` and the top-level numbers become the cross-run mean, to
+average out run-to-run noise.
+
 ## Usage
 
 ```sh
@@ -42,7 +47,8 @@ Two consecutive flash failures abort the sweep on the assumption the bench
 The same sketch + `measure.py` also power AMY's per-PR hardware CI
 (`.github/workflows/amy-hwci-build.yml` builds the firmware in the cloud —
 the PR *and* a baseline at its merge base; `amy-hwci.yml` flashes both
-back-to-back on the self-hosted bench Pi and comments a before/after/Δ
+back-to-back on the self-hosted bench Pi — each with `--runs 3`, so every
+number is a 3-run mean — and comments a before/after/Δ
 load table on the PR, formatted by `hwci_report.py`).
 CI **FAIL means only that the PR's test couldn't run** — load values and a
 failed baseline are informational there; regression *hunting* is this
