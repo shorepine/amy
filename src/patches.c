@@ -757,7 +757,7 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
 void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
-    //fprintf(stderr, "parse_patch_string: message %s\n", message);
+    //fprintf(stderr, "parse_patch_string: message %s base_osc %d synth %d time %d is_first_voice %d\n", message, base_osc, synth, time, is_first_voice);
     amy_event e;
     size_t pos = 0;
     do {
@@ -1020,7 +1020,27 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     e->synth = instrument;
 }
 
-void release_voice_oscs(int32_t voice) {
+void schedule_osc_reset(uint32_t time, uint16_t osc, struct delta **queue) {
+    if (queue == NULL)  queue = &amy_global.delta_queue;
+    // Use event mechanism to post osc resets, to ensure they are done in sequence.
+    // This was important because for testing the patch reassignment, we were running the default
+    // osc setup, then changing the patch, which reset the oscs here, but then the osc config
+    // from the default setup was applied *after* the reset, so the osc state was not reset.
+    //amy_event reset_event = amy_default_event();
+    //reset_event.reset_osc = osc + j;
+    //amy_event_to_deltas_queue(&reset_event, 0, &amy_global.delta_queue);
+    // That's a lot of stack usage to add a single delta.  Let's cut to the chase.
+    struct delta d = {
+        .time = time,
+        .osc = 0,
+        .param = RESET_OSC,
+        .data.i = osc,
+        .next = NULL,
+    };
+    add_delta_to_queue(&d, queue);
+}
+
+void release_voice_oscs(int32_t voice, uint32_t time) {
     if(AMY_IS_SET(voice_to_base_osc[voice])) {
         //fprintf(stderr, "Already set voice %d, removing it\n", voice);
         // Remove the oscs for this old voice
@@ -1029,7 +1049,7 @@ void release_voice_oscs(int32_t voice) {
                 //fprintf(stderr, "Already set voice %d osc %d, removing it\n", voices[v], i);
                 AMY_UNSET(osc_to_voice[i]);
                 // Make sure the osc is cleared.
-                reset_osc(i);
+                schedule_osc_reset(time, i, NULL);
             }
         }
         AMY_UNSET(voice_to_base_osc[voice]);
@@ -1042,10 +1062,11 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     int num_voices = 0;
     // If the instrument is alread initialized, copy the voice numbers.
     num_voices = instrument_get_num_voices(e->synth, voices);
+    //fprintf(stderr, "patches_voices_for_load: e->num_voices %d num_voices %d\n", e->num_voices, num_voices);
     if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
         // If we did already have voice oscs, release them.
         for (int32_t i = 0; i < num_voices; ++i) {
-            release_voice_oscs(voices[i]);
+            release_voice_oscs(voices[i], e->time);
         }
         num_voices = 0;
         // Find avaliable voices with a single pass through voice_to_base_osc.
@@ -1067,12 +1088,13 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
         }
         // Was this deleting the instrument?  i.e. was e->num_voices set but setting the num_voices to zero?
         if (num_voices == 0) {
-            instrument_release(e->synth);
-            // Delete the instrument number so we don't forward the 'rest' of the event to it.
-            AMY_UNSET(e->synth);
             // Clear all the midi mappings.
             int type = MIDI_MAP_TYPE_ANY;
             midi_clear_channel_mappings(e->synth, type);
+            // Delete the instrument
+            instrument_release(e->synth);
+            // Delete the instrument number so we don't forward the 'rest' of the event to it.
+            AMY_UNSET(e->synth);
             return 0;
         }
         //fprintf(stderr, "Allocated %d voices to instrument %d\n", num_voices, e->synth);
@@ -1083,7 +1105,6 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     //fprintf(stderr, "\n");
     return num_voices;
 }
-
 
 void patches_load_patch(amy_event *e) {
     // Given an event with a synth (instrument) or voice spec, set up a synth.
@@ -1096,7 +1117,7 @@ void patches_load_patch(amy_event *e) {
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
     uint16_t patch_number = e->patch_number;   // Need to match type of e->patch_number so AMY_IS_UNSET(patch_number) will work.
-    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
+    fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
     if (AMY_IS_SET(e->synth)) {
         num_voices = patches_voices_for_load_synth(e, voices);
     } else if (AMY_IS_SET(e->voices[0])) {
@@ -1117,7 +1138,7 @@ void patches_load_patch(amy_event *e) {
                 uint16_t base = voice_to_base_osc[voices[v]];
                 for (uint16_t j = 0; j < AMY_OSCS - base; j++) {
                     if (osc_to_voice[base + j] != voices[v]) break;
-                    reset_osc(base + j);
+                    schedule_osc_reset(e->time, base + j, NULL);
                 }
             }
         }
@@ -1164,7 +1185,7 @@ void patches_load_patch(amy_event *e) {
 
     for(uint8_t v=0;v<num_voices;v++)  {
         // Release all the oscs of any voices we're re-using before we start re-allocating oscs.
-        release_voice_oscs(voices[v]);
+        release_voice_oscs(voices[v], e->time);
     }
 
     for(uint8_t v=0;v<num_voices;v++)  {
@@ -1195,23 +1216,7 @@ void patches_load_patch(amy_event *e) {
                     for(uint16_t j=0; j < oscs_per_voice; j++) {
                         //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
                         osc_to_voice[osc+j] = voices[v];
-                        //reset_osc(osc+j);
-                        // Use event mechanism to post osc resets, to ensure they are done in sequence.
-                        // This was important because for testing the patch reassignment, we were running the default
-                        // osc setup, then changing the patch, which reset the oscs here, but then the osc config
-                        // from the default setup was applied *after* the reset, so the osc state was not reset.
-                        //amy_event reset_event = amy_default_event();
-                        //reset_event.reset_osc = osc + j;
-                        //amy_event_to_deltas_queue(&reset_event, 0, &amy_global.delta_queue);
-                        // That's a lot of stack usage to add a single delta.  Let's cut to the chase.
-                        struct delta d = {
-                            .time = 0,
-                            .osc = 0,
-                            .param = RESET_OSC,
-                            .data.i = osc + j,
-                            .next = NULL,
-                        };
-                        add_delta_to_queue(&d, &amy_global.delta_queue);
+                        schedule_osc_reset(e->time, osc + j, NULL);
                     }
                     // exit the loop
                     i = AMY_OSCS + 1;
