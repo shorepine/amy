@@ -199,6 +199,22 @@ output_sample_type * output_block;
     //fprintf(stderr, "malloc(%ld) @0x%lx\n", size, result);
     return result;
   }
+
+  // 16-byte-aligned allocator for the sample-block buffers the ESP32-S3 PIE
+  // clear/copy path walks (the FM-operator scratch used by zero()/copy() in
+  // algorithms.c). Alignment lets those take the 128-bit vector path instead of
+  // the bzero/bcopy fallback; it is a speed matter, never a correctness one.
+  // Kept separate from malloc_caps() because most AMY allocations are small
+  // structs and aligned allocation over-allocates per block. free(p) is
+  // unchanged: under IDF free() == heap_caps_free(), the correct deallocator
+  // for heap_caps_aligned_alloc (heap_caps_aligned_free is deprecated).
+  void * malloc_caps_block(uint32_t size, uint32_t flags) {
+  #if defined(ESP_PLATFORM) && defined(CONFIG_IDF_TARGET_ESP32S3)
+    return heap_caps_aligned_alloc(16, (size + 15u) & ~15u, flags);
+  #else
+    return malloc_caps(size, flags);
+  #endif
+  }
 #endif
 
 
