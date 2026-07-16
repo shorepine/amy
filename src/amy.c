@@ -1809,7 +1809,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     return max_val;
 }
 
-void amy_render(uint16_t start, uint16_t end, uint8_t core) {
+AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     AMY_PROFILE_START(AMY_RENDER)
 
     for(int bus = 0; bus <= amy_global.highest_bus; ++bus)

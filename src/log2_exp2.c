@@ -11,7 +11,7 @@ static inline SAMPLE lut_val(SAMPLE frac, const LUTSAMPLE *table, const int log2
 }
 
 
-SAMPLE log2_lut(SAMPLE x) {
+AMY_IRAM_ATTR SAMPLE log2_lut(SAMPLE x) {
     // assert(x > 0);
     int scale = 0;
     while (x < F2S(1.0f)) {
@@ -27,7 +27,7 @@ SAMPLE log2_lut(SAMPLE x) {
 }
 
 
-SAMPLE exp2_lut(SAMPLE x) {
+AMY_IRAM_ATTR SAMPLE exp2_lut(SAMPLE x) {
     int offset = INT_OF_S(x, 0);
     SAMPLE x_frac = S_FRAC_OF_S(x, 0);
     // lut_val is negated because table is stored as negative (to reach 1.0).
@@ -40,7 +40,7 @@ SAMPLE exp2_lut(SAMPLE x) {
 }
 
 
-SAMPLE sin_lut(SAMPLE x) {
+AMY_IRAM_ATTR SAMPLE sin_lut(SAMPLE x) {
     // sin(x / 2 pi)
     SAMPLE x_frac = SHIFTL(S_FRAC_OF_S(x, 0), 2);  // Fractional part of x * 4, so 0 <= x_frac < 4.
     int quadrant = INT_OF_S(x_frac, 0);
@@ -54,6 +54,6 @@ SAMPLE sin_lut(SAMPLE x) {
     return -sign * lut_val(x_frac2, qsin_fxpt_lutable, 8);
 }
 
-SAMPLE cos_lut(SAMPLE x) {
+AMY_IRAM_ATTR SAMPLE cos_lut(SAMPLE x) {
     return sin_lut(x + F2S(0.25f));
 }
