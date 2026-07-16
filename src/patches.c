@@ -1062,6 +1062,7 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     int num_voices = 0;
     // If the instrument is alread initialized, copy the voice numbers.
     num_voices = instrument_get_num_voices(e->synth, voices);
+    //fprintf(stderr, "patches_voices_for_load: e->num_voices %d num_voices %d\n", e->num_voices, num_voices);
     if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
         // If we did already have voice oscs, release them.
         for (int32_t i = 0; i < num_voices; ++i) {
@@ -1087,12 +1088,13 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
         }
         // Was this deleting the instrument?  i.e. was e->num_voices set but setting the num_voices to zero?
         if (num_voices == 0) {
-            instrument_release(e->synth);
-            // Delete the instrument number so we don't forward the 'rest' of the event to it.
-            AMY_UNSET(e->synth);
             // Clear all the midi mappings.
             int type = MIDI_MAP_TYPE_ANY;
             midi_clear_channel_mappings(e->synth, type);
+            // Delete the instrument
+            instrument_release(e->synth);
+            // Delete the instrument number so we don't forward the 'rest' of the event to it.
+            AMY_UNSET(e->synth);
             return 0;
         }
         //fprintf(stderr, "Allocated %d voices to instrument %d\n", num_voices, e->synth);

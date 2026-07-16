@@ -1348,7 +1348,7 @@ class TestClearSynth(AmyTest):
     # Clear the synth
     amy.send(time=250, synth=1, num_voices=0)
     send_midi(time=300, synth=1, note=54, vel=1)  # Should do nothing & print warning
-    # Set up a new synth
+    # Set up a new synth.  Play some of the drum-remapped notes to make sure drum remappings have been cleared.
     amy.send(time=350, synth=1, num_voices=6, patch=0)
     send_midi(time=400, synth=1, note=54, vel=1)
     send_midi(time=500, synth=1, note=56, vel=1)
