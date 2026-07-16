@@ -973,13 +973,26 @@ def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
         # the patch is enough (`amy.send(synth=11, patch=386, num_voices=6)`);
         # the legacy 258 kit keeps its historical flags (callers set their own).
         synth_flags = amy.SYNTH_FLAGS_NOTES_VIA_MIDI | amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS
-    # Set up a bunch of midi_note_cmd mappings for CH10 drums
-    message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=synth_flags)
+    # Set up a bunch of midi_note_cmd mappings for CH10 drums.
+    # No amp in the patch (or in the note templates below): amp[COEF_CONST]
+    # stays at its osc-reset default of 1.0 and is never rewritten by a hit,
+    # so it remains free as the per-channel level control (`i<ch>v0a<val>`,
+    # e.g. MIDI CC 7 / AMYboard Online's Level slider) — exactly like the
+    # melodic patches. All per-drum gain rides the velocity instead (below).
+    message = amy.message(osc=0, wave=amy.PCM, synth_flags=synth_flags)
     message += amy.message(synth_flags=synth_flags)
     # Level balancing for the Gamma9001 kits: the source samples were never
     # level-matched as a kit (the Koblo kick is a full-scale 3s boom, the hats
-    # 6-8 dB quieter than the old set), so bake a per-note amp into each
+    # 6-8 dB quieter than the old set), so bake a per-note gain into each
     # mapping that lands every voice at a consistent loudness target.
+    # The gain goes in the mapping's linear velocity scale (the max field of
+    # `io<note>,<log>,<min>,<max>,<offset>,` -> %v = max * vel/127), NOT an
+    # amp coefficient: amp[COEF_CONST] must stay untouched (see above), and
+    # amp[COEF_VEL] is an *exponent* on velocity (coefficients combine in the
+    # log domain — amp_combine_controls), not a gain. Because the const and
+    # velocity terms sum as log10() before the final exponentiation, scaling
+    # the velocity input is loudness-identical to the old baked amp const at
+    # every velocity: level * (gain*vel) == (level*gain) * vel.
     rms_table = _gamma_preset_rms() if balance else {}
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
@@ -993,6 +1006,9 @@ def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
             # over the caller's event, so a baked Q0.5 would clobber per-note
             # pan (amy.send(synth=10, note=50, pan=...) — TestSynthDrumsPanning).
             kwargs = {'filter_type': 0}
+            # Unbalanced (pcm_tiny) drums historically got their gain from a
+            # persistent amp=5 in the patch; keep that loudness via velocity.
+            vel_scale = 5.0
             rms = rms_table.get(pcm_preset_number)
             if rms is not None:
                 # kicks louder than the rest; toms in between
@@ -1004,10 +1020,10 @@ def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
                     target = -14.0
                 gain = 10.0 ** ((target - rms) / 20.0)
                 gain = min(3.0, max(0.33, gain))
-                kwargs['amp'] = round(5.0 * gain, 2)
+                vel_scale = round(5.0 * gain, 2)
             message += amy.message(
                 midi_note_cmd=(
-                    ("%d,0,0,1,0," % midi_note)
+                    ("%d,0,0,%g,0," % (midi_note, vel_scale))
                     + amy.message(
                         synth=8888,
                         preset=pcm_preset_number,
