@@ -1320,6 +1320,44 @@ ic10,1,1.000,100.000,1.000,i%id%vZ"""
     return is_ok, message
 
 
+def send_midi(time=0, synth=1, note=60, vel=0):
+  """Wrap inject_midi with an amy.send-like interface."""
+  amy.inject_midi(time, 0x90 + (synth - 1), note, min(127, int(round(vel * 127))))
+
+
+class TestOscResetIsScheduled(AmyTest):
+  """There was a (mostly test-relevant) bug where the osc resets implied by num_voices=0 were being applied immediately, not when scheduled."""
+
+  def run(self):
+    # First install MIDI drums: chan 1
+    amy.send(time=0, synth=1, num_voices=2, patch=258, synth_flags=3)
+    send_midi(time=100, synth=1, note=54, vel=1)
+    send_midi(time=200, synth=1, note=66, vel=1)
+    # But clearing the synth later would mess it up.
+    amy.send(time=500, synth=1, num_voices=0)
+
+
+class TestClearSynth(AmyTest):
+  """Test that setting num_voices to zero totally clears a synth."""
+
+  def run(self):
+    # First install MIDI drums: chan 1
+    amy.send(time=0, synth=1, num_voices=6, patch=258, synth_flags=3)
+    send_midi(time=100, synth=1, note=54, vel=1)
+
+    # Clear the synth
+    amy.send(time=250, synth=1, num_voices=0)
+    send_midi(time=300, synth=1, note=54, vel=1)  # Should do nothing & print warning
+    # Set up a new synth
+    amy.send(time=350, synth=1, num_voices=6, patch=0)
+    send_midi(time=400, synth=1, note=54, vel=1)
+    send_midi(time=500, synth=1, note=56, vel=1)
+    send_midi(time=600, synth=1, note=58, vel=1)
+    send_midi(time=700, synth=1, note=54, vel=0)
+    send_midi(time=800, synth=1, note=56, vel=0)
+    send_midi(time=900, synth=1, note=58, vel=0)
+
+
 class TestResetOscs(AmyTest):
   """Test that setting the number of oscs per voice resets the oscs."""
 
@@ -1574,11 +1612,6 @@ class TestGrabMidiNotes(AmyTest):
     amy.inject_midi(500, 0x80, 48, 0)  # low note off
     amy.inject_midi(700, 0x99, 37, 100)  # snare (should not sound)
     amy.inject_midi(900, 0x89, 37, 100)  # snare note off
-
-
-def send_midi(time=0, synth=1, note=60, vel=0):
-  """Wrap inject_midi with an amy.send-like interface."""
-  amy.inject_midi(time, 0x90 + (synth - 1), note, min(127, int(round(vel * 127))))
 
 
 class TestMidiNoteCmd(AmyTest):
