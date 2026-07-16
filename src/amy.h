@@ -165,6 +165,20 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
+// From github.com/rt-rtos/S3-Amysynth: Place the render hot path in internal
+// IRAM. Use IRAM_ATTR (per-symbol) rather than a linker fragment because this
+// build uses GCC LTO: .text.* section names are rewritten in ltrans, so
+// object/symbol-granularity `noflash` rules silently miss. IRAM_ATTR rides the
+// symbol itself (.iram1.*) and survives LTO. No-op on non-ESP platforms.
+#define AMY_IRAM_ATTR IRAM_ATTR
+// Pin the clipping lookup table
+// (~9.6 KB) to internal DRAM. Read on every output sample; in flash .rodata it
+// is served via the PSRAM XIP cache and incurs cache-miss stalls. DRAM_ATTR
+// places it in fast internal SRAM (data-safe section, NOT IRAM). No-op off ESP.
+#define AMY_DRAM_ATTR DRAM_ATTR
+#else
+#define AMY_IRAM_ATTR
+#define AMY_DRAM_ATTR
 #endif
 
 #ifndef MALLOC_CAP_DEFAULT

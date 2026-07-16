@@ -6,7 +6,7 @@
 extern const int16_t pcm[];
 
 
-SAMPLE compute_mod_value(uint16_t mod_osc) {
+AMY_IRAM_ATTR SAMPLE compute_mod_value(uint16_t mod_osc) {
     // Return the modulation-rate value for the specified oscillator.
     // i.e., this oscillator is acting as modulation for something, so
     // just calculate that modulation rate (without knowing what it
@@ -32,7 +32,7 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     return value;
 }
 
-SAMPLE compute_mod_scale(uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE compute_mod_scale(uint16_t osc) {
     uint16_t source = synth[osc]->mod_source;
     if(AMY_IS_SET(source)) {
         if(source != osc) {  // that would be weird
@@ -44,7 +44,7 @@ SAMPLE compute_mod_scale(uint16_t osc) {
 }
 
 // sample_offset allows you to probe the EG output at some point this many samples into the future.
-SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset) {
+AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset) {
     AMY_PROFILE_START(COMPUTE_BREAKPOINT_SCALE)
     // given a breakpoint list, compute the scale
     // we first see how many BPs are defined, and where we are in them?

@@ -589,7 +589,7 @@ def make_clipping_lut(filename):
         f.write("#define NONLIN_RANGE %d\n" % NONLIN_RANGE)
         f.write("// First sample value beyond end of table (just clip to max).\n")
         f.write("#define FIRST_HARDCLIP (FIRST_NONLIN + NONLIN_RANGE)\n")
-        f.write("const uint16_t clipping_lookup_table[NONLIN_RANGE] PROGMEM = {\n")
+        f.write("const uint16_t clipping_lookup_table[NONLIN_RANGE] AMY_DRAM_ATTR PROGMEM = {\n")
         samples_per_row = 8
         for row_start in range(0, NONLIN_RANGE, samples_per_row):
             for sample in range(row_start, min(NONLIN_RANGE, row_start + samples_per_row)):

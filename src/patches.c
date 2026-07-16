@@ -1117,7 +1117,7 @@ void patches_load_patch(amy_event *e) {
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
     uint16_t patch_number = e->patch_number;   // Need to match type of e->patch_number so AMY_IS_UNSET(patch_number) will work.
-    fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
+    //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
     if (AMY_IS_SET(e->synth)) {
         num_voices = patches_voices_for_load_synth(e, voices);
     } else if (AMY_IS_SET(e->voices[0])) {

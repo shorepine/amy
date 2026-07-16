@@ -343,7 +343,7 @@ SAMPLE top16SMUL_after_a(SAMPLE a_processed, SAMPLE b, int adropped_unused, int 
 
 #endif // AMY_USE_FIXEDPOINT
 
-SAMPLE scan_max(SAMPLE* block, int len) {
+AMY_IRAM_ATTR SAMPLE scan_max(SAMPLE* block, int len) {
     AMY_PROFILE_START(SCAN_MAX)
 
     // Find the max abs sample value in a block.
@@ -360,7 +360,7 @@ SAMPLE scan_max(SAMPLE* block, int len) {
 // This is the multiply just for dsps_biquad_f32_ansi_split_fb_twice, which is only used for FILTER_LPF24.
 #define FILT_MUL_SS_24(a, b) top16SMUL(a, b)
 
-SAMPLE dsps_biquad_f32_ansi_split_fb_once(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
+AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_once(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
     // Apply the filter once (for 12 dB/oct LPF)
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -407,7 +407,7 @@ SAMPLE dsps_biquad_f32_ansi_split_fb_once(const SAMPLE *input, SAMPLE *output, i
     return max_out;
 }
 
-SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
+AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val) {
     // Apply the filter twice
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -536,7 +536,7 @@ inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
     return b;
 }
 
-void parametric_eq_process(uint8_t bus, SAMPLE *block) {
+AMY_IRAM_ATTR void parametric_eq_process(uint8_t bus, SAMPLE *block) {
     // was void parametric_eq_process_top16block
     // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
     AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
@@ -688,7 +688,7 @@ SAMPLE block_denorm(SAMPLE* block, int len, int bits) {
     return block_norm(block, len, -bits);
 }
 
-SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
+AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val) {
 
     SAMPLE coeffs[5];
 
