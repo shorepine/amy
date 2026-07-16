@@ -987,6 +987,29 @@ class TestSynthDrumsPanning(AmyTest):
     amy.send(time=800, synth=10, note=41, vel=1, pan=0.05)
 
 
+class TestSynthDrumsLevel(AmyTest):
+  """Per-channel level (amp CONST — MIDI CC 7 / a mixer Level control) must
+  scale kit drums and persist across hits: the kit note templates carry their
+  per-drum gain in the mapping's velocity scale, NOT in amp, so a hit never
+  rewrites the channel level (shorepine/amy drum-level fix)."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    # Same snare at three channel levels; each pair of hits checks the level
+    # survives the previous note-on.
+    amy.send(time=50, synth=10, amp=0.2)
+    amy.send(time=100, synth=10, note=37, vel=1)
+    amy.send(time=250, synth=10, note=37, vel=1)
+    amy.send(time=400, synth=10, amp=1.0)
+    amy.send(time=450, synth=10, note=37, vel=1)
+    amy.send(time=600, synth=10, note=37, vel=1)
+    amy.send(time=750, synth=10, amp=1.8)
+    amy.send(time=800, synth=10, note=37, vel=1)
+
+
 class TestSynthProgChange(AmyTest):
   """Test switchting default synth to DX7, do oscs allocate OK?"""
 
