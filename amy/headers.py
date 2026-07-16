@@ -984,7 +984,15 @@ def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
         if pcm_preset_number >= 0:
-            kwargs = {}
+            # Explicit filter-off (G0) in every note template: kit voices are
+            # reused across drums and osc params persist on the osc, so a
+            # template that doesn't mention filter_type would inherit whatever
+            # the last drum on that voice set — a per-drum editor (AMYboard
+            # Online's drum knobs) putting an LPF on one drum would smear it
+            # onto every other drum. Deliberately NOT pan: the template layers
+            # over the caller's event, so a baked Q0.5 would clobber per-note
+            # pan (amy.send(synth=10, note=50, pan=...) — TestSynthDrumsPanning).
+            kwargs = {'filter_type': 0}
             rms = rms_table.get(pcm_preset_number)
             if rms is not None:
                 # kicks louder than the rest; toms in between
