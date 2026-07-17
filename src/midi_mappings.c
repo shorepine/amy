@@ -262,7 +262,7 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t i
                 char *message = yield_state->message = (char *)(yield_state + 1);
                 yield_state->pos = 0;
                 // And now set up the message
-                float value = map_midi_value(mapping, bytes[2]);
+                float value = map_midi_value(mapping, (bytes[2] == 0xFF)? 0 : bytes[2]);  // suppress "fake note on" value.
                 if (status == 0x80) {  // Translate note-off to note-on with vel 0.
                     status = 0x90;
                     value = 0;
@@ -289,17 +289,21 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t i
 }
 
 void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue) {
-    fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
-    fprintf_event_stderr(base_event);
+    //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
+    //fprintf_event_stderr(base_event);
     //
     void *state = NULL;
     if (queue == NULL)  queue = &amy_global.delta_queue;
     amy_event e;
+    bool fake_note_on = (((bytes[0] & 0xF0) == 0x90) && (bytes[2] == 0xFF));
     do {
         if (base_event) e = *base_event;
         else amy_clear_event(&e);
         state = yield_midi_message_handler_events(bytes, len, is_sysex, time, &e, state);
         if (state != NULL) {
+            if (fake_note_on) {
+                AMY_UNSET(e.velocity);
+            }
             amy_event_to_deltas_queue(&e, 0, queue);
         }
     } while (state != NULL);

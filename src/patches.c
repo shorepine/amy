@@ -1001,15 +1001,16 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     // Set the bus for the instrument, but also for each osc of each voice, below.
     if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // Should we invoke MIDI note-on cmd rules?
-    if (AMY_IS_SET(e->velocity)
+    if (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI
         && AMY_IS_SET(e->midi_note)
-        && (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI)
         && (e->note_source_channel != synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
         bytes[0] = 0x90 + (0x0F & (instrument - 1));
         bytes[1] = 0x7F & (uint8_t)(e->midi_note);
-        bytes[2] = (uint8_t) MIN(127, 127.1f * e->velocity);
+        uint8_t velocity = 255;   // fake-note-on magic value.
+        if (AMY_IS_SET(e->velocity)) velocity = (uint8_t) MIN(127, 127.1f * e->velocity);
+        bytes[2] = velocity;
         //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
         // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
         AMY_UNSET(e->midi_note);
