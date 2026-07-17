@@ -1018,7 +1018,6 @@ void amy_start_web();
 void amy_start_web_no_synths();
 #endif
 
-
 // external functions
 void amy_restart();
 void amy_reset_oscs();
@@ -1051,6 +1050,8 @@ extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, ui
 // As midi_message_handler, but any events produced by the mapping are converted to deltas
 // on `queue` instead of being played, unless queue is NULL or the global delta queue.
 extern void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue);
+// Generator function for midi_message_handler.  Returns series of modified events while state is returned non-NULL.
+extern void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *event, void *state);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
 #ifdef __EMSCRIPTEN__

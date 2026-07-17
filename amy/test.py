@@ -885,7 +885,7 @@ class TestMidiDrumsPatch258(AmyTest):
 
   def run(self):
     # The MIDI drums default has amp=5
-    amy.send(time=0, synth=1, num_voices=6, patch=258)
+    amy.send(time=0, synth=1, num_voices=1, patch=258)
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(100, 0x90, 35, 100)  # bass
     amy.inject_midi(400, 0x90, 35, 100)  # bass
@@ -989,6 +989,28 @@ class TestSynthDrumsLevel(AmyTest):
     amy.send(time=600, synth=10, note=37, vel=1)
     amy.send(time=750, synth=10, amp=1.8)
     amy.send(time=800, synth=10, note=37, vel=1)
+
+
+class TestSynthDrumsStaticParams(AmyTest):
+  """Under the #913 one-osc-per-drum structure, we should be able to set persistent params per drum sound (see #914)."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    CLAP = 39
+    HIHAT = 42
+    amy.send(time=100, synth=10, note=CLAP, vel=1)
+    amy.send(time=200, synth=10, note=HIHAT, vel=1)
+    # Move clap to the left
+    amy.send(time=250, synth=10, note=CLAP, pan=0)
+    amy.send(time=300, synth=10, note=CLAP, vel=1)
+    # Move hihat to the right
+    amy.send(time=400, synth=10, note=HIHAT, vel=1)
+    amy.send(time=450, synth=10, note=HIHAT, pan=1)
+    amy.send(time=500, synth=10, note=CLAP, vel=1)
+    amy.send(time=600, synth=10, note=HIHAT, vel=1)
 
 
 class TestSynthProgChange(AmyTest):
@@ -1345,7 +1367,7 @@ class TestOscResetIsScheduled(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=2, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
     send_midi(time=100, synth=1, note=54, vel=1)
     send_midi(time=200, synth=1, note=66, vel=1)
     # But clearing the synth later would mess it up.
@@ -1357,7 +1379,7 @@ class TestClearSynth(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=6, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
     send_midi(time=100, synth=1, note=54, vel=1)
 
     # Clear the synth
@@ -1634,7 +1656,7 @@ class TestMidiNoteCmd(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
-    amy.send(time=0, synth=10, num_voices=4, patch=258, synth_flags=3)  # MIDI drums
+    amy.send(time=0, synth=10, num_voices=1, patch=258, synth_flags=3)  # MIDI drums
     # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
     amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
     # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)

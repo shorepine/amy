@@ -329,6 +329,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
 }
 
 void fprintf_event_stderr(amy_event *e) {
+    if (e == NULL) return;
     char s[1024];
     sprint_event(e, s, 1024, /* wirecode */ false);
     fprintf(stderr, "%s\n", s);
