@@ -185,13 +185,9 @@ void pcm_note_on(uint16_t osc) {
         }
         
         if (AMY_IS_SET(synth[osc]->trigger_phase)) {
-            // A pending trigger_phase (P) sets the sample start point for this
-            // note-on (start_frame / 2^PCM_INDEX_BITS) and is consumed here, so
-            // it can't leak into a later note that reuses this osc — e.g. a
-            // drum-synth voice being reallocated to a different drum whose
-            // note-on doesn't carry a P of its own.
+            // trigger_phase (P) sets the sample start point for this
+            // note-on (start_frame / 2^PCM_INDEX_BITS).
             synth[osc]->phase = F2P(synth[osc]->trigger_phase);
-            AMY_UNSET(synth[osc]->trigger_phase);
         } else {
             synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }

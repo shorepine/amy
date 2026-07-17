@@ -148,13 +148,12 @@ class TestPcmPatchChange(AmyTest):
 
 class TestPcmTriggerPhase(AmyTest):
   """PCM: a trigger_phase (P) sent with a note-on sets the sample start point
-     (start_frame / 2^23) and is consumed by that note-on — a later note-on
-     without a phase starts from the beginning again."""
+     (start_frame / 2^23).   It persist for that osc."""
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PCM, preset=1)
     amy.send(time=100, osc=0, phase=0.0005, vel=1)   # start ~4200 frames in
-    amy.send(time=600, osc=0, vel=1)                 # consumed -> starts at 0
+    amy.send(time=600, osc=0, vel=1)                 # starts at the same point again.
 
 
 class TestPcmLoop(AmyTest):
