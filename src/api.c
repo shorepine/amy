@@ -351,7 +351,7 @@ void amy_default_synths() {
     // GM drum synth on channel 10
     e = amy_default_event();
     e.synth = AMY_MIDI_CHANNEL_DRUMS;  // 10
-    e.num_voices = 6;
+    e.num_voices = 1;      // Drums synth has a single voice acting as a dumb container with one osc devoted to each drum sound.
 #ifdef GAMMA9001
     e.patch_number = 384;  // Gamma9001 drum kit 0 (baked TR-808 bank); kits 1+ at 385+ via PC bank MSB 3
 #else

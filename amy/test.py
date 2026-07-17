@@ -225,7 +225,7 @@ class TestBYOPNoteOff(AmyTest):
     amy.send(time=0, voices='0,1', patch=1024)
     for i in range(num_partials):
       amy.send(voices='0,1', osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
-    amy.send(voices='0,1', bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
+    amy.send(voices='0,1', osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
     amy.send(time=100, voices=1, note=60, vel=1)
     amy.send(time=700, voices=1, vel=0)
 
@@ -685,7 +685,7 @@ class TestJunoCheapTrumpetPatch(AmyTest):
 
   def run(self):
     amy.send(time=0, voices="0,1", patch=2)
-    amy.send(time=0, voices="0,1", filter_type=amy.FILTER_LPF)
+    amy.send(time=0, voices="0,1", osc=0, filter_type=amy.FILTER_LPF)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=200, voices="0", vel=0)
     amy.send(time=300, voices="1", note=60, vel=1)
@@ -917,25 +917,6 @@ class TestMidiRunningStatusClock(AmyTest):
     ])
 
 
-class TestDrumsVoiceStealing(AmyTest):
-  """Drums ignore missing note offs, but should still notice excess note-offs."""
-
-  def __init__(self):
-    super().__init__()
-    self.default_synths = True
-
-  def run(self):
-    for i in range(14):
-      #amy.send(time=100 + i * 20, synth=10, note=40 + i // 2, vel=1)
-      amy.inject_midi(100 + i * 20, 0x99, 40 + i // 2, 0x7F)
-    for i in range(14):
-      #amy.send(time=400 + i * 20, synth=10, note=40 + i // 2, vel=0)
-      amy.inject_midi(400 + i * 20, 0x99, 40 + i // 2, 0)
-    print("expect to see excess note-off for note 40")
-    #amy.send(time=900, synth=10, note=40, vel=0)
-    amy.inject_midi(900, 0x89, 40, 0)
-
-  
 class TestDefaultChan1Synth(AmyTest):
   """Test default setup of Juno synth on synth 1 (MIDI channel 1)."""
 
@@ -1205,7 +1186,7 @@ class TestHPFHighBaseFreq(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=1, patch=0, num_voices=4)
-    amy.send(time=10, synth=1, filter_type=amy.FILTER_HPF, filter_freq=1000)
+    amy.send(time=10, synth=1, osc=0, filter_type=amy.FILTER_HPF, filter_freq=1000)
     amy.send(time=50, synth=1, note=48, vel=10)
     amy.send(time=150, synth=1, note=60, vel=10)
     amy.send(time=250, synth=1, note=63, vel=10)

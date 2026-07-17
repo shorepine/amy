@@ -611,17 +611,12 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     if(AMY_IS_UNSET(e->time)) { d.time = 0; } 
 
     // If this is a bus-directed event, use d->osc to store the bus number instead.
-    bool bus_directed_command = false;
-    bool any_volume_set = false;
-    for (int b = 0; b < AMY_NUM_BUSES; ++b) {
-        any_volume_set |= AMY_IS_SET(e->volume[b]);
-    }
-    if (any_volume_set
-        || AMY_IS_SET(e->eq_l) || AMY_IS_SET(e->eq_m) || AMY_IS_SET(e->eq_h)
-        || AMY_IS_SET(e->echo_level) || AMY_IS_SET(e->echo_delay_ms) || AMY_IS_SET(e->echo_max_delay_ms) || AMY_IS_SET(e->echo_feedback) || AMY_IS_SET(e->echo_filter_coef)
-        || AMY_IS_SET(e->chorus_level) || AMY_IS_SET(e->chorus_max_delay) || AMY_IS_SET(e->chorus_lfo_freq) || AMY_IS_SET(e->chorus_depth) 
-        || AMY_IS_SET(e->reverb_level) || AMY_IS_SET(e->reverb_liveness) || AMY_IS_SET(e->reverb_damping) || AMY_IS_SET(e->reverb_xover_hz)) {
-        if (AMY_IS_SET(e->osc))  fprintf(stderr, "** osc %d specific for bus-directed command, ignoring\n", e->osc);  // Can't at this moment be more specific about which command.
+    bool bus_directed_command = event_is_bus_directed(e);
+    if (bus_directed_command) {
+        if (AMY_IS_SET(e->osc))  {
+            fprintf(stderr, "** osc %d specific for bus-directed command, ignoring\n", e->osc);  // Can't at this moment be more specific about which command.
+            fprintf_event_stderr(e);
+        }
         // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
         d.osc = AMY_IS_SET(e->bus) ? e->bus :
             ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS);
@@ -1604,8 +1599,6 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_EXT0] = cv_inputs[0];
     ctrl_inputs[COEF_EXT1] = cv_inputs[1];
 
-    msynth[osc]->last_pan = msynth[osc]->pan;
-
     // copy all the modifier variables
     float logfreq = combine_controls(ctrl_inputs, synth[osc]->logfreq_coefs);
     if (synth[osc]->portamento_alpha == 0) {
@@ -1628,7 +1621,17 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc]->last_filter_logfreq = filter_logfreq;
     msynth[osc]->filter_logfreq = filter_logfreq;
     msynth[osc]->duty = combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
+
+    msynth[osc]->last_pan = msynth[osc]->pan;
     msynth[osc]->pan = combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
+    // Don't smear the pan on first frame of new note
+    if (synth[osc]->note_on_clock == amy_global.total_samples) {
+        //fprintf(stderr, "time %.3f osc %d note on\n", amy_global.time, osc);
+        // First frame for this osc since note-on, don't smooth-over the pan.
+        // (showed up when panning drum sounds).
+        msynth[osc]->last_pan = msynth[osc]->pan;
+    }
+
     // amp is a special case - coeffs apply in log domain.
     float new_amp = amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
     // Also, we advance one frame by writing both last_amp and amp (=next amp)

@@ -349,6 +349,24 @@ void fprintf_event_stderr(amy_event *e) {
 #define _TRUE_IF_5_F_UNSET(VAL1, VAL2, VAL3, VAL4, VAL5)  \
     (AMY_IS_UNSET((float)(VAL1)) && AMY_IS_UNSET((float)(VAL2)) && AMY_IS_UNSET((float)(VAL3)) && AMY_IS_UNSET((float)(VAL4)) && AMY_IS_UNSET((float)(VAL5)))
 
+
+bool event_is_bus_directed(amy_event *e) {
+    bool bus_directed_command = false;
+    bool any_volume_set = false;
+    for (int b = 0; b < AMY_NUM_BUSES; ++b) {
+        any_volume_set |= AMY_IS_SET(e->volume[b]);
+    }
+    if (any_volume_set
+        || AMY_IS_SET(e->eq_l) || AMY_IS_SET(e->eq_m) || AMY_IS_SET(e->eq_h)
+        || AMY_IS_SET(e->echo_level) || AMY_IS_SET(e->echo_delay_ms) || AMY_IS_SET(e->echo_max_delay_ms) || AMY_IS_SET(e->echo_feedback) || AMY_IS_SET(e->echo_filter_coef)
+        || AMY_IS_SET(e->chorus_level) || AMY_IS_SET(e->chorus_max_delay) || AMY_IS_SET(e->chorus_lfo_freq) || AMY_IS_SET(e->chorus_depth) 
+        || AMY_IS_SET(e->reverb_level) || AMY_IS_SET(e->reverb_liveness) || AMY_IS_SET(e->reverb_damping) || AMY_IS_SET(e->reverb_xover_hz)) {
+        bus_directed_command = true;
+    }
+    return bus_directed_command;
+}
+
+
 bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     // We don't want to go through the rigmarole of passing events down to voices if the instruments haven't been set up yet.
     // Check to see if this event has any fields set other than time, osc, synth.
@@ -395,8 +413,6 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     _RET_TRUE_IF_SET(oscs_per_voice);
     _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
     //
-    _RET_TRUE_IF_SET(bus);
-    //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);
     // Global effects
@@ -408,6 +424,10 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     is_empty &= _TRUE_IF_5_F_UNSET(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT);
     is_empty &= _TRUE_IF_5_F_UNSET(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT);
 
+    // If none of the bus events are set, but the bus flag itself is set, we're trying to set the bus of a (default??) osc
+    if (is_empty)
+        _RET_TRUE_IF_SET(bus);
+    
     if (p_is_empty) *p_is_empty = is_empty;
 
     return false;   // None of the osc-addressing fields were set.
@@ -600,7 +620,7 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
         empty_synth.max_num_breakpoints[i] = synth[osc]->max_num_breakpoints[i];
         empty_synth.breakpoint_times[i] = times + i * MAX_BREAKPOINTS;
         empty_synth.breakpoint_values[i] = values + i * MAX_BREAKPOINTS;
-    }
+   }
     reset_osc_by_pointer(&empty_synth, /* msynth */ NULL);
     // Go through parameter fields picking out the ones that are nondefault.
     EVENT_FROM_OSC(wave);
@@ -764,12 +784,14 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
         amy_clear_event(&e);
         e.time = time;
         if (message[pos] == 'i') {
-            if (!is_first_voice)  break;  // synth-layer messages are only executed for first voice, after that just skip the rest of string.
             // It's a synth-layer message, it needs a synth defined.
             e.synth = synth;
         }
         pos = yield_event_from_message(message, &e, pos);
-        if (pos > 0) amy_event_to_deltas_queue(&e, base_osc, queue);
+        if (pos > 0) {
+            if (event_addresses_oscs(&e, NULL) || is_first_voice)
+                amy_event_to_deltas_queue(&e, base_osc, queue);
+        }
     } while (pos > 0);
 }
 
@@ -999,11 +1021,11 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         for(uint8_t i = 0; i < num_voices; i++) {
             if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
                 uint16_t target_osc = voice_to_base_osc[voices[i]];
-                if (AMY_IS_UNSET(e->velocity) || AMY_IS_SET(e->osc)) {
-                    // Not a note on/off, or osc is specified
+                if (AMY_IS_SET(e->osc) || !event_addresses_oscs(e, NULL)) {
+                    // Osc is specified, or not osc-relevant so only needs writing once.
                     amy_event_to_deltas_queue(e, target_osc, queue);
                 } else {
-                    // Note on/off and osc is not specified - send to all oscs in voice.
+                    // Osc-related but osc is not specified - send to all oscs in voice.
                     int num_oscs = num_oscs_for_voice(voices[i]);
                     for (int osc = 0; osc < num_oscs; ++osc) {
                         e->osc = osc;
@@ -1250,5 +1272,4 @@ void patches_load_patch(amy_event *e) {
             is_first_voice = false;
         }
     }
-
 }
