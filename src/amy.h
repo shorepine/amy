@@ -569,6 +569,7 @@ typedef struct amy_event {
     // Instrument-layer values.
     uint8_t synth;
     uint32_t synth_flags;  // Special flags to set when defining instruments.
+    float synth_level;  // Per-instrument level (iV): scales every osc of the synth at render, default 1.
     uint16_t synth_delay_ms;  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     uint8_t to_synth;  // For moving setup between synth numbers.
     uint8_t grab_midi_notes;  // To enable/disable automatic MIDI note-on/off generating note-on/off.
@@ -1121,6 +1122,9 @@ extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool inclu
 extern int size_of_amy_event(void);
 extern bool event_is_bus_directed(amy_event *e);
 
+// osc -> (amy) voice ownership map (patches.c); AMY_UNSET for oscs outside any voice.
+extern uint8_t *osc_to_voice;
+
 extern struct delta **queue_for_patch_number(int patch_number);
 extern void update_num_oscs_for_patch_number(int patch_number);
 extern void all_notes_off();
@@ -1144,6 +1148,10 @@ extern int instrument_get_oscs_per_voice(int instrument_number);
 extern uint32_t instrument_get_flags(int instrument_number);
 extern void instrument_set_flags(int instrument_number, uint32_t flags);
 extern int instrument_get_bus(int instrument_number);
+extern float instrument_get_level(int instrument_number);
+extern void instrument_set_level(int instrument_number, float level);
+// Per-render lookup: the level of the instrument owning this (amy) voice, 1.0 if none.
+extern float instrument_level_for_voice(uint16_t voice);
 extern void instrument_set_bus(int instrument_number, uint8_t bus);
 extern uint16_t instrument_noteon_delay_ms(int instrument_number);
 extern void instrument_set_noteon_delay_ms(int instrument_number, uint16_t noteon_delay_ms);

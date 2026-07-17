@@ -453,6 +453,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'p')  e->pedal = atoi(message);
     else if (cmd == 't')  e->to_synth = atoi(message);
     else if (cmd == 'v')  e->num_voices = atoi(message);
+    else if (cmd == 'V')  e->synth_level = atoff(message);  // Per-instrument level, default 1.
     else if (cmd == 'y')  e->bus = atoi(message);  // 'i1iy1' is the same as 'i1y1'.
     else if (cmd == 'c' || cmd == 'o') skip_chars = midi_mapping_from_message(message, cmd, e->synth, skip_chars);
     else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
