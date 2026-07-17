@@ -1682,18 +1682,28 @@ static inline float rgain_of_pan(float pan) {
 }
 
 
-void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end) {
+void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float pan_end, float level) {
     AMY_PROFILE_START(MIX_WITH_PAN)
-    /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan */
+    /* copy a block_size of mono samples into an interleaved stereo buffer, applying pan
+       and the synth's level (iV). In stereo the level folds into the pan gain endpoints,
+       so it costs a few float multiplies per block — the existing per-sample gain ramp
+       applies it for free. */
     if(AMY_NCHANS==1) {
         // actually dest is mono, pan is ignored.
-        for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
-    } else { 
+        if (level != 1.0f) {
+            SAMPLE scale = F2S(level);
+            for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += MUL8_SS(scale, mono_src[i]); }
+        } else {
+            for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) { stereo_dest[i] += mono_src[i]; }
+        }
+    } else {
         // stereo
-        SAMPLE gain_l = F2S(lgain_of_pan(pan_start));
-        SAMPLE gain_r = F2S(rgain_of_pan(pan_start));
-        SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) - lgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
-        SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) - rgain_of_pan(pan_start)) / AMY_BLOCK_SIZE);
+        float lgain_start = lgain_of_pan(pan_start) * level;
+        float rgain_start = rgain_of_pan(pan_start) * level;
+        SAMPLE gain_l = F2S(lgain_start);
+        SAMPLE gain_r = F2S(rgain_start);
+        SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) * level - lgain_start) / AMY_BLOCK_SIZE);
+        SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) * level - rgain_start) / AMY_BLOCK_SIZE);
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
             stereo_dest[i] += MUL8_SS(gain_l, mono_src[i]);
             stereo_dest[AMY_BLOCK_SIZE + i] += MUL8_SS(gain_r, mono_src[i]);
@@ -1858,16 +1868,13 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 // by its synth's level (1.0 for oscs outside any instrument's
                 // voices). Applied to the audio output only — mod/control
                 // oscs already multiply into their carriers, so scaling every
-                // osc's amp would square the level for layered patches.
+                // osc's amp would square the level for layered patches. The
+                // level folds into mix_with_pan's per-block gain endpoints,
+                // so it adds no per-sample work in stereo.
                 float instrument_level = 1.0f;
                 if (osc_to_voice != NULL && AMY_IS_SET(osc_to_voice[osc]))
                     instrument_level = instrument_level_for_voice(osc_to_voice[osc]);
-                if (instrument_level != 1.0f) {
-                    SAMPLE level_scale = F2S(instrument_level);
-                    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i)
-                        per_osc_fb[core][bus][i] = MUL4_SS(per_osc_fb[core][bus][i], level_scale);
-                }
-                mix_with_pan(fbl[core][bus], per_osc_fb[core][bus], msynth[osc]->last_pan, msynth[osc]->pan);
+                mix_with_pan(fbl[core][bus], per_osc_fb[core][bus], msynth[osc]->last_pan, msynth[osc]->pan, instrument_level);
             }
             if (max_val > max_max) max_max = max_val;
         } // end if audible
