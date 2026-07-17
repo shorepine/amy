@@ -1853,7 +1853,22 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
                 #endif
             }
             // only mix the audio in if the external hook did not handle it
-            if(!handled) mix_with_pan(fbl[core][bus], per_osc_fb[core][bus], msynth[osc]->last_pan, msynth[osc]->pan);
+            if(!handled) {
+                // Per-instrument level (iV): scale this osc's rendered audio
+                // by its synth's level (1.0 for oscs outside any instrument's
+                // voices). Applied to the audio output only — mod/control
+                // oscs already multiply into their carriers, so scaling every
+                // osc's amp would square the level for layered patches.
+                float instrument_level = 1.0f;
+                if (osc_to_voice != NULL && AMY_IS_SET(osc_to_voice[osc]))
+                    instrument_level = instrument_level_for_voice(osc_to_voice[osc]);
+                if (instrument_level != 1.0f) {
+                    SAMPLE level_scale = F2S(instrument_level);
+                    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i)
+                        per_osc_fb[core][bus][i] = MUL4_SS(per_osc_fb[core][bus][i], level_scale);
+                }
+                mix_with_pan(fbl[core][bus], per_osc_fb[core][bus], msynth[osc]->last_pan, msynth[osc]->pan);
+            }
             if (max_val > max_max) max_max = max_val;
         } // end if audible
     }

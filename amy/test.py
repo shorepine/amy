@@ -990,6 +990,27 @@ class TestSynthDrumsLevel(AmyTest):
     amy.send(time=800, synth=10, note=37, vel=1)
 
 
+class TestSynthLevel(AmyTest):
+  """Per-instrument level (iV / synth_level): scales every osc of a synth at
+     render, default 1. Instrument-layer commands apply at receive time (not
+     schedulable), so levels are set up front and contrasted across synths."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy.send(time=0, synth=2, num_voices=2, patch=0)
+    amy.send(time=0, synth=2, synth_level=0.25)   # same patch as synth 1, quarter level
+    amy.send(time=0, synth=10, synth_level=0.5)   # GM drums: scales every per-drum osc
+    amy.send(time=100, synth=1, note=60, vel=1)   # full level
+    amy.send(time=300, synth=1, vel=0)
+    amy.send(time=400, synth=2, note=60, vel=1)   # quarter level
+    amy.send(time=600, synth=2, vel=0)
+    amy.send(time=700, synth=10, note=36, vel=1)
+    amy.send(time=850, synth=10, note=42, vel=1)
+
+
 class TestSynthDrumsStaticParams(AmyTest):
   """Under the #913 one-osc-per-drum structure, we should be able to set persistent params per drum sound (see #914)."""
 

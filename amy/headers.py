@@ -611,7 +611,7 @@ def make_piano_patch():
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
 amyboard_patch_cc_defs = [
-    'ic7,1,0.001,7,0.1,i%iv0a%vZ',                     # channel level (CTL osc amp)
+    'ic7,1,0.001,7,0.1,i%iiV%vZ',                      # channel level (per-instrument level, iV)
     'ic74,1,20,8000,0,i%iv0F%vZ',                      # VCF freq
     'ic71,1,0.5,16,0,i%iv0R%vZ',                       # VCF resonance
     'ic76,1,0.1,20,0,i%iv1f%vZ',                       # LFO freq

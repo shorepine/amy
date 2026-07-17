@@ -303,6 +303,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Instrument-layer values.
     _EPRINT_I(synth, "synth", "i");
     _EPRINT_I(synth_flags, "synth_flags", "if");  // Special flags to set when defining instruments.
+    _EPRINT_F(synth_level, "synth_level", "iV");  // Per-instrument level, scales every osc at render.
     _EPRINT_I(synth_delay_ms, "synth_delay_ms", "id");  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _EPRINT_I(to_synth, "to_synth", "it");  // For moving setup between synth numbers.
     _EPRINT_I(grab_midi_notes, "grab_midi_notes", "im");  // To enable/disable automatic MIDI note-on/off generating note-on/off.
@@ -405,6 +406,7 @@ bool event_addresses_oscs(amy_event *e, bool *p_is_empty) {
     // Instrument-layer values.
     //_RET_TRUE_IF_SET(synth);
     _RET_TRUE_IF_SET(synth_flags);  // Special flags to set when defining instruments.
+    _RET_TRUE_IF_SET(synth_level);  // Per-instrument level.
     _RET_TRUE_IF_SET(synth_delay_ms);  // Extra delay added to synth note-ons to allow decay on voice-stealing.
     _RET_TRUE_IF_SET(to_synth);  // For moving setup between synth numbers.
     _RET_TRUE_IF_SET(grab_midi_notes);  // To enable/disable automatic MIDI note-on/off generating note-on/off.
@@ -724,6 +726,8 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
         event->num_voices = instrument_get_num_voices(instr_num, NULL);
         event->oscs_per_voice = instrument_get_oscs_per_voice(instr_num);
         if (flags != 0)  event->synth_flags = flags;
+        float level = instrument_get_level(instr_num);
+        if (level != 1.0f)  event->synth_level = level;
         // Bus is specified in set_event_for_bus_fx, no need to include here.
         //if (bus != 0)  event->bus = bus;
     } else if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
@@ -910,6 +914,11 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
         }
         if (AMY_IS_SET(e->synth_flags)) {
             instrument_set_flags(e->synth, e->synth_flags);
+        }
+        if (AMY_IS_SET(e->synth_level)) {
+            // Per-instrument level (iV): stored on the instrument, applied to
+            // every one of its oscs at render time (hold_and_modify).
+            instrument_set_level(e->synth, e->synth_level);
         }
         if (AMY_IS_SET(e->grab_midi_notes)) {
             // Set the grab_midi state.
