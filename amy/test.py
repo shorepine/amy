@@ -148,13 +148,12 @@ class TestPcmPatchChange(AmyTest):
 
 class TestPcmTriggerPhase(AmyTest):
   """PCM: a trigger_phase (P) sent with a note-on sets the sample start point
-     (start_frame / 2^23) and is consumed by that note-on — a later note-on
-     without a phase starts from the beginning again."""
+     (start_frame / 2^23).   It persist for that osc."""
 
   def run(self):
     amy.send(time=0, osc=0, wave=amy.PCM, preset=1)
     amy.send(time=100, osc=0, phase=0.0005, vel=1)   # start ~4200 frames in
-    amy.send(time=600, osc=0, vel=1)                 # consumed -> starts at 0
+    amy.send(time=600, osc=0, vel=1)                 # starts at the same point again.
 
 
 class TestPcmLoop(AmyTest):
@@ -225,7 +224,7 @@ class TestBYOPNoteOff(AmyTest):
     amy.send(time=0, voices='0,1', patch=1024)
     for i in range(num_partials):
       amy.send(voices='0,1', osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
-    amy.send(voices='0,1', bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
+    amy.send(voices='0,1', osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
     amy.send(time=100, voices=1, note=60, vel=1)
     amy.send(time=700, voices=1, vel=0)
 
@@ -685,7 +684,7 @@ class TestJunoCheapTrumpetPatch(AmyTest):
 
   def run(self):
     amy.send(time=0, voices="0,1", patch=2)
-    amy.send(time=0, voices="0,1", filter_type=amy.FILTER_LPF)
+    amy.send(time=0, voices="0,1", osc=0, filter_type=amy.FILTER_LPF)
     amy.send(time=50, voices="0", note=60, vel=1)
     amy.send(time=200, voices="0", vel=0)
     amy.send(time=300, voices="1", note=60, vel=1)
@@ -885,7 +884,7 @@ class TestMidiDrumsPatch258(AmyTest):
 
   def run(self):
     # The MIDI drums default has amp=5
-    amy.send(time=0, synth=1, num_voices=6, patch=258)
+    amy.send(time=0, synth=1, num_voices=1, patch=258)
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(100, 0x90, 35, 100)  # bass
     amy.inject_midi(400, 0x90, 35, 100)  # bass
@@ -917,25 +916,6 @@ class TestMidiRunningStatusClock(AmyTest):
     ])
 
 
-class TestDrumsVoiceStealing(AmyTest):
-  """Drums ignore missing note offs, but should still notice excess note-offs."""
-
-  def __init__(self):
-    super().__init__()
-    self.default_synths = True
-
-  def run(self):
-    for i in range(14):
-      #amy.send(time=100 + i * 20, synth=10, note=40 + i // 2, vel=1)
-      amy.inject_midi(100 + i * 20, 0x99, 40 + i // 2, 0x7F)
-    for i in range(14):
-      #amy.send(time=400 + i * 20, synth=10, note=40 + i // 2, vel=0)
-      amy.inject_midi(400 + i * 20, 0x99, 40 + i // 2, 0)
-    print("expect to see excess note-off for note 40")
-    #amy.send(time=900, synth=10, note=40, vel=0)
-    amy.inject_midi(900, 0x89, 40, 0)
-
-  
 class TestDefaultChan1Synth(AmyTest):
   """Test default setup of Juno synth on synth 1 (MIDI channel 1)."""
 
@@ -1008,6 +988,28 @@ class TestSynthDrumsLevel(AmyTest):
     amy.send(time=600, synth=10, note=37, vel=1)
     amy.send(time=750, synth=10, amp=1.8)
     amy.send(time=800, synth=10, note=37, vel=1)
+
+
+class TestSynthDrumsStaticParams(AmyTest):
+  """Under the #913 one-osc-per-drum structure, we should be able to set persistent params per drum sound (see #914)."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    CLAP = 39
+    HIHAT = 42
+    amy.send(time=100, synth=10, note=CLAP, vel=1)
+    amy.send(time=200, synth=10, note=HIHAT, vel=1)
+    # Move clap to the left
+    amy.send(time=250, synth=10, note=CLAP, pan=0)
+    amy.send(time=300, synth=10, note=CLAP, vel=1)
+    # Move hihat to the right
+    amy.send(time=400, synth=10, note=HIHAT, vel=1)
+    amy.send(time=450, synth=10, note=HIHAT, pan=1)
+    amy.send(time=500, synth=10, note=CLAP, vel=1)
+    amy.send(time=600, synth=10, note=HIHAT, vel=1)
 
 
 class TestSynthProgChange(AmyTest):
@@ -1205,7 +1207,7 @@ class TestHPFHighBaseFreq(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=1, patch=0, num_voices=4)
-    amy.send(time=10, synth=1, filter_type=amy.FILTER_HPF, filter_freq=1000)
+    amy.send(time=10, synth=1, osc=0, filter_type=amy.FILTER_HPF, filter_freq=1000)
     amy.send(time=50, synth=1, note=48, vel=10)
     amy.send(time=150, synth=1, note=60, vel=10)
     amy.send(time=250, synth=1, note=63, vel=10)
@@ -1364,7 +1366,7 @@ class TestOscResetIsScheduled(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=2, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
     send_midi(time=100, synth=1, note=54, vel=1)
     send_midi(time=200, synth=1, note=66, vel=1)
     # But clearing the synth later would mess it up.
@@ -1376,7 +1378,7 @@ class TestClearSynth(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=6, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
     send_midi(time=100, synth=1, note=54, vel=1)
 
     # Clear the synth
@@ -1653,7 +1655,7 @@ class TestMidiNoteCmd(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
-    amy.send(time=0, synth=10, num_voices=4, patch=258, synth_flags=3)  # MIDI drums
+    amy.send(time=0, synth=10, num_voices=1, patch=258, synth_flags=3)  # MIDI drums
     # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
     amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
     # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)

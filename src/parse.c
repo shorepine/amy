@@ -649,9 +649,12 @@ int _next_alpha(char *s) {
 
 
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
+    //fprintf(stderr, "yield_event_from_message in:  pos %d message %s\n", pos, message);
     // Parse the wire string into an event
     if (message[pos] == '\0')  pos = 0;  // Hit end of string
     else pos += amy_parse_message(message + pos, e);
+    //fprintf(stderr, "yield_event_from_message out: pos %d event\n", pos);
+    //fprintf_event_stderr(e);
     return pos;
 }
 
