@@ -1242,6 +1242,25 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     return false;
 }
 
+int mod_osc_would_cause_loop(uint16_t osc, uint16_t mod_osc) {
+    // Check to see if setting osc's mod_source to mod_osc would close a cycle.
+    // Modulators may themselves be modulated (chained modulators):
+    // hold_and_modify() evaluates an osc's mod_source recursively, so a cycle
+    // (e.g. a->b->a) would recurse without bound. Mirrors
+    // chained_osc_would_cause_loop() above.
+    uint16_t next_osc = mod_osc;
+    do {
+        ensure_osc_allocd(next_osc, NULL);
+        if (next_osc == osc) {
+            fprintf(stderr, "osc %d as mod_source for osc %d would cause loop.\n",
+                    mod_osc, osc);
+            return true;
+        }
+        next_osc = synth[next_osc]->mod_source;
+    } while(AMY_IS_SET(next_osc));
+    return false;
+}
+
 float portamento_ms_to_alpha(uint16_t portamento_ms) {
     return 1.0f  - 1.0f / (1 + portamento_ms * AMY_SAMPLE_RATE / 1000 / AMY_BLOCK_SIZE);
 }
@@ -1386,19 +1405,29 @@ void play_delta(struct delta *d) {
         }
     }
     if(d->param == MOD_SOURCE) {
-        uint16_t mod_osc = d->data.i;
-        synth[d->osc]->mod_source = mod_osc;
-        // NOTE: These are delta-only side effects.  A purist would strive to remove them.
-        // When an oscillator is named as a modulator, we change its state.
-        ensure_osc_allocd(mod_osc, NULL);
-        synth[mod_osc]->role = SYNTH_IS_MOD_SOURCE;
-        // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
-        synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
-        // No longer record this osc in note_off state.
-        AMY_UNSET(synth[mod_osc]->note_off_clock);
-        // Start the mod osc.
-        synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
-        osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
+        int mod_osc = d->data.i;
+        // Modulators may themselves have a mod_source (chained modulators, e.g.
+        // a slow LFO varying a vibrato LFO's rate or depth). That works because
+        // hold_and_modify() evaluates mod_source recursively, so - as with
+        // CHAINED_OSC above - a cycle must be rejected before it is stored or
+        // the recursion never terminates.
+        if (mod_osc >= 0 && mod_osc < AMY_OSCS &&
+            !mod_osc_would_cause_loop(d->osc, mod_osc)) {
+            synth[d->osc]->mod_source = mod_osc;
+            // NOTE: These are delta-only side effects.  A purist would strive to remove them.
+            // When an oscillator is named as a modulator, we change its state.
+            ensure_osc_allocd(mod_osc, NULL);
+            synth[mod_osc]->role = SYNTH_IS_MOD_SOURCE;
+            // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
+            synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
+            // No longer record this osc in note_off state.
+            AMY_UNSET(synth[mod_osc]->note_off_clock);
+            // Start the mod osc.
+            synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
+            osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
+        } else {
+            AMY_UNSET(synth[d->osc]->mod_source);
+        }
     }
     if(d->param == ALGORITHM) {
         synth[d->osc]->algorithm = d->data.i;
