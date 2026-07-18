@@ -1305,7 +1305,9 @@ void play_delta(struct delta *d) {
         // Phase sets the *initial* phase of the osc.
         synth[d->osc]->trigger_phase = d->data.f;
         // .. but also warps the current phase to that value.
-        synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
+        // Skip for PCM because it doesn't really make much sense and causes brrr on web drum editor (#916).
+        if (synth[d->osc]->wave != PCM)
+            synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
     }
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)

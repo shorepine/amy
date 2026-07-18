@@ -177,6 +177,22 @@ class TestPcmLoopEnvFilt(AmyTest):
     amy.send(time=500, osc=0, vel=0)
 
 
+class TestPcmPhaseLive(AmyTest):
+  """Modifying the PCM freq while a sound is playing gives discontinuities.  Issue #916"""
+
+  def run(self):
+    amy.send(time=0, synth=10, num_voices=1, patch=258, synth_flags=3)   # GM drums
+    amy.send(time=100, synth=10, note=36, vel=1)                         # long kick sounding
+    # while it rings, sweep the pitch:
+    # i10n35f479.727a1Q0.5G0F16000R0.7P0Z
+    kwargs = {'amp': 1, 'pan': 0.5, 'filter_type': amy.FILTER_NONE, 'filter_freq': 16000, 'resonance': 0.7, 'phase': 0}
+    amy.send(time=150, synth=10, note=36, freq=490, **kwargs)
+    amy.send(time=175, synth=10, note=36, freq=523, **kwargs)
+    amy.send(time=200, synth=10, note=36, freq=554, **kwargs)
+    amy.send(time=225, synth=10, note=36, freq=575, **kwargs)
+    amy.send(time=250, synth=10, note=36, freq=595, **kwargs)
+
+
 class TestBuildYourOwnPartials(AmyTest):
 
   def run(self):
