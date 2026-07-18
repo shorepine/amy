@@ -559,36 +559,6 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             return total;
         }
     }
-    else if (cmd == 'A') {
-        // zA: Update sketch.py on disk with current AMY state (calls update_file_hook).
-        // Takes optional filename; defaults to /user/current/sketch.py on AMYboard.
-        // Payload semantics match zD: the filename is "rest of message", a
-        // trailing 'Z' terminator is stripped, and interior capital-Z chars
-        // in the filename are preserved.
-        char filename[MAX_FILENAME_LEN];
-        uint16_t len = 0;
-        while (message[len] && len < MAX_FILENAME_LEN - 1) {
-            filename[len] = message[len];
-            len++;
-        }
-        filename[len] = '\0';
-        if (len > 0 && filename[len - 1] == 'Z') {
-            filename[--len] = '\0';
-        }
-        if (amy_global.config.amy_external_update_file_hook) {
-            if (filename[0]) {
-                amy_global.config.amy_external_update_file_hook(filename);
-            } else {
-                amy_global.config.amy_external_update_file_hook("/user/current/sketch.py");
-            }
-        }
-        {
-            uint16_t total = 0;
-            const char *scan = message - 1;
-            while (scan[total]) total++;
-            return total;
-        }
-    }
     else if (cmd == 'P') {
         // zP: Execute Python code on host (e.g. zPimport amyboard; amyboard.restart_sketch()Z).
         // Payload semantics match zD: the code string is "rest of message",

@@ -31,7 +31,6 @@ amy_config_t amy_default_config() {
     c.amy_external_fseek_hook = NULL;
     c.amy_external_fclose_hook = NULL;
     c.amy_external_file_transfer_done_hook = NULL;
-    c.amy_external_update_file_hook = NULL;
     c.amy_external_exec_hook = NULL;
     c.amy_external_reboot_hook = NULL;
     c.amy_external_overload_hook = NULL;
