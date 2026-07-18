@@ -709,7 +709,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
         return NULL;  // instrument not allocated.
     }
     uint32_t flags = instrument_get_flags(instr_num);
-    //uint8_t bus = instrument_get_bus(instr_num);
+    uint8_t bus = instrument_get_bus(instr_num);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = num_oscs_for_voice(voice);
@@ -729,7 +729,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
         float level = instrument_get_level(instr_num);
         if (level != 1.0f)  event->synth_level = level;
         // Bus is specified in set_event_for_bus_fx, no need to include here.
-        //if (bus != 0)  event->bus = bus;
+        if (!include_fx && bus != 0)  event->bus = bus;
     } else if (state_val >= first_osc_state_val && state_val < last_osc_state_val) {
         event->osc = state_val - first_osc_state_val;
         //fprintf(stderr, "2 base_osc %d, event->osc %d, state_val %d first_osc_state_val %d last_osc_state_val %d\n",

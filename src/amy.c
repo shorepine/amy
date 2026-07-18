@@ -623,6 +623,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS);
         bus_directed_command = true;
         if (d.osc > amy_global.highest_bus) amy_global.highest_bus = d.osc;
+        // If both synth and bus are set, make sure we also send an event to the synth setting its bus
+        if (AMY_IS_SET(e->bus) && AMY_IS_SET(e->synth))
+            instrument_set_bus(e->synth, e->bus);
     } else {
         // d.osc refers to an osc
         // First, adapt the osc in this event with base_osc offsets for voices
