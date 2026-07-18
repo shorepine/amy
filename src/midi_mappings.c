@@ -45,7 +45,10 @@ struct midi_mapping {
     char *message_template;
 };
 
-struct midi_mapping *midi_mapping_root = NULL;
+bool mappings_inited = false;
+
+struct midi_mapping *midi_cc_mapping_root_by_chan[AMY_NUM_MIDI_CHANNELS + 1];
+struct midi_mapping *midi_note_mapping_root_by_chan[AMY_NUM_MIDI_CHANNELS + 1];
 
 // Built-in default for note commands
 struct midi_mapping default_note_mapping = {
@@ -67,7 +70,13 @@ void midi_mapping_print(struct midi_mapping *mapping) {
             (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
 }
 
-struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
+struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return NULL;
+    struct midi_mapping **p_root;
+    if (type == MIDI_MAP_TYPE_CC)
+        p_root = &midi_cc_mapping_root_by_chan[channel];
+    else
+        p_root = &midi_note_mapping_root_by_chan[channel];
     struct midi_mapping *result = (struct midi_mapping *)malloc_caps(sizeof(struct midi_mapping) + message_len + 1, amy_global.config.ram_caps_synth);
     result->message_template = ((char *)result) + sizeof(struct midi_mapping);
     result->channel = channel;
@@ -87,10 +96,17 @@ struct midi_mapping *midi_mapping_init(struct midi_mapping **p_root, int channel
 
 void midi_mapping_debug(void) {
     fprintf(stderr, "midi_mapping_debug:\n");
-    struct midi_mapping **p_mapping = &midi_mapping_root;
-    while (*p_mapping != NULL) {
-        midi_mapping_print(*p_mapping);
-        p_mapping = &((*p_mapping)->next);
+    for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+        struct midi_mapping **p_mapping = &midi_cc_mapping_root_by_chan[channel];
+        while (*p_mapping != NULL) {
+            midi_mapping_print(*p_mapping);
+            p_mapping = &((*p_mapping)->next);
+        }
+        p_mapping = &midi_note_mapping_root_by_chan[channel];
+        while (*p_mapping != NULL) {
+            midi_mapping_print(*p_mapping);
+            p_mapping = &((*p_mapping)->next);
+        }
     }
 }
 
@@ -102,19 +118,41 @@ void midi_mapping_free(struct midi_mapping **p_mapping) {
     free(doomed);
 }
 
-void midi_mappings_init(void) {
-    midi_mapping_root = NULL;
-}
-
-void midi_mappings_deinit(void) {
-    struct midi_mapping **p_mapping = &midi_mapping_root;
+void midi_mappings_free(struct midi_mapping **p_mapping) {
     while (*p_mapping != NULL) {
         midi_mapping_free(p_mapping);
     }
 }
 
+void midi_mappings_init(void) {
+    for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+        midi_cc_mapping_root_by_chan[channel] = NULL;
+        midi_note_mapping_root_by_chan[channel] = NULL;
+    }
+    mappings_inited = true;
+}
+
+void midi_mappings_deinit(void) {
+    if (mappings_inited) {
+        for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+            midi_mappings_free(&midi_cc_mapping_root_by_chan[channel]);
+            midi_mappings_free(&midi_note_mapping_root_by_chan[channel]);
+        }
+        mappings_inited = false;
+    }
+}
+
 void midi_clear_channel_mappings(int channel, int type) {
-    struct midi_mapping **p_mapping = &midi_mapping_root;
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return;
+    if (type == MIDI_MAP_TYPE_ANY) {
+        midi_clear_channel_mappings(channel, MIDI_MAP_TYPE_CC);
+        midi_clear_channel_mappings(channel, MIDI_MAP_TYPE_NOTE);
+    }
+    struct midi_mapping **p_mapping;
+    if (type == MIDI_MAP_TYPE_CC)
+        p_mapping = &midi_cc_mapping_root_by_chan[channel];
+    else
+        p_mapping = &midi_note_mapping_root_by_chan[channel];
     while (*p_mapping != NULL) {
         if ((*p_mapping)->channel == channel && ((type == MIDI_MAP_TYPE_ANY) || ((*p_mapping)->type == type))) {
             midi_mapping_free(p_mapping);
@@ -128,8 +166,20 @@ void midi_clear_channel_mappings(int channel, int type) {
 }
 
 struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return NULL;
     // Retrieve the mapping associated with a midi channel + code, if any.
-    struct midi_mapping **p_mapping = &midi_mapping_root;
+    struct midi_mapping **result;
+    if (type == MIDI_MAP_TYPE_ANY) {
+        result = midi_mapping_find(channel, MIDI_MAP_TYPE_CC, code);
+        if (result == NULL)
+            result = midi_mapping_find(channel, MIDI_MAP_TYPE_NOTE, code);
+        return result;
+    }
+    struct midi_mapping **p_mapping;
+    if (type == MIDI_MAP_TYPE_CC)
+        p_mapping = &midi_cc_mapping_root_by_chan[channel];
+    else
+        p_mapping = &midi_note_mapping_root_by_chan[channel];
     while (*p_mapping != NULL) {
         if ((*p_mapping)->channel == channel && ((type == MIDI_MAP_TYPE_ANY) || (*p_mapping)->type == type)) {
             if ((code == MIDI_MAP_CODE_ANY) || ((*p_mapping)->code == MIDI_MAP_CODE_ANY) || ((*p_mapping)->code == code))
@@ -141,6 +191,7 @@ struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
 }
 
 int midi_clear_mapping(int channel, int type, int code) {
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return 0;
     // Backwards compatibility
     if (code == 255) code = MIDI_MAP_CODE_ANY;
     if (code == MIDI_MAP_CODE_ANY) {
@@ -159,6 +210,7 @@ int midi_clear_mapping(int channel, int type, int code) {
 }
 
 int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len) {
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return 0;
     // Register a MIDI mapping and a wire code template.
     //char tmp[256];
     //strncpy(tmp, message, message_len);
@@ -173,7 +225,7 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     if (p_mapping) midi_mapping_free(p_mapping);
     // store with an empty string removes mapping
     if (message_len) {
-        /* struct midi_mapping *mapping = */ midi_mapping_init(&midi_mapping_root, channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
+        /* struct midi_mapping *mapping = */ midi_mapping_init(channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
         //midi_mapping_debug();
     }
     // We just deleted a mapping on this channel, was it the last one?
@@ -193,6 +245,7 @@ bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t
 }
 
 bool midi_mappings_exist_for_channel(int channel) {
+    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return false;
     if (midi_mapping_find(channel, MIDI_MAP_TYPE_ANY, MIDI_MAP_CODE_ANY)) return true;
     return false;
 }

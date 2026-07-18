@@ -494,6 +494,7 @@ int8_t global_init(amy_config_t c) {
         ++bus_configs;
     }
     buses_reset();
+    midi_mappings_init();  // Make sure arrays are clear.
     
     amy_init_lock();
 
