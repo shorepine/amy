@@ -5,7 +5,7 @@
 
 #include <assert.h>   // for buffer overruns in midi_fetch_control_code_command.
 
-void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex) {
+void juno_filter_midi_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex_unused) {
     // An example of adding a handler for MIDI CCs.  Can't really build this in because it depends on your synth/patch config, controllers, wishes...
     // Here, we use MIDI CC 70 to modify the Juno VCF center freq, and 71 for resonance.
     amy_event e;
@@ -122,6 +122,9 @@ void midi_clear_channel_mappings(int channel, int type) {
             p_mapping = &((*p_mapping)->next);
         }
     }
+    // Stop listening to this MIDI channel unless there's a synth on it.
+    if (!instrument_number_exists(channel, NULL))
+        midi_active_channel_set(channel, false);
 }
 
 struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
@@ -146,7 +149,12 @@ int midi_clear_mapping(int channel, int type, int code) {
         return 1;
     }
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
-    if (p_mapping) { midi_mapping_free(p_mapping); return 1; }
+    if (p_mapping) {
+        midi_mapping_free(p_mapping);
+        // We just deleted a mapping on this channel, was it the last one?
+        midi_active_channel_set(channel, midi_mappings_exist_for_channel(channel) || instrument_number_exists(channel, NULL));
+        return 1;
+    }
     return 0;  // nothing found.
 }
 
@@ -168,6 +176,8 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
         /* struct midi_mapping *mapping = */ midi_mapping_init(&midi_mapping_root, channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
         //midi_mapping_debug();
     }
+    // We just deleted a mapping on this channel, was it the last one?
+    midi_active_channel_set(channel, midi_mappings_exist_for_channel(channel) || instrument_number_exists(channel, NULL));
     return 1;
 }
 
@@ -180,6 +190,11 @@ bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t
     sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
     assert(strlen(s) < len);
     return true;
+}
+
+bool midi_mappings_exist_for_channel(int channel) {
+    if (midi_mapping_find(channel, MIDI_MAP_TYPE_ANY, MIDI_MAP_CODE_ANY)) return true;
+    return false;
 }
 
 float map_midi_value(struct midi_mapping *mapping, uint8_t value) {
@@ -239,7 +254,7 @@ struct midi_cmd_yield_state {
     char *message;
 };
 
-void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *event, void *state) {
+void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *event, void *state) {
     //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
     //fprintf_event_stderr(event);
     //
@@ -288,7 +303,7 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t i
     return (void *)yield_state;
 }
 
-void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue) {
+void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue) {
     //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
     //fprintf_event_stderr(base_event);
     //
@@ -299,7 +314,7 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sys
     do {
         if (base_event) e = *base_event;
         else amy_clear_event(&e);
-        state = yield_midi_message_handler_events(bytes, len, is_sysex, time, &e, state);
+        state = yield_midi_message_handler_events(bytes, len, time, &e, state);
         if (state != NULL) {
             if (fake_note_on) {
                 AMY_UNSET(e.velocity);
@@ -309,6 +324,6 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sys
     } while (state != NULL);
 }
 
-void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time) {
-    midi_message_handler_to_queue(bytes, len, is_sysex, time, NULL, NULL);
+void midi_msg_handler(uint8_t * bytes, uint16_t len, uint32_t time) {
+    midi_message_handler_to_queue(bytes, len, time, NULL, NULL);
 }

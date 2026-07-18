@@ -207,25 +207,54 @@ void amy_received_pitch_bend(uint8_t channel, uint8_t low_byte, uint8_t high_byt
     amy_add_event(&e);
 }
 
+bool _midi_channel_active[AMY_NUM_MIDI_CHANNELS + 1];  // + 1 because we number them 1 to 16
+
+void midi_active_channels_reset(void) {
+    for (int i = 0; i < AMY_NUM_MIDI_CHANNELS + 1; ++i) {
+        _midi_channel_active[i] = false;
+    }
+}
+
+void midi_active_channel_set(uint8_t channel, bool state) {
+    if (channel < AMY_NUM_MIDI_CHANNELS + 1) {
+        _midi_channel_active[channel] = state;
+    }
+}
+
+void midi_active_channels_debug(void) {
+    fprintf(stderr, "Active MIDI channels:");
+    for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+        if (_midi_channel_active[channel]) {
+            fprintf(stderr, " %2d", channel);
+        } else {
+            fprintf(stderr, " --");
+        }
+    }
+    fprintf(stderr, "\n");
+}
+
+
 // I'm called when we get a fully formed MIDI message from any interface -- usb, gadget, uart, mac, and either sysex or normal
 void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time) {
     if(!sysex) {
         uint8_t status_byte = data[0];
-        uint8_t status = status_byte & 0xF0;
-        uint8_t channel = status_byte & 0x0F;
-        // Do the AMY instrument things here
-        if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel+1, data[2], time);
-        else if(status == 0xB0 && data[1] == 0x7B) amy_received_all_notes_off(channel+1, time);
-        else if(status == 0XB0) amy_received_control_change(channel+1, data[1], data[2], time);
-        else if(status == 0xC0) amy_received_program_change(channel+1, data[1], time);
-        else if(status == 0xE0) amy_received_pitch_bend(channel+1, data[1], data[2], time);
-        // MIDI transport (Start/Stop) only drives the sequencer when the user
-        // has opted into following external sync; otherwise a connected DAW's
-        // transport would hijack the AMYboard's own internal sequence.
-        else if(status_byte == 0xFA) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_start(); }
-        else if(status_byte == 0xFC) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_stop(); }
+        uint8_t channel = 1 + (status_byte & 0x0F);
+        if (_midi_channel_active[channel]) {
+            uint8_t status = status_byte & 0xF0;
+            // Do the AMY instrument things here
+            if(status == 0xB0 && data[1] == 0x40) amy_received_pedal(channel, data[2], time);
+            else if(status == 0xB0 && data[1] == 0x7B) amy_received_all_notes_off(channel, time);
+            else if(status == 0XB0) amy_received_control_change(channel, data[1], data[2], time);
+            else if(status == 0xC0) amy_received_program_change(channel, data[1], time);
+            else if(status == 0xE0) amy_received_pitch_bend(channel, data[1], data[2], time);
+            // MIDI transport (Start/Stop) only drives the sequencer when the user
+            // has opted into following external sync; otherwise a connected DAW's
+            // transport would hijack the AMYboard's own internal sequence.
+            else if(status_byte == 0xFA) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_start(); }
+            else if(status_byte == 0xFC) { if(external_midi_sync_mode == AMY_MIDI_SYNC_FOLLOW) sequencer_midi_stop(); }
+            midi_message_handler_to_queue(data, len, time, NULL, NULL);
+        }
     }
-    midi_message_handler_to_queue(data, len, sysex, time, NULL, NULL);
 
     // Also send the external hooks if set
     if(amy_global.config.amy_external_midi_input_hook != NULL) {

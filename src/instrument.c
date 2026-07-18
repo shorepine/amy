@@ -372,6 +372,9 @@ void instrument_release(int instrument_number) {
         instrument_free(instruments[instrument_number]);
     }
     instruments[instrument_number] = NULL;
+    // Unless there are active midi_mappings, stop listening to this channel.
+    if (!midi_mappings_exist_for_channel(instrument_number))
+        midi_active_channel_set(instrument_number, false);
 }
 
 bool instrument_number_ok(int instrument_number, const char *tag) {
@@ -398,6 +401,8 @@ void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voi
         instrument_free(instruments[instrument_number]);
     }
     instruments[instrument_number] = instrument_init(instrument_number, num_voices, amy_voices, patch_number, oscs_per_voice, bus, flags);
+    // Make sure we start listning to this channel.
+    midi_active_channel_set(instrument_number, true);
 }
 
 void instrument_change_number(int old_instrument_number, int new_instrument_number) {
