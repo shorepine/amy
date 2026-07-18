@@ -1124,7 +1124,9 @@ extern void fprintf_event_stderr(amy_event *e);
 extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
 extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state);
 extern int size_of_amy_event(void);
-extern bool event_is_bus_directed(amy_event *e);
+extern bool event_addresses_bus(amy_event *e);
+extern bool event_addresses_synth(amy_event *e);
+extern bool event_addresses_oscs(amy_event *e);
 
 // osc -> (amy) voice ownership map (patches.c); AMY_UNSET for oscs outside any voice.
 extern uint8_t *osc_to_voice;

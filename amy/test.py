@@ -1669,6 +1669,44 @@ class TestSynthBusCmds(AmyTest):
     amy.send(time=700, synth=2, note=70, vel=5)
 
 
+class TestOscAndBusCommands(AmyTest):
+  """Bus-directed events are special; check they are handled right."""
+
+  def run(self):
+    # Setup bus 1 with echo so we can tell when it's used
+    amy.send(time=0, synth=1, num_voices=2, oscs_per_voice=1)
+    amy.send(time=10, synth=1, osc=0, wave=amy.SAW_UP, eg0='0,1,200,0,200,0')
+    amy.send(time=20, synth=2, num_voices=2, oscs_per_voice=1, bus=1, echo='1,50,,0.5,0.5', pan=1)
+    #amy.send(time=20, synth=2, num_voices=2, oscs_per_voice=1)
+    #amy.send(time=20, synth=2, bus=1)
+    #amy.send(time=20, synth=2, echo='1,50,,0.5,0.5')
+    #amy.send(time=20, synth=2, pan=1)
+    ##
+    amy.send(time=30, synth=2, osc=0, wave=amy.SAW_DOWN, eg0='0,1,200,0,200,0')
+    #
+    amy.send(time=100, synth=1, note=60, vel=1)  # pan 0.5, no FX
+    amy.send(time=200, synth=2, note=66, vel=1)  # pan 1, 50ms echo
+    # Change properties via synth, also with osc-directed pan
+    amy.send(time=250, synth=1, eq='10,-20,10', pan=0)
+    #amy.send(time=250, synth=1, eq='10,-20,10')
+    #amy.send(time=250, synth=1, pan=0)
+    ##
+    amy.send(time=300, synth=1, note=60, vel=1)   # pan 0, mid cut
+    amy.send(time=400, synth=2, note=66, vel=1)   # pan 1, 50ms echo (as before)
+    # Change the synth's bus while altering the bus
+    amy.send(time=550, synth=1, bus=1, echo='1,90,,0.5,0.5')
+    #amy.send(time=550, synth=1, bus=1)
+    #amy.send(time=550, bus=1, echo='1,90,,0.5,0.5')
+    ##
+    amy.send(time=650, synth=2, bus=0)
+    ##
+    amy.send(time=700, synth=1, note=72, vel=1)   # pan 0, flat EQ, 90ms echo
+    amy.send(time=800, synth=2, note=78, vel=1)   # pan 1, mid cut, no echo
+    # Modify bus without referencing synth
+    amy.send(time=850, bus=1, echo='1,20,,0.5,0.5')
+    amy.send(time=900, synth=1, note=72, vel=1)   # pan 0, flat EQ, 20ms echo
+
+
 class TestGrabMidiNotes(AmyTest):
   """Test that grab_midi_notes=False works.  This test should not include the drums."""
 

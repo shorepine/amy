@@ -602,6 +602,8 @@ float map_01_to_60dBf(float log) {
 
 // Add a API facing event, convert into delta directly
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
+    // fprintf(stderr, "time %.3f amy_event_to_deltas: base_osc %d\n", amy_global.time, base_osc);
+    // fprintf_event_stderr(e);
     AMY_PROFILE_START(AMY_ADD_DELTA)
     struct delta d;
     peek_stack("event_to_deltas");
@@ -610,7 +612,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     if(AMY_IS_UNSET(e->time)) { d.time = 0; } 
 
     // If this is a bus-directed event, use d->osc to store the bus number instead.
-    if (event_is_bus_directed(e)) {
+    if (event_addresses_bus(e)) {
         // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
         uint8_t bus = AMY_IS_SET(e->bus) ? e->bus :
             ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS);
