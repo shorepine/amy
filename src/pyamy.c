@@ -7,6 +7,7 @@
 #include "amy.h"
 #include "amy_midi.h"
 #include "libminiaudio-audio.h"
+#include "transfer.h"
 
 // Python module wrapper for AMY commands
 
@@ -280,6 +281,17 @@ static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
     return list_obj;
 }
 
+static PyObject *dump_state_wrapper(PyObject *self, PyObject *args) {
+    int len = 0;
+    char *dump = amy_dump_state_to_string(&len);
+    if (dump == NULL) {
+        return PyErr_NoMemory();
+    }
+    PyObject *result = PyUnicode_FromStringAndSize(dump, len);
+    free(dump);
+    return result;
+}
+
 static PyObject *set_cv_from_osc_wrapper(PyObject *self, PyObject *args) {
     if (!(PyTuple_Size(args) == 2)) return NULL;
     int cv_channel, osc;
@@ -315,6 +327,7 @@ static PyMethodDef c_amyMethods[] = {
     {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     {"inject_midi_bytes", inject_midi_bytes_wrapper, METH_VARARGS, "Inject a raw MIDI byte stream through the parser"},
     {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
+    {"dump_state", dump_state_wrapper, METH_NOARGS, "Read complete replayable AMY state"},
     {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
     {"ticks_ms", amy_ticks_ms_wrapper, METH_VARARGS, "Read AMY millisecond clock"},
     {"render_load", amy_get_render_load_wrapper, METH_VARARGS, "Read current render load fraction"},

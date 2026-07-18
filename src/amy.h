@@ -1123,6 +1123,8 @@ extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void fprintf_event_stderr(amy_event *e);
 extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
 extern void *yield_synth_commands(uint8_t synth, char *s, size_t len, bool include_fx, void *state);
+extern void *yield_bus_commands(char *s, size_t len, void *state);
+extern void set_event_for_bus_fx(amy_event *event, uint8_t bus, global_state_t *state);
 extern int size_of_amy_event(void);
 extern bool event_addresses_bus(amy_event *e);
 extern bool event_addresses_synth(amy_event *e);
