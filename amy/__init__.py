@@ -6,7 +6,13 @@ import time
 def _get_synth_commands_stub(synth, include_fx=False):
     return []
 
+def _dump_state_stub():
+    # Unlike get_synth_commands, an empty result would be indistinguishable from
+    # genuinely empty state, so fail loudly when the build has no dump support.
+    raise RuntimeError("amy.dump_state() is not available in this build")
+
 _get_synth_commands = _get_synth_commands_stub
+_dump_state = _dump_state_stub
 try:
     import c_amy as _amy  # Import the C module
     live = _amy.live
@@ -15,6 +21,7 @@ try:
     _ticks_ms = _amy.ticks_ms
     _render_load = _amy.render_load
     _set_render_load_threshold = _amy.set_render_load_threshold
+    _dump_state = _amy.dump_state
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
@@ -25,6 +32,8 @@ except (ImportError, AttributeError):
         _ticks_ms = tulip.amy_ticks_ms
         _render_load = tulip.amy_render_load
         _set_render_load_threshold = tulip.amy_set_render_load_threshold
+        # Older tulip builds predate the wrapper; keep the loud stub there.
+        _dump_state = getattr(tulip, "amy_dump_state", _dump_state_stub)
     except (ImportError, AttributeError):
         pass  # Not available (e.g. web build); _get_synth_commands returns []
 
@@ -583,6 +592,13 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
         prologue = [prefix + "i%div%din%dZ" % (dest_synth, num_voices, num_oscs)]
         prefix += "i%d" % dest_synth
     return "\n".join(prologue + [prefix + command for command in commands])
+
+"""
+    Reading back the complete engine state
+"""
+def dump_state():
+    # Full replayable engine state as newline-separated wire commands.
+    return _dump_state()
 
 """
     Simulate CV input from an osc (testing support)

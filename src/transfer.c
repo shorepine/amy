@@ -467,7 +467,6 @@ b64_decode_ex (const char *src, size_t len, b64_buffer_t * decbuf, size_t *decsi
 static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx), void *ctx) {
     char buf[1024];
     char line[1100];
-    bool include_fx = true;
     for (int inst = 0; inst < instruments_max_instruments(); inst++) {
         if (instrument_number_exists(inst, NULL)) {
             uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
@@ -480,14 +479,22 @@ static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx
             cb(line, n, ctx);
             void *state = NULL;
             do {
-                state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), include_fx, state);
+                state = yield_synth_commands((uint8_t)inst, buf, sizeof(buf), false, state);
                 if (buf[0] == '\0') continue;
-                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);  // Prepends to FX as well, that's OK.
+                n = snprintf(line, sizeof(line), "i%d%s", inst, buf);
                 cb(line, n, ctx);
             } while (state);
-            // We include FX only in the first osc.
-            include_fx = false;
         }
+    }
+
+    // Bus state is global, not owned by whichever instrument happens to be enumerated first.
+    // Emit each active bus exactly once. Buses above highest_bus stay out of the dump:
+    // replaying them would activate them, adding render cost for buses nothing uses.
+    for (int bus = 0; bus <= amy_global.highest_bus; ++bus) {
+        amy_event event = amy_default_event();
+        set_event_for_bus_fx(&event, (uint8_t)bus, &amy_global);
+        int n = sprint_event(&event, line, sizeof(line), true);
+        cb(line, n, ctx);
     }
 }
 
