@@ -1039,6 +1039,9 @@ extern void reset_osc(uint16_t i );
 // Value for code (or note) that matches anything
 #define MIDI_MAP_CODE_ANY (-1)
 
+// How many channels we consider for tracking active MIDI channels.
+#define AMY_NUM_MIDI_CHANNELS 16
+
 extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len);
 extern int midi_clear_mapping(int channel, int type, int code);
 extern bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len);
@@ -1046,13 +1049,14 @@ extern void midi_mapping_debug();
 extern void midi_mappings_init();
 extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
+extern bool midi_mappings_exist_for_channel(int channel);
 extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
-extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time);
+extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint32_t time);
 // As midi_message_handler, but any events produced by the mapping are converted to deltas
 // on `queue` instead of being played, unless queue is NULL or the global delta queue.
-extern void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *base_event, struct delta **queue);
+extern void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue);
 // Generator function for midi_message_handler.  Returns series of modified events while state is returned non-NULL.
-extern void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint8_t is_sysex, uint32_t time, amy_event *event, void *state);
+extern void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *event, void *state);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
 #ifdef __EMSCRIPTEN__

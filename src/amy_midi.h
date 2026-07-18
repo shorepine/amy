@@ -41,6 +41,11 @@ void midi_clock_out_stop();
 void midi_clock_out_flush();  // called from the browser main loop
 #endif
 
+// Track which midi channels not to ignore
+void midi_active_channels_reset(void);
+void midi_active_channel_set(uint8_t channel, bool state);
+void midi_active_channels_debug(void);
+
 
 #define MAX_MIDI_BYTES_TO_PARSE 1024
 #define MAX_MIDI_BYTES_PER_MESSAGE 3

@@ -903,6 +903,7 @@ void amy_reset_oscs() {
     // Reset midi_mappings.
     midi_mappings_deinit();
     midi_mappings_init();
+    midi_active_channels_reset();
     cv_trigger_deinit();
     cv_trigger_init();
     cv_from_osc_deinit();
@@ -1135,6 +1136,7 @@ void show_debug(uint8_t type) {
         }
         if (type > 5) {
             midi_mapping_debug();
+            midi_active_channels_debug();
             cv_trigger_debug();
         }
         if (type > 6) {
