@@ -331,8 +331,16 @@ static struct PyModuleDef c_amyDef =
     c_amyMethods
 };
 
+#ifdef GAMMA9001
+// The Gamma9001 drums.bin blob, linked into the module (build/drums_bin.c).
+extern const int16_t gamma9001_pcm_data[];
+#endif
+
 PyMODINIT_FUNC PyInit_c_amy(void)
 {
+#ifdef GAMMA9001
+    amy_set_gamma9001_pcm(gamma9001_pcm_data);
+#endif
     // This is the first time it's called, so there's nothing in amy_global.
     // But for later calls, we copy the existing amy_global.config.
     amy_config_t amy_config = amy_default_config();
