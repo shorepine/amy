@@ -1812,6 +1812,41 @@ class TestSequencerOsc(AmyTest):
     amy.send(time=900, osc=1, vel=0)
 
 
+class TestDumpState(AmyTest):
+  """Exercise amy.dump_state() against a golden."""
+
+  def test(self):
+    _amy.stop()
+    _amy.start(0)
+    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy.send(time=0, synth=2, num_voices=1, oscs_per_voice=1, bus=1, volume=0.5)
+    amy.send_raw('i1ic10,1,1,100,1,i%id%v')
+    amy.send_raw('i1io39,0,0,1,0,i%in40l%v')
+    amy.render(1)  # Let the events execute.
+    commands = amy.dump_state()
+    expected = """i1ic255Z
+i1iv4in2Z
+i1v0f110.000c1Z
+i1v1w3f880.000Z
+i1ic10,1,1.000,100.000,1.000,i%id%vZ
+i1io39,0,0.000,1.000,0.000,i%in40l%vZ
+i2ic255Z
+i2iv1in1y1Z
+i2v0Z
+y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
+y1V0.500x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
+"""
+    if commands != expected:
+      is_ok = False
+      message = self.__class__.__name__ + ': get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
+    else:
+      is_ok = True
+      message = self.__class__.__name__ + ' : ok'
+    return is_ok, message
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True

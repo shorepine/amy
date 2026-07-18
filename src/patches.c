@@ -736,27 +736,34 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
     return (void *)((intptr_t)state_val);
 }
 
-#define STATE_START_OF_MIDI 1024
+#define STATE_START_OF_MIDI_TPLT_CMDS 1024
+
 void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_fx, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", instr_num, state_val);
     s[0] = '\0';  // By default, return an empty string.
-    if (state_val < STATE_START_OF_MIDI) {
+    if (state_val < STATE_START_OF_MIDI_TPLT_CMDS) {
         amy_event event = amy_default_event();
         state_val = (intptr_t)yield_synth_events(instr_num, &event, include_fx, (void *)(intptr_t)state_val);
         sprint_event(&event, s, len, /* wirecode= */ true);
         if (state_val == 0) {
             // Push the state machine on to the MIDI codes
-            state_val = STATE_START_OF_MIDI;
+            state_val = STATE_START_OF_MIDI_TPLT_CMDS;
         }
     } else {
         // MIDI CC part
         bool found = false;
         int type = MIDI_MAP_TYPE_CC;
-        for (int next_midi_code = state_val - STATE_START_OF_MIDI; next_midi_code < 128; ++next_midi_code) {
+        int starting_code = state_val - STATE_START_OF_MIDI_TPLT_CMDS;
+        for (int next_code = starting_code; next_code < 256; ++next_code) {
+            int next_midi_code = next_code;
+            if (next_midi_code >= 128) {
+                next_midi_code -= 128;
+                type = MIDI_MAP_TYPE_NOTE;
+            }
             if (midi_fetch_mapping_command(instr_num, type, next_midi_code, s, len) == true) {
-                state_val = STATE_START_OF_MIDI + next_midi_code + 1;
+                state_val = STATE_START_OF_MIDI_TPLT_CMDS + next_code + 1;
                 found = true;
                 break;
             }
@@ -765,6 +772,23 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
             // We hit the bottom of the MIDI CCs
             state_val = 0;  // Will terminate the yield cycle.
         }
+    }
+    return (void *)(intptr_t)state_val;
+}
+
+
+void *yield_bus_commands(char *s, size_t len, void *state) {
+    // Like yield_synth_commands, returns just the commands for the FX
+    int state_val = (intptr_t)state;
+    if (state_val > amy_global.highest_bus) {
+        state_val = 0;
+    } else {
+        // Return a wire command to set up a bus.
+        uint8_t bus = state_val;
+        amy_event e = amy_default_event();
+        set_event_for_bus_fx(&e, bus, &amy_global);
+        sprint_event(&e, s, len, /* wirecode= */ true);
+        ++state_val;
     }
     return (void *)(intptr_t)state_val;
 }

@@ -15,6 +15,7 @@ try:
     _ticks_ms = _amy.ticks_ms
     _render_load = _amy.render_load
     _set_render_load_threshold = _amy.set_render_load_threshold
+    _dump_state = _amy.dump_state
 except (ImportError, AttributeError):
     # C module is not required? not available?
     # I'm guessing this might mean we're on Micropython?
@@ -25,6 +26,7 @@ except (ImportError, AttributeError):
         _ticks_ms = tulip.amy_ticks_ms
         _render_load = tulip.amy_render_load
         _set_render_load_threshold = tulip.amy_set_render_load_threshold
+        _dump_state = tulip.amy_dump_state
     except (ImportError, AttributeError):
         pass  # Not available (e.g. web build); _get_synth_commands returns []
 
@@ -589,6 +591,12 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
 """
 def set_cv_from_osc(cv, osc):
     _set_cv_from_osc(cv, osc)
+
+"""
+    Reading back the complete engine state
+"""
+def dump_state():
+    return _dump_state()
 
 """
     Render load tracking
