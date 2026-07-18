@@ -976,23 +976,11 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(amy_event *e, struct delta **queue) {
     peek_stack("has_voices");
-    {
-        bool is_empty = true;
-        bool addresses_oscs = event_addresses_oscs(e, &is_empty);
-        if (!addresses_oscs) {
-            if (!is_empty) {
-                // does contain FX-facing events, must strip instr/voices, set bus.
-                if (AMY_IS_SET(e->synth) && AMY_IS_UNSET(e->bus)) {
-                    // We infer the current bus for this synth.
-                    e->bus = instrument_get_bus(e->synth);
-                }
-                AMY_UNSET(e->synth);
-                AMY_UNSET(e->voices[0]);
-                amy_event_to_deltas_queue(e, 0 /* base_osc, should be ignored */, queue);
-            }
-            return;  // Early exit.
-        }
-    }
+    // Set the bus for the instrument, but also for each osc of each voice, below.
+    if (AMY_IS_SET(e->synth) && AMY_IS_SET(e->bus)) instrument_set_bus(e->synth, e->bus);
+    // If this event is only changing bus parameters (FX), those parts have already been handled before we see it.
+    if (!event_addresses_oscs(e, NULL))
+        return;  // Early exit.
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = patches_voices_for_event(e, voices);
     if (num_voices == 0) {
@@ -1007,8 +995,6 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     uint8_t synth = e->synth;
     AMY_UNSET(e->synth);
     if (AMY_IS_SET(synth))  synth_flags = instrument_get_flags(synth);
-    // Set the bus for the instrument, but also for each osc of each voice, below.
-    if (AMY_IS_SET(e->bus)) instrument_set_bus(instrument, e->bus);
     // Should we invoke MIDI note-on cmd rules?
     if (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI
         && AMY_IS_SET(e->midi_note)
