@@ -324,6 +324,6 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time,
     } while (state != NULL);
 }
 
-void midi_msg_handler(uint8_t * bytes, uint16_t len, uint32_t time) {
+void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex_unused, uint32_t time) {
     midi_message_handler_to_queue(bytes, len, time, NULL, NULL);
 }
