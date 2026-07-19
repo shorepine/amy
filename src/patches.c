@@ -902,48 +902,54 @@ uint8_t patches_voices_for_note_onoff_event(amy_event *e, uint16_t voices[], uin
 }
 
 
-uint8_t patches_grab_synth_level_return_voices_for_event(amy_event *e, uint16_t voices[]) {
+void patches_grab_synth_tier(amy_event *e) {
+    // Extract synth-tier parameters from the event before anything else.
+    if (!AMY_IS_SET(e->synth)) {
+        // No instrument
+        return;
+    }
+    // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
+    // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
+    if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
+        fprintf(stderr, "You specified both synth %" PRId32 " and voices %" PRIu16 "...  Synth implies voices, ignoring voices.\n",
+                (int32_t)e->synth, e->voices[0]);
+    }
+    if (AMY_IS_SET(e->to_synth)) {
+        // This involves moving the instrument number.
+        instrument_change_number(e->synth, e->to_synth);
+        e->synth = e->to_synth;
+        AMY_UNSET(e->to_synth);
+        // Then continue handling any other args.
+    }
+    if (AMY_IS_SET(e->bus)) {
+        instrument_set_bus(e->synth, e->bus);
+        // Set the bus for the instrument, but also for each osc of each voice (handled by the caller).
+    }
+    if (AMY_IS_SET(e->synth_delay_ms)) {
+        // Set the synth noteon delay.
+        instrument_set_noteon_delay_ms(e->synth, e->synth_delay_ms);
+    }
+    if (AMY_IS_SET(e->synth_flags)) {
+        instrument_set_flags(e->synth, e->synth_flags);
+    }
+    if (AMY_IS_SET(e->synth_level)) {
+        // Per-instrument level (iV): stored on the instrument, applied to
+        // every one of its oscs at render time (hold_and_modify).
+        instrument_set_level(e->synth, e->synth_level);
+    }
+    if (AMY_IS_SET(e->grab_midi_notes)) {
+        // Set the grab_midi state.
+        instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
+    }
+}
+uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
     // Convert an event that may specify a synth into a number of specific voices.
-    // While we're looking at the event, set up some synth-level parameters too.
     uint8_t num_voices = 0;
     uint32_t synth_flags = 0;
     if (!AMY_IS_SET(e->synth)) {
         // No instrument, just directly naming the voices.
         num_voices = copy_voices(e->voices, voices);
     } else {  // We have an instrument specified - decide which of its voices are actually to be used.
-        // It's a mistake to specify both synth (instrument) and voices, warn user we're ignoring voices.
-        // (except in the afterlife of a load_patch event, which will most likely be empty anyway).
-        if (AMY_IS_SET(e->voices[0]) && !AMY_IS_SET(e->patch_number)) {
-            fprintf(stderr, "You specified both synth %" PRId32 " and voices %" PRIu16 "...  Synth implies voices, ignoring voices.\n",
-                    (int32_t)e->synth, e->voices[0]);
-        }
-        if (AMY_IS_SET(e->to_synth)) {
-            // This involves moving the instrument number.
-            instrument_change_number(e->synth, e->to_synth);
-            e->synth = e->to_synth;
-            AMY_UNSET(e->to_synth);
-            // Then continue handling any other args.
-        }
-        if (AMY_IS_SET(e->bus)) {
-            instrument_set_bus(e->synth, e->bus);
-            // Set the bus for the instrument, but also for each osc of each voice (handled by the caller).
-        }
-        if (AMY_IS_SET(e->synth_delay_ms)) {
-            // Set the synth noteon delay.
-            instrument_set_noteon_delay_ms(e->synth, e->synth_delay_ms);
-        }
-        if (AMY_IS_SET(e->synth_flags)) {
-            instrument_set_flags(e->synth, e->synth_flags);
-        }
-        if (AMY_IS_SET(e->synth_level)) {
-            // Per-instrument level (iV): stored on the instrument, applied to
-            // every one of its oscs at render time (hold_and_modify).
-            instrument_set_level(e->synth, e->synth_level);
-        }
-        if (AMY_IS_SET(e->grab_midi_notes)) {
-            // Set the grab_midi state.
-            instrument_set_grab_midi_notes(e->synth, e->grab_midi_notes);
-        }
         if (AMY_IS_SET(e->pedal)) {
             // Pedal events are a special case
             bool sustain = (e->pedal != 0);
@@ -985,8 +991,10 @@ uint8_t patches_grab_synth_level_return_voices_for_event(amy_event *e, uint16_t 
             // Not note on/off, treat the synth as a shorthand for *all* the voices.
             num_voices = instrument_get_num_voices(e->synth, voices);
         }
-        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & SYNTH_FLAGS_IGNORE_NOTE_OFFS))
+        if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & SYNTH_FLAGS_IGNORE_NOTE_OFFS)) {
+            fprintf(stderr, "ignoring note off.");
             return 0;  // Ignore the note off, as requested.
+        }
     }
     return num_voices;
 }
@@ -996,30 +1004,28 @@ uint8_t patches_grab_synth_level_return_voices_for_event(amy_event *e, uint16_t 
 // So i know that the patch / voice alloc already exists and the patch has already been set!
 void patches_event_has_voices(amy_event *e, struct delta **queue) {
     peek_stack("has_voices");
-    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
-    uint8_t num_voices = patches_grab_synth_level_return_voices_for_event(e, voices);
+    //fprintf(stderr, "patches_event_has_voices:\n");
+    //fprintf_event_stderr(e);
+
+    patches_grab_synth_tier(e);
     // If this event is only changing bus parameters (FX), those parts have already been handled before we see it.
-    if (!event_addresses_oscs(e))
+    // A pure pedal event doesn't strictly address oscs, but it can result in note-off events.
+    if (!event_addresses_oscs(e) && AMY_IS_UNSET(e->pedal))
         return;  // Early exit.
-    if (num_voices == 0) {
-        // No voices to process, somehow event is to be ignored.
-        return;
-    }
-    // Clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
-    AMY_UNSET(e->voices[0]);
-    AMY_UNSET(e->patch_number);
-    int32_t instrument = e->synth;
-    int synth_flags = 0;
+
     uint8_t synth = e->synth;
-    AMY_UNSET(e->synth);
-    if (AMY_IS_SET(synth))  synth_flags = instrument_get_flags(synth);
+    int synth_flags = 0;
+    if (AMY_IS_SET(e->synth)) {
+        synth_flags = instrument_get_flags(e->synth);
+    }
     // Should we invoke MIDI note-on cmd rules?
     if (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI
         && AMY_IS_SET(e->midi_note)
-        && (e->note_source_channel != synth)) {
+        && (e->note_source_channel != e->synth)) {
         // Route note-on event via MIDI to invoke midi_note_cmds
         uint8_t bytes[3];
-        bytes[0] = 0x90 + (0x0F & (instrument - 1));
+        // Note: nonzero synth_flags means e->synth was set.
+        bytes[0] = 0x90 + (0x0F & (e->synth - 1));
         bytes[1] = 0x7F & (uint8_t)(e->midi_note);
         uint8_t velocity = 255;   // fake-note-on magic value.
         if (AMY_IS_SET(e->velocity)) velocity = (uint8_t) MIN(127, 127.1f * e->velocity);
@@ -1032,6 +1038,16 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         // from sequencer_add_event), its deltas must land in that queue, not play now.
         midi_message_handler_to_queue(bytes, 3, e->time, e, queue);
     } else {
+        uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+        uint8_t num_voices = patches_voices_for_event(e, voices);
+        if (num_voices == 0) {
+            // No voices to process, somehow event is to be ignored.
+            return;
+        }
+        // Clear out the instrument, voices, patch from the event. If we didn't, we'd keep calling this over and over
+        AMY_UNSET(e->voices[0]);
+        AMY_UNSET(e->patch_number);
+        AMY_UNSET(e->synth);
         // for each voice, send the event to the base osc (+ e->osc if given)
         for(uint8_t i = 0; i < num_voices; i++) {
             if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
@@ -1049,12 +1065,12 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
                     }
                     AMY_UNSET(e->osc);
                 }
-                //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", instrument, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
+                //fprintf(stderr, "patches: synth %d voice %d osc %d wav %d note %d vel %d\n", synth, voices[i], target_osc, e->wave, (int)e->midi_note, (int)(127.f * e->velocity));
             }
         }
     }
     // Restore the instrument in case this event is re-used.
-    e->synth = instrument;
+    e->synth = synth;
 }
 
 void schedule_osc_reset(uint32_t time, uint16_t osc, struct delta **queue) {
