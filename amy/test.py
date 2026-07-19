@@ -218,8 +218,6 @@ class TestBYOPVoices(AmyTest):
     num_partials = 4
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
-    #amy.send(patchr=1024, patch_string=s)
-    #amy.send(time=0, voices='0,1,2,3', patch=1024)
     amy.send(time=0, synth=1, num_voices=4, patch_string=s)
     for i in range(num_partials):
       amy.send(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
