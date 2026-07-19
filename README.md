@@ -138,7 +138,7 @@ AMY supports [note commands, some MIDI controllers, and program changes to chang
 
 Presumably you'd like to explicitly tell AMY what to play. You can control AMY from almost anything. We mostly work in Python, C or Javascript, but AMY has been built to work with anything that can send a string.
 
-AMY has two API interfaces: _wire messages_ and `amy_event`. An AMY wire message is a string that looks like `v0n50l1K130r0Z`, with each letter corresponding to a field (like `v0` means `oscillator 0`, `n50` means midi note 50, `K130` means patch number 130, etc.) Wire messages are converted into `amy_event`s within AMY once received. 
+AMY has two API interfaces: _wire messages_ and `amy_event`. An AMY wire message is a string that looks like `v0n50l1K130i1iv4Z`, with each letter corresponding to a field (like `v0` means `oscillator 0`, `n50` means midi note 50, `K130` means patch number 130, etc.) Wire messages are converted into `amy_event`s within AMY once received. 
 
 So in C, or JS, you'd fill an `amy_event` struct to define a single event of the synthesizer. For example, that wire message above is:
 
@@ -148,14 +148,15 @@ e.osc = 0;
 e.patch_number = 130;
 e.velocity = 1;
 e.midi_note = 50;
-e.voices[0] = 0;
+e.synth = 1;
+e.num_voices = 4;
 amy_add_event(&e);
 ```
 
 In Python, we provide the `amy` package that generates wire messages from a Pythonic `amy.send(**kwargs)`. In Python, you'd do
 
 ```python
-amy.send(osc=0, patch = 130, vel = 1, note = 50, voices = [0])
+amy.send(osc=0, patch=130, vel=1, note=50, synth=1, num_voices=4)
 ```
 
 Wire messages are used in AMY as a compact serialization of AMY events and become useful when communicating between AMY and other programs that may not be linked together. For example, [Alles](https://github.com/shorepine/alles) uses wire messages over Wi-Fi UDP to control a mesh of AMY synthesizers. [Tulip Web](https://tulip.computer/run) sends wire messages from the Micropython web process to the AudioWorklet running AMY on the web. We also store the Juno-6 and DX7 patches within AMY itself using wire messages, which helps keep the code size down. 
