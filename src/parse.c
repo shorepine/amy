@@ -733,7 +733,7 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'P': e->trigger_phase=atoff(arg); break;
             /* q unused */
             case 'Q': parse_coef_message(arg, e->pan_coefs); break;
-            case 'r': parse_voices(arg, e->voices); break;
+            //case 'r': parse_voices(arg, e->voices); break;  // 'r' deprecated, you basically never control a voice directly from the API.  Planning to use it for multi-amyboard.
             case 'R': e->resonance=atoff(arg); break;
             case 's': e->pitch_bend = atoff(arg); break;
             case 'S':

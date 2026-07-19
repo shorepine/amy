@@ -4,29 +4,29 @@
 import amy
 from . import piano_params
 
-def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None):
+def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None, synth=1):
     amy.send(reset=amy.RESET_TIMEBASE)
     amy.send(time=0, volume=volume)
     init_command()
-    send_command(time=50, voices='0', note=base_note, vel=0.05)
-    send_command(time=435, voices='0', note=base_note, vel=0)
-    send_command(time=450, voices='0', note=base_note, vel=0.63)
-    send_command(time=835, voices='0', note=base_note, vel=0)
-    send_command(time=850, voices='0', note=base_note, vel=1.0)
-    send_command(time=1485, voices='0', note=base_note, vel=0)
-    send_command(time=1500, voices='1', note=base_note - 24, vel=0.6)
-    send_command(time=2100, voices='2', note=base_note + 24, vel=1.0)
-    send_command(time=3000, voices='1', note=base_note - 24, vel=0)
-    send_command(time=3000, voices='2', note=base_note + 24, vel=0)
+    send_command(time=50, synth=synth, note=base_note, vel=0.05)
+    send_command(time=435, synth=synth, note=base_note, vel=0)
+    send_command(time=450, synth=synth, note=base_note, vel=0.63)
+    send_command(time=835, synth=synth, note=base_note, vel=0)
+    send_command(time=850, synth=synth, note=base_note, vel=1.0)
+    send_command(time=1485, synth=synth, note=base_note, vel=0)
+    send_command(time=1500, synth=synth, note=base_note - 24, vel=0.6)
+    send_command(time=2100, synth=synth, note=base_note + 24, vel=1.0)
+    send_command(time=3000, synth=synth, note=base_note - 24, vel=0)
+    send_command(time=3000, synth=synth, note=base_note + 24, vel=0)
 
 
 def juno_example():
 	piano_example(base_note=74, volume=10, 
-		init_command=lambda: amy.send(time=0, voices='0,1,2', patch=7))
+		init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=7))
 
 def dx7_example():
 	piano_example(base_note=50, volume=25, 
-              init_command=lambda: amy.send(time=0, voices='0,1,2', patch=137))
+              init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=137))
 
 
 """Piano notes generated on amy/tulip."""
@@ -153,11 +153,11 @@ patch_string = 'v0w10Zv%dw%dZ' % (NUM_HARMONICS[0] + 1, amy.PARTIAL)
 # The lowest note provides an upper-bound on the number of partials we need to allocate.
 def init_piano_voices(num_partials=NUM_HARMONICS[0]):
     amy.send(patch='1024', patch_string=patch_string)
-    amy.send(voices='0,1,2', patch=1024)
-    init_piano_voice(num_partials, voices='0,1,2')
+    amy.send(synth=1, num_voices=3, patch=1024)
+    init_piano_voice(num_partials, synth=1)
     # piano_note_on (below) overwrites these settings before each note,
     # but pre-configure each note to C4.mf so we can experiment.
-    setup_piano_voice(harms_params_for_note_vel(note=60, vel=80), voices='0,1,2')
+    setup_piano_voice(harms_params_for_note_vel(note=60, vel=80), synth=1)
 
 def play_piano_partials_1():
 	piano_example(base_note=62, volume=5, init_command=init_piano_voices)
