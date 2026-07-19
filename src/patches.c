@@ -980,7 +980,6 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
         num_voices = instrument_get_num_voices(e->synth, voices);
     }
     if (AMY_IS_SET(e->velocity) && e->velocity == 0 && (synth_flags & SYNTH_FLAGS_IGNORE_NOTE_OFFS)) {
-        fprintf(stderr, "ignoring note off.");
         return 0;  // Ignore the note off, as requested.
     }
     return num_voices;
