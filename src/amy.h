@@ -761,7 +761,6 @@ typedef struct  {
     void (*amy_external_fseek_hook)(uint32_t fptr, uint32_t pos);
     void (*amy_external_fclose_hook)(uint32_t fptr);
     void (*amy_external_file_transfer_done_hook)(const char *filename);
-    void (*amy_external_update_file_hook)(const char *filename);
     void (*amy_external_exec_hook)(const char *code);
     void (*amy_external_reboot_hook)(uint8_t mode);
     // Called (from the render task -- set a flag and return quickly) when the
