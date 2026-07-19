@@ -220,13 +220,13 @@ class TestBYOPVoices(AmyTest):
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
     #amy.send(patchr=1024, patch_string=s)
     #amy.send(time=0, voices='0,1,2,3', patch=1024)
-    amy.send(time=0, voices='0,1,2,3', patch_string=s)
+    amy.send(time=0, synth=1, num_voices=4, patch_string=s)
     for i in range(num_partials):
-      amy.send(voices='0,1,2,3', osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
-    amy.send(time=100, voices=0, note=60, vel=1)
-    amy.send(time=200, voices=1, note=63, vel=1)
-    amy.send(time=300, voices=2, note=67, vel=1)
-    amy.send(time=400, voices=3, note=70, vel=1)
+      amy.send(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=200, synth=1, note=63, vel=1)
+    amy.send(time=300, synth=1, note=67, vel=1)
+    amy.send(time=400, synth=1, note=70, vel=1)
 
 
 class TestBYOPNoteOff(AmyTest):
@@ -237,12 +237,12 @@ class TestBYOPNoteOff(AmyTest):
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
     amy.send(patch=1024, patch_string=s)
-    amy.send(time=0, voices='0,1', patch=1024)
+    amy.send(time=0, synth=1, num_voices=2, patch=1024)
     for i in range(num_partials):
-      amy.send(voices='0,1', osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
-    amy.send(voices='0,1', osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
-    amy.send(time=100, voices=1, note=60, vel=1)
-    amy.send(time=700, voices=1, vel=0)
+      amy.send(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
+    amy.send(time=0, synth=1, osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
+    amy.send(time=100, synth=1, note=60, vel=1)
+    amy.send(time=700, synth=1, vel=0)
 
 
 class TestInterpPartials(AmyTest):
@@ -339,18 +339,18 @@ class TestSineAM(AmyTest):
 class TestAlgo(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0",  patch=21+128)
-    amy.send(time=100, voices="0", note=58, vel=1)
-    amy.send(time=500, voices="0", vel=0)
+    amy.send(time=0, synth=1, num_voices=1, patch=21+128)
+    amy.send(time=100, synth=1, note=58, vel=1)
+    amy.send(time=500, synth=1, vel=0)
 
 
 class TestAlgo2(AmyTest):
 
   def run(self):
     amy.send(time=0, volume=0.5)  # To counteract vel=2 without rewriting ref.
-    amy.send(time=0, voices="0", patch=128+24)
-    amy.send(time=100, voices="0", note=58, vel=2)
-    amy.send(time=500, voices="0", vel=0)
+    amy.send(time=0, synth=1, num_voices=1, patch=128+24)
+    amy.send(time=100, synth=1, note=58, vel=2)
+    amy.send(time=500, synth=1, vel=0)
 
 
 class TestWoodPiano(AmyTest):
@@ -380,11 +380,11 @@ class TestFMRepeat(AmyTest):
   """Douglas reports that the DX7 Marimba sometimes clicks at onset."""
 
   def run(self):
-    amy.send(time=0, voices="0", patch=128+21)
+    amy.send(time=0, synth=1, num_voices=1, patch=128+21)
     for i in range(5):
       t = 100 + round(i * 51200 / 441)
-      amy.send(time=t, voices="0", note=32, vel=1)
-      amy.send(time=t + 20, voices="0", vel=0)
+      amy.send(time=t, synth=1, note=32, vel=1)
+      amy.send(time=t + 20, synth=1, vel=0)
 
 
 class TestXanaduFM(AmyTest):
@@ -595,15 +595,15 @@ class TestJunoClip(AmyTest):
   """Juno patch that used to clip until we trimmed the volumes in #802.  Now run with vel=5."""
 
   def run(self):
-    amy.send(time=0, voices="0,1,2,3", patch=9)
-    amy.send(time=50, voices="0", note=60, vel=5)
-    amy.send(time=50, voices="1", note=57, vel=5)
-    amy.send(time=50, voices="2", note=55, vel=5)
-    amy.send(time=50, voices="3", note=52, vel=5)
-    amy.send(time=800, voices="0", vel=0)
-    amy.send(time=800, voices="1", vel=0)
-    amy.send(time=800, voices="2", vel=0)
-    amy.send(time=800, voices="3", vel=0)
+    amy.send(time=0, synth=1, num_voices=4, patch=9)
+    amy.send(time=50, synth=1, note=60, vel=5)
+    amy.send(time=50, synth=1, note=57, vel=5)
+    amy.send(time=50, synth=1, note=55, vel=5)
+    amy.send(time=50, synth=1, note=52, vel=5)
+    amy.send(time=800, synth=1, vel=0)
+    amy.send(time=800, synth=1, vel=0)
+    amy.send(time=800, synth=1, vel=0)
+    amy.send(time=800, synth=1, vel=0)
 
 
 class TestLowVcf(AmyTest):
@@ -688,23 +688,23 @@ class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
 
   def run(self):
-    amy.send(time=0, voices="0,1", patch=2)
-    amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=200, voices="0", vel=0)
-    amy.send(time=300, voices="1", note=60, vel=1)
-    amy.send(time=450, voices="1", vel=0)
+    amy.send(time=0, synth=1, num_voices=1, patch=2)
+    amy.send(time=50, synth=1, note=60, vel=1)
+    amy.send(time=200, synth=1, vel=0)
+    amy.send(time=300, synth=1, note=60, vel=1)
+    amy.send(time=450, synth=1, vel=0)
 
 
 class TestJunoCheapTrumpetPatch(AmyTest):
   """Try out the 'cheap' LPF hack."""
 
   def run(self):
-    amy.send(time=0, voices="0,1", patch=2)
-    amy.send(time=0, voices="0,1", osc=0, filter_type=amy.FILTER_LPF)
-    amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=200, voices="0", vel=0)
-    amy.send(time=300, voices="1", note=60, vel=1)
-    amy.send(time=450, voices="1", vel=0)
+    amy.send(time=0, synth=1, num_voices=2, patch=2)
+    amy.send(time=0, synth=1, osc=0, filter_type=amy.FILTER_LPF)
+    amy.send(time=50, synth=1, note=60, vel=1)
+    amy.send(time=200, synth=1, vel=0)
+    amy.send(time=300, synth=1, note=60, vel=1)
+    amy.send(time=450, synth=1, vel=0)
 
 
 class TestFilterReleaseGlitch(AmyTest):
@@ -719,22 +719,23 @@ class TestFilterReleaseGlitch(AmyTest):
 class TestPortamento(AmyTest):
 
   def run(self):
-    amy.send(time=0, voices="0,1,2", patch=0)
+    amy.send(time=0, synth=1, num_voices=3, patch=0)
 
     # Starting-point pitches...
-    amy.send(time=50, voices="0", note=60, vel=1)
-    amy.send(time=50, voices="1", note=64, vel=1)
-    amy.send(time=50, voices="2", note=67, vel=1)
+    amy.send(time=50, synth=1, note=60, vel=1)
+    amy.send(time=50, synth=1, note=64, vel=1)
+    amy.send(time=50, synth=1, note=67, vel=1)
 
     # .. immediately start bending towards final pitches.
-    amy.send(time=60, voices="0,1,2", osc=2, portamento=100)
-    amy.send(time=60, voices="0,1,2", osc=3, portamento=100)
-    amy.send(time=60, voices="0,1,2", osc=4, portamento=100)
-    amy.send(time=60, voices="0", note=65)
-    amy.send(time=60, voices="1", note=69)
-    amy.send(time=60, voices="2", note=72)
+    amy.send(time=60, synth=1, osc=2, portamento=100)
+    amy.send(time=60, synth=1, osc=3, portamento=100)
+    amy.send(time=60, synth=1, osc=4, portamento=100)
 
-    amy.send(time=800, voices="0,1,2", vel=0)
+    amy.send(time=60, synth=1, note=65, vel=1)
+    amy.send(time=60, synth=1, note=69, vel=1)
+    amy.send(time=60, synth=1, note=72, vel=1)
+
+    amy.send(time=800, synth=1, vel=0)
 
 
 class TestEcho(AmyTest):
