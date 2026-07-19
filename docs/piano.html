@@ -81,24 +81,24 @@
       <p>Electronic musical instruments have always taken inspiration from their acoustic forbears, and most electronic keyboards will attempt to simulate a piano.  
       <p>Let's set up a function in AMY (which runs in this web page in Python, you can edit the code!) that plays the recorded pattern above on some AMY presets:
       <div class="editor mb-4 preload-python">
-def piano_example(base_note=72, volume=1, send_command=amy.send, init_command=lambda: None):
+def piano_example(base_note=72, volume=1, send_command=amy.send, init_command=lambda: None, synth=1):
     amy.send(time=100, volume=volume)
     init_command()
-    send_command(time=150, voices='0', note=base_note, vel=0.05)
-    send_command(time=535, voices='0', note=base_note, vel=0)
-    send_command(time=550, voices='0', note=base_note, vel=0.63)
-    send_command(time=935, voices='0', note=base_note, vel=0)
-    send_command(time=950, voices='0', note=base_note, vel=1.0)
-    send_command(time=1585, voices='0', note=base_note, vel=0)
-    send_command(time=1600, voices='1', note=base_note - 24, vel=0.6)
-    send_command(time=2200, voices='2', note=base_note + 24, vel=1.0)
-    send_command(time=3100, voices='1', note=base_note - 24, vel=0)
-    send_command(time=3100, voices='2', note=base_note + 24, vel=0)
+    send_command(time=150, synth=synth, note=base_note, vel=0.05)
+    send_command(time=535, synth=synth, note=base_note, vel=0)
+    send_command(time=550, synth=synth, note=base_note, vel=0.63)
+    send_command(time=935, synth=synth, note=base_note, vel=0)
+    send_command(time=950, synth=synth, note=base_note, vel=1.0)
+    send_command(time=1585, synth=synth, note=base_note, vel=0)
+    send_command(time=1600, synth=synth, note=base_note - 24, vel=0.6)
+    send_command(time=2200, synth=synth, note=base_note + 24, vel=1.0)
+    send_command(time=3100, synth=synth, note=base_note - 24, vel=0)
+    send_command(time=3100, synth=synth, note=base_note + 24, vel=0)
       </div>
       <P>The Roland Juno-60 included a preset called Piano, which we can now hear with
       <div class="editor mb-4">
 piano_example(base_note=74, volume=1, 
-                init_command=lambda: amy.send(time=0, voices='0,1,2', patch=7))
+                init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=7))
       </div>
       <P>(Try changing the base_note or volume or the patch number and running again)</P>
       <P><img src="juno.png"  class="img-fluid"></P>
@@ -106,7 +106,7 @@ piano_example(base_note=74, volume=1,
       <p>The DX7 similarly provides a number of <a href="https://www.synthmania.com/dx7.htm">presets claiming to be pianos</a>, including 135-137 (in our numbering which starts at 128):</p>
       <div class="editor mb-4">
 piano_example(base_note=50, volume=2, 
-              init_command=lambda: amy.send(time=0, voices='0,1,2', patch=137))
+              init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=137))
       </div>
       <P><img src="dx7.png" class="img-fluid"></P>
       <p>This sounds more like a DX7 than any acoustic instrument.  It does manage to bring some modulation on top of the decays of the harmonics (visible as gaps in the horizontal lines) but is not very convincing.</p>
@@ -213,7 +213,7 @@ def harms_params_for_note_vel(note, vel):
     return harms_params
       </div>
       <p>And then some AMY helper code to send out these parameters to the right voices. 
-      We're using the BYO_PARTIALS type in AMY, which allows you set up your own partial synthesis breakpoints using envelopes.</p>
+      We are using the BYO_PARTIALS type in AMY, which allows you set up your own partial synthesis breakpoints using envelopes.</p>
       <div class="editor mb-4 preload-python">
 def init_piano_voice(num_partials, base_osc=0, **kwargs):
     """One-time initialization of the unchanging parts of the partials voices."""
@@ -243,13 +243,13 @@ def setup_piano_voice(harms_params, base_osc=0, **kwargs):
 patch_string = 'v0w10Zv%dw%dZ' % (NUM_HARMONICS[0] + 1, amy.PARTIAL)
 
 # The lowest note provides an upper-bound on the number of partials we need to allocate.
-def init_piano_voices(num_partials=NUM_HARMONICS[0]):
-    amy.send(patch='1024', patch_string=patch_string)
-    amy.send(voices='0,1,2', patch=1024)
-    init_piano_voice(num_partials, voices='0,1,2')
+def init_piano_voices(num_partials=NUM_HARMONICS[0], synth=1):
+    amy.send(patch=1024, patch_string=patch_string)
+    amy.send(synth=synth, num_voices=3, patch=1024)
+    init_piano_voice(num_partials, synth=synth)
     # piano_note_on (below) overwrites these settings before each note,
     # but pre-configure each note to C4.mf so we can experiment.
-    setup_piano_voice(harms_params_for_note_vel(note=60, vel=80), voices='0,1,2')
+    setup_piano_voice(harms_params_for_note_vel(note=60, vel=80), synth=synth)
       </div>
       <P>And play those:</P>
       <div class="editor mb-4">
@@ -271,7 +271,7 @@ def piano_note_on(note=60, vel=1, **kwargs):
         # the note and vel of the note-on are always the same.
         amy.send(note=60, vel=1, **kwargs)
       </div>
-      <P>Let's hear this much nicer version:</P>
+      <P>Let us hear this much nicer version:</P>
       <div class="editor mb-4">
 piano_example(base_note=62,
               init_command=init_piano_voices,
@@ -286,25 +286,25 @@ piano_example(base_note=62,
         <div class="editor mb-4">
 # Configure the default voice for C4.ff
 init_piano_voices()
-setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
+setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, synth=1)
 # Convert each PARTIAL osc into regular SINE oscs and play them in order.
 for partial in range(1, 20):
         time = partial * 400
-        amy.send(time=time, voices='0', osc=partial, wave=amy.SINE, note=60, vel=1)
-        amy.send(time=time + 390, voices='0', osc=partial, vel=0)
+        amy.send(time=time, synth=1, osc=partial, wave=amy.SINE, note=60, vel=1)
+        amy.send(time=time + 390, synth=1, osc=partial, vel=0)
         </div>
 
       <p>By restricting the number of partials the control osc things it is driving, we can listen to syntheses with different numbers of partials:
         <div class="editor mb-4">
 # Re-initialize the voice (after flipping the oscs into SINEs).
 init_piano_voices()
-setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, voices='0')
+setup_piano_voice(harms_params_for_note_vel(64, 120), time=0, synth=1)
 # Add partials one by one
 for num_partials in range(1, 20):
         time = num_partials * 400
-        amy.send(time=time, voices='0', wave=amy.BYO_PARTIALS, num_partials=num_partials)
-        amy.send(time=time + 15, voices='0', note=60, vel=1)
-amy.send(time=8500, voices='0', vel=0)
+        amy.send(time=time, synth=1, wave=amy.BYO_PARTIALS, num_partials=num_partials)
+        amy.send(time=time + 15, synth=1, note=60, vel=1)
+amy.send(time=8500, synth=1, vel=0)
         </div>
 
       <p>We can also change the tuning of each harmonic away from what was provided by the analysis.  For instance, we can retune them to have different inharmonicities (see below for a discussion of piano inharmonicity):</p>
@@ -315,20 +315,20 @@ def retune_partials(f0=263.3, beta=0.0003, num_partials=20, **kwargs):
 
 init_piano_voices()
 # Try it for a low note
-setup_piano_voice(harms_params_for_note_vel(32, 120), voices='0', time=0)
+setup_piano_voice(harms_params_for_note_vel(32, 120), synth=1, time=0)
 # Tuning from analysis
-amy.send(time=0, voices='0', note=60, vel=1)
-amy.send(time=2000, voices='0', vel=0)
+amy.send(time=0, synth=1, note=60, vel=1)
+amy.send(time=2000, synth=1, vel=0)
 
 # Unstretched tuning
-retune_partials(f0=cents_to_hz(3200), beta=0, voices='0', time=2200)
-amy.send(time=2210, voices='0', note=60, vel=1)
-amy.send(time=4200, voices='0', vel=0)
+retune_partials(f0=cents_to_hz(3200), beta=0, synth=1, time=2200)
+amy.send(time=2210, synth=1, note=60, vel=1)
+amy.send(time=4200, synth=1, vel=0)
 
 # Parametric stretching tuning, exaggerated
-retune_partials(f0=cents_to_hz(3200), beta=0.0008, voices='0', time=4400)
-amy.send(time=4410, voices='0', note=60, vel=1)
-amy.send(time=6400, voices='0', vel=0)
+retune_partials(f0=cents_to_hz(3200), beta=0.0008, synth=1, time=4400)
+amy.send(time=4410, synth=1, note=60, vel=1)
+amy.send(time=6400, synth=1, vel=0)
         </div>
 
       <p>We can also do interesting things with interpolation.  For instance, we can interpolate pitches more finely than the standard semitones:</p>
@@ -339,9 +339,9 @@ hps_c5 = harms_params_for_note_vel(72, 120)
 for quarter_tone in range(24):
         time = quarter_tone * 400
         hps_interpolated = interp_harms_params(hps_c4, hps_c5, quarter_tone / 24)
-        setup_piano_voice(hps_interpolated, time=time, voices='0')
-        amy.send(time=time + 10, voices='0', note=60, vel=1)
-amy.send(time=time + 500, voices='0', vel=0)
+        setup_piano_voice(hps_interpolated, time=time, synth=1)
+        amy.send(time=time + 10, synth=1, note=60, vel=1)
+amy.send(time=time + 500, synth=1, vel=0)
       </div>
 
       <p>By using interpolation factors outside the range (0, 1) we can even extrapolate the strike strength:<p>
@@ -353,9 +353,9 @@ for strike in range(5):
         time = strike * 400
         strike_alpha = 0.4 * (strike - 1)  # strike_alpha ranges from -0.4 to +1.2
         hps_interpolated = interp_harms_params(hps_pp, hps_ff, strike_alpha)
-        setup_piano_voice(hps_interpolated, time=time, voices='0')
-        amy.send(time=time + 10, voices='0', note=60, vel=1)
-amy.send(time=time + 500, voices='0', vel=0)
+        setup_piano_voice(hps_interpolated, time=time, synth=1)
+        amy.send(time=time + 10, synth=1, note=60, vel=1)
+amy.send(time=time + 500, synth=1, vel=0)
       </div>
 
       <p>If you&#39;re curious about exactly how we extracted the harmonic frequencies and envelopes, the rest of this page provides an overview of the process implemented in <a href="https://github.com/shorepine/amy/blob/main/experiments/piano_heterodyne.ipynb">piano_heterodyne.ipynb</a>.

@@ -560,7 +560,6 @@ typedef struct amy_event {
     uint16_t bp_is_set[MAX_BREAKPOINT_SETS];
     // Convert these two at least to vectors of ints, save several hundred bytes
     int16_t algo_source[MAX_ALGO_OPS];
-    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint32_t eg0_times[MAX_BPS];
     float eg0_values[MAX_BPS];
     uint32_t eg1_times[MAX_BPS];

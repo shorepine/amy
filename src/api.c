@@ -155,9 +155,6 @@ void amy_clear_event(amy_event *e) {
     for (int i = 0; i < MAX_ALGO_OPS; ++i) {
         AMY_UNSET(e->algo_source[i]);
     }
-    for (int i = 0; i < MAX_VOICES_PER_INSTRUMENT; ++i) {
-        AMY_UNSET(e->voices[i]);
-    }
     for (int i = 0; i < MAX_BPS; ++i) {
         AMY_UNSET(e->eg0_times[i]);
         AMY_UNSET(e->eg0_values[i]);
