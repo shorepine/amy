@@ -465,7 +465,9 @@ def gen_web():
         else:
             py.append('amy._%s = _acj.%s' % (e['py'], e['py']))
             py.append('tulip.%s = _acj.%s' % (mp_name(e), e['py']))
-    install = '\\n'.join(line.replace("'", "\\'") for line in py)
+    # Escape backslashes before quotes: a python-source '\n' inside a line must
+    # survive the JS string literal as backslash-n, not become a real newline.
+    install = '\\n'.join(line.replace('\\', '\\\\').replace("'", "\\'") for line in py)
     lines.append('// Run this in MicroPython after registerJsModule("amy_c_api_js", api).')
     lines.append("var AMY_C_API_PY_INSTALL = '%s';" % install)
     lines.append('')
@@ -488,38 +490,47 @@ GD_ARG = {'u8': 'int64_t', 'u16': 'int64_t', 'i32': 'int64_t', 'u32': 'int64_t',
 
 
 def gen_godot():
-    methods, binds = [], []
+    # Three fragments: method declarations for the class body in
+    # amy_gdextension.h, out-of-line definitions for amy_gdextension.cpp
+    # (which includes amy.h inside extern "C"), and ClassDB::bind_method rows
+    # for _bind_methods(). C calls are ::-qualified so a member sharing the C
+    # function's name (e.g. sequencer_ticks) can't shadow it into recursion.
+    decls, impls, binds = [], [], []
     for e in API:
         if 'gd' not in e['platforms']:
             continue
         name = e['py']
         if e['kind'] == 'scalar':
-            params, callargs = [], []
+            declparams, defparams, callargs = [], [], []
             for aname, t, default in e['args']:
                 p = '%s %s' % (GD_ARG[t], aname)
+                defparams.append(p)
                 if default is not None:
                     p += ' = %s' % default
-                params.append(p)
+                declparams.append(p)
                 if t == 'str':
                     callargs.append('(char *)%s.utf8().get_data()' % aname)
                 else:
                     callargs.append('(%s)%s' % (C_ARG_TYPE[t], aname))
-            call = c_call(e, callargs)
+            call = '::%s(%s)' % (e['c'], ', '.join(callargs))
+            decls.append('\t%s %s(%s);' % (GD_RET[e['ret']], name, ', '.join(declparams)))
             if e['ret'] == 'void':
                 bodyline = '%s;' % call
             else:
                 bodyline = 'return (%s)%s;' % (GD_RET[e['ret']], call)
-            methods.append('\t%s %s(%s) { %s }'
-                           % (GD_RET[e['ret']], name, ', '.join(params), bodyline))
+            impls.append('%s AmySynth::%s(%s) { %s }'
+                         % (GD_RET[e['ret']], name, ', '.join(defparams), bodyline))
         elif e['kind'] == 'string_out_malloc':
-            methods.append('\tString %s() {' % name)
-            methods.append('\t\tint len = 0;')
-            methods.append('\t\tchar *dump = %s(&len);' % e['c'])
-            methods.append('\t\tif (dump == NULL) return String();')
-            methods.append('\t\tString result = String::utf8(dump, len);')
-            methods.append('\t\tfree(dump);')
-            methods.append('\t\treturn result;')
-            methods.append('\t}')
+            decls.append('\tString %s();' % name)
+            impls.append('String AmySynth::%s() {' % name)
+            impls.append('\tint len = 0;')
+            impls.append('\tchar *dump = ::%s(&len);' % e['c'])
+            impls.append('\tif (dump == NULL) return String();')
+            impls.append('\tString result = String::utf8(dump, len);')
+            # ::-qualified: GDCLASS defines a static member free() that shadows libc's
+            impls.append('\t::free(dump);')
+            impls.append('\treturn result;')
+            impls.append('}')
         else:
             continue  # other kinds not exposed to Godot yet
         argnames = ['"%s"' % a[0] for a in e['args']]
@@ -529,9 +540,94 @@ def gen_godot():
                         ''.join(', DEFVAL(%s)' % a[2] for a in e['args'] if a[2] is not None)))
     header = '// %s\n' % GENERATED_NOTE
     (ROOT / 'godot' / 'src' / 'amy_c_api_gd_methods.inc').write_text(
-        header + '\n'.join(methods) + '\n')
+        header + '\n'.join(decls) + '\n')
+    (ROOT / 'godot' / 'src' / 'amy_c_api_gd_impl.inc').write_text(
+        header + '\n'.join(impls) + '\n')
     (ROOT / 'godot' / 'src' / 'amy_c_api_gd_bind.inc').write_text(
         header + '\n'.join(binds) + '\n')
+
+
+GD_SCRIPT_BEGIN = '# BEGIN GENERATED C API - scripts/gen_amy_c_api.py'
+GD_SCRIPT_END = '# END GENERATED C API'
+
+GD_SCRIPT_RET = {'void': 'void', 'u32': 'int', 'i32': 'int', 'f32': 'float'}
+GD_SCRIPT_RET_DEFAULT = {'int': '0', 'float': '0.0', 'String': '""'}
+GD_SCRIPT_ARG = {'u8': 'int', 'u16': 'int', 'i32': 'int', 'u32': 'int',
+                 'f32': 'float', 'bool': 'bool'}
+
+
+def render_gd_script_block():
+    out = []
+    for e in API:
+        if 'gd' not in e['platforms']:
+            continue
+        name = e['py']
+        if e['kind'] == 'scalar':
+            ret = GD_SCRIPT_RET[e['ret']]
+        elif e['kind'] == 'string_out_malloc':
+            ret = 'String'
+        else:
+            continue
+        params = []
+        for aname, t, default in e['args']:
+            p = '%s: %s' % (aname, GD_SCRIPT_ARG[t])
+            if default is not None:
+                p += ' = %s' % default
+            params.append(p)
+        argnames = [a[0] for a in e['args']]
+        js_args = ', '.join('%s' for _ in argnames)
+        js_fmt = 'amy_c_api.%s(%s)' % (name, js_args)
+        out.append('## %s' % e['doc'])
+        out.append('func %s(%s) -> %s:' % (name, ', '.join(params), ret))
+        if ret == 'void':
+            out.append('\tif _is_web:')
+            if argnames:
+                out.append('\t\tJavaScriptBridge.eval("amy_c_api && %s" %% [%s])'
+                           % (js_fmt, ', '.join('str(%s)' % a for a in argnames)))
+            else:
+                out.append('\t\tJavaScriptBridge.eval("amy_c_api && %s")'
+                           % (js_fmt % ()))
+            out.append('\telif _synth:')
+            out.append('\t\t_synth.call(%s)'
+                       % ', '.join(['"%s"' % name] + argnames))
+        else:
+            fallback = GD_SCRIPT_RET_DEFAULT[ret]
+            js_null = 'null'
+            out.append('\tif _is_web:')
+            if argnames:
+                out.append('\t\tvar v: Variant = JavaScriptBridge.eval("amy_c_api ? %s : %s" %% [%s], true)'
+                           % (js_fmt, js_null, ', '.join('str(%s)' % a for a in argnames)))
+            else:
+                out.append('\t\tvar v: Variant = JavaScriptBridge.eval("amy_c_api ? %s : %s", true)'
+                           % (js_fmt % (), js_null))
+            out.append('\t\treturn %s if v == null else %s(v)' % (fallback, ret))
+            out.append('\tif _synth:')
+            out.append('\t\treturn _synth.call(%s)'
+                       % ', '.join(['"%s"' % name] + argnames))
+            out.append('\treturn %s' % fallback)
+        out.append('')
+    return '\n'.join(out).rstrip() + '\n'
+
+
+def gen_gd_script(check=False):
+    path = ROOT / 'godot' / 'amy.gd'
+    text = path.read_text()
+    lines = text.split('\n')
+    try:
+        b = next(i for i, l in enumerate(lines) if l.strip() == GD_SCRIPT_BEGIN)
+        e = next(i for i, l in enumerate(lines) if l.strip() == GD_SCRIPT_END)
+    except StopIteration:
+        raise SystemExit('Could not find %r / %r markers in %s'
+                         % (GD_SCRIPT_BEGIN, GD_SCRIPT_END, path))
+    if e <= b:
+        raise SystemExit('Markers out of order in %s' % path)
+    new = lines[:b + 1] + render_gd_script_block().split('\n') + lines[e:]
+    new_text = '\n'.join(new)
+    if new_text != text:
+        if check:
+            return False
+        path.write_text(new_text)
+    return True
 
 
 # ------------------------------------------------- amy/__init__.py block ----
@@ -621,6 +717,7 @@ def main():
         ROOT / 'src' / 'amy_c_api.generated.js',
         ROOT / 'src' / 'amy_c_api_exports.mk',
         ROOT / 'godot' / 'src' / 'amy_c_api_gd_methods.inc',
+        ROOT / 'godot' / 'src' / 'amy_c_api_gd_impl.inc',
         ROOT / 'godot' / 'src' / 'amy_c_api_gd_bind.inc',
     ]
     before = {p: (p.read_text() if p.exists() else None) for p in outputs}
@@ -630,11 +727,14 @@ def main():
     gen_web()
     gen_godot()
     init_fresh = gen_py_init(check=opts.check)
+    gd_fresh = gen_gd_script(check=opts.check)
 
     if opts.check:
         stale = [str(p.relative_to(ROOT)) for p in outputs if before[p] != p.read_text()]
         if not init_fresh:
             stale.append('amy/__init__.py')
+        if not gd_fresh:
+            stale.append('godot/amy.gd')
         # restore originals so --check has no side effects
         for p in outputs:
             if before[p] is None:
@@ -651,6 +751,7 @@ def main():
         for p in outputs:
             print('wrote %s' % p.relative_to(ROOT))
         print('updated amy/__init__.py generated block')
+        print('updated godot/amy.gd generated C API block')
 
 
 if __name__ == '__main__':
