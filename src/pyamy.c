@@ -11,26 +11,10 @@
 
 // Python module wrapper for AMY commands
 
-static PyObject * send_wrapper(PyObject *self, PyObject *args) {
-    char *arg1;
-    if (! PyArg_ParseTuple(args, "s", &arg1)) {
-        return NULL;
-    }
-    amy_add_message(arg1);
-    return Py_None;
-}
-
-// Like send_wire but marks the message as coming from an external sysex
-// source, so file transfer routing (transfer_flag) applies. Used by
-// amy.transfer_file() to send chunked base64 data after the zT header.
-static PyObject * send_wire_from_sysex_wrapper(PyObject *self, PyObject *args) {
-    char *arg1;
-    if (! PyArg_ParseTuple(args, "s", &arg1)) {
-        return NULL;
-    }
-    amy_add_message_from_sysex(arg1);
-    return Py_None;
-}
+// Generated wrappers for the table-driven C API (send_wire, ticks_ms,
+// get_synth_commands, dump_state, ...). Regenerate with
+// `python3 scripts/gen_amy_c_api.py` after editing the table there.
+#include "amy_c_api_py.inc"
 
 
 static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value) {
@@ -258,80 +242,15 @@ static PyObject * inject_midi_bytes_wrapper(PyObject *self, PyObject *args) {
     return Py_None;
 }
 
-static PyObject * get_synth_commands_wrapper(PyObject *self, PyObject *args) {
-    char s[MAX_MESSAGE_LEN];
-    void *state = NULL;
-    int synth, include_fx;
-    if(!(PyTuple_Size(args) == 1 || PyTuple_Size(args) == 2)) {
-        return NULL;
-    }
-    if (PyTuple_Size(args) == 1) {
-        if (!PyArg_ParseTuple(args, "i", &synth)) return NULL;
-        include_fx = 1;
-    } else {  // 2 args
-        if (!PyArg_ParseTuple(args, "ip", &synth, &include_fx)) return NULL;
-    }
-    PyObject* list_obj = PyList_New(0);
-    do {
-        state = yield_synth_commands(synth, s, MAX_MESSAGE_LEN, include_fx, state);
-        int slen = strlen(s);
-        if (slen)
-            PyList_Append(list_obj, PyUnicode_FromString(s));
-    } while (state != NULL);
-    return list_obj;
-}
-
-static PyObject *dump_state_wrapper(PyObject *self, PyObject *args) {
-    int len = 0;
-    char *dump = amy_dump_state_to_string(&len);
-    if (dump == NULL) {
-        return PyErr_NoMemory();
-    }
-    PyObject *result = PyUnicode_FromStringAndSize(dump, len);
-    free(dump);
-    return result;
-}
-
-static PyObject *set_cv_from_osc_wrapper(PyObject *self, PyObject *args) {
-    if (!(PyTuple_Size(args) == 2)) return NULL;
-    int cv_channel, osc;
-    if (!PyArg_ParseTuple(args, "ii", &cv_channel, &osc)) return NULL;
-    set_cv_from_osc(cv_channel, osc);
-    return Py_None;
-}
-
-static PyObject *amy_ticks_ms_wrapper(PyObject *self, PyObject *args) {
-    return Py_BuildValue("i", amy_sysclock());
-}
-
-static PyObject *amy_get_render_load_wrapper(PyObject *self, PyObject *args) {
-    return Py_BuildValue("f", amy_get_render_load());
-}
-
-static PyObject *amy_set_render_load_threshold_wrapper(PyObject *self, PyObject *args) {
-    if (!(PyTuple_Size(args) == 1)) return NULL;
-    float threshold;
-    if (!PyArg_ParseTuple(args, "f", &threshold)) return NULL;
-    amy_set_render_load_threshold(threshold);
-    return Py_None;
-}
-
 static PyMethodDef c_amyMethods[] = {
     {"render_to_list", render_wrapper, METH_VARARGS, "Render audio"},
-    {"send_wire", send_wrapper, METH_VARARGS, "Send a message"},
-    {"send_wire_from_sysex", send_wire_from_sysex_wrapper, METH_VARARGS, "Send a message as if from sysex (for transfer_file)"},
     {"live", (PyCFunction)live_wrapper, METH_VARARGS | METH_KEYWORDS, "Live AMY"},
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
     {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     {"inject_midi_bytes", inject_midi_bytes_wrapper, METH_VARARGS, "Inject a raw MIDI byte stream through the parser"},
-    {"get_synth_commands", get_synth_commands_wrapper, METH_VARARGS, "Read synth configuration commands"},
-    {"dump_state", dump_state_wrapper, METH_NOARGS, "Read complete replayable AMY state"},
-    {"set_cv_from_osc", set_cv_from_osc_wrapper, METH_VARARGS, "Feed external CV input from a mod osc"},
-    {"ticks_ms", amy_ticks_ms_wrapper, METH_VARARGS, "Read AMY millisecond clock"},
-    {"render_load", amy_get_render_load_wrapper, METH_VARARGS, "Read current render load fraction"},
-    {"set_render_load_threshold", amy_set_render_load_threshold_wrapper, METH_VARARGS, "Set the fraction of CPU at which to trigger overload failsafe"},
+#include "amy_c_api_py_table.inc"
     { NULL, NULL, 0, NULL }
 };
 
