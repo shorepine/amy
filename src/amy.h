@@ -1017,6 +1017,10 @@ void amy_start_web();
 void amy_start_web_no_synths();
 #endif
 
+// Play the startup bleep with raw oscs / the default sinewave synth voice.
+void amy_bleep(uint32_t start);
+void amy_bleep_synth(uint32_t start);
+
 // external functions
 void amy_restart();
 void amy_reset_oscs();

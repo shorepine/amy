@@ -3,32 +3,105 @@ from .constants import *
 from . import examples
 import collections
 import time
-def _get_synth_commands_stub(synth, include_fx=False):
-    return []
-
-_get_synth_commands = _get_synth_commands_stub
 try:
-    import c_amy as _amy  # Import the C module
+    import c_amy as _amy  # The CPython C module; absent on MicroPython/web
     live = _amy.live
-    _get_synth_commands = _amy.get_synth_commands
-    _set_cv_from_osc = _amy.set_cv_from_osc
-    _ticks_ms = _amy.ticks_ms
-    _render_load = _amy.render_load
-    _set_render_load_threshold = _amy.set_render_load_threshold
-    _dump_state = _amy.dump_state
-except (ImportError, AttributeError):
-    # C module is not required? not available?
-    # I'm guessing this might mean we're on Micropython?
-    _set_cv_from_osc = lambda c, o: None
-    try:
-        import tulip
-        _get_synth_commands = tulip.amy_get_synth_commands
-        _ticks_ms = tulip.amy_ticks_ms
-        _render_load = tulip.amy_render_load
-        _set_render_load_threshold = tulip.amy_set_render_load_threshold
-        _dump_state = tulip.amy_dump_state
-    except (ImportError, AttributeError):
-        pass  # Not available (e.g. web build); _get_synth_commands returns []
+except ImportError:
+    _amy = None
+
+# BEGIN GENERATED - scripts/gen_amy_c_api.py
+# One backend resolver per C API function: prefer the CPython c_amy
+# module, then the linked-MicroPython tulip module. On web builds both
+# resolve to _capi_missing at import; the JS side installs amy._<name>
+# backends after the WASM module loads (see amy_c_api.generated.js).
+def _capi_missing(name):
+    def _f(*args, **kwargs):
+        raise NotImplementedError("amy.%s is not available on this platform" % name)
+    return _f
+
+try:
+    import c_amy as _capi_c_amy
+except ImportError:
+    _capi_c_amy = None
+try:
+    import tulip as _capi_tulip
+except ImportError:
+    _capi_tulip = None
+
+def _capi_resolve(py_name, mp_name):
+    f = getattr(_capi_c_amy, py_name, None) if _capi_c_amy else None
+    if f is None and _capi_tulip:
+        f = getattr(_capi_tulip, mp_name, None)
+    return f if f is not None else _capi_missing(py_name)
+
+_send_wire = _capi_resolve('send_wire', 'amy_send')
+_send_wire_from_sysex = _capi_resolve('send_wire_from_sysex', 'amy_send_wire_from_sysex')
+_ticks_ms = _capi_resolve('ticks_ms', 'amy_ticks_ms')
+_reset_sysclock = _capi_resolve('reset_sysclock', 'amy_reset_sysclock')
+_render_load = _capi_resolve('render_load', 'amy_render_load')
+_set_render_load_threshold = _capi_resolve('set_render_load_threshold', 'amy_set_render_load_threshold')
+_bleep = _capi_resolve('bleep', 'amy_bleep')
+_sequencer_ticks = _capi_resolve('sequencer_ticks', 'amy_sequencer_ticks')
+_process_single_midi_byte = _capi_resolve('process_single_midi_byte', 'amy_process_single_midi_byte')
+_set_cv_from_osc = _capi_resolve('set_cv_from_osc', 'amy_set_cv_from_osc')
+_get_synth_commands = _capi_resolve('get_synth_commands', 'amy_get_synth_commands')
+_dump_state = _capi_resolve('dump_state', 'amy_dump_state')
+_get_output_buffer = _capi_resolve('get_output_buffer', 'amy_get_output_buffer')
+_get_input_buffer = _capi_resolve('get_input_buffer', 'amy_get_input_buffer')
+
+def send_wire(message):
+    """Send a wire-protocol message to AMY"""
+    return _send_wire(message)
+
+def send_wire_from_sysex(message):
+    """Send a wire message as if from sysex (file-transfer routing applies)"""
+    return _send_wire_from_sysex(message)
+
+def ticks_ms():
+    """Read the AMY millisecond clock"""
+    return _ticks_ms()
+
+def reset_sysclock():
+    """Reset the AMY millisecond clock to zero"""
+    return _reset_sysclock()
+
+def render_load():
+    """Smoothed fraction of real time AMY spends rendering (0..1)"""
+    return _render_load()
+
+def set_render_load_threshold(threshold):
+    """Set the render-load fraction that trips the overload failsafe (0 disables)"""
+    return _set_render_load_threshold(threshold)
+
+def bleep(start=0):
+    """Play the startup bleep"""
+    return _bleep(start)
+
+def sequencer_ticks():
+    """Read the sequencer tick count"""
+    return _sequencer_ticks()
+
+def process_single_midi_byte(byte, from_web_or_usb=1):
+    """Feed one MIDI byte to AMY's stream parser"""
+    return _process_single_midi_byte(byte, from_web_or_usb)
+
+def set_cv_from_osc(cv_channel, osc):
+    """Feed external CV input from a mod osc (testing support)"""
+    return _set_cv_from_osc(cv_channel, osc)
+
+def dump_state():
+    """Read the complete replayable AMY state as a wire-command string"""
+    return _dump_state()
+
+def get_output_buffer():
+    """Read the most recent rendered audio block as bytes (None if none ready)"""
+    return _get_output_buffer()
+
+def get_input_buffer():
+    """Read the most recent captured input audio block as bytes (None if none ready)"""
+    return _get_input_buffer()
+
+# END GENERATED - scripts/gen_amy_c_api.py
 
 
 # If set, inserts func as time for every call to send(). Will not override an explicitly set time
@@ -240,7 +313,7 @@ def send_raw(m):
     if(override_send is not None):
         override_send(m)
     else:
-        _amy.send_wire(m)
+        _send_wire(m)
     if(log): mess.append(m)
 
 def log_patch():
@@ -339,9 +412,6 @@ def inject_midi_bytes(data, usb=0):
     # byte-stream parser, exercising running status and real-time interleaving --
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
-
-def ticks_ms():
-    return _ticks_ms()
 
 def unload_sample(patch=0):
     s= "%d,%d" % (patch, 0)
@@ -586,23 +656,5 @@ def get_synth_commands(synth, patch_num=None, dest_synth=None, num_voices=6, inc
         prefix += "i%d" % dest_synth
     return "\n".join(prologue + [prefix + command for command in commands])
 
-"""
-    Simulate CV input from an osc (testing support)
-"""
-def set_cv_from_osc(cv, osc):
-    _set_cv_from_osc(cv, osc)
-
-"""
-    Reading back the complete engine state
-"""
-def dump_state():
-    return _dump_state()
-
-"""
-    Render load tracking
-"""
-def render_load():
-    return _render_load()
-
-def set_render_load_threshold(t):
-    _set_render_load_threshold(t)
+# set_cv_from_osc / dump_state / render_load / set_render_load_threshold and
+# the other direct C API entry points are defined in the generated block above.

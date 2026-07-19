@@ -69,6 +69,10 @@ public:
 	int get_max_voices() const;
 	void set_max_synths(int p_val);
 	int get_max_synths() const;
+
+	// Generated table-driven C API methods (reset_sysclock, render_load,
+	// dump_state, ...). Regenerate with `make c-api`.
+#include "amy_c_api_gd_methods.inc"
 };
 
 } // namespace godot

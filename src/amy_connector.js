@@ -2,6 +2,7 @@
 // helpers for JS to communicate with AMY, including webMIDI
 
 var amy_add_message = null;
+var amy_c_api = null;
 var amy_reset_sysclock = null
 var amy_module = null;
 var amy_started = false;
@@ -18,14 +19,20 @@ var amy_audioin_toggle = false;
 
 // Once AMY module is loaded, register its functions and start AMY (not yet audio, you need to click for that)
 amyModule().then(async function(am) {
+  // Table-driven C API bridge (send_wire, ticks_ms, dump_state, ...) —
+  // amy_c_api_bind is defined in amy_c_api.generated.js, concatenated after
+  // this file into docs/amy.js (this callback runs long after both load).
+  // Exposed on globalThis for hosts like the Godot web export.
+  amy_c_api = amy_c_api_bind(am);
+  globalThis.amy_c_api = amy_c_api;
   amy_live_start_web = am.cwrap(
-    'amy_live_start_web', null, null, {async: true}    
+    'amy_live_start_web', null, null, {async: true}
   );
   amy_live_start_web_audioin = am.cwrap(
-    'amy_live_start_web_audioin', null, null, {async: true}    
+    'amy_live_start_web_audioin', null, null, {async: true}
   );
   amy_live_stop = am.cwrap(
-    'amy_live_stop', null,  null, {async: true}    
+    'amy_live_stop', null,  null, {async: true}
   );
   amy_start_web = am.cwrap(
     'amy_start_web', null, null
@@ -33,21 +40,11 @@ amyModule().then(async function(am) {
   amy_start_web_no_synths = am.cwrap(
     'amy_start_web_no_synths', null, null
   );
-  amy_add_message = am.cwrap(
-    'amy_add_message', null, ['string']
-  );
-  amy_reset_sysclock = am.cwrap(
-    'amy_reset_sysclock', null, null
-  );
-  amy_ticks = am.cwrap(
-    'sequencer_ticks', 'number', [null]
-  );
-  amy_sysclock = am.cwrap(
-    'amy_sysclock', 'number', [null]
-  );
-  amy_process_single_midi_byte = am.cwrap(
-    'amy_process_single_midi_byte', null, ['number, number']
-  );
+  amy_add_message = amy_c_api.send_wire;
+  amy_reset_sysclock = amy_c_api.reset_sysclock;
+  amy_ticks = amy_c_api.sequencer_ticks;
+  amy_sysclock = amy_c_api.ticks_ms;
+  amy_process_single_midi_byte = amy_c_api.process_single_midi_byte;
   // If Godot bridge is present, let it control startup with config.
   // Otherwise start with defaults (standalone REPL mode).
   if (typeof window !== 'undefined' && window._amy_godot_bridge) {

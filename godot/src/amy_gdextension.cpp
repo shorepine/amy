@@ -29,6 +29,10 @@ void AmySynth::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sysclock"), &AmySynth::get_sysclock);
 	ClassDB::bind_method(D_METHOD("is_running"), &AmySynth::is_running);
 
+	// Generated table-driven C API bindings (reset_sysclock, render_load,
+	// dump_state, ...). Regenerate with `make c-api`.
+#include "amy_c_api_gd_bind.inc"
+
 	// Config property bindings — set before calling start()
 	ClassDB::bind_method(D_METHOD("set_chorus", "enabled"), &AmySynth::set_chorus);
 	ClassDB::bind_method(D_METHOD("get_chorus"), &AmySynth::get_chorus);
@@ -187,3 +191,6 @@ void AmySynth::set_max_voices(int p_val) { max_voices = p_val; }
 int AmySynth::get_max_voices() const { return max_voices; }
 void AmySynth::set_max_synths(int p_val) { max_synths = p_val; }
 int AmySynth::get_max_synths() const { return max_synths; }
+
+// Generated table-driven C API method bodies. Regenerate with `make c-api`.
+#include "amy_c_api_gd_impl.inc"

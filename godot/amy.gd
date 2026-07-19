@@ -402,3 +402,57 @@ var _KW_PRIORITY: Dictionary = {
 	"patch_string": 63,
 }
 # END GENERATED
+
+# ============================================================
+#  Table-driven C API (native + web). Regenerate: make c-api
+# ============================================================
+# BEGIN GENERATED C API - scripts/gen_amy_c_api.py
+## Reset the AMY millisecond clock to zero
+func reset_sysclock() -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.reset_sysclock()")
+	elif _synth:
+		_synth.call("reset_sysclock")
+
+## Smoothed fraction of real time AMY spends rendering (0..1)
+func render_load() -> float:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.render_load() : null", true)
+		return 0.0 if v == null else float(v)
+	if _synth:
+		return _synth.call("render_load")
+	return 0.0
+
+## Set the render-load fraction that trips the overload failsafe (0 disables)
+func set_render_load_threshold(threshold: float) -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.set_render_load_threshold(%s)" % [str(threshold)])
+	elif _synth:
+		_synth.call("set_render_load_threshold", threshold)
+
+## Play the startup bleep
+func bleep(start: int = 0) -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.bleep(%s)" % [str(start)])
+	elif _synth:
+		_synth.call("bleep", start)
+
+## Read the sequencer tick count
+func sequencer_ticks() -> int:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.sequencer_ticks() : null", true)
+		return 0 if v == null else int(v)
+	if _synth:
+		return _synth.call("sequencer_ticks")
+	return 0
+
+## Read the complete replayable AMY state as a wire-command string
+func dump_state() -> String:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.dump_state() : null", true)
+		return "" if v == null else String(v)
+	if _synth:
+		return _synth.call("dump_state")
+	return ""
+
+# END GENERATED C API

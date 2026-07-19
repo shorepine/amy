@@ -88,6 +88,24 @@ jobs:
           exit 1
         fi
 
+  c-api:
+    # The cross-platform C API bindings (pyamy/micropython/web/godot .inc + .js
+    # files, the amy/__init__.py dispatch block, and godot/amy.gd's C API
+    # section) are generated from the table in scripts/gen_amy_c_api.py. Fail
+    # the build if a PR edited the table (or a generated file) without
+    # regenerating, so the four platforms can't drift.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Check generated C API bindings are in sync
+      run: make check-c-api
+
   godot-build:
     # Build the Godot GDExtension for Linux. amy_midi.c is excluded from the
     # Godot build, so new functions there that core code calls need stubs in
