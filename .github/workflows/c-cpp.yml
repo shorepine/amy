@@ -87,3 +87,37 @@ jobs:
           git diff -- godot/amy.gd
           exit 1
         fi
+
+  godot-build:
+    # Build the Godot GDExtension for Linux. amy_midi.c is excluded from the
+    # Godot build, so new functions there that core code calls need stubs in
+    # godot/src/amy_platform_stubs.c — without this job that only surfaces as a
+    # Windows link failure at release time (which silently ships releases with
+    # no addon zip). The SConstruct links Linux with -Wl,--no-undefined so the
+    # same unresolved symbols fail here, on the PR.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install scons
+      run: pip install scons
+
+    - name: Checkout godot-cpp
+      uses: actions/checkout@v4
+      with:
+        repository: godotengine/godot-cpp
+        ref: godot-4.4-stable
+        path: godot-cpp
+        submodules: true
+
+    - name: Build GDExtension (Linux debug)
+      working-directory: godot
+      run: scons platform=linux arch=x86_64 target=template_debug -j4
+      env:
+        GODOT_CPP_PATH: ${{ github.workspace }}/godot-cpp
+        AMY_SRC_PATH: ${{ github.workspace }}/src
