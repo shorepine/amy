@@ -547,6 +547,85 @@ def gen_godot():
         header + '\n'.join(binds) + '\n')
 
 
+DOCS_BEGIN = '<!-- BEGIN GENERATED C API DOCS - scripts/gen_amy_c_api.py -->'
+DOCS_END = '<!-- END GENERATED C API DOCS -->'
+
+DOC_C_TYPE = {'u8': 'uint8_t', 'u16': 'uint16_t', 'i32': 'int', 'u32': 'uint32_t',
+              'f32': 'float', 'bool': 'bool', 'str': 'char *'}
+DOC_C_RET = {'void': 'void', 'u32': 'uint32_t', 'i32': 'int', 'f32': 'float'}
+
+
+def doc_c_signature(e):
+    if e['kind'] == 'string_generator':
+        return ('void *%s(uint8_t synth, char *s, size_t len, bool include_fx, '
+                'void *state)' % e['c'])
+    if e['kind'] == 'string_out_malloc':
+        return 'char *%s(int *out_len)' % e['c']
+    if e['kind'] == 'bytes_out':
+        return 'int %s(int16_t *samples)' % e['c']
+    args = ', '.join('%s %s' % (DOC_C_TYPE[t], n) for n, t, _ in e['args'])
+    return '%s %s(%s)' % (DOC_C_RET[e['ret']], e['c'], args)
+
+
+def doc_py_signature(e):
+    parts = []
+    for n, t, d in e['args']:
+        if d is None:
+            parts.append(n)
+        else:
+            parts.append('%s=%s' % (n, {'1': 'True', '0': 'False'}[d] if t == 'bool' else d))
+    return 'amy.%s(%s)' % (e['py'], ', '.join(parts))
+
+
+def render_docs_block():
+    out = []
+    out.append('| Python (all platforms) | C function | MicroPython alias | Godot (`AmySynth`) | What it does |')
+    out.append('|---|---|---|---|---|')
+    for e in API:
+        py = '`%s`' % doc_py_signature(e) if e['py_public'] else '`amy.%s` (low-level; see below)' % e['py']
+        gd = '`%s`' % e['py'] if 'gd' in e['platforms'] else '—'
+        mp = '`tulip.%s`' % mp_name(e) if 'mp' in e['platforms'] else '—'
+        if 'py' not in e['platforms'] or 'web' not in e['platforms']:
+            plats = [p for p, label in (('py', 'CPython'), ('mp', 'MicroPython'),
+                                        ('web', 'web')) if p in e['platforms']]
+            py += ' *(%s only)*' % '/'.join({'py': 'CPython', 'mp': 'MicroPython',
+                                             'web': 'web'}[p] for p in plats)
+        out.append('| %s | `%s` | %s | %s | %s |'
+                   % (py, doc_c_signature(e), mp, gd, e['doc']))
+    out.append('')
+    out.append('Notes:')
+    out.append('')
+    out.append('- `amy.get_synth_commands(synth, ...)` is a hand-written wrapper in')
+    out.append('  `amy/__init__.py` adding `patch_num`/`dest_synth` handling on top of the')
+    out.append('  generated backend (which drives the C generator `yield_synth_commands`);')
+    out.append('  it returns the commands newline-joined into one string.')
+    out.append('- `amy.get_output_buffer()` / `amy.get_input_buffer()` return up to 1024')
+    out.append('  bytes of interleaved int16 samples (`None` when no block is ready).')
+    out.append('- `amy.dump_state()` returns the complete replayable engine state as a')
+    out.append('  newline-separated wire-command string.')
+    return '\n'.join(out) + '\n'
+
+
+def gen_docs(check=False):
+    path = ROOT / 'docs' / 'api.md'
+    text = path.read_text()
+    lines = text.split('\n')
+    try:
+        b = next(i for i, l in enumerate(lines) if l.strip() == DOCS_BEGIN)
+        e = next(i for i, l in enumerate(lines) if l.strip() == DOCS_END)
+    except StopIteration:
+        raise SystemExit('Could not find %r / %r markers in %s' % (DOCS_BEGIN, DOCS_END, path))
+    if e <= b:
+        raise SystemExit('Markers out of order in %s' % path)
+    new = lines[:b + 1] + render_docs_block().split('\n') + lines[e:]
+    new_text = '\n'.join(new)
+    if new_text != text:
+        if check:
+            return False
+        path.write_text(new_text)
+    return True
+
+
 GD_SCRIPT_BEGIN = '# BEGIN GENERATED C API - scripts/gen_amy_c_api.py'
 GD_SCRIPT_END = '# END GENERATED C API'
 
@@ -728,6 +807,7 @@ def main():
     gen_godot()
     init_fresh = gen_py_init(check=opts.check)
     gd_fresh = gen_gd_script(check=opts.check)
+    docs_fresh = gen_docs(check=opts.check)
 
     if opts.check:
         stale = [str(p.relative_to(ROOT)) for p in outputs if before[p] != p.read_text()]
@@ -735,6 +815,8 @@ def main():
             stale.append('amy/__init__.py')
         if not gd_fresh:
             stale.append('godot/amy.gd')
+        if not docs_fresh:
+            stale.append('docs/api.md')
         # restore originals so --check has no side effects
         for p in outputs:
             if before[p] is None:
@@ -752,6 +834,7 @@ def main():
             print('wrote %s' % p.relative_to(ROOT))
         print('updated amy/__init__.py generated block')
         print('updated godot/amy.gd generated C API block')
+        print('updated docs/api.md generated C API table')
 
 
 if __name__ == '__main__':
