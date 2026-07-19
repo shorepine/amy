@@ -491,6 +491,26 @@ static void amy_emit_state_lines(void (*cb)(const char *line, int len, void *ctx
     }
 }
 
+typedef struct { char *buf; int pos; int cap; } _string_ctx;
+static void _dump_string_cb(const char *line, int len, void *ctx) {
+    _string_ctx *c = (_string_ctx *)ctx;
+    if (c->pos + len + 1 > c->cap) return;
+    memcpy(c->buf + c->pos, line, len);
+    c->pos += len;
+    c->buf[c->pos++] = '\n';
+}
+
+char *amy_dump_state_to_string(int *out_len) {
+    int cap = 16384;
+    char *buf = (char *)malloc_caps(cap, amy_global.config.ram_caps_sysex);
+    if (!buf) { *out_len = 0; return NULL; }
+    _string_ctx ctx = { buf, 0, cap };
+    amy_emit_state_lines(_dump_string_cb, &ctx);
+    buf[ctx.pos] = '\0';
+    *out_len = ctx.pos;
+    return buf;
+}
+
 // Max base64 chars per sysex chunk. Empirically Chrome's Web MIDI has trouble
 // delivering sysex messages above a few KB reliably, so we split large dumps
 // into multiple smaller sysex frames. 1024 base64 chars → ~1030-byte sysex

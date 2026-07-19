@@ -63,6 +63,7 @@ void stop_receiving_sample();
 // State dump functions (used by zD wire command in parse.c)
 void amy_dump_state_to_sysex(void);
 void amy_dump_file_to_sysex(const char *filename);
+char *amy_dump_state_to_string(int *out_len);
 
 
 
