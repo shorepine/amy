@@ -154,6 +154,34 @@ jobs:
             core.setOutput('merger', merger);
             core.setOutput('amy_pr', String(pr.number));
 
+      - name: Refresh tulipcc's refdocs/amy snapshot for the new pin
+        env:
+          AMY_SHA: ${{ steps.gather.outputs.amy_sha }}
+        run: |
+          # tulipcc CI's refdocs-fresh check fails any PR that moves the amy gitlink
+          # without regenerating tulip/server/refdocs/amy (its _VENDORED_FROM.txt
+          # stamps the source SHA). Run tulipcc's own sync script against the new pin
+          # and hand the changed files to the next step to fold into the bump commit.
+          #
+          # SAFE under pull_request_target: this clones shorepine/tulipcc@main
+          # (trusted) and the script reads amy docs via GitHub raw at the merged
+          # main SHA — it never checks out or executes this PR's code.
+          #
+          # Best-effort: on any failure (e.g. a tulipcc@main sync_amy_docs.py
+          # without the --sha flag), leave the changes list empty and open the
+          # pin PR without the snapshot, exactly as before this step existed.
+          : > "$GITHUB_WORKSPACE/refdocs_changes.txt"
+          if git clone --depth 1 https://github.com/shorepine/tulipcc "$RUNNER_TEMP/tulipcc" \
+              && python3 "$RUNNER_TEMP/tulipcc/tulip/server/sync_amy_docs.py" --sha "$AMY_SHA"; then
+            git -C "$RUNNER_TEMP/tulipcc" add -A tulip/server/refdocs/amy
+            git -C "$RUNNER_TEMP/tulipcc" -c diff.renames=false diff --cached --name-status \
+              -- tulip/server/refdocs/amy > "$GITHUB_WORKSPACE/refdocs_changes.txt"
+          else
+            echo "::warning::refdocs refresh failed; opening the pin PR without a snapshot refresh"
+          fi
+          echo "refdocs changes for the bump commit:"
+          cat "$GITHUB_WORKSPACE/refdocs_changes.txt"
+
       - name: Open the bump PR on tulipcc
         id: pin
         uses: actions/github-script@v7
@@ -191,9 +219,29 @@ jobs:
             const baseSha = baseRef.data.object.sha;
             const baseCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: baseSha });
 
+            // The gitlink bump, plus the refreshed refdocs/amy snapshot (if the
+            // previous step produced one) so the refdocs-fresh check passes.
+            const entries = [{ path: 'amy', mode: '160000', type: 'commit', sha: amySha }];
+            let refdocsChanges = [];
+            try {
+              refdocsChanges = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/refdocs_changes.txt`, 'utf8')
+                .split('\n').map(l => l.trim()).filter(Boolean);
+            } catch (e) { /* no refresh available; bump the gitlink alone */ }
+            for (const line of refdocsChanges) {
+              const [status, file] = line.split('\t');
+              if (!file || !file.startsWith('tulip/server/refdocs/amy/')) continue;
+              if (status === 'D') {
+                // sha: null deletes the path from the tree.
+                entries.push({ path: file, mode: '100644', type: 'blob', sha: null });
+              } else {
+                const content = fs.readFileSync(`${process.env.RUNNER_TEMP}/tulipcc/${file}`, 'utf8');
+                entries.push({ path: file, mode: '100644', type: 'blob', content });
+              }
+            }
+
             const tree = await github.rest.git.createTree({
               owner, repo, base_tree: baseCommit.data.tree.sha,
-              tree: [{ path: 'amy', mode: '160000', type: 'commit', sha: amySha }],
+              tree: entries,
             });
 
             // Nothing to do if tulipcc already points at this amy commit.
@@ -202,9 +250,12 @@ jobs:
               return;
             }
 
+            const refdocsNote = entries.length > 1
+              ? '\n\nIncludes the regenerated tulip/server/refdocs/amy snapshot for this pin.'
+              : '';
             const commit = await github.rest.git.createCommit({
               owner, repo,
-              message: `Bump amy submodule to ${short} (amy#${amyPr})`,
+              message: `Bump amy submodule to ${short} (amy#${amyPr})` + refdocsNote,
               tree: tree.data.sha,
               parents: [baseSha],
             });
