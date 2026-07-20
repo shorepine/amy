@@ -165,7 +165,27 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 }
 
 // Stick to the faster mult for biquad, hpf etc, since the parameters aren't so sensitive, and parametric_eq was chewing major CPU.
+/* SMULR6 truncates both operands to 12 fractional bits.  At low cutoff the
+ * split-feedback corrections e = 2 + a1 and f = 1 - a2 are ~2^-10, so they keep
+ * only 2-3 significant bits and the pole lands well off target: HPF/BPF at
+ * Q >= 2 rings up into clipping or loses its resonance, and the LPF numerator
+ * rounds to zero.  Exact multiply, ~2 more instructions. */
+#ifdef AMY_USE_FIXEDPOINT
+// 64 x 64 -> 64 is fast on ESP32-S3
+// Also use MUL64 for non-MCU builts
+#if (defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)) || defined(__linux__) || defined(__gnu_linux__) || defined(_WIN32) || defined(_WIN64) || (defined(__APPLE__) && defined(__MACH__))
+#define AMY_HAS_MUL64
+#endif
+#endif
+
+#ifdef AMY_HAS_MUL64
+static inline SAMPLE SMUL64R(SAMPLE a, SAMPLE b) {
+    return (SAMPLE)((((int64_t)a * (int64_t)b) + (1 << (S_FRAC_BITS - 1))) >> S_FRAC_BITS);
+}
+#define FILT_MUL_SS(a, b) SMUL64R(a, b)
+#else
 #define FILT_MUL_SS(a, b) SMULR6(a, b)
+#endif
 
 #define FILTER_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
 #define FILTER_BIQUAD_SCALEUP_BITS 0  // Apply this gain to input before filtering to avoid underflow in intermediate value.
@@ -201,6 +221,19 @@ int8_t dsps_biquad_f32_ansi(const SAMPLE *input, SAMPLE *output, int len, SAMPLE
     return 0;
 }
 
+int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_COMMUTED)
+    // poles before zeros, for Direct Form II
+    for (int i = 0 ; i < len ; i++) {
+        SAMPLE d0 = input[i] - FILT_MUL_SS(coef[3], w[0]) - FILT_MUL_SS(coef[4], w[1]);
+        output[i] = FILT_MUL_SS(coef[0], d0) + FILT_MUL_SS(coef[1], w[0]) + FILT_MUL_SS(coef[2], w[1]);
+        w[1] = w[0];
+        w[0] = d0;
+    }
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_COMMUTED)
+
+    return 0;
+}
 
 int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
@@ -209,7 +242,7 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     SAMPLE x2 = w[1];
     SAMPLE y1 = w[2];
     SAMPLE y2 = w[3];
-    SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
+    SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = 2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
     for (int i = 0 ; i < len ; i++) {
@@ -230,6 +263,52 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
 
     return 0;
+}
+
+AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice_nobfp_fixedzeros(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val_unused) {
+    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
+    // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
+    SAMPLE x1 = w[0];
+    SAMPLE x2 = w[1];
+    SAMPLE y1 = w[2];
+    SAMPLE y2 = w[3];
+    SAMPLE v1 = w[4];
+    SAMPLE v2 = w[5];
+    SAMPLE a = coef[0];
+    SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = 2 + e
+    SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
+    //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
+    SAMPLE max_out = 0;
+    for (int i = 0 ; i < len ; i++) {
+        SAMPLE x0, w0, v0;
+        x0 = FILT_MUL_SS(a, input[i]);
+        w0 = x0 + SHIFTL(x1, 1) + x2;
+        v0 = w0 + SHIFTL(v1, 1) - v2;
+        v0 = v0 - FILT_MUL_SS(e, v1) + FILT_MUL_SS(f, v2);
+        w0 = v0 + SHIFTL(v1, 1) + v2;
+        w0 = FILT_MUL_SS(a, w0);
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
+        y0 = y0 - FILT_MUL_SS(e, y1) + FILT_MUL_SS(f, y2);
+        x2 = x1;
+        x1 = x0;
+        v2 = v1;
+        v1 = v0;
+        y2 = y1;
+        y1 = y0;
+        output[i] = y0;
+        if (y0 < 0) y0 = -y0;
+        if (y0 > max_out)
+            max_out = y0;
+    }
+    w[0] = x1;
+    w[1] = x2;
+    w[2] = y1;
+    w[3] = y2;
+    w[4] = v1;
+    w[5] = v2;
+    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
+        
+    return max_out;
 }
 
 // 16 bit pseudo floating-point multiply.
@@ -420,7 +499,7 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SA
     SAMPLE state_max = scan_max(w, 6);
     int abits, bbits, cbits, ebits, fbits;
     SAMPLE a = top16SMUL_a_part(coef[0], &abits);
-    SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = -2 + e
+    SAMPLE e = top16SMUL_a_part(F2S(2.0f) + coef[3], &ebits);  // So coef[3] = 2 + e
     SAMPLE f = top16SMUL_a_part(F2S(1.0f) - coef[4], &fbits);  // So coef[4] = 1 - f
     assert(FILTER_SCALEUP_BITS == 0);
     bbits = nheadroom16(max_val);
@@ -465,20 +544,6 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice(const SAMPLE *input, SA
     AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE)
 
     return max_out;
-}
-
-int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
-    AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_COMMUTED)
-    // poles before zeros, for Direct Form II
-    for (int i = 0 ; i < len ; i++) {
-        SAMPLE d0 = input[i] - FILT_MUL_SS(coef[3], w[0]) - FILT_MUL_SS(coef[4], w[1]);
-        output[i] = FILT_MUL_SS(coef[0], d0) + FILT_MUL_SS(coef[1], w[0]) + FILT_MUL_SS(coef[2], w[1]);
-        w[1] = w[0];
-        w[0] = d0;
-    }
-    AMY_PROFILE_STOP(DSPS_BIQUAD_F32_ANSI_COMMUTED)
-
-    return 0;
 }
 
 void filters_deinit(uint8_t bus) {
@@ -747,8 +812,13 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
     //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc]->last_filt_norm_bits, filtnormbits, normbits);
     if(synth[osc]->filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
+#ifdef AMY_HAS_MUL64
+        max_val = dsps_biquad_f32_ansi_split_fb_twice_nobfp_fixedzeros(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
+#else
+        // Use block-floating-point to preserve headroom on 32 bit mult architectures.
         max_val = dsps_biquad_f32_ansi_split_fb_twice(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
-    //} else if(synth[osc]->filter_type==FILTER_LPF) {
+#endif
+        //} else if(synth[osc]->filter_type==FILTER_LPF) {
         // Optimized block-floating point 12 dB/oct LPF
         //max_val = dsps_biquad_f32_ansi_split_fb_once(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
     } else {
