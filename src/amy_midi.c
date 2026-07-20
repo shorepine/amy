@@ -741,7 +741,13 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 // Is there USB gadget midi? Send it
 #if defined TUD_USB_GADGET
-    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) {
+    // tud_ready(): only try USB when a host has enumerated us (and the bus
+    // isn't suspended). tud_midi_stream_write has no mount check -- with no
+    // host attached (e.g. AMYboard on eurorack power alone) it fills its tx
+    // FIFO, then returns 0 forever, and the stall loop below burns ~1s per
+    // byte. MIDI clock out (24 PPQ) hits that from the render path and
+    // wedges the sequencer while starving the UART/TRS out.
+    if((amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) && tud_ready()) {
         // tud_midi_stream_write uses a small FIFO (e.g. 64 bytes). For long
         // messages (e.g. zD sysex dumps) we must loop and yield until the
         // USB task flushes the FIFO, otherwise bytes are silently dropped.
