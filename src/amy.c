@@ -334,7 +334,7 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
         // Configure the LFO osc.
         ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL);
         // if we're turning on for the first time, start the oscillator.
-        if (synth[CHORUS_MOD_SOURCE + bus]->status == SYNTH_OFF) {  //chorus.level == 0) {
+        if (synth[CHORUS_MOD_SOURCE + bus]->role == SYNTH_IS_NORMAL) {  //chorus.level == 0) {
             // Setup chorus oscillator.
             synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_NOTE] = 0;  // Turn off default.
             synth[CHORUS_MOD_SOURCE + bus]->logfreq_coefs[COEF_BEND] = 0;  // Turn off default.
@@ -343,7 +343,7 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
             synth[CHORUS_MOD_SOURCE + bus]->wave = TRIANGLE;
             osc_note_on(CHORUS_MOD_SOURCE + bus, lfo_freq);
             // Stop us from doing this again.
-            synth[CHORUS_MOD_SOURCE + bus]->status = SYNTH_IS_MOD_SOURCE;
+            synth[CHORUS_MOD_SOURCE + bus]->role = SYNTH_IS_MOD_SOURCE;
         }
         // apply depth, lfo_freq
         synth[CHORUS_MOD_SOURCE + bus]->amp_coefs[COEF_CONST] = depth;
@@ -648,7 +648,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     ensure_osc_allocd(d.osc, NULL);
 
     // Voices / patches gets set up here 
-    // you must set both synht & load_patch together to load a patch 
+    // you must set both synth & load_patch together to load a patch 
     if (AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices) || AMY_IS_SET(e->oscs_per_voice)) {
             amy_execute_deltas();
@@ -847,6 +847,7 @@ void reset_osc_params(struct synthinfo *psynth) {
 
 void reset_osc_state(struct synthinfo *psynth) {
     // osc state are the internal values that keep track of the osc evolution in time.
+    psynth->role = SYNTH_IS_NORMAL;
     psynth->status = SYNTH_OFF;
     psynth->phase = F2P(0);
     psynth->step = 0;
@@ -1078,8 +1079,8 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
-    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " wave %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
-            i, synth[i]->status, synth[i]->wave, synth[i]->mod_source,
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
+            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
@@ -1266,14 +1267,18 @@ void play_delta(struct delta *d) {
 
     if(d->param == MIDI_NOTE) {
         // Midi note and Velocity are propagated to chained_osc.
+        // We ignore note values directed at MOD_SOURCE to avoid default voice note-on messing up mod_osc.
+        // We ignore note values directed at ALGO_SOURCE, PARTIAL, or CHAINED oscs because they get note values from their parents.
+        // Note, we're about to walk down the chain, but the *head* of the chain is not marked CHAINED.
         uint16_t osc = d->osc;
-        while(AMY_IS_SET(osc) &&
-              !(synth[osc]->status == SYNTH_IS_MOD_SOURCE
-                || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
-                || synth[osc]->wave == PARTIAL)) {
-            // (We ignore note values directed at MOD_SOURCE to avoid default voice note-on messing up mod_osc.)
-            synth[osc]->midi_note = d->data.f;
-            osc = synth[osc]->chained_osc;
+        if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
+              || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
+              || synth[osc]->role == SYNTH_IS_CHAINED
+              || synth[osc]->wave == PARTIAL)) {
+            while(AMY_IS_SET(osc)) {
+                synth[osc]->midi_note = d->data.f;
+                osc = synth[osc]->chained_osc;
+            }
         }
     }
     if(d->param == WAVE) {
@@ -1351,10 +1356,15 @@ void play_delta(struct delta *d) {
     if(d->param == CHAINED_OSC) {
         int chained_osc = d->data.i;
         if (chained_osc >=0 && chained_osc < AMY_OSCS &&
-            !chained_osc_would_cause_loop(d->osc, chained_osc))
+            !chained_osc_would_cause_loop(d->osc, chained_osc)) {
             synth[d->osc]->chained_osc = chained_osc;
-        else
+            synth[chained_osc]->role = SYNTH_IS_CHAINED;
+        } else {
+            // If we were pointing to a chained osc, it would have been flagged as SYNTH_IS_CHAINED, but now it is not in fact chained.  So it should be ..?
+            if (AMY_IS_SET(synth[d->osc]->chained_osc))
+                synth[synth[d->osc]->chained_osc]->role = SYNTH_IS_NORMAL;
             AMY_UNSET(synth[d->osc]->chained_osc);
+        }
     }
     if(d->param == RESET_OSC) { 
         // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
@@ -1381,7 +1391,7 @@ void play_delta(struct delta *d) {
         // NOTE: These are delta-only side effects.  A purist would strive to remove them.
         // When an oscillator is named as a modulator, we change its state.
         ensure_osc_allocd(mod_osc, NULL);
-        synth[mod_osc]->status = SYNTH_IS_MOD_SOURCE;
+        synth[mod_osc]->role = SYNTH_IS_MOD_SOURCE;
         // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
         synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
         // No longer record this osc in note_off state.
@@ -1403,7 +1413,7 @@ void play_delta(struct delta *d) {
         if(AMY_IS_SET(synth[d->osc]->algo_source[which_source])) {
             int osc = synth[d->osc]->algo_source[which_source];
             ensure_osc_allocd(osc, NULL);
-            synth[osc]->status = SYNTH_IS_ALGO_SOURCE;
+            synth[osc]->role = SYNTH_IS_ALGO_SOURCE;
             // Configure the amp envelope appropriately, just once when named as an algo_source.
             synth[osc]->eg_type[0] = ENVELOPE_DX7;
         }
@@ -1447,9 +1457,9 @@ void play_delta(struct delta *d) {
             uint16_t osc = d->osc;
             //fprintf(stderr, "t %.3f: delta note_on: osc %d vel %.3f\n\r", amy_global.time, osc, d->data.f);
             while(AMY_IS_SET(osc)) {
-                //fprintf(stderr, "osc: %d wave %d status %d\n\r", osc, synth[osc]->wave, synth[osc]->status);
-                if (!(synth[osc]->status == SYNTH_IS_MOD_SOURCE
-                      || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
+                //fprintf(stderr, "osc: %d wave %d role %d\n\r", osc, synth[osc]->wave, synth[osc]->role);
+                if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
+                      || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
                       || synth[osc]->wave == PARTIAL)
                     && (AMY_IS_SET(synth[osc]->chained_osc)
                         || synth[osc]->amp_coefs[COEF_VEL] == 0
@@ -1507,8 +1517,8 @@ void play_delta(struct delta *d) {
         } else if(synth[d->osc]->velocity > 0 && d->data.f == 0) { // new note off
             uint16_t osc = d->osc;
             while(AMY_IS_SET(osc)) {
-                if (!(synth[osc]->status == SYNTH_IS_MOD_SOURCE
-                      || synth[osc]->status == SYNTH_IS_ALGO_SOURCE
+                if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
+                      || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
                       || synth[osc]->wave == PARTIAL)) {
                     //synth[osc]->velocity = 0;
                     switch(synth[osc]->wave) {

@@ -653,7 +653,6 @@ int amy_parse_message(char * message, amy_event *e) {
     if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
         (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE)) {
         parse_transfer_message(message, length);
-        e->status = EVENT_TRANSFER_DATA;
         return length;
     }
 

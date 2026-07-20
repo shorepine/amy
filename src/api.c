@@ -116,7 +116,6 @@ amy_event amy_default_event() {
 }
 
 void amy_clear_event(amy_event *e) {
-    e->status = EVENT_EMPTY;
     AMY_UNSET(e->time);
     AMY_UNSET(e->osc);
     AMY_UNSET(e->bus);
@@ -279,7 +278,6 @@ void amy_add_event(amy_event *e) {
     if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
         uint8_t added = sequencer_add_event(e);
         (void)added; // we don't need to do anything with this info at this time
-        e->status = EVENT_SEQUENCE;
     } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
         // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
         patches_reset_patch(e->patch_number);
@@ -293,7 +291,6 @@ void amy_add_event(amy_event *e) {
         if(AMY_IS_SET(e->time)) playback_time = e->time;
         playback_time += amy_global.latency_ms;
         e->time = playback_time;
-        e->status = EVENT_SCHEDULED;
         amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
