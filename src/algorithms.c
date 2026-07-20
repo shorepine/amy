@@ -145,7 +145,7 @@ SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, 
 void note_on_mod(uint16_t osc, uint16_t algo_osc) {
     // Perform the vital parts of amy.c:1089 ff since these oscs aren't turned on elsewhere.
     synth[osc]->note_on_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
-    synth[osc]->status = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
+    synth[osc]->role = SYNTH_IS_ALGO_SOURCE; // to ensure it's rendered
     if (AMY_IS_SET(synth[osc]->trigger_phase))
         synth[osc]->phase = F2P(synth[osc]->trigger_phase);
     if(synth[osc]->wave==SINE) fm_sine_note_on(osc, algo_osc);
@@ -245,7 +245,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
 
         SAMPLE value = 0;
         if(AMY_IS_SET(synth[osc]->algo_source[op])
-           && synth[synth[osc]->algo_source[op]]->status == SYNTH_IS_ALGO_SOURCE) {
+           && synth[synth[osc]->algo_source[op]]->role == SYNTH_IS_ALGO_SOURCE) {
             value = render_mod(in_buf, out_buf, synth[osc]->algo_source[op], feedback_level, osc, mod_amp);
         } // If osc is not set, output has already been cleared.
         if (out_buf == buf && value > max_value)  max_value = value;

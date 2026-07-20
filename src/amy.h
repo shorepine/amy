@@ -311,14 +311,11 @@ enum coefs{
 #define SYNTH_OFF 0
 #define SYNTH_AUDIBLE 1
 #define SYNTH_INAUDIBLE 2
-#define SYNTH_IS_MOD_SOURCE 3
-#define SYNTH_IS_ALGO_SOURCE 4
-
-// event.status values
-#define EVENT_EMPTY 0
-#define EVENT_SCHEDULED 1
-#define EVENT_TRANSFER_DATA 2
-#define EVENT_SEQUENCE 3
+// synth[].role values
+#define SYNTH_IS_NORMAL 0
+#define SYNTH_IS_MOD_SOURCE 1
+#define SYNTH_IS_ALGO_SOURCE 2
+#define SYNTH_IS_CHAINED 3
 
 // Envelope generator types (for synth[osc].env_type[eg]).
 #define ENVELOPE_NORMAL 0
@@ -578,7 +575,6 @@ typedef struct amy_event {
     //
     uint32_t sequence[3]; // tick, period, tag
     //
-    uint8_t status;
     uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
     // Global effects
@@ -632,6 +628,7 @@ struct synthinfo {
     const LUT *lut;       // Selected lookup table and size.
     // Per-block state (changes with time)
     uint8_t status;  // not in event
+    uint8_t role;  // not in event
     PHASOR phase;  // not in event
     float step;  // not in event
     float substep;  // not in event

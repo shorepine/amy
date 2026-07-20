@@ -49,7 +49,7 @@ void partials_note_on(uint16_t osc) {
         // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
         synth[o]->preset = synth[osc]->preset;
         synth[o]->logfreq_coefs[COEF_BEND] = 0;  // Each PARTIAL will receive pitch bend via the midi_note modulation from the parent osc, don't add it twice.
-        synth[o]->status = SYNTH_IS_ALGO_SOURCE;
+        synth[o]->role = SYNTH_IS_ALGO_SOURCE;
         synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
         AMY_UNSET(synth[o]->note_off_clock);
         msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
@@ -87,7 +87,7 @@ SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
-        if(synth[o]->status ==SYNTH_IS_ALGO_SOURCE) {
+        if(synth[o]->role == SYNTH_IS_ALGO_SOURCE) {
             // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
             synth[o]->velocity = msynth[osc]->amp;
             // We also use dynamic, fractional note to propagate parent freq modulation.
@@ -171,7 +171,7 @@ void _osc_on_with_harm_param(uint16_t o, float *harm_param, const interp_partial
     synth[o]->logfreq_coefs[COEF_NOTE] = 0;
     synth[o]->amp_coefs[COEF_VEL] = 1.0;  // velocity is modified on-the-fly by the control osc to vary global amplitude.
     // Other osc params.
-    synth[o]->status = SYNTH_IS_ALGO_SOURCE;
+    synth[o]->role = SYNTH_IS_ALGO_SOURCE;
     synth[o]->note_on_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     AMY_UNSET(synth[o]->note_off_clock);
     partial_note_on(o);
@@ -256,7 +256,7 @@ void interp_partials_note_on(uint16_t osc) {
         }
     }
     // Make sure any remaining oscs are still marked as ALGO_SOURCE
-    while(partial_osc < osc + 1 + max_num_partials)  { synth[partial_osc]->status = SYNTH_IS_ALGO_SOURCE; ++partial_osc; }
+    while(partial_osc < osc + 1 + max_num_partials)  { synth[partial_osc]->role = SYNTH_IS_ALGO_SOURCE; ++partial_osc; }
 }
 
 void interp_partials_note_off(uint16_t osc) {
