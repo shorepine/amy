@@ -1231,7 +1231,7 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     // Check to see if chaining this osc would cause a loop.
     uint16_t next_osc = chained_osc;
     do {
-        ensure_osc_allocd(chained_osc, NULL);
+        ensure_osc_allocd(next_osc, NULL);
         if (next_osc == osc) {
             fprintf(stderr, "chaining osc %d to osc %d would cause loop.\n",
                     chained_osc, osc);

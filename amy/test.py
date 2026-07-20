@@ -682,6 +682,34 @@ class TestChainedOsc(AmyTest):
     #amy.send(time=900, osc=1, vel=0)
 
 
+class TestChainedModOsc(AmyTest):
+  """A modulator that is itself modulated: slow LFO varies a vibrato LFO's depth."""
+
+  def run(self):
+    # osc 2: 1 Hz triangle, the "breathing" control signal.
+    amy.send(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
+    # osc 1: 5 Hz vibrato LFO whose amplitude (i.e. vibrato depth) breathes
+    # with osc 2 via its own mod_source.
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
+    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=900, vel=0)
+
+
+class TestModSourceLoopRejected(AmyTest):
+  """A mod_source cycle (a->b->a) must be rejected at assignment, not recurse
+  unboundedly at render time. The third send below would close a 1<->2 cycle and
+  must be dropped; the render then proceeds identically to TestChainedModOsc."""
+
+  def run(self):
+    amy.send(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
+    amy.send(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
+    amy.send(time=0, osc=2, mod_source=1)   # would close 1<->2: rejected
+    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
+    amy.send(time=100, note=70, vel=1)
+    amy.send(time=900, vel=0)
+
+
 class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
 
