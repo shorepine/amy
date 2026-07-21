@@ -33,9 +33,14 @@ AMY_IRAM_ATTR SAMPLE compute_mod_value(uint16_t mod_osc) {
 }
 
 AMY_IRAM_ATTR SAMPLE compute_mod_scale(uint16_t osc) {
+    // hold_and_modify(source) evaluates the modulator's own COEF_MOD input,
+    // so modulators can themselves be modulated (chained modulators). Cycles
+    // are rejected at assignment time (mod_osc_would_cause_loop in amy.c), so
+    // the recursion is bounded; the per-block memo in compute_mod_value keeps
+    // shared modulators cheap.
     uint16_t source = synth[osc]->mod_source;
     if(AMY_IS_SET(source)) {
-        if(source != osc) {  // that would be weird
+        if(source != osc) {  // belt-and-braces; assignment already rejects this
             hold_and_modify(source);
             return compute_mod_value(source);
         }
