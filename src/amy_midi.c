@@ -402,9 +402,13 @@ void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb) {
             if(byte == 0xF7) {
                 sysex_flag = 0;
                 parse_sysex();
-            } else {
+            } else if(sysex_len < MAX_SYSEX_BYTES - 1) {
                 sysex_buffer[sysex_len++] = byte;
             }
+            // else: sysex payload has overflowed sysex_buffer (MAX_SYSEX_BYTES) --
+            // drop the extra byte rather than writing past the allocation. The
+            // "- 1" keeps room for the NUL terminator parse_sysex() writes at
+            // sysex_buffer[sysex_len].
         } else {
             if(byte & 0x80) { // new status byte
                 // System Real-Time messages (0xF8-0xFF) may be interleaved
