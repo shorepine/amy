@@ -298,8 +298,8 @@ void dealloc_chorus_delay_lines(uint8_t bus) {
 
 void alloc_chorus_delay_lines(uint8_t bus) {
     amy_global.bus[bus]->chorus.delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
-    bool success = true;
-    for(int c = 0; c < AMY_NCHANS; ++c) {
+    bool success = (amy_global.bus[bus]->chorus.delay_mod != NULL);
+    for(int c = 0; success && c < AMY_NCHANS; ++c) {
         delay_line_t *delay_line = new_delay_line(DELAY_LINE_LEN, DELAY_LINE_LEN / 2, amy_global.config.ram_caps_delay);
         if (delay_line) {
             amy_global.bus[bus]->chorus.chorus_delay_lines[c] = delay_line;
@@ -326,6 +326,12 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
         if (amy_global.bus[bus]->chorus.chorus_delay_lines[0] == NULL) {
             alloc_chorus_delay_lines(bus);
         }
+        // Alloc can fail when out of memory: leave the chorus off, as
+        // config_reverb does.
+        if (amy_global.bus[bus]->chorus.chorus_delay_lines[0] == NULL) {
+            amy_global.bus[bus]->chorus.level = 0;
+            return;
+        }
         // apply max_delay.
         for (int chan=0; chan<AMY_NCHANS; ++chan) {
             //chorus_delay_lines[chan]->max_delay = max_delay;
@@ -333,6 +339,11 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
         }
         // Configure the LFO osc.
         ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL);
+        // LFO osc alloc failed (out of memory): leave the chorus off.
+        if (synth[CHORUS_MOD_SOURCE + bus] == NULL) {
+            amy_global.bus[bus]->chorus.level = 0;
+            return;
+        }
         // if we're turning on for the first time, start the oscillator.
         if (synth[CHORUS_MOD_SOURCE + bus]->role == SYNTH_IS_NORMAL) {  //chorus.level == 0) {
             // Setup chorus oscillator.
@@ -550,6 +561,16 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
         amy_global.delta_qsize++;
 
     struct delta *new_d = delta_get(d);
+
+    // Pool could not be grown (out of memory): undo the qsize bump and drop
+    // the delta.
+    if (new_d == NULL) {
+        if (queue == &amy_global.delta_queue && amy_global.delta_qsize > 0)
+            amy_global.delta_qsize--;
+        amy_release_lock();
+        AMY_PROFILE_STOP(ADD_DELTA_TO_QUEUE)
+        return;
+    }
 
     // insert it into the sorted list for fast playback
     struct delta **pptr = queue;
@@ -925,6 +946,15 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
     uint8_t *ptr = malloc_caps(sizeof(struct synthinfo) + sizeof(struct mod_synthinfo)
                                + total_num_breakpoints * (sizeof(float) + sizeof(uint32_t)),
                                amy_global.config.ram_caps_events);
+    // Out of memory: leave the osc unallocated (NULL) rather than crash.
+    // reset_osc, the render loop, and play_delta all tolerate a NULL osc, so
+    // the voice goes silent instead.
+    if (ptr == NULL) {
+        fprintf(stderr, "alloc_osc: out of memory allocating osc %d - osc left silent\n", osc);
+        synth[osc] = NULL;
+        msynth[osc] = NULL;
+        return;
+    }
     synth[osc] = (struct synthinfo *)ptr;
     msynth[osc] = (struct mod_synthinfo *)(ptr + sizeof(struct synthinfo));
     // Point to the breakpoint sets.
@@ -1237,6 +1267,9 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
                     chained_osc, osc);
             return true;
         }
+        // Alloc failed (out of memory): refuse the link so the chain walk
+        // never sees a NULL osc.
+        if (synth[next_osc] == NULL) return true;
         next_osc = synth[next_osc]->chained_osc;
     } while(AMY_IS_SET(next_osc));
     return false;
@@ -1256,6 +1289,9 @@ int mod_osc_would_cause_loop(uint16_t osc, uint16_t mod_osc) {
                     mod_osc, osc);
             return true;
         }
+        // Alloc failed (out of memory): refuse the link so hold_and_modify
+        // never recurses into a NULL osc.
+        if (synth[next_osc] == NULL) return true;
         next_osc = synth[next_osc]->mod_source;
     } while(AMY_IS_SET(next_osc));
     return false;
@@ -1282,7 +1318,15 @@ void play_delta(struct delta *d) {
     //uint8_t trig=0;
     // todo: delta-only side effect, remove
 
-    if (d->param != RESET_OSC)  ensure_osc_allocd(d->osc, NULL);
+    if (d->param != RESET_OSC) {
+        ensure_osc_allocd(d->osc, NULL);
+        // The alloc can fail when out of memory; every branch below
+        // dereferences synth[d->osc], so drop the delta instead of crashing.
+        if (synth[d->osc] == NULL) {
+            AMY_PROFILE_STOP(PLAY_DELTA)
+            return;
+        }
+    }
 
     if(d->param == MIDI_NOTE) {
         // Midi note and Velocity are propagated to chained_osc.
@@ -1347,6 +1391,11 @@ void play_delta(struct delta *d) {
             max_num_breakpoints[bp_set] = bp_index + 1;
             // realloc rounds up in blocks of DEFAULT_NUM_BREAKPOINTS (8).
             ensure_osc_allocd(d->osc, max_num_breakpoints);
+            // The realloc frees the old osc first, so it can come back NULL.
+            if (synth[d->osc] == NULL) {
+                AMY_PROFILE_STOP(PLAY_DELTA)
+                return;
+            }
         }
         if(pos % 2 == 0) {
             synth[d->osc]->breakpoint_times[bp_set][pos / 2] = d->data.i;
@@ -1442,9 +1491,15 @@ void play_delta(struct delta *d) {
         if(AMY_IS_SET(synth[d->osc]->algo_source[which_source])) {
             int osc = synth[d->osc]->algo_source[which_source];
             ensure_osc_allocd(osc, NULL);
-            synth[osc]->role = SYNTH_IS_ALGO_SOURCE;
-            // Configure the amp envelope appropriately, just once when named as an algo_source.
-            synth[osc]->eg_type[0] = ENVELOPE_DX7;
+            // Alloc failed (out of memory): unset the source so render_algo
+            // never walks into a NULL osc.
+            if (synth[osc] == NULL) {
+                AMY_UNSET(synth[d->osc]->algo_source[which_source]);
+            } else {
+                synth[osc]->role = SYNTH_IS_ALGO_SOURCE;
+                // Configure the amp envelope appropriately, just once when named as an algo_source.
+                synth[osc]->eg_type[0] = ENVELOPE_DX7;
+            }
         }
     }
     // for global changes, just make the change, no need to update the per-osc synth
@@ -1923,6 +1978,8 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if(AMY_HAS_CHORUS && core == 0) {
         for(int bus = 0; bus <= amy_global.highest_bus; ++bus) {
             ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL);
+            // Alloc failed (out of memory): skip this bus's chorus LFO.
+            if (synth[CHORUS_MOD_SOURCE + bus] == NULL) continue;
             hold_and_modify(CHORUS_MOD_SOURCE + bus);
             if(amy_global.bus[bus]->chorus.level!=0)  {
                 bzero(amy_global.bus[bus]->chorus.delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
@@ -2207,6 +2264,8 @@ int next_delta_block = 0;
 struct delta *deltas_pool_alloc(int max_delta_pool_size, struct delta *tail) {
     struct delta *new_pool = (struct delta *)malloc_caps(max_delta_pool_size * sizeof(struct delta),
                                                          amy_global.config.ram_caps_synth);
+    // Out of memory: leave the existing chain alone, caller handles NULL.
+    if (new_pool == NULL) return NULL;
     struct delta *d = new_pool;
     // Link all the deltas together
     for (int i = 1; i < max_delta_pool_size; ++i) {
@@ -2227,7 +2286,12 @@ void deltas_add_pool_block(void) {
         fprintf(stderr, "**PANIC: Ran out of deltas (%d blocks of %d deltas)\n", MAX_DELTA_BLOCKS, DELTA_BLOCK_SIZE);
         abort();
     }
-    free_deltas_pool = delta_blocks[next_delta_block++] = deltas_pool_alloc(DELTA_BLOCK_SIZE, free_deltas_pool);
+    struct delta *block = deltas_pool_alloc(DELTA_BLOCK_SIZE, free_deltas_pool);
+    if (block == NULL) {
+        fprintf(stderr, "deltas_add_pool_block: out of memory - events will be dropped\n");
+        return;
+    }
+    free_deltas_pool = delta_blocks[next_delta_block++] = block;
 }
 
 void deltas_pool_init() {
@@ -2249,6 +2313,8 @@ struct delta *delta_get(struct delta *from) {
     if (d == NULL)  {
         deltas_add_pool_block();
         d = free_deltas_pool;
+        // Pool could not be grown; add_delta_to_queue handles NULL.
+        if (d == NULL) return NULL;
     }
     free_deltas_pool = d->next;
     if (from != NULL) {

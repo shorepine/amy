@@ -190,6 +190,11 @@ void set_cv_from_osc(int cv_channel, int osc) {
     osc_for_cv[cv_channel] = osc;
     if (osc < 0)  return;  // syntax to unset cv_from_osc.
     ensure_osc_allocd(osc, NULL);
+    // Alloc failed (out of memory): leave the mapping unset rather than crash.
+    if (synth[osc] == NULL) {
+        osc_for_cv[cv_channel] = -1;
+        return;
+    }
     synth[osc]->role = SYNTH_IS_MOD_SOURCE;
     // No longer record this osc in note_off state.
     AMY_UNSET(synth[osc]->note_off_clock);
