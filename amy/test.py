@@ -1231,6 +1231,7 @@ class TestLoadSample(AmyTest):
   an "Unrecognized transfer-level command"."""
 
   def run(self):
+    amy.reset()
     amy.load_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
     amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
