@@ -892,6 +892,9 @@ typedef struct global_state {
     // Precomputed overload thresholds
     uint32_t overload_threshold_us;
     uint16_t overload_blocks;
+
+    // Runtime allocation failures since amy_start (see amy_oom).
+    uint32_t oom_count;
 } global_state_t;
 
 
@@ -1000,6 +1003,11 @@ void amy_overload_check(uint32_t render_us);
 void amy_overload_failsafe();
 void amy_set_render_load_threshold(float threshold);
 float amy_get_render_load();
+// Count of runtime allocation failures since amy_start.  AMY degrades on OOM
+// (silent voice, dropped event) instead of crashing, so this is the host's
+// signal that it happened: poll it, and if it moved, re-create the synth to
+// get back to a known state.  Monotonic until the next amy_start.
+uint32_t amy_get_oom_count();
 int amy_get_output_buffer(output_sample_type * samples);
 int amy_get_input_buffer(output_sample_type * samples);
 void amy_set_external_input_buffer(output_sample_type * samples);

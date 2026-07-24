@@ -219,10 +219,11 @@ output_sample_type * output_block;
 #endif
 
 // Every runtime allocation-failure path reports through here. Release builds
-// log one stderr line and degrade gracefully at the call site; under
-// AMY_DEBUG we abort() instead, so the failure leaves a backtrace at its
-// cause rather than surfacing later as a silent osc.
+// bump amy_get_oom_count(), log one stderr line and degrade gracefully at the
+// call site; under AMY_DEBUG we abort() instead, so the failure leaves a
+// backtrace at its cause rather than surfacing later as a silent osc.
 void amy_oom(const char *fmt, ...) {
+    ++amy_global.oom_count;
     va_list ap;
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
@@ -230,6 +231,10 @@ void amy_oom(const char *fmt, ...) {
 #ifdef AMY_DEBUG
     abort();
 #endif
+}
+
+uint32_t amy_get_oom_count() {
+    return amy_global.oom_count;
 }
 
 
@@ -506,6 +511,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.hpf_state = 0;
     amy_global.render_us = 0;
     amy_global.overload_count = 0;
+    amy_global.oom_count = 0;
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
