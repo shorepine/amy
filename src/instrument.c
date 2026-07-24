@@ -172,7 +172,7 @@ float instrument_level_for_voice(uint16_t voice) {
 
 struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
-    // Out of memory: NULL is already "synth not defined" to all callers.
+    // NULL already means "synth not defined" to all callers.
     if (instrument == NULL) {
         amy_oom("instrument_init: out of memory for synth %d\n", id);
         return NULL;
