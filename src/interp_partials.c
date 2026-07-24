@@ -44,7 +44,8 @@ void partials_note_on(uint16_t osc) {
     int num_partials = synth[osc]->preset;
     for (int i = 0; i < num_partials; ++i) {
         int o = osc + 1 + i;
-        ensure_osc_allocd(o, NULL);
+        // On OOM this partial stays silent.
+        if (!ensure_osc_allocd(o, NULL)) continue;
         // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
         // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
         synth[o]->preset = synth[osc]->preset;
@@ -61,6 +62,8 @@ void partials_note_off(uint16_t osc) {
     int num_oscs = synth[osc]->preset;
     for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
         uint16_t o = i % AMY_OSCS;
+        // The partial may have failed to alloc at note-on.
+        if (synth[o] == NULL) continue;
         AMY_UNSET(synth[o]->note_on_clock);
         synth[o]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     }
@@ -236,7 +239,8 @@ void interp_partials_note_on(uint16_t osc) {
     uint8_t max_num_partials = _max_partials_for_partials_voice(partials_voice);
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS};
     for (int o = 0; o < max_num_partials; ++o) {
-        ensure_osc_allocd(osc + 1 + o, max_num_breakpoints);
+        // On OOM drop the note rather than render under-sized partials.
+        if (!ensure_osc_allocd(osc + 1 + o, max_num_breakpoints)) return;
     }
     int partial_osc = osc;
     for (int h = 0; h < num_harmonics; ++h) {
