@@ -471,6 +471,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
+            amy_execute_deltas();
             int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, sm[3], sm[4], sm[5]);
             start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
         }
