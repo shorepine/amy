@@ -750,6 +750,11 @@ typedef struct  {
     float (*amy_external_coef_hook)(uint16_t channel);
     void (*amy_external_block_done_hook)(void);
     void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
+    // Called with every run of bytes AMY sends out over MIDI, before (and
+    // regardless of) any device interface configured in `midi`, so hosts can
+    // forward AMY's MIDI output to transports AMY doesn't drive itself (e.g.
+    // BLE MIDI).  May be called from the render/sequencer task; keep it fast.
+    void (*amy_external_midi_output_hook)(uint8_t *bytes, uint16_t len);
     void (*amy_external_sequencer_hook)(uint32_t tick_count);
     uint32_t (*amy_external_fopen_hook)(char *filename, const char *mode);
     uint32_t (*amy_external_fwrite_hook)(uint32_t fptr, uint8_t *bytes, uint32_t len);
