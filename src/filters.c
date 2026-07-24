@@ -591,7 +591,8 @@ void filters_init(uint8_t bus) {
 }
 
 
-#define FILT_MUL_SS_EQ(a, b) top16SMUL(a, b)
+#ifndef AMY_HAS_MUL64
+//#define FILT_MUL_SS_EQ(a, b) top16SMUL(a, b)
 //#define FILT_MUL_SS_EQ(a, b) SMULR6(a, b)
 
 inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
@@ -669,6 +670,74 @@ AMY_IRAM_ATTR void parametric_eq_process(uint8_t bus, SAMPLE *block) {
     }
     AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
 }
+
+#else // AMY_HAS_MUL64
+
+#define FILT_MUL_SS_EQ(a, b) SMUL64R(a, b)
+
+AMY_IRAM_ATTR void parametric_eq_process(uint8_t bus, SAMPLE *block) {
+    // was void parametric_eq_process_top16block
+    // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
+    AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
+    SAMPLE **eq_coeffs = amy_global.bus[bus]->eq.eq_coeffs;
+    SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
+        
+    for(int c = 0; c < AMY_NCHANS; ++c) {
+        SAMPLE *cblock = block + c * AMY_BLOCK_SIZE;
+        // Zeros then poles - Direct Form I
+        // We need 2 memories for input, and 2 for output.
+        SAMPLE x1 = eq_delay[c][0][0];
+        SAMPLE x2 = eq_delay[c][0][1];
+        SAMPLE y01 = eq_delay[c][0][2];
+        SAMPLE y02 = eq_delay[c][0][3];
+        SAMPLE y11 = eq_delay[c][1][2];
+        SAMPLE y12 = eq_delay[c][1][3];
+        SAMPLE y21 = eq_delay[c][2][2];
+        SAMPLE y22 = eq_delay[c][2][3];
+        // Fold the global EQ parameters into the forward-gains of each stage.
+        SAMPLE c00 = FILT_MUL_SS_EQ(amy_global.bus[bus]->eq.eq[0], eq_coeffs[0][0]);
+        SAMPLE c03 = eq_coeffs[0][3];
+        SAMPLE c04 = eq_coeffs[0][4];
+        SAMPLE c10 = FILT_MUL_SS_EQ(amy_global.bus[bus]->eq.eq[1], eq_coeffs[1][0]);
+        SAMPLE c13 = eq_coeffs[1][3];
+        SAMPLE c14 = eq_coeffs[1][4];
+        SAMPLE c20 = FILT_MUL_SS_EQ(amy_global.bus[bus]->eq.eq[2], eq_coeffs[2][0]);
+        SAMPLE c23 = eq_coeffs[2][3];
+        SAMPLE c24 = eq_coeffs[2][4];
+        for (int i = 0 ; i < AMY_BLOCK_SIZE ; i++) {
+            SAMPLE x0 = cblock[i];
+            SAMPLE x1times2 = SHIFTL(x1, 1);
+            // Optimize the FIR multiplies for the known structure of the zeros in LPF/BPF/HPF.
+            SAMPLE w00 = FILT_MUL_SS_EQ(c00, x0 + x1times2 + x2);
+            SAMPLE y00 = w00 - FILT_MUL_SS_EQ(c03, y01) - FILT_MUL_SS_EQ(c04, y02);
+            SAMPLE w10 = FILT_MUL_SS_EQ(c10, x0 - x2);
+            SAMPLE y10 = w10 - FILT_MUL_SS_EQ(c13, y11) - FILT_MUL_SS_EQ(c14, y12);
+            SAMPLE w20 = FILT_MUL_SS_EQ(c20, x0 - x1times2 + x2);
+            SAMPLE y20 = w20 - FILT_MUL_SS_EQ(c23, y21) - FILT_MUL_SS_EQ(c24, y22);
+            x2 = x1;
+            x1 = x0;
+            y02 = y01;
+            y01 = y00;
+            y12 = y11;
+            y11 = y10;
+            y22 = y21;
+            y21 = y20;
+            cblock[i] = y00 - y10 + y20;
+        }
+        eq_delay[c][0][0] = x1;
+        eq_delay[c][0][1] = x2;
+        eq_delay[c][0][2] = y01;
+        eq_delay[c][0][3] = y02;
+        eq_delay[c][1][2] = y11;
+        eq_delay[c][1][3] = y12;
+        eq_delay[c][2][2] = y21;
+        eq_delay[c][2][3] = y22;
+    }
+    AMY_PROFILE_STOP(PARAMETRIC_EQ_PROCESS)
+}
+
+#endif // AMY_HAS_MUL64
+
 
 void hpf_buf(SAMPLE *buf, SAMPLE *state) {
     AMY_PROFILE_START(HPF_BUF)
