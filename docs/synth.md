@@ -70,6 +70,8 @@ amy.send(synth=0, note=70, vel=0)
 amy.send(synth=0, vel=0)
 # Once a synth has been initialized and associated with a set of voices, you can use it alone with patch
 amy.send(synth=0, patch=13)  # Load a different Juno patch, it will remain 4-voice.
+# You can also use `patch_string` to directly define a patch using a wire-command string.
+amy.send(synth=0, num_voices=3, patch_string=amy.message(wave=amy.TRIANGLE, bp0='0,1,1000,0,1000,0'))
 # You can release all the voices/oscs being used by a synth by setting its num_voices to zero.
 amy.send(synth=0, num_voices=0)
 # Each synth has an overall level (`synth_level`, wire code `iV`), default 1.0,
@@ -82,9 +84,6 @@ amy.send(synth=0, synth_level=0.5)
 amy.send(synth=10, patch=384)
 amy.send(synth=10, note=38, vel=1)  # acoustic snare (GM note numbers)
 amy.send(synth=10, patch=389)       # hot-swap the synth to the 80s Power Kit
-# You can also use `patch_string` to directly define a patch using a wire-command string.
-# The `synth_flags` here triggers the MIDI-drums-to-PCM-preset-patch translation.
-amy.send(synth=11, num_voices=3, patch_string='w7f0Z', synth_flags=3)
 ```
 
 Note 1: Although `note` can take on real values -- e.g. `note=60.5` for 50 cents above C4 -- the voice management tracks voices by integer note numbers (i.e., midi notes) so it rounds note values to the nearest integer when deciding which note-off goes with which note-on.  Note also that note-on events that also set the `preset` parameter (e.g. to select PCM samples) will fold the patch number into the note integer used as the key for note-on, note-off matching.
