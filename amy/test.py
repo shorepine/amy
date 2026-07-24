@@ -181,8 +181,8 @@ class TestPcmPhaseLive(AmyTest):
   """Modifying the PCM freq while a sound is playing gives discontinuities.  Issue #916"""
 
   def run(self):
-    amy.send(time=0, synth=10, num_voices=1, patch=258, synth_flags=3)   # GM drums
-    amy.send(time=100, synth=10, note=36, vel=1)                         # long kick sounding
+    amy.send(time=0, synth=10, patch=258)         # GM drums
+    amy.send(time=100, synth=10, note=36, vel=1)  # long kick sounding
     # while it rings, sweep the pitch:
     # i10n35f479.727a1Q0.5G0F16000R0.7P0Z
     kwargs = {'amp': 1, 'pan': 0.5, 'filter_type': amy.FILTER_NONE, 'filter_freq': 16000, 'resonance': 0.7, 'phase': 0}
@@ -1431,7 +1431,7 @@ class TestOscResetIsScheduled(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, patch=258)
     send_midi(time=100, synth=1, note=54, vel=1)
     send_midi(time=200, synth=1, note=66, vel=1)
     # But clearing the synth later would mess it up.
@@ -1443,7 +1443,7 @@ class TestClearSynth(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, num_voices=1, patch=258, synth_flags=3)
+    amy.send(time=0, synth=1, patch=258)
     send_midi(time=100, synth=1, note=54, vel=1)
 
     # Clear the synth
@@ -1758,7 +1758,7 @@ class TestMidiNoteCmd(AmyTest):
 
   def run(self):
     amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
-    amy.send(time=0, synth=10, num_voices=1, patch=258, synth_flags=3)  # MIDI drums
+    amy.send(time=0, synth=10, patch=258)  # MIDI drums
     # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
     amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
     # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)

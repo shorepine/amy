@@ -77,14 +77,13 @@ amy.send(synth=0, num_voices=0)
 # for the synth, independent of any osc amp settings (and the natural way to
 # scale a drum-kit synth, whose per-drum oscs each carry their own amp):
 amy.send(synth=0, synth_level=0.5)
-# As a special case, you can use `synth_flags` to set up a MIDI drum synth
-# that will translate GM note events into PCM presets. Load one of the drum kit
-# patches (384-390, see the Drum kits section). Drum kits are single-voice:
-# the one voice holds a dedicated osc per drum sound, so num_voices must be 1:
-amy.send(synth=10, num_voices=1, patch=384, synth_flags=3)
+# Patches 258 and 384-390 are General MIDI drum synth kits (see the Drum kits section).
+# They include special flags that will translate GM note events into PCM presets.
+amy.send(synth=10, patch=384)
 amy.send(synth=10, note=38, vel=1)  # acoustic snare (GM note numbers)
 amy.send(synth=10, patch=389)       # hot-swap the synth to the 80s Power Kit
 # You can also use `patch_string` to directly define a patch using a wire-command string.
+# The `synth_flags` here triggers the MIDI-drums-to-PCM-preset-patch translation.
 amy.send(synth=11, num_voices=3, patch_string='w7f0Z', synth_flags=3)
 ```
 
@@ -329,7 +328,7 @@ AMY comes with a bank of drum-like PCM samples baked in, as they are normally ha
 
 ### Drum kits
 
-On Gamma9001 devices, patches 384-390 are ready-made General MIDI drum kits: load one on a synth with `synth_flags=3` and GM note numbers (35/36 kick, 38 snare, 42 closed hat, 46 open hat, 49 crash, ...) play the right sound.
+On Gamma9001 devices, patches 384-390 are ready-made General MIDI drum kits: load one on a synth and GM note numbers (35/36 kick, 38 snare, 42 closed hat, 46 open hat, 49 crash, ...) play the right sound.
 
 | patch | MIDI PC (bank MSB 3) | kit |
 |-------|----------------------|-----|
@@ -341,7 +340,7 @@ On Gamma9001 devices, patches 384-390 are ready-made General MIDI drum kits: loa
 | 389 | 5 | 80s Power Kit (gated reverb) |
 | 390 | 6 | Percussion (hand drums / latin) |
 
-Switch kits from code with `amy.send(synth=10, patch=38x)`, or over MIDI with a bank select MSB of 3 (CC0=3) followed by a program change 0-6 on the drum channel. A synth already sitting on a kit patch stays in the kit bank, so a bare program change also switches kits. Channel 10 boots as the TR-808 kit when default synths are on; you can run a second kit polytimbrally on another channel, e.g. `amy.send(synth=11, num_voices=1, patch=390, synth_flags=3)`. Set a kit channel's overall level with a constant amp on the synth, e.g. `amy.send(synth=10, amp=0.5)` — the kits keep their per-drum gains in each note mapping's velocity scale, so the level persists across hits, just like on the melodic patches.
+Switch kits from code with `amy.send(synth=10, patch=38x)`, or over MIDI with a bank select MSB of 3 (CC0=3) followed by a program change 0-6 on the drum channel. A synth already sitting on a kit patch stays in the kit bank, so a bare program change also switches kits. Channel 10 boots as the TR-808 kit when default synths are on; you can run a second kit polytimbrally on another channel, e.g. `amy.send(synth=11, patch=390)`. Set a kit channel's overall level with a constant amp on the synth, e.g. `amy.send(synth=10, amp=0.5)` — the kits keep their per-drum gains in each note mapping's velocity scale, so the level persists across hits, just like on the melodic patches.
 
 
 ```python
