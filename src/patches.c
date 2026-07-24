@@ -92,7 +92,7 @@ void patches_debug() {
     for (uint8_t i = 0; i < 32 /* MAX_INSTRUMENTS */; ++i) {
         int num_voices = instrument_get_num_voices(i, voices);
         if (num_voices) {
-            fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " flags %" PRIu32 " voices",
+            fprintf(stderr, "synth %" PRIu8 " num_voices %" PRId32 " patch_num %" PRId32 " flags %" PRIu32 " voice #s",
                     i, (int32_t)num_voices, (int32_t)instrument_get_patch_number(i), instrument_get_flags(i));
             for (int j = 0; j < num_voices; ++j)  fprintf(stderr, " %" PRIu16, voices[j]);
             fprintf(stderr, "\n");
@@ -1097,11 +1097,15 @@ void release_voice_oscs(int32_t voice, uint32_t time) {
 uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     // When load_patch specifies a synth, convert that into voices.
     // e->synth is assumed to be set.
-    int num_voices = 0;
+    uint16_t requested_voices = e->num_voices;
     // If the instrument is alread initialized, copy the voice numbers.
-    num_voices = instrument_get_num_voices(e->synth, voices);
+    int num_voices = instrument_get_num_voices(e->synth, voices);
     //fprintf(stderr, "patches_voices_for_load: e->num_voices %d num_voices %d\n", e->num_voices, num_voices);
-    if (AMY_IS_SET(e->num_voices) && e->num_voices != num_voices) {
+    if (num_voices == 0 && AMY_IS_UNSET(requested_voices)) {
+        // New alloc without specifying num_voices - default to 1
+        requested_voices = 1;
+    }
+    if (AMY_IS_SET(requested_voices) && requested_voices != num_voices) {
         // If we did already have voice oscs, release them.
         for (int32_t i = 0; i < num_voices; ++i) {
             release_voice_oscs(voices[i], e->time);
@@ -1109,14 +1113,14 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
         num_voices = 0;
         // Find avaliable voices with a single pass through voice_to_base_osc.
         uint32_t v = 0;
-        for (int32_t i = 0; i < e->num_voices; ++i) {
+        for (int32_t i = 0; i < requested_voices; ++i) {
             while (v < amy_global.config.max_voices) {
                 if (AMY_IS_UNSET(voice_to_base_osc[v])) break;
                 ++v;
             }
             if (v == amy_global.config.max_voices)  {
                 fprintf(stderr, "ran out of voices allocating %" PRId32 " voices to synth %" PRId32 ", ignoring.",
-                        (int32_t)e->num_voices, (int32_t)e->synth);
+                        (int32_t)requested_voices, (int32_t)e->synth);
                 patches_debug();
                 return 0;
             }
@@ -1224,8 +1228,7 @@ void patches_load_patch(amy_event *e) {
 
     for(uint8_t v=0;v<num_voices;v++)  {
         // Find the first osc with oscs_per_voice free oscs.
-        uint8_t good = 0;
-
+        bool found = false;
         uint16_t osc_start = (AMY_OSCS/2);
 
         #ifdef TULIP
@@ -1235,29 +1238,31 @@ void patches_load_patch(amy_event *e) {
         if(voices[v]%2==1) osc_start = 0;
         #endif
 
-        for(uint16_t i=0;i<AMY_OSCS;i++) {
-            uint16_t osc = (osc_start + i) % AMY_OSCS;
-            if(AMY_IS_UNSET(osc_to_voice[osc])) {
-                // Are there num_voices x oscs_per_voice free oscs after this one?
-                good = 1;
-                for(uint16_t j=0; j < oscs_per_voice; j++) {
-                    good = good & (AMY_IS_UNSET(osc_to_voice[osc + j]));
+        for(uint16_t i = 0; !found && i < AMY_OSCS; i++) {
+            uint16_t base_osc = (osc_start + i) % AMY_OSCS;
+            // Don't scan if the block would wrap AMY_OSCS.
+            if (base_osc > AMY_OSCS - oscs_per_voice)  continue;
+            int available_oscs = 0;
+            // Are there num_voices x oscs_per_voice free oscs after this one?
+            for(uint16_t osc = base_osc; osc < base_osc + oscs_per_voice; ++osc) {
+                if (AMY_IS_SET(osc_to_voice[osc])) {
+                    break;
                 }
-                if(good) {
-                    //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", patch_oscs[patch_number], osc, voices[v]);
-                    //fprintf(stderr, "setting base osc for voice %d to %d\n", voices[v], osc);
-                    voice_to_base_osc[voices[v]] = osc; 
-                    for(uint16_t j=0; j < oscs_per_voice; j++) {
-                        //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", j, voices[v], osc+j);
-                        osc_to_voice[osc+j] = voices[v];
-                        schedule_osc_reset(e->time, osc + j, NULL);
-                    }
-                    // exit the loop
-                    i = AMY_OSCS + 1;
+                ++available_oscs;
+            }
+            if(available_oscs == oscs_per_voice) {
+                //fprintf(stderr, "found %d consecutive oscs starting at %d for voice %d\n", oscs_per_voice, base_osc, voices[v]);
+                voice_to_base_osc[voices[v]] = base_osc;
+                for(uint16_t osc = base_osc; osc < base_osc + oscs_per_voice; ++osc) {
+                    //fprintf(stderr, "setting osc %d for voice %d to amy osc %d\n", osc - base_osc, voices[v], osc);
+                    osc_to_voice[osc] = voices[v];
+                    schedule_osc_reset(e->time, osc, NULL);
                 }
+                // exit the loop
+                found = true;
             }
         }
-        if(!good) {
+        if(!found) {
             fprintf(stderr, "cannot find %" PRIu16 " oscs for patch %" PRIu16 " for voice %" PRIu16 ". not setting this voice\n",
                     oscs_per_voice, patch_number, voices[v]);
         }

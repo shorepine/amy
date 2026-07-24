@@ -1066,14 +1066,15 @@ def make_patches(filename):
         # build-conditional (amy.c: pcm_gamma808.h under GAMMA9001, else
         # pcm_tiny.h) -- so emit a matching 258 for each ROM. The GAMMA9001
         # variant reuses kit 384's GM map.
-        num_osc_drums, patch_string  = make_drums_patch()
+        _, patch_string  = make_drums_patch()
         _, gamma_patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
         f.write("#ifdef GAMMA9001\n")
         f.write("\t/* 258: MIDI drums (gamma808 ROM) */ \"%s\",\n" % (gamma_patch_string))
         f.write("#else\n")
         f.write("\t/* 258: MIDI drums (pcm_tiny ROM) */ \"%s\",\n" % (patch_string))
         f.write("#endif\n")
-        num_oscs.append(num_osc_drums)
+        # Drum patches actually set their oscs_per_voice as part of the patch, so put a placeholder in `patch_oscs`
+        num_oscs.append(1)
 
         # 259-383 are reserved so the Gamma9001 drum kits land on their own
         # MIDI program-change bank: patch = 384 + kit = 128 * MSB(3) + program.
@@ -1083,15 +1084,15 @@ def make_patches(filename):
             num_oscs.append(0)
 
         # kit 0: the baked TR-808 bank (ROM presets only; works without drums.bin)
-        num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
+        _, patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
         f.write("\t/* %d: drum kit 0 TR-808 (Gamma9001) */ \"%s\",\n" % (GAMMA_KIT_PATCH_BASE, patch_string))
-        num_oscs.append(num_osc_drums)
+        num_oscs.append(1)  # Dummy; patch includes 'inXX'
         # kits 1+: the drums.bin banks
         for k, (kit_name, kit) in enumerate(GAMMA_KITS):
-            num_osc_drums, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit), balance=True)
+            _, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit), balance=True)
             f.write("\t/* %d: drum kit %d %s (Gamma9001) */ \"%s\",\n" % (
                 GAMMA_KIT_PATCH_BASE + 1 + k, k + 1, kit_name, patch_string))
-            num_oscs.append(num_osc_drums)
+            num_oscs.append(1)  # Dummy: patch includes 'inXX'
 
         f.write("};\n")
         f.write("const uint16_t patch_oscs[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)
