@@ -44,9 +44,8 @@ void partials_note_on(uint16_t osc) {
     int num_partials = synth[osc]->preset;
     for (int i = 0; i < num_partials; ++i) {
         int o = osc + 1 + i;
-        ensure_osc_allocd(o, NULL);
         // Alloc failed (out of memory): this partial stays silent.
-        if (synth[o] == NULL) continue;
+        if (!ensure_osc_allocd(o, NULL)) continue;
         // Mark this PARTIAL as part of a build-your own with a flag value in its preset field.
         // This is used I think only at envelope.c:121 to avoid the normal partial preset special-case for PARTIALs.
         synth[o]->preset = synth[osc]->preset;
@@ -240,10 +239,9 @@ void interp_partials_note_on(uint16_t osc) {
     uint8_t max_num_partials = _max_partials_for_partials_voice(partials_voice);
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS};
     for (int o = 0; o < max_num_partials; ++o) {
-        ensure_osc_allocd(osc + 1 + o, max_num_breakpoints);
-        // Alloc failed (out of memory): drop the note rather than render
-        // through NULL partials below.
-        if (synth[osc + 1 + o] == NULL) return;
+        // Alloc (or breakpoint grow) failed (out of memory): drop the note
+        // rather than render through NULL or under-sized partials below.
+        if (!ensure_osc_allocd(osc + 1 + o, max_num_breakpoints)) return;
     }
     int partial_osc = osc;
     for (int h = 0; h < num_harmonics; ++h) {

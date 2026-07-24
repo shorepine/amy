@@ -39,7 +39,7 @@ struct voice_fifo *voice_fifo_init(int size, const char *name) {
     }
     struct voice_fifo *result = (struct voice_fifo *)malloc_caps(sizeof(struct voice_fifo), amy_global.config.ram_caps_synth);
     if (result == NULL) {
-        fprintf(stderr, "init_voice_fifo: out of memory\n");
+        amy_oom("init_voice_fifo: out of memory\n");
         return NULL;
     }
     result->head = 0;
@@ -174,7 +174,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     // Out of memory: NULL is already "synth not defined" to all callers.
     if (instrument == NULL) {
-        fprintf(stderr, "instrument_init: out of memory for synth %d\n", id);
+        amy_oom("instrument_init: out of memory for synth %d\n", id);
         return NULL;
     }
     instrument->id = id;

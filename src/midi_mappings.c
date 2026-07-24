@@ -328,7 +328,10 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
                 // First call to this mapping, allocate state, perform processing.
                 yield_state = malloc_caps(sizeof(struct midi_cmd_yield_state) + AMY_WIRE_COMMAND_LEN, amy_global.config.ram_caps_events);
                 // Out of memory: drop this midi message rather than crash.
-                if (yield_state == NULL) return NULL;
+                if (yield_state == NULL) {
+                    amy_oom("yield_midi_message_handler_events: out of memory\n");
+                    return NULL;
+                }
                 char *message = yield_state->message = (char *)(yield_state + 1);
                 yield_state->pos = 0;
                 // And now set up the message
