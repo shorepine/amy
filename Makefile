@@ -127,6 +127,12 @@ speedtest:
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
 	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
 
+speedtest-piano:
+	echo "Compiling LoadTestChord.ino..."
+	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256" tools/arduino_loadsweep/LoadTestChord
+	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
+	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
+
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
 
