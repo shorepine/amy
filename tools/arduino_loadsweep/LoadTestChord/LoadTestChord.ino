@@ -61,7 +61,7 @@ void loop() {
     amy_event e = amy_default_event();
     e.synth = 1;
     e.midi_note = 40 + (note_i * 3);
-    e.velocity = 0.2f;
+    e.velocity = 0.9f;
     amy_add_event(&e);
     fprintf(stderr, "NOTE i=%d note=%d ms=%lu\n",
             note_i, 40 + (note_i * 2), (unsigned long)millis());

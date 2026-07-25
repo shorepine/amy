@@ -1680,7 +1680,7 @@ float amp_combine_controls(float *controls, float *coefs) {
 #ifdef __EMSCRIPTEN__
 #include "emscripten/webaudio.h"
 #endif
-void hold_and_modify(uint16_t osc) {
+AMY_IRAM_ATTR void hold_and_modify(uint16_t osc) {
     // Calculate the dynamic parameters for this frame and store them in the msynth[osc] structure.
     AMY_PROFILE_START(HOLD_AND_MODIFY)
     float ctrl_inputs[NUM_COMBO_COEFS];

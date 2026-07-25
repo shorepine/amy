@@ -144,7 +144,7 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
         sign = -1;
         v0 = -v0; v1 = -v1;
     }
-    if(t1==t0 || elapsed==t1) {
+    if(t1==t0 || elapsed==t1 || v1 == v0) {
         // This way we return exact zero for v1 at the end of the segment, rather than BREAKPOINT_EPS
         scale = v1;
     } else {
