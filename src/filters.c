@@ -180,7 +180,11 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
 
 #ifdef AMY_HAS_MUL64
 static inline SAMPLE SMUL64R(SAMPLE a, SAMPLE b) {
+#ifdef USE_ROUNDING_IN_SMUL64R
     return (SAMPLE)((((int64_t)a * (int64_t)b) + (1 << (S_FRAC_BITS - 1))) >> S_FRAC_BITS);
+#else
+    return (SAMPLE)(((int64_t)a * (int64_t)b) >> S_FRAC_BITS);
+#endif
 }
 #define FILT_MUL_SS(a, b) SMUL64R(a, b)
 #else
