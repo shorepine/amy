@@ -56,6 +56,8 @@ void partials_note_on(uint16_t osc) {
         msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
         partial_note_on(o);
     }
+    // Squirrel away num_oscs
+    synth[osc]->last_two[0] = synth[osc]->preset;
 }
 
 void partials_note_off(uint16_t osc) {
@@ -73,17 +75,18 @@ void partials_note_off(uint16_t osc) {
 // render a full partial set at offset osc (with preset)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all presets have sustain point?
-SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     SAMPLE max_value = 0;
-    uint16_t num_oscs = 0;
+    //uint16_t num_oscs = 0;
     // No preset partials map, we are in "build-your-own".  The max number of oscs is taken from algo_source[0].
-    num_oscs = synth[osc]->preset;
-
-    if (synth[osc]->wave == INTERP_PARTIALS) {
-        //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
-        //num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
-        num_oscs = interp_partials_max_partials_for_patch(synth[osc]->preset);
-    }
+    //num_oscs = synth[osc]->preset;
+    //
+    //if (synth[osc]->wave == INTERP_PARTIALS) {
+    //    //const interp_partials_voice_t *partials_voice = &interp_partials_map[synth[osc]->preset % NUM_INTERP_PARTIALS_PRESETS];
+    //    //num_oscs = partials_voice->num_harmonics[0];   // Assume first preset has the max #harmonics.
+    //    num_oscs = interp_partials_max_partials_for_patch(synth[osc]->preset);
+    //}
+    uint16_t num_oscs = synth[osc]->last_two[0];  // hijack FM feedback state.
 
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
@@ -259,8 +262,10 @@ void interp_partials_note_on(uint16_t osc) {
             _osc_on_with_harm_param(partial_osc, harm_param, partials_voice);
         }
     }
+    // Squirrel away num_oscs
+    synth[osc]->last_two[0] = partial_osc - osc;
     // Make sure any remaining oscs are still marked as ALGO_SOURCE
-    while(partial_osc < osc + 1 + max_num_partials)  { synth[partial_osc]->role = SYNTH_IS_ALGO_SOURCE; ++partial_osc; }
+    while(partial_osc < osc + 1 + max_num_partials)  { synth[partial_osc]->role = SYNTH_IS_ALGO_SOURCE; synth[partial_osc]->status = SYNTH_OFF; ++partial_osc; }
 }
 
 void interp_partials_note_off(uint16_t osc) {

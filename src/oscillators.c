@@ -117,8 +117,8 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
 
 #define NOTHING ;
 
-
-AMY_IRAM_ATTR PHASOR render_lut_fm_fb(SAMPLE* buf,
+/* is this in fact ever used? */
+PHASOR render_lut_fm_fb(SAMPLE* buf,
                         PHASOR phase, 
                         PHASOR step,
                         SAMPLE incoming_amp, SAMPLE ending_amp,
@@ -648,22 +648,23 @@ void partial_note_on(uint16_t osc) {
     synth[osc]->lut = NULL;
 }
 
-void _partial_note_on(uint16_t osc, float freq) {
-    if (synth[osc]->lut == NULL) {
-        float period_samples = (float)AMY_SAMPLE_RATE / freq;
-        synth[osc]->lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
-    }
-}
+//void _partial_note_on(uint16_t osc, float freq) {
+//    if (synth[osc]->lut == NULL) {
+//        float period_samples = (float)AMY_SAMPLE_RATE / freq;
+//        synth[osc]->lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
+//    }
+//}
 
-SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
-    _partial_note_on(osc, freq);
+    //_partial_note_on(osc, freq);
+    //synth[osc]->lut = sine_fxpt_lutset[0];  // we know there's only one.
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc]->logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc]->lut->table_size);
     SAMPLE max_value;
-    synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
+    synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
 }
