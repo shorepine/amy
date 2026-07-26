@@ -43,6 +43,9 @@ const bool use_this_partial_map[MAX_NUM_HARMONICS] = {
 // choose a preset from the .h file
 void partials_note_on(uint16_t osc) {
     int num_partials = synth[osc]->preset;
+    // Never reserve or render past the end of the osc pool (see render_partials).
+    if (osc + 1 + num_partials > AMY_OSCS)
+        num_partials = (osc + 1 < AMY_OSCS) ? (AMY_OSCS - osc - 1) : 0;
     for (int i = 0; i < num_partials; ++i) {
         int o = osc + 1 + i;
         // On OOM this partial stays silent.
@@ -57,8 +60,9 @@ void partials_note_on(uint16_t osc) {
         msynth[o]->logfreq = synth[o]->logfreq_coefs[COEF_CONST] + msynth[osc]->logfreq;
         partial_note_on(o);
     }
-    // Squirrel away num_oscs
-    synth[osc]->last_two[0] = synth[osc]->preset;
+    // Squirrel away num_oscs -- the count we actually reserved, which the pool
+    // clamp above may have reduced below preset.
+    synth[osc]->last_two[0] = num_partials;
 }
 
 void partials_note_off(uint16_t osc) {
@@ -199,8 +203,16 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
     //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
+    // Clamp to the osc pool. The assert below is compiled out in every firmware
+    // build (-DNDEBUG), and this loop no longer wraps with % AMY_OSCS, so an
+    // out-of-range count would read straight past synth[].
+    if (osc + 1 + num_oscs > AMY_OSCS)
+        num_oscs = (osc + 1 < AMY_OSCS) ? (AMY_OSCS - osc - 1) : 0;
     assert(osc < AMY_OSCS - (num_oscs + 1));  // We won't overrun.
     for(uint16_t o = osc + 1; o < osc + 1 + num_oscs; o++) {
+        // A partial can be absent: partials_note_on() skips ones that failed to
+        // allocate. Both note_off paths already guard this; this one didn't.
+        if(synth[o] == NULL) continue;
         if(synth[o]->role == SYNTH_IS_ALGO_SOURCE) {
             // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
             synth[o]->velocity = msynth[osc]->amp;
@@ -349,9 +361,25 @@ void interp_partials_note_on(uint16_t osc) {
     // This has to be enough for any note in this map.  Assume num_harmonics[0] is largest (lowest pitch).
     uint8_t max_num_partials = _max_partials_for_partials_voice(partials_voice);
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS] = {2 + partials_voice->num_sample_times_ms, DEFAULT_NUM_BREAKPOINTS};
+    // The partials live at osc+1 .. osc+max_num_partials. If that range would
+    // run off the end of the osc pool, drop the note: ensure_osc_allocd()
+    // indexes synth[] without a bounds check, and render_partials() no longer
+    // wraps with % AMY_OSCS.
+    if (osc + 1 + max_num_partials > AMY_OSCS) {
+        synth[osc]->last_two[0] = 0;
+        return;
+    }
     for (int o = 0; o < max_num_partials; ++o) {
-        // On OOM drop the note rather than render under-sized partials.
-        if (!ensure_osc_allocd(osc + 1 + o, max_num_breakpoints)) return;
+        // On OOM drop the note rather than render under-sized partials. Clear the
+        // stashed partial count on the way out: render_partials() reads it as its
+        // loop bound, and returning without touching it leaves whatever was there
+        // before -- a previous note's count, or leftover FM feedback state, since
+        // last_two is a SAMPLE we're hijacking. Either makes the render walk oscs
+        // this note never set up.
+        if (!ensure_osc_allocd(osc + 1 + o, max_num_breakpoints)) {
+            synth[osc]->last_two[0] = 0;
+            return;
+        }
     }
     int partial_osc = osc;
     for (int h = 0; h < num_harmonics; ++h) {
