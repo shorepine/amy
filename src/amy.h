@@ -1137,7 +1137,9 @@ extern bool event_addresses_synth(amy_event *e);
 extern bool event_addresses_oscs(amy_event *e);
 
 // osc -> (amy) voice ownership map (patches.c); AMY_UNSET for oscs outside any voice.
-extern uint8_t *osc_to_voice;
+// uint16_t, like every other voice index: a uint8_t here silently truncated
+// voice numbers once max_voices went over 255.
+extern uint16_t *osc_to_voice;
 
 extern struct delta **queue_for_patch_number(int patch_number);
 extern void update_num_oscs_for_patch_number(int patch_number);
@@ -1151,7 +1153,11 @@ extern void instruments_reset();
 extern void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags);
 extern void instrument_release(int instrument_number);
 extern void instrument_change_number(int old_instrument_number, int new_instrument_number);
-#define _INSTRUMENT_NO_VOICE (255)
+// "no voice" sentinel. Must stay outside the range of a real voice index:
+// the functions below return either this or an amy voice number, and both
+// are uint16_t, so 255 stopped being a safe choice once max_voices could
+// exceed it.
+#define _INSTRUMENT_NO_VOICE (UINT16_MAX)
 extern uint16_t instrument_voice_for_note_event(int instrument_number, int note, bool is_note_off, bool *pstolen);
 extern bool instrument_number_exists(int instrument_number, const char *tag);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
