@@ -1,6 +1,7 @@
 // interp_partials - AMY kernel-side implementation of the interpolated partials-based synthesis originally implemented in tulip_piano.py.
 
 #include "amy.h"
+#include <assert.h>
 #include <stdbool.h>
 
 typedef struct {
@@ -72,6 +73,113 @@ void partials_note_off(uint16_t osc) {
 }
 
 
+static inline float p_combine_controls(float *controls, float *coefs) {
+    float result = 0;
+    for (int i = 0; i <= COEF_EG0; ++i)
+        result += coefs[i] * controls[i];
+    return result;
+}
+
+static inline float p_amp_combine_controls(float *controls, float *coefs) {
+    // Linear combination of amp coefs is then mapped so that 0 -> 0.001 and 1 -> 1 exponentially.
+    // For partials, amp_coefs = {const:1, vel:1, eg0:1, rest:0}
+    //float result = 0;
+    //for (int i = 0; i <= COEF_EG0; ++i)  {
+    //    float coef = coefs[i];
+    //    // A zero coef contributes nothing (0 * val == 0), so skip map_60db_to_01f
+    //    if (coef == 0)  continue;
+    //    float val = controls[i];
+    //    if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
+    //    if (i != COEF_MOD) {
+    //        val = map_60dB_to_01f(MAX(0, val)) - 1.0;    // const, vel, eg0, eg1 get log-compressed.
+            // make 0 mean "no amp" and 1 mean "regular (full) amp".
+    //    }
+    //    result += coef * val;
+    //}
+    //result = 3.0f * (result);
+    //if (log_amp < -2.0f) {
+    //    // Double the slope below 0.01.
+    //    log_amp = -2.0f + 2.0f * (log_amp + 2.0f);
+    //}
+    // Avoid powf with fxpt exp2
+    //result = S2F(exp2_lut(F2S(result * 3.321928094887362f)));
+    float result = coefs[COEF_CONST] * controls[COEF_VEL] * controls[COEF_EG0];
+    if (result <= AMP_THRESH_PLUS)  result = 0;
+    return result;
+}
+
+AMY_IRAM_ATTR void partials_hold_and_modify(uint16_t osc) {
+    // Version of hold_and_modify local to partials to allow speedup
+    float ctrl_inputs[NUM_COMBO_COEFS];
+    ctrl_inputs[COEF_CONST] = 1.0f;
+    ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc]->midi_note)) ? logfreq_for_midi_note(synth[osc]->midi_note) : 0;
+    ctrl_inputs[COEF_VEL] = synth[osc]->velocity;
+    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, 0));
+    //ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
+    //ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
+    //ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
+    //ctrl_inputs[COEF_EXT0] = cv_inputs[0];
+    //ctrl_inputs[COEF_EXT1] = cv_inputs[1];
+
+    // copy all the modifier variables
+    float logfreq = p_combine_controls(ctrl_inputs, synth[osc]->logfreq_coefs);
+    if (synth[osc]->portamento_alpha == 0) {
+        msynth[osc]->logfreq = logfreq;
+    } else {
+        msynth[osc]->logfreq = logfreq + synth[osc]->portamento_alpha * (msynth[osc]->last_logfreq - logfreq);
+    }
+    msynth[osc]->last_logfreq = msynth[osc]->logfreq;
+    //float filter_logfreq = p_combine_controls(ctrl_inputs, synth[osc]->filter_logfreq_coefs);
+    //if (filter_logfreq < MIN_FILTER_LOGFREQ)  filter_logfreq = MIN_FILTER_LOGFREQ;
+    //if (AMY_IS_SET(msynth[osc]->last_filter_logfreq)) {
+    //    #define MAX_DELTA_FILTER_LOGFREQ_DOWN 3.0f
+    //    float last_logfreq = msynth[osc]->last_filter_logfreq;
+    //    if (filter_logfreq < (last_logfreq - (MAX_DELTA_FILTER_LOGFREQ_DOWN / synth[osc]->resonance))) {
+    //        // Filter cutoff downward slew-rate limit.
+    //        // See https://github.com/shorepine/amy/issues/126
+    //        filter_logfreq = last_logfreq - (MAX_DELTA_FILTER_LOGFREQ_DOWN / synth[osc]->resonance);
+    //    }
+    //}
+    msynth[osc]->last_filter_logfreq = 0; //filter_logfreq;
+    msynth[osc]->filter_logfreq = 0; //filter_logfreq;
+    //msynth[osc]->duty = p_combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
+
+    //msynth[osc]->last_pan = msynth[osc]->pan;
+    //msynth[osc]->pan = p_combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
+    // Don't smear the pan on first frame of new note
+    ///if (synth[osc]->note_on_clock == amy_global.total_samples) {
+    //    //fprintf(stderr, "time %.3f osc %d note on\n", amy_global.time, osc);
+    //    // First frame for this osc since note-on, don't smooth-over the pan.
+    //    // (showed up when panning drum sounds).
+    //    msynth[osc]->last_pan = msynth[osc]->pan;
+    //}
+
+    // amp is a special case - coeffs apply in log domain.
+    float new_amp = p_amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
+    // Also, we advance one frame by writing both last_amp and amp (=next amp)
+    // *Except* for partials, where we allow one frame of ramp-on.
+    //if (synth[osc]->wave == PARTIAL) {
+        msynth[osc]->last_amp = msynth[osc]->amp;
+        msynth[osc]->amp = new_amp;
+    //} else {
+    //    // Prevent hard-off on transition to release by updating last_amp only for nonzero new_last_amp.
+    //    //if (new_amp > msynth[osc]->last_amp) {   // was > 0
+    //    if (msynth[osc]->last_amp == 0) {
+    //        msynth[osc]->last_amp = new_amp;
+    //    }
+    //    // Advance the envelopes to the beginning of the next frame.
+    //    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, AMY_BLOCK_SIZE));
+    //    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
+    //    msynth[osc]->amp = amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
+    //}
+    // synth[osc]->feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
+    // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
+    // we also check for custom, for tulips' memorypcm 
+    //if (synth[osc]->wave != PCM && synth[osc]->wave != CUSTOM)  msynth[osc]->feedback = synth[osc]->feedback;
+    //msynth[osc]->resonance = synth[osc]->resonance;
+    //}
+}
+
 // render a full partial set at offset osc (with preset)
 // freq controls pitch_ratio, amp amp_ratio, ratio controls time ratio
 // do all presets have sustain point?
@@ -91,8 +199,8 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
     //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
-    for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
-        uint16_t o = i % AMY_OSCS;
+    assert(osc < AMY_OSCS - (num_oscs + 1));  // We won't overrun.
+    for(uint16_t o = osc + 1; o < osc + 1 + num_oscs; o++) {
         if(synth[o]->role == SYNTH_IS_ALGO_SOURCE) {
             // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
             synth[o]->velocity = msynth[osc]->amp;
@@ -101,7 +209,7 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             // hold_and_modify contains a special case for wave == PARTIAL so that
             // envelope value are delayed by 1 frame compared to other oscs
             // so that partials fade in over one frame from zero amp.
-            hold_and_modify(o);
+            partials_hold_and_modify(o);
             //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
             //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
             SAMPLE value = render_partial(buf, o);
