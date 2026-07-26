@@ -114,6 +114,9 @@ qtest: amy-module
 playfailed: qtest
 	for x in `cat failed_tests.txt`; do echo $$x "ref"; sleep 0.2; afplay tests/ref/$$x.wav; echo $$x "tst"; sleep 0.2; afplay tests/tst/$$x.wav; done
 
+updateref: qtest
+	for x in `cat failed_tests.txt`; do cp tests/tst/$$x.wav tests/ref/; done
+
 # Report the median FILTER_PROCESS timing over 50 runs.
 timing: amy-module
 	for a in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do ${PYTHON} -m amy.timing 2>&1 ; done > /tmp/timings.txt
@@ -121,17 +124,20 @@ timing: amy-module
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
+#USBSERIAL=/dev/cu.usbserial-0001
+USBSERIAL=/dev/cu.usbserial-A5069RR4
+
 speedtest:
 	echo "Compiling LoadTestChord.ino..."
 	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
-	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
+	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
 speedtest-piano:
 	echo "Compiling LoadTestChord.ino..."
 	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
-	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
+	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example

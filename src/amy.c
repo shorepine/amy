@@ -554,12 +554,13 @@ float freq_of_logfreq(float logfreq) {
 float freq_for_midi_note(float midi_note) {
     //return 440.0f*powf(2.f, (midi_note - 69.0f) / 12.0f);
     //return 440.0f * exp2f((midi_note - 69.0f) / 12.0f);
-    return 440.0f * S2F(exp2_lut(F2S((midi_note - 69.0f) / 12.0f)));
+    return 440.0f * S2F(exp2_lut(F2S((midi_note - 69.0f) * 0.083333333333f)));
 }
 
 float logfreq_for_midi_note(float midi_note) {
     // TODO: Precompensate for EPS_FOR_LOG
-    return (midi_note - ZERO_MIDI_NOTE) / 12.0f;
+    //return (midi_note - ZERO_MIDI_NOTE) / 12.0f;
+    return (midi_note - ZERO_MIDI_NOTE) * 0.083333333333f;
 }
 
 float midi_note_for_logfreq(float logfreq) {
@@ -610,7 +611,8 @@ float map_60dB_to_01f(float lin) {
 float map_01_to_60dBf(float log) {
     // Inverse of map_60dB_to_01f - Map (0, 1) to (.001, 1) exponentially
     if (log <= -10.0f) return 0;
-    float result = S2F(exp2_lut(F2S((log - 1.0f) / 0.10034333188799373f)));
+    //float result = S2F(exp2_lut(F2S((log - 1.0f) / 0.10034333188799373f)));
+    float result = S2F(exp2_lut(F2S((log - 1.0f) * 9.9657842846621f)));
     return result;
 }
 
@@ -1680,7 +1682,7 @@ float amp_combine_controls(float *controls, float *coefs) {
 #ifdef __EMSCRIPTEN__
 #include "emscripten/webaudio.h"
 #endif
-AMY_IRAM_ATTR void hold_and_modify(uint16_t osc) {
+void hold_and_modify(uint16_t osc) {
     // Calculate the dynamic parameters for this frame and store them in the msynth[osc] structure.
     AMY_PROFILE_START(HOLD_AND_MODIFY)
     float ctrl_inputs[NUM_COMBO_COEFS];
@@ -1797,8 +1799,8 @@ void mix_with_pan(SAMPLE *stereo_dest, SAMPLE *mono_src, float pan_start, float 
         float rgain_start = rgain_of_pan(pan_start) * level;
         SAMPLE gain_l = F2S(lgain_start);
         SAMPLE gain_r = F2S(rgain_start);
-        SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) * level - lgain_start) / AMY_BLOCK_SIZE);
-        SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) * level - rgain_start) / AMY_BLOCK_SIZE);
+        SAMPLE d_gain_l = F2S((lgain_of_pan(pan_end) * level - lgain_start)) >> BLOCK_SIZE_BITS;
+        SAMPLE d_gain_r = F2S((rgain_of_pan(pan_end) * level - rgain_start)) >> BLOCK_SIZE_BITS;
         for(uint16_t i=0;i<AMY_BLOCK_SIZE;i++) {
             stereo_dest[i] += MUL8_SS(gain_l, mono_src[i]);
             stereo_dest[AMY_BLOCK_SIZE + i] += MUL8_SS(gain_r, mono_src[i]);
@@ -2233,7 +2235,7 @@ int16_t * amy_fill_buffer() {
     }
     amy_global.total_blocks++;
     amy_global.total_samples = amy_global.total_blocks * AMY_BLOCK_SIZE;
-    amy_global.time = amy_global.total_samples / (float)AMY_SAMPLE_RATE;
+    amy_global.time = amy_global.total_samples * (1.0f / AMY_SAMPLE_RATE);
 
     AMY_PROFILE_STOP(AMY_FILL_BUFFER)
 
