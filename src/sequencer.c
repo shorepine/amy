@@ -71,7 +71,7 @@ void sequencer_recompute() {
     // 60000000 us/min / (bpm * ticks per beat); keep it single-precision -
     // unsuffixed double literals pull in software double emulation on 32-bit.
     amy_global.us_per_tick = (uint32_t) (60000000.0f / (amy_global.tempo * (float)AMY_SEQUENCER_PPQ));
-    amy_global.next_amy_tick_us = (((uint64_t)amy_sysclock()) * 1000L) + (uint64_t)amy_global.us_per_tick;
+    amy_global.next_amy_tick_us = (amy_sysclock64() * 1000ULL) + (uint64_t)amy_global.us_per_tick;
 }
 
 static void sequencer_process_tick(void) {
@@ -145,7 +145,7 @@ void sequencer_midi_start() {
     }
     // Reset the tick timer to now so sequencer_check_and_fill doesn't try to
     // catch up all the ticks that elapsed while stopped.
-    amy_global.next_amy_tick_us = (uint64_t)amy_sysclock() * 1000L;
+    amy_global.next_amy_tick_us = amy_sysclock64() * 1000ULL;
     sequencer_running = true;
     midi_clock_out_start();  // tell downstream slaves, if we're the clock master
 }
@@ -173,7 +173,7 @@ void sequencer_external_clock_disable() {
     sequencer_running = true;
     // Re-anchor the tick timer to now so sequencer_check_and_fill doesn't try to
     // replay every tick that elapsed while we were on external clock.
-    amy_global.next_amy_tick_us = (uint64_t)amy_sysclock() * 1000L;
+    amy_global.next_amy_tick_us = amy_sysclock64() * 1000ULL;
 }
 
 uint8_t sequencer_add_event(amy_event *e) {
@@ -220,7 +220,12 @@ void sequencer_check_and_fill() {
     // If we've fallen behind by more than 1 second (e.g. sequencer was stopped
     // and restarted, or a long blocking operation occurred), skip ahead instead
     // of processing hundreds of backed-up ticks at once.
-    uint64_t now_us = (uint64_t)amy_sysclock() * 1000L;
+    // next_amy_tick_us is a 64-bit accumulator, so it must be anchored to the
+    // 64-bit clock. Seeding it from the 32-bit amy_sysclock() used to kill the
+    // sequencer permanently at the 49.7-day rollover: now_us collapsed to ~0
+    // while next_amy_tick_us stayed at ~4.3e12, and neither the catch-up guard
+    // (which only handles falling behind) nor the tick loop could ever fire.
+    uint64_t now_us = amy_sysclock64() * 1000ULL;
     if (now_us > amy_global.next_amy_tick_us + 1000000ULL) {
         amy_global.next_amy_tick_us = now_us;
     }

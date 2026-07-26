@@ -974,6 +974,8 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             uint32_t playback_time = amy_sysclock();
             if(AMY_IS_SET(e->time)) playback_time = e->time;
             playback_time += instrument_noteon_delay_ms(e->synth);
+            // See amy_process_event(): dodge the u32 "unset" sentinel.
+            if(AMY_IS_UNSET(playback_time)) playback_time++;
             e->time = playback_time;
             //fprintf(stderr, "synth %d note %d delay %d time %d\n", e->synth, (int)roundf(e->midi_note), instrument_noteon_delay_ms(e->synth), e->time);
         }

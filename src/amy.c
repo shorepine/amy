@@ -588,9 +588,12 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
         return;
     }
 
-    // insert it into the sorted list for fast playback
+    // insert it into the sorted list for fast playback.
+    // Wrap-relative: at the 49.7-day rollover a note_off scheduled a few ms out
+    // has a tiny d->time while its own note_on is still near 2^32, so a plain
+    // `>=` sorted the release ahead of the attack and the note droned forever.
     struct delta **pptr = queue;
-    while(*pptr && d->time >= (*pptr)->time)
+    while(*pptr && AMY_TIME_GEQ(d->time, (*pptr)->time))
         pptr = &(*pptr)->next;
     new_d->next = *pptr;
     *pptr = new_d;
@@ -2009,7 +2012,7 @@ void amy_execute_delta() {
 
     // find any deltas that need to be played from the (in-order) queue
     struct delta *d = amy_global.delta_queue;
-    if(d && sysclock >= d->time) {
+    if(d && AMY_TIME_GEQ(sysclock, d->time)) {
         play_delta(d);
         d = delta_release(d);
         amy_global.delta_qsize--;
@@ -2037,7 +2040,7 @@ void amy_execute_deltas() {
 
     // find any deltas that need to be played from the (in-order) queue
     struct delta *d = amy_global.delta_queue;
-    while(d && sysclock >= d->time) {
+    while(d && AMY_TIME_GEQ(sysclock, d->time)) {
         play_delta(d);
         d = delta_release(d);
         amy_global.delta_qsize--;
