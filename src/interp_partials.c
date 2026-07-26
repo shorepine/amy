@@ -1,6 +1,7 @@
 // interp_partials - AMY kernel-side implementation of the interpolated partials-based synthesis originally implemented in tulip_piano.py.
 
 #include "amy.h"
+#include <assert.h>
 #include <stdbool.h>
 
 typedef struct {
@@ -91,22 +92,37 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
     //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
-    for(uint16_t i = osc + 1; i < osc + 1 + num_oscs; i++) {
-        uint16_t o = i % AMY_OSCS;
+    assert(osc < AMY_OSCS - (num_oscs + 1));  // We won't overrun.
+    for(uint16_t o = osc + 1; o < osc + 1 + num_oscs; o++) {
         if(synth[o]->role == SYNTH_IS_ALGO_SOURCE) {
-            // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
-            synth[o]->velocity = msynth[osc]->amp;
-            // We also use dynamic, fractional note to propagate parent freq modulation.
-            synth[o]->midi_note = midi_note;
-            // hold_and_modify contains a special case for wave == PARTIAL so that
-            // envelope value are delayed by 1 frame compared to other oscs
-            // so that partials fade in over one frame from zero amp.
-            hold_and_modify(o);
-            //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
-            //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
-            SAMPLE value = render_partial(buf, o);
-            //fprintf(stderr, "render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
-            if (value > max_value) max_value = value;
+            if ((o + 1) < (osc + 1 + num_oscs)  // Not the last osc
+                && synth[o + 1]->role == SYNTH_IS_ALGO_SOURCE) {
+                // We have two successive partial oscs, run them both at once
+                synth[o]->velocity = msynth[osc]->amp;
+                synth[o]->midi_note = midi_note;
+                hold_and_modify(o);
+                synth[o + 1]->velocity = msynth[osc]->amp;
+                synth[o + 1]->midi_note = midi_note;
+                hold_and_modify(o + 1);
+                SAMPLE value = render_two_partials(buf, o, o + 1);
+                if (value > max_value) max_value = value;
+                o += 1;  // Skip over the second partial in the loop
+            } else {
+                // Old case - do one partial
+                // We vary each partial's "velocity" on-the-fly as the way the parent osc's amplitude envelope contributes to the partials.
+                synth[o]->velocity = msynth[osc]->amp;
+                // We also use dynamic, fractional note to propagate parent freq modulation.
+                synth[o]->midi_note = midi_note;
+                // hold_and_modify contains a special case for wave == PARTIAL so that
+                // envelope value are delayed by 1 frame compared to other oscs
+                // so that partials fade in over one frame from zero amp.
+                hold_and_modify(o);
+                //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
+                //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
+                SAMPLE value = render_partial(buf, o);
+                //fprintf(stderr, "render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
+                if (value > max_value) max_value = value;
+            }
         }
     }
     return max_value;

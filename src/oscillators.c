@@ -1,6 +1,5 @@
 #include "amy.h"
 
-
 // For checking assumptions about bitwidths.
 #include <assert.h>
 
@@ -207,6 +206,58 @@ AMY_IRAM_ATTR PHASOR render_lut(SAMPLE* buf,
     *pmax_value = max_value;
     AMY_PROFILE_STOP(RENDER_LUT)
     return phase;
+}
+
+AMY_IRAM_ATTR void render_lut_two(SAMPLE* buf,
+                  PHASOR *p_phase,
+                  PHASOR step,
+                  SAMPLE incoming_amp, SAMPLE ending_amp,
+                  PHASOR *p_phase2,
+                  PHASOR step2,
+                  SAMPLE incoming_amp2, SAMPLE ending_amp2,
+                  const LUT* lut,
+                  SAMPLE* pmax_value) {
+    // I'll tell you what: Two LUT oscs at the same time!
+    AMY_PROFILE_START(RENDER_LUT)
+    if(lut == NULL)  return;
+    int lut_mask = lut->table_size - 1;
+    int lut_bits = lut->log_2_table_size;
+    SAMPLE sample = 0;
+    SAMPLE sample2 = 0;
+    SAMPLE max_value = 0;
+    SAMPLE current_amp = incoming_amp;
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+    PHASOR phase = *p_phase;
+    SAMPLE current_amp2 = incoming_amp2;
+    SAMPLE incremental_amp2 = SHIFTR(ending_amp2 - incoming_amp2, BLOCK_SIZE_BITS);
+    PHASOR phase2 = *p_phase2;
+    for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
+        int16_t base_index = INT_OF_P(phase, lut_bits);
+        SAMPLE frac = S_FRAC_OF_P(phase, lut_bits);
+        SAMPLE b = L2S(lut->table[base_index]);
+        SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]);
+        sample = b + MUL0_SS(c - b, frac);
+
+        base_index = INT_OF_P(phase2, lut_bits);
+        frac = S_FRAC_OF_P(phase2, lut_bits);
+        b = L2S(lut->table[base_index]);
+        c = L2S(lut->table[(base_index + 1) & lut_mask]);
+        sample2 = b + MUL0_SS(c - b, frac);
+
+        SAMPLE value = buf[i] + MULA_SS(sample, current_amp) + MULA_SS(sample2, current_amp2);
+        buf[i] = value;
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;
+        current_amp += incremental_amp;
+        phase = P_WRAPPED_SUM(phase, step);
+        current_amp2 += incremental_amp2;
+        phase2 = P_WRAPPED_SUM(phase2, step2);
+     }
+    *pmax_value = max_value;
+    AMY_PROFILE_STOP(RENDER_LUT)
+    *p_phase = phase;
+    *p_phase2 = phase2;
+    return;
 }
 
 AMY_IRAM_ATTR PHASOR render_lut_cub(SAMPLE* buf,
@@ -666,6 +717,29 @@ AMY_IRAM_ATTR SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     SAMPLE max_value;
     synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     msynth[osc]->last_amp = msynth[osc]->amp;
+    return max_value;
+}
+
+AMY_IRAM_ATTR SAMPLE render_two_partials(SAMPLE * buf, uint16_t osc, uint16_t osc2) {
+    float freq = freq_of_logfreq(msynth[osc]->logfreq);
+    //_partial_note_on(osc, freq);
+    //synth[osc]->lut = sine_fxpt_lutset[0];  // we know there's only one.
+    PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
+    SAMPLE amp = F2S(msynth[osc]->amp);
+    SAMPLE last_amp = F2S(msynth[osc]->last_amp);
+    //
+    float freq2 = freq_of_logfreq(msynth[osc2]->logfreq);
+    PHASOR step2 = F2P(freq2 / (float)AMY_SAMPLE_RATE);
+    SAMPLE amp2 = F2S(msynth[osc2]->amp);
+    SAMPLE last_amp2 = F2S(msynth[osc2]->last_amp);
+    //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc]->logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc]->lut->table_size);
+    SAMPLE max_value;
+    render_lut_two(buf,
+                   &synth[osc]->phase, step, last_amp, amp,
+                   &synth[osc2]->phase, step2, last_amp2, amp2,
+                   /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
+    msynth[osc]->last_amp = msynth[osc]->amp;
+    msynth[osc2]->last_amp = msynth[osc2]->amp;
     return max_value;
 }
 
