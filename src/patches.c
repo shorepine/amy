@@ -13,7 +13,7 @@ uint32_t max_num_memory_patches = 0;
 struct delta **memory_patch_deltas = NULL;
 uint16_t *memory_patch_oscs = NULL;
 uint16_t next_user_patch_index = 0;
-uint8_t * osc_to_voice = NULL;
+uint16_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
 void patches_deinit() {
@@ -28,13 +28,13 @@ void patches_init(int max_memory_patches) {
     uint8_t *alloc_base = malloc_caps(
             max_num_memory_patches * sizeof(struct delta *)
 	    + max_num_memory_patches * sizeof(uint16_t)
-            + AMY_OSCS * sizeof(uint8_t)
+            + AMY_OSCS * sizeof(uint16_t)
             + amy_global.config.max_voices * sizeof(uint16_t),
 	    amy_global.config.ram_caps_synth
     );
     memory_patch_deltas = (struct delta **)alloc_base;
     memory_patch_oscs = (uint16_t *)(memory_patch_deltas + max_num_memory_patches);
-    osc_to_voice = (uint8_t *)(memory_patch_oscs + max_num_memory_patches);
+    osc_to_voice = (uint16_t *)(memory_patch_oscs + max_num_memory_patches);
     voice_to_base_osc = (uint16_t *)(osc_to_voice + AMY_OSCS);
     bzero(memory_patch_deltas, max_num_memory_patches * sizeof(struct delta *));
     patches_reset();
@@ -68,9 +68,11 @@ void patches_reset() {
 }
 
 void patches_debug() {
-    for(uint8_t v = 0; v < amy_global.config.max_voices; v++) {
+    // uint16_t counter: a uint8_t one never reaches a max_voices of 256+,
+    // so this loop did not terminate.
+    for(uint16_t v = 0; v < amy_global.config.max_voices; v++) {
         if (AMY_IS_SET(voice_to_base_osc[v]))
-            fprintf(stderr, "voice %" PRIu8 " base osc %" PRIu16 "\n", v, voice_to_base_osc[v]);
+            fprintf(stderr, "voice %" PRIu16 " base osc %" PRIu16 "\n", v, voice_to_base_osc[v]);
     }
     fprintf(stderr, "osc_to_voice:\n");
     for(uint16_t i=0;i<AMY_OSCS;) {
@@ -78,7 +80,7 @@ void patches_debug() {
         fprintf(stderr, "%" PRIu16 ": ", i);
         for (j=0; j < 16; ++j) {
             if ((i + j) >= AMY_OSCS)  break;
-            fprintf(stderr, "%" PRIu8 " ", osc_to_voice[i + j]);
+            fprintf(stderr, "%" PRIu16 " ", osc_to_voice[i + j]);
         }
         i += j;
         fprintf(stderr, "\n");
@@ -264,12 +266,12 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Return is how many chrs written to s.  Will abort if it overruns.
     char *s_entry = s;
     if (!wirecode) {
-        snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%" PRIu16 ", adr_osc=%d adr_syn=%d adr_bus=%d): ", e->time, e->osc,
+        snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%u, addr_osc=%d adr_syn=%d adr_bus=%d): ", e->time, (unsigned)e->osc,
                  event_addresses_oscs(e), event_addresses_synth(e), event_addresses_bus(e));
         s += strlen(s);
     } else {
         if (AMY_IS_SET(e->time)) { snprintf(s, len - (size_t)(s - s_entry), "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
-        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%" PRIu16, (int16_t)e->osc); s += strlen(s); }
+        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%u", (unsigned)e->osc); s += strlen(s); }
     }
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
@@ -972,6 +974,8 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
             uint32_t playback_time = amy_sysclock();
             if(AMY_IS_SET(e->time)) playback_time = e->time;
             playback_time += instrument_noteon_delay_ms(e->synth);
+            // See amy_process_event(): dodge the u32 "unset" sentinel.
+            if(AMY_IS_UNSET(playback_time)) playback_time++;
             e->time = playback_time;
             //fprintf(stderr, "synth %d note %d delay %d time %d\n", e->synth, (int)roundf(e->midi_note), instrument_noteon_delay_ms(e->synth), e->time);
         }

@@ -345,7 +345,7 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 // Add 1 to B shift-up and cast to uint32_t to strip sign bit, pad a zero sign bit on way down.
 #define S_FRAC_OF_P(P, B) (int32_t)(((uint32_t)(((P) << ((B) + 1)))) >> (1 + P_FRAC_BITS - S_FRAC_BITS))
 // Increment phasor but wrap at +1.0
-#define P_WRAPPED_SUM(P, I) (int32_t)(((uint32_t)((((uint32_t)(P)) + ((uint32_t)(I))) << 1)) >> 1)
+#define P_WRAPPED_SUM(P, I) (int32_t)(((uint32_t)((((uint32_t)(P)) + ((uint32_t)(I))) << (32 - P_FRAC_BITS))) >> (32 - P_FRAC_BITS))
 
 #endif // AMY_USED_FIXEDPOINT
 

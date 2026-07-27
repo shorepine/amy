@@ -212,7 +212,7 @@ def parse_list_or_comma_string(obj):
             return ""
         return str(s)
 
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple)):
         return ','.join(map(str_none_is_empty, obj))
     return str(obj)
 

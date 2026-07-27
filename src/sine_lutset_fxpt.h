@@ -13,7 +13,7 @@ typedef struct {
 } lut_entry_fxpt;
 #endif // LUTENTRY_FXPT_DEFINED
 
-const int16_t sine_fxpt_lutable_0[256] PROGMEM = {
+AMY_DRAM_ATTR const int16_t sine_fxpt_lutable_0[257] PROGMEM = {
 0,804,1608,2411,3212,4011,4808,5602,
 6393,7180,7962,8740,9512,10279,11039,11793,
 12540,13279,14010,14733,15447,16151,16846,17531,
@@ -46,6 +46,7 @@ const int16_t sine_fxpt_lutable_0[256] PROGMEM = {
 -18205,-17531,-16846,-16151,-15447,-14733,-14010,-13279,
 -12540,-11793,-11039,-10279,-9512,-8740,-7962,-7180,
 -6393,-5602,-4808,-4011,-3212,-2411,-1608,-804,
+0,
 };
 
 lut_entry_fxpt sine_fxpt_lutset[2] = {

@@ -579,7 +579,14 @@ void esp_deinit_midi(void) {
 void esp_poll_midi(void) {
     const int uart_num = esp_get_uart(amy_global.config.midi_uart);
     uint8_t data[MAX_MIDI_BYTES_TO_PARSE];
-    int length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, 1/portTICK_PERIOD_MS);
+    // Block for at least one tick. The old 1/portTICK_PERIOD_MS is
+    // integer-zero whenever the tick is slower than 1ms (e.g. ESP-IDF's
+    // and MicroPython's default CONFIG_FREERTOS_HZ=100), which made this
+    // a zero-timeout read and run_midi_task() a busy-spin pinning its
+    // core at 100% from a priority-23 task.
+    TickType_t timeout = pdMS_TO_TICKS(1);
+    if (timeout == 0) timeout = 1;
+    int length = uart_read_bytes(uart_num, data, MAX_MIDI_BYTES_TO_PARSE /*MAX_MIDI_BYTES_PER_MESSAGE*MIDI_QUEUE_DEPTH*/, timeout);
     if(length > 0) {
         convert_midi_bytes_to_messages(data,length,0);
     }

@@ -13,6 +13,14 @@
 
 #include <AMY-Arduino.h>
 
+#ifndef SPEEDTEST_PATCH
+#define SPEEDTEST_PATCH (1)
+#endif
+
+#ifndef SPEEDTEST_NUM_NOTES
+#define SPEEDTEST_NUM_NOTES (6)
+#endif
+
 void setup() {
   amy_config_t amy_config = amy_default_config();
 
@@ -34,7 +42,7 @@ void setup() {
   // amy.send(synth=1, num_voices=8, patch=1)
   e = amy_default_event();
   e.synth = 1;
-  e.patch_number = 1;
+  e.patch_number = SPEEDTEST_PATCH;
   e.num_voices = 8;
   amy_add_event(&e);
 
@@ -48,12 +56,12 @@ void loop() {
   amy_update();
 
   // Every 2 seconds: amy.send(synth=1, note=40+(i*2), vel=0.2), held forever.
-  if (note_i < 6 && millis() - last_note_ms >= 2000) {
+  if (note_i < SPEEDTEST_NUM_NOTES && millis() - last_note_ms >= 2000) {
     last_note_ms = millis();
     amy_event e = amy_default_event();
     e.synth = 1;
     e.midi_note = 40 + (note_i * 3);
-    e.velocity = 0.2f;
+    e.velocity = 0.9f;
     amy_add_event(&e);
     fprintf(stderr, "NOTE i=%d note=%d ms=%lu\n",
             note_i, 40 + (note_i * 2), (unsigned long)millis());

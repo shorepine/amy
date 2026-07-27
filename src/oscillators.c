@@ -117,8 +117,8 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
 
 #define NOTHING ;
 
-
-AMY_IRAM_ATTR PHASOR render_lut_fm_fb(SAMPLE* buf,
+/* is this in fact ever used? */
+PHASOR render_lut_fm_fb(SAMPLE* buf,
                         PHASOR phase, 
                         PHASOR step,
                         SAMPLE incoming_amp, SAMPLE ending_amp,
@@ -206,6 +206,38 @@ AMY_IRAM_ATTR PHASOR render_lut(SAMPLE* buf,
      }
     *pmax_value = max_value;
     AMY_PROFILE_STOP(RENDER_LUT)
+    return phase;
+}
+
+// Highly optimized for 256 pt sine table
+AMY_IRAM_ATTR PHASOR render_lut_256(SAMPLE* buf,
+                  PHASOR phase,
+                  PHASOR step,
+                  SAMPLE incoming_amp, SAMPLE ending_amp,
+                  const LUT* lut,
+                  SAMPLE* pmax_value) {
+    // RENDER_LUT_PREAMBLE
+    //int lut_mask = 255;
+    int lut_bits = 8;
+    SAMPLE sample = 0;
+    SAMPLE max_value = 0;
+    SAMPLE current_amp = incoming_amp;
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+    for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
+        int16_t base_index = INT_OF_P(phase, lut_bits);
+        SAMPLE frac = S_FRAC_OF_P(phase, lut_bits);
+        SAMPLE b = L2S(lut->table[base_index]);
+        //SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]);
+        SAMPLE c = L2S(lut->table[base_index + 1]); // table has guard point at end
+        sample = b + MUL0_SS(c - b, frac);
+        SAMPLE value = buf[i] + MULA_SS(sample, current_amp);
+        buf[i] = value;
+        if (value < 0) value = -value;
+        if (value > max_value) max_value = value;
+        current_amp += incremental_amp;
+        phase = P_WRAPPED_SUM(phase, step);
+    }
+    *pmax_value = max_value;
     return phase;
 }
 
@@ -648,22 +680,24 @@ void partial_note_on(uint16_t osc) {
     synth[osc]->lut = NULL;
 }
 
-void _partial_note_on(uint16_t osc, float freq) {
-    if (synth[osc]->lut == NULL) {
-        float period_samples = (float)AMY_SAMPLE_RATE / freq;
-        synth[osc]->lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
-    }
-}
+//void _partial_note_on(uint16_t osc, float freq) {
+//    if (synth[osc]->lut == NULL) {
+//        float period_samples = (float)AMY_SAMPLE_RATE / freq;
+//        synth[osc]->lut = choose_from_lutset(period_samples, sine_fxpt_lutset);
+//    }
+//}
 
-SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
-    _partial_note_on(osc, freq);
+    //_partial_note_on(osc, freq);
+    //synth[osc]->lut = sine_fxpt_lutset[0];  // we know there's only one.
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc]->logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc]->lut->table_size);
     SAMPLE max_value;
-    synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
+    //synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
+    synth[osc]->phase = render_lut_256(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
 }

@@ -45,7 +45,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test web deploy-web godot-api c-api check-c-api
+.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api
 
 default: $(TARGET)
 all: default
@@ -102,6 +102,21 @@ amy-piano: $(OBJECTS) src/amy-piano.o
 amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
 
+# Plain C tests for things the audio-rendering suite can't reach -- e.g. clock
+# rollovers 50 days out, which you can only hit by fast-forwarding the counters.
+CTESTS = tests/test_clock_wrap
+
+# Static pattern rules, so these win over the generic %.o: %.c above (which
+# would compile without -Isrc and fail to find amy.h).
+$(addsuffix .o,$(CTESTS)): %.o: %.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -Isrc -c $< -o $@
+
+$(CTESTS): %: %.o $(OBJECTS)
+	$(CC) $(CFLAGS) $(OBJECTS) $< -Wall $(LIBS) -o $@
+
+ctest: $(CTESTS)
+	@for t in $(CTESTS); do echo "== $$t"; ./$$t || exit 1; done
+
 amy-module: amy-example
 	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall --no-deps; cd ..
 
@@ -114,6 +129,9 @@ qtest: amy-module
 playfailed: qtest
 	for x in `cat failed_tests.txt`; do echo $$x "ref"; sleep 0.2; afplay tests/ref/$$x.wav; echo $$x "tst"; sleep 0.2; afplay tests/tst/$$x.wav; done
 
+updateref: qtest
+	for x in `cat failed_tests.txt`; do cp tests/tst/$$x.wav tests/ref/; done
+
 # Report the median FILTER_PROCESS timing over 50 runs.
 timing: amy-module
 	for a in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40; do ${PYTHON} -m amy.timing 2>&1 ; done > /tmp/timings.txt
@@ -121,11 +139,20 @@ timing: amy-module
 	cat /tmp/timings.txt | grep FILTER_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 	cat /tmp/timings.txt | grep PARAMETRIC_EQ_PROCESS: | sed -e 's/us//' | sort -n | awk ' { a[i++]=$$4; } END { print a[int(i/2)]; }'
 
+#USBSERIAL=/dev/cu.usbserial-0001
+USBSERIAL=/dev/cu.usbserial-A5069RR4
+
 speedtest:
 	echo "Compiling LoadTestChord.ino..."
 	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
-	python tools/arduino_loadsweep/measure.py --out ./load --port /dev/cu.usbserial-0001 ./build
+	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
+
+speedtest-piano:
+	echo "Compiling LoadTestChord.ino..."
+	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256 -DSPEEDTEST_NUM_NOTES=6" tools/arduino_loadsweep/LoadTestChord
+	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
+	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example
@@ -160,3 +187,4 @@ clean:
 	-rm -r src/patches.h
 	-rm -f amy/constants.py
 	-rm -f $(TARGET)
+	-rm -f tests/*.o $(CTESTS)
