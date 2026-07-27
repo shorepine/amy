@@ -250,9 +250,57 @@ static inline SAMPLE F2S_nofpu(float f) {
 
 // Fixed-point multiply routines
 
+#if !defined(__ARM_ARCH_6M__)  // Should cover cortex-M0, cortex-M0-plus (including RP2040), cortex-M1 - the only processors we're likely to encounter that don't have 32x32 -> 64
+// 64 x 64 -> 64 is fast on ESP32-S3
+// Also use MUL64 for non-MCU builds
+#define AMY_HAS_MUL64
+#endif
+
+// When ee have only 32x32 -> 32, we have to worry about preserving resolution.
 #define FXMUL_TEMPLATE(a, b, a_bitloss, b_bitloss, reqd_bitloss) ((((a) >> a_bitloss) * ((b) >> b_bitloss)) >> (reqd_bitloss - a_bitloss - b_bitloss))
 
-// from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+#ifdef AMY_HAS_MUL64
+static inline SAMPLE SMUL64R(SAMPLE a, SAMPLE b) {
+#if 0 && defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)
+    // To my surprise, this minimal LX7-optimized version is slower than the int64_t C version on ESP32-S3 (speedtest of 3029 us vs. 2495us (2721us with rounding)).
+
+    // Multiply two s8.23 fixed-point numbers, result also s8.23.
+    // Uses Xtensa LX7 MUL32 (mull/mulsh) + SRC funnel shift.
+    int32_t result, lo, hi;
+
+    __asm__ volatile (
+        "mull    %[lo], %[a], %[b]     \n\t"   // lo = low 32 bits of a*b
+        "mulsh   %[hi], %[a], %[b]     \n\t"   // hi = high 32 bits (signed) of a*b
+        "ssai    23                    \n\t"   // SAR = 23
+        "src     %[res], %[hi], %[lo]  \n\t"   // res = ({hi:lo} >> SAR)[31:0]
+        : [res] "=&r" (result), [lo] "=&r" (lo), [hi] "=&r" (hi)
+        : [a] "r" (a), [b] "r" (b)
+          /* : "sar" */
+    );
+
+    return result;
+#endif
+#ifdef USE_ROUNDING_IN_SMUL64
+    return (SAMPLE)((((int64_t)a * (int64_t)b) + (1 << (S_FRAC_BITS - 1))) >> S_FRAC_BITS);
+#else
+    // Rounding is not critical with so much resolution....
+    return (SAMPLE)((((int64_t)a * (int64_t)b)) >> S_FRAC_BITS);
+#endif
+}
+
+// All the different (rounded) mults are just SMUL64R
+//#define MUL0_SS(a, b) SMUL64R(a, b)
+//#define MUL4_SS(a, b) SMUL64R(a, b)
+//#define MUL5A_SS(a, b) SMUL64R(a, b)
+//#define MUL6A_SS(a, b) SMUL64R(a, b)
+//#define MUL8_SS(a, b) SMUL64R(a, b)
+//#define MUL8F_SS(a, b) SMUL64R(a, b)
+//#define MUL4E_SS(a, b) SMUL64R(a, b)
+//#define MUL4_SP_S(a, b) SMUL64R(a, b)
+#define SMULR6(a, b) SMUL64R(a, b)
+#define SMULR7(a, b) SMUL64R(a, b)
+
+#else  // !AMY_HAS_MUL64
 static inline SAMPLE SMULR6(SAMPLE a, SAMPLE b) {
     // s8.23 fixed-point multiplication with rounding, 1 zero on output (-128..128)
     SAMPLE r = 1 + ((a + (1 << 10)) >> 11) * ((b + (1 << 10)) >> 11);
@@ -264,6 +312,9 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
     SAMPLE r = 4 + ((a + (1 << 9)) >> 10) * ((b + (1 << 9)) >> 10);
     return r >> 3;
 }
+#endif
+// from https://colab.research.google.com/drive/1_uQto5WSVMiSPHQ34cHbCC6qkF614EoN#scrollTo=73JbLFhg44QG
+
 
 // Multiply two SAMPLE values when the result will always be [-1.0, 1.0).
 #define MUL0_SS(a, b) FXMUL_TEMPLATE(a, b, 8, 7, S_FRAC_BITS)  // 8+7 = 15, so additional 8 bits shift right on output to make 23 req'd total.

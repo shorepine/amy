@@ -1934,6 +1934,10 @@ def main(argv):
   if not quiet:
     amy.send(debug=0)
 
+  # Sort errors by severity
+  errors = sorted(errors,
+                  key=lambda x: float_or_val(x.split(' ')[-2].split('=')[-1], error_val=1000),
+                  reverse=True)
   # Write out failed_tests.txt even if it's empty.
   with open("failed_tests.txt", "wt") as f:
     for e in errors:
@@ -1941,7 +1945,7 @@ def main(argv):
 
   if errors:
     print(len(oks), "tests pass,", len(errors), "tests failed:")
-    print('\n'.join(sorted(errors, key=lambda x: float_or_val(x.split(' ')[-2].split('=')[-1], error_val=1000), reverse=True)))
+    print('\n'.join(errors))
     if not quiet:
       sys.exit(1)
   else:
