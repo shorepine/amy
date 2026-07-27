@@ -217,7 +217,7 @@ AMY_IRAM_ATTR PHASOR render_lut_256(SAMPLE* buf,
                   const LUT* lut,
                   SAMPLE* pmax_value) {
     // RENDER_LUT_PREAMBLE
-    int lut_mask = 255;
+    //int lut_mask = 255;
     int lut_bits = 8;
     SAMPLE sample = 0;
     SAMPLE max_value = 0;
