@@ -45,7 +45,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test web deploy-web godot-api c-api check-c-api
+.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api
 
 default: $(TARGET)
 all: default
@@ -101,6 +101,21 @@ amy-piano: $(OBJECTS) src/amy-piano.o
 
 amy-message: $(OBJECTS) src/amy-message.o
 	$(CC) $(CFLAGS) $(OBJECTS) src/amy-message.o -Wall $(LIBS) -o $@
+
+# Plain C tests for things the audio-rendering suite can't reach -- e.g. clock
+# rollovers 50 days out, which you can only hit by fast-forwarding the counters.
+CTESTS = tests/test_clock_wrap
+
+# Static pattern rules, so these win over the generic %.o: %.c above (which
+# would compile without -Isrc and fail to find amy.h).
+$(addsuffix .o,$(CTESTS)): %.o: %.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -Isrc -c $< -o $@
+
+$(CTESTS): %: %.o $(OBJECTS)
+	$(CC) $(CFLAGS) $(OBJECTS) $< -Wall $(LIBS) -o $@
+
+ctest: $(CTESTS)
+	@for t in $(CTESTS); do echo "== $$t"; ./$$t || exit 1; done
 
 amy-module: amy-example
 	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall --no-deps; cd ..
@@ -172,3 +187,4 @@ clean:
 	-rm -r src/patches.h
 	-rm -f amy/constants.py
 	-rm -f $(TARGET)
+	-rm -f tests/*.o $(CTESTS)

@@ -233,12 +233,23 @@ output_sample_type * amy_simple_fill_buffer() {
 
 
 // on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
-uint32_t amy_sysclock() {
-    // Time is returned in integer milliseconds; wraps at 2^32 ms = 49.7 days.
+// 64-bit milliseconds since start. total_blocks is u32 and increments once per
+// AMY_BLOCK_SIZE samples, so this does not wrap for ~219 years at 44.1 kHz.
+// Anything that stores an absolute deadline and compares it later must use this
+// rather than amy_sysclock(); see sequencer_check_and_fill().
+uint64_t amy_sysclock64() {
     // Integer math: computing this through float quantizes the clock once
     // total samples exceed the 24-bit mantissa (~6 min at 48 kHz), and the
     // u32 samples-domain multiply wrapped after 2^32 samples (~25 h).
-    return (uint32_t)(((uint64_t)amy_global.total_blocks * (AMY_BLOCK_SIZE * 1000u)) / AMY_SAMPLE_RATE);
+    return ((uint64_t)amy_global.total_blocks * (AMY_BLOCK_SIZE * 1000u)) / AMY_SAMPLE_RATE;
+}
+
+uint32_t amy_sysclock() {
+    // Time is returned in integer milliseconds; wraps at 2^32 ms = 49.7 days.
+    // This is the wire/event-facing clock and stays 32-bit for compatibility.
+    // Consumers compare event times wrap-relative (AMY_TIME_GEQ), so the
+    // rollover is handled rather than avoided.
+    return (uint32_t)amy_sysclock64();
 }
 
 
@@ -290,6 +301,10 @@ void amy_add_event(amy_event *e) {
         uint32_t playback_time = amy_sysclock();
         if(AMY_IS_SET(e->time)) playback_time = e->time;
         playback_time += amy_global.latency_ms;
+        // UINT32_MAX is the "unset" sentinel for a u32 field, and the clock does
+        // land on it for one millisecond every 49.7 days. Nudge by 1ms so the
+        // event doesn't read back as having no time at all.
+        if(AMY_IS_UNSET(playback_time)) playback_time++;
         e->time = playback_time;
         amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
