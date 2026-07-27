@@ -2192,20 +2192,20 @@ int16_t * amy_fill_buffer() {
             // TODO -- the esp stuff here could sit outside of AMY
             // For some reason, have to drop a bit to stop hard wrapping on esp?
 #if defined(ESP_PLATFORM) || defined(__IMXRT1062__)
-                uintval >>= 1;
-            #endif
+            uintval >>= 1;
+#endif
             if (positive) {
               sample = uintval;
             } else {
               sample = -uintval;
             }
             if(AMY_NCHANS == 1) {
-                #ifdef ESP_PLATFORM
+#ifdef ESP_PLATFORM
                     // esp32's i2s driver has this bug
                     output_block[i ^ 0x01] = sample;
-                #else
+#else
                     output_block[i] = sample;
-                #endif
+#endif
             } else {
                 output_block[(AMY_NCHANS * i) + c] = sample;
             }

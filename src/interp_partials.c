@@ -72,7 +72,6 @@ void partials_note_off(uint16_t osc) {
     }
 }
 
-
 static inline float p_combine_controls(float *controls, float *coefs) {
     float result = 0;
     for (int i = 0; i <= COEF_EG0; ++i)

@@ -355,11 +355,11 @@ def generate_gamma9001_headers(sounds_dir='sounds/gamma9001', bin_path='build/dr
     print("gamma9001: %d ROM samples -> pcm_gamma808.h, %d samples (%.2f MB) -> %s + pcm_gamma9001.h + %s"
           % (len(rom), len(bin_entries), offset * 2 / 1e6, bin_path, c_path))
 
-def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
+def cos_lut(table_size, harmonics_weights, harmonics_phases=None, extra_point=False):
     if harmonics_phases is None:
         harmonics_phases = np.zeros(len(harmonics_weights))
-    table = np.zeros(table_size)
-    phases = np.arange(table_size) * 2 * np.pi / table_size
+    table = np.zeros(table_size + extra_point)
+    phases = np.arange(table_size + extra_point) * 2 * np.pi / table_size
     for harmonic_number, harmonic_weight in enumerate(harmonics_weights):
         table += harmonic_weight * np.cos(
             phases * harmonic_number + harmonics_phases[harmonic_number])
@@ -369,7 +369,7 @@ def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
 # A LUTset is a list of LUTentries describing downsampled versions of the same
 # basic waveform, sorted with the longest (highest-bandwidth) first.
 def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None, 
-                  length_factor=8, bandwidth_factor=None):
+                  length_factor=8, bandwidth_factor=None, extra_point=False):
     if bandwidth_factor is None:
         bandwidth_factor = np.sqrt(0.5)
     """Create an ordered list of LUTs with decreasing harmonic content.
@@ -388,6 +388,7 @@ def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None,
         bandwidth_factor: Target ratio between the highest harmonics in successive
             table entries. Default is sqrt(0.5), so after two tables, bandwidth is
             reduced by 1/2 (and length with follow).
+        extra_point: Add an extra point for interpolation without address wrap.
 
     Returns:
         A list of LUTentry objects, sorted in decreasing order of the highest 
@@ -410,7 +411,7 @@ def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None,
         lut_size = int(2 ** np.ceil(np.log(length_factor * highest_harmonic) / np.log(2)))
         lutsets.append(LUTentry(
                 table=cos_lut(lut_size, harmonic_weights[:num_harmonics], 
-                                harmonic_phases[:num_harmonics]),    # / lut_size,
+                                harmonic_phases[:num_harmonics], extra_point),    # / lut_size,
                 highest_harmonic=highest_harmonic))
         float_num_harmonics = bandwidth_factor * float_num_harmonics
     return lutsets
@@ -487,12 +488,14 @@ def write_lutset_to_h(filename, variable_base, lutset):
     print("wrote", filename)
 
 
-def write_fxpt_lutable(f, lutable, name, samples_per_row=8):
+def write_fxpt_lutable(f, lutable, name, samples_per_row=8, attr=''):
     """Write a single lutable to an open file."""
     table_size = len(lutable)
     scale_factor = np.max(np.abs(lutable.astype(float)))
-    f.write("const int16_t {:s}[{:d}] PROGMEM = {{\n".format(
-        name, table_size))
+    if attr:
+        attr += ' '
+    f.write("{:s}const int16_t {:s}[{:d}] PROGMEM = {{\n".format(
+        attr, name, table_size))
     for row_start in range(0, table_size, samples_per_row):
         for sample_index in range(row_start,
                                   min(row_start + samples_per_row, table_size)):
@@ -506,7 +509,7 @@ def write_fxpt_lutable(f, lutable, name, samples_per_row=8):
     return scale_factor
 
 
-def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
+def write_lutset_to_h_as_fxpt(filename, variable_base, lutset, attr=''):
     """Save out a lutset as a C-compatible header file using ints."""
     import math
     num_luts = len(lutset)
@@ -532,7 +535,8 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
         for i in range(num_luts):
             scale_factor = write_fxpt_lutable(
                 f, lutset[i].table,
-                '{:s}_fxpt_lutable_{:d}'.format(variable_base, i)
+                '{:s}_fxpt_lutable_{:d}'.format(variable_base, i),
+                attr=attr,
             )
             scale_factors.append(scale_factor)
         # Define the table of LUTs.
@@ -543,7 +547,7 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
             # Provide the shift size corresponding to the lutset.
             log_2_table_size = int(round(math.log(table_size) / math.log(2.0)))
             f.write("    {{{:s}_fxpt_lutable_{:d}, {:d}, {:d}, {:d}, {:f}}},\n".format(
-                variable_base, i, table_size, log_2_table_size,
+                variable_base, i, table_size & -2, log_2_table_size,
                 lutset[i].highest_harmonic, scale_factors[i]))
         # Final entry is null to indicate end of table.
         f.write("    {NULL, 0, 0, 0, 0.0},\n")
@@ -1185,9 +1189,9 @@ def generate_all():
     write_lutset_to_h_as_fxpt('src/triangle_lutset_fxpt.h', 'triangle', triangle_lutset)
 
     # Sinusoid "lutset" (only one table)
-    sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
+    sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256, extra_point=True)
     #write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
-    write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
+    write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset, attr='AMY_DRAM_ATTR')
 
     # log2/exp2 LUTs
     make_log2_exp2_luts('src/log2_exp2_fxpt_lutable.h')
