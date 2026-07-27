@@ -1286,7 +1286,8 @@ class TestWavetable(AmyTest):
   """Simple exercise of the wavetable oscillator, using default wavetable."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.WAVETABLE, preset=0, duty='0.25,0,0,0,0.5', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
+    amy.send(time=0, osc=0, wave=amy.WAVETABLE, duty='0.25,0,0,0,0.5', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
+    # preset=19,
     amy.send(time=50, note=50, vel=1)
     amy.send(time=850, vel=0)
 
