@@ -219,13 +219,17 @@ output_sample_type * output_block;
 #endif
 
 // All runtime allocation failures report through here: count, log, and under
-// AMY_DEBUG abort() at the cause instead of degrading silently.
+// AMY_DEBUG abort() at the cause instead of degrading silently. Only the
+// first failure is logged: this can run on the render thread, where stdio
+// blocks, and failed allocations retry (and re-fail) on every note-on.
+// Poll amy_get_oom_count() for ongoing failures.
 void amy_oom(const char *fmt, ...) {
-    ++amy_global.oom_count;
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
+    if (++amy_global.oom_count == 1) {
+        va_list ap;
+        va_start(ap, fmt);
+        vfprintf(stderr, fmt, ap);
+        va_end(ap);
+    }
 #ifdef AMY_DEBUG
     abort();
 #endif
