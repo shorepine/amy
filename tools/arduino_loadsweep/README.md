@@ -23,6 +23,11 @@ The root-level amy/Makefile has a `speedtest` rule that:
  * Write `results/<idx>_<date>_<sha>/` with `load.csv`, `serial.log`,
    `meta.json`.
 
+`measure.py --runs N` flashes once, then resets the board and re-captures N
+times (`loadK.csv`/`serialK.log` for runs 2+); `meta.json` records per-run
+stats under `runs` and the top-level numbers become the cross-run mean, to
+average out run-to-run noise.
+
 ## Usage
 
 ```sh
@@ -44,6 +49,10 @@ The same sketch + `measure.py` also power AMY's per-PR hardware CI
 the PR *and* a baseline at its merge base; `amy-hwci.yml` flashes both
 back-to-back on the self-hosted bench Pi and comments a before/after/Δ
 load table on the PR, formatted by `hwci_report.py`).
+CI captures each build once: a `--runs 3` trial (PR #897 benching #896)
+showed run-to-run spread of only ±1–2 µs within one binary, while the
+~±30 µs deltas seen on no-op PRs persisted across every run — they're
+per-binary code-layout jitter, which averaging resets can't remove.
 CI **FAIL means only that the PR's test couldn't run** — load values and a
 failed baseline are informational there; regression *hunting* is this
 sweep's job.

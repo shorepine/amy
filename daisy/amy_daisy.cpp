@@ -65,12 +65,12 @@ void midi_polyphony(uint32_t start, uint16_t patch) {
 #define MAX_POLYPHONY 17
 
 void event_polyphony(uint32_t start, uint16_t patch) {
-    // Verify polyphony by directly configuring a lot of voices and playing them all at once.
+    // Verify polyphony by directly configuring a synth with a lot of voices and playing them all at once.
     amy_event e = amy_default_event();
     e.time = start;
     e.patch_number = patch;
-    for (int i = 0; i < MAX_POLYPHONY; ++i)
-	e.voices[i] = i;
+    e.synth = 1;
+    e.num_voices = MAX_POLYPHONY;
     amy_add_event(&e);
     start += 250;
     uint8_t note = 40;
@@ -78,7 +78,7 @@ void event_polyphony(uint32_t start, uint16_t patch) {
         e = amy_default_event();
         e.time = start;
         e.velocity = 0.5;
-        e.voices[0] = i;
+        e.synth = 1;
         e.midi_note = note;
         amy_add_event(&e);
         start += 1000;

@@ -308,7 +308,6 @@ var _KW_MAP: Dictionary = {
 	"reverb":              ["h", "L"],
 	"echo":                ["M", "L"],
 	"patch":               ["K", "I"],
-	"voices":              ["r", "L"],
 	"external_channel":    ["W", "I"],
 	"portamento":          ["m", "I"],
 	"sequence":            ["H", "L"],
@@ -320,6 +319,7 @@ var _KW_MAP: Dictionary = {
 	"synth_flags":         ["if", "I"],
 	"num_voices":          ["iv", "I"],
 	"oscs_per_voice":      ["in", "I"],
+	"synth_level":         ["iV", "F"],
 	"to_synth":            ["it", "I"],
 	"grab_midi_notes":     ["im", "I"],
 	"note_source_channel": ["iM", "I"],
@@ -375,18 +375,18 @@ var _KW_PRIORITY: Dictionary = {
 	"reverb": 36,
 	"echo": 37,
 	"patch": 38,
-	"voices": 39,
-	"external_channel": 40,
-	"portamento": 41,
-	"sequence": 42,
-	"tempo": 43,
-	"sequencer_run": 44,
-	"external_midi_sync": 45,
-	"synth": 46,
-	"pedal": 47,
-	"synth_flags": 48,
-	"num_voices": 49,
-	"oscs_per_voice": 50,
+	"external_channel": 39,
+	"portamento": 40,
+	"sequence": 41,
+	"tempo": 42,
+	"sequencer_run": 43,
+	"external_midi_sync": 44,
+	"synth": 45,
+	"pedal": 46,
+	"synth_flags": 47,
+	"num_voices": 48,
+	"oscs_per_voice": 49,
+	"synth_level": 50,
 	"to_synth": 51,
 	"grab_midi_notes": 52,
 	"note_source_channel": 53,
@@ -402,3 +402,57 @@ var _KW_PRIORITY: Dictionary = {
 	"patch_string": 63,
 }
 # END GENERATED
+
+# ============================================================
+#  Table-driven C API (native + web). Regenerate: make c-api
+# ============================================================
+# BEGIN GENERATED C API - scripts/gen_amy_c_api.py
+## Reset the AMY millisecond clock to zero
+func reset_sysclock() -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.reset_sysclock()")
+	elif _synth:
+		_synth.call("reset_sysclock")
+
+## Smoothed fraction of real time AMY spends rendering (0..1)
+func render_load() -> float:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.render_load() : null", true)
+		return 0.0 if v == null else float(v)
+	if _synth:
+		return _synth.call("render_load")
+	return 0.0
+
+## Set the render-load fraction that trips the overload failsafe (0 disables)
+func set_render_load_threshold(threshold: float) -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.set_render_load_threshold(%s)" % [str(threshold)])
+	elif _synth:
+		_synth.call("set_render_load_threshold", threshold)
+
+## Play the startup bleep
+func bleep(start: int = 0) -> void:
+	if _is_web:
+		JavaScriptBridge.eval("amy_c_api && amy_c_api.bleep(%s)" % [str(start)])
+	elif _synth:
+		_synth.call("bleep", start)
+
+## Read the sequencer tick count
+func sequencer_ticks() -> int:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.sequencer_ticks() : null", true)
+		return 0 if v == null else int(v)
+	if _synth:
+		return _synth.call("sequencer_ticks")
+	return 0
+
+## Read the complete replayable AMY state as a wire-command string
+func dump_state() -> String:
+	if _is_web:
+		var v: Variant = JavaScriptBridge.eval("amy_c_api ? amy_c_api.dump_state() : null", true)
+		return "" if v == null else String(v)
+	if _synth:
+		return _synth.call("dump_state")
+	return ""
+
+# END GENERATED C API

@@ -74,6 +74,9 @@ if target_platform == "macos":
     env.Append(LINKFLAGS=["-framework", "CoreFoundation"])
 elif target_platform == "linux":
     env.Append(LIBS=["pthread", "m"])
+    # Fail the link on unresolved symbols (matches Windows DLL behavior), so a
+    # missing amy_platform_stubs.c entry breaks CI here instead of at runtime.
+    env.Append(LINKFLAGS=["-Wl,--no-undefined"])
 elif target_platform == "windows":
     if is_msvc:
         env.Append(CCFLAGS=["-DWINDOWS"])

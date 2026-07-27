@@ -6,7 +6,7 @@
 extern const int16_t pcm[];
 
 
-SAMPLE compute_mod_value(uint16_t mod_osc) {
+AMY_IRAM_ATTR SAMPLE compute_mod_value(uint16_t mod_osc) {
     // Return the modulation-rate value for the specified oscillator.
     // i.e., this oscillator is acting as modulation for something, so
     // just calculate that modulation rate (without knowing what it
@@ -32,10 +32,15 @@ SAMPLE compute_mod_value(uint16_t mod_osc) {
     return value;
 }
 
-SAMPLE compute_mod_scale(uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE compute_mod_scale(uint16_t osc) {
+    // hold_and_modify(source) evaluates the modulator's own COEF_MOD input,
+    // so modulators can themselves be modulated (chained modulators). Cycles
+    // are rejected at assignment time (mod_osc_would_cause_loop in amy.c), so
+    // the recursion is bounded; the per-block memo in compute_mod_value keeps
+    // shared modulators cheap.
     uint16_t source = synth[osc]->mod_source;
     if(AMY_IS_SET(source)) {
-        if(source != osc) {  // that would be weird
+        if(source != osc) {  // belt-and-braces; assignment already rejects this
             hold_and_modify(source);
             return compute_mod_value(source);
         }
@@ -44,7 +49,7 @@ SAMPLE compute_mod_scale(uint16_t osc) {
 }
 
 // sample_offset allows you to probe the EG output at some point this many samples into the future.
-SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset) {
+AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset) {
     AMY_PROFILE_START(COMPUTE_BREAKPOINT_SCALE)
     // given a breakpoint list, compute the scale
     // we first see how many BPs are defined, and where we are in them?
@@ -118,7 +123,6 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         if(elapsed > synth[osc]->breakpoint_times[bp_set][bp_r]) {
             //printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, msynth[osc]->amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
-            //synth[osc]->status=SYNTH_OFF;
             //AMY_UNSET(synth[osc]->note_off_clock);
             scale = F2S(synth[osc]->breakpoint_values[bp_set][bp_r]);
             synth[osc]->last_scale[bp_set] = scale;
@@ -140,7 +144,7 @@ SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_of
         sign = -1;
         v0 = -v0; v1 = -v1;
     }
-    if(t1==t0 || elapsed==t1) {
+    if(t1==t0 || elapsed==t1 || v1 == v0) {
         // This way we return exact zero for v1 at the end of the segment, rather than BREAKPOINT_EPS
         scale = v1;
     } else {

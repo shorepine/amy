@@ -4,12 +4,14 @@
 Parses patch names and patch command strings from the C header and emits
 a self-contained JS module that exposes them to the AMYboard web editor.
 """
+import argparse
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PATCHES_H = ROOT / "src" / "patches.h"
-OUTPUT = ROOT / "build" / "patches.generated.js"
+OUTPUT = ROOT / "src" / "patches.generated.js"
 
 # Regex to match each entry in patch_commands[]:
 #   /* 0: Juno A11 Brass Set 1 */ "v1w4a1,...Z",
@@ -105,10 +107,21 @@ def generate_js(patches):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--check', action='store_true',
+                    help='verify the committed output is up to date')
+    opts = ap.parse_args()
+
     source = PATCHES_H.read_text()
     patches = parse_patches(source)
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(generate_js(patches))
+    js = generate_js(patches)
+    if opts.check:
+        if not OUTPUT.exists() or OUTPUT.read_text() != js:
+            print(f"stale {OUTPUT.relative_to(ROOT)} (run: python3 scripts/gen_patches_js.py)")
+            sys.exit(1)
+        print(f"{OUTPUT.relative_to(ROOT)} is up to date")
+        return
+    OUTPUT.write_text(js)
     print(f"Generated {OUTPUT.relative_to(ROOT)} ({len(patches)} patches)")
 
 

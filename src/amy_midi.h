@@ -3,6 +3,15 @@
 #ifndef __MIDI_H
 #define __MIDI_H
 
+// AMY_HOST_MIDI: the embedding host owns the MIDI device layer (run_midi /
+// stop_midi / midi_out) and amy_midi.c compiles only the platform-neutral
+// message parsing. MACOS implies it — the macOS desktop host layer is
+// macos_midi.m. Other hosts (e.g. the AMYboard VCV Rack plugin, which
+// provides its own MIDI on every platform) define AMY_HOST_MIDI directly.
+#if defined(MACOS) && !defined(AMY_HOST_MIDI)
+#define AMY_HOST_MIDI 1
+#endif
+
 #ifdef ESP_PLATFORM 
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
@@ -31,6 +40,11 @@ void midi_clock_out_stop();
 #ifdef __EMSCRIPTEN__
 void midi_clock_out_flush();  // called from the browser main loop
 #endif
+
+// Track which midi channels not to ignore
+void midi_active_channels_reset(void);
+void midi_active_channel_set(uint8_t channel, bool state);
+void midi_active_channels_debug(void);
 
 
 #define MAX_MIDI_BYTES_TO_PARSE 1024

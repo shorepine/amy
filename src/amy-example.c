@@ -1,5 +1,5 @@
 // amy-example.c
-// a simple C example that plays audio using AMY out your speaker 
+// a simple C example that plays audio using AMY out your speaker
 
 #ifndef ARDUINO
 
@@ -75,21 +75,21 @@ void test_loop_env_filt() {
 }
 
 void test_algo() {
-    //amy.send(time=0, voices="0",  patch=21+128)
-    amy_add_message("t0r0K149Z");
-    //amy.send(time=100, voices="0", note=58, vel=1)
-    amy_add_message("t100r0n58l1Z");
-    //amy.send(time=500, voices="0", vel=0)
-    amy_add_message("t400r0l0Z");
+    //amy.send(time=0, synth=1, num_voices=1,  patch=21+128)
+    amy_add_message("t0i1iv1K149Z");
+    //amy.send(time=100, synth=1, note=58, vel=1)
+    amy_add_message("t100i1n58l1Z");
+    //amy.send(time=500, synth=1, vel=0)
+    amy_add_message("t400i1l0Z");
 }
 
 void test_K257() {
-    //amy.send(time=0, voices="0",  patch=257)
-    amy_add_message("t0i0iv4K257Z");
-    //amy.send(time=100, voices="0", note=58, vel=1)
-    amy_add_message("t100i0n58l1Z");
-    //amy.send(time=500, voices="0", vel=0)
-    amy_add_message("t400i0l0Z");
+    //amy.send(time=0, synth=1, num_voices=1,  patch=257)
+    amy_add_message("t0i1iv4K257Z");
+    //amy.send(time=100, synth=1, note=58, vel=1)
+    amy_add_message("t100i1n58l1Z");
+    //amy.send(time=500, synth=1, vel=0)
+    amy_add_message("t400i1l0Z");
 }
 
 void test_stored_patch() {

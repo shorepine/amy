@@ -149,40 +149,6 @@ def example_multimbral_synth():
 def example_reset(start=0):
     amy.send(osc=0, reset=amy.RESET_ALL_OSCS, time=start)
 
-def example_voice_alloc():
-    # alloc 2 juno voices, then try to alloc a dx7 voice on voice 0
-    amy.send(patch=1, voices=[0, 1])
-    sleep(0.25)
-
-    amy.send(patch=131, voices=[0])
-    sleep(0.25)
-
-    # play the same note on both
-    amy.send(vel=1, note=60, voices=[0])
-    sleep(2)
-
-    amy.send(vel=1, note=60, voices=[1])
-    sleep(2)
-
-    # now try to alloc voice 0 with a juno, should use oscs 0-4 again
-    amy.send(patch=2, voices=[0])
-    sleep(0.25)
-
-def example_voice_chord(patch=0):
-    amy.send(patch=patch, voices=[0, 1, 2])
-    sleep(.250)
-
-    amy.send(vel=0.5, voices=[0], note=50)
-    sleep(1)
-
-    amy.send(vel=0.5, voices=[1], note=54)
-    sleep(1)
-
-    amy.send(vel=0.5, voices=[2], note=56)
-    sleep(2)
-
-    amy.send(vel=0, voices=[0, 1, 2])
-
 def example_synth_chord(patch=0):
     # Like example_voice_chord, but use 'synth' to avoid having to keep track of voices
     amy.send(patch=patch, num_voices=3, synth=0)
@@ -240,14 +206,14 @@ def example_sustain_pedal(patch=0):
 
 def example_patches():
     for i in range(256):
-        amy.send(patch=i, voices=[0])
+        amy.send(patch=i, synth=1, num_voices=1)
         print(f"sending patch {i}")
         sleep(0.25)
 
-        amy.send(voices=[0], osc=0, note=50, vel=0.5)
+        amy.send(synth=1, osc=0, note=50, vel=0.5)
         sleep(1)
 
-        amy.send(voices=[0], vel=0)
+        amy.send(synth=1, vel=0)
         sleep(0.25)
 
         amy.reset()
@@ -268,8 +234,8 @@ def example_multimbral_fm():
     notes = [60, 70, 64, 68, 72, 82]
     for i, note in enumerate(notes):
         # Two amy sends, one to load the patch, one to play it
-        amy.send(voices=[i], patch=128+i)
-        amy.send(voices=[i], note=note, vel=0.5, pan=[i*2])
+        amy.send(synth=i, num_voices=1, patch=128+i)
+        amy.send(synth=u, note=note, vel=0.5, pan=[i % 2])
         sleep(1)
 
 

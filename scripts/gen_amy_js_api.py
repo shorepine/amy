@@ -5,15 +5,17 @@ Reads the _KW_MAP_LIST and ctrl_coefs dict_fields from the Python AMY API,
 plus all constants from amy/constants.py, and generates a self-contained
 JS module with amy_message(), amy_send(), and an AMY constants object.
 """
+import argparse
 import ast
 import re
+import sys
 import textwrap
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AMY_INIT = ROOT / "amy" / "__init__.py"
 AMY_CONSTANTS = ROOT / "amy" / "constants.py"
-OUTPUT = ROOT / "build" / "amy_api.generated.js"
+OUTPUT = ROOT / "src" / "amy_api.generated.js"
 
 
 def extract_kw_map_list(source: str):
@@ -251,11 +253,22 @@ def generate_js(kw_map_list, coef_fields, constants=None):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--check', action='store_true',
+                    help='verify the committed output is up to date')
+    opts = ap.parse_args()
+
     source = AMY_INIT.read_text()
     kw_map_list = extract_kw_map_list(source)
     coef_fields = extract_coef_fields(source)
     constants = extract_constants(AMY_CONSTANTS.read_text())
     js = generate_js(kw_map_list, coef_fields, constants)
+    if opts.check:
+        if not OUTPUT.exists() or OUTPUT.read_text() != js:
+            print(f"stale {OUTPUT.relative_to(ROOT)} (run: python3 scripts/gen_amy_js_api.py)")
+            sys.exit(1)
+        print(f"{OUTPUT.relative_to(ROOT)} is up to date")
+        return
     OUTPUT.write_text(js)
     print(f"Generated {OUTPUT.relative_to(ROOT)} ({len(kw_map_list)} parameters, {len(coef_fields)} coef fields, {len(constants)} constants)")
 

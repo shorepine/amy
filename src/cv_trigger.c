@@ -189,8 +189,12 @@ void set_cv_from_osc(int cv_channel, int osc) {
     // Mirror MOD_SOURCE setup from amy.c:config_chorus
     osc_for_cv[cv_channel] = osc;
     if (osc < 0)  return;  // syntax to unset cv_from_osc.
-    ensure_osc_allocd(osc, NULL);
-    synth[osc]->status = SYNTH_IS_MOD_SOURCE;
+    // On OOM leave the mapping unset.
+    if (!ensure_osc_allocd(osc, NULL)) {
+        osc_for_cv[cv_channel] = -1;
+        return;
+    }
+    synth[osc]->role = SYNTH_IS_MOD_SOURCE;
     // No longer record this osc in note_off state.
     AMY_UNSET(synth[osc]->note_off_clock);
     // Remove default amplitude dependence on velocity when an oscillator is made a modulator.

@@ -1,5 +1,6 @@
 # headers.py
 # Generate headers for AMY
+import math
 import os
 import sys
 import glob
@@ -354,11 +355,11 @@ def generate_gamma9001_headers(sounds_dir='sounds/gamma9001', bin_path='build/dr
     print("gamma9001: %d ROM samples -> pcm_gamma808.h, %d samples (%.2f MB) -> %s + pcm_gamma9001.h + %s"
           % (len(rom), len(bin_entries), offset * 2 / 1e6, bin_path, c_path))
 
-def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
+def cos_lut(table_size, harmonics_weights, harmonics_phases=None, extra_point=False):
     if harmonics_phases is None:
         harmonics_phases = np.zeros(len(harmonics_weights))
-    table = np.zeros(table_size)
-    phases = np.arange(table_size) * 2 * np.pi / table_size
+    table = np.zeros(table_size + extra_point)
+    phases = np.arange(table_size + extra_point) * 2 * np.pi / table_size
     for harmonic_number, harmonic_weight in enumerate(harmonics_weights):
         table += harmonic_weight * np.cos(
             phases * harmonic_number + harmonics_phases[harmonic_number])
@@ -368,7 +369,7 @@ def cos_lut(table_size, harmonics_weights, harmonics_phases=None):
 # A LUTset is a list of LUTentries describing downsampled versions of the same
 # basic waveform, sorted with the longest (highest-bandwidth) first.
 def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None, 
-                  length_factor=8, bandwidth_factor=None):
+                  length_factor=8, bandwidth_factor=None, extra_point=False):
     if bandwidth_factor is None:
         bandwidth_factor = np.sqrt(0.5)
     """Create an ordered list of LUTs with decreasing harmonic content.
@@ -387,6 +388,7 @@ def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None,
         bandwidth_factor: Target ratio between the highest harmonics in successive
             table entries. Default is sqrt(0.5), so after two tables, bandwidth is
             reduced by 1/2 (and length with follow).
+        extra_point: Add an extra point for interpolation without address wrap.
 
     Returns:
         A list of LUTentry objects, sorted in decreasing order of the highest 
@@ -409,7 +411,7 @@ def create_lutset(LUTentry, harmonic_weights, harmonic_phases=None,
         lut_size = int(2 ** np.ceil(np.log(length_factor * highest_harmonic) / np.log(2)))
         lutsets.append(LUTentry(
                 table=cos_lut(lut_size, harmonic_weights[:num_harmonics], 
-                                harmonic_phases[:num_harmonics]),    # / lut_size,
+                                harmonic_phases[:num_harmonics], extra_point),    # / lut_size,
                 highest_harmonic=highest_harmonic))
         float_num_harmonics = bandwidth_factor * float_num_harmonics
     return lutsets
@@ -486,12 +488,14 @@ def write_lutset_to_h(filename, variable_base, lutset):
     print("wrote", filename)
 
 
-def write_fxpt_lutable(f, lutable, name, samples_per_row=8):
+def write_fxpt_lutable(f, lutable, name, samples_per_row=8, attr=''):
     """Write a single lutable to an open file."""
     table_size = len(lutable)
     scale_factor = np.max(np.abs(lutable.astype(float)))
-    f.write("const int16_t {:s}[{:d}] PROGMEM = {{\n".format(
-        name, table_size))
+    if attr:
+        attr += ' '
+    f.write("{:s}const int16_t {:s}[{:d}] PROGMEM = {{\n".format(
+        attr, name, table_size))
     for row_start in range(0, table_size, samples_per_row):
         for sample_index in range(row_start,
                                   min(row_start + samples_per_row, table_size)):
@@ -505,7 +509,7 @@ def write_fxpt_lutable(f, lutable, name, samples_per_row=8):
     return scale_factor
 
 
-def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
+def write_lutset_to_h_as_fxpt(filename, variable_base, lutset, attr=''):
     """Save out a lutset as a C-compatible header file using ints."""
     import math
     num_luts = len(lutset)
@@ -531,7 +535,8 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
         for i in range(num_luts):
             scale_factor = write_fxpt_lutable(
                 f, lutset[i].table,
-                '{:s}_fxpt_lutable_{:d}'.format(variable_base, i)
+                '{:s}_fxpt_lutable_{:d}'.format(variable_base, i),
+                attr=attr,
             )
             scale_factors.append(scale_factor)
         # Define the table of LUTs.
@@ -542,7 +547,7 @@ def write_lutset_to_h_as_fxpt(filename, variable_base, lutset):
             # Provide the shift size corresponding to the lutset.
             log_2_table_size = int(round(math.log(table_size) / math.log(2.0)))
             f.write("    {{{:s}_fxpt_lutable_{:d}, {:d}, {:d}, {:d}, {:f}}},\n".format(
-                variable_base, i, table_size, log_2_table_size,
+                variable_base, i, table_size & -2, log_2_table_size,
                 lutset[i].highest_harmonic, scale_factors[i]))
         # Final entry is null to indicate end of table.
         f.write("    {NULL, 0, 0, 0, 0.0},\n")
@@ -589,7 +594,7 @@ def make_clipping_lut(filename):
         f.write("#define NONLIN_RANGE %d\n" % NONLIN_RANGE)
         f.write("// First sample value beyond end of table (just clip to max).\n")
         f.write("#define FIRST_HARDCLIP (FIRST_NONLIN + NONLIN_RANGE)\n")
-        f.write("const uint16_t clipping_lookup_table[NONLIN_RANGE] PROGMEM = {\n")
+        f.write("const uint16_t clipping_lookup_table[NONLIN_RANGE] AMY_DRAM_ATTR PROGMEM = {\n")
         samples_per_row = 8
         for row_start in range(0, NONLIN_RANGE, samples_per_row):
             for sample in range(row_start, min(NONLIN_RANGE, row_start + samples_per_row)):
@@ -610,7 +615,7 @@ def make_piano_patch():
     return 25  # We now use up to 24 partials per voice + 1 control osc.
 
 amyboard_patch_cc_defs = [
-    'ic7,1,0.001,7,0.1,i%iv0a%vZ',                     # channel level (CTL osc amp)
+    'ic7,1,0.001,7,0.1,i%iiV%vZ',                      # channel level (per-instrument level, iV)
     'ic74,1,20,8000,0,i%iv0F%vZ',                      # VCF freq
     'ic71,1,0.5,16,0,i%iv0R%vZ',                       # VCF resonance
     'ic76,1,0.1,20,0,i%iv1f%vZ',                       # LFO freq
@@ -965,26 +970,27 @@ def gamma_kit_to_drumkit(kit):
     return out
 
 
-def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
+def make_drums_patch(drumkit=None, balance=False):
     if drumkit is None:
         drumkit = DRUMKIT
-    if synth_flags is None:
-        # The Gamma9001 kit patches bake NOTES_VIA_MIDI in so that just loading
-        # the patch is enough (`amy.send(synth=11, patch=386, num_voices=6)`);
-        # the legacy 258 kit keeps its historical flags (callers set their own).
-        synth_flags = amy.SYNTH_FLAGS_NOTES_VIA_MIDI | amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS
-    # Set up a bunch of midi_note_cmd mappings for CH10 drums
-    message = amy.message(osc=0, wave=amy.PCM, amp=5, synth_flags=synth_flags)
-    message += amy.message(synth_flags=synth_flags)
+    # Bake in the synth flags.
+    synth_flags = amy.SYNTH_FLAGS_NOTES_VIA_MIDI | amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS
+    num_drums = sum([d[0] >= 0 for d in drumkit])
+    message = amy.message(num_voices=1, oscs_per_voice=num_drums, synth_flags=synth_flags)
     # Level balancing for the Gamma9001 kits: the source samples were never
     # level-matched as a kit (the Koblo kick is a full-scale 3s boom, the hats
-    # 6-8 dB quieter than the old set), so bake a per-note amp into each
+    # 6-8 dB quieter than the old set), so bake a per-note gain into each
     # mapping that lands every voice at a consistent loudness target.
+    # The gain goes in the midi_mapping's velocity scaling MAX.
     rms_table = _gamma_preset_rms() if balance else {}
+    this_osc = 0
     for midi_note in range(AMY_MIDI_DRUMS_LOWEST_NOTE, AMY_MIDI_DRUMS_HIGHEST_NOTE + 1):
         pcm_preset_number, base_midi_note = drumkit[midi_note - AMY_MIDI_DRUMS_LOWEST_NOTE]
         if pcm_preset_number >= 0:
-            kwargs = {}
+            # Set up the osc with the right preset (but still rely on the base_note to come from the note-on event).
+            message += amy.message(osc=this_osc, wave=amy.PCM, preset=pcm_preset_number)
+            # Set up the MIDI mapping to map this note to the correct osc.
+            vel_scale = 5.0
             rms = rms_table.get(pcm_preset_number)
             if rms is not None:
                 # kicks louder than the rest; toms in between
@@ -996,20 +1002,22 @@ def make_drums_patch(drumkit=None, synth_flags=None, balance=False):
                     target = -14.0
                 gain = 10.0 ** ((target - rms) / 20.0)
                 gain = min(3.0, max(0.33, gain))
-                kwargs['amp'] = round(5.0 * gain, 2)
+                vel_scale = round(5.0 * gain, 2)
             message += amy.message(
                 midi_note_cmd=(
-                    ("%d,0,0,1,0," % midi_note)
+                    ("%d,0,0,%g,0," % (midi_note, vel_scale))
                     + amy.message(
-                        synth=8888,
-                        preset=pcm_preset_number,
+                        synth='%i',
+                        osc=this_osc,
                         note=base_midi_note,
-                        vel=9999,
-                        **kwargs
-                    ).replace('8888', '%i').replace('9999', '%v')
+                        vel='%v',
+                    )
                 )
             )
-    return 1, message  # 1 osc per voice
+            this_osc = this_osc + 1
+            if this_osc == num_drums:
+                break  # We ran out of oscs.  Should never happen.
+    return num_drums, message  # num_drums osc per voice (but drum synth should only have one voice).
 
 
 def make_patches(filename):
@@ -1061,16 +1069,16 @@ def make_patches(filename):
         # this string index the compiled-in ROM sample set, which is
         # build-conditional (amy.c: pcm_gamma808.h under GAMMA9001, else
         # pcm_tiny.h) -- so emit a matching 258 for each ROM. The GAMMA9001
-        # variant reuses kit 384's GM map but keeps 258's historical flags
-        # (no baked NOTES_VIA_MIDI; callers set their own).
-        num_osc_drums, patch_string  = make_drums_patch(synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS)
-        _, gamma_patch_string = make_drums_patch(GAMMA_DRUMKIT, synth_flags=amy.SYNTH_FLAGS_IGNORE_NOTE_OFFS, balance=True)
+        # variant reuses kit 384's GM map.
+        _, patch_string  = make_drums_patch()
+        _, gamma_patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
         f.write("#ifdef GAMMA9001\n")
         f.write("\t/* 258: MIDI drums (gamma808 ROM) */ \"%s\",\n" % (gamma_patch_string))
         f.write("#else\n")
         f.write("\t/* 258: MIDI drums (pcm_tiny ROM) */ \"%s\",\n" % (patch_string))
         f.write("#endif\n")
-        num_oscs.append(num_osc_drums)
+        # Drum patches actually set their oscs_per_voice as part of the patch, so put a placeholder in `patch_oscs`
+        num_oscs.append(1)
 
         # 259-383 are reserved so the Gamma9001 drum kits land on their own
         # MIDI program-change bank: patch = 384 + kit = 128 * MSB(3) + program.
@@ -1080,15 +1088,15 @@ def make_patches(filename):
             num_oscs.append(0)
 
         # kit 0: the baked TR-808 bank (ROM presets only; works without drums.bin)
-        num_osc_drums, patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
+        _, patch_string = make_drums_patch(GAMMA_DRUMKIT, balance=True)
         f.write("\t/* %d: drum kit 0 TR-808 (Gamma9001) */ \"%s\",\n" % (GAMMA_KIT_PATCH_BASE, patch_string))
-        num_oscs.append(num_osc_drums)
+        num_oscs.append(1)  # Dummy; patch includes 'inXX'
         # kits 1+: the drums.bin banks
         for k, (kit_name, kit) in enumerate(GAMMA_KITS):
-            num_osc_drums, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit), balance=True)
+            _, patch_string = make_drums_patch(gamma_kit_to_drumkit(kit), balance=True)
             f.write("\t/* %d: drum kit %d %s (Gamma9001) */ \"%s\",\n" % (
                 GAMMA_KIT_PATCH_BASE + 1 + k, k + 1, kit_name, patch_string))
-            num_oscs.append(num_osc_drums)
+            num_oscs.append(1)  # Dummy: patch includes 'inXX'
 
         f.write("};\n")
         f.write("const uint16_t patch_oscs[%d] PROGMEM = {\n" % TOTAL_NUM_PATCHES)
@@ -1181,9 +1189,9 @@ def generate_all():
     write_lutset_to_h_as_fxpt('src/triangle_lutset_fxpt.h', 'triangle', triangle_lutset)
 
     # Sinusoid "lutset" (only one table)
-    sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256)
+    sine_lutset = create_lutset(LUTentry, np.array([0, 1]),  harmonic_phases = -np.pi / 2 * np.ones(2), length_factor=256, extra_point=True)
     #write_lutset_to_h('src/sine_lutset.h', 'sine', sine_lutset)
-    write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset)
+    write_lutset_to_h_as_fxpt('src/sine_lutset_fxpt.h', 'sine', sine_lutset, attr='AMY_DRAM_ATTR')
 
     # log2/exp2 LUTs
     make_log2_exp2_luts('src/log2_exp2_fxpt_lutable.h')

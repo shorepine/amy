@@ -5,7 +5,10 @@ name: AMY HW CI
 # an artifact by "AMY HW CI build") onto the physical AMYboard on the
 # self-hosted bench Pi (amyboardci), capture 20 s of its debug UART while the
 # sketch stacks up an 8-note held Juno chord, and comment the measured render
-# load at each chord size back on the PR.
+# load at each chord size back on the PR. (measure.py can average several
+# resets of one flash via --runs, but a 3x trial showed run-to-run spread of
+# only ±1-2 µs — the ±30 µs no-op deltas are per-BINARY layout jitter that
+# averaging can't remove — so CI captures once.)
 #
 # PASS/FAIL semantics: FAIL means only that the bench COULD NOT RUN the test
 # (flash/serial failure, board crash, capture interference). The load values
@@ -157,12 +160,12 @@ jobs:
           name: amy-hwci-pr${{ env.PR }}
           if-no-files-found: warn
           path: |
-            out/serial.log
-            out/load.csv
+            out/serial*.log
+            out/load*.csv
             out/meta.json
             out/run.log
-            out-base/serial.log
-            out-base/load.csv
+            out-base/serial*.log
+            out-base/load*.csv
             out-base/meta.json
             out-base/run.log
             report.md

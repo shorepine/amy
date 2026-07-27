@@ -6,13 +6,6 @@ import time
 import amy
 
 try:
-    import midi
-    have_midi = True
-except:
-    print("midi not found")
-    have_midi = False
-
-try:
     from ulab import numpy as np
 except:
     import numpy as np
@@ -117,17 +110,17 @@ def init_piano_voice(num_partials, base_osc=0, **kwargs):
         bp_string += ',200,0'
         amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
-def setup_piano_voice(harms_params, base_osc=0, voices=None, time=None, sequence=None):
+def setup_piano_voice(harms_params, base_osc=0, synth=1, time=None, sequence=None):
     """Configure a set of PARTIALs oscs to play a particular note and velocity."""
     num_partials = len(harms_params)
     amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials,
-           voices=voices, time=time, sequence=sequence)
+           synth=synth, time=time, sequence=sequence)
     if time is not None:
         base_cmd = 't' + str(time)
     else:
         base_cmd = ''
-    if voices is not None:
-        base_cmd += 'r' + str(voices)
+    if synth is not None:
+        base_cmd += 'i' + str(synth)
     if sequence is not None:
         base_cmd += 'H' + str(sequence)
     for i in range(num_partials):
@@ -140,22 +133,22 @@ def setup_piano_voice(harms_params, base_osc=0, voices=None, time=None, sequence
         # Add final release.
         bp_string += ',200,0'
         f0_hz = cents_to_hz(harms_params[i, 0])
-        #amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, voices=voices, time=time)
+        #amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, synth=synth, time=time)
         # Special-case construction of the Wire Protocol message to save time
         amy.send_raw(
             base_cmd + 'v' + str(base_osc + i + 1) + ('f%.1f' % f0_hz) + 'A' + bp_string + 'Z'
         )
 
-def piano_note_on(note=60, vel=1, **kwargs):
+def piano_note_on(note=60, vel=1, synth=1, **kwargs):
     if vel == 0:
         # Note off.
-        amy.send(vel=0, **kwargs)
+        amy.send(vel=0, synth=synth, **kwargs)
     else:
         hps = harms_params_for_note_vel(note, round(vel * 127))
-        setup_piano_voice(hps, **kwargs)
+        setup_piano_voice(hps, synth=synth, **kwargs)
         # We already configured the freuquencies and magnitudes in setup, so
         # the note on is completely neutral.
-        amy_send(note=60, vel=1, **kwargs)
+        amy_send(note=60, vel=1, synth=synth, **kwargs)
 
 
 def amy_send(**kwargs):
@@ -166,35 +159,8 @@ def amy_send(**kwargs):
 amy.reset()
 time.sleep(0.1)  # to let reset happen.
 amy.send(store_patch='1024,v0w10Zv%dw%dZ')
-amy.send(voices='0,1,2,3', load_patch=1024)
+amy.send(synth=1, num_voices=4, load_patch=1024)
 num_partials = NUM_HARMONICS[0]
 patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
-print("Loaded dpwe piano on patch #1024, AMY voices 0,1,2,3")
+print("Loaded dpwe piano on patch #1024, AMY synth 1")
 
-if have_midi:
-    synth_obj = midi.Synth(num_voices=4, patch_string=patch_string)
-    #voices = '0,1,2,3'
-    voices = ",".join([str(a) for a in synth_obj.amy_voice_nums])
-    #print("voices=", voices)
-    # We have to intercept the note-on events of the Synth voice objects.
-    class PianoVoiceObject:
-        """Substitute for midi.VoiceObject for Piano voices."""
-        def __init__(self, amy_voice):
-            self.amy_voice = amy_voice
-
-        def note_on(self, note, vel, time=None, sequence=None):
-            #amy.send(time=time, voices=self.amy_voice, note=note, vel=vel, sequence=sequence)
-            piano_note_on(note, vel, voices=self.amy_voice, time=time, sequence=sequence)
-
-        def note_off(self, time=None, sequence=None):
-            amy.send(time=time, voices=self.amy_voice, vel=0, sequence=sequence)
-
-
-    # Intercept the voice objects for our synth
-    synth_obj.voice_objs = [PianoVoiceObject(obj.amy_voice) for obj in synth_obj.voice_objs]
-    for voice_obj in synth_obj.voice_objs:
-        init_piano_voice(num_partials, voices=voice_obj.amy_voice)
-        time.sleep(0.05)  # Let the amy queue catch up.
-
-    midi.config.add_synth_object(channel=1, synth_object=synth_obj)
-    print("Added Tulip synth object to respond to MIDI channel 1")

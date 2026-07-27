@@ -30,7 +30,7 @@ The live Python REPL at `docs/tutorial.html` runs MicroPython in the browser wit
 3. Copy the output to amy's docs: `cp build-standard/tulip/obj/micropython.mjs build-standard/tulip/obj/micropython.wasm <amy-repo>/docs/`
 4. The browser AMY build (`docs/amy.js`, `docs/amy.wasm`) is now rebuilt and committed automatically on every release by `.github/workflows/release.yml` (it runs `make deploy-web` and folds the output into the version-bump commit it tags), so you don't need `make deploy-web` by hand for a release. Run `cd <amy-repo> && make web && make deploy-web` locally only to preview those changes before merging. This automation covers only `docs/amy.*` — the `docs/micropython.*` REPL files above are still the separate tulipcc build.
 
-The `docs/amy.js` file is a concatenation of the Emscripten build (`build/amy.js`), `src/amy_connector.js`, and `build/amy_api.generated.js`. The JS API is auto-generated from `amy/__init__.py` by `scripts/gen_amy_js_api.py`.
+The `docs/amy.js` file is a concatenation of the Emscripten build (`build/amy.js`), `src/amy_connector.js`, and `src/amy_api.generated.js`. The JS API file — like `src/patches.generated.js` and `src/pcm_presets.generated.js` — is a committed generated output: regenerate with `make c-api` after changing `amy/__init__.py`, `src/patches.h`, or `src/pcm_tiny.h`; CI's `make check-c-api` fails any PR where they drift.
 
 ## GitHub Auth
 
