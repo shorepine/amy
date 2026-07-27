@@ -135,7 +135,7 @@ speedtest:
 
 speedtest-piano:
 	echo "Compiling LoadTestChord.ino..."
-	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256" tools/arduino_loadsweep/LoadTestChord
+	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256 -DSPEEDTEST_NUM_NOTES=6" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
 	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
