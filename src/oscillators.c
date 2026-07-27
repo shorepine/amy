@@ -218,14 +218,19 @@ AMY_IRAM_ATTR PHASOR render_lut_256(SAMPLE* buf,
                   SAMPLE* pmax_value) {
     // RENDER_LUT_PREAMBLE
     //int lut_mask = 255;
-    int lut_bits = 8;
+    //int lut_bits = 8;
     SAMPLE sample = 0;
     SAMPLE max_value = 0;
     SAMPLE current_amp = incoming_amp;
     SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+    phase = SHIFTL(phase, 1);  // Make phase into _32 instead of s_31
+    step = SHIFTL(step, 1);
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
-        int16_t base_index = INT_OF_P(phase, lut_bits);
-        SAMPLE frac = S_FRAC_OF_P(phase, lut_bits);
+        //int16_t base_index = INT_OF_P(phase, lut_bits);
+        //int16_t base_index = (int32_t)((((uint32_t)(phase << 1)) >> (P_FRAC_BITS + 1 - lut_bits)));
+        int16_t base_index = (int32_t)((((uint32_t)phase) >> 24));
+        //SAMPLE frac = S_FRAC_OF_P(phase, lut_bits);
+        SAMPLE frac = (int32_t)(((uint32_t)(phase << 8)) >> 9);
         SAMPLE b = L2S(lut->table[base_index]);
         //SAMPLE c = L2S(lut->table[(base_index + 1) & lut_mask]);
         SAMPLE c = L2S(lut->table[base_index + 1]); // table has guard point at end
@@ -235,8 +240,10 @@ AMY_IRAM_ATTR PHASOR render_lut_256(SAMPLE* buf,
         if (value < 0) value = -value;
         if (value > max_value) max_value = value;
         current_amp += incremental_amp;
-        phase = P_WRAPPED_SUM(phase, step);
+        //phase = P_WRAPPED_SUM(phase, step);
+        phase = (int32_t)((uint32_t)(((uint32_t)phase) + ((uint32_t)step)));
     }
+    phase = SHIFTR(phase, 1);  // Restore phase to s_31
     *pmax_value = max_value;
     return phase;
 }
@@ -518,9 +525,12 @@ SAMPLE render_fm_sine(SAMPLE* buf, uint16_t osc, SAMPLE* mod, SAMPLE feedback_le
                                          synth[osc]->lut,
                                          mod, &max_value);
     else
-        synth[osc]->phase = render_lut(buf, synth[osc]->phase, step,
-                                      last_amp, amp,
-                                      synth[osc]->lut, &max_value);
+        //synth[osc]->phase = render_lut(buf, synth[osc]->phase, step,
+        //                              last_amp, amp,
+        //                              synth[osc]->lut, &max_value);
+        synth[osc]->phase = render_lut_256(buf, synth[osc]->phase, step,
+                                           last_amp, amp,
+                                           /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
 
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
@@ -549,7 +559,8 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     //fprintf(stderr, "render_sine: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
     SAMPLE max_value;
-    synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
+    //synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
+    synth[osc]->phase = render_lut_256(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
 }
