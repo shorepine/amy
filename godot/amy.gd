@@ -43,6 +43,7 @@ const FILTER_LPF: int = 1
 const FILTER_BPF: int = 2
 const FILTER_HPF: int = 3
 const FILTER_LPF24: int = 4
+const FILTER_NOTCH: int = 5
 
 # ============================================================
 #  Envelope types

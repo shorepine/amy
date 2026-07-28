@@ -164,6 +164,42 @@ int8_t dsps_biquad_gen_bpf_f32(SAMPLE *coeffs, float f, float qFactor)
     return 0;
 }
 
+int8_t dsps_biquad_gen_notch_f32(SAMPLE *coeffs, float f, float qFactor)
+{
+    if (qFactor <= 0.0001f) {
+        qFactor = 0.0001f;
+    }
+    if (f > 0.45f) {
+        f = 0.45f;
+    }
+    float Fs = 1;
+
+    float w0 = f / Fs;
+    // The notch depends on precise zero placement: cos2pi()'s absolute LUT
+    // error (~2^-15) skews the center by several percent at low f, enough to
+    // miss the notch's own bandwidth at high Q. The half-angle form keeps
+    // 1 - cos(w0) to the LUT's relative precision instead.
+    float sh = sin2pi(w0 / 2);
+    float c = 1 - 2 * sh * sh;
+    float s = sin2pi(w0);
+
+    float alpha = s / (2 * qFactor);
+
+    float b0 = 1;
+    float b1 = -2 * c;
+    float b2 = 1;
+    float a0 = 1 + alpha;
+    float a1 = -2 * c;
+    float a2 = 1 - alpha;
+
+    coeffs[0] = F2S(b0 / a0);
+    coeffs[1] = F2S(b1 / a0);
+    coeffs[2] = F2S(b2 / a0);
+    coeffs[3] = F2S(a1 / a0);
+    coeffs[4] = F2S(a2 / a0);
+    return 0;
+}
+
 // Stick to the faster mult for biquad, hpf etc, since the parameters aren't so sensitive, and parametric_eq was chewing major CPU.
 /* SMULR6 truncates both operands to 12 fractional bits.  At low cutoff the
  * split-feedback corrections e = 2 + a1 and f = 1 - a2 are ~2^-10, so they keep
@@ -863,6 +899,8 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
         dsps_biquad_gen_bpf_f32(coeffs, ratio, msynth[osc]->resonance);
     else if(synth[osc]->filter_type==FILTER_HPF)
         dsps_biquad_gen_hpf_f32(coeffs, ratio, msynth[osc]->resonance);
+    else if(synth[osc]->filter_type==FILTER_NOTCH)
+        dsps_biquad_gen_notch_f32(coeffs, ratio, msynth[osc]->resonance);
     else {
         fprintf(stderr, "Unrecognized filter type %d\n", synth[osc]->filter_type);
         return 0;
