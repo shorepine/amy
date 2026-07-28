@@ -367,6 +367,15 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time,
     //
     void *state = NULL;
     if (queue == NULL)  queue = &amy_global.delta_queue;
+    if (queue == &amy_global.delta_queue && base_event == NULL && len <= 3
+        && AMY_IS_SET(time) && !AMY_TIME_GEQ(amy_sysclock(), time)) {
+        // Live MIDI input with a future timestamp: park the raw bytes in the
+        // timed store.  The whole handler (mapping lookup, template expansion,
+        // voice allocation) runs when the message comes due, against the synth
+        // state of that moment, not the state at ingest.
+        timed_midi_add(time, bytes, (uint8_t)len);
+        return;
+    }
     amy_event e;
     bool fake_note_on = (((bytes[0] & 0xF0) == 0x90) && (bytes[2] == 0xFF));
     do {
