@@ -662,13 +662,20 @@ struct mod_synthinfo {
 };
 
 
-typedef struct sequence_entry_ll_t {
-    struct delta d;
-    uint32_t tag;
-    uint32_t tick; // 0 means not used 
-    uint32_t period; // 0 means not used 
-    struct sequence_entry_ll_t *next;
-} sequence_entry_ll_t;
+// Result of the fast ingest scan of one wire message for the scheduling
+// commands 't' (time) and 'H' (sequence).  See amy_scan_wire_message().
+typedef struct wire_schedule_t {
+    uint16_t consumed;      // chars of message in this segment (incl. 'Z')
+    uint8_t has_time;       // top-level 't' command found
+    uint8_t has_sequence;   // top-level 'H' command found
+    uint32_t time;          // value of 't'
+    uint32_t sequence[3];   // tick, period, tag from 'H' (missing values 0)
+    uint16_t time_span[2];  // [start, end) of the 't' command, for stripping
+    uint16_t seq_span[2];   // [start, end) of the 'H' command, for stripping
+} wire_schedule_t;
+
+uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws);
+uint16_t amy_strip_scheduling(const char *message, const wire_schedule_t *ws, char *out);
 
 
 typedef struct delay_line {
@@ -878,7 +885,6 @@ typedef struct global_state {
     uint32_t sequencer_tick_count;
     uint64_t next_amy_tick_us;
     uint32_t us_per_tick;
-    sequence_entry_ll_t * sequence_entry_ll_start;
 
     // Buses
     bus_state_t *bus[AMY_NUM_BUSES];
@@ -978,6 +984,9 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Parse and play a stored wire message now; base_time (UINT32_MAX for none)
+// supplies the time for events that don't carry their own.
+void amy_play_message_with_time(char *message, uint32_t base_time);
 // Like amy_add_message but the data is treated as coming from an external
 // sysex source, so file transfer routing (transfer_flag) applies.
 void amy_add_message_from_sysex(char *message);

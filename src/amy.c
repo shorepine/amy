@@ -515,7 +515,6 @@ int8_t global_init(amy_config_t c) {
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
-    amy_global.sequence_entry_ll_start = NULL;
 
     struct bus_state *bus_configs = malloc_caps(sizeof(struct bus_state) * AMY_NUM_BUSES,
                                                 amy_global.config.ram_caps_synth);
@@ -2032,9 +2031,11 @@ void amy_execute_delta() {
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
-    // Advance the sequencer on AMY (sample) time and queue any due sequence
+    // Advance the sequencer on AMY (sample) time and play any due sequence
     // events, so sequencing works in any rendering context, real-time or not.
     sequencer_check_and_fill();
+    // Play any timed ('t') wire messages that have come due.
+    timed_wire_check_and_fire();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
 

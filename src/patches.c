@@ -1024,8 +1024,8 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
         AMY_UNSET(e->midi_note);
         AMY_UNSET(e->velocity);
-        // Pass the target queue through: if this event is being stored (e.g. it came
-        // from sequencer_add_event), its deltas must land in that queue, not play now.
+        // Pass the target queue through: if this event is being stored (e.g. into
+        // a patch), its deltas must land in that queue, not play now.
         midi_message_handler_to_queue(bytes, 3, e->time, e, queue);
     } else {
         uint16_t voices[MAX_VOICES_PER_INSTRUMENT];

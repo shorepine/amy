@@ -261,16 +261,73 @@ uint32_t amy_sysclock() {
 // would get base64-decoded and written to the file as garbage.
 bool amy_parsing_from_sysex = false;
 
-// given a wire message string play / schedule the event directly (WIRE API)
-void amy_add_message(char *message) {
-    peek_stack("add_message");
+// Parse and play a stored wire message now.  base_time is the original 't'
+// value of a timed message (or UINT32_MAX for none): events that don't carry
+// their own time get it, so the resulting deltas have the same times (and
+// ordering) as if the message had been parsed when it arrived.
+void amy_play_message_with_time(char *message, uint32_t base_time) {
+    peek_stack("play_message");
     amy_event e;
     size_t pos = 0;
     do {
         amy_clear_event(&e);
         pos = yield_event_from_message(message, &e, pos);
-        if (pos > 0)  amy_add_event(&e);
+        if (pos > 0) {
+            if (base_time != UINT32_MAX && AMY_IS_UNSET(e.time))  e.time = base_time;
+            amy_add_event(&e);
+        }
     } while(pos > 0);
+}
+
+// given a wire message string play / schedule the event directly (WIRE API)
+void amy_add_message(char *message) {
+    peek_stack("add_message");
+    amy_event e;
+    size_t pos = 0;
+    size_t len = strlen(message);
+    while (pos < len) {
+        // Transfer payloads (base64 sample/file data) must not be scanned for
+        // scheduling commands; hand them straight to the parser, which routes
+        // them to parse_transfer_message.  (Same condition as amy_parse_message.)
+        if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
+            (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE)) {
+            amy_clear_event(&e);
+            pos = yield_event_from_message(message, &e, pos);
+            if (pos == 0) break;
+            amy_add_event(&e);
+            continue;
+        }
+        // Fast pre-scan of this message for scheduling commands ('t' in the
+        // future, or 'H').  Scheduled messages are stored as their raw wire
+        // string and only parsed when they come due; everything else takes
+        // the normal parse-and-play path.
+        wire_schedule_t ws;
+        amy_scan_wire_message(message + pos, &ws);
+        if (ws.has_sequence ||
+            (ws.has_time && !AMY_TIME_GEQ(amy_sysclock(), ws.time))) {
+            char *stripped = (char *)malloc_caps(ws.consumed + 1, amy_global.config.ram_caps_events);
+            if (stripped == NULL) {
+                amy_oom("add_message");
+            } else {
+                amy_strip_scheduling(message + pos, &ws, stripped);
+                if (ws.has_sequence) {
+                    // 'H' wins if both are present (as before: a sequenced
+                    // event's time field is effectively ignored).
+                    sequencer_add_wire(ws.sequence[SEQUENCE_TICK], ws.sequence[SEQUENCE_PERIOD],
+                                       ws.sequence[SEQUENCE_TAG], stripped);
+                } else {
+                    timed_wire_add(ws.time, stripped);
+                }
+            }
+            pos += ws.consumed;
+            continue;
+        }
+        // Not scheduled (or 't' is now/past): parse and play it now.
+        amy_clear_event(&e);
+        pos = yield_event_from_message(message, &e, pos);
+        if (pos == 0) break;
+        amy_add_event(&e);
+    }
 }
 
 // Like amy_add_message but marks the message as coming from an external
@@ -287,8 +344,16 @@ void amy_add_event(amy_event *e) {
     peek_stack("add_event");
     // was amy_process_event
     if(AMY_IS_SET(e->sequence[SEQUENCE_TICK]) || AMY_IS_SET(e->sequence[SEQUENCE_PERIOD]) || AMY_IS_SET(e->sequence[SEQUENCE_TAG])) {
-        uint8_t added = sequencer_add_event(e);
-        (void)added; // we don't need to do anything with this info at this time
+        // C-API sequenced event: serialize it to a wire message and hand it to
+        // the wire scheduler, so sequences have a single storage format.
+        char *buf = (char *)malloc_caps(MAX_MESSAGE_LEN, amy_global.config.ram_caps_events);
+        if (buf == NULL) {
+            amy_oom("add_event sequence");
+            return;
+        }
+        sprint_event(e, buf, MAX_MESSAGE_LEN, /* wirecode */ true);
+        amy_add_message(buf);
+        free(buf);
     } else if (AMY_IS_SET(e->reset_osc) && (e->reset_osc & RESET_PATCH) && AMY_IS_SET(e->patch_number)) {
         // We're resetting just one patch, do it now.  But RESET_PATCH with no patch_number should propagate to deltas.
         patches_reset_patch(e->patch_number);
@@ -306,6 +371,12 @@ void amy_add_event(amy_event *e) {
         // event doesn't read back as having no time at all.
         if(AMY_IS_UNSET(playback_time)) playback_time++;
         e->time = playback_time;
+        if (!AMY_TIME_GEQ(amy_sysclock(), playback_time)) {
+            // Future event: park a copy in the timed store.  Nothing about it
+            // (parsing, voice allocation, patch loads) happens until it's due.
+            timed_event_add(playback_time, e);
+            return;
+        }
         amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
     }
 }
@@ -422,6 +493,7 @@ void amy_overload_failsafe() {
     amy_grab_lock();
     amy_deltas_reset();
     amy_release_lock();
+    timed_wire_reset();  // takes the lock itself
     amy_event e = amy_default_event();
     e.reset_osc = RESET_ALL_NOTES | RESET_ALL_OSCS | RESET_SEQUENCER;
     amy_add_event(&e);
