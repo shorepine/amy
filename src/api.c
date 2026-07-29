@@ -121,6 +121,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->bus);
     AMY_UNSET(e->preset);
     AMY_UNSET(e->wave);
+    AMY_UNSET(e->mode);
     AMY_UNSET(e->patch_number);
     AMY_UNSET(e->trigger_phase);
     AMY_UNSET(e->feedback);

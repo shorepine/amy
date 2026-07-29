@@ -764,7 +764,13 @@ int amy_parse_message(char * message, amy_event *e) {
             /* U used by Alles for sync */
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
             case 'V': parse_list_float(arg, e->volume, AMY_NUM_BUSES, AMY_UNSET_VALUE(e->volume[0])); break;
-            case 'w': e->wave=atoi(arg); break;
+            case 'w': if (arg[0] == 'w') {  // 'ww' is wave submode.
+                    e->mode=atoi(arg + 1);
+                    ++pos;
+                } else {
+                    e->wave=atoi(arg);
+                }
+                break;
             /* W used by Tulip for CV, external_channel */
             case 'X': e->eg_type[1] = atoi(arg); break;
             case 'x': {

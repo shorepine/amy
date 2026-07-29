@@ -305,6 +305,13 @@ enum coefs{
 #define SILENT 20  // A control osc for applying filte and env without contributing waveform
 #define CUSTOM 21
 #define WAVE_OFF 22
+// wave mode values, depend on wave type
+#define MODE_NONE 0
+#define PCM_PLAY_STOP 0
+#define PCM_PLAY 1
+#define PCM_LOOP 2
+#define PCM_LOOP_STOP 3
+#define PCM_LOOP_FOREVER 4
 
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
@@ -386,6 +393,7 @@ enum params{
     ALGORITHM, LATENCY, TEMPO,           // 62, 63, 64
     VOLUME_BASE,                         // 65..68
     VOLUME_END=VOLUME_BASE + AMY_NUM_BUSES, // 69
+    MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
     BP_START=ALGO_SOURCE_END + 1,        // 107..202
@@ -530,6 +538,7 @@ typedef struct amy_event {
     uint32_t time;  // event only
     uint16_t osc;
     uint16_t wave;
+    uint16_t mode;   // sub-mode within wave
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
     float midi_note;
     uint16_t patch_number;  // event only
@@ -601,8 +610,9 @@ struct synthinfo {
     // Configuration (can be fixed during oscillation)
     uint8_t bus;  // Which bus this osc ends up on
     uint16_t wave;
+    uint16_t mode;   // sub-mode within wave
     int16_t preset;  // Negative preset is voice count for build-your-own PARTIALS
-    uint8_t note_source_channel;  // Was the most recent note on/off received from a MIDI channel?
+    uint8_t s_note_source_channel;  // Was the most recent note on/off received from a MIDI channel?
     float midi_note;
     float velocity;
     float amp_coefs[NUM_COMBO_COEFS];
@@ -660,6 +670,7 @@ struct mod_synthinfo {
     float last_filter_logfreq;  // filter freq history for smoothing.
     float resonance;
     float feedback;
+    uint16_t state;    // Used for PCM looping state.
 };
 
 

@@ -207,8 +207,11 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
         scale = -scale;  // does not mix well with no_amp_001
     }
     // Keep track of the most-recently returned non-release scale.
-    //if (osc < AMY_OSCS && found != -1)
-    //    fprintf(stderr, "env: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //static int last_seg = -1;
+    //if (osc < AMY_OSCS && found != -1 && last_seg != found) {
+    //  fprintf(stderr, "\renv: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //  last_seg = found;
+    //}
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)
     return scale;
 }

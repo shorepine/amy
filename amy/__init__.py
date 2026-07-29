@@ -241,7 +241,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source_channel', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
-    ('bus', 'yI'),
+    ('bus', 'yI'), ('mode', 'wwI'),
     ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), ('cv_trigger', 'igL'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
