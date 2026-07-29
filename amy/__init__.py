@@ -178,7 +178,7 @@ def parse_ctrl_coefs(coefs):
     The Python API accepts multiple kinds of input:
      * A scalar numeric value: freq=440
      * A list of values in the format accepted by the wire protocol: freq=',,,,0.01'.
-     * A Python list of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 7 values, the remainder are treated as None (analogous to the wire-protocol string).
+     * A Python list (or tuple) of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 7 values, the remainder are treated as None (analogous to the wire-protocol string).
      * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend', 'ext0', and 'ext1'.
     """
     # Pass through ready-formed strings, and convert single values to single value strings
@@ -195,25 +195,25 @@ def parse_ctrl_coefs(coefs):
                 raise ValueError('\'%s\' is not a recognized CtrlCoef field %s' % (key, str(dict_fields)))
             coef_list[dict_fields.index(key)] = value
         coefs = coef_list
+    if isinstance(coefs, tuple):
+        coefs = list(coefs)
     assert isinstance(coefs, list)
     coefs = trim_trailing(coefs, lambda x: x is not None)
 
-    def to_str(x):
-        if x is None:
-            return ''
-        return str(x)
+    return ','.join([elem_to_str(x) for x in coefs])
 
-    return ','.join([to_str(x) for x in coefs])
+def elem_to_str(x):
+    """One list/coef element for the wire: None is '', floats are trunc'd
+    to the same canonical form a scalar coef gets, everything else str()."""
+    if x is None:
+        return ''
+    if isinstance(x, float):
+        return trunc(x)
+    return str(x)
 
 def parse_list_or_comma_string(obj):
-
-    def str_none_is_empty(s):
-        if s is None:
-            return ""
-        return str(s)
-
     if isinstance(obj, (list, tuple)):
-        return ','.join(map(str_none_is_empty, obj))
+        return ','.join(map(elem_to_str, obj))
     return str(obj)
 
 def str_of_int(arg):
