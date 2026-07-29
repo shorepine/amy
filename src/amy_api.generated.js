@@ -64,6 +64,7 @@ var AMY_KW_MAP = {
   start_sample: {wire: "zS", type: "L"},
   stop_sample: {wire: "zO", type: "I"},
   bus: {wire: "y", type: "I"},
+  wave_submode: {wire: "ww", type: "I"},
   midi_cc: {wire: "ic", type: "L"},
   midi_note_cmd: {wire: "io", type: "L"},
   cv_trigger: {wire: "ig", type: "L"},
@@ -131,10 +132,11 @@ var AMY_KW_PRIORITY = {
   start_sample: 57,
   stop_sample: 58,
   bus: 59,
-  midi_cc: 60,
-  midi_note_cmd: 61,
-  cv_trigger: 62,
-  patch_string: 63
+  wave_submode: 60,
+  midi_cc: 61,
+  midi_note_cmd: 62,
+  cv_trigger: 63,
+  patch_string: 64
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod", "bend", "ext0", "ext1"];
@@ -359,6 +361,12 @@ var AMY = {
   SILENT: 20,
   CUSTOM: 21,
   WAVE_OFF: 22,
+  SUBMODE_NONE: 0,
+  PCM_PLAY_STOP: 0,
+  PCM_PLAY: 1,
+  PCM_LOOP: 2,
+  PCM_LOOP_STOP: 3,
+  PCM_LOOP_FOREVER: 4,
   SYNTH_OFF: 0,
   SYNTH_AUDIBLE: 1,
   SYNTH_INAUDIBLE: 2,

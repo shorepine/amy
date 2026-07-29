@@ -221,12 +221,11 @@ void pcm_note_off(uint16_t osc) {
             msynth[osc]->state = PCM_LOOP;
             // Allow the engine to terminate it when it goes to silence (e.g. from envelope).
             synth[osc]->terminate_on_silence = 1;
-        } else if (msynth[osc]->state == PCM_LOOP) {
+        } else if (msynth[osc]->state == PCM_LOOP || msynth[osc]->state == PCM_PLAY) {
             // Looping was enabled but after stop we just play through to the end.
             // (sending a second note-off will stop it immediately).
             msynth[osc]->state = PCM_PLAY_STOP;
         }
-        // PCM_PLAY ignores stop
     }
 }
 
