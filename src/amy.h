@@ -664,11 +664,14 @@ struct mod_synthinfo {
 
 
 // Result of the fast ingest scan of one wire message for the scheduling
-// commands 't' (time) and 'H' (sequence).  See amy_scan_wire_message().
+// commands 't' (time) and 'H' (sequence).  These are only recognized as
+// scheduling commands when they are the very first character of the
+// message, so at most one of has_time/has_sequence is ever set.
+// See amy_scan_wire_message().
 typedef struct wire_schedule_t {
     uint16_t consumed;      // chars of message in this segment (incl. 'Z')
-    uint8_t has_time;       // top-level 't' command found
-    uint8_t has_sequence;   // top-level 'H' command found
+    uint8_t has_time;       // leading 't' command found
+    uint8_t has_sequence;   // leading 'H' command found
     uint32_t time;          // value of 't'
     uint32_t sequence[3];   // tick, period, tag from 'H' (missing values 0)
     uint16_t time_span[2];  // [start, end) of the 't' command, for stripping

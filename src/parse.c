@@ -626,14 +626,23 @@ int _next_alpha(char *s) {
 // when it comes due, so bulk loads of sequencer/timed events don't pay for
 // event parsing, voice allocation and delta expansion up front.
 //
+// 't' and 'H' are only recognized as scheduling commands when they are the
+// very first character of the message (pos == 0); at most one of them can
+// occupy that position, so a message carries at most one scheduling command.
+// A 't' or 'H' anywhere else is just another command in the message -- it
+// keeps its ordinary per-event meaning (e.g. an event's own time field) and
+// is left in place for the real parser, not stripped or treated specially.
+// This mirrors the existing implicit rule that a patch string ('u') argument
+// must be last, and closes off the ambiguity of a scheduling command showing
+// up mid-message (e.g. inside a later command's argument list).
+//
 // The scan walks command letters and skips their numeric arguments, without
-// interpreting them.  Commands whose argument is a string that may itself
-// contain wire code or arbitrary text (patch strings 'u', MIDI/CV templates
-// 'ic'/'io'/'ig', filename/code transfers 'zT'/'zF'/'zD'/'zP') consume the
-// rest of the message in the real parser, so the scan treats them as opaque:
-// it stops looking and extends the segment to the end of the string.  Any
-// 't'/'H' after such a command is part of that command's payload, never a
-// top-level scheduling command, so nothing is missed.
+// interpreting them (beyond the leading t/H). Commands whose argument is a
+// string that may itself contain wire code or arbitrary text (patch strings
+// 'u', MIDI/CV templates 'ic'/'io'/'ig', filename/code transfers
+// 'zT'/'zF'/'zD'/'zP') consume the rest of the message in the real parser, so
+// the scan treats them as opaque: it stops looking and extends the segment to
+// the end of the string.
 //
 // Returns the number of chars in this message segment (through the 'Z'
 // terminator, or to end of string).  Fills *ws.
@@ -647,7 +656,7 @@ uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws) {
         char c = message[pos];
         if (!isalpha((unsigned char)c)) { ++pos; continue; }
         if (c == 'Z') { ++pos; break; }  // end of message
-        if (c == 't') {
+        if (c == 't' && pos == 0) {
             uint16_t start = pos++;
             ws->time = (uint32_t)atol(message + pos);
             pos += _next_alpha(message + pos);
@@ -656,7 +665,7 @@ uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws) {
             ws->time_span[1] = pos;
             continue;
         }
-        if (c == 'H') {
+        if (c == 'H' && pos == 0) {
             uint16_t start = pos++;
             ws->sequence[0] = ws->sequence[1] = ws->sequence[2] = 0;
             parse_list_uint32_t(message + pos, ws->sequence, 3, 0);
@@ -696,11 +705,13 @@ uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws) {
     return pos;
 }
 
-// Copy the message segment described by ws into out, minus the t/H command
-// spans.  out must have room for ws->consumed + 1 chars.  Returns the length
-// of the stripped string.
+// Copy the message segment described by ws into out, minus the leading t/H
+// command span.  out must have room for ws->consumed + 1 chars.  Returns the
+// length of the stripped string.
 uint16_t amy_strip_scheduling(const char *message, const wire_schedule_t *ws, char *out) {
-    // Order the (up to two) spans by start position; zero-length spans are no-ops.
+    // At most one of time_span/seq_span is ever non-empty (t and H are only
+    // recognized at pos == 0), but keep this general over both spans; a
+    // zero-length span is a no-op.
     uint16_t s1 = ws->time_span[0], e1 = ws->time_span[1];
     uint16_t s2 = ws->seq_span[0], e2 = ws->seq_span[1];
     if (s2 < s1) {

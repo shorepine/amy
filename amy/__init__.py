@@ -225,16 +225,24 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
-    ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
+    # 'sequence' and 'time' must come first: AMY's wire parser only recognizes
+    # 'H' (sequence) and 't' (time) as scheduling commands when one of them is
+    # the very first character of the message, so whichever of these two is
+    # present has to be serialized ahead of every other keyword. 'sequence'
+    # sorts ahead of 'time' so that if both are passed in the same call, 'H'
+    # (which takes priority when both are present) ends up as that leading
+    # character.
+    ('sequence', 'HL'), ('time', 'tI'),
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
+    ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'),
     ('volume', 'VL'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
     ('bp0', 'AL'), ('bp1', 'BL'),
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
     ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
     ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
-    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
+    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
-    ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
+    ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
     ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
     ('synth_level', 'iVF'),

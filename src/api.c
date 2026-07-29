@@ -297,10 +297,11 @@ void amy_add_message(char *message) {
             amy_add_event(&e);
             continue;
         }
-        // Fast pre-scan of this message for scheduling commands ('t' in the
-        // future, or 'H').  Scheduled messages are stored as their raw wire
-        // string and only parsed when they come due; everything else takes
-        // the normal parse-and-play path.
+        // Fast pre-scan of this message for a leading scheduling command
+        // ('t' in the future, or 'H', only recognized as the very first
+        // character of the message).  Scheduled messages are stored as their
+        // raw wire string and only parsed when they come due; everything
+        // else takes the normal parse-and-play path.
         wire_schedule_t ws;
         amy_scan_wire_message(message + pos, &ws);
         if (ws.has_sequence ||
@@ -311,8 +312,8 @@ void amy_add_message(char *message) {
             } else {
                 amy_strip_scheduling(message + pos, &ws, stripped);
                 if (ws.has_sequence) {
-                    // 'H' wins if both are present (as before: a sequenced
-                    // event's time field is effectively ignored).
+                    // Only 'H' or 't' can occupy the leading position, so
+                    // has_sequence and has_time are mutually exclusive here.
                     sequencer_add_wire(ws.sequence[SEQUENCE_TICK], ws.sequence[SEQUENCE_PERIOD],
                                        ws.sequence[SEQUENCE_TAG], stripped);
                 } else {
