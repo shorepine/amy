@@ -330,6 +330,7 @@ var _KW_MAP: Dictionary = {
 	"start_sample":        ["zS", "L"],
 	"stop_sample":         ["zO", "I"],
 	"bus":                 ["y", "I"],
+	"wave_submode":        ["ww", "I"],
 	"midi_cc":             ["ic", "L"],
 	"midi_note_cmd":       ["io", "L"],
 	"cv_trigger":          ["ig", "L"],
@@ -397,10 +398,11 @@ var _KW_PRIORITY: Dictionary = {
 	"start_sample": 57,
 	"stop_sample": 58,
 	"bus": 59,
-	"midi_cc": 60,
-	"midi_note_cmd": 61,
-	"cv_trigger": 62,
-	"patch_string": 63,
+	"wave_submode": 60,
+	"midi_cc": 61,
+	"midi_note_cmd": 62,
+	"cv_trigger": 63,
+	"patch_string": 64,
 }
 # END GENERATED
 
