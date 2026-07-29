@@ -27,6 +27,7 @@ typedef struct {
     uint8_t midinote;
     uint32_t samplerate;
     float log2sr;
+    uint8_t loop_warned;  // AMY_PCM_TYPE_FILE: warned once that PCM_LOOP* can't loop
 } memorypcm_preset_t;
 
 // linked list of memorypcm presets
@@ -160,6 +161,36 @@ static void fclose_if_file(memorypcm_preset_t *preset) {
     }
 }
 
+// A file-backed preset streams through a small sliding buffer rather than
+// sitting in a table we can index freely, so there is nothing to loop back
+// into: render_pcm refills from the file each block and rewinds phase to the
+// top of the fresh buffer. Rather than accept a PCM_LOOP* mode and then
+// silently play the clip once, degrade to the nearest non-looping mode -- same
+// note-off behavior, no loop -- and say so once per preset.
+//
+// (Whole-file looping *would* be implementable on top of the fseek+re-parse
+// rewind pcm_note_on already does; what a stream can never honor is the
+// loopstart/loopend marks. That's a bigger change than this one.)
+static uint16_t pcm_effective_mode(uint16_t osc, memorypcm_preset_t *preset) {
+    uint16_t mode = synth[osc]->mode;
+    if (preset == NULL || preset->type != AMY_PCM_TYPE_FILE)
+        return mode;
+    uint16_t degraded = mode;
+    if (mode == PCM_LOOP || mode == PCM_LOOP_FOREVER) {
+        // Both play on through a note-off; PCM_PLAY is that without the loop.
+        degraded = PCM_PLAY;
+    } else if (mode == PCM_LOOP_STOP) {
+        degraded = PCM_PLAY_STOP;
+    }
+    if (degraded != mode && !preset->loop_warned) {
+        preset->loop_warned = 1;
+        fprintf(stderr, "amy: preset %d streams from %s, so it cannot loop; "
+                        "playing it once instead. Use load_sample() to loop.\n",
+                synth[osc]->preset, preset->filename);
+    }
+    return degraded;
+}
+
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t rom_local;
@@ -192,7 +223,7 @@ void pcm_note_on(uint16_t osc) {
             synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
         // Copy the looping mode from the wave mode field.  Can be updated on note_off.
-        msynth[osc]->state = synth[osc]->mode;
+        msynth[osc]->state = pcm_effective_mode(osc, preset);
         // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }
@@ -216,6 +247,14 @@ void pcm_note_off(uint16_t osc) {
             || msynth[osc]->state == PCM_LOOP_STOP) {
             // PCM mode where note off causes immediate stop: Set phase to the end
             synth[osc]->phase = F2P(length / (float)(1 << PCM_INDEX_BITS));
+            if (preset != NULL && preset->type == AMY_PCM_TYPE_FILE) {
+                // ...except a streamed preset re-reads the file and resets
+                // phase to 0 every block, which throws that away -- the clip
+                // would keep playing to end-of-file, note-off ignored. This is
+                // the default mode, so it hit every disk_sample() note-off,
+                // not just the LOOP ones. Stop the osc outright instead.
+                synth[osc]->status = SYNTH_OFF;
+            }
         } else if (msynth[osc]->state == PCM_LOOP_FOREVER) {
             // Sending one note-off to a LOOP_FOREVER loop downgrades it to a stoppable loop.
             msynth[osc]->state = PCM_LOOP;
@@ -421,6 +460,7 @@ int pcm_load_file() {
     memory_preset->midinote = midinote;
     memory_preset->length = total_frames;
     memory_preset->type = AMY_PCM_TYPE_FILE;
+    memory_preset->loop_warned = 0;
     memory_preset->file_bytes_remaining = total_frames * info.channels * 2;
     memory_preset->file_handle = handle;
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),

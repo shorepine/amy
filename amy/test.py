@@ -1241,6 +1241,31 @@ class TestRestartFileSample(AmyTest):
     amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
 
 
+class TestDiskSampleStopsOnNoteOff(AmyTest):
+  """A streamed preset must honor the immediate-stop note-off like an
+  in-memory one does. pcm_note_off stops by seeking phase to the end, but
+  render_pcm resets phase to 0 every block for file presets, so the stop
+  used to be discarded and the clip played on to end-of-file. Note-off at
+  100ms, sample is ~256ms, so a regression shows up as extra audio."""
+
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+    amy.send(time=100, osc=0, vel=0)
+
+
+class TestDiskSampleLoopModeDegrades(AmyTest):
+  """PCM_LOOP on a streamed preset can't loop (no seekable table), so it
+  degrades to PCM_PLAY: one pass, note-off doesn't cut it short. Rendered
+  output should match a plain PCM_PLAY of the same clip."""
+
+  def run(self):
+    amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
+    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57,
+             mode=amy.PCM_LOOP)
+    amy.send(time=100, osc=0, vel=0)
+
+
 class TestDiskSampleStereo(AmyTest):
 
   def run(self):

@@ -360,6 +360,15 @@ amy.send(wave=amy.PCM, preset=99, vel=1, mode=amy.PCM_LOOP_FOREVER, eg0='0,1,100
 amy.send(vel=0) # note off
 ```
 
+**Looping needs an in-memory sample.** Presets loaded with `disk_sample` stream
+from the file through a small buffer instead of sitting in memory, so there is
+nothing to loop back into and the loop marks can't be honored. Asking for a
+`PCM_LOOP*` mode on one of those falls back to the nearest non-looping mode --
+`PCM_LOOP`/`PCM_LOOP_FOREVER` play the clip once and ignore note-off like
+`PCM_PLAY`, `PCM_LOOP_STOP` behaves like `PCM_PLAY_STOP` -- and AMY prints a
+one-time warning naming the preset. Load the sample with `load_sample` instead
+if you need it to loop.
+
 ### Sampler (aka Memory PCM)
 
 You can also load your own samples into AMY memory at runtime by sending PCM data over the wire protocol. Use `load_sample` in `amy.py` as an example:
