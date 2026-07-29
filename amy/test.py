@@ -1282,6 +1282,16 @@ class TestHPFHighBaseFreq(AmyTest):
     amy.send(time=400, synth=1, note=63, vel=0)
 
 
+class TestNotchFilter(AmyTest):
+
+  def run(self):
+    amy.send(time=0, synth=1, patch=0, num_voices=4)
+    amy.send(time=10, synth=1, osc=0, filter_type=amy.FILTER_NOTCH, resonance=2)
+    amy.send(time=20, synth=1, filter_freq='400,1,0,0,4', eg1='0,1,1000,0,100,0')
+    amy.send(time=100, synth=1, note=72, vel=10)
+    amy.send(time=800, synth=1, note=72, vel=0)
+
+
 class TestWavetable(AmyTest):
   """Simple exercise of the wavetable oscillator, using default wavetable."""
 
