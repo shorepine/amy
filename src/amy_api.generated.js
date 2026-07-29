@@ -334,6 +334,7 @@ var AMY = {
   FILTER_BPF: 2,
   FILTER_HPF: 3,
   FILTER_LPF24: 4,
+  FILTER_NOTCH: 5,
   SINE: 0,
   PULSE: 1,
   SAW_DOWN: 2,
