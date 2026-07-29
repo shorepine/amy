@@ -725,6 +725,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             amy_global.highest_bus = e->bus;
     }
     EVENT_TO_DELTA_I(wave, WAVE)
+    EVENT_TO_DELTA_I(wave_submode, WAVE_SUBMODE)
     EVENT_TO_DELTA_I(preset, PRESET)
     EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
     EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
@@ -838,6 +839,7 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
         pmsynth->pan = 0.5f;
         pmsynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
         pmsynth->resonance = 0.7f;
+        pmsynth->state = 0;
     }
 }
 
@@ -846,8 +848,9 @@ void reset_osc_params(struct synthinfo *psynth) {
     // Event-derived config
     psynth->bus = AMY_DEFAULT_BUS;
     psynth->wave = SINE;
+    psynth->wave_submode = SUBMODE_NONE;
     AMY_UNSET(psynth->preset);
-    AMY_UNSET(psynth->note_source_channel);
+    AMY_UNSET(psynth->s_note_source_channel);
     AMY_UNSET(psynth->midi_note);
     psynth->velocity = 0;
     for (int j = 0; j < NUM_COMBO_COEFS; ++j)  psynth->amp_coefs[j] = 0;
@@ -1128,8 +1131,8 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
-    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
-            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mod_source,
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " wavesub %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
+            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->wave_submode, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
@@ -1146,7 +1149,7 @@ void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
             }
             fprintf(stderr,"\n");
         }
-        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f \n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan);
+        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f state %" PRIu16 "\n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan, msynth[i]->state);
     }
 }
 
@@ -1365,12 +1368,13 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc]->logfreq_coefs[COEF_CONST]));
         }
     }
+    DELTA_TO_SYNTH_I(WAVE_SUBMODE, wave_submode)
     DELTA_TO_SYNTH_I(BUS, bus)
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
-    DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, note_source_channel)
+    DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
     if (d->param == PRESET) {
@@ -1618,11 +1622,6 @@ void play_delta(struct delta *d) {
                     switch(synth[osc]->wave) {
                     case KS: ks_note_off(osc); break;
                     case ALGO: algo_note_off(osc); break;
-                    case PCM:
-                    case PCM_LEFT:
-                    case PCM_RIGHT:
-                        pcm_note_off(osc);
-                        break;
                     case AMY_MIDI: amy_send_midi_note_off(osc); break;
                     case CUSTOM: custom_note_off(osc); break;
                     case BYO_PARTIALS:
@@ -1631,6 +1630,19 @@ void play_delta(struct delta *d) {
                         synth[osc]->note_off_clock = amy_global.total_samples;
                         if(synth[osc]->wave==INTERP_PARTIALS) interp_partials_note_off(osc);
                         else partials_note_off(osc);
+                        break;
+                    case PCM:
+                    case PCM_LEFT:
+                    case PCM_RIGHT:
+                        pcm_note_off(osc);
+                        if (synth[osc]->wave_submode == PCM_LOOP_FOREVER) {
+                            // Special case: with LOOP_FOREVER, we assume envelope is set.
+                            AMY_UNSET(synth[osc]->note_on_clock);
+                            if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {
+                                // Only set the note_off_clock (start of release) if we don't already have one.
+                                synth[osc]->note_off_clock = amy_global.total_samples;
+                            }
+                        }
                         break;
                     default:
                         // ** no_amp_001
@@ -1754,10 +1766,7 @@ void hold_and_modify(uint16_t osc) {
         ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, AMY_BLOCK_SIZE));
         msynth[osc]->amp = amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
     }
-    // synth[osc]->feedback is copied to msynth in pcm_note_on, then used to track note-off for looping PCM.
-    // For PCM, don't re-copy it every loop, or we'd lose track of that flag.  (This means you can't change feedback mid-playback for PCM).
-    // we also check for custom, for tulips' memorypcm 
-    if (synth[osc]->wave != PCM && synth[osc]->wave != CUSTOM)  msynth[osc]->feedback = synth[osc]->feedback;
+    msynth[osc]->feedback = synth[osc]->feedback;
     msynth[osc]->resonance = synth[osc]->resonance;
 
     if (osc == 999) {

@@ -191,10 +191,9 @@ void pcm_note_on(uint16_t osc) {
         } else {
             synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
-        // Special case: We use the msynth feedback flag to indicate note-off for looping PCM.  As a result, it's explicitly NOT set in amy:hold_and_modify for PCM voices.  Set it here.
-        msynth[osc]->feedback = synth[osc]->feedback;
-
-        // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.
+        // Copy the looping mode from the wave_submode field.  Can be updated on note_off.
+        msynth[osc]->state = synth[osc]->wave_submode;
+        // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }
 }
@@ -213,14 +212,21 @@ void pcm_note_off(uint16_t osc) {
         if(preset != NULL) {
             length = preset->length;
         }
-        if(msynth[osc]->feedback == 0) {
-            // Non-looping note: Set phase to the end to cause immediate stop.
+        if (msynth[osc]->state == PCM_PLAY_STOP
+            || msynth[osc]->state == PCM_LOOP_STOP) {
+            // PCM mode where note off causes immediate stop: Set phase to the end
             synth[osc]->phase = F2P(length / (float)(1 << PCM_INDEX_BITS));
-        } else {
-            // Looping is requested, disable future looping, sample will play through to end.
+        } else if (msynth[osc]->state == PCM_LOOP_FOREVER) {
+            // Sending one note-off to a LOOP_FOREVER loop downgrades it to a stoppable loop.
+            msynth[osc]->state = PCM_LOOP;
+            // Allow the engine to terminate it when it goes to silence (e.g. from envelope).
+            synth[osc]->terminate_on_silence = 1;
+        } else if (msynth[osc]->state == PCM_LOOP) {
+            // Looping was enabled but after stop we just play through to the end.
             // (sending a second note-off will stop it immediately).
-            msynth[osc]->feedback = 0;
+            msynth[osc]->state = PCM_PLAY_STOP;
         }
+        // PCM_PLAY ignores stop
     }
 }
 
@@ -327,7 +333,10 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                     synth[osc]->status = SYNTH_OFF;// is this right?
                     sample = 0;
                 } else {
-                    if(msynth[osc]->feedback > 0) { // still looping.  The feedback flag is cleared by pcm_note_off.
+                    if(msynth[osc]->state == PCM_LOOP
+                       || msynth[osc]->state == PCM_LOOP_STOP
+                       || msynth[osc]->state == PCM_LOOP_FOREVER) {
+                        // still looping.  The state may be modified by pcm_note_off.
                         if(base_index >= preset->loopend) { // loopend
                             // back to loopstart
                             int32_t loop_len = preset->loopend - preset->loopstart;

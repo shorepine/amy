@@ -157,9 +157,10 @@ class TestPcmTriggerPhase(AmyTest):
 
 
 class TestPcmLoop(AmyTest):
+  """I think these don't work at the moment because under Gamma9001 there are no loop points."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
+    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, wave_submode=amy.PCM_LOOP)
     amy.send(time=100, osc=0, vel=1)
     amy.send(time=500, osc=0, vel=0)
 
@@ -168,7 +169,7 @@ class TestPcmLoopEnvFilt(AmyTest):
   """Check that filter, amp-env, and pitch mod apply to PCM."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
+    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, wave_submode=amy.PCM_LOOP)
     amy.send(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='200,0,0,0,3', bp1='0,1,500,0,200,0')
     amy.send(time=0, osc=0, bp0='100,1,1000,0,1000,0')
     amy.send(time=0, osc=1, freq='1')
