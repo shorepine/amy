@@ -413,10 +413,10 @@ def inject_midi_bytes(data, usb=0):
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
 
-def unload_sample(patch=0):
-    s= "%d,%d" % (patch, 0)
+def unload_sample(preset=0):
+    s= "%d,%d" % (preset, 0)
     send(load_sample=s)
-    print("Patch %d unloaded from RAM" % (patch))
+    print("Preset %d unloaded from RAM" % (preset))
 
 # For AMYBoard and other AMYs that can get messages over MIDI sysex
 # AMYboard is the name of the default AMYboard USB over MIDI device. 
