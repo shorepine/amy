@@ -765,7 +765,7 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
             case 'V': parse_list_float(arg, e->volume, AMY_NUM_BUSES, AMY_UNSET_VALUE(e->volume[0])); break;
             case 'w': if (arg[0] == 'w') {  // 'ww' is wave submode.
-                    e->wave_submode=atoi(arg + 1);
+                    e->mode=atoi(arg + 1);
                     ++pos;
                 } else {
                     e->wave=atoi(arg);

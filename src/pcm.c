@@ -191,8 +191,8 @@ void pcm_note_on(uint16_t osc) {
         } else {
             synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
-        // Copy the looping mode from the wave_submode field.  Can be updated on note_off.
-        msynth[osc]->state = synth[osc]->wave_submode;
+        // Copy the looping mode from the wave mode field.  Can be updated on note_off.
+        msynth[osc]->state = synth[osc]->mode;
         // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }

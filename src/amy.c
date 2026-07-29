@@ -725,7 +725,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             amy_global.highest_bus = e->bus;
     }
     EVENT_TO_DELTA_I(wave, WAVE)
-    EVENT_TO_DELTA_I(wave_submode, WAVE_SUBMODE)
+    EVENT_TO_DELTA_I(mode, MODE)
     EVENT_TO_DELTA_I(preset, PRESET)
     EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
     EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
@@ -848,7 +848,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     // Event-derived config
     psynth->bus = AMY_DEFAULT_BUS;
     psynth->wave = SINE;
-    psynth->wave_submode = SUBMODE_NONE;
+    psynth->mode = MODE_NONE;
     AMY_UNSET(psynth->preset);
     AMY_UNSET(psynth->s_note_source_channel);
     AMY_UNSET(psynth->midi_note);
@@ -1131,8 +1131,8 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
-    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " wavesub %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
-            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->wave_submode, synth[i]->mod_source,
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
+            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source,
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
@@ -1368,7 +1368,7 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc]->logfreq_coefs[COEF_CONST]));
         }
     }
-    DELTA_TO_SYNTH_I(WAVE_SUBMODE, wave_submode)
+    DELTA_TO_SYNTH_I(MODE, mode)
     DELTA_TO_SYNTH_I(BUS, bus)
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
@@ -1635,7 +1635,7 @@ void play_delta(struct delta *d) {
                     case PCM_LEFT:
                     case PCM_RIGHT:
                         pcm_note_off(osc);
-                        if (synth[osc]->wave_submode == PCM_LOOP_FOREVER) {
+                        if (synth[osc]->mode == PCM_LOOP_FOREVER) {
                             // Special case: with LOOP_FOREVER, we assume envelope is set.
                             AMY_UNSET(synth[osc]->note_on_clock);
                             if (AMY_IS_UNSET(synth[osc]->note_off_clock)) {

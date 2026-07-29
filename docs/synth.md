@@ -347,16 +347,16 @@ amy.send(osc=0, wave=amy.PCM, vel=1, preset=10) # cowbell
 amy.send(osc=0, wave=amy.PCM, vel=1, preset=10, note=70) # higher cowbell! 
 ```
 
-You can turn on sample looping, helpful for instruments, using `wave_submode`:
+You can turn on sample looping, helpful for instruments, using `mode`:
 
 ```python
 amy.reset()
 amy.load_sample('sounds/partial_sources/VI ISUMP2A.wav', preset=99)  # wave file with looping
 amy.send(wave=amy.PCM, preset=99, vel=1) # plays through, no looping
-amy.send(wave=amy.PCM, preset=99, vel=1, wave_submode=amy.PCM_LOOP) # loops until note off
+amy.send(wave=amy.PCM, preset=99, vel=1, mode=amy.PCM_LOOP) # loops until note off
 amy.send(vel=0) # note off
 # Continue looping even after note off, but ADSR will apply a release
-amy.send(wave=amy.PCM, preset=99, vel=1, wave_submode=amy.PCM_LOOP_FOREVER, eg0='0,1,1000,0')
+amy.send(wave=amy.PCM, preset=99, vel=1, mode=amy.PCM_LOOP_FOREVER, eg0='0,1,1000,0')
 amy.send(vel=0) # note off
 ```
 
