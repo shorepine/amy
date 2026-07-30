@@ -75,10 +75,6 @@ Here's an example of a PCM1808 and PCM5101 working together to provide audio in 
 <img src="AMY-Arduino-ESP32S3_bb.png" width="600"/>
 
 
-### ES8311 (Freenove FNK0104 and similar)
-
-Boards built around the `ES8311` codec (for example the [Freenove FNK0104](https://store.freenove.com/products/fnk0104) ESP32-S3 display boards) drive their speaker through the codec plus a Class-D amplifier, so the codec must be configured over I2C before it will pass audio. AMY includes a small ES8311 playback driver (`src/es8311.c`); see the [`AMY_ES8311_FNK0104`](../examples/AMY_ES8311_FNK0104/AMY_ES8311_FNK0104.ino) example, which starts AMY's I2S output and then calls `amy_es8311_init()`. On the FNK0104 the audio pins are `MCLK=4`, `BCLK=5`, `WS=7`, `DOUT=8`, the codec control bus is `SDA=16 / SCL=15` (address `0x18`), and the amplifier enable is on `GPIO 1`. If you can pass compiler flags, building AMY with `-DAMY_CODEC_ES8311` makes AMY configure the codec automatically (pins overridable via `-DAMY_ES8311_*` defines).
-
 ## Per-board notes
 
 ### AMYboard
@@ -88,6 +84,12 @@ Our built-for-AMY board [AMYboard](https://amyboard.com) should just work out of
 ### ESP32, ESP32-S3, ESP32-P4
 
 Tested: Arduino IDE 2.3.6 (mac) + arduino-esp32 3.2.0
+
+### ES8311 (Freenove FNK0104 and similar)
+
+Boards built around the `ES8311` codec (for example the [Freenove FNK0104](https://store.freenove.com/products/fnk0104) ESP32-S3 display boards) drive their speaker through the codec plus a Class-D amplifier, so the codec must be configured over I2C before it will pass audio. AMY includes a small ES8311 playback driver (`src/es8311.c`); see the [`AMY_ES8311_FNK0104`](../examples/AMY_ES8311_FNK0104/AMY_ES8311_FNK0104.ino) example, which starts AMY's I2S output and then calls `amy_es8311_init()`. On the FNK0104 the audio pins are `MCLK=4`, `BCLK=5`, `WS=7`, `DOUT=8`, the codec control bus is `SDA=16 / SCL=15` (address `0x18`), and the amplifier enable is on `GPIO 1`. If you can pass compiler flags, building AMY with `-DAMY_CODEC_ES8311` makes AMY configure the codec automatically (pins overridable via `-DAMY_ES8311_*` defines).
+
+**Set the codec up before `Wire.begin()`.** The driver takes exclusive ownership of the I2C port while it configures the codec, then releases the pins again. On boards that share the codec's control bus with something else — on the FNK0104 the FT6336U touch controller is on the same `SDA=16 / SCL=15` — bringing that other device up first makes the codec's bus init fail, which means silence. So call `amy_start()` / `amy_es8311_init()` (or `amy_start()` alone under `-DAMY_CODEC_ES8311`) *first*, and initialise the display/touch panel afterwards. `amy_es8311_status()` reports how the codec bring-up went, including when AMY did it for you inside `amy_start()`.
 
 
 ### Teensy 4.0, 4.1

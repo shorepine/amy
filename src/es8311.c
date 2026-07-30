@@ -3,14 +3,16 @@
 //
 // Ported from Espressif's reference ES8311 driver (ESPRESSIF MIT License) down
 // to just the playback path AMY needs, and re-plumbed onto the ESP-IDF
-// driver_ng I2C master API (driver/i2c_master.h) so it coexists with Arduino's
-// Wire, exactly like the PCM9211 setup in i2s.c.
+// driver_ng I2C master API (via amy_i2c.h) so it coexists with Arduino's Wire,
+// exactly like the PCM9211 setup in i2s.c.
 //
 // Assumptions (matching AMY's default ESP I2S setup in i2s.c):
 //   * The ES8311 is the I2S slave; AMY (the ESP) is the master and supplies
 //     MCLK, BCLK and WS.
 //   * The codec's internal MCLK comes from the MCLK pin (not BCLK).
-//   * MCLK = sample_rate * 256 (AMY's default I2S_STD_CLK_DEFAULT_CONFIG).
+//   * MCLK = sample_rate * amy_config.i2s_mclk_mult (256 by default).  The
+//     caller passes the resulting frequency in, so what we program here can't
+//     drift away from what the I2S peripheral actually generates.
 //   * Data is 32-bit, MSB / left-justified (I2S_STD_MSB_SLOT_DEFAULT_CONFIG).
 //     Define AMY_ES8311_I2S_PHILIPS to use standard (Philips) I2S framing
 //     instead, should AMY's slot config ever change.
@@ -19,7 +21,7 @@
 
 #include <stdio.h>
 #include "es8311.h"
-#include "driver/i2c_master.h"
+#include "amy_i2c.h"
 #include "driver/gpio.h"
 #include "esp_rom_sys.h"   // esp_rom_delay_us
 
@@ -56,8 +58,16 @@
 #define ES8311_CHD1_REGFD           0xFD   // chip ID 1
 #define ES8311_CHD2_REGFE           0xFE   // chip ID 2
 
+#define ES8311_I2C_FREQ             400000
+
+// reg32 (DAC volume) steps 0.5 dB: 0x00 = -95.5 dB, 0xBF = 0 dB, and anything
+// above 0xBF is *digital gain*.  AMY's mixed output routinely runs to full
+// scale, so our 0-100 volume scale tops out at unity rather than clipping inside
+// the codec -- which sounds just like an I2S format problem.
+#define ES8311_DAC_VOL_0DB          0xBF
+
 // Clock coefficient row: how to derive the codec's internal clocks from a given
-// (MCLK, sample-rate) pair.  Copied verbatim from the Espressif reference driver.
+// (MCLK, sample-rate) pair.  Copied from the Espressif reference driver.
 struct coeff_div {
     uint32_t mclk;
     uint32_t rate;
@@ -73,9 +83,24 @@ struct coeff_div {
     uint8_t dac_osr;
 };
 
+// AMY_SAMPLE_RATE is fixed at compile time, so only the rows for that one rate
+// can ever be selected; the reference driver's other ~55 rows would be a
+// kilobyte of dead flash on an MCU.  Every MCLK variant of our rate stays,
+// because amy_config.i2s_mclk_mult picks which one we feed the codec.  A build at
+// a rate the reference table doesn't list keeps the whole table, so get_coeff()
+// still behaves (and still reports what's missing).
+#if (AMY_SAMPLE_RATE != 8000) && (AMY_SAMPLE_RATE != 11025) && (AMY_SAMPLE_RATE != 12000) && \
+    (AMY_SAMPLE_RATE != 16000) && (AMY_SAMPLE_RATE != 22050) && (AMY_SAMPLE_RATE != 24000) && \
+    (AMY_SAMPLE_RATE != 32000) && (AMY_SAMPLE_RATE != 44100) && (AMY_SAMPLE_RATE != 48000) && \
+    (AMY_SAMPLE_RATE != 96000)
+#define ES8311_WANT(r) 1
+#else
+#define ES8311_WANT(r) (AMY_SAMPLE_RATE == (r))
+#endif
+
 static const struct coeff_div coeff_div[] = {
     // mclk      rate   prediv  mult  adcdiv dacdiv fsmode lrch  lrcl  bckdiv adcosr dacosr
-    /* 8k */
+#if ES8311_WANT(8000)
     {12288000, 8000 , 0x06, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 8000 , 0x03, 0x02, 0x03, 0x03, 0x00, 0x05, 0xff, 0x18, 0x10, 0x10},
     {16384000, 8000 , 0x08, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
@@ -86,17 +111,20 @@ static const struct coeff_div coeff_div[] = {
     {2048000 , 8000 , 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 8000 , 0x03, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1024000 , 8000 , 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 11.025k */
+#endif
+#if ES8311_WANT(11025)
     {11289600, 11025, 0x04, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {5644800 , 11025, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {2822400 , 11025, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1411200 , 11025, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 12k */
+#endif
+#if ES8311_WANT(12000)
     {12288000, 12000, 0x04, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {6144000 , 12000, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {3072000 , 12000, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 12000, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 16k */
+#endif
+#if ES8311_WANT(16000)
     {12288000, 16000, 0x03, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 16000, 0x03, 0x02, 0x03, 0x03, 0x00, 0x02, 0xff, 0x0c, 0x10, 0x10},
     {16384000, 16000, 0x04, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
@@ -107,18 +135,21 @@ static const struct coeff_div coeff_div[] = {
     {2048000 , 16000, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 16000, 0x03, 0x08, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1024000 , 16000, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 22.05k */
+#endif
+#if ES8311_WANT(22050)
     {11289600, 22050, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {5644800 , 22050, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {2822400 , 22050, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1411200 , 22050, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 24k */
+#endif
+#if ES8311_WANT(24000)
     {12288000, 24000, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 24000, 0x03, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {6144000 , 24000, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {3072000 , 24000, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 24000, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 32k */
+#endif
+#if ES8311_WANT(32000)
     {12288000, 32000, 0x03, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 32000, 0x03, 0x04, 0x03, 0x03, 0x00, 0x02, 0xff, 0x0c, 0x10, 0x10},
     {16384000, 32000, 0x02, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
@@ -129,39 +160,39 @@ static const struct coeff_div coeff_div[] = {
     {2048000 , 32000, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 32000, 0x03, 0x08, 0x01, 0x01, 0x01, 0x00, 0x7f, 0x02, 0x10, 0x10},
     {1024000 , 32000, 0x01, 0x08, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 44.1k */
+#endif
+#if ES8311_WANT(44100)
     {11289600, 44100, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {5644800 , 44100, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {2822400 , 44100, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1411200 , 44100, 0x01, 0x08, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 48k */
+#endif
+#if ES8311_WANT(48000)
     {12288000, 48000, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 48000, 0x03, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {6144000 , 48000, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {3072000 , 48000, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 48000, 0x01, 0x08, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
-    /* 96k */
+#endif
+#if ES8311_WANT(96000)
     {12288000, 96000, 0x01, 0x02, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {18432000, 96000, 0x03, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {6144000 , 96000, 0x01, 0x04, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {3072000 , 96000, 0x01, 0x08, 0x01, 0x01, 0x00, 0x00, 0xff, 0x04, 0x10, 0x10},
     {1536000 , 96000, 0x01, 0x08, 0x01, 0x01, 0x01, 0x00, 0x7f, 0x02, 0x10, 0x10},
+#endif
 };
 
-static i2c_master_dev_handle_t es_dev = NULL;
-
-static esp_err_t es_write(uint8_t reg, uint8_t val) {
-    uint8_t buf[2] = { reg, val };
-    esp_err_t ret = i2c_master_transmit(es_dev, buf, 2, 100);
+static esp_err_t es_write(const amy_i2c_dev_t *d, uint8_t reg, uint8_t val) {
+    esp_err_t ret = amy_i2c_write_reg(d, reg, val);
     if (ret != ESP_OK) {
         fprintf(stderr, "ES8311: write reg 0x%02x failed: %s\n", reg, esp_err_to_name(ret));
     }
     return ret;
 }
 
-static esp_err_t es_read(uint8_t reg, uint8_t *val) {
-    *val = 0;
-    esp_err_t ret = i2c_master_transmit_receive(es_dev, &reg, 1, val, 1, 100);
+static esp_err_t es_read(const amy_i2c_dev_t *d, uint8_t reg, uint8_t *val) {
+    esp_err_t ret = amy_i2c_read_reg(d, reg, val);
     if (ret != ESP_OK) {
         fprintf(stderr, "ES8311: read reg 0x%02x failed: %s\n", reg, esp_err_to_name(ret));
     }
@@ -178,7 +209,7 @@ static int get_coeff(uint32_t mclk, uint32_t rate) {
 
 // Program the clock-manager registers for the given (mclk, rate) pair.
 // Codec is a slave, MCLK sourced from the MCLK pin (not inverted).
-static esp_err_t es8311_config_clock(int coeff) {
+static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     uint8_t regv;
     esp_err_t ret;
 
@@ -191,65 +222,68 @@ static esp_err_t es8311_config_clock(int coeff) {
         case 8: datmp = 3; break;
         default: break;
     }
-    ret = es_read(ES8311_CLK_MANAGER_REG02, &regv);
+    ret = es_read(d, ES8311_CLK_MANAGER_REG02, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x07;
     regv |= (coeff_div[coeff].pre_div - 1) << 5;
     regv |= datmp << 3;
-    ret = es_write(ES8311_CLK_MANAGER_REG02, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG02, regv);
     if (ret != ESP_OK) return ret;
 
     // ADC/DAC clock dividers (reg05).
     regv = (coeff_div[coeff].adc_div - 1) << 4;
     regv |= (coeff_div[coeff].dac_div - 1) << 0;
-    ret = es_write(ES8311_CLK_MANAGER_REG05, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG05, regv);
     if (ret != ESP_OK) return ret;
 
     // ADC over-sample rate + fs mode (reg03).
-    ret = es_read(ES8311_CLK_MANAGER_REG03, &regv);
+    ret = es_read(d, ES8311_CLK_MANAGER_REG03, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x80;
     regv |= coeff_div[coeff].fs_mode << 6;
     regv |= coeff_div[coeff].adc_osr << 0;
-    ret = es_write(ES8311_CLK_MANAGER_REG03, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG03, regv);
     if (ret != ESP_OK) return ret;
 
     // DAC over-sample rate (reg04).
-    ret = es_read(ES8311_CLK_MANAGER_REG04, &regv);
+    ret = es_read(d, ES8311_CLK_MANAGER_REG04, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x80;
     regv |= coeff_div[coeff].dac_osr << 0;
-    ret = es_write(ES8311_CLK_MANAGER_REG04, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG04, regv);
     if (ret != ESP_OK) return ret;
 
     // LRCK divider high/low (reg07/reg08).
-    ret = es_read(ES8311_CLK_MANAGER_REG07, &regv);
+    ret = es_read(d, ES8311_CLK_MANAGER_REG07, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0xC0;
     regv |= coeff_div[coeff].lrck_h << 0;
-    ret = es_write(ES8311_CLK_MANAGER_REG07, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG07, regv);
     if (ret != ESP_OK) return ret;
     regv = coeff_div[coeff].lrck_l;
-    ret = es_write(ES8311_CLK_MANAGER_REG08, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG08, regv);
     if (ret != ESP_OK) return ret;
 
     // BCLK divider (reg06).
-    ret = es_read(ES8311_CLK_MANAGER_REG06, &regv);
+    ret = es_read(d, ES8311_CLK_MANAGER_REG06, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0xE0;
     if (coeff_div[coeff].bclk_div < 19)
         regv |= (coeff_div[coeff].bclk_div - 1) << 0;
     else
         regv |= (coeff_div[coeff].bclk_div) << 0;
-    ret = es_write(ES8311_CLK_MANAGER_REG06, regv);
+    ret = es_write(d, ES8311_CLK_MANAGER_REG06, regv);
     if (ret != ESP_OK) return ret;
 
     return ESP_OK;
 }
 
-amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr,
-                          int8_t pa_enable_gpio, uint8_t pa_active_low,
-                          uint32_t sample_rate, uint32_t mclk_hz, uint8_t volume) {
+// The bring-up proper.  Wrapped by amy_es8311_init below, which records the
+// result so amy_es8311_status() can report it to a caller that did not do the
+// bring-up itself.
+static amy_err_t es8311_init_impl(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr,
+                                  int8_t pa_enable_gpio, uint8_t pa_active_low,
+                                  uint32_t sample_rate, uint32_t mclk_hz, uint8_t volume) {
     // The default ESP I2S path drives 32-bit MSB (left-justified) slots.
 #ifdef AMY_ES8311_I2S_PHILIPS
     const uint8_t fmt_bits = 0x00;   // standard I2S (Philips)
@@ -266,29 +300,13 @@ amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr
     }
 
     // Bring up the I2C master bus + codec device.
-    i2c_master_bus_config_t bus_conf = {
-        .i2c_port = i2c_port,
-        .sda_io_num = sda,
-        .scl_io_num = scl,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
-    i2c_master_bus_handle_t bus = NULL;
-    esp_err_t ret = i2c_new_master_bus(&bus_conf, &bus);
+    amy_i2c_dev_t d;
+    esp_err_t ret = amy_i2c_open_device(&d, i2c_port, sda, scl, i2c_addr, ES8311_I2C_FREQ);
     if (ret != ESP_OK) {
-        fprintf(stderr, "ES8311: I2C bus init failed: %s\n", esp_err_to_name(ret));
-        return -1;
-    }
-    i2c_device_config_t dev_conf = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = i2c_addr,
-        .scl_speed_hz = 400000,
-    };
-    ret = i2c_master_bus_add_device(bus, &dev_conf, &es_dev);
-    if (ret != ESP_OK) {
-        fprintf(stderr, "ES8311: I2C add device 0x%02x failed: %s\n", i2c_addr, esp_err_to_name(ret));
-        i2c_del_master_bus(bus);
+        fprintf(stderr, "ES8311: I2C open (port %d, sda %d, scl %d, addr 0x%02x) failed: %s\n"
+                        "        If something else already owns that bus -- e.g. Wire.begin() for a\n"
+                        "        touch panel sharing those pins -- configure the codec first.\n",
+                i2c_port, sda, scl, i2c_addr, esp_err_to_name(ret));
         return -1;
     }
 
@@ -301,8 +319,8 @@ amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr
 
     // Presence check (ES8311 chip id is 0x83 0x11).
     uint8_t id1, id2, regv;
-    ES8311_INIT_CHECK(es_read(ES8311_CHD1_REGFD, &id1));
-    ES8311_INIT_CHECK(es_read(ES8311_CHD2_REGFE, &id2));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_CHD1_REGFD, &id1));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_CHD2_REGFE, &id2));
     if (!(id1 == 0x83 && id2 == 0x11)) {
         fprintf(stderr, "ES8311: unexpected chip id 0x%02x%02x (expected 0x8311)\n", id1, id2);
         ret = ESP_FAIL;
@@ -310,65 +328,61 @@ amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr
     }
 
     // ---- Codec init (clock manager + power) ----
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG01, 0x30));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG02, 0x00));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG03, 0x10));
-    ES8311_INIT_CHECK(es_write(ES8311_ADC_REG16, 0x24));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG04, 0x10));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG05, 0x00));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG0B, 0x00));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG0C, 0x00));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG10, 0x1F));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG11, 0x7F));
-    ES8311_INIT_CHECK(es_write(ES8311_RESET_REG00, 0x80));   // power up, CSM/clock on
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG01, 0x30));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG02, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG03, 0x10));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG16, 0x24));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG04, 0x10));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG05, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG0B, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG0C, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG10, 0x1F));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG11, 0x7F));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_RESET_REG00, 0x80));   // power up, CSM/clock on
 
     // Slave mode: clear bit6 of reg00.
-    ES8311_INIT_CHECK(es_read(ES8311_RESET_REG00, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_RESET_REG00, regv & 0xBF));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG01, 0x3F));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_RESET_REG00, &regv));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_RESET_REG00, regv & 0xBF));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG01, 0x3F));
     // MCLK from the MCLK pin (not BCLK): clear bit7 of reg01.
-    ES8311_INIT_CHECK(es_read(ES8311_CLK_MANAGER_REG01, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG01, regv & 0x7F));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_CLK_MANAGER_REG01, &regv));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG01, regv & 0x7F));
 
-    ES8311_INIT_CHECK(es8311_config_clock(coeff));
+    ES8311_INIT_CHECK(es8311_config_clock(&d, coeff));
 
     // MCLK / SCLK not inverted.
-    ES8311_INIT_CHECK(es_read(ES8311_CLK_MANAGER_REG01, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG01, regv & ~0x40));
-    ES8311_INIT_CHECK(es_read(ES8311_CLK_MANAGER_REG06, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_CLK_MANAGER_REG06, regv & ~0x20));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_CLK_MANAGER_REG01, &regv));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG01, regv & ~0x40));
+    ES8311_INIT_CHECK(es_read(&d, ES8311_CLK_MANAGER_REG06, &regv));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_CLK_MANAGER_REG06, regv & ~0x20));
 
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG13, 0x10));
-    ES8311_INIT_CHECK(es_write(ES8311_ADC_REG1B, 0x0A));
-    ES8311_INIT_CHECK(es_write(ES8311_ADC_REG1C, 0x6A));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG13, 0x10));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG1B, 0x0A));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG1C, 0x6A));
 
     // ---- Serial data-port format: 32-bit, left-justified (or Philips) ----
-    // DAC port (reg09): word length in bits [4:2], format in bits [1:0].
-    ES8311_INIT_CHECK(es_write(ES8311_SDPIN_REG09, (len_bits) | fmt_bits));
-    ES8311_INIT_CHECK(es_write(ES8311_SDPOUT_REG0A, (len_bits) | fmt_bits));
+    // reg09/reg0A: serial-port mute in bit6 (so 0 here also un-mutes the port),
+    // word length in bits [4:2], format in bits [1:0].
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPIN_REG09, len_bits | fmt_bits));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPOUT_REG0A, len_bits | fmt_bits));
 
     // ---- Start playback (DAC) path ----
-    // Un-mute the DAC serial port (clear bit6 of reg09).
-    ES8311_INIT_CHECK(es_read(ES8311_SDPIN_REG09, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_SDPIN_REG09, regv & ~0x40));
-    ES8311_INIT_CHECK(es_write(ES8311_ADC_REG17, 0xBF));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG0E, 0x02));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG12, 0x00));   // enable DAC
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG14, 0x1A));   // analog PGA / not DMIC
-    ES8311_INIT_CHECK(es_read(ES8311_SYSTEM_REG14, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG14, regv & ~0x40));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG0D, 0x01));
-    ES8311_INIT_CHECK(es_write(ES8311_ADC_REG15, 0x40));
-    ES8311_INIT_CHECK(es_write(ES8311_DAC_REG37, 0x48));
-    ES8311_INIT_CHECK(es_write(ES8311_GP_REG45, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG17, 0xBF));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG0E, 0x02));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG12, 0x00));   // enable DAC
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG14, 0x1A));   // analog PGA, not DMIC (bit6 = 0)
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SYSTEM_REG0D, 0x01));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG15, 0x40));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_DAC_REG37, 0x48));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_GP_REG45, 0x00));
 
     // ---- Volume + un-mute ----
     if (volume > 100) volume = 100;
-    ES8311_INIT_CHECK(es_write(ES8311_DAC_REG32, (uint8_t)((volume * 2550) / 1000)));  // 0..255
-    // Un-mute: clear DAC mute bits (reg31 [6:5]) and clear the system mute (reg12).
-    ES8311_INIT_CHECK(es_read(ES8311_DAC_REG31, &regv));
-    ES8311_INIT_CHECK(es_write(ES8311_DAC_REG31, regv & 0x9F));
-    ES8311_INIT_CHECK(es_write(ES8311_SYSTEM_REG12, 0x00));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_DAC_REG32,
+                               (uint8_t)(((uint32_t)volume * ES8311_DAC_VOL_0DB + 50) / 100)));
+    // Un-mute: clear the DAC mute bits (reg31 [6:5]).
+    ES8311_INIT_CHECK(es_read(&d, ES8311_DAC_REG31, &regv));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_DAC_REG31, regv & 0x9F));
 
     // Give the DAC ramp a moment before the amp comes up (avoids a turn-on pop).
     esp_rom_delay_us(2000);
@@ -384,29 +398,83 @@ amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr
 
     // The codec now runs off I2S; release the I2C bus so Arduino Wire (touch
     // panel, etc.) can reuse it, mirroring the PCM9211 setup in i2s.c.
-    ret = i2c_master_bus_rm_device(es_dev);
-    es_dev = NULL;
-    if (ret != ESP_OK) {
-        fprintf(stderr, "ES8311: I2C device cleanup failed: %s\n", esp_err_to_name(ret));
-        i2c_del_master_bus(bus);
-        return -1;
-    }
-    ret = i2c_del_master_bus(bus);
-    if (ret != ESP_OK) {
-        fprintf(stderr, "ES8311: I2C bus cleanup failed: %s\n", esp_err_to_name(ret));
-        return -1;
-    }
+    amy_i2c_close_device(&d);
 
 #undef ES8311_INIT_CHECK
     return AMY_OK;
 
 init_failed:
-    if (es_dev != NULL) {
-        i2c_master_bus_rm_device(es_dev);
-        es_dev = NULL;
-    }
-    if (bus != NULL) i2c_del_master_bus(bus);
+    amy_i2c_close_device(&d);
     return -1;
 }
+
+static amy_err_t es8311_last_status = AMY_ES8311_NOT_STARTED;
+
+// What we last configured.  amy_es8311_init() hands the I2C pins back when it's
+// done, so shutting the codec down again means re-opening the control bus.
+static struct {
+    int i2c_port;
+    int8_t sda;
+    int8_t scl;
+    uint8_t i2c_addr;
+    int8_t pa_gpio;
+    uint8_t pa_active_low;
+} es8311_hw;
+
+amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr,
+                          int8_t pa_enable_gpio, uint8_t pa_active_low,
+                          uint32_t sample_rate, uint32_t mclk_hz, uint8_t volume) {
+    // If a codec is already up (a second esp32_setup_i2s(), a stop/start cycle),
+    // mute it and drop the amp first so we re-configure a quiet chip instead of
+    // reprogramming clocks underneath a live amplifier.
+    if (es8311_last_status == AMY_OK) amy_es8311_deinit();
+
+    es8311_last_status = es8311_init_impl(i2c_port, sda, scl, i2c_addr,
+                                         pa_enable_gpio, pa_active_low,
+                                         sample_rate, mclk_hz, volume);
+    if (es8311_last_status == AMY_OK) {
+        es8311_hw.i2c_port = i2c_port;
+        es8311_hw.sda = sda;
+        es8311_hw.scl = scl;
+        es8311_hw.i2c_addr = i2c_addr;
+        es8311_hw.pa_gpio = pa_enable_gpio;
+        es8311_hw.pa_active_low = pa_active_low;
+    }
+    return es8311_last_status;
+}
+
+amy_err_t amy_es8311_deinit(void) {
+    if (es8311_last_status != AMY_OK) return AMY_OK;   // nothing of ours is running
+    es8311_last_status = AMY_ES8311_NOT_STARTED;
+
+    // Shut the power amplifier down *first*: muting the DAC -- or, worse, having
+    // the caller stop MCLK/BCLK/WS -- while the amp is live puts a pop, or a
+    // sustained DC thump, through the speaker.
+    if (es8311_hw.pa_gpio >= 0) {
+        gpio_set_level((gpio_num_t)es8311_hw.pa_gpio, es8311_hw.pa_active_low ? 1 : 0);
+        esp_rom_delay_us(2000);   // let the amp actually get there
+    }
+
+    // Then quiet the codec, so a stopped I2S clock (or the next init) meets a
+    // muted, powered-down DAC.  Re-open the control bus we handed back in init.
+    amy_i2c_dev_t d;
+    esp_err_t ret = amy_i2c_open_device(&d, es8311_hw.i2c_port, es8311_hw.sda, es8311_hw.scl,
+                                       es8311_hw.i2c_addr, ES8311_I2C_FREQ);
+    if (ret != ESP_OK) {
+        fprintf(stderr, "ES8311: I2C open for shutdown failed: %s "
+                        "(amp is off, DAC left as it was)\n", esp_err_to_name(ret));
+        return -1;
+    }
+    uint8_t regv;
+    es_write(&d, ES8311_DAC_REG32, 0x00);              // volume down to -95.5 dB
+    if (es_read(&d, ES8311_DAC_REG31, &regv) == ESP_OK)
+        es_write(&d, ES8311_DAC_REG31, regv | 0x60);   // mute the DAC
+    es_write(&d, ES8311_SYSTEM_REG12, 0x02);           // DAC off
+    es_write(&d, ES8311_SYSTEM_REG0D, 0xFA);           // power down the analog blocks
+    amy_i2c_close_device(&d);
+    return AMY_OK;
+}
+
+amy_err_t amy_es8311_status(void) { return es8311_last_status; }
 
 #endif // ESP_PLATFORM

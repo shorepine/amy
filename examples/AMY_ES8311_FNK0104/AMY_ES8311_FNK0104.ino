@@ -11,19 +11,18 @@
 //   Amp : enable on GPIO 1
 //
 // No special build flags are required: amy_es8311_init() is part of the AMY
-// library on ESP32, so we just call it from setup() after amy_start().
+// library on ESP32 (prototype in src/es8311.h, pulled in by AMY-Arduino.h), so
+// we just call it from setup() after amy_start().
 // (If you can pass compiler flags, e.g. in PlatformIO, building AMY with
-//  -DAMY_CODEC_ES8311 makes AMY configure the codec automatically and you can
-//  drop the amy_es8311_init() call below.)
+//  -DAMY_CODEC_ES8311 makes AMY configure the codec inside amy_start() instead;
+//  this sketch then just reports amy_es8311_status().)
+//
+// Ordering matters on this board: the ES8311 shares SDA=16 / SCL=15 with the
+// FT6336U touch controller, and the codec driver needs exclusive ownership of
+// that I2C port while it runs.  Configure the codec *first*, then Wire.begin()
+// for the touch panel / anything else on the bus.
 
 #include <AMY-Arduino.h>
-
-// ES8311 codec setup (implemented in the AMY library, src/es8311.c).
-extern "C" {
-  amy_err_t amy_es8311_init(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr,
-                            int8_t pa_enable_gpio, uint8_t pa_active_low,
-                            uint32_t sample_rate, uint32_t mclk_hz, uint8_t volume);
-};
 
 // FNK0104 audio pins.
 #define FNK_I2S_MCLK   4
@@ -35,15 +34,20 @@ extern "C" {
 #define FNK_ES8311_ADDR 0x18
 #define FNK_PA_ENABLE  1
 #define FNK_PA_ACTIVE_LOW 1   // FNK0104 amp enable is active-low (LOW = amp on)
+#define FNK_VOLUME     100    // ES8311 DAC volume 0-100; 100 = unity (0 dB)
 
 void setup() {
   amy_config_t amy_config = amy_default_config();
   amy_config.features.default_synths = 0;
   amy_config.features.audio_in = 0;
 
-  // Render on core 1 (multicore) plus a dedicated render thread (multithread).
+  // Split rendering across both cores.  We deliberately leave multithread at 0:
+  // with a background render thread, the amy_add_event() calls in loop() below
+  // would race that thread over voice/oscillator allocation (AMY's queue lock
+  // covers the delta list, not the allocation state).  With multithread = 0,
+  // amy_update() executes events on this task, so loop() is the only writer.
   amy_config.platform.multicore = 1;
-  amy_config.platform.multithread = 1;
+  amy_config.platform.multithread = 0;
 
   // Let AMY own the I2S output.
   amy_config.audio = AMY_AUDIO_IS_I2S;
@@ -55,16 +59,24 @@ void setup() {
   // Starts I2S: MCLK/BCLK/WS are running after this returns.
   amy_start(amy_config);
 
-  // Now configure the ES8311 over I2C and switch on the power amplifier.
-  // MCLK = 256 * sample rate (AMY's default ESP I2S clock config).
+#ifdef AMY_CODEC_ES8311
+  // AMY already configured the codec (and the amp) from inside amy_start().
+  amy_err_t rc = amy_es8311_status();
+#else
+  // Configure the ES8311 over I2C and switch on the power amplifier.  MCLK is
+  // i2s_mclk_mult * sample rate -- take it from the config so this can't drift
+  // away from what AMY's I2S peripheral is actually generating.
   amy_err_t rc = amy_es8311_init(0 /*I2C_NUM_0*/, FNK_I2C_SDA, FNK_I2C_SCL,
                                  FNK_ES8311_ADDR, FNK_PA_ENABLE, FNK_PA_ACTIVE_LOW,
-                                 AMY_SAMPLE_RATE, (uint32_t)AMY_SAMPLE_RATE * 256,
-                                 80 /* volume 0-100 */);
+                                 AMY_SAMPLE_RATE,
+                                 (uint32_t)AMY_SAMPLE_RATE * amy_config.i2s_mclk_mult,
+                                 FNK_VOLUME);
+#endif
   if (rc == AMY_OK) {
     printf("ES8311 codec init OK\n");
   } else {
-    // Codec didn't come up — check wiring / I2C address.
+    // Codec didn't come up — check wiring / I2C address, and that nothing else
+    // (Wire.begin() for the touch panel) claimed SDA/SCL first.
     printf("ES8311 codec init FAILED (%d)\n", rc);
   }
 
@@ -79,8 +91,9 @@ void setup() {
   amy_add_event(&e);
 }
 
-static long last_note_ms = 0;
+static uint32_t last_note_ms = 0;
 static const int notes[] = { 60, 64, 67, 72 };
+static const int num_notes = sizeof(notes) / sizeof(notes[0]);
 static int note_idx = 0;
 static int playing_note = -1;  // -1 until the first note is played
 
@@ -89,7 +102,8 @@ void loop() {
   amy_update();
 
   // Play a note from the little arpeggio once a second so the speaker is audible.
-  long now = millis();
+  // Unsigned math, so this keeps working across the ~49-day millis() rollover.
+  uint32_t now = millis();
   if (now - last_note_ms > 1000) {
     last_note_ms = now;
 
@@ -110,6 +124,6 @@ void loop() {
     amy_add_event(&on);
 
     playing_note = notes[note_idx];
-    note_idx = (note_idx + 1) % 4;
+    note_idx = (note_idx + 1) % num_notes;
   }
 }
