@@ -57,8 +57,11 @@
 //        - call amy_fill_buffer
 
 #include "driver/i2s_std.h"
-#ifdef AMYBOARD_ARDUINO
+#if defined(AMYBOARD_ARDUINO) || defined(AMY_CODEC_ES8311)
 #include "driver/i2c_master.h"
+#endif
+#ifdef AMY_CODEC_ES8311
+#include "es8311.h"
 #endif
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
@@ -118,6 +121,38 @@ amy_err_t esp32_setup_i2s(void) {
     /* Before writing data, start the TX channel first */
     i2s_channel_enable(tx_handle);
     if(AMY_HAS_AUDIO_IN) i2s_channel_enable(rx_handle);
+
+#ifdef AMY_CODEC_ES8311
+    // Configure an ES8311 codec (e.g. the Freenove FNK0104 ESP32-S3 boards) over
+    // I2C now that MCLK/BCLK/WS are running.  Pins/address/amp-enable default to
+    // the FNK0104 and can be overridden with -D build defines.  The default ESP
+    // I2S clock config above produces MCLK = 256 * sample rate.
+    #ifndef AMY_ES8311_I2C_PORT
+    #define AMY_ES8311_I2C_PORT   I2C_NUM_0
+    #endif
+    #ifndef AMY_ES8311_I2C_SDA
+    #define AMY_ES8311_I2C_SDA    16     // FNK0104 codec-control SDA
+    #endif
+    #ifndef AMY_ES8311_I2C_SCL
+    #define AMY_ES8311_I2C_SCL    15     // FNK0104 codec-control SCL
+    #endif
+    #ifndef AMY_ES8311_I2C_ADDR
+    #define AMY_ES8311_I2C_ADDR   0x18   // ES8311 with CE tied low
+    #endif
+    #ifndef AMY_ES8311_PA_GPIO
+    #define AMY_ES8311_PA_GPIO    1      // FNK0104 power-amplifier enable
+    #endif
+    #ifndef AMY_ES8311_PA_ACTIVE_LOW
+    #define AMY_ES8311_PA_ACTIVE_LOW 1   // FNK0104 amp enable is active-low
+    #endif
+    #ifndef AMY_ES8311_VOLUME
+    #define AMY_ES8311_VOLUME     80     // startup DAC volume, 0-100
+    #endif
+    amy_es8311_init(AMY_ES8311_I2C_PORT, AMY_ES8311_I2C_SDA, AMY_ES8311_I2C_SCL,
+                    AMY_ES8311_I2C_ADDR, AMY_ES8311_PA_GPIO, AMY_ES8311_PA_ACTIVE_LOW,
+                    AMY_SAMPLE_RATE, (uint32_t)AMY_SAMPLE_RATE * 256, AMY_ES8311_VOLUME);
+#endif // AMY_CODEC_ES8311
+
     return AMY_OK;
 }
 
