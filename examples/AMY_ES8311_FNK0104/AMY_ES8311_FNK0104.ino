@@ -24,17 +24,14 @@
 
 #include <AMY-Arduino.h>
 
-// FNK0104 audio pins.
+// FNK0104 I2S pins.  The codec-control side (I2C SDA/SCL, codec address, amp
+// enable, startup volume) already defaults to the FNK0104 as the AMY_ES8311_*
+// defines in es8311.h -- on a different ES8311 board, #define those before the
+// AMY-Arduino.h include above.
 #define FNK_I2S_MCLK   4
 #define FNK_I2S_BCLK   5
 #define FNK_I2S_WS     7
 #define FNK_I2S_DOUT   8
-#define FNK_I2C_SDA    16
-#define FNK_I2C_SCL    15
-#define FNK_ES8311_ADDR 0x18
-#define FNK_PA_ENABLE  1
-#define FNK_PA_ACTIVE_LOW 1   // FNK0104 amp enable is active-low (LOW = amp on)
-#define FNK_VOLUME     100    // ES8311 DAC volume 0-100; 100 = unity (0 dB)
 
 void setup() {
   amy_config_t amy_config = amy_default_config();
@@ -66,11 +63,11 @@ void setup() {
   // Configure the ES8311 over I2C and switch on the power amplifier.  MCLK is
   // i2s_mclk_mult * sample rate -- take it from the config so this can't drift
   // away from what AMY's I2S peripheral is actually generating.
-  amy_err_t rc = amy_es8311_init(0 /*I2C_NUM_0*/, FNK_I2C_SDA, FNK_I2C_SCL,
-                                 FNK_ES8311_ADDR, FNK_PA_ENABLE, FNK_PA_ACTIVE_LOW,
+  amy_err_t rc = amy_es8311_init(AMY_ES8311_I2C_PORT, AMY_ES8311_I2C_SDA, AMY_ES8311_I2C_SCL,
+                                 AMY_ES8311_I2C_ADDR, AMY_ES8311_PA_GPIO, AMY_ES8311_PA_ACTIVE_LOW,
                                  AMY_SAMPLE_RATE,
                                  (uint32_t)AMY_SAMPLE_RATE * amy_config.i2s_mclk_mult,
-                                 FNK_VOLUME);
+                                 AMY_ES8311_VOLUME);
 #endif
   if (rc == AMY_OK) {
     printf("ES8311 codec init OK\n");

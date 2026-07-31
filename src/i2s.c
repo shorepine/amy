@@ -151,6 +151,19 @@ amy_err_t esp32_setup_i2s(void) {
             mclk_mult = 256;
             break;
     }
+#ifdef AMY_USE_ES8311
+    // The ESP can generate multiples the ES8311's clock-coefficient table has no
+    // row for; accepting one here would just make codec bring-up fail later.
+    if (!amy_es8311_supports_mclk((uint32_t)AMY_SAMPLE_RATE * mclk_mult, AMY_SAMPLE_RATE)) {
+        fprintf(stderr, "i2s: ES8311 does not support %ux MCLK at %uHz, using 256\n",
+                (unsigned)mclk_mult, (unsigned)AMY_SAMPLE_RATE);
+        mclk_mult = 256;
+    }
+#endif
+    // Keep the config describing the hardware: anything reading i2s_mclk_mult
+    // after amy_start() (to program another MCLK consumer, say) must see the
+    // multiple I2S actually generates, not the value we overrode.
+    amy_global.config.i2s_mclk_mult = mclk_mult;
 
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     if(AMY_HAS_AUDIO_IN) {
@@ -211,28 +224,7 @@ amy_err_t esp32_setup_i2s(void) {
 #ifdef AMY_USE_ES8311
     // Configure an ES8311 codec (e.g. the Freenove FNK0104 ESP32-S3 boards) over
     // I2C now that MCLK/BCLK/WS are running.  Pins/address/amp-enable default to
-    // the FNK0104 and can be overridden with -D build defines.
-    #ifndef AMY_ES8311_I2C_PORT
-    #define AMY_ES8311_I2C_PORT   I2C_NUM_0
-    #endif
-    #ifndef AMY_ES8311_I2C_SDA
-    #define AMY_ES8311_I2C_SDA    16     // FNK0104 codec-control SDA
-    #endif
-    #ifndef AMY_ES8311_I2C_SCL
-    #define AMY_ES8311_I2C_SCL    15     // FNK0104 codec-control SCL
-    #endif
-    #ifndef AMY_ES8311_I2C_ADDR
-    #define AMY_ES8311_I2C_ADDR   0x18   // ES8311 with CE tied low
-    #endif
-    #ifndef AMY_ES8311_PA_GPIO
-    #define AMY_ES8311_PA_GPIO    1      // FNK0104 power-amplifier enable
-    #endif
-    #ifndef AMY_ES8311_PA_ACTIVE_LOW
-    #define AMY_ES8311_PA_ACTIVE_LOW 1   // FNK0104 amp enable is active-low
-    #endif
-    #ifndef AMY_ES8311_VOLUME
-    #define AMY_ES8311_VOLUME     100    // startup DAC volume, 0-100 (100 = 0 dB)
-    #endif
+    // the FNK0104 and can be overridden with -D build defines (see es8311.h).
     // amy_start() ignores this function's result, so a codec that didn't come up
     // would otherwise be a silent board with nothing said anywhere: complain
     // here, leave the verdict in amy_es8311_status() for the sketch to report,

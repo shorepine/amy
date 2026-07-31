@@ -234,6 +234,19 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 
 // Rest of amy setup
 #define SAMPLE_MAX 32767
+
+// Bits dropped from the output sample in amy_fill_buffer (see amy.c): ESP and
+// Teensy hard-wrap without this.  The soft clipper already bounds samples to
+// SAMPLE_MAX, so this makes the output ceiling SAMPLE_MAX >> bits -- i.e. ~6.02 dB
+// of guaranteed headroom per bit, for any content.  Downstream gain stages can
+// give exactly that much back without any risk of clipping; es8311.c does.
+// (Values parenthesized so the Makefile's constants.py scrape skips this
+// platform-dependent, C-internal define.)
+#if defined(ESP_PLATFORM) || defined(__IMXRT1062__)
+#define AMY_OUTPUT_HEADROOM_BITS (1)
+#else
+#define AMY_OUTPUT_HEADROOM_BITS (0)
+#endif
 #define MAX_ALGO_OPS 6 
 #define DEFAULT_NUM_BREAKPOINTS 8
 // We need a max on the number of breakpoints to lay out the params enum statically.  Otherwise, it's dynamic.

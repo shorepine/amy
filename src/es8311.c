@@ -14,8 +14,6 @@
 //     caller passes the resulting frequency in, so what we program here can't
 //     drift away from what the I2S peripheral actually generates.
 //   * Data is 32-bit, MSB / left-justified (I2S_STD_MSB_SLOT_DEFAULT_CONFIG).
-//     Define AMY_ES8311_I2S_PHILIPS to use standard (Philips) I2S framing
-//     instead, should AMY's slot config ever change.
 
 #if defined(ESP_PLATFORM)
 
@@ -54,6 +52,7 @@
 #define ES8311_DAC_REG31            0x31   // DAC mute
 #define ES8311_DAC_REG32            0x32   // DAC volume
 #define ES8311_DAC_REG37            0x37
+#define ES8311_GPIO_REG44           0x44   // GPIO / I2C noise immunity
 #define ES8311_GP_REG45             0x45
 #define ES8311_CHD1_REGFD           0xFD   // chip ID 1
 #define ES8311_CHD2_REGFE           0xFE   // chip ID 2
@@ -61,10 +60,17 @@
 #define ES8311_I2C_FREQ             400000
 
 // reg32 (DAC volume) steps 0.5 dB: 0x00 = -95.5 dB, 0xBF = 0 dB, and anything
-// above 0xBF is *digital gain*.  AMY's mixed output routinely runs to full
-// scale, so our 0-100 volume scale tops out at unity rather than clipping inside
-// the codec -- which sounds just like an I2S format problem.
+// above 0xBF is *digital gain* (up to +32 dB at 0xFF), which would clip a signal
+// that already reaches full scale.
 #define ES8311_DAC_VOL_0DB          0xBF
+// AMY's output on this platform can't reach full scale: amy_fill_buffer's soft
+// clipper bounds the sample to SAMPLE_MAX and then drops
+// AMY_OUTPUT_HEADROOM_BITS bits (see amy.h), so the I2S stream is ceilinged
+// ~6.02 dB below full scale per dropped bit no matter what's playing.  Giving
+// exactly that back here (12 half-dB steps per bit) restores a full-scale analog
+// output and still cannot clip -- and it tracks amy.h, so removing AMY's bit
+// drop automatically drops this gain back to unity.
+#define ES8311_DAC_VOL_MAX          (ES8311_DAC_VOL_0DB + 12 * AMY_OUTPUT_HEADROOM_BITS)
 
 // Clock coefficient row: how to derive the codec's internal clocks from a given
 // (MCLK, sample-rate) pair.  Copied from the Espressif reference driver.
@@ -86,17 +92,10 @@ struct coeff_div {
 // AMY_SAMPLE_RATE is fixed at compile time, so only the rows for that one rate
 // can ever be selected; the reference driver's other ~55 rows would be a
 // kilobyte of dead flash on an MCU.  Every MCLK variant of our rate stays,
-// because amy_config.i2s_mclk_mult picks which one we feed the codec.  A build at
-// a rate the reference table doesn't list keeps the whole table, so get_coeff()
-// still behaves (and still reports what's missing).
-#if (AMY_SAMPLE_RATE != 8000) && (AMY_SAMPLE_RATE != 11025) && (AMY_SAMPLE_RATE != 12000) && \
-    (AMY_SAMPLE_RATE != 16000) && (AMY_SAMPLE_RATE != 22050) && (AMY_SAMPLE_RATE != 24000) && \
-    (AMY_SAMPLE_RATE != 32000) && (AMY_SAMPLE_RATE != 44100) && (AMY_SAMPLE_RATE != 48000) && \
-    (AMY_SAMPLE_RATE != 96000)
-#define ES8311_WANT(r) 1
-#else
+// because amy_config.i2s_mclk_mult picks which one we feed the codec.  (A build
+// at a rate the table doesn't list compiles to an empty table, and get_coeff()
+// reports the miss.)
 #define ES8311_WANT(r) (AMY_SAMPLE_RATE == (r))
-#endif
 
 static const struct coeff_div coeff_div[] = {
     // mclk      rate   prediv  mult  adcdiv dacdiv fsmode lrch  lrcl  bckdiv adcosr dacosr
@@ -199,23 +198,27 @@ static esp_err_t es_read(const amy_i2c_dev_t *d, uint8_t reg, uint8_t *val) {
     return ret;
 }
 
-static int get_coeff(uint32_t mclk, uint32_t rate) {
+static const struct coeff_div *get_coeff(uint32_t mclk, uint32_t rate) {
     for (unsigned i = 0; i < sizeof(coeff_div) / sizeof(coeff_div[0]); i++) {
         if (coeff_div[i].rate == rate && coeff_div[i].mclk == mclk)
-            return (int)i;
+            return &coeff_div[i];
     }
-    return -1;
+    return NULL;
 }
 
-// Program the clock-manager registers for the given (mclk, rate) pair.
+int amy_es8311_supports_mclk(uint32_t mclk_hz, uint32_t sample_rate) {
+    return get_coeff(mclk_hz, sample_rate) != NULL;
+}
+
+// Program the clock-manager registers for the given coefficient row.
 // Codec is a slave, MCLK sourced from the MCLK pin (not inverted).
-static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
+static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, const struct coeff_div *c) {
     uint8_t regv;
     esp_err_t ret;
 
     // Pre-divider / pre-multiplier (reg02). pre_multi 1/2/4/8 -> 0/1/2/3.
     uint8_t datmp = 0;
-    switch (coeff_div[coeff].pre_multi) {
+    switch (c->pre_multi) {
         case 1: datmp = 0; break;
         case 2: datmp = 1; break;
         case 4: datmp = 2; break;
@@ -225,14 +228,14 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     ret = es_read(d, ES8311_CLK_MANAGER_REG02, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x07;
-    regv |= (coeff_div[coeff].pre_div - 1) << 5;
+    regv |= (c->pre_div - 1) << 5;
     regv |= datmp << 3;
     ret = es_write(d, ES8311_CLK_MANAGER_REG02, regv);
     if (ret != ESP_OK) return ret;
 
     // ADC/DAC clock dividers (reg05).
-    regv = (coeff_div[coeff].adc_div - 1) << 4;
-    regv |= (coeff_div[coeff].dac_div - 1) << 0;
+    regv = (c->adc_div - 1) << 4;
+    regv |= (c->dac_div - 1) << 0;
     ret = es_write(d, ES8311_CLK_MANAGER_REG05, regv);
     if (ret != ESP_OK) return ret;
 
@@ -240,8 +243,8 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     ret = es_read(d, ES8311_CLK_MANAGER_REG03, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x80;
-    regv |= coeff_div[coeff].fs_mode << 6;
-    regv |= coeff_div[coeff].adc_osr << 0;
+    regv |= c->fs_mode << 6;
+    regv |= c->adc_osr << 0;
     ret = es_write(d, ES8311_CLK_MANAGER_REG03, regv);
     if (ret != ESP_OK) return ret;
 
@@ -249,7 +252,7 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     ret = es_read(d, ES8311_CLK_MANAGER_REG04, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0x80;
-    regv |= coeff_div[coeff].dac_osr << 0;
+    regv |= c->dac_osr << 0;
     ret = es_write(d, ES8311_CLK_MANAGER_REG04, regv);
     if (ret != ESP_OK) return ret;
 
@@ -257,10 +260,10 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     ret = es_read(d, ES8311_CLK_MANAGER_REG07, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0xC0;
-    regv |= coeff_div[coeff].lrck_h << 0;
+    regv |= c->lrck_h << 0;
     ret = es_write(d, ES8311_CLK_MANAGER_REG07, regv);
     if (ret != ESP_OK) return ret;
-    regv = coeff_div[coeff].lrck_l;
+    regv = c->lrck_l;
     ret = es_write(d, ES8311_CLK_MANAGER_REG08, regv);
     if (ret != ESP_OK) return ret;
 
@@ -268,10 +271,10 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
     ret = es_read(d, ES8311_CLK_MANAGER_REG06, &regv);
     if (ret != ESP_OK) return ret;
     regv &= 0xE0;
-    if (coeff_div[coeff].bclk_div < 19)
-        regv |= (coeff_div[coeff].bclk_div - 1) << 0;
+    if (c->bclk_div < 19)
+        regv |= (c->bclk_div - 1) << 0;
     else
-        regv |= (coeff_div[coeff].bclk_div) << 0;
+        regv |= (c->bclk_div) << 0;
     ret = es_write(d, ES8311_CLK_MANAGER_REG06, regv);
     if (ret != ESP_OK) return ret;
 
@@ -284,16 +287,8 @@ static esp_err_t es8311_config_clock(const amy_i2c_dev_t *d, int coeff) {
 static amy_err_t es8311_init_impl(int i2c_port, int8_t sda, int8_t scl, uint8_t i2c_addr,
                                   int8_t pa_enable_gpio, uint8_t pa_active_low,
                                   uint32_t sample_rate, uint32_t mclk_hz, uint8_t volume) {
-    // The default ESP I2S path drives 32-bit MSB (left-justified) slots.
-#ifdef AMY_ES8311_I2S_PHILIPS
-    const uint8_t fmt_bits = 0x00;   // standard I2S (Philips)
-#else
-    const uint8_t fmt_bits = 0x01;   // MSB / left-justified
-#endif
-    const uint8_t len_bits = 0x10;   // 32-bit word length
-
-    int coeff = get_coeff(mclk_hz, sample_rate);
-    if (coeff < 0) {
+    const struct coeff_div *coeff = get_coeff(mclk_hz, sample_rate);
+    if (coeff == NULL) {
         fprintf(stderr, "ES8311: no clock coefficients for %luHz MCLK at %luHz\n",
                 (unsigned long)mclk_hz, (unsigned long)sample_rate);
         return -1;
@@ -316,6 +311,13 @@ static amy_err_t es8311_init_impl(int i2c_port, int8_t sda, int8_t scl, uint8_t 
         ret = (call); \
         if (ret != ESP_OK) goto init_failed; \
     } while (0)
+
+    // The ES8311 can occasionally NACK its first I2C transaction.  Espressif's
+    // reference sequence writes reg44 twice both to enable the chip's I2C noise
+    // immunity and to make the first write a disposable warm-up.  Require the
+    // second write to succeed before treating subsequent accesses as reliable.
+    (void)amy_i2c_write_reg(&d, ES8311_GPIO_REG44, 0x08);
+    ES8311_INIT_CHECK(es_write(&d, ES8311_GPIO_REG44, 0x08));
 
     // Presence check (ES8311 chip id is 0x83 0x11).
     uint8_t id1, id2, regv;
@@ -360,11 +362,12 @@ static amy_err_t es8311_init_impl(int i2c_port, int8_t sda, int8_t scl, uint8_t 
     ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG1B, 0x0A));
     ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG1C, 0x6A));
 
-    // ---- Serial data-port format: 32-bit, left-justified (or Philips) ----
+    // ---- Serial data-port format ----
     // reg09/reg0A: serial-port mute in bit6 (so 0 here also un-mutes the port),
-    // word length in bits [4:2], format in bits [1:0].
-    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPIN_REG09, len_bits | fmt_bits));
-    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPOUT_REG0A, len_bits | fmt_bits));
+    // word length in bits [4:2], format in bits [1:0].  0x11 = 32-bit words,
+    // MSB / left-justified, matching AMY's I2S_STD_MSB_SLOT_DEFAULT_CONFIG.
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPIN_REG09, 0x11));
+    ES8311_INIT_CHECK(es_write(&d, ES8311_SDPOUT_REG0A, 0x11));
 
     // ---- Start playback (DAC) path ----
     ES8311_INIT_CHECK(es_write(&d, ES8311_ADC_REG17, 0xBF));
@@ -379,7 +382,7 @@ static amy_err_t es8311_init_impl(int i2c_port, int8_t sda, int8_t scl, uint8_t 
     // ---- Volume + un-mute ----
     if (volume > 100) volume = 100;
     ES8311_INIT_CHECK(es_write(&d, ES8311_DAC_REG32,
-                               (uint8_t)(((uint32_t)volume * ES8311_DAC_VOL_0DB + 50) / 100)));
+                               (uint8_t)(((uint32_t)volume * ES8311_DAC_VOL_MAX + 50) / 100)));
     // Un-mute: clear the DAC mute bits (reg31 [6:5]).
     ES8311_INIT_CHECK(es_read(&d, ES8311_DAC_REG31, &regv));
     ES8311_INIT_CHECK(es_write(&d, ES8311_DAC_REG31, regv & 0x9F));
