@@ -182,7 +182,15 @@ uint8_t sequencer_add_event(amy_event *e) {
     // if the tag already exists - if there's tick/period, overwrite, if there's no tick / period, we should remove the entry
     //fprintf(stderr, "sequencer_add_event: e->instrument %d e->note %.0f e->vel %.2f tick %d period %d tag %d\n", e->instrument, e->midi_note, e->velocity, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], e->sequence[SEQUENCE_TAG]);
     int32_t tag = e->sequence[SEQUENCE_TAG];
-    if (tag > max_sequences) {
+    // `sequences` is max_sequences entries, so the last valid tag is
+    // max_sequences - 1. This read `>` and let tag == max_sequences
+    // through to write one sequence_info_t past the end of the
+    // allocation -- the message the check prints has always said "greater
+    // than or eq", which is what it was meant to be doing. A negative tag
+    // is rejected here too: SEQUENCE_TAG arrives as an unsigned field but
+    // lands in an int32_t, so a value past INT32_MAX reads as negative and
+    // would index backwards out of the array.
+    if (tag < 0 || tag >= max_sequences) {
         fprintf(stderr, "sequencer tag %" PRIi32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIi32"\n",
                 tag, e->sequence[SEQUENCE_TICK], e->sequence[SEQUENCE_PERIOD], max_sequences);
         // ignore
