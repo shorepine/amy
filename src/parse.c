@@ -620,113 +620,33 @@ int _next_alpha(char *s) {
 }
 
 
-// Fast pre-parse of one wire message for the scheduling commands 't' (time)
-// and 'H' (sequence).  This is the ingest fast path: a scheduled message is
-// stored as its raw wire string (with t/H stripped out) and only fully parsed
-// when it comes due, so bulk loads of sequencer/timed events don't pay for
-// event parsing, voice allocation and delta expansion up front.
+// Fast pre-check of one wire message for a leading 'H' (ticks) scheduling
+// command.  This is the ingest fast path: a scheduled message is stored as
+// its raw wire string ('H' stripped off the front) and only fully parsed
+// when it comes due, so bulk loads of sequenced events don't pay for event
+// parsing, voice allocation and delta expansion up front.
 //
-// 't' and 'H' are only recognized as scheduling commands when they are the
-// very first character of the message (pos == 0); at most one of them can
-// occupy that position, so a message carries at most one scheduling command.
-// A 't' or 'H' anywhere else is just another command in the message -- it
-// keeps its ordinary per-event meaning (e.g. an event's own time field) and
-// is left in place for the real parser, not stripped or treated specially.
-// This mirrors the existing implicit rule that a patch string ('u') argument
-// must be last, and closes off the ambiguity of a scheduling command showing
-// up mid-message (e.g. inside a later command's argument list).
+// 'H' is only recognized as a scheduling command when it is the very first
+// character of the message, so this is a single check, not something to
+// look for while walking the message. Everything after the leading
+// tick,period,tag argument is the caller's to keep verbatim as an opaque
+// payload (parsed for real later, when the entry comes due) -- this doesn't
+// walk or interpret any of it, so there's no need to hunt for a 'Z'
+// terminator or tiptoe around string-payload commands ('u' patch strings,
+// 'ic'/'io'/'ig' templates, 'zT'/'zF'/'zD'/'zP' transfers) the way the real
+// parser does.
 //
-// The scan walks command letters and skips their numeric arguments, without
-// interpreting them (beyond the leading t/H). Commands whose argument is a
-// string that may itself contain wire code or arbitrary text (patch strings
-// 'u', MIDI/CV templates 'ic'/'io'/'ig', filename/code transfers
-// 'zT'/'zF'/'zD'/'zP') consume the rest of the message in the real parser, so
-// the scan treats them as opaque: it stops looking and extends the segment to
-// the end of the string.
-//
-// Returns the number of chars in this message segment (through the 'Z'
-// terminator, or to end of string).  Fills *ws.
-uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws) {
-    uint16_t pos = 0;
-    ws->has_time = 0;
-    ws->has_sequence = 0;
-    ws->time_span[0] = ws->time_span[1] = 0;
-    ws->seq_span[0] = ws->seq_span[1] = 0;
-    while (message[pos]) {
-        char c = message[pos];
-        if (!isalpha((unsigned char)c)) { ++pos; continue; }
-        if (c == 'Z') { ++pos; break; }  // end of message
-        if (c == 't' && pos == 0) {
-            uint16_t start = pos++;
-            ws->time = (uint32_t)atol(message + pos);
-            pos += _next_alpha(message + pos);
-            ws->has_time = 1;
-            ws->time_span[0] = start;
-            ws->time_span[1] = pos;
-            continue;
-        }
-        if (c == 'H' && pos == 0) {
-            uint16_t start = pos++;
-            ws->sequence[0] = ws->sequence[1] = ws->sequence[2] = 0;
-            parse_list_uint32_t(message + pos, ws->sequence, 3, 0);
-            pos += _next_alpha(message + pos);
-            ws->has_sequence = 1;
-            ws->seq_span[0] = start;
-            ws->seq_span[1] = pos;
-            continue;
-        }
-        if (c == 'u') {  // patch string: rest of message is its payload
-            pos += (uint16_t)strlen(message + pos);
-            break;
-        }
-        if (c == 'i') {
-            char sub = message[pos + 1];
-            if (sub == 'c' || sub == 'o' || sub == 'g') {  // wire-code templates
-                pos += (uint16_t)strlen(message + pos);
-                break;
-            }
-            ++pos;
-            if (isalpha((unsigned char)sub)) ++pos;  // skip subcommand letter; numeric arg follows
-            continue;
-        }
-        if (c == 'z') {
-            char sub = message[pos + 1];
-            if (sub == 'T' || sub == 'F' || sub == 'D' || sub == 'P') {  // string payloads
-                pos += (uint16_t)strlen(message + pos);
-                break;
-            }
-            ++pos;
-            if (isalpha((unsigned char)sub)) ++pos;
-            continue;
-        }
-        ++pos;  // any other command; its non-alpha argument is skipped above
-    }
-    ws->consumed = pos;
-    return pos;
-}
-
-// Copy the message segment described by ws into out, minus the leading t/H
-// command span.  out must have room for ws->consumed + 1 chars.  Returns the
-// length of the stripped string.
-uint16_t amy_strip_scheduling(const char *message, const wire_schedule_t *ws, char *out) {
-    // At most one of time_span/seq_span is ever non-empty (t and H are only
-    // recognized at pos == 0), but keep this general over both spans; a
-    // zero-length span is a no-op.
-    uint16_t s1 = ws->time_span[0], e1 = ws->time_span[1];
-    uint16_t s2 = ws->seq_span[0], e2 = ws->seq_span[1];
-    if (s2 < s1) {
-        uint16_t ts = s1, te = e1;
-        s1 = s2; e1 = e2;
-        s2 = ts; e2 = te;
-    }
-    uint16_t o = 0;
-    for (uint16_t i = 0; i < ws->consumed; ++i) {
-        if (i >= s1 && i < e1) continue;
-        if (i >= s2 && i < e2) continue;
-        out[o++] = message[i];
-    }
-    out[o] = '\0';
-    return o;
+// Returns true if found (and false if the message isn't scheduled at all).
+// On a match, ticks[0..2] (tick, period, tag; missing values 0) and
+// *num_vals (how many of the 3 were actually present -- 3 means a tag was
+// given, fewer means it wasn't) are set, along with *schedule_len, the
+// length of the leading "Ha,b,c" command itself.
+bool amy_scan_wire_ticks(char *message, uint32_t ticks[3], int *num_vals, uint16_t *schedule_len) {
+    if (message[0] != 'H') return false;
+    ticks[0] = ticks[1] = ticks[2] = 0;
+    *num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
+    *schedule_len = (uint16_t)(1 + _next_alpha(message + 1));
+    return true;
 }
 
 
@@ -742,30 +662,15 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
 
 
 // given a string return a parsed event
+//
+// Transfer payloads never reach here: amy_add_message() traps them before
+// any parsing is attempted (see the comment there), so this only ever sees
+// real wire commands.
 int amy_parse_message(char * message, amy_event *e) {
     peek_stack("parse_message");
     int length = strlen(message);
     char cmd = '\0';
     uint16_t pos = 0;
-
-    // Check if we're in a transfer block, if so, parse it and leave this loop.
-    // FILE transfers (zT, used to write files over MIDI sysex) arrive async
-    // while a sketch may also be running, so we ONLY route them to the
-    // transfer handler when the data is sysex-originated -- otherwise a
-    // sketch calling amy.send(note=36) mid-transfer would get its wire
-    // command base64-decoded as file data and corrupt the file.
-    //
-    // AUDIO transfers (amy.load_sample / load_sample_bytes) are different:
-    // Python sends every chunk synchronously in a tight loop within the same
-    // call, so no other amy.send() can interleave. They route regardless of
-    // the sysex flag (which they don't carry, since send_raw goes through
-    // the regular wire path).
-    extern bool amy_parsing_from_sysex;
-    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
-        (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE)) {
-        parse_transfer_message(message, length);
-        return length;
-    }
 
     while(pos < length) {
         cmd = message[pos];
@@ -796,7 +701,7 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
             case 'G': e->filter_type = atoi(arg); break;
             /* g used for Alles for client # */
-            case 'H': parse_list_uint32_t(arg, e->sequence, 3, 0); break;
+            case 'H': parse_list_uint32_t(arg, e->ticks, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
                 float reverb_params[4];
                 parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(e->reverb_level));
@@ -860,7 +765,6 @@ int amy_parse_message(char * message, amy_event *e) {
                     }
                     if(e->reset_osc & RESET_EVENTS) {
                         amy_deltas_reset();
-                        timed_wire_reset();
                     }
                     if(e->reset_osc & RESET_SYNTHS) {
                         amy_reset_oscs();
@@ -868,8 +772,7 @@ int amy_parse_message(char * message, amy_event *e) {
                     AMY_UNSET(e->reset_osc);
                 }
                 break;
-            /* t used for time */
-            case 't': e->time=atol(arg); break;
+            /* t no longer used (was time=) */
             case 'T': e->eg_type[0] = atoi(arg); break;
             case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */

@@ -343,11 +343,13 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
                 // Mark message as already passed through mapping for this channel (synth).
                 sprintf(message, "iM%d", channel);
                 int offset = strlen(message);
-                if (AMY_IS_SET(time)) {
-                    sprintf(message + offset, "t%" PRId32, time);
-                    offset = strlen(message);
-                }
                 substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
+                // There's no wire representation for a time left to give this
+                // event anymore, so set it directly: only the first event
+                // built from this MIDI message gets it (matching the old
+                // behavior, where a leading "t<time>" was only ever prepended
+                // to this first-built message string).
+                if (AMY_IS_SET(time)) event->time = time;
             }  // If state is non-null, assume we're working through the later yields.
             // Layer each parsed event on top of the caller's base event, if any.
             yield_state->pos = yield_event_from_message(yield_state->message, event, yield_state->pos);
@@ -367,15 +369,6 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time,
     //
     void *state = NULL;
     if (queue == NULL)  queue = &amy_global.delta_queue;
-    if (queue == &amy_global.delta_queue && base_event == NULL && len <= 3
-        && AMY_IS_SET(time) && !AMY_TIME_GEQ(amy_sysclock(), time)) {
-        // Live MIDI input with a future timestamp: park the raw bytes in the
-        // timed store.  The whole handler (mapping lookup, template expansion,
-        // voice allocation) runs when the message comes due, against the synth
-        // state of that moment, not the state at ingest.
-        timed_midi_add(time, bytes, (uint8_t)len);
-        return;
-    }
     amy_event e;
     bool fake_note_on = (((bytes[0] & 0xF0) == 0x90) && (bytes[2] == 0xFF));
     do {

@@ -104,9 +104,6 @@ def get_input_buffer():
 # END GENERATED - scripts/gen_amy_c_api.py
 
 
-# If set, inserts func as time for every call to send(). Will not override an explicitly set time
-insert_time = None
-
 # If set, calls this instead of amy.send()
 override_send = None
 
@@ -225,14 +222,10 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    # 'sequence' and 'time' must come first: AMY's wire parser only recognizes
-    # 'H' (sequence) and 't' (time) as scheduling commands when one of them is
-    # the very first character of the message, so whichever of these two is
-    # present has to be serialized ahead of every other keyword. 'sequence'
-    # sorts ahead of 'time' so that if both are passed in the same call, 'H'
-    # (which takes priority when both are present) ends up as that leading
-    # character.
-    ('sequence', 'HL'), ('time', 'tI'),
+    # 'ticks' must come first: AMY's wire parser only recognizes 'H' (ticks)
+    # as a scheduling command when it's the very first character of the
+    # message, so it has to be serialized ahead of every other keyword.
+    ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
     ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'),
     ('volume', 'VL'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
@@ -285,9 +278,6 @@ def message(**kwargs):
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 
-    if(insert_time is not None and 'time' not in kwargs):
-        kwargs['time'] = insert_time()
-
     # Validity check all the passed args.
     prioritized_keys = []
     for key, arg in kwargs.items():
@@ -295,8 +285,8 @@ def message(**kwargs):
             raise ValueError('Unknown keyword ' + key)
         priority = _KW_PRIORITY[key]
         if arg is None:
-            # Ignore time=None or sequence=None
-            if key != 'time' and key != 'sequence':
+            # Ignore ticks=None
+            if key != 'ticks':
                 raise ValueError('No arg for key ' + key)
         else:
             prioritized_keys.append((priority, key))

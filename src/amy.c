@@ -2034,8 +2034,6 @@ void amy_execute_deltas() {
     // Advance the sequencer on AMY (sample) time and play any due sequence
     // events, so sequencing works in any rendering context, real-time or not.
     sequencer_check_and_fill();
-    // Play any timed ('t') wire messages that have come due.
-    timed_wire_check_and_fire();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
 

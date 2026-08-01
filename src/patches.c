@@ -270,7 +270,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
                  event_addresses_oscs(e), event_addresses_synth(e), event_addresses_bus(e));
         s += strlen(s);
     } else {
-        if (AMY_IS_SET(e->time)) { snprintf(s, len - (size_t)(s - s_entry), "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
+        // e->time has no wire representation anymore (there's no 't' command);
+        // it's only ever meaningful as this event's own near-term playback time.
         if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%u", (unsigned)e->osc); s += strlen(s); }
     }
     _EPRINT_I(wave, "wave", "w");
@@ -313,7 +314,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
     _EPRINT_I(num_voices, "num_voices", "iv");
     _EPRINT_I(oscs_per_voice, "oscs_per_voice", "in");
-    _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
+    _EPRINT_I_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
     _EPRINT_I(reset_osc, "reset_osc", "S");
@@ -417,7 +418,7 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(eg_type[0]);
     _RET_TRUE_IF_SET(eg_type[1]);
     // We don't know
-    _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
+    _RET_TRUE_IF_SET_SEQ(ticks, 3); // tick, period, tag
     //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);

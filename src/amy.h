@@ -324,10 +324,10 @@ enum coefs{
 #define ENVELOPE_DX7 2
 #define ENVELOPE_TRUE_EXPONENTIAL 3
 
-// Sequence enum
-#define SEQUENCE_TICK 0
-#define SEQUENCE_PERIOD 1
-#define SEQUENCE_TAG 2
+// Ticks enum
+#define TICKS_TICK 0
+#define TICKS_PERIOD 1
+#define TICKS_TAG 2
 
 // Reset masks
 #define RESET_SEQUENCER 4096
@@ -574,7 +574,7 @@ typedef struct amy_event {
     uint16_t num_voices;
     uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
     //
-    uint32_t sequence[3]; // tick, period, tag
+    uint32_t ticks[3]; // tick, period, tag
     //
     uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
@@ -662,24 +662,7 @@ struct mod_synthinfo {
     float feedback;
 };
 
-
-// Result of the fast ingest scan of one wire message for the scheduling
-// commands 't' (time) and 'H' (sequence).  These are only recognized as
-// scheduling commands when they are the very first character of the
-// message, so at most one of has_time/has_sequence is ever set.
-// See amy_scan_wire_message().
-typedef struct wire_schedule_t {
-    uint16_t consumed;      // chars of message in this segment (incl. 'Z')
-    uint8_t has_time;       // leading 't' command found
-    uint8_t has_sequence;   // leading 'H' command found
-    uint32_t time;          // value of 't'
-    uint32_t sequence[3];   // tick, period, tag from 'H' (missing values 0)
-    uint16_t time_span[2];  // [start, end) of the 't' command, for stripping
-    uint16_t seq_span[2];   // [start, end) of the 'H' command, for stripping
-} wire_schedule_t;
-
-uint16_t amy_scan_wire_message(char *message, wire_schedule_t *ws);
-uint16_t amy_strip_scheduling(const char *message, const wire_schedule_t *ws, char *out);
+bool amy_scan_wire_ticks(char *message, uint32_t ticks[3], int *num_vals, uint16_t *schedule_len);
 
 
 typedef struct delay_line {
@@ -988,9 +971,8 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
-// Parse and play a stored wire message now; base_time (UINT32_MAX for none)
-// supplies the time for events that don't carry their own.
-void amy_play_message_with_time(char *message, uint32_t base_time);
+// Parse and play a stored wire message now (a fired sequencer entry).
+void amy_play_message(char *message);
 // Like amy_add_message but the data is treated as coming from an external
 // sysex source, so file transfer routing (transfer_flag) applies.
 void amy_add_message_from_sysex(char *message);
