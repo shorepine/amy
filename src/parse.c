@@ -4,6 +4,7 @@
 #include "amy.h"
 #include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
+#include <assert.h>
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
 #endif
@@ -620,36 +621,6 @@ int _next_alpha(char *s) {
 }
 
 
-// Fast pre-check of one wire message for a leading 'H' (ticks) scheduling
-// command.  This is the ingest fast path: a scheduled message is stored as
-// its raw wire string ('H' stripped off the front) and only fully parsed
-// when it comes due, so bulk loads of sequenced events don't pay for event
-// parsing, voice allocation and delta expansion up front.
-//
-// 'H' is only recognized as a scheduling command when it is the very first
-// character of the message, so this is a single check, not something to
-// look for while walking the message. Everything after the leading
-// tick,period,tag argument is the caller's to keep verbatim as an opaque
-// payload (parsed for real later, when the entry comes due) -- this doesn't
-// walk or interpret any of it, so there's no need to hunt for a 'Z'
-// terminator or tiptoe around string-payload commands ('u' patch strings,
-// 'ic'/'io'/'ig' templates, 'zT'/'zF'/'zD'/'zP' transfers) the way the real
-// parser does.
-//
-// Returns true if found (and false if the message isn't scheduled at all).
-// On a match, ticks[0..2] (tick, period, tag; missing values 0) and
-// *num_vals (how many of the 3 were actually present -- 3 means a tag was
-// given, fewer means it wasn't) are set, along with *schedule_len, the
-// length of the leading "Ha,b,c" command itself.
-bool amy_scan_wire_ticks(char *message, uint32_t ticks[3], int *num_vals, uint16_t *schedule_len) {
-    if (message[0] != 'H') return false;
-    ticks[0] = ticks[1] = ticks[2] = 0;
-    *num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
-    *schedule_len = (uint16_t)(1 + _next_alpha(message + 1));
-    return true;
-}
-
-
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     //fprintf(stderr, "yield_event_from_message in:  pos %d message %s\n", pos, message);
     // Parse the wire string into an event
@@ -660,6 +631,28 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     return pos;
 }
 
+// Called from amy_add_message when the first char is 'H', indicating a ticks message.
+// It claims the rest of the message as its payload -- stored as a raw
+// wire string and only parsed when it comes due -- so a schedule command
+// is only ever honored as the first command of a message.
+void handle_ticks_message(char *message) {
+    assert(message[0] == 'H');
+    uint32_t ticks[3] = {0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
+    uint16_t schedule_len = 1 + _next_alpha(message + 1);
+    char *payload = message + schedule_len;
+    uint16_t payload_len = (uint16_t)strlen(payload);
+    char *stripped = (char *)malloc_caps(payload_len + 1, amy_global.config.ram_caps_events);
+    if (stripped == NULL) {
+        amy_oom("ticks_message");
+    } else {
+        memcpy(stripped, payload, payload_len + 1);
+        // A tag is only "given" if all 3 values were present; fewer
+        // than that (a 1- or 2-value ticks=) stores anonymously.
+        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+                           num_vals >= 3, stripped);
+    }
+}
 
 // given a string return a parsed event
 //
@@ -701,7 +694,8 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
             case 'G': e->filter_type = atoi(arg); break;
             /* g used for Alles for client # */
-            case 'H': parse_list_uint32_t(arg, e->ticks, 3, 0); break;
+            // 'H' is the ticks= schedule command, it's caught in amy_add_message before this.
+            //case 'H': parse_list_uint32_t(arg, e->ticks, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
                 float reverb_params[4];
                 parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(e->reverb_level));

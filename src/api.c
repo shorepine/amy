@@ -303,29 +303,12 @@ void amy_add_message(char *message) {
     }
     // Fast pre-check of this message for a leading 'H' (ticks) scheduling
     // command, only recognized as the very first character of the message.
-    // It claims the rest of the message as its payload -- stored as a raw
-    // wire string and only parsed when it comes due -- so a schedule command
-    // is only ever honored as the first command of a message.
-    uint32_t ticks[3];
-    int num_vals;
-    uint16_t schedule_len;
-    if (amy_scan_wire_ticks(message, ticks, &num_vals, &schedule_len)) {
-        char *payload = message + schedule_len;
-        uint16_t payload_len = (uint16_t)strlen(payload);
-        char *stripped = (char *)malloc_caps(payload_len + 1, amy_global.config.ram_caps_events);
-        if (stripped == NULL) {
-            amy_oom("add_message");
-        } else {
-            memcpy(stripped, payload, payload_len + 1);
-            // A tag is only "given" if all 3 values were present; fewer
-            // than that (a 1- or 2-value ticks=) stores anonymously.
-            sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
-                                num_vals >= 3, stripped);
-        }
-        return;
+    if (message[0] == 'H') {
+        handle_ticks_message(message);
+    } else {
+        // Not scheduled: parse and play every command in the message now.
+        amy_play_message(message);
     }
-    // Not scheduled: parse and play every command in the message now.
-    amy_play_message(message);
 }
 
 // Like amy_add_message but marks the message as coming from an external

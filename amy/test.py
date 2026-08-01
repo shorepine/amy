@@ -30,47 +30,27 @@ def dB(level):
   return 20 * np.log10(level + 1e-5)
 
 
-# AMY no longer has a millisecond scheduling primitive (the removed `time=`):
-# everything ahead of "now" goes through the tick-based sequencer instead.
-# Tests still want to say "at ms X, do this", so amy_send_at() replaces
-# amy.send(time=X, **kwargs) by rendering forward -- in whole AMY_BLOCK_SIZE
-# blocks, exactly like amy.render() does -- to simulated time X, then sending
-# the command for real "now". This produces the same audio a deferred-to-X
-# event would have (the render engine doesn't care whether an event was
-# queued up front or injected right as its block comes up), as long as a
-# test's time= values are non-decreasing -- true of every test in this file,
-# since they're naturally written in chronological order -- since we can
-# only render forward, never back up.
-#
+# amy_send_at() allows tests to run AMY commands in "real time" by rendering
+# up until the time specified (thus advancing AMY's internal clock), then
+# sending the rest of the command.
 # The rendered blocks are accumulated here so AmyTest.test() can pick up
-# exactly where run() left off and render out to the 1s test limit, instead
-# of re-rendering (or skipping) whatever run() already advanced through.
+# exactly where run() left off and render out to the 1s test limit.
 _test_clock_frames = []
 _test_clock_blocks = 0
-_test_clock_capture_start = 0  # see _rebase_test_clock()
 
 def _reset_test_clock():
-  global _test_clock_frames, _test_clock_blocks, _test_clock_capture_start
+  global _test_clock_frames, _test_clock_blocks
   _test_clock_frames = []
   _test_clock_blocks = 0
-  _test_clock_capture_start = 0
 
 def _blocks_for_ms(ms):
-  """The block count on which amy_sysclock() first reads >= `ms` since
-  _reset_test_clock() (always absolute from true test start -- time= values
-  are never relative to _rebase_test_clock(), only the exported clip is),
-  i.e. the same block a wire-scheduled event at this exact ms would have
-  fired on. amy_sysclock() truncates (N * AMY_BLOCK_SIZE * 1000) //
-  AMY_SAMPLE_RATE to an integer, so this is a ceiling, not amy.render()'s
-  plain truncation -- getting this wrong shifts every event by up to one
-  block versus the old wire-scheduled timing."""
+  """The block count on which amy_sysclock() first reads >= `ms`."""
   numerator = int(round(ms)) * amy.AMY_SAMPLE_RATE
   denominator = amy.AMY_BLOCK_SIZE * 1000
   return -(-numerator // denominator)  # ceiling division
 
 def _render_test_clock_to_ms(ms):
-  """Render whole blocks until amy_sysclock() would read >= `ms` (since the
-  last _reset_test_clock())."""
+  """Render whole blocks until amy_sysclock() would read >= `ms`."""
   global _test_clock_blocks
   target_blocks = _blocks_for_ms(ms)
   while _test_clock_blocks < target_blocks:
@@ -78,9 +58,7 @@ def _render_test_clock_to_ms(ms):
     _test_clock_blocks += 1
 
 def _render_test_clock_seconds(seconds):
-  """Render exactly amy.render(seconds)'s own block count (truncating, not
-  the ceiling _blocks_for_ms uses -- this is "however many whole blocks fit
-  in seconds", not "the block an event at this ms fires on"), through the
+  """Render exactly amy.render(seconds)'s own block count, through the
   tracked test clock. A run() that wants to let some initial state settle
   before reading it back (the way plain amy.render() was used for) should
   call this instead of amy.render() directly, or it'll desync the tracked
@@ -92,33 +70,14 @@ def _render_test_clock_seconds(seconds):
     _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
     _test_clock_blocks += 1
 
-def _rebase_test_clock():
-  """For a run() that lets some initial state settle (via
-  _render_test_clock_seconds, standing in for the old plain amy.render())
-  before its "real" 1s clip begins: mark the current position as where the
-  exported/compared clip should start, so _finish_test_clock() renders (and
-  returns) just the post-settle window -- WITHOUT changing how time= values
-  in amy_send_at() are interpreted; they still count from true test start
-  (so pre-existing tests keep their times written as "absolute test-start
-  ms", same as before this rebase concept existed). This matches how these
-  tests worked before: the old harness's own final amy.render(1.0) (now
-  _finish_test_clock) rendered fresh from wherever the engine's clock
-  already was, so only the post-settle audio was ever captured or compared
-  -- the settle render's audio was always discarded, never a choice this
-  code is making anew."""
-  global _test_clock_capture_start
-  _test_clock_capture_start = _test_clock_blocks
-
 def _finish_test_clock(seconds):
-  """Render out to `seconds` past the capture start (see
-  _rebase_test_clock(); 0 if it was never called) and return just that
-  window, same shape as amy.render() gives."""
+  """Render out to `seconds`, same shape as amy.render() gives."""
   global _test_clock_blocks
-  target_blocks = _test_clock_capture_start + int((seconds * amy.AMY_SAMPLE_RATE) / amy.AMY_BLOCK_SIZE)
+  target_blocks = int((seconds * amy.AMY_SAMPLE_RATE) / amy.AMY_BLOCK_SIZE)
   while _test_clock_blocks < target_blocks:
     _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
     _test_clock_blocks += 1
-  return np.hstack(_test_clock_frames[_test_clock_capture_start:]).reshape((-1, amy.AMY_NCHANS))
+  return np.hstack(_test_clock_frames).reshape((-1, amy.AMY_NCHANS))
 
 def amy_send_at(time=0, **kwargs):
   """Drop-in replacement for the removed amy.send(time=..., **kwargs)."""
@@ -1411,19 +1370,19 @@ class TestCopyingSynthConfig(AmyTest):
     self.default_synths = True
 
   def run(self):
-    _render_test_clock_seconds(1)  # Let the system config commands play out, else get_synth_commands won't find anything
-    _rebase_test_clock()  # ... and this test's own 1s clip starts fresh from here
+    # Make sure we've executed the default synth setup.
+    amy_send_at(time=10, osc=0, amp=1)
     commands = amy.get_synth_commands(synth=1, dest_synth=3, num_voices=4, time=0)
     #print(commands)
     amy.send_raw(commands)
-    amy_send_at(time=1050, synth=3, note=48, vel=1)
-    amy_send_at(time=1150, synth=3, note=60, vel=1)
-    amy_send_at(time=1250, synth=3, note=63, vel=1)
-    amy_send_at(time=1350, synth=3, note=67, vel=1)
-    amy_send_at(time=1600, synth=3, note=48, vel=0)
-    amy_send_at(time=1700, synth=3, note=60, vel=0)
-    amy_send_at(time=1800, synth=3, note=63, vel=0)
-    amy_send_at(time=1900, synth=3, note=67, vel=0)
+    amy_send_at(time=50, synth=3, note=48, vel=1)
+    amy_send_at(time=150, synth=3, note=60, vel=1)
+    amy_send_at(time=250, synth=3, note=63, vel=1)
+    amy_send_at(time=350, synth=3, note=67, vel=1)
+    amy_send_at(time=600, synth=3, note=48, vel=0)
+    amy_send_at(time=700, synth=3, note=60, vel=0)
+    amy_send_at(time=800, synth=3, note=63, vel=0)
+    amy_send_at(time=900, synth=3, note=67, vel=0)
 
 
 class TestGetSynthCommandsGetsBus(AmyTest):

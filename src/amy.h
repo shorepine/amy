@@ -662,8 +662,6 @@ struct mod_synthinfo {
     float feedback;
 };
 
-bool amy_scan_wire_ticks(char *message, uint32_t ticks[3], int *num_vals, uint16_t *schedule_len);
-
 
 typedef struct delay_line {
     SAMPLE *samples;
@@ -978,6 +976,7 @@ void amy_play_message(char *message);
 void amy_add_message_from_sysex(char *message);
 void amy_add_event(amy_event *e);
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos);
+void handle_ticks_message(char *message);
 int amy_parse_message(char * message, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
