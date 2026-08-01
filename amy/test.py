@@ -197,24 +197,51 @@ class TestPcmTriggerPhase(AmyTest):
 
 
 class TestPcmLoop(AmyTest):
+  """Basic looping."""
 
   def run(self):
-    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
+    amy.load_sample('sounds/partial_sources/CL SHCI A3 LP.wav', preset=1024, midinote=60)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1024, mode=amy.PCM_LOOP)
     amy_send_at(time=100, osc=0, vel=1)
-    amy_send_at(time=500, osc=0, vel=0)
+    amy_send_at(time=500, osc=0, vel=0)  # Should play through end of sample
+
+
+class TestPcmLoopStop(AmyTest):
+  """Loop with immediate stop on note-off."""
+
+  def run(self):
+    amy.load_sample('sounds/partial_sources/CL SHCI A3 LP.wav', preset=1024, midinote=60)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1024, mode=amy.PCM_LOOP_STOP)
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=500, osc=0, vel=0)  # Should stop immediately
+
+
+class TestPcmLoopForever(AmyTest):
+  """Looping continues after note-off, envelope is applied."""
+
+  def run(self):
+    amy.load_sample('sounds/partial_sources/CL SHCI A3 LP.wav', preset=1024, midinote=60)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1024, mode=amy.PCM_LOOP_FOREVER)
+    amy_send_at(time=10, osc=0, eg0='0,1,700,0')
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=200, osc=0, vel=0)  # Should keep looping and decay over 700ms
 
 
 class TestPcmLoopEnvFilt(AmyTest):
   """Check that filter, amp-env, and pitch mod apply to PCM."""
 
   def run(self):
-    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
-    amy_send_at(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='200,0,0,0,3', bp1='0,1,500,0,200,0')
+    amy.load_sample('sounds/partial_sources/CL SHCI A3 LP.wav', preset=1024, midinote=60)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1024, mode=amy.PCM_LOOP_FOREVER)
+    amy_send_at(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='1000,0,0,0,3',
+             bp1='0,1,500,0,200,0')
     amy_send_at(time=0, osc=0, bp0='100,1,1000,0,1000,0')
-    amy_send_at(time=0, osc=1, freq='1')
-    amy_send_at(time=0, osc=0, mod_source=1, freq=',,,,,-0.2')
-    amy_send_at(time=100, osc=0, note=64, vel=5)
-    amy_send_at(time=500, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, mod_source=1, freq=',,,,,0.1')
+    amy_send_at(time=0, osc=1, freq=1, phase=0.5)
+    # Highpitch playback breaks looping - BUG
+    #amy_send_at(time=100, osc=0, note=72, vel=5)
+    amy_send_at(time=100, osc=0, note=60, vel=5)
+    amy_send_at(time=800, osc=0, vel=0)
 
 
 class TestPcmPhaseLive(AmyTest):

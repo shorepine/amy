@@ -188,10 +188,9 @@ AMY starts a musical sequencer that works on `ticks` from startup. You can reset
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
 You can schedule an event with `amy.send(..., ticks="tick,period,tag")`. All three values are optional past `tick`:
-
 ```python
 amy.send(osc=0, wave=amy.SAW_UP, eg0="0,1,500,0,500,0")  # Pluck tone
-amy.send(osc=0, note=50, vel=1, ticks=amy.sequencer_ticks() + 86)   # one-off: fires once, ~1s from now
+amy.send(osc=0, note=50, vel=1, ticks=amy.sequencer_ticks() + 96)   # one-off: fires once, ~1s from now
 amy.send(osc=0, note=38, vel=1, ticks="0,24,7")    # repeating, cancelable via tag 7
 amy.send(osc=0, ticks="0,0,7")                     # cancel tag 7
 amy.send(osc=0, note=72, vel=1, ticks="0,24")      # repeating, not individually cancelable
@@ -347,13 +346,17 @@ amy.send(osc=0, wave=amy.PCM, vel=1, preset=10) # cowbell
 amy.send(osc=0, wave=amy.PCM, vel=1, preset=10, note=70) # higher cowbell! 
 ```
 
-You can turn on sample looping, helpful for instruments, using `feedback`:
+You can turn on sample looping, helpful for instruments, using `mode`:
 
 ```python
-amy.send(wave=amy.PCM,vel=1,preset=21,feedback=0) # clean guitar string, no looping
-amy.send(wave=amy.PCM,vel=1,preset=21,feedback=1) # loops forever until note off
+amy.reset()
+amy.load_sample('sounds/partial_sources/VI ISUMP2A.wav', preset=99)  # wave file with looping
+amy.send(wave=amy.PCM, preset=99, vel=1) # plays through, no looping
+amy.send(wave=amy.PCM, preset=99, vel=1, mode=amy.PCM_LOOP) # loops until note off
 amy.send(vel=0) # note off
-amy.send(wave=amy.PCM,vel=1,preset=35,feedback=1) # nice violin
+# Continue looping even after note off, but ADSR will apply a release
+amy.send(wave=amy.PCM, preset=99, vel=1, mode=amy.PCM_LOOP_FOREVER, eg0='0,1,1000,0')
+amy.send(vel=0) # note off
 ```
 
 ### Sampler (aka Memory PCM)

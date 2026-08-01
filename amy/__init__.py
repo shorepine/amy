@@ -240,7 +240,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source_channel', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
-    ('bus', 'yI'),
+    ('bus', 'yI'), ('mode', 'wwI'),
     ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), ('cv_trigger', 'igL'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
@@ -409,10 +409,10 @@ def inject_midi_bytes(data, usb=0):
     # unlike inject_midi(), which injects a single pre-formed message.
     _amy.inject_midi_bytes(data, usb)
 
-def unload_sample(patch=0):
-    s= "%d,%d" % (patch, 0)
+def unload_sample(preset=0):
+    s= "%d,%d" % (preset, 0)
     send(load_sample=s)
-    print("Patch %d unloaded from RAM" % (patch))
+    print("Preset %d unloaded from RAM" % (preset))
 
 # For AMYBoard and other AMYs that can get messages over MIDI sysex
 # AMYboard is the name of the default AMYboard USB over MIDI device. 
