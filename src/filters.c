@@ -212,6 +212,36 @@ int8_t dsps_biquad_gen_notch_f32(SAMPLE *coeffs, float f, float qFactor)
 #define FILT_MUL_SS(a, b) SMULR6(a, b)
 #endif
 
+// One sample through n first-order allpass stages sharing coefficient a;
+// s[0..n-1] are the per-stage memories.  One-multiply transposed form of
+// H(z) = (a + z^-1)/(1 + a z^-1): the same a feeds both multiplies, so each
+// stage is exactly allpass for any representable |a| < 1 - coefficient
+// quantization moves the phase curve but never the gain.
+static inline SAMPLE allpass1_chain(SAMPLE x0, SAMPLE a, SAMPLE *w, int n) {
+    for (int k = 0; k < n; ++k) {
+        SAMPLE y0 = FILT_MUL_SS(a, x0) + w[k];
+        w[k] = x0 - FILT_MUL_SS(a, y0);
+        x0 = y0;
+    }
+    return x0;
+}
+
+#define PHASER_STAGES 6
+
+// 6-stage phaser: global feedback around the allpass chain, 50/50 dry mix,
+// in place on block.  w[0..PHASER_STAGES-1] = stage memories,
+// w[PHASER_STAGES] = feedback sample.  The chain is unity-gain and the loop
+// gain is fb < 1 at every frequency, so no block-floating-point wrapper is
+// needed: worst-case resonant gain 1/(1-fb) stays inside s8.23 headroom.
+static AMY_IRAM_ATTR void dsps_phaser_f32_ansi(SAMPLE *block, int len, SAMPLE a, SAMPLE fb, SAMPLE *w) {
+    for (int i = 0; i < len; ++i) {
+        SAMPLE x0 = block[i];
+        SAMPLE y0 = allpass1_chain(x0 + FILT_MUL_SS(fb, w[PHASER_STAGES]), a, w, PHASER_STAGES);
+        w[PHASER_STAGES] = y0;
+        block[i] = SHIFTR(x0 + y0, 1);
+    }
+}
+
 #ifndef AMY_HAS_MUL64
 // On the RP2040 (and other ARMV6 platforms) we use block-floating-point)
 #define USE_BLOCK_FLOATING_POINT
@@ -893,6 +923,26 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
 
     float ratio = freq_of_logfreq(msynth[osc]->filter_logfreq)/(float)AMY_SAMPLE_RATE;
     if(ratio < LOWEST_RATIO) ratio = LOWEST_RATIO;
+    if(synth[osc]->filter_type==FILTER_PHASER) {
+        // Not a biquad: dedicated allpass-chain runner, no coeffs[5], no BFP wrapper.
+        float f = ratio;
+        if (f > 0.45f) f = 0.45f;
+        // Each stage is -90 degrees at f, centering the middle notch there.
+        float t = sin2pi(f / 2) / cos2pi(f / 2);   // tan(pi*f)
+        float a = (t - 1.0f) / (t + 1.0f);
+        // Regeneration from the resonance param: Q 0.51..8.0 -> fb 0..0.85.
+        float fb = 0.85f * (msynth[osc]->resonance - 0.51f) / (8.0f - 0.51f);
+        if (fb < 0.0f) fb = 0.0f;
+        if (fb > 0.85f) fb = 0.85f;
+        AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
+        AMY_PROFILE_START(FILTER_PROCESS_STAGE1)
+        dsps_phaser_f32_ansi(block, AMY_BLOCK_SIZE, F2S(a), F2S(fb), synth[osc]->filter_delay);
+        AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
+        AMY_PROFILE_STOP(FILTER_PROCESS)
+        // Post-filter max_val is a hint on this path (see split_fb below); the
+        // mix of two unity-gain paths keeps the incoming bound representative.
+        return max_val;
+    }
     if(synth[osc]->filter_type==FILTER_LPF || synth[osc]->filter_type==FILTER_LPF24)
         dsps_biquad_gen_lpf_f32(coeffs, ratio, msynth[osc]->resonance);
     else if(synth[osc]->filter_type==FILTER_BPF)

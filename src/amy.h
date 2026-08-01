@@ -280,6 +280,7 @@ enum coefs{
 #define FILTER_HPF 3
 #define FILTER_LPF24 4
 #define FILTER_NOTCH 5
+#define FILTER_PHASER 6
 // synth[].wave values
 #define SINE 0
 #define PULSE 1
