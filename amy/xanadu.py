@@ -93,12 +93,8 @@ def fm_note_patch(duration=7.5):
     ])
 
 
-# There's no more time= to schedule these ahead of a wall-clock ms deadline,
-# so delays are expressed in ticks instead, at AMY's default tempo (108 BPM,
-# 48 PPQ) -- approximately equivalent for this piece's staggered-chord
-# timing, not an exact substitute. A delay is turned into an absolute tick
-# target (amy.sequencer_ticks() + the delay in ticks) since a 1-value ticks=
-# is an absolute tick, not a relative one.
+# Delays are expressed in ticks at AMY's default tempo (108 BPM,
+# 48 PPQ). A delay is turned into an absolute tick.
 TICKS_PER_MS = 108 * 48 / 60000.0
 
 def synth_note_on(synth=0, note=60, vel=1, delay_ms=0):
@@ -132,8 +128,8 @@ def broken_chord(base_pitch, intervals, start_time=0, **kwargs):
     **next_chord)."""
     for index, interval in enumerate([0] + intervals):
         pitch = shift_pitch(base_pitch, interval)
-        NoteFM(pitch - 1.0, 1, 0)
-        Note(pitch, 1, 100 * index, **kwargs)
+        NoteFM(pitch=pitch - 1.0, vel=1, delay_ms=0)
+        Note(pitch=pitch, vel=1, delay_ms=100 * index, **kwargs)
 
 def xanadu_init():
     amy.chorus(1)
@@ -194,6 +190,8 @@ if not running_amyboard:
     while next_chord:
         loop()
         time.sleep(0.02)
+    # Allow final play-out
+    time.sleep(10)
 
 # Do not edit. Set automatically by the knobs on AMYboard Online.
 _auto_generated_knobs = """

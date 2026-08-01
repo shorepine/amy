@@ -190,9 +190,12 @@ Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means 
 You can schedule an event with `amy.send(..., ticks="tick,period,tag")`. All three values are optional past `tick`:
 
 ```python
-amy.send(osc=0, note=50, vel=1, ticks="86")              # one-off: fires once, ~1s from now
-amy.send(osc=0, wave=amy.NOISE, vel=1, ticks="0,24")      # repeating, not individually cancelable
-amy.send(osc=0, note=38, vel=1, ticks="0,24,7")           # repeating, cancelable via tag 7
+amy.send(osc=0, wave=amy.SAW_UP, eg0="0,1,500,0,500,0")  # Pluck tone
+amy.send(osc=0, note=50, vel=1, ticks=amy.sequencer_ticks() + 86)   # one-off: fires once, ~1s from now
+amy.send(osc=0, note=38, vel=1, ticks="0,24,7")    # repeating, cancelable via tag 7
+amy.send(osc=0, ticks="0,0,7")                     # cancel tag 7
+amy.send(osc=0, note=72, vel=1, ticks="0,24")      # repeating, not individually cancelable
+amy.reset()   # Stop everything
 ```
 
 `tick` can be an absolute or offset tick number. If `period` is omitted or 0, `tick` is assumed to be absolute: once AMY reaches `tick`, the rest of your event plays once and the saved event is removed from memory. This is also how you schedule a plain one-off event in the future -- give only `tick` (no `period`, no `tag`) and it behaves like the old millisecond `time=` parameter did, except the delay is in ticks, at the current tempo. If an absolute `tick` is in the past, AMY will ignore it.

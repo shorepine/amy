@@ -33,8 +33,6 @@ def dB(level):
 # amy_send_at() allows tests to run AMY commands in "real time" by rendering
 # up until the time specified (thus advancing AMY's internal clock), then
 # sending the rest of the command.
-# The rendered blocks are accumulated here so AmyTest.test() can pick up
-# exactly where run() left off and render out to the 1s test limit.
 _test_clock_frames = []
 _test_clock_blocks = 0
 
@@ -57,19 +55,6 @@ def _render_test_clock_to_ms(ms):
     _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
     _test_clock_blocks += 1
 
-def _render_test_clock_seconds(seconds):
-  """Render exactly amy.render(seconds)'s own block count, through the
-  tracked test clock. A run() that wants to let some initial state settle
-  before reading it back (the way plain amy.render() was used for) should
-  call this instead of amy.render() directly, or it'll desync the tracked
-  clock from the engine's real one and throw off every amy_send_at() call
-  after it."""
-  global _test_clock_blocks
-  target_blocks = int((seconds * amy.AMY_SAMPLE_RATE) / amy.AMY_BLOCK_SIZE)
-  while _test_clock_blocks < target_blocks:
-    _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
-    _test_clock_blocks += 1
-
 def _finish_test_clock(seconds):
   """Render out to `seconds`, same shape as amy.render() gives."""
   global _test_clock_blocks
@@ -80,7 +65,7 @@ def _finish_test_clock(seconds):
   return np.hstack(_test_clock_frames).reshape((-1, amy.AMY_NCHANS))
 
 def amy_send_at(time=0, **kwargs):
-  """Drop-in replacement for the removed amy.send(time=..., **kwargs)."""
+  """Send an amy command once amy.render() reaches the specified time (in ms)."""
   _render_test_clock_to_ms(time)
   amy.send(**kwargs)
 
@@ -119,7 +104,7 @@ class AmyTest:
       message += ' / Error reading ' + ref_file
       rms_n = 0
 
-    # For now, any value above this threshold counts as a failed test
+    # Any value above this threshold counts as a failed test
     threshold = float(os.environ.get('AMY_TEST_THRESHOLD_DB', '-100.0'))
     test_passed = (rms_n <= threshold)
     return test_passed, message

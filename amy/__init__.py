@@ -222,9 +222,7 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    # 'ticks' must come first: AMY's wire parser only recognizes 'H' (ticks)
-    # as a scheduling command when it's the very first character of the
-    # message, so it has to be serialized ahead of every other keyword.
+    # 'ticks' must come first: 'H' is recognized only as first char in wire message.
     ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
     ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'),
@@ -554,7 +552,10 @@ def reset(osc=None, **kwargs):
     if(osc is not None):
         send(reset=osc, **kwargs)
     else:
-        send(reset=RESET_ALL_OSCS, **kwargs) 
+        # Also clear the sequencer: anonymous ticks= entries (2- or 1-value
+        # forms) have no tag, so a plain amy.reset() is the only way to get
+        # rid of one once it's scheduled.
+        send(reset=RESET_ALL_OSCS | RESET_SEQUENCER, **kwargs)
 
 
 

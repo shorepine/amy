@@ -1,4 +1,3 @@
-
 # piano.py
 # examples from piano.html
 import amy
@@ -6,10 +5,7 @@ from time import sleep
 from . import piano_params
 
 def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None, synth=1):
-    # Live demo: there's no more time= to schedule these ahead of time, so we
-    # send each note as its real moment arrives (matching the timing of the
-    # original hard-coded ms offsets: 50, 435, 450, 835, 850, 1485, 1500,
-    # 2100, 3000, 3000).
+    # Live demo playback of piano notes.
     amy.send(reset=amy.RESET_TIMEBASE)
     amy.send(volume=volume)
     init_command()
