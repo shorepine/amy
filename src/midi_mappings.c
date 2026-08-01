@@ -340,15 +340,11 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
                     status = 0x90;
                     value = 0;
                 }
-                // Mark message as already passed through mapping for this channel (synth).
-                sprintf(message, "iM%d", channel);
-                int offset = strlen(message);
-                substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
-                // There's no wire representation for a time left to give this
-                // event anymore, so set it directly: only the first event
-                // built from this MIDI message gets it (matching the old
-                // behavior, where a leading "t<time>" was only ever prepended
-                // to this first-built message string).
+                substitute_midi_special_values(message, mapping->message_template, channel, code, value);
+                // Mark the event as already passed through mapping for this
+                // channel, so we don't send it back out again.
+                event->note_source_channel = channel;
+                // If we're given a time, set it in the event.
                 if (AMY_IS_SET(time)) event->time = time;
             }  // If state is non-null, assume we're working through the later yields.
             // Layer each parsed event on top of the caller's base event, if any.

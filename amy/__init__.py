@@ -457,6 +457,19 @@ def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60
 def stop_sample():
     send(stop_sample=1)
 
+def _send_transfer_chunk(message):
+    """Send one chunk of an AUDIO or FILE transfer's payload. Always routed
+    via the sysex-marked path (see amy_message_is_transfer_chunk() in
+    api.c) so the C side can unambiguously identify it as transfer data
+    rather than risk misinterpreting -- or having misinterpreted -- a
+    regular wire command as such, regardless of what else might be calling
+    amy.send() concurrently (e.g. a sketch's own loop() on hardware during a
+    live transfer)."""
+    if override_send is not None:
+        override_send(message)
+    else:
+        _amy.send_wire_from_sysex(message)
+
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
     from math import ceil
@@ -470,7 +483,7 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
     for i in range(ceil(n_frames/94)):
         frames_bytes = b[last_f:last_f+188]
         message = b64(frames_bytes)
-        send_raw(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
         last_f = last_f + 188
 
 def disk_sample(wavfilename, preset=0, midinote=60):
@@ -496,19 +509,11 @@ def transfer_file(source_filename, dest_filename=None):
 
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
-    # Use the _from_sysex variant so the chunks are routed to
-    # parse_transfer_message via the amy_parsing_from_sysex flag. Internal
-    # amy.send() calls from other contexts (e.g. a sketch's loop() on
-    # AMYboard hardware running during a live transfer) use the regular
-    # path and won't be mis-interpreted as transfer data.
     w = open(source_filename, 'rb')
     for i in range(ceil(file_size/188)):
         file_bytes = w.read(188)
         message = b64(file_bytes)
-        if override_send is not None:
-            override_send(message.decode('ascii'))
-        else:
-            _amy.send_wire_from_sysex(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
     w.close()
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
@@ -540,7 +545,7 @@ def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
             # de-interleave and just choose the first channel
             frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
         message = b64(frames_bytes)
-        send_raw(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
     print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, w.getnframes()*2, w.getnframes(), midinote))
 
 

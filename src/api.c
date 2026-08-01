@@ -232,11 +232,12 @@ output_sample_type * amy_simple_fill_buffer() {
 }
 
 
-// on all platforms, sysclock is based on total samples played, using audio out (i2s or etc) as system clock
-// 64-bit milliseconds since start. total_blocks is u32 and increments once per
-// AMY_BLOCK_SIZE samples, so this does not wrap for ~219 years at 44.1 kHz.
-// Anything that stores an absolute deadline and compares it later must use this
-// rather than amy_sysclock(); see sequencer_check_and_fill().
+// on all platforms, sysclock is based on total samples played, using audio out
+// (i2s or etc) as system clock 64-bit milliseconds since start. total_blocks is
+// u32 and increments once per AMY_BLOCK_SIZE samples, so this does not wrap for
+// ~219 years at 44.1 kHz.  Anything that stores an absolute deadline and
+// compares it later must use this rather than amy_sysclock(); see
+// sequencer_check_and_fill().
 uint64_t amy_sysclock64() {
     // Integer math: computing this through float quantizes the clock once
     // total samples exceed the 24-bit mantissa (~6 min at 48 kHz), and the
@@ -253,33 +254,6 @@ uint32_t amy_sysclock() {
 }
 
 
-// Flag indicating whether the current amy_add_message call is from an
-// external sysex source (in which case transfer_flag should route data
-// to parse_transfer_message) or from an internal amy.send() call (in
-// which case it should be processed as a normal wire command).
-// Without this, a sketch's amy.send(note=36) during a file transfer
-// would get base64-decoded and written to the file as garbage.
-static bool amy_parsing_from_sysex = false;
-
-// True when the next message handed to amy_add_message() is a chunk of an
-// in-progress transfer's raw data, not a wire command, and so must go
-// straight to parse_transfer_message() untouched -- a base64 chunk is
-// arbitrary text and could easily start with a letter that looks like a
-// real command (including the scheduling 'H') purely by chance.
-//
-// FILE transfers (zT, used to write files over MIDI sysex) arrive while a
-// sketch may also be running, so they only trap sysex-originated calls --
-// otherwise a sketch's own amy.send(note=36) during the transfer would get
-// base64-decoded and written to the file as garbage. AUDIO transfers
-// (amy.load_sample / load_sample_bytes) are different: Python sends every
-// chunk synchronously in a tight loop, so nothing else can interleave, and
-// they trap regardless of the sysex flag (which they don't carry, since
-// send_raw goes through the regular wire path).
-static bool amy_message_is_transfer_chunk(void) {
-    return amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
-        (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE);
-}
-
 // Parse and play a stored (fired sequencer) wire message now.
 void amy_play_message(char *message) {
     peek_stack("play_message");
@@ -293,9 +267,11 @@ void amy_play_message(char *message) {
 }
 
 // given a wire message string play / schedule the event directly (WIRE API)
-void amy_add_message(char *message) {
+void amy_add_message_with_sysex_flag(char *message, bool sysex) {
     peek_stack("add_message");
-    if (amy_message_is_transfer_chunk()) {
+    if (sysex
+        && (amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE
+            || amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO)) {
         // Transfer status can't change mid-message, so the whole string is
         // one chunk of transfer payload.
         parse_transfer_message(message, (uint16_t)strlen(message));
@@ -311,13 +287,16 @@ void amy_add_message(char *message) {
     }
 }
 
+// given a wire message string play / schedule the event directly (WIRE API)
+void amy_add_message(char *message) {
+    amy_add_message_with_sysex_flag(message, /* sysex */ false);
+}
+
 // Like amy_add_message but marks the message as coming from an external
-// sysex source so the FILE transfer routing in amy_message_is_transfer_chunk()
+// sysex source so the transfer routing in amy_message_is_transfer_chunk()
 // applies.
-void amy_add_message_from_sysex(char *message) {
-    amy_parsing_from_sysex = true;
-    amy_add_message(message);
-    amy_parsing_from_sysex = false;
+void amy_send_wire_from_sysex(char *message) {
+    amy_add_message_with_sysex_flag(message, /* sysex */ true);
 }
 
 // given an event play / schedule the event directly (C API)
@@ -328,8 +307,6 @@ void amy_add_event(amy_event *e) {
     if(AMY_IS_SET(e->ticks[TICKS_TICK]) || AMY_IS_SET(e->ticks[TICKS_PERIOD]) || AMY_IS_SET(e->ticks[TICKS_TAG])) {
         // C-API ticks event: serialize it to a wire message and hand it to
         // the sequencer, so scheduled events have a single storage format.
-        // Any future scheduling -- one-off or repeating -- goes through here;
-        // there's no separate far-future path for a plain e->time anymore.
         char *buf = (char *)malloc_caps(MAX_MESSAGE_LEN, amy_global.config.ram_caps_events);
         if (buf == NULL) {
             amy_oom("add_event ticks");

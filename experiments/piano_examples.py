@@ -7,7 +7,7 @@ import scipy.io.wavfile as wav
 import amy
 import c_amy as _amy
 
-from experiments import tulip_piano
+import tulip_piano
 
 import scipy.io.wavfile as wav
 
@@ -19,13 +19,8 @@ def wavwrite(filename, data, samplerate=44100, force_mono=True):
   wav.write(filename, samplerate, (32768.0 * data).astype(np.int16))
 
 
-# There's no more time= to schedule notes ahead of time (AMY only schedules
-# on ticks now), so this offline render instead renders forward -- in whole
-# AMY_BLOCK_SIZE blocks, exactly like amy.render() does -- to each note's
-# simulated ms position before sending it, then renders out to the end.
-# _blocks_for_ms must be a ceiling, not amy.render()'s truncation: it needs
-# the same block amy_sysclock() first reads >= ms on, or every note lands up
-# to one block later than intended (see amy/test.py's identical helper).
+# Offline render places events at "times" by generating the samples up until
+# that time.  Based on the similar method in amy/test.py.
 _frames = []
 _blocks_done = 0
 
@@ -43,7 +38,7 @@ def _render_to_ms(ms):
 
 
 def piano_example(base_note=72, filename='piano_examples.wav', volume=5,
-                  note_command=amy.send, init_command=lambda: None):
+                  send_command=amy.send, init_command=lambda: None):
     global _frames, _blocks_done
     amy.restart()
     _frames = []
@@ -52,20 +47,21 @@ def piano_example(base_note=72, filename='piano_examples.wav', volume=5,
 
     init_command()
 
-    def send_command(ms, **kwargs):
-        _render_to_ms(ms)
-        note_command(**kwargs)
+    def send_at(time, **kwargs):
+        # time is in milliseconds.
+        _render_to_ms(time)
+        send_command(**kwargs)
 
-    send_command(50, synth=1, note=base_note, vel=0.05)
-    send_command(435, synth=1, note=base_note, vel=0)
-    send_command(450, synth=1, note=base_note, vel=0.63)
-    send_command(835, synth=1, note=base_note, vel=0)
-    send_command(850, synth=1, note=base_note, vel=1.0)
-    send_command(1485, synth=1, note=base_note, vel=0)
-    send_command(1500, synth=1, note=base_note - 24, vel=0.6)
-    send_command(2100, synth=1, note=base_note + 24, vel=1.0)
-    send_command(3000, synth=1, note=base_note - 24, vel=0)
-    send_command(3000, synth=1, note=base_note + 24, vel=0)
+    send_at(time=50, synth=1, note=base_note, vel=0.05)
+    send_at(time=435, synth=1, note=base_note, vel=0)
+    send_at(time=450, synth=1, note=base_note, vel=0.63)
+    send_at(time=835, synth=1, note=base_note, vel=0)
+    send_at(time=850, synth=1, note=base_note, vel=1.0)
+    send_at(time=1485, synth=1, note=base_note, vel=0)
+    send_at(time=1500, synth=1, note=base_note - 24, vel=0.6)
+    send_at(time=2100, synth=1, note=base_note + 24, vel=1.0)
+    send_at(time=3000, synth=1, note=base_note - 24, vel=0)
+    send_at(time=3000, synth=1, note=base_note + 24, vel=0)
 
     _render_to_ms(3300)
     samples = np.hstack(_frames).reshape((-1, amy.AMY_NCHANS))
@@ -75,27 +71,29 @@ def piano_example(base_note=72, filename='piano_examples.wav', volume=5,
 
 
 def init_piano_voices():
-    amy.send(store_patch='1024,' + tulip_piano.patch_string)
-    amy.send(synth=1, num_voices=3, load_patch=1024)
+    amy.send(synth=1, num_voices=4, oscs_per_voice=1 + tulip_piano.num_partials)
     tulip_piano.init_piano_voice(tulip_piano.num_partials, synth=1)
     # additive_interpolated overwrites these settings before each note,
     # but pre-configure each note to C4.mf for additive_fixed.
-    tulip_piano.setup_piano_voice_for_note_vel(note=60, vel=80, synth=1)
+    tulip_piano.setup_piano_voice(
+      tulip_piano.harms_params_for_note_vel(note=60, vel=80),
+      synth=1
+    )
 
 
 def main(argv):
 
   piano_example(base_note=74, volume=10, filename='piano_example_juno_patch_7.wav',
-                init_command=lambda: amy.send(synth=1, num_voices=3, load_patch=7))
+                init_command=lambda: amy.send(synth=1, num_voices=3, patch=7))
   piano_example(base_note=50, volume=25, filename='piano_example_dx7_patch_137.wav',
-                init_command=lambda: amy.send(synth=1, num_voices=3, load_patch=137))
+                init_command=lambda: amy.send(synth=1, num_voices=3, patch=137))
   piano_example(base_note=62, volume=5,
                 filename='piano_example_additive_fixed.wav',
                 init_command=init_piano_voices)
   piano_example(base_note=62,
                 filename='piano_example_additive_interpolated.wav',
                 init_command=init_piano_voices,
-                note_command=tulip_piano.piano_note_on)
+                send_command=tulip_piano.piano_note_on)
   
   print("done.")
 

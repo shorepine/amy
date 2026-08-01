@@ -9,9 +9,7 @@ uint32_t sequencer_ticks() { return amy_global.sequencer_tick_count; }
 
 // Sequenced ticks events are stored as the raw wire-message string (with its
 // leading 'H' command stripped) plus the scheduling metadata needed to play
-// it back.  The string is only parsed when the entry comes due, so bulk
-// ingest of scheduled events is just a scan and a copy -- no event parsing,
-// voice allocation or delta expansion up front.
+// it back.  The string is only parsed when the entry comes due.
 typedef struct sequence_info_t {
     char *wire;    // Stored wire message; NULL means the tag is unused.
     //uint32_t tag;  // tag is implicit, it's its index in the table
@@ -71,9 +69,11 @@ void sequencer_reset() {
 }
 
 void sequencer_deinit() {
-    sequencer_reset();
-    if (sequences != NULL) free(sequences);
-    sequences = NULL;  // sequencer_check_and_fill guards on this
+    if (sequences != NULL) {
+        sequencer_reset();
+        free(sequences);
+        sequences = NULL;  // sequencer_check_and_fill guards on this
+    }
     max_sequences = 0;
 }
 

@@ -482,7 +482,6 @@ void buses_reset() {
     }
 }
 
-
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
@@ -498,7 +497,7 @@ int8_t global_init(amy_config_t c) {
         amy_global.volume[bus] = 1.0f;
     amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
-    amy_global.tempo = 108.0; 
+    amy_global.tempo = 108.0;
     amy_global.pitch_bend = 0;
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_NONE;
     amy_global.transfer_storage = NULL;
@@ -2005,28 +2004,6 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 
 }
 
-
-// this plays just the next delta if it's time.
-void amy_execute_delta() {
-    AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
-    // check to see which sounds to play
-    uint32_t sysclock = amy_sysclock();
-    amy_grab_lock();
-
-    // find any deltas that need to be played from the (in-order) queue
-    struct delta *d = amy_global.delta_queue;
-    if(d && AMY_TIME_GEQ(sysclock, d->time)) {
-        play_delta(d);
-        d = delta_release(d);
-        amy_global.delta_qsize--;
-    }
-    amy_global.delta_queue = d;
-
-    amy_release_lock();
-
-    AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
-
-}
 
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {

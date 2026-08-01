@@ -959,7 +959,6 @@ void patches_init(int max_memory_patches);
 void patches_deinit();
 void parse_algo_source(char* message, int16_t *vals);
 void hold_and_modify(uint16_t osc) ;
-void amy_execute_delta();
 void amy_execute_deltas();
 int16_t * amy_fill_buffer();
 int16_t * amy_simple_fill_buffer();  // excute_deltas + render + fill_buffer
@@ -973,7 +972,7 @@ void amy_add_message(char *message);
 void amy_play_message(char *message);
 // Like amy_add_message but the data is treated as coming from an external
 // sysex source, so file transfer routing (transfer_flag) applies.
-void amy_add_message_from_sysex(char *message);
+void amy_send_wire_from_sysex(char *message);
 void amy_add_event(amy_event *e);
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos);
 void handle_ticks_message(char *message);

@@ -67,7 +67,7 @@ API = [
          args=[('message', 'str', None)], ret='void',
          doc='Send a wire-protocol message to AMY',
          platforms={'py', 'mp', 'web'}),
-    dict(py='send_wire_from_sysex', c='amy_add_message_from_sysex',
+    dict(py='send_wire_from_sysex', c='amy_send_wire_from_sysex',
          args=[('message', 'str', None)], ret='void',
          doc='Send a wire message as if from sysex (file-transfer routing applies)',
          platforms={'py'}),

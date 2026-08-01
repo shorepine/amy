@@ -154,9 +154,7 @@ def amy_send(**kwargs):
 
 amy.reset()
 time.sleep(0.1)  # to let reset happen.
-amy.send(store_patch='1024,v0w10Zv%dw%dZ')
-amy.send(synth=1, num_voices=4, load_patch=1024)
 num_partials = NUM_HARMONICS[0]
-patch_string = 'v0w10Zv%dw%dZ' % (num_partials + 1, amy.PARTIAL)
-print("Loaded dpwe piano on patch #1024, AMY synth 1")
+amy.send(synth=1, num_voices=4, oscs_per_voice=1 + num_partials)
+print("Loaded dpwe piano on AMY synth 1")
 
