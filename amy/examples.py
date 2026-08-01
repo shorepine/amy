@@ -147,7 +147,9 @@ def example_multimbral_synth():
     amy.send(synth=4, num_voices=4, patch=pitch_lfo()) # pitch LFO user patch on MIDI channel 4
 
 def example_reset(start=0):
-    amy.send(osc=0, reset=amy.RESET_ALL_OSCS, time=start)
+    if start:
+        sleep(start / 1000.0)
+    amy.send(osc=0, reset=amy.RESET_ALL_OSCS)
 
 def example_synth_chord(patch=0):
     # Like example_voice_chord, but use 'synth' to avoid having to keep track of voices
@@ -257,16 +259,16 @@ def example_sequencer_drums():
 
     # Add patterns
     # Hi hat every 1/8th note
-    amy.send(sequence=[0, 24, 0], osc=2, vel=2.0)
+    amy.send(ticks=[0, 24, 0], osc=2, vel=2.0)
 
     # Bass drum every quarter note
-    amy.send(sequence=[0, 96, 1], osc=0, vel=1.0)
+    amy.send(ticks=[0, 96, 1], osc=0, vel=1.0)
 
     # Snare every quarter note, counterphase to BD
-    amy.send(sequence=[24, 96, 2], osc=1, vel=1.0)
+    amy.send(ticks=[24, 96, 2], osc=1, vel=1.0)
 
     # Cow once every other cycle
-    amy.send(sequence=[0, 192, 3], osc=3, vel=1.0)
+    amy.send(ticks=[0, 192, 3], osc=3, vel=1.0)
 
 def example_fm():
     amy.reset()

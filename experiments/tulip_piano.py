@@ -110,19 +110,16 @@ def init_piano_voice(num_partials, base_osc=0, **kwargs):
         bp_string += ',200,0'
         amy_send(osc=base_osc + partial, wave=amy.PARTIAL, bp0=bp_string, eg0_type=amy.ENVELOPE_TRUE_EXPONENTIAL, **kwargs)
 
-def setup_piano_voice(harms_params, base_osc=0, synth=1, time=None, sequence=None):
+def setup_piano_voice(harms_params, base_osc=0, synth=1, ticks=None):
     """Configure a set of PARTIALs oscs to play a particular note and velocity."""
     num_partials = len(harms_params)
     amy_send(osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials,
-           synth=synth, time=time, sequence=sequence)
-    if time is not None:
-        base_cmd = 't' + str(time)
-    else:
-        base_cmd = ''
+           synth=synth, ticks=ticks)
+    base_cmd = ''
     if synth is not None:
         base_cmd += 'i' + str(synth)
-    if sequence is not None:
-        base_cmd += 'H' + str(sequence)
+    if ticks is not None:
+        base_cmd += 'H' + str(ticks)
     for i in range(num_partials):
         # Omit the time-deltas from the list to save space.  The osc will keep the ones we set up in init_piano_voice.
         #env_vals = db_to_lin(harms_params[i, 1:])
@@ -133,7 +130,6 @@ def setup_piano_voice(harms_params, base_osc=0, synth=1, time=None, sequence=Non
         # Add final release.
         bp_string += ',200,0'
         f0_hz = cents_to_hz(harms_params[i, 0])
-        #amy_send(osc=base_osc + 1 + i, freq=f0_hz, bp0=bp_string, synth=synth, time=time)
         # Special-case construction of the Wire Protocol message to save time
         amy.send_raw(
             base_cmd + 'v' + str(base_osc + i + 1) + ('f%.1f' % f0_hz) + 'A' + bp_string + 'Z'

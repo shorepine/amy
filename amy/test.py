@@ -30,6 +30,101 @@ def dB(level):
   return 20 * np.log10(level + 1e-5)
 
 
+# AMY no longer has a millisecond scheduling primitive (the removed `time=`):
+# everything ahead of "now" goes through the tick-based sequencer instead.
+# Tests still want to say "at ms X, do this", so amy_send_at() replaces
+# amy.send(time=X, **kwargs) by rendering forward -- in whole AMY_BLOCK_SIZE
+# blocks, exactly like amy.render() does -- to simulated time X, then sending
+# the command for real "now". This produces the same audio a deferred-to-X
+# event would have (the render engine doesn't care whether an event was
+# queued up front or injected right as its block comes up), as long as a
+# test's time= values are non-decreasing -- true of every test in this file,
+# since they're naturally written in chronological order -- since we can
+# only render forward, never back up.
+#
+# The rendered blocks are accumulated here so AmyTest.test() can pick up
+# exactly where run() left off and render out to the 1s test limit, instead
+# of re-rendering (or skipping) whatever run() already advanced through.
+_test_clock_frames = []
+_test_clock_blocks = 0
+_test_clock_capture_start = 0  # see _rebase_test_clock()
+
+def _reset_test_clock():
+  global _test_clock_frames, _test_clock_blocks, _test_clock_capture_start
+  _test_clock_frames = []
+  _test_clock_blocks = 0
+  _test_clock_capture_start = 0
+
+def _blocks_for_ms(ms):
+  """The block count on which amy_sysclock() first reads >= `ms` since
+  _reset_test_clock() (always absolute from true test start -- time= values
+  are never relative to _rebase_test_clock(), only the exported clip is),
+  i.e. the same block a wire-scheduled event at this exact ms would have
+  fired on. amy_sysclock() truncates (N * AMY_BLOCK_SIZE * 1000) //
+  AMY_SAMPLE_RATE to an integer, so this is a ceiling, not amy.render()'s
+  plain truncation -- getting this wrong shifts every event by up to one
+  block versus the old wire-scheduled timing."""
+  numerator = int(round(ms)) * amy.AMY_SAMPLE_RATE
+  denominator = amy.AMY_BLOCK_SIZE * 1000
+  return -(-numerator // denominator)  # ceiling division
+
+def _render_test_clock_to_ms(ms):
+  """Render whole blocks until amy_sysclock() would read >= `ms` (since the
+  last _reset_test_clock())."""
+  global _test_clock_blocks
+  target_blocks = _blocks_for_ms(ms)
+  while _test_clock_blocks < target_blocks:
+    _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
+    _test_clock_blocks += 1
+
+def _render_test_clock_seconds(seconds):
+  """Render exactly amy.render(seconds)'s own block count (truncating, not
+  the ceiling _blocks_for_ms uses -- this is "however many whole blocks fit
+  in seconds", not "the block an event at this ms fires on"), through the
+  tracked test clock. A run() that wants to let some initial state settle
+  before reading it back (the way plain amy.render() was used for) should
+  call this instead of amy.render() directly, or it'll desync the tracked
+  clock from the engine's real one and throw off every amy_send_at() call
+  after it."""
+  global _test_clock_blocks
+  target_blocks = int((seconds * amy.AMY_SAMPLE_RATE) / amy.AMY_BLOCK_SIZE)
+  while _test_clock_blocks < target_blocks:
+    _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
+    _test_clock_blocks += 1
+
+def _rebase_test_clock():
+  """For a run() that lets some initial state settle (via
+  _render_test_clock_seconds, standing in for the old plain amy.render())
+  before its "real" 1s clip begins: mark the current position as where the
+  exported/compared clip should start, so _finish_test_clock() renders (and
+  returns) just the post-settle window -- WITHOUT changing how time= values
+  in amy_send_at() are interpreted; they still count from true test start
+  (so pre-existing tests keep their times written as "absolute test-start
+  ms", same as before this rebase concept existed). This matches how these
+  tests worked before: the old harness's own final amy.render(1.0) (now
+  _finish_test_clock) rendered fresh from wherever the engine's clock
+  already was, so only the post-settle audio was ever captured or compared
+  -- the settle render's audio was always discarded, never a choice this
+  code is making anew."""
+  global _test_clock_capture_start
+  _test_clock_capture_start = _test_clock_blocks
+
+def _finish_test_clock(seconds):
+  """Render out to `seconds` past the capture start (see
+  _rebase_test_clock(); 0 if it was never called) and return just that
+  window, same shape as amy.render() gives."""
+  global _test_clock_blocks
+  target_blocks = _test_clock_capture_start + int((seconds * amy.AMY_SAMPLE_RATE) / amy.AMY_BLOCK_SIZE)
+  while _test_clock_blocks < target_blocks:
+    _test_clock_frames.append(np.array(_amy.render_to_list()) / 32768.0)
+    _test_clock_blocks += 1
+  return np.hstack(_test_clock_frames[_test_clock_capture_start:]).reshape((-1, amy.AMY_NCHANS))
+
+def amy_send_at(time=0, **kwargs):
+  """Drop-in replacement for the removed amy.send(time=..., **kwargs)."""
+  _render_test_clock_to_ms(time)
+  amy.send(**kwargs)
+
 
 class AmyTest:
 
@@ -43,9 +138,10 @@ class AmyTest:
     name = self.__class__.__name__
     _amy.stop()
     _amy.start(1 if self.default_synths else 0)
+    _reset_test_clock()
     self.run()
 
-    samples = amy.render(1.0)
+    samples = _finish_test_clock(1.0)
     amy.write(samples, os.path.join(self.test_dir, name + '.wav'))
     rms_x = dB(rms(samples))
     message = ('%-32s:' % name) + (' signal=%5.1f dB' % rms_x)
@@ -73,77 +169,77 @@ class AmyTest:
 class TestSineOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestPulseOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PULSE, freq=1000)
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.PULSE, freq=1000)
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestSawDownOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN)
-    amy.send(time=100, note=48, vel=1)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN)
+    amy_send_at(time=100, note=48, vel=1)
+    amy_send_at(time=900, vel=0)
 
 
 class TestSawUpOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_UP)
-    amy.send(time=100, note=46, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_UP)
+    amy_send_at(time=100, note=46, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestTriangleOsc(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.TRIANGLE, freq=1000)
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.TRIANGLE, freq=1000)
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestNoiseOsc(AmyTest):
 
   def run(self):
     # If this is the first time noise is called, the waveform should be deterministic.
-    amy.send(time=0, osc=0, wave=amy.NOISE, freq=1000)
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.NOISE, freq=1000)
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestPcm(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=1)
-    amy.send(time=100, vel=1)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1)
+    amy_send_at(time=100, vel=1)
 
 
 class TestPcmShift(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=10)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=10)
     # Cowbell with no note should play at "default" pitch, midi 69 (for that preset)
-    amy.send(time=100, vel=1)
+    amy_send_at(time=100, vel=1)
     # Specifying a note should shift its pitch.
-    amy.send(time=500, note=70, vel=1)
+    amy_send_at(time=500, note=70, vel=1)
 
 
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=9)  # Clap
-    amy.send(time=100, vel=1)
-    amy.send(time=450, preset=10)  # Cowbell
-    amy.send(time=500, vel=1)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=9)  # Clap
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=450, preset=10)  # Cowbell
+    amy_send_at(time=500, vel=1)
 
 
 class TestPcmTriggerPhase(AmyTest):
@@ -151,46 +247,46 @@ class TestPcmTriggerPhase(AmyTest):
      (start_frame / 2^23).   It persist for that osc."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=1)
-    amy.send(time=100, osc=0, phase=0.0005, vel=1)   # start ~4200 frames in
-    amy.send(time=600, osc=0, vel=1)                 # starts at the same point again.
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1)
+    amy_send_at(time=100, osc=0, phase=0.0005, vel=1)   # start ~4200 frames in
+    amy_send_at(time=600, osc=0, vel=1)                 # starts at the same point again.
 
 
 class TestPcmLoop(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
-    amy.send(time=100, osc=0, vel=1)
-    amy.send(time=500, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=500, osc=0, vel=0)
 
 
 class TestPcmLoopEnvFilt(AmyTest):
   """Check that filter, amp-env, and pitch mod apply to PCM."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
-    amy.send(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='200,0,0,0,3', bp1='0,1,500,0,200,0')
-    amy.send(time=0, osc=0, bp0='100,1,1000,0,1000,0')
-    amy.send(time=0, osc=1, freq='1')
-    amy.send(time=0, osc=0, mod_source=1, freq=',,,,,-0.2')
-    amy.send(time=100, osc=0, note=64, vel=5)
-    amy.send(time=500, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=10, feedback=1)
+    amy_send_at(time=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='200,0,0,0,3', bp1='0,1,500,0,200,0')
+    amy_send_at(time=0, osc=0, bp0='100,1,1000,0,1000,0')
+    amy_send_at(time=0, osc=1, freq='1')
+    amy_send_at(time=0, osc=0, mod_source=1, freq=',,,,,-0.2')
+    amy_send_at(time=100, osc=0, note=64, vel=5)
+    amy_send_at(time=500, osc=0, vel=0)
 
 
 class TestPcmPhaseLive(AmyTest):
   """Modifying the PCM freq while a sound is playing gives discontinuities.  Issue #916"""
 
   def run(self):
-    amy.send(time=0, synth=10, patch=258)         # GM drums
-    amy.send(time=100, synth=10, note=36, vel=1)  # long kick sounding
+    amy_send_at(time=0, synth=10, patch=258)         # GM drums
+    amy_send_at(time=100, synth=10, note=36, vel=1)  # long kick sounding
     # while it rings, sweep the pitch:
     # i10n35f479.727a1Q0.5G0F16000R0.7P0Z
     kwargs = {'amp': 1, 'pan': 0.5, 'filter_type': amy.FILTER_NONE, 'filter_freq': 16000, 'resonance': 0.7, 'phase': 0}
-    amy.send(time=150, synth=10, note=36, freq=490, **kwargs)
-    amy.send(time=175, synth=10, note=36, freq=523, **kwargs)
-    amy.send(time=200, synth=10, note=36, freq=554, **kwargs)
-    amy.send(time=225, synth=10, note=36, freq=575, **kwargs)
-    amy.send(time=250, synth=10, note=36, freq=595, **kwargs)
+    amy_send_at(time=150, synth=10, note=36, freq=490, **kwargs)
+    amy_send_at(time=175, synth=10, note=36, freq=523, **kwargs)
+    amy_send_at(time=200, synth=10, note=36, freq=554, **kwargs)
+    amy_send_at(time=225, synth=10, note=36, freq=575, **kwargs)
+    amy_send_at(time=250, synth=10, note=36, freq=595, **kwargs)
 
 
 class TestBuildYourOwnPartials(AmyTest):
@@ -200,15 +296,15 @@ class TestBuildYourOwnPartials(AmyTest):
     num_partials = 16
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     base_osc = 0
-    amy.send(time=0, osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, eg0='0,1,30000,0')
+    amy_send_at(time=0, osc=base_osc, wave=amy.BYO_PARTIALS, num_partials=num_partials, eg0='0,1,30000,0')
     for i in range(1, num_partials + 1):
       # Set up each partial as the corresponding harmonic of the base_freq, with an amplitude of 1/N, 50ms attack, and a decay of 1 sec / N
       # Note that "vel sentivity" in amp actually means "Sensitivity to parent osc amplitude", since it is passed down through a modified vel.
       amy.send(osc=base_osc + i, wave=amy.PARTIAL, freq=base_freq * i, eg0='50,1,%d,0,50,0' % (1000 // i),
                amp='%.2f,0,1,1' % (1.0 / i))
-    amy.send(time=100, osc=0, note=60, vel=0.5)
-    amy.send(time=200, osc=0, note=72, vel=1)
-    amy.send(time=800, osc=0, note=72, vel=0)
+    amy_send_at(time=100, osc=0, note=60, vel=0.5)
+    amy_send_at(time=200, osc=0, note=72, vel=1)
+    amy_send_at(time=800, osc=0, note=72, vel=0)
 
 
 class TestBYOPVoices(AmyTest):
@@ -218,13 +314,13 @@ class TestBYOPVoices(AmyTest):
     num_partials = 4
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
-    amy.send(time=0, synth=1, num_voices=4, patch_string=s)
+    amy_send_at(time=0, synth=1, num_voices=4, patch_string=s)
     for i in range(num_partials):
-      amy.send(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
-    amy.send(time=100, synth=1, note=60, vel=1)
-    amy.send(time=200, synth=1, note=63, vel=1)
-    amy.send(time=300, synth=1, note=67, vel=1)
-    amy.send(time=400, synth=1, note=70, vel=1)
+      amy_send_at(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,0,50,0' % (600 // (i + 1)))
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=200, synth=1, note=63, vel=1)
+    amy_send_at(time=300, synth=1, note=67, vel=1)
+    amy_send_at(time=400, synth=1, note=70, vel=1)
 
 
 class TestBYOPNoteOff(AmyTest):
@@ -235,12 +331,12 @@ class TestBYOPNoteOff(AmyTest):
     base_freq = constants.ZERO_LOGFREQ_IN_HZ
     s = 'v0w%dp%dZ' % (amy.BYO_PARTIALS, num_partials) + ''.join(['v%dw%dZ' % (i + 1, amy.PARTIAL) for i in range(num_partials)])
     amy.send(patch=1024, patch_string=s)
-    amy.send(time=0, synth=1, num_voices=2, patch=1024)
+    amy_send_at(time=0, synth=1, num_voices=2, patch=1024)
     for i in range(num_partials):
-      amy.send(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
-    amy.send(time=0, synth=1, osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
-    amy.send(time=100, synth=1, note=60, vel=1)
-    amy.send(time=700, synth=1, vel=0)
+      amy_send_at(time=0, synth=1, osc=i + 1, freq=base_freq * (i + 1), bp0='50,1,%d,%f,200,0' % (1000 // (i + 1), 1 / (i + 1)))
+    amy_send_at(time=0, synth=1, osc=0, bp0='0,1,1000,0')  # Parent osc env is slow release to be able to see partials.
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=700, synth=1, vel=0)
 
 
 class TestInterpPartials(AmyTest):
@@ -249,13 +345,13 @@ class TestInterpPartials(AmyTest):
     # PARTIALS but each partial is interpolated from a table of pre-analyzed harmonic-sets.
     base_osc = 0
     num_partials = 25  # Doesn't do anything?
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
+    amy_send_at(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL, amp='1,0,1,1')
-    amy.send(time=50, osc=0, note=60, vel=0.1)
-    amy.send(time=300, osc=0, note=67, vel=0.6)
-    amy.send(time=550, osc=0, note=72, vel=1)
-    amy.send(time=800, osc=0, vel=0)
+    amy_send_at(time=50, osc=0, note=60, vel=0.1)
+    amy_send_at(time=300, osc=0, note=67, vel=0.6)
+    amy_send_at(time=550, osc=0, note=72, vel=1)
+    amy_send_at(time=800, osc=0, vel=0)
 
 
 class TestInterpPartialsRetrigger(AmyTest):
@@ -263,17 +359,17 @@ class TestInterpPartialsRetrigger(AmyTest):
   def run(self):
     base_osc = 0
     num_partials = 20
-    amy.send(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
+    amy_send_at(time=0, osc=base_osc, wave=amy.INTERP_PARTIALS, preset=0, amp='1,0,0,0')
     for i in range(1, num_partials + 1):
       amy.send(osc=base_osc + i, wave=amy.PARTIAL)
-    amy.send(time=50, osc=0, note=52, vel=0.7)
-    amy.send(time=200, osc=0, note=52, vel=0.8)
-    amy.send(time=350, osc=0, note=52, vel=0.9)
-    amy.send(time=500, osc=0, vel=0)
-    amy.send(time=510, osc=100, wave=amy.SINE, bp0='3,1,500,0,50,0')
-    amy.send(time=550, osc=100, note=76, vel=1)
-    amy.send(time=700, osc=100, note=76, vel=1)
-    amy.send(time=850, osc=100, vel=0)
+    amy_send_at(time=50, osc=0, note=52, vel=0.7)
+    amy_send_at(time=200, osc=0, note=52, vel=0.8)
+    amy_send_at(time=350, osc=0, note=52, vel=0.9)
+    amy_send_at(time=500, osc=0, vel=0)
+    amy_send_at(time=510, osc=100, wave=amy.SINE, bp0='3,1,500,0,50,0')
+    amy_send_at(time=550, osc=100, note=76, vel=1)
+    amy_send_at(time=700, osc=100, note=76, vel=1)
+    amy_send_at(time=850, osc=100, vel=0)
 
 
 class TestInterpPartialsOutOfRange(AmyTest):
@@ -285,70 +381,75 @@ class TestInterpPartialsOutOfRange(AmyTest):
   out-of-range path runs, not how it sounds."""
 
   def run(self):
-    amy.send(time=0, reset=amy.RESET_SYNTHS)
-    amy.send(time=0, synth=1, num_voices=6, patch=256)
+    amy_send_at(time=0, reset=amy.RESET_SYNTHS)
+    amy_send_at(time=0, synth=1, num_voices=6, patch=256)
     t = 50
     for i in range(4):
-      amy.send(time=t, synth=1, note=60 + i, vel=0.7)
+      amy_send_at(time=t, synth=1, note=60 + i, vel=0.7)
+      # Grouped by time (all three note-ons, then all three note-offs) rather
+      # than by note, so the render clock (which can only move forward) sees
+      # a non-decreasing sequence of times -- interleaving on/off per note
+      # would ask it to rewind from t+150 back to t+50 on the next note.
       for note in (108, 112, 115):
-        amy.send(time=t + 50, synth=1, note=note, vel=0.1)
-        amy.send(time=t + 150, synth=1, note=note, vel=0)
-      amy.send(time=t + 150, synth=1, note=60 + i, vel=0)
+        amy_send_at(time=t + 50, synth=1, note=note, vel=0.1)
+      for note in (108, 112, 115):
+        amy_send_at(time=t + 150, synth=1, note=note, vel=0)
+      amy_send_at(time=t + 150, synth=1, note=60 + i, vel=0)
       t += 200
     # This final in-range note went permanently silent when the out-of-range
     # notes above read past the end of the tables.
-    amy.send(time=t, synth=1, note=60, vel=1)
+    amy_send_at(time=t, synth=1, note=60, vel=1)
 
 
 class TestSineEnv(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='1,0,1,1,0,0', bp0='50,1,200,0.1,50,0')
-    amy.send(time=100, vel=.85)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy_send_at(time=0, osc=0, amp='1,0,1,1,0,0', bp0='50,1,200,0.1,50,0')
+    amy_send_at(time=100, vel=.85)
+    amy_send_at(time=500, vel=0)
 
 
 class TestSineEnv2(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
-    amy.send(time=0, osc=0, amp='1.0,0,1,1,0,0', bp0='0,0,200,5,200,0,0,0')
-    amy.send(time=100, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy_send_at(time=0, osc=0, amp='1.0,0,1,1,0,0', bp0='0,0,200,5,200,0,0,0')
+    amy_send_at(time=100, vel=1)
+    amy_send_at(time=500, vel=0)
     # The DX7 algo is weird - attack is different from decay, envelope is clipped to 1.
-    amy.send(time=500, osc=0, eg0_type=amy.ENVELOPE_DX7)
-    amy.send(time=550, vel=1)
-    amy.send(time=950, vel=0)
+    amy_send_at(time=500, osc=0, eg0_type=amy.ENVELOPE_DX7)
+    amy_send_at(time=550, vel=1)
+    amy_send_at(time=950, vel=0)
 
 
 class TestSineAM(AmyTest):
   """Amplitude modulation was messed up by log-combination amp."""
 
   def run(self):
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=5)
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000, mod_source=1, amp='1,0,0,0,0,0.05')
-    amy.send(time=100, vel=1)  # Needed to wake up osc, even though vel value is ignored
-    amy.send(time=500, vel=0)  # Will not turn off osc since vel value is ignored / eg0 not engaged.
-    amy.send(time=600, amp=0)  # Should silence osc.
-    amy.send(time=800, amp=1)  # osc ready to go, but will still wait for nonzero vel note-on
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=5)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000, mod_source=1, amp='1,0,0,0,0,0.05')
+    amy_send_at(time=100, vel=1)  # Needed to wake up osc, even though vel value is ignored
+    amy_send_at(time=500, vel=0)  # Will not turn off osc since vel value is ignored / eg0 not engaged.
+    amy_send_at(time=600, amp=0)  # Should silence osc.
+    amy_send_at(time=800, amp=1)  # osc ready to go, but will still wait for nonzero vel note-on
 
 
 class TestAlgo(AmyTest):
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=1, patch=21+128)
-    amy.send(time=100, synth=1, note=58, vel=1)
-    amy.send(time=500, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=1, patch=21+128)
+    amy_send_at(time=100, synth=1, note=58, vel=1)
+    amy_send_at(time=500, synth=1, vel=0)
 
 
 class TestAlgo2(AmyTest):
 
   def run(self):
-    amy.send(time=0, volume=0.5)  # To counteract vel=2 without rewriting ref.
-    amy.send(time=0, synth=1, num_voices=1, patch=128+24)
-    amy.send(time=100, synth=1, note=58, vel=2)
-    amy.send(time=500, synth=1, vel=0)
+    amy_send_at(time=0, volume=0.5)  # To counteract vel=2 without rewriting ref.
+    amy_send_at(time=0, synth=1, num_voices=1, patch=128+24)
+    amy_send_at(time=100, synth=1, note=58, vel=2)
+    amy_send_at(time=500, synth=1, vel=0)
 
 
 class TestWoodPiano(AmyTest):
@@ -356,33 +457,33 @@ class TestWoodPiano(AmyTest):
 
   def run(self):
     # The four-op WOOD PIANO patch
-    amy.send(time=0, synth=1, num_voices=6, oscs_per_voice=5)
-    amy.send(time=0, synth=1, osc=4, wave=amy.SINE, ratio=1, bp0='10,1,1000,0.8,100,0', amp='0.4,0,0,1', eg0_type=2, phase=0)
-    amy.send(time=0, synth=1, osc=3, wave=amy.SINE, ratio=0.5, bp0='0,1,1000,0,100,0', amp='1,0,0,1', eg0_type=2, phase=0)
-    amy.send(time=0, synth=1, osc=2, wave=amy.SINE, ratio=1, bp0='0,1,300,0.5,500,0.3,1000,0', amp='0.8,0,0,1,0,0', eg0_type=2, phase=0)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SINE, ratio=0.495, bp0='0,1,2000,0,300,0', amp='1,0,0,1,0,0', eg0_type=2, phase=0)
+    amy_send_at(time=0, synth=1, num_voices=6, oscs_per_voice=5)
+    amy_send_at(time=0, synth=1, osc=4, wave=amy.SINE, ratio=1, bp0='10,1,1000,0.8,100,0', amp='0.4,0,0,1', eg0_type=2, phase=0)
+    amy_send_at(time=0, synth=1, osc=3, wave=amy.SINE, ratio=0.5, bp0='0,1,1000,0,100,0', amp='1,0,0,1', eg0_type=2, phase=0)
+    amy_send_at(time=0, synth=1, osc=2, wave=amy.SINE, ratio=1, bp0='0,1,300,0.5,500,0.3,1000,0', amp='0.8,0,0,1,0,0', eg0_type=2, phase=0)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SINE, ratio=0.495, bp0='0,1,2000,0,300,0', amp='1,0,0,1,0,0', eg0_type=2, phase=0)
     # Osc 0 amp envelope is just to avoid truncating the FM output.
-    amy.send(time=0, synth=1, osc=0, wave=amy.ALGO, algorithm=2, algo_source=',,4,3,2,1', bp0='0,1,1000,1,300,0', amp='4,0,1,1', freq='220,1,0,0,0,0')
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.ALGO, algorithm=2, algo_source=',,4,3,2,1', bp0='0,1,1000,1,300,0', amp='4,0,1,1', freq='220,1,0,0,0,0')
     # Notes
-    amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=350, synth=1, note=48, vel=0)
-    amy.send(time=400, synth=1, note=48, vel=1)
-    amy.send(time=650, synth=1, note=48, vel=0)
-    amy.send(time=700, synth=1, note=58, vel=1)
-    amy.send(time=800, synth=1, note=58, vel=0)
-    amy.send(time=800, synth=1, note=60, vel=1)
-    amy.send(time=900, synth=1, note=60, vel=0)
+    amy_send_at(time=100, synth=1, note=48, vel=1)
+    amy_send_at(time=350, synth=1, note=48, vel=0)
+    amy_send_at(time=400, synth=1, note=48, vel=1)
+    amy_send_at(time=650, synth=1, note=48, vel=0)
+    amy_send_at(time=700, synth=1, note=58, vel=1)
+    amy_send_at(time=800, synth=1, note=58, vel=0)
+    amy_send_at(time=800, synth=1, note=60, vel=1)
+    amy_send_at(time=900, synth=1, note=60, vel=0)
 
 
 class TestFMRepeat(AmyTest):
   """Douglas reports that the DX7 Marimba sometimes clicks at onset."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=1, patch=128+21)
+    amy_send_at(time=0, synth=1, num_voices=1, patch=128+21)
     for i in range(5):
       t = 100 + round(i * 51200 / 441)
-      amy.send(time=t, synth=1, note=32, vel=1)
-      amy.send(time=t + 20, synth=1, vel=0)
+      amy_send_at(time=t, synth=1, note=32, vel=1)
+      amy_send_at(time=t + 20, synth=1, vel=0)
 
 
 class TestXanaduFM(AmyTest):
@@ -390,80 +491,80 @@ class TestXanaduFM(AmyTest):
 
   def run(self):
     amy.send(volume=100)
-    #amy.send(time=0, osc=3, wave=amy.SINE, freq=1/7.5, phase=0.75, amp=.99)
-    amy.send(time=0, osc=2, wave=amy.SINE, ratio=1, amp='0.5,0,0,0,0,0') #, mod_source=3)
-    amy.send(time=0, osc=1, wave=amy.SINE, ratio=1, amp='1,0,0,1', bp0='1000,1,1000,0')
-    amy.send(time=0, osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1', bp0='0,1,1000,1,2000,0')
-    amy.send(time=100, osc=0, note=49, vel=1)
-    amy.send(time=450, osc=0, note=49, vel=0)
-    amy.send(time=550, osc=0, note=49, vel=1)
-    amy.send(time=900, osc=0, note=49, vel=0)
+    #amy_send_at(time=0, osc=3, wave=amy.SINE, freq=1/7.5, phase=0.75, amp=.99)
+    amy_send_at(time=0, osc=2, wave=amy.SINE, ratio=1, amp='0.5,0,0,0,0,0') #, mod_source=3)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, ratio=1, amp='1,0,0,1', bp0='1000,1,1000,0')
+    amy_send_at(time=0, osc=0, wave=amy.ALGO, algorithm=1, algo_source=',,,,2,1', bp0='0,1,1000,1,2000,0')
+    amy_send_at(time=100, osc=0, note=49, vel=1)
+    amy_send_at(time=450, osc=0, note=49, vel=0)
+    amy_send_at(time=550, osc=0, note=49, vel=1)
+    amy_send_at(time=900, osc=0, note=49, vel=0)
 
 
 class TestFilter(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=100, note=48, vel=1.0)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy_send_at(time=100, note=48, vel=1.0)
+    amy_send_at(time=900, vel=0)
 
 
 class TestFilter24(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=100, note=48, vel=1.0)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy_send_at(time=100, note=48, vel=1.0)
+    amy_send_at(time=900, vel=0)
 
 
 class TestFilterLFO(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=6, amp=1.0)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq='400,0,0,0,3,0.5', bp1='0,1,500,0,100,0')
-    amy.send(time=100, note=48, vel=1.0)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=6, amp=1.0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, mod_source=1, filter_freq='400,0,0,0,3,0.5', bp1='0,1,500,0,100,0')
+    amy_send_at(time=100, note=48, vel=1.0)
+    amy_send_at(time=500, vel=0)
 
 
 class TestLFO(AmyTest):
 
   def run(self):
     # LFO mod used to be 1+x i.e. 0.9..1.1
-    #amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
+    #amy_send_at(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.1)
     # With unit-per-octave scaling, that's approx log2(0.9) = -0.152, log2(1.1) = 0.138
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.138)
-    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq='0,1,0,0,0,1')
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=4, amp=0.138)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, mod_source=1, freq='0,1,0,0,0,1')
+    amy_send_at(time=100, note=70, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestDuty(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PULSE, duty=0.1)
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=200, vel=0)
-    amy.send(time=300, osc=0, wave=amy.PULSE, duty=0.9)
-    amy.send(time=300, note=70, vel=1)
-    amy.send(time=400, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.PULSE, duty=0.1)
+    amy_send_at(time=100, note=70, vel=1)
+    amy_send_at(time=200, vel=0)
+    amy_send_at(time=300, osc=0, wave=amy.PULSE, duty=0.9)
+    amy_send_at(time=300, note=70, vel=1)
+    amy_send_at(time=400, vel=0)
 
 
 class TestPWM(AmyTest):
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.PULSE, mod_source=1, duty='0.5,0,0,0,0,0.25')
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=4, amp=1)
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.PULSE, mod_source=1, duty='0.5,0,0,0,0,0.25')
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=4, amp=1)
+    amy_send_at(time=100, note=70, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestGlobalEQ(AmyTest):
 
   def run(self):
-    amy.send(time=0, eq="-10,10,3")
-    amy.send(time=0, osc=0, wave=amy.SAW_UP)
-    amy.send(time=100, note=46, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, eq="-10,10,3")
+    amy_send_at(time=0, osc=0, wave=amy.SAW_UP)
+    amy_send_at(time=100, note=46, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestChorus(AmyTest):
@@ -472,34 +573,34 @@ class TestChorus(AmyTest):
     # Turn on chorus.
     amy.send(chorus=1)
     # Note from TestFilter.
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=100, note=48, vel=1.0)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy_send_at(time=100, note=48, vel=1.0)
+    amy_send_at(time=900, vel=0)
 
 
 class TestBrass(AmyTest):
   """One of the Juno-6 patches, spelled out."""
 
   def run(self):
-    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
+    #amy_send_at(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF,
     #         resonance=0.167, bp0='60,1,740,0.9,200,0', filter_freq='6000,0.5,0,0,1,0',
     #         bp1='60,1,740,0.9,200,0')
-    #amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
+    #amy_send_at(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1,0,0', freq='130.81,1,0,0,0,0', filter_type=amy.FILTER_LPF24,
     #         resonance=0.167, bp0='60,1,340,0.3,200,0', filter_freq='2000,0.5,0,0,4,0',
     #         bp1='60,1,340,0.3,200,0')
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
+    amy_send_at(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
              amp='0.85,0,1,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2,
              )
     # Osc 2 is LFO for vibrato
-    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
-    amy.send(time=100, osc=1, note=76, vel=1.0)
-    amy.send(time=300, osc=1, vel=0)
-    amy.send(time=600, osc=1, note=76, vel=1.0)
-    amy.send(time=800, osc=1, vel=0)
+    amy_send_at(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
+    amy_send_at(time=100, osc=1, note=76, vel=1.0)
+    amy_send_at(time=300, osc=1, vel=0)
+    amy_send_at(time=600, osc=1, note=76, vel=1.0)
+    amy_send_at(time=800, osc=1, vel=0)
     # 'filter_freq': '93.73,0.677,0,0,4.567,0', 'bp1': '30,1,672,0.354,232,0'
 
 
@@ -509,20 +610,20 @@ class TestBrassAlt(AmyTest):
   def run(self):
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
     # Osc 1 is waveform, with vibrato mod but no amp env
-    amy.send(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
+    amy_send_at(time=0, osc=1, wave=amy.SAW_UP, freq=osc_freq_str + ',1,0,0,0,0.02',
              amp='1,0,0,0,0,0', mod_source=2)
     # Osc 2 is LFO for vibrato
-    amy.send(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
+    amy_send_at(time=0, osc=2, wave=amy.SINE, freq=3, bp0='156,1.0,100,1.0,100,0')
     # Osc 0 is VCF and amplitude env
-    amy.send(time=0, osc=0, wave=amy.SILENT,
+    amy_send_at(time=0, osc=0, wave=amy.SILENT,
              amp='0.85,0,1,1,0,0', bp0='30,1,672,0.354,100,0',
              filter_type=amy.FILTER_LPF24, resonance=0.167,
              filter_freq='93.73,0.677,0,0,9.133,0', bp1='30,1,672,0.354,100,0',
              mod_source=2, chained_osc=1)
-    amy.send(time=100, osc=0, note=76, vel=1.0)
-    amy.send(time=300, osc=0, vel=0)
-    amy.send(time=600, osc=0, note=76, vel=1.0)
-    amy.send(time=800, osc=0, vel=0)
+    amy_send_at(time=100, osc=0, note=76, vel=1.0)
+    amy_send_at(time=300, osc=0, vel=0)
+    amy_send_at(time=600, osc=0, note=76, vel=1.0)
+    amy_send_at(time=800, osc=0, vel=0)
 
 
 class TestBrass2(AmyTest):
@@ -530,11 +631,11 @@ class TestBrass2(AmyTest):
 
   def run(self):
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1', freq=osc_freq_str + ',1',
+    amy_send_at(time=0, osc=0, wave=amy.SAW_UP, amp='0.85,0,1,1', freq=osc_freq_str + ',1',
              resonance=0.713, filter_type=amy.FILTER_LPF24, filter_freq='93.726,0.677,0,0,9.134',
              bp0='30,1,672,0.354,232,0', bp1='30,1,672,0.354,232,0')
-    amy.send(time=100, osc=0, note=60, vel=1.0)
-    amy.send(time=600, osc=0, vel=0)
+    amy_send_at(time=100, osc=0, note=60, vel=1.0)
+    amy_send_at(time=600, osc=0, vel=0)
 
 
 class TestGuitar(AmyTest):
@@ -542,35 +643,35 @@ class TestGuitar(AmyTest):
 
   def run(self):
     base_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    amy.send(time=0, osc=0, wave=amy.SAW_UP, amp='0.756,0,1,1', freq=base_freq_str + ',1',
+    amy_send_at(time=0, osc=0, wave=amy.SAW_UP, amp='0.756,0,1,1', freq=base_freq_str + ',1',
              filter_freq='16.23,0.236,0,0,11.181', resonance=0.753, filter_type=amy.FILTER_LPF24,
              bp0='6,1,51,0.425,153,0',
              bp1='6,1,51,0.425,153,0')
-    amy.send(time=100, osc=0, note=60, vel=4.0)
-    amy.send(time=150, osc=0, vel=0)
-    amy.send(time=500, osc=0, note=60, vel=4.0)
-    amy.send(time=550, osc=0, vel=0)
+    amy_send_at(time=100, osc=0, note=60, vel=4.0)
+    amy_send_at(time=150, osc=0, vel=0)
+    amy_send_at(time=500, osc=0, note=60, vel=4.0)
+    amy_send_at(time=550, osc=0, vel=0)
 
 
 class TestBleep(AmyTest):
   """Test the tulip start-up beep."""
 
   def run(self):
-    amy.send(time=0, wave=amy.SINE, freq=220)
-    amy.send(time=0, osc=0, pan=0.9, vel=1)
-    amy.send(time=150, osc=0, pan=0.1, freq=440)
-    amy.send(time=300, osc=0, pan=0.5, vel=0)
+    amy_send_at(time=0, wave=amy.SINE, freq=220)
+    amy_send_at(time=0, osc=0, pan=0.9, vel=1)
+    amy_send_at(time=150, osc=0, pan=0.1, freq=440)
+    amy_send_at(time=300, osc=0, pan=0.5, vel=0)
 
 
 class TestOverload(AmyTest):
   """Run the output very hot to check for clipping."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    amy.send(time=0, eq="12")
-    amy.send(time=0, chorus=1)
-    amy.send(time=100, note=48, vel=8.0)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    amy_send_at(time=0, eq="12")
+    amy_send_at(time=0, chorus=1)
+    amy_send_at(time=100, note=48, vel=8.0)
+    amy_send_at(time=900, vel=0)
 
 
 class TestJunoPatch(AmyTest):
@@ -578,76 +679,76 @@ class TestJunoPatch(AmyTest):
 
   def run(self):
     # Also test the synth mechanism.
-    amy.send(time=0, synth=1, num_voices=4, patch=20)
-    amy.send(time=50, synth=1, note=48, vel=1)
-    amy.send(time=150, synth=1, note=60, vel=1)
-    amy.send(time=250, synth=1, note=63, vel=1)
-    amy.send(time=350, synth=1, note=67, vel=1)
-    amy.send(time=600, synth=1, note=48, vel=0)
-    amy.send(time=700, synth=1, note=60, vel=0)
-    amy.send(time=800, synth=1, note=63, vel=0)
-    amy.send(time=900, synth=1, note=67, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=20)
+    amy_send_at(time=50, synth=1, note=48, vel=1)
+    amy_send_at(time=150, synth=1, note=60, vel=1)
+    amy_send_at(time=250, synth=1, note=63, vel=1)
+    amy_send_at(time=350, synth=1, note=67, vel=1)
+    amy_send_at(time=600, synth=1, note=48, vel=0)
+    amy_send_at(time=700, synth=1, note=60, vel=0)
+    amy_send_at(time=800, synth=1, note=63, vel=0)
+    amy_send_at(time=900, synth=1, note=67, vel=0)
 
 
 class TestJunoClip(AmyTest):
   """Juno patch that used to clip until we trimmed the volumes in #802.  Now run with vel=5."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=4, patch=9)
-    amy.send(time=50, synth=1, note=60, vel=5)
-    amy.send(time=50, synth=1, note=57, vel=5)
-    amy.send(time=50, synth=1, note=55, vel=5)
-    amy.send(time=50, synth=1, note=52, vel=5)
-    amy.send(time=800, synth=1, vel=0)
-    amy.send(time=800, synth=1, vel=0)
-    amy.send(time=800, synth=1, vel=0)
-    amy.send(time=800, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=9)
+    amy_send_at(time=50, synth=1, note=60, vel=5)
+    amy_send_at(time=50, synth=1, note=57, vel=5)
+    amy_send_at(time=50, synth=1, note=55, vel=5)
+    amy_send_at(time=50, synth=1, note=52, vel=5)
+    amy_send_at(time=800, synth=1, vel=0)
+    amy_send_at(time=800, synth=1, vel=0)
+    amy_send_at(time=800, synth=1, vel=0)
+    amy_send_at(time=800, synth=1, vel=0)
 
 
 class TestLowVcf(AmyTest):
   """Weird fxpt warble when hitting fundamental."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN,
              filter_type=amy.FILTER_LPF24, resonance=1.0,
              amp='0.85,0,1,1',
              filter_freq='161.28,0,0,0,5',
              bp0='0,1,0,0',
              bp1='0,1,600,0,1,0')
-    amy.send(time=100, osc=0, note=48, vel=3)
-    amy.send(time=800, osc=0, vel=0)
+    amy_send_at(time=100, osc=0, note=48, vel=3)
+    amy_send_at(time=800, osc=0, vel=0)
 
 
 class TestLowerVcf(AmyTest):
   """Top16 LPF24 has issues with cf below fundamental?"""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN,
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN,
              filter_type=amy.FILTER_LPF24, resonance=4.0,
              amp='0.85,0,1,1',
              filter_freq='50,0,0,0,6',
              bp0='0,1,0,0',
              bp1='0,1,300,0,1,0')
-    amy.send(time=100, osc=0, note=48, vel=3)
-    amy.send(time=800, osc=0, vel=0)
+    amy_send_at(time=100, osc=0, note=48, vel=3)
+    amy_send_at(time=800, osc=0, vel=0)
 
 
 class TestFlutesEq(AmyTest):
   """VCF leaving almost pure sine + HPF2 -> noise, clicks?"""
 
   def run(self):
-    amy.send(time=0, eq="-15,8,8")
+    amy_send_at(time=0, eq="-15,8,8")
     osc_args = {'time':0, 'wave':amy.SAW_UP, 'filter_type':amy.FILTER_LPF24, 'resonance':1.75, 
         'bp0':'200,1,9800,0,100,0', 'bp1':'200,1,9800,0,100,0', 'filter_freq':'242,0.323'}
-    amy.send(osc=0, **osc_args)
-    amy.send(osc=1, **osc_args)
-    amy.send(osc=2, **osc_args)
-    amy.send(time=100, osc=0, note=48, vel=0.5)
-    amy.send(time=200, osc=1, note=52, vel=0.5)
-    amy.send(time=300, osc=2, note=55, vel=0.5)
-    amy.send(time=900, osc=0, vel=0)
-    amy.send(time=900, osc=1, vel=0)
-    amy.send(time=900, osc=2, vel=0)
+    amy_send_at(osc=0, **osc_args)
+    amy_send_at(osc=1, **osc_args)
+    amy_send_at(osc=2, **osc_args)
+    amy_send_at(time=100, osc=0, note=48, vel=0.5)
+    amy_send_at(time=200, osc=1, note=52, vel=0.5)
+    amy_send_at(time=300, osc=2, note=55, vel=0.5)
+    amy_send_at(time=900, osc=0, vel=0)
+    amy_send_at(time=900, osc=1, vel=0)
+    amy_send_at(time=900, osc=2, vel=0)
 
 
 class TestOscBD(AmyTest):
@@ -655,12 +756,12 @@ class TestOscBD(AmyTest):
 
   def run(self):
     # Uses a 0.25Hz sine wave at 0.5 phase (going down) to modify frequency of another sine wave
-    amy.send(time=0, osc=1, wave=amy.SINE, amp=1, freq=0.25, phase=0.5)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, amp=1, freq=0.25, phase=0.5)
     # Sine waveform always starts at phase 0 after retrigger.
-    amy.send(time=0, osc=0, wave=amy.SINE, phase=0, bp0="0,1,500,0,0,0", freq=str(constants.ZERO_LOGFREQ_IN_HZ) + ",1,0,0,0,2", mod_source=1)
-    amy.send(time=100, osc=0, note=84, vel=1)
-    amy.send(time=350, osc=0, note=84, vel=1)
-    amy.send(time=600, osc=0, note=84, vel=1)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, phase=0, bp0="0,1,500,0,0,0", freq=str(constants.ZERO_LOGFREQ_IN_HZ) + ",1,0,0,0,2", mod_source=1)
+    amy_send_at(time=100, osc=0, note=84, vel=1)
+    amy_send_at(time=350, osc=0, note=84, vel=1)
+    amy_send_at(time=600, osc=0, note=84, vel=1)
 
 
 class TestChainedOsc(AmyTest):
@@ -669,17 +770,17 @@ class TestChainedOsc(AmyTest):
   def run(self):
     # TestFilter but on Saw + subosc with same envelope.
     osc_freq_str = str(constants.ZERO_LOGFREQ_IN_HZ / 2)
-    #amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    #amy.send(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0.2,0,1,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
-    #amy.send(time=100, osc=0, note=48, vel=1.0)
-    #amy.send(time=100, osc=1, note=48, vel=1.0)
-    amy.send(time=0, osc=0, wave=amy.SILENT, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
-    amy.send(time=0, osc=1, wave=amy.SAW_DOWN, chained_osc=2)
-    amy.send(time=0, osc=2, wave=amy.PULSE, amp="0.2,0,1,1", freq=osc_freq_str + ',1,0,0,0,0,1')
-    amy.send(time=100, osc=0, note=48, vel=1.0)
-    #amy.send(time=100, osc=1, note=48, vel=1.0)
-    amy.send(time=900, osc=0, vel=0)
-    #amy.send(time=900, osc=1, vel=0)
+    #amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    #amy_send_at(time=0, osc=1, wave=amy.PULSE, filter_type=amy.FILTER_LPF, resonance=8.0, amp="0.2,0,1,1", freq="130.81,1", filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0')
+    #amy_send_at(time=100, osc=0, note=48, vel=1.0)
+    #amy_send_at(time=100, osc=1, note=48, vel=1.0)
+    amy_send_at(time=0, osc=0, wave=amy.SILENT, filter_type=amy.FILTER_LPF, resonance=8.0, filter_freq='300,0,0,0,3', bp1='0,1,800,0.1,50,0.0', chained_osc=1)
+    amy_send_at(time=0, osc=1, wave=amy.SAW_DOWN, chained_osc=2)
+    amy_send_at(time=0, osc=2, wave=amy.PULSE, amp="0.2,0,1,1", freq=osc_freq_str + ',1,0,0,0,0,1')
+    amy_send_at(time=100, osc=0, note=48, vel=1.0)
+    #amy_send_at(time=100, osc=1, note=48, vel=1.0)
+    amy_send_at(time=900, osc=0, vel=0)
+    #amy_send_at(time=900, osc=1, vel=0)
 
 
 class TestChainedModOsc(AmyTest):
@@ -687,13 +788,13 @@ class TestChainedModOsc(AmyTest):
 
   def run(self):
     # osc 2: 1 Hz triangle, the "breathing" control signal.
-    amy.send(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
+    amy_send_at(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
     # osc 1: 5 Hz vibrato LFO whose amplitude (i.e. vibrato depth) breathes
     # with osc 2 via its own mod_source.
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
-    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
+    amy_send_at(time=100, note=70, vel=1)
+    amy_send_at(time=900, vel=0)
 
 
 class TestModSourceLoopRejected(AmyTest):
@@ -702,93 +803,93 @@ class TestModSourceLoopRejected(AmyTest):
   must be dropped; the render then proceeds identically to TestChainedModOsc."""
 
   def run(self):
-    amy.send(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
-    amy.send(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
-    amy.send(time=0, osc=2, mod_source=1)   # would close 1<->2: rejected
-    amy.send(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
-    amy.send(time=100, note=70, vel=1)
-    amy.send(time=900, vel=0)
+    amy_send_at(time=0, osc=2, wave=amy.TRIANGLE, freq=1)
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=5, amp={'const': 0.1, 'mod': 0.4}, mod_source=2)
+    amy_send_at(time=0, osc=2, mod_source=1)   # would close 1<->2: rejected
+    amy_send_at(time=0, osc=0, wave=amy.SINE, mod_source=1, freq={'mod': 0.1})
+    amy_send_at(time=100, note=70, vel=1)
+    amy_send_at(time=900, vel=0)
 
 
 class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=1, patch=2)
-    amy.send(time=50, synth=1, note=60, vel=1)
-    amy.send(time=200, synth=1, vel=0)
-    amy.send(time=300, synth=1, note=60, vel=1)
-    amy.send(time=450, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=1, patch=2)
+    amy_send_at(time=50, synth=1, note=60, vel=1)
+    amy_send_at(time=200, synth=1, vel=0)
+    amy_send_at(time=300, synth=1, note=60, vel=1)
+    amy_send_at(time=450, synth=1, vel=0)
 
 
 class TestJunoCheapTrumpetPatch(AmyTest):
   """Try out the 'cheap' LPF hack."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=2, patch=2)
-    amy.send(time=0, synth=1, osc=0, filter_type=amy.FILTER_LPF)
-    amy.send(time=50, synth=1, note=60, vel=1)
-    amy.send(time=200, synth=1, vel=0)
-    amy.send(time=300, synth=1, note=60, vel=1)
-    amy.send(time=450, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=2, patch=2)
+    amy_send_at(time=0, synth=1, osc=0, filter_type=amy.FILTER_LPF)
+    amy_send_at(time=50, synth=1, note=60, vel=1)
+    amy_send_at(time=200, synth=1, vel=0)
+    amy_send_at(time=300, synth=1, note=60, vel=1)
+    amy_send_at(time=450, synth=1, vel=0)
 
 
 class TestFilterReleaseGlitch(AmyTest):
   """See https://github.com/shorepine/amy/issues/126."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, filter_freq='100,0,0,6')
-    amy.send(time=100, note=64, vel=1)
-    amy.send(time=500, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, filter_type=amy.FILTER_LPF24, filter_freq='100,0,0,6')
+    amy_send_at(time=100, note=64, vel=1)
+    amy_send_at(time=500, vel=0)
 
 
 class TestPortamento(AmyTest):
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=3, patch=0)
+    amy_send_at(time=0, synth=1, num_voices=3, patch=0)
 
     # Starting-point pitches...
-    amy.send(time=50, synth=1, note=60, vel=1)
-    amy.send(time=50, synth=1, note=64, vel=1)
-    amy.send(time=50, synth=1, note=67, vel=1)
+    amy_send_at(time=50, synth=1, note=60, vel=1)
+    amy_send_at(time=50, synth=1, note=64, vel=1)
+    amy_send_at(time=50, synth=1, note=67, vel=1)
 
     # .. immediately start bending towards final pitches.
-    amy.send(time=60, synth=1, osc=2, portamento=100)
-    amy.send(time=60, synth=1, osc=3, portamento=100)
-    amy.send(time=60, synth=1, osc=4, portamento=100)
+    amy_send_at(time=60, synth=1, osc=2, portamento=100)
+    amy_send_at(time=60, synth=1, osc=3, portamento=100)
+    amy_send_at(time=60, synth=1, osc=4, portamento=100)
 
-    amy.send(time=60, synth=1, note=65, vel=1)
-    amy.send(time=60, synth=1, note=69, vel=1)
-    amy.send(time=60, synth=1, note=72, vel=1)
+    amy_send_at(time=60, synth=1, note=65, vel=1)
+    amy_send_at(time=60, synth=1, note=69, vel=1)
+    amy_send_at(time=60, synth=1, note=72, vel=1)
 
-    amy.send(time=800, synth=1, vel=0)
+    amy_send_at(time=800, synth=1, vel=0)
 
 
 class TestEcho(AmyTest):
 
   def run(self):
     amy.echo(level=0.5, delay_ms=200, feedback=0.7)
-    amy.send(time=0, osc=0, bp0="0,1,200,0,0,0")
+    amy_send_at(time=0, osc=0, bp0="0,1,200,0,0,0")
 
-    amy.send(time=100, osc=0, note=48, vel=1)
+    amy_send_at(time=100, osc=0, note=48, vel=1)
 
 
 class TestEchoLPF(AmyTest):
 
   def run(self):
     amy.echo(level=0.5, delay_ms=200, feedback=0.7, filter_coef=0.9)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
 
-    amy.send(time=100, osc=0, note=48, vel=1)
+    amy_send_at(time=100, osc=0, note=48, vel=1)
 
 
 class TestEchoHPF(AmyTest):
 
   def run(self):
     amy.echo(level=0.5, delay_ms=200, feedback=0.7, filter_coef=-0.9)
-    amy.send(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
+    amy_send_at(time=0, osc=0, wave=amy.SAW_DOWN, bp0="0,1,200,0,0,0")
 
-    amy.send(time=100, osc=0, note=48, vel=1)
+    amy_send_at(time=100, osc=0, note=48, vel=1)
 
 
 class TestVoiceManagement(AmyTest):
@@ -797,20 +898,20 @@ class TestVoiceManagement(AmyTest):
   def run(self):
     # Patch is bare sinewave oscillator but with a 100ms release.
     #amy.send(patch=1024, patch_string=amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,1,100,0'))
-    #amy.send(time=10, synth=0, num_voices=3, patch=1024)
+    #amy_send_at(time=10, synth=0, num_voices=3, patch=1024)
     patch_string = amy.message(osc=0, wave=amy.SINE, bp0='0,1,1000,0,100,0')
-    amy.send(time=10, synth=0, num_voices=2, patch_string=patch_string)
-    amy.send(time=100, synth=0, note=60, vel=1)
-    amy.send(time=200, synth=0, note=72, vel=1)
+    amy_send_at(time=10, synth=0, num_voices=2, patch_string=patch_string)
+    amy_send_at(time=100, synth=0, note=60, vel=1)
+    amy_send_at(time=200, synth=0, note=72, vel=1)
     # Check if using the same string for a second synth reuses the same memory_patch (based on debug fprintfs).
-    amy.send(time=200, synth=1, num_voices=1, patch_string=patch_string)
-    amy.send(time=300, synth=1, note=84, vel=1)
+    amy_send_at(time=200, synth=1, num_voices=1, patch_string=patch_string)
+    amy_send_at(time=300, synth=1, note=84, vel=1)
     # We ran out of voices, this should steal the first one
-    amy.send(time=400, synth=0, note=96, vel=1)
+    amy_send_at(time=400, synth=0, note=96, vel=1)
     # Stop one
-    amy.send(time=500, synth=1, note=84, vel=0)
+    amy_send_at(time=500, synth=1, note=84, vel=0)
     # Stop all the rest - vel=0 without note= means all notes off.
-    amy.send(time=600, synth=0, vel=0)
+    amy_send_at(time=600, synth=0, vel=0)
 
 
 class TestVoiceStealing(AmyTest):
@@ -822,27 +923,27 @@ class TestVoiceStealing(AmyTest):
 
   def run(self):
     # Default juno synth.
-    amy.send(time=40, synth=1, note=60, vel=1)
-    amy.send(time=120, synth=1, note=64, vel=1)
-    amy.send(time=200, synth=1, note=67, vel=1)
-    amy.send(time=280, synth=1, note=70, vel=1)
-    amy.send(time=360, synth=1, note=72, vel=1)
-    amy.send(time=440, synth=1, note=76, vel=1)
-    amy.send(time=520, synth=1, note=79, vel=1)
-    amy.send(time=600, synth=1, note=82, vel=1)
-    amy.send(time=800, synth=1, note=60, vel=0)
-    amy.send(time=820, synth=1, note=64, vel=0)
-    amy.send(time=840, synth=1, note=67, vel=0)
-    amy.send(time=860, synth=1, note=70, vel=0)
-    amy.send(time=880, synth=1, note=72, vel=0)
-    amy.send(time=900, synth=1, note=76, vel=0)
-    amy.send(time=920, synth=1, note=79, vel=0)
-    amy.send(time=940, synth=1, note=82, vel=0)
+    amy_send_at(time=40, synth=1, note=60, vel=1)
+    amy_send_at(time=120, synth=1, note=64, vel=1)
+    amy_send_at(time=200, synth=1, note=67, vel=1)
+    amy_send_at(time=280, synth=1, note=70, vel=1)
+    amy_send_at(time=360, synth=1, note=72, vel=1)
+    amy_send_at(time=440, synth=1, note=76, vel=1)
+    amy_send_at(time=520, synth=1, note=79, vel=1)
+    amy_send_at(time=600, synth=1, note=82, vel=1)
+    amy_send_at(time=800, synth=1, note=60, vel=0)
+    amy_send_at(time=820, synth=1, note=64, vel=0)
+    amy_send_at(time=840, synth=1, note=67, vel=0)
+    amy_send_at(time=860, synth=1, note=70, vel=0)
+    amy_send_at(time=880, synth=1, note=72, vel=0)
+    amy_send_at(time=900, synth=1, note=76, vel=0)
+    amy_send_at(time=920, synth=1, note=79, vel=0)
+    amy_send_at(time=940, synth=1, note=82, vel=0)
     # Sent spurious note-offs, just to check that error report works
     print("expect to see excess note-off for notes 64, 82, 99")
-    amy.send(time=940, synth=1, note=64, vel=0)
-    amy.send(time=940, synth=1, note=82, vel=0)
-    amy.send(time=940, synth=1, note=99, vel=0)
+    amy_send_at(time=940, synth=1, note=64, vel=0)
+    amy_send_at(time=940, synth=1, note=82, vel=0)
+    amy_send_at(time=940, synth=1, note=99, vel=0)
 
 
 class TestVoiceStealDecay(AmyTest):
@@ -853,53 +954,53 @@ class TestVoiceStealDecay(AmyTest):
       synth=0, num_voices=2,
       patch_string=amy.message(osc=0, wave=amy.SINE, bp0='50,1,200,0.5,50,0'),
     )
-    amy.send(time=100, synth=0, note=40, vel=10)  # voice 0
-    amy.send(time=200, synth=0, note=50, vel=2)   # voice 1
-    amy.send(time=300, synth=0, note=60, vel=2)   # Steal voice 0, big click at t=0.3
-    amy.send(time=400, synth=0, note=65, vel=2)   # Steal voice 1
-    amy.send(time=500, synth=0, note=45, vel=10)  # Steal voice 0
+    amy_send_at(time=100, synth=0, note=40, vel=10)  # voice 0
+    amy_send_at(time=200, synth=0, note=50, vel=2)   # voice 1
+    amy_send_at(time=300, synth=0, note=60, vel=2)   # Steal voice 0, big click at t=0.3
+    amy_send_at(time=400, synth=0, note=65, vel=2)   # Steal voice 1
+    amy_send_at(time=500, synth=0, note=45, vel=10)  # Steal voice 0
     # Now add synth_delay
-    amy.send(time=550, synth=0, synth_delay=50)
-    amy.send(time=600, synth=0, note=70, vel=2)   # Steal voice 1
-    amy.send(time=700, synth=0, note=75, vel=2)   # Steal voice 0, but no big click (at t=0.75)
-    amy.send(time=800, synth=0, note=80, vel=2)   # Steal voice 1
-    amy.send(time=900, synth=0, vel=0)  # All notes off
+    amy_send_at(time=550, synth=0, synth_delay=50)
+    amy_send_at(time=600, synth=0, note=70, vel=2)   # Steal voice 1
+    amy_send_at(time=700, synth=0, note=75, vel=2)   # Steal voice 0, but no big click (at t=0.75)
+    amy_send_at(time=800, synth=0, note=80, vel=2)   # Steal voice 1
+    amy_send_at(time=900, synth=0, vel=0)  # All notes off
 
 
 class TestVoiceStealClick(AmyTest):
   """There are still clicks on voice stealing and it's not cool."""
 
   def run(self):
-    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=1)
-    amy.send(time=0, synth=0, osc=0, wave=amy.SINE, bp0='0,0,100,1,200,0.8,500,0')
+    amy_send_at(time=0, synth=0, num_voices=1, oscs_per_voice=1)
+    amy_send_at(time=0, synth=0, osc=0, wave=amy.SINE, bp0='0,0,100,1,200,0.8,500,0')
     # It's the filter being reset that's hurting us?
-    amy.send(time=0, synth=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='8000,0,0,0,0,0')
+    amy_send_at(time=0, synth=0, osc=0, filter_type=amy.FILTER_LPF24, filter_freq='8000,0,0,0,0,0')
     # Send first chords
-    amy.send(time=100, synth=0, note=60, vel=10)
+    amy_send_at(time=100, synth=0, note=60, vel=10)
     # Send second chords
-    amy.send(time=500, synth=0, note=60, vel=10)
+    amy_send_at(time=500, synth=0, note=60, vel=10)
     # Notes off
-    amy.send(time=800, synth=0, vel=0)
+    amy_send_at(time=800, synth=0, vel=0)
 
 class TestOwBassClick(AmyTest):
   """Hearing clicks on OwBass??.  See https://github.com/shorepine/amy/issues/629. """
 
   def run(self):
-    amy.send(time=0, synth=0, num_voices=1, oscs_per_voice=4)
+    amy_send_at(time=0, synth=0, num_voices=1, oscs_per_voice=4)
     # Ow Bass reproduced by hand on AMYboard Editor.
-    amy.send(time=10, synth=0, osc=0, wave=amy.SILENT, amp='1,,1,1', freq=220, filter_freq='20,1,,,5.443', resonance=4.381,
+    amy_send_at(time=10, synth=0, osc=0, wave=amy.SILENT, amp='1,,1,1', freq=220, filter_freq='20,1,,,5.443', resonance=4.381,
              filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0', mod_source=1, chained_osc=2)
-    amy.send(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
-    amy.send(time=10, synth=0, osc=2, wave=amy.PULSE, amp='0.551,,0', freq=220, duty=0.697, chained_osc=3, mod_source=1)
-    amy.send(time=10, synth=0, osc=3, wave=amy.SAW_UP, amp='0.551,,0', freq=110, mod_source=1)
-    amy.send(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')
+    amy_send_at(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
+    amy_send_at(time=10, synth=0, osc=2, wave=amy.PULSE, amp='0.551,,0', freq=220, duty=0.697, chained_osc=3, mod_source=1)
+    amy_send_at(time=10, synth=0, osc=3, wave=amy.SAW_UP, amp='0.551,,0', freq=110, mod_source=1)
+    amy_send_at(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')
     # Rapid repeated notes.
-    amy.send(time=100, synth=0, note=48, vel=1)
-    amy.send(time=250, synth=0, note=48, vel=0)
-    amy.send(time=350, synth=0, note=48, vel=1)
-    amy.send(time=500, synth=0, note=48, vel=0)
-    amy.send(time=600, synth=0, note=48, vel=1)
-    amy.send(time=750, synth=0, note=48, vel=0)
+    amy_send_at(time=100, synth=0, note=48, vel=1)
+    amy_send_at(time=250, synth=0, note=48, vel=0)
+    amy_send_at(time=350, synth=0, note=48, vel=1)
+    amy_send_at(time=500, synth=0, note=48, vel=0)
+    amy_send_at(time=600, synth=0, note=48, vel=1)
+    amy_send_at(time=750, synth=0, note=48, vel=0)
 
 
 class TestMidiDrums(AmyTest):
@@ -927,7 +1028,7 @@ class TestMidiDrumsPatch258(AmyTest):
 
   def run(self):
     # The MIDI drums default has amp=5
-    amy.send(time=0, synth=1, num_voices=1, patch=258)
+    amy_send_at(time=0, synth=1, num_voices=1, patch=258)
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(100, 0x90, 35, 100)  # bass
     amy.inject_midi(400, 0x90, 35, 100)  # bass
@@ -967,14 +1068,14 @@ class TestDefaultChan1Synth(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.send(time=100, synth=1, note=60, vel=1)
-    amy.send(time=300, synth=1, note=63, vel=1)
-    amy.send(time=500, synth=1, note=67, vel=1)
-    amy.send(time=700, synth=1, note=74, vel=1)
-    amy.send(time=800, synth=1, note=60, vel=0)
-    amy.send(time=850, synth=1, note=63, vel=0)
-    amy.send(time=900, synth=1, note=67, vel=0)
-    amy.send(time=950, synth=1, note=74, vel=0)
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=300, synth=1, note=63, vel=1)
+    amy_send_at(time=500, synth=1, note=67, vel=1)
+    amy_send_at(time=700, synth=1, note=74, vel=1)
+    amy_send_at(time=800, synth=1, note=60, vel=0)
+    amy_send_at(time=850, synth=1, note=63, vel=0)
+    amy_send_at(time=900, synth=1, note=67, vel=0)
+    amy_send_at(time=950, synth=1, note=74, vel=0)
 
 
 class TestSynthDrums(AmyTest):
@@ -985,11 +1086,11 @@ class TestSynthDrums(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.send(time=100, synth=10, note=35, vel=100/127)  # bass
-    amy.send(time=400, synth=10, note=35, vel=100/127)  # bass
-    amy.send(time=400, synth=10, note=37, vel=100/127)  # snare
-    amy.send(time=700, synth=10, note=37, vel=100/127)  # snare
-    amy.send(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
+    amy_send_at(time=100, synth=10, note=35, vel=100/127)  # bass
+    amy_send_at(time=400, synth=10, note=35, vel=100/127)  # bass
+    amy_send_at(time=400, synth=10, note=37, vel=100/127)  # snare
+    amy_send_at(time=700, synth=10, note=37, vel=100/127)  # snare
+    amy_send_at(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
 class TestSynthDrumsPanning(AmyTest):
@@ -1000,14 +1101,14 @@ class TestSynthDrumsPanning(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.send(time=100, synth=10, note=50, vel=1, pan=0.95)
-    amy.send(time=200, synth=10, note=50, vel=1, pan=0.85)
-    amy.send(time=300, synth=10, note=47, vel=1, pan=0.7)
-    amy.send(time=400, synth=10, note=47, vel=1, pan=0.55)
-    amy.send(time=500, synth=10, note=45, vel=1, pan=0.45)
-    amy.send(time=600, synth=10, note=45, vel=1, pan=0.3)
-    amy.send(time=700, synth=10, note=41, vel=1, pan=0.15)
-    amy.send(time=800, synth=10, note=41, vel=1, pan=0.05)
+    amy_send_at(time=100, synth=10, note=50, vel=1, pan=0.95)
+    amy_send_at(time=200, synth=10, note=50, vel=1, pan=0.85)
+    amy_send_at(time=300, synth=10, note=47, vel=1, pan=0.7)
+    amy_send_at(time=400, synth=10, note=47, vel=1, pan=0.55)
+    amy_send_at(time=500, synth=10, note=45, vel=1, pan=0.45)
+    amy_send_at(time=600, synth=10, note=45, vel=1, pan=0.3)
+    amy_send_at(time=700, synth=10, note=41, vel=1, pan=0.15)
+    amy_send_at(time=800, synth=10, note=41, vel=1, pan=0.05)
 
 
 class TestSynthDrumsLevel(AmyTest):
@@ -1023,14 +1124,14 @@ class TestSynthDrumsLevel(AmyTest):
   def run(self):
     # Same snare at three channel levels; each pair of hits checks the level
     # survives the previous note-on.
-    amy.send(time=50, synth=10, amp=0.2)
-    amy.send(time=100, synth=10, note=37, vel=1)
-    amy.send(time=250, synth=10, note=37, vel=1)
-    amy.send(time=400, synth=10, amp=1.0)
-    amy.send(time=450, synth=10, note=37, vel=1)
-    amy.send(time=600, synth=10, note=37, vel=1)
-    amy.send(time=750, synth=10, amp=1.8)
-    amy.send(time=800, synth=10, note=37, vel=1)
+    amy_send_at(time=50, synth=10, amp=0.2)
+    amy_send_at(time=100, synth=10, note=37, vel=1)
+    amy_send_at(time=250, synth=10, note=37, vel=1)
+    amy_send_at(time=400, synth=10, amp=1.0)
+    amy_send_at(time=450, synth=10, note=37, vel=1)
+    amy_send_at(time=600, synth=10, note=37, vel=1)
+    amy_send_at(time=750, synth=10, amp=1.8)
+    amy_send_at(time=800, synth=10, note=37, vel=1)
 
 
 class TestSynthLevel(AmyTest):
@@ -1043,15 +1144,15 @@ class TestSynthLevel(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.send(time=0, synth=2, num_voices=2, patch=0)
-    amy.send(time=0, synth=2, synth_level=0.25)   # same patch as synth 1, quarter level
-    amy.send(time=0, synth=10, synth_level=0.5)   # GM drums: scales every per-drum osc
-    amy.send(time=100, synth=1, note=60, vel=1)   # full level
-    amy.send(time=300, synth=1, vel=0)
-    amy.send(time=400, synth=2, note=60, vel=1)   # quarter level
-    amy.send(time=600, synth=2, vel=0)
-    amy.send(time=700, synth=10, note=36, vel=1)
-    amy.send(time=850, synth=10, note=42, vel=1)
+    amy_send_at(time=0, synth=2, num_voices=2, patch=0)
+    amy_send_at(time=0, synth=2, synth_level=0.25)   # same patch as synth 1, quarter level
+    amy_send_at(time=0, synth=10, synth_level=0.5)   # GM drums: scales every per-drum osc
+    amy_send_at(time=100, synth=1, note=60, vel=1)   # full level
+    amy_send_at(time=300, synth=1, vel=0)
+    amy_send_at(time=400, synth=2, note=60, vel=1)   # quarter level
+    amy_send_at(time=600, synth=2, vel=0)
+    amy_send_at(time=700, synth=10, note=36, vel=1)
+    amy_send_at(time=850, synth=10, note=42, vel=1)
 
 
 class TestSynthDrumsStaticParams(AmyTest):
@@ -1064,16 +1165,16 @@ class TestSynthDrumsStaticParams(AmyTest):
   def run(self):
     CLAP = 39
     HIHAT = 42
-    amy.send(time=100, synth=10, note=CLAP, vel=1)
-    amy.send(time=200, synth=10, note=HIHAT, vel=1)
+    amy_send_at(time=100, synth=10, note=CLAP, vel=1)
+    amy_send_at(time=200, synth=10, note=HIHAT, vel=1)
     # Move clap to the left
-    amy.send(time=250, synth=10, note=CLAP, pan=0)
-    amy.send(time=300, synth=10, note=CLAP, vel=1)
+    amy_send_at(time=250, synth=10, note=CLAP, pan=0)
+    amy_send_at(time=300, synth=10, note=CLAP, vel=1)
     # Move hihat to the right
-    amy.send(time=400, synth=10, note=HIHAT, vel=1)
-    amy.send(time=450, synth=10, note=HIHAT, pan=1)
-    amy.send(time=500, synth=10, note=CLAP, vel=1)
-    amy.send(time=600, synth=10, note=HIHAT, vel=1)
+    amy_send_at(time=400, synth=10, note=HIHAT, vel=1)
+    amy_send_at(time=450, synth=10, note=HIHAT, pan=1)
+    amy_send_at(time=500, synth=10, note=CLAP, vel=1)
+    amy_send_at(time=600, synth=10, note=HIHAT, vel=1)
 
 
 class TestSynthProgChange(AmyTest):
@@ -1085,43 +1186,43 @@ class TestSynthProgChange(AmyTest):
 
   def run(self):
     # DX7 first patch, uses 9 oscs/voice, num_voices is inherited from previous init.
-    amy.send(time=0, synth=1, patch=128)
-    amy.send(time=100, synth=1, note=60, vel=1)
-    amy.send(time=300, synth=1, note=63, vel=1)
-    amy.send(time=500, synth=1, note=67, vel=1)
-    amy.send(time=700, synth=1, note=74, vel=1)
-    amy.send(time=800, synth=1, note=60, vel=0)
-    amy.send(time=850, synth=1, note=63, vel=0)
-    amy.send(time=900, synth=1, note=67, vel=0)
-    amy.send(time=950, synth=1, note=74, vel=0)
+    amy_send_at(time=0, synth=1, patch=128)
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=300, synth=1, note=63, vel=1)
+    amy_send_at(time=500, synth=1, note=67, vel=1)
+    amy_send_at(time=700, synth=1, note=74, vel=1)
+    amy_send_at(time=800, synth=1, note=60, vel=0)
+    amy_send_at(time=850, synth=1, note=63, vel=0)
+    amy_send_at(time=900, synth=1, note=67, vel=0)
+    amy_send_at(time=950, synth=1, note=74, vel=0)
 
 
 class TestDoubleNoteOff(AmyTest):
   """Test for bug where release restarts if a second note-off is received (#319)."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, bp0='0,1,100,1,1000,0')
-    amy.send(time=100, osc=0, note=60, vel=1)
-    amy.send(time=200, osc=0, vel=0)
-    amy.send(time=600, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, bp0='0,1,100,1,1000,0')
+    amy_send_at(time=100, osc=0, note=60, vel=1)
+    amy_send_at(time=200, osc=0, vel=0)
+    amy_send_at(time=600, osc=0, vel=0)
 
 
 class TestSustainPedal(AmyTest):
   """Test sustain pedal."""
 
   def run(self):
-    amy.send(time=0, reset=amy.RESET_SYNTHS)
-    amy.send(time=0, synth=1, num_voices=4, patch=256)
-    amy.send(time=50, synth=1, note=76, vel=1)
-    amy.send(time=100, synth=1, note=76, vel=0)
-    amy.send(time=150, synth=1, pedal=127)
-    amy.send(time=250, synth=1, note=63, vel=1)
-    amy.send(time=300, synth=1, note=63, vel=0)
-    amy.send(time=450, synth=1, note=67, vel=1)
-    amy.send(time=500, synth=1, note=67, vel=0)
-    amy.send(time=650, synth=1, note=72, vel=1)   # This note is held across the pedal release
-    amy.send(time=750, synth=1, pedal=0)
-    amy.send(time=900, synth=1, note=72, vel=0)
+    amy_send_at(time=0, reset=amy.RESET_SYNTHS)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=256)
+    amy_send_at(time=50, synth=1, note=76, vel=1)
+    amy_send_at(time=100, synth=1, note=76, vel=0)
+    amy_send_at(time=150, synth=1, pedal=127)
+    amy_send_at(time=250, synth=1, note=63, vel=1)
+    amy_send_at(time=300, synth=1, note=63, vel=0)
+    amy_send_at(time=450, synth=1, note=67, vel=1)
+    amy_send_at(time=500, synth=1, note=67, vel=0)
+    amy_send_at(time=650, synth=1, note=72, vel=1)   # This note is held across the pedal release
+    amy_send_at(time=750, synth=1, pedal=0)
+    amy_send_at(time=900, synth=1, note=72, vel=0)
 
 
 class TestPatchFromEvents(AmyTest):
@@ -1133,14 +1234,14 @@ class TestPatchFromEvents(AmyTest):
 
   def run(self):
     osc_freq = constants.ZERO_LOGFREQ_IN_HZ / 2
-    amy.send(time=0, patch=1039, reset=amy.RESET_PATCH)
-    amy.send(time=0, patch=1039, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
-    amy.send(time=0, patch=1039, osc=1, wave=amy.SINE, freq=osc_freq, bp0='0,1,500,0,200,0')
-    amy.send(time=0, synth=0, num_voices=4, patch=1039)
-    amy.send(time=100, synth=0, note=60, vel=1)
-    amy.send(time=300, synth=0, note=64, vel=1)
-    amy.send(time=500, synth=0, note=67, vel=1)
-    amy.send(time=800, synth=0, vel=0)
+    amy_send_at(time=0, patch=1039, reset=amy.RESET_PATCH)
+    amy_send_at(time=0, patch=1039, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
+    amy_send_at(time=0, patch=1039, osc=1, wave=amy.SINE, freq=osc_freq, bp0='0,1,500,0,200,0')
+    amy_send_at(time=0, synth=0, num_voices=4, patch=1039)
+    amy_send_at(time=100, synth=0, note=60, vel=1)
+    amy_send_at(time=300, synth=0, note=64, vel=1)
+    amy_send_at(time=500, synth=0, note=67, vel=1)
+    amy_send_at(time=800, synth=0, vel=0)
 
 
 class TestInvalidPatchNumber(AmyTest):
@@ -1150,22 +1251,22 @@ class TestInvalidPatchNumber(AmyTest):
     patch = 25
     osc_freq = constants.ZERO_LOGFREQ_IN_HZ / 2
     print("expect to see 'patch number %d is out of range' twice" % patch)
-    amy.send(time=0, patch=patch, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
-    amy.send(time=0, patch=patch, osc=1, wave=amy.SINE, freq=osc_freq, bp0='0,1,500,0,200,0')
-    amy.send(time=0, synth=0, num_voices=4, patch=patch)
-    amy.send(time=100, synth=0, note=60, vel=1)
-    amy.send(time=300, synth=0, note=64, vel=1)
-    amy.send(time=500, synth=0, note=67, vel=1)
-    amy.send(time=800, synth=0, vel=0)
+    amy_send_at(time=0, patch=patch, osc=0, wave=amy.SAW_DOWN, bp0='0,1,1000,0.1,200,0', chained_osc=1)
+    amy_send_at(time=0, patch=patch, osc=1, wave=amy.SINE, freq=osc_freq, bp0='0,1,500,0,200,0')
+    amy_send_at(time=0, synth=0, num_voices=4, patch=patch)
+    amy_send_at(time=100, synth=0, note=60, vel=1)
+    amy_send_at(time=300, synth=0, note=64, vel=1)
+    amy_send_at(time=500, synth=0, note=67, vel=1)
+    amy_send_at(time=800, synth=0, vel=0)
 
 
 class TestBreakpointsRealloc(AmyTest):
   """A default osc has only 8 breakpoints, but it should realloc to 24 if you try to set a long bpset."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, bp0='100,1,100,0,100,1,100,0,100,1,100,0,100,1,100,0')
-    amy.send(time=100, osc=0, note=60, vel=1)
-    amy.send(time=900, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, bp0='100,1,100,0,100,1,100,0,100,1,100,0,100,1,100,0')
+    amy_send_at(time=100, osc=0, note=60, vel=1)
+    amy_send_at(time=900, osc=0, vel=0)
 
 
 class TestFileTransfer(AmyTest):
@@ -1196,22 +1297,22 @@ class TestDiskSample(AmyTest):
 
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
 
 class TestDiskSampleWithSilentGap(AmyTest):
 
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3 with gap.wav', preset=1024, midinote=57)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=63)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=63)
 
 
 class TestRestartFileSample(AmyTest):
 
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=60)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=72)
-    amy.send(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=72)
+    amy_send_at(time=500, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=50)
 
 
 class TestDiskSampleStereo(AmyTest):
@@ -1219,8 +1320,8 @@ class TestDiskSampleStereo(AmyTest):
   def run(self):
     amy.disk_sample('sounds/220_440_stereo.wav', preset=1024, midinote=60)
     amy.disk_sample('sounds/220_440_stereo.wav', preset=1025, midinote=60)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
-    amy.send(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_LEFT, pan=0, vel=1, note=60)
+    amy_send_at(time=500, osc=1, preset=1025, wave=amy.PCM_RIGHT, pan=1, vel=1, note=60)
 
 
 class TestLoadSample(AmyTest):
@@ -1233,73 +1334,73 @@ class TestLoadSample(AmyTest):
   def run(self):
     amy.reset()
     amy.load_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
 
 
 class TestSample(AmyTest):
 
   def run(self):
     amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=22050, midinote=60)
-    amy.send(time=0, synth=1, num_voices=4, patch=20)
-    amy.send(time=50, synth=1, note=48, vel=1)
-    amy.send(time=150, synth=1, note=60, vel=1)
-    amy.send(time=250, synth=1, note=63, vel=1)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=20)
+    amy_send_at(time=50, synth=1, note=48, vel=1)
+    amy_send_at(time=150, synth=1, note=60, vel=1)
+    amy_send_at(time=250, synth=1, note=63, vel=1)
     # notes off
-    amy.send(time=400, synth=1, note=48, vel=0)
-    amy.send(time=400, synth=1, note=60, vel=0)
-    amy.send(time=400, synth=1, note=63, vel=0)
+    amy_send_at(time=400, synth=1, note=48, vel=0)
+    amy_send_at(time=400, synth=1, note=60, vel=0)
+    amy_send_at(time=400, synth=1, note=63, vel=0)
 
     # play a pitched up version
-    amy.send(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
-    amy.send(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
+    amy_send_at(osc=116, time=400, preset=1024, wave=amy.PCM_MIX, vel=1, note=72)
+    amy_send_at(osc=116, time=700, preset=1024, wave=amy.PCM_MIX, vel=2, note=84)
 
 
 class TestParamsInPatchCmd(AmyTest):
 
   def run(self):
     # Is it possible to *modify* a patch in the same command we install it?
-    amy.send(time=0, synth=1, patch=0, num_voices=4, resonance=4)
-    amy.send(time=50, synth=1, note=48, vel=1)
-    amy.send(time=150, synth=1, note=60, vel=1)
-    amy.send(time=250, synth=1, note=63, vel=1)
+    amy_send_at(time=0, synth=1, patch=0, num_voices=4, resonance=4)
+    amy_send_at(time=50, synth=1, note=48, vel=1)
+    amy_send_at(time=150, synth=1, note=60, vel=1)
+    amy_send_at(time=250, synth=1, note=63, vel=1)
     # notes off
-    amy.send(time=400, synth=1, note=48, vel=0)
-    amy.send(time=400, synth=1, note=60, vel=0)
-    amy.send(time=400, synth=1, note=63, vel=0)
+    amy_send_at(time=400, synth=1, note=48, vel=0)
+    amy_send_at(time=400, synth=1, note=60, vel=0)
+    amy_send_at(time=400, synth=1, note=63, vel=0)
 
 
 class TestHPFHighBaseFreq(AmyTest):
 
   def run(self):
-    amy.send(time=0, synth=1, patch=0, num_voices=4)
-    amy.send(time=10, synth=1, osc=0, filter_type=amy.FILTER_HPF, filter_freq=1000)
-    amy.send(time=50, synth=1, note=48, vel=10)
-    amy.send(time=150, synth=1, note=60, vel=10)
-    amy.send(time=250, synth=1, note=63, vel=10)
+    amy_send_at(time=0, synth=1, patch=0, num_voices=4)
+    amy_send_at(time=10, synth=1, osc=0, filter_type=amy.FILTER_HPF, filter_freq=1000)
+    amy_send_at(time=50, synth=1, note=48, vel=10)
+    amy_send_at(time=150, synth=1, note=60, vel=10)
+    amy_send_at(time=250, synth=1, note=63, vel=10)
     # notes off
-    amy.send(time=400, synth=1, note=48, vel=0)
-    amy.send(time=400, synth=1, note=60, vel=0)
-    amy.send(time=400, synth=1, note=63, vel=0)
+    amy_send_at(time=400, synth=1, note=48, vel=0)
+    amy_send_at(time=400, synth=1, note=60, vel=0)
+    amy_send_at(time=400, synth=1, note=63, vel=0)
 
 
 class TestNotchFilter(AmyTest):
 
   def run(self):
-    amy.send(time=0, synth=1, patch=0, num_voices=4)
-    amy.send(time=10, synth=1, osc=0, filter_type=amy.FILTER_NOTCH, resonance=2)
-    amy.send(time=20, synth=1, filter_freq='400,1,0,0,4', eg1='0,1,1000,0,100,0')
-    amy.send(time=100, synth=1, note=72, vel=10)
-    amy.send(time=800, synth=1, note=72, vel=0)
+    amy_send_at(time=0, synth=1, patch=0, num_voices=4)
+    amy_send_at(time=10, synth=1, osc=0, filter_type=amy.FILTER_NOTCH, resonance=2)
+    amy_send_at(time=20, synth=1, filter_freq='400,1,0,0,4', eg1='0,1,1000,0,100,0')
+    amy_send_at(time=100, synth=1, note=72, vel=10)
+    amy_send_at(time=800, synth=1, note=72, vel=0)
 
 
 class TestWavetable(AmyTest):
   """Simple exercise of the wavetable oscillator, using default wavetable."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.WAVETABLE, duty='0.25,0,0,0,0.5', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
+    amy_send_at(time=0, osc=0, wave=amy.WAVETABLE, duty='0.25,0,0,0,0.5', bp1='0,0,800,1,100,1', bp0='50,1,50,0')
     # preset=19,
-    amy.send(time=50, note=50, vel=1)
-    amy.send(time=850, vel=0)
+    amy_send_at(time=50, note=50, vel=1)
+    amy_send_at(time=850, vel=0)
 
 
 class TestCopyingSynthConfig(AmyTest):
@@ -1310,18 +1411,19 @@ class TestCopyingSynthConfig(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.render(1)  # Let the system config commands play out, else get_synth_commands won't find anything
+    _render_test_clock_seconds(1)  # Let the system config commands play out, else get_synth_commands won't find anything
+    _rebase_test_clock()  # ... and this test's own 1s clip starts fresh from here
     commands = amy.get_synth_commands(synth=1, dest_synth=3, num_voices=4, time=0)
     #print(commands)
     amy.send_raw(commands)
-    amy.send(time=1050, synth=3, note=48, vel=1)
-    amy.send(time=1150, synth=3, note=60, vel=1)
-    amy.send(time=1250, synth=3, note=63, vel=1)
-    amy.send(time=1350, synth=3, note=67, vel=1)
-    amy.send(time=1600, synth=3, note=48, vel=0)
-    amy.send(time=1700, synth=3, note=60, vel=0)
-    amy.send(time=1800, synth=3, note=63, vel=0)
-    amy.send(time=1900, synth=3, note=67, vel=0)
+    amy_send_at(time=1050, synth=3, note=48, vel=1)
+    amy_send_at(time=1150, synth=3, note=60, vel=1)
+    amy_send_at(time=1250, synth=3, note=63, vel=1)
+    amy_send_at(time=1350, synth=3, note=67, vel=1)
+    amy_send_at(time=1600, synth=3, note=48, vel=0)
+    amy_send_at(time=1700, synth=3, note=60, vel=0)
+    amy_send_at(time=1800, synth=3, note=63, vel=0)
+    amy_send_at(time=1900, synth=3, note=67, vel=0)
 
 
 class TestGetSynthCommandsGetsBus(AmyTest):
@@ -1329,12 +1431,12 @@ class TestGetSynthCommandsGetsBus(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start(0)
-    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
-    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
-    amy.send(time=0, bus=2, volume=0.1)
-    amy.send(time=0, synth=1, bus=2)
-    amy.send(time=0, synth=1, echo=0.5)
+    amy_send_at(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy_send_at(time=0, bus=2, volume=0.1)
+    amy_send_at(time=0, synth=1, bus=2)
+    amy_send_at(time=0, synth=1, echo=0.5)
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """iv4in2Z
@@ -1355,9 +1457,9 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start(0)
-    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
-    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy_send_at(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
     amy.send_raw('i1ic5,0,0,10,0,hello')
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     amy.render(1)  # Let the events execute.
@@ -1383,9 +1485,9 @@ class TestClearMidiCCs(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start(0)
-    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
-    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy_send_at(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
     amy.send_raw('i1ic5,0,0,10,0,hello')
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     # Test that you can have other commands after the ic255 too.
@@ -1410,9 +1512,9 @@ class TestClearOneMidiCC(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start(0)
-    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
-    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy_send_at(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
     amy.send_raw('i1ic5,0,0,10,0,hello')
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     amy.send_raw('i1ic5v0f220')
@@ -1442,11 +1544,11 @@ class TestOscResetIsScheduled(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, patch=258)
+    amy_send_at(time=0, synth=1, patch=258)
     send_midi(time=100, synth=1, note=54, vel=1)
     send_midi(time=200, synth=1, note=66, vel=1)
     # But clearing the synth later would mess it up.
-    amy.send(time=500, synth=1, num_voices=0)
+    amy_send_at(time=500, synth=1, num_voices=0)
 
 
 class TestClearSynth(AmyTest):
@@ -1454,14 +1556,14 @@ class TestClearSynth(AmyTest):
 
   def run(self):
     # First install MIDI drums: chan 1
-    amy.send(time=0, synth=1, patch=258)
+    amy_send_at(time=0, synth=1, patch=258)
     send_midi(time=100, synth=1, note=54, vel=1)
 
     # Clear the synth
-    amy.send(time=250, synth=1, num_voices=0)
+    amy_send_at(time=250, synth=1, num_voices=0)
     send_midi(time=300, synth=1, note=54, vel=1)  # Should do nothing & print warning
     # Set up a new synth.  Play some of the drum-remapped notes to make sure drum remappings have been cleared.
-    amy.send(time=350, synth=1, num_voices=6, patch=0)
+    amy_send_at(time=350, synth=1, num_voices=6, patch=0)
     send_midi(time=400, synth=1, note=54, vel=1)
     send_midi(time=500, synth=1, note=56, vel=1)
     send_midi(time=600, synth=1, note=58, vel=1)
@@ -1474,30 +1576,30 @@ class TestResetOscs(AmyTest):
   """Test that setting the number of oscs per voice resets the oscs."""
 
   def run(self):
-    amy.send(time=0, synth=1, patch=0, num_voices=4)
-    amy.send(time=10, synth=1, oscs_per_voice=5)  # Should cause oscs to reset.
-    amy.send(time=50, synth=1, note=48, vel=1)    # Will sound all the oscs in unison (post #716)
-    amy.send(time=400, synth=1, note=48, vel=0)
+    amy_send_at(time=0, synth=1, patch=0, num_voices=4)
+    amy_send_at(time=10, synth=1, oscs_per_voice=5)  # Should cause oscs to reset.
+    amy_send_at(time=50, synth=1, note=48, vel=1)    # Will sound all the oscs in unison (post #716)
+    amy_send_at(time=400, synth=1, note=48, vel=0)
 
 
 class TestPreset257(AmyTest):
   """There was a bug in the setting of K257 (amyboard web editor baseline)."""
 
   def run(self):
-    amy.send(time=0, synth=1, patch=257, num_voices=4)
-    amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=500, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, patch=257, num_voices=4)
+    amy_send_at(time=100, synth=1, note=48, vel=1)
+    amy_send_at(time=500, synth=1, vel=0)
 
 
 class TestPreset257MidiCCs(AmyTest):
   """Preset 257 now includes a range of default MIDI CC mappings."""
 
   def run(self):
-    amy.send(time=0, synth=1, patch=257, num_voices=4)
-    amy.send(time=100, synth=1, note=48, vel=1)
+    amy_send_at(time=0, synth=1, patch=257, num_voices=4)
+    amy_send_at(time=100, synth=1, note=48, vel=1)
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(400, 0xB0, 74, 127)  # Make the VCF freq be low - 1/4 of the way from 20 to 8000, so 89 Hz
-    amy.send(time=800, synth=1, vel=0)
+    amy_send_at(time=800, synth=1, vel=0)
 
 
 class TestProgChangeOnPreset257(AmyTest):
@@ -1514,18 +1616,18 @@ class TestProgChangeOnPreset257(AmyTest):
     # Program Change to program 5, no prior Bank Select.  Used to map to patch
     # 261 (undefined -> silent); now maps to Juno patch 5.
     amy.inject_midi_bytes([0xC0, 5])
-    amy.send(time=100, synth=1, note=60, vel=1)
-    amy.send(time=600, synth=1, note=60, vel=0)
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=600, synth=1, note=60, vel=0)
 
 
 class TestChangeSustain(AmyTest):
   """Check that you can rewrite just the sustain level in an EG without rewriting it all."""
 
   def run(self):
-    amy.send(time=0, synth=1, patch=257, num_voices=4)
-    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
-    amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=500, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, patch=257, num_voices=4)
+    amy_send_at(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy_send_at(time=100, synth=1, note=48, vel=1)
+    amy_send_at(time=500, synth=1, vel=0)
 
 
 def float_or_val(str, error_val=None):
@@ -1540,30 +1642,30 @@ class TestResetPreset(AmyTest):
   """Setting a synth to a patch should rewrite all the params even if it's the same patch."""
 
   def run(self):
-    amy.send(time=0, synth=1, patch=257, num_voices=4)
-    amy.send(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
-    amy.send(time=20, synth=1, patch=257)
-    amy.send(time=100, synth=1, note=48, vel=1)
-    amy.send(time=500, synth=1, vel=0)
-    amy.send(time=750, synth=1, note=48, vel=1)
-    amy.send(time=950, synth=1, vel=0)
+    amy_send_at(time=0, synth=1, patch=257, num_voices=4)
+    amy_send_at(time=10, synth=1, bp0=',,,0.8', bp1=',,,0.8')
+    amy_send_at(time=20, synth=1, patch=257)
+    amy_send_at(time=100, synth=1, note=48, vel=1)
+    amy_send_at(time=500, synth=1, vel=0)
+    amy_send_at(time=750, synth=1, note=48, vel=1)
+    amy_send_at(time=950, synth=1, vel=0)
 
 
 class TestBuses(AmyTest):
   """You can assign synths to different buses to get independent FX."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
-    amy.send(time=0, bus=0, reverb=1, echo=0)
-    #amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
-    amy.send(time=0, synth=2, num_voices=4, patch=22)
-    amy.send(time=0, synth=2, bus=1, pan=0.8)
-    amy.send(time=0, bus=1, reverb=0, echo='1,100,,0.5,0.5')
-    amy.send(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
-    amy.send(time=100, synth=1, note=60, vel=5)
-    amy.send(time=300, synth=2, note=63, vel=5)
-    amy.send(time=500, synth=1, note=67, vel=5)
-    amy.send(time=700, synth=2, note=70, vel=5)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
+    amy_send_at(time=0, bus=0, reverb=1, echo=0)
+    #amy_send_at(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
+    amy_send_at(time=0, synth=2, num_voices=4, patch=22)
+    amy_send_at(time=0, synth=2, bus=1, pan=0.8)
+    amy_send_at(time=0, bus=1, reverb=0, echo='1,100,,0.5,0.5')
+    amy_send_at(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
+    amy_send_at(time=100, synth=1, note=60, vel=5)
+    amy_send_at(time=300, synth=2, note=63, vel=5)
+    amy_send_at(time=500, synth=1, note=67, vel=5)
+    amy_send_at(time=700, synth=2, note=70, vel=5)
 
 
 class TestZeroFreqModPhase(AmyTest):
@@ -1571,11 +1673,11 @@ class TestZeroFreqModPhase(AmyTest):
 
   def run(self):
     # Make ext0 come from osc 1
-    amy.send(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
-    amy.send(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
-    amy.send(time=100, osc=0, vel=1)
-    amy.send(time=200, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
-    amy.send(time=400, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, freq={'const': 440, 'mod': 1}, mod_source=1)
+    amy_send_at(time=0, osc=1, freq=0)  # Starts in phase 0, so sin = 0
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=200, osc=1, phase=0.25)  # sin(0.25 pi) = 1.0, octave jump
+    amy_send_at(time=400, osc=0, vel=0)
 
 
 class TestCVFromOsc(AmyTest):
@@ -1584,10 +1686,10 @@ class TestCVFromOsc(AmyTest):
   def run(self):
     # Make ext0 come from osc 1
     amy.set_cv_from_osc(0, 1)
-    amy.send(time=0, osc=0, freq={'const': 440, 'note': 1, 'ext0': 1})
-    amy.send(time=0, osc=1, freq=4.0, amp=0.1)
-    amy.send(time=100, osc=0, vel=1)
-    amy.send(time=900, osc=0, vel=0)
+    amy_send_at(time=0, osc=0, freq={'const': 440, 'note': 1, 'ext0': 1})
+    amy_send_at(time=0, osc=1, freq=4.0, amp=0.1)
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=900, osc=0, vel=0)
 
 
 class TestCVTrigger(AmyTest):
@@ -1596,9 +1698,9 @@ class TestCVTrigger(AmyTest):
   def run(self):
     # Setup the simulated CV input as 4 Hz sine
     amy.set_cv_from_osc(0, 1)
-    amy.send(time=0, osc=1, freq=4)
+    amy_send_at(time=0, osc=1, freq=4)
     # Osc 0 gives a little tone.
-    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    amy_send_at(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
     # Tone is triggered when CV osc passes 0.5.
     amy.send(cv_trigger='0,0.5,0.1,1,0,1,v0l1')
 
@@ -1609,12 +1711,12 @@ class TestCVTriggerNote(AmyTest):
   def run(self):
     # Setup the simulated CV input 0 as 4 Hz sine
     amy.set_cv_from_osc(0, 1)
-    amy.send(time=0, osc=1, freq=4)
+    amy_send_at(time=0, osc=1, freq=4)
     # Setup the simulated CV input 1 (pitch) as slow ramp
     amy.set_cv_from_osc(1, 2)
-    amy.send(time=0, osc=2, freq=1, wave=amy.SAW_UP)
+    amy_send_at(time=0, osc=2, freq=1, wave=amy.SAW_UP)
     # Osc 0 gives a little tone.
-    amy.send(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
+    amy_send_at(time=0, osc=0, freq=440, eg0='0,1,200,0,200,0')
     # Tone is triggered when CV osc passes 0.5.
     amy.send(cv_trigger='0,0.5,0.1,1,0.5,0,v0l1n%v')
 
@@ -1626,16 +1728,16 @@ class TestCVTriggerNoteOff(AmyTest):
     amy.send(reset=amy.RESET_TIMEBASE)
     # Setup the simulated CV input 0 as 4 Hz sine
     amy.set_cv_from_osc(0, 1)
-    amy.send(time=0, osc=1, freq=4)
+    amy_send_at(time=0, osc=1, freq=4)
     # Osc 0 gives a gated tone.
-    amy.send(time=0, osc=0, freq=440, eg1='0,1,1000,0,100,0')
+    amy_send_at(time=0, osc=0, freq=440, eg1='0,1,1000,0,100,0')
     # Note on when CV osc passes 0.5 rising (reset lower than trigger).
-    amy.send(time=0, cv_trigger='0,0.5,0.1,1,1,0,v0l1n%v')
+    amy_send_at(time=0, cv_trigger='0,0.5,0.1,1,1,0,v0l1n%v')
     # Note off when CV osc passes 0.5 falling (reset higher than trigger).
-    amy.send(time=0, cv_trigger='0,0.5,0.6,v0l0')
+    amy_send_at(time=0, cv_trigger='0,0.5,0.6,v0l0')
     # Also test that we can cancel the trigger events by clearing them
     # midway through last tone.  All triggers on CV0 are cancelled together.
-    #amy.send(time=800, cv_trigger='0')
+    #amy_send_at(time=800, cv_trigger='0')
     # Oh, cv_trigger is executed on message parse, not deferred to a timed
     # event, so this cleared the events before they even started.
 
@@ -1644,18 +1746,18 @@ class TestAllVoiceOscsGetNoteOn(AmyTest):
   """#716 modifies behavior of sending note-on to a synth/voice to send it to all oscs."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=2, oscs_per_voice=3)
-    amy.send(time=0, synth=1, osc=0, mod_source=1)  # Mark osc 1 as a mod, should NOT get note-ons
-    amy.send(time=0, synth=1, osc=1, freq=10)
-    amy.send(time=0, synth=1, osc=2, freq=660)  # Second sounding osc
-    amy.send(time=100, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
-    amy.send(time=200, synth=1, osc=0, note=84, vel=0)
-    amy.send(time=300, synth=1, note=84, vel=1)   # Trigger both oscs
-    amy.send(time=400, synth=1, note=84, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=2, oscs_per_voice=3)
+    amy_send_at(time=0, synth=1, osc=0, mod_source=1)  # Mark osc 1 as a mod, should NOT get note-ons
+    amy_send_at(time=0, synth=1, osc=1, freq=10)
+    amy_send_at(time=0, synth=1, osc=2, freq=660)  # Second sounding osc
+    amy_send_at(time=100, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
+    amy_send_at(time=200, synth=1, osc=0, note=84, vel=0)
+    amy_send_at(time=300, synth=1, note=84, vel=1)   # Trigger both oscs
+    amy_send_at(time=400, synth=1, note=84, vel=0)
     # Check mod_osc is working and not being shifted by note.  10 Hz should do one mod cycle in 0.1 s note.
-    amy.send(time=450, synth=1, osc=0, freq={'mod': 0.2})
-    amy.send(time=500, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
-    amy.send(time=600, synth=1, osc=0, note=84, vel=0)
+    amy_send_at(time=450, synth=1, osc=0, freq={'mod': 0.2})
+    amy_send_at(time=500, synth=1, osc=0, note=84, vel=1)   # Trigger osc 0 only
+    amy_send_at(time=600, synth=1, osc=0, note=84, vel=0)
 
 
 class TestNoteGoesToZero(AmyTest):
@@ -1663,16 +1765,16 @@ class TestNoteGoesToZero(AmyTest):
 
   def run(self):
     # 15 Hz AM modulator
-    amy.send(time=0, osc=0, freq=15)
+    amy_send_at(time=0, osc=0, freq=15)
     # Osc 1 on left has AM that doesn't push it to zero
-    amy.send(time=0, osc=1, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.5, 'mod': 0.5}, pan=0)
+    amy_send_at(time=0, osc=1, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.5, 'mod': 0.5}, pan=0)
     # Osc 2 on the right has much deeper AM that pushes to zero in the troughs.  It will be killed in the first release trough.
-    amy.send(time=0, osc=2, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.01, 'mod': 1.0}, pan=1)
-    amy.send(time=100, osc=1, note=60, vel=1)
-    amy.send(time=100, osc=2, note=60, vel=1)
+    amy_send_at(time=0, osc=2, eg0="50,1,300,0.5,500,0", mod_source=0, amp={'const': 0.01, 'mod': 1.0}, pan=1)
+    amy_send_at(time=100, osc=1, note=60, vel=1)
+    amy_send_at(time=100, osc=2, note=60, vel=1)
     # Start release at 600 ms.
-    amy.send(time=600, osc=1, note=60, vel=0)
-    amy.send(time=600, osc=2, note=60, vel=0)
+    amy_send_at(time=600, osc=1, note=60, vel=0)
+    amy_send_at(time=600, osc=2, note=60, vel=0)
 
 
 class TestSynthGlobalFX(AmyTest):
@@ -1680,32 +1782,32 @@ class TestSynthGlobalFX(AmyTest):
 
   def run(self):
     # Also test the synth mechanism.
-    amy.send(time=0, synth=1, num_voices=4, patch=20)
-    amy.send(time=0, chorus=0)   # Turn off the chorus
-    amy.send(time=0, synth=1, chorus=1)  #  Turn it back on with synth-directed command.
-    amy.send(time=50, synth=1, note=48, vel=1)
-    amy.send(time=150, synth=1, note=60, vel=1)
-    amy.send(time=250, synth=1, note=63, vel=1)
-    amy.send(time=350, synth=1, note=67, vel=1)
-    amy.send(time=600, synth=1, note=48, vel=0)
-    amy.send(time=700, synth=1, note=60, vel=0)
-    amy.send(time=800, synth=1, note=63, vel=0)
-    amy.send(time=900, synth=1, note=67, vel=0)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=20)
+    amy_send_at(time=0, chorus=0)   # Turn off the chorus
+    amy_send_at(time=0, synth=1, chorus=1)  #  Turn it back on with synth-directed command.
+    amy_send_at(time=50, synth=1, note=48, vel=1)
+    amy_send_at(time=150, synth=1, note=60, vel=1)
+    amy_send_at(time=250, synth=1, note=63, vel=1)
+    amy_send_at(time=350, synth=1, note=67, vel=1)
+    amy_send_at(time=600, synth=1, note=48, vel=0)
+    amy_send_at(time=700, synth=1, note=60, vel=0)
+    amy_send_at(time=800, synth=1, note=63, vel=0)
+    amy_send_at(time=900, synth=1, note=67, vel=0)
 
 
 class TestSynthBusCmds(AmyTest):
   """Test that FX commands to nondefault bus via synth is right.   Should match TestBuses. """
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
-    amy.send(time=0, bus=0, reverb=1, echo=0)
-    amy.send(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
-    amy.send(time=0, synth=2, reverb=0, echo='1,100,,0.5,0.5')  # Bus implied by synth.
-    amy.send(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
-    amy.send(time=100, synth=1, note=60, vel=5)
-    amy.send(time=300, synth=2, note=63, vel=5)
-    amy.send(time=500, synth=1, note=67, vel=5)
-    amy.send(time=700, synth=2, note=70, vel=5)
+    amy_send_at(time=0, synth=1, num_voices=4, patch=22, bus=0, pan=0.2)  # A37 Pizzicato
+    amy_send_at(time=0, bus=0, reverb=1, echo=0)
+    amy_send_at(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
+    amy_send_at(time=0, synth=2, reverb=0, echo='1,100,,0.5,0.5')  # Bus implied by synth.
+    amy_send_at(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
+    amy_send_at(time=100, synth=1, note=60, vel=5)
+    amy_send_at(time=300, synth=2, note=63, vel=5)
+    amy_send_at(time=500, synth=1, note=67, vel=5)
+    amy_send_at(time=700, synth=2, note=70, vel=5)
 
 
 class TestOscAndBusCommands(AmyTest):
@@ -1713,37 +1815,37 @@ class TestOscAndBusCommands(AmyTest):
 
   def run(self):
     # Setup bus 1 with echo so we can tell when it's used
-    amy.send(time=0, synth=1, num_voices=2, oscs_per_voice=1)
-    amy.send(time=10, synth=1, osc=0, wave=amy.SAW_UP, eg0='0,1,200,0,200,0')
-    amy.send(time=20, synth=2, num_voices=2, oscs_per_voice=1, bus=1, echo='1,50,,0.5,0.5', pan=1)
-    #amy.send(time=20, synth=2, num_voices=2, oscs_per_voice=1)
-    #amy.send(time=20, synth=2, bus=1)
-    #amy.send(time=20, synth=2, echo='1,50,,0.5,0.5')
-    #amy.send(time=20, synth=2, pan=1)
+    amy_send_at(time=0, synth=1, num_voices=2, oscs_per_voice=1)
+    amy_send_at(time=10, synth=1, osc=0, wave=amy.SAW_UP, eg0='0,1,200,0,200,0')
+    amy_send_at(time=20, synth=2, num_voices=2, oscs_per_voice=1, bus=1, echo='1,50,,0.5,0.5', pan=1)
+    #amy_send_at(time=20, synth=2, num_voices=2, oscs_per_voice=1)
+    #amy_send_at(time=20, synth=2, bus=1)
+    #amy_send_at(time=20, synth=2, echo='1,50,,0.5,0.5')
+    #amy_send_at(time=20, synth=2, pan=1)
     ##
-    amy.send(time=30, synth=2, osc=0, wave=amy.SAW_DOWN, eg0='0,1,200,0,200,0')
+    amy_send_at(time=30, synth=2, osc=0, wave=amy.SAW_DOWN, eg0='0,1,200,0,200,0')
     #
-    amy.send(time=100, synth=1, note=60, vel=1)  # pan 0.5, no FX
-    amy.send(time=200, synth=2, note=66, vel=1)  # pan 1, 50ms echo
+    amy_send_at(time=100, synth=1, note=60, vel=1)  # pan 0.5, no FX
+    amy_send_at(time=200, synth=2, note=66, vel=1)  # pan 1, 50ms echo
     # Change properties via synth, also with osc-directed pan
-    amy.send(time=250, synth=1, eq='10,-20,10', pan=0)
-    #amy.send(time=250, synth=1, eq='10,-20,10')
-    #amy.send(time=250, synth=1, pan=0)
+    amy_send_at(time=250, synth=1, eq='10,-20,10', pan=0)
+    #amy_send_at(time=250, synth=1, eq='10,-20,10')
+    #amy_send_at(time=250, synth=1, pan=0)
     ##
-    amy.send(time=300, synth=1, note=60, vel=1)   # pan 0, mid cut
-    amy.send(time=400, synth=2, note=66, vel=1)   # pan 1, 50ms echo (as before)
+    amy_send_at(time=300, synth=1, note=60, vel=1)   # pan 0, mid cut
+    amy_send_at(time=400, synth=2, note=66, vel=1)   # pan 1, 50ms echo (as before)
     # Change the synth's bus while altering the bus
-    amy.send(time=550, synth=1, bus=1, echo='1,90,,0.5,0.5')
-    #amy.send(time=550, synth=1, bus=1)
-    #amy.send(time=550, bus=1, echo='1,90,,0.5,0.5')
+    amy_send_at(time=550, synth=1, bus=1, echo='1,90,,0.5,0.5')
+    #amy_send_at(time=550, synth=1, bus=1)
+    #amy_send_at(time=550, bus=1, echo='1,90,,0.5,0.5')
     ##
-    amy.send(time=650, synth=2, bus=0)
+    amy_send_at(time=650, synth=2, bus=0)
     ##
-    amy.send(time=700, synth=1, note=72, vel=1)   # pan 0, flat EQ, 90ms echo
-    amy.send(time=800, synth=2, note=78, vel=1)   # pan 1, mid cut, no echo
+    amy_send_at(time=700, synth=1, note=72, vel=1)   # pan 0, flat EQ, 90ms echo
+    amy_send_at(time=800, synth=2, note=78, vel=1)   # pan 1, mid cut, no echo
     # Modify bus without referencing synth
-    amy.send(time=850, bus=1, echo='1,20,,0.5,0.5')
-    amy.send(time=900, synth=1, note=72, vel=1)   # pan 0, flat EQ, 20ms echo
+    amy_send_at(time=850, bus=1, echo='1,20,,0.5,0.5')
+    amy_send_at(time=900, synth=1, note=72, vel=1)   # pan 0, flat EQ, 20ms echo
 
 
 class TestGrabMidiNotes(AmyTest):
@@ -1755,7 +1857,7 @@ class TestGrabMidiNotes(AmyTest):
 
   def run(self):
     # Disable MIDI on ch10
-    amy.send(time=0, synth=10, grab_midi_notes=False);
+    amy_send_at(time=0, synth=10, grab_midi_notes=False);
     # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
     amy.inject_midi(100, 0x90, 48, 100)  # low note
     amy.inject_midi(400, 0x99, 35, 100)  # bass drum (should not sound)
@@ -1768,12 +1870,12 @@ class TestMidiNoteCmd(AmyTest):
   """midi_note_cmd sets a particular command for a particular midi note."""
 
   def run(self):
-    amy.send(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
-    amy.send(time=0, synth=10, patch=258)  # MIDI drums
+    amy_send_at(time=0, synth=1, num_voices=4, patch=0, synth_flags=1)
+    amy_send_at(time=0, synth=10, patch=258)  # MIDI drums
     # midi_note_cmd = <midi note>,log,min,max,offset,wire_cmd
-    amy.send(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
+    amy_send_at(time=0, synth=1, midi_note_cmd='64,0,0,1,0,' + amy.message(synth=10, note=56, vel='%v'))
     # Synth 2 is not defined but we can still set up midi_note_cmds for it.  Note=-1 means all notes (%n)
-    amy.send(time=0, synth=2, midi_note_cmd='-1,0,0,1,0,' + amy.message(synth=1, note='%n', vel='%v'))
+    amy_send_at(time=0, synth=2, midi_note_cmd='-1,0,0,1,0,' + amy.message(synth=1, note='%n', vel='%v'))
     # Note 63 should play as normal, note 64 should cause cowbell.
     send_midi(time=100, synth=1, note=63, vel=1)
     send_midi(time=200, synth=1, note=64, vel=1)
@@ -1790,26 +1892,26 @@ class TestTranceGlitch(AmyTest):
   """Investigating a glitch that occurs in 'Emo Trance Backbeat' on AMYboard World."""
 
   def run(self):
-    amy.send(time=0, volume=0.1)
-    amy.send(time=0, synth=2, patch=55, num_voices=6)
+    amy_send_at(time=0, volume=0.1)
+    amy_send_at(time=0, synth=2, patch=55, num_voices=6)
     #for n in [40, 43, 47, 52, 55]:
     for n in [52]:
-      amy.send(time=100, synth=2, note=n, vel=2.75)
+      amy_send_at(time=100, synth=2, note=n, vel=2.75)
 
 
 class TestPatch32Glitch(AmyTest):
   """One of the excessive glitch voices reported."""
 
   def run(self):
-    amy.send(time=0, synth=2, patch=32, num_voices=4)
-    amy.send(time=100, synth=2, note=71, vel=1)
-    amy.send(time=200, synth=2, note=71, vel=0)
-    amy.send(time=300, synth=2, note=71, vel=1)
-    amy.send(time=400, synth=2, note=71, vel=0)
-    amy.send(time=500, synth=2, note=71, vel=1)
-    amy.send(time=600, synth=2, note=71, vel=0)
-    amy.send(time=700, synth=2, note=71, vel=1)
-    amy.send(time=800, synth=2, note=71, vel=0)
+    amy_send_at(time=0, synth=2, patch=32, num_voices=4)
+    amy_send_at(time=100, synth=2, note=71, vel=1)
+    amy_send_at(time=200, synth=2, note=71, vel=0)
+    amy_send_at(time=300, synth=2, note=71, vel=1)
+    amy_send_at(time=400, synth=2, note=71, vel=0)
+    amy_send_at(time=500, synth=2, note=71, vel=1)
+    amy_send_at(time=600, synth=2, note=71, vel=0)
+    amy_send_at(time=700, synth=2, note=71, vel=1)
+    amy_send_at(time=800, synth=2, note=71, vel=0)
 
 
 class TestSequencer(AmyTest):
@@ -1820,7 +1922,7 @@ class TestSequencer(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy.send(time=100, sequence='20,24,0', synth=1, note=64, vel=1)
+    amy_send_at(time=100, ticks='20,24,0', synth=1, note=64, vel=1)
 
 
 class TestSequencedSynthDrums(AmyTest):
@@ -1832,7 +1934,7 @@ class TestSequencedSynthDrums(AmyTest):
 
   def run(self):
     # The sequencer working on the SYNTH_FLAGS_NOTES_VIA_MIDI synth 10 (38 = Acoustic Snare).
-    amy.send(time=100, sequence='20,24,0', synth=10, note=38, vel=1)
+    amy_send_at(time=100, ticks='20,24,0', synth=10, note=38, vel=1)
 
 
 class TestSequencerOsc(AmyTest):
@@ -1842,13 +1944,13 @@ class TestSequencerOsc(AmyTest):
   second of rendering covers 86 ticks."""
 
   def run(self):
-    amy.send(time=0, osc=0, wave=amy.SINE, freq=1000)
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000)
     # Absolute-tick events: note on at tick 20 (~231 ms), off at tick 40 (~463 ms).
-    amy.send(osc=0, vel=1, sequence="20,0,1")
-    amy.send(osc=0, vel=0, sequence="40,0,2")
+    amy.send(osc=0, vel=1, ticks="20,0,1")
+    amy.send(osc=0, vel=0, ticks="40,0,2")
     # Periodic event: a lower note every 60 ticks, lands once at ~694 ms.
-    amy.send(osc=1, wave=amy.SINE, freq=500, vel=1, sequence="0,60,3")
-    amy.send(time=900, osc=1, vel=0)
+    amy.send(osc=1, wave=amy.SINE, freq=500, vel=1, ticks="0,60,3")
+    amy_send_at(time=900, osc=1, vel=0)
 
 
 class TestDumpState(AmyTest):
@@ -1857,10 +1959,10 @@ class TestDumpState(AmyTest):
   def test(self):
     _amy.stop()
     _amy.start(0)
-    amy.send(time=0, synth=1, num_voices=4, oscs_per_voice=2)
-    amy.send(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
-    amy.send(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
-    amy.send(time=0, synth=2, num_voices=1, oscs_per_voice=1, bus=1, volume=0.5)
+    amy_send_at(time=0, synth=1, num_voices=4, oscs_per_voice=2)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, freq=110, chained_osc=1)
+    amy_send_at(time=0, synth=1, osc=1, wave=amy.SAW_UP, freq=880)
+    amy_send_at(time=0, synth=2, num_voices=1, oscs_per_voice=1, bus=1, volume=0.5)
     amy.send_raw('i1ic10,1,1,100,1,i%id%v')
     amy.send_raw('i1io39,0,0,1,0,i%in40l%v')
     amy.render(1)  # Let the events execute.
