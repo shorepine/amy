@@ -104,9 +104,6 @@ def get_input_buffer():
 # END GENERATED - scripts/gen_amy_c_api.py
 
 
-# If set, inserts func as time for every call to send(). Will not override an explicitly set time
-insert_time = None
-
 # If set, calls this instead of amy.send()
 override_send = None
 
@@ -225,16 +222,18 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'), 
-    ('feedback', 'bF'), ('time', 'tI'),  ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'), 
+    # 'ticks' must come first: 'H' is recognized only as first char in wire message.
+    ('ticks', 'HL'),
+    ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
+    ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('pan', 'QC'), ('client', 'gI'),
     ('volume', 'VL'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
     ('bp0', 'AL'), ('bp1', 'BL'),
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
     ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
     ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
-    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'), 
+    ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
-    ('external_channel', 'WI'), ('portamento', 'mI'), ('sequence', 'HL'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
+    ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
     ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
     ('synth_level', 'iVF'),
@@ -277,9 +276,6 @@ def message(**kwargs):
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 
-    if(insert_time is not None and 'time' not in kwargs):
-        kwargs['time'] = insert_time()
-
     # Validity check all the passed args.
     prioritized_keys = []
     for key, arg in kwargs.items():
@@ -287,8 +283,8 @@ def message(**kwargs):
             raise ValueError('Unknown keyword ' + key)
         priority = _KW_PRIORITY[key]
         if arg is None:
-            # Ignore time=None or sequence=None
-            if key != 'time' and key != 'sequence':
+            # Ignore ticks=None
+            if key != 'ticks':
                 raise ValueError('No arg for key ' + key)
         else:
             prioritized_keys.append((priority, key))
@@ -461,6 +457,19 @@ def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60
 def stop_sample():
     send(stop_sample=1)
 
+def _send_transfer_chunk(message):
+    """Send one chunk of an AUDIO or FILE transfer's payload. Always routed
+    via the sysex-marked path (see amy_message_is_transfer_chunk() in
+    api.c) so the C side can unambiguously identify it as transfer data
+    rather than risk misinterpreting -- or having misinterpreted -- a
+    regular wire command as such, regardless of what else might be calling
+    amy.send() concurrently (e.g. a sketch's own loop() on hardware during a
+    live transfer)."""
+    if override_send is not None:
+        override_send(message)
+    else:
+        _amy.send_wire_from_sysex(message)
+
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
     from math import ceil
@@ -474,7 +483,7 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
     for i in range(ceil(n_frames/94)):
         frames_bytes = b[last_f:last_f+188]
         message = b64(frames_bytes)
-        send_raw(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
         last_f = last_f + 188
 
 def disk_sample(wavfilename, preset=0, midinote=60):
@@ -500,19 +509,11 @@ def transfer_file(source_filename, dest_filename=None):
 
     # Now generate the base64 encoded segments, 188 bytes at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
-    # Use the _from_sysex variant so the chunks are routed to
-    # parse_transfer_message via the amy_parsing_from_sysex flag. Internal
-    # amy.send() calls from other contexts (e.g. a sketch's loop() on
-    # AMYboard hardware running during a live transfer) use the regular
-    # path and won't be mis-interpreted as transfer data.
     w = open(source_filename, 'rb')
     for i in range(ceil(file_size/188)):
         file_bytes = w.read(188)
         message = b64(file_bytes)
-        if override_send is not None:
-            override_send(message.decode('ascii'))
-        else:
-            _amy.send_wire_from_sysex(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
     w.close()
 
 def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
@@ -544,7 +545,7 @@ def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
             # de-interleave and just choose the first channel
             frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
         message = b64(frames_bytes)
-        send_raw(message.decode('ascii'))
+        _send_transfer_chunk(message.decode('ascii'))
     print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, w.getnframes()*2, w.getnframes(), midinote))
 
 
@@ -556,7 +557,10 @@ def reset(osc=None, **kwargs):
     if(osc is not None):
         send(reset=osc, **kwargs)
     else:
-        send(reset=RESET_ALL_OSCS, **kwargs) 
+        # Also clear the sequencer: anonymous ticks= entries (2- or 1-value
+        # forms) have no tag, so a plain amy.reset() is the only way to get
+        # rid of one once it's scheduled.
+        send(reset=RESET_ALL_OSCS | RESET_SEQUENCER, **kwargs)
 
 
 

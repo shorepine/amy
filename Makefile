@@ -182,6 +182,9 @@ deploy-web: web
 godot-api:
 	$(PYTHON) scripts/gen_amy_gd_api.py
 
+js-api:
+	$(PYTHON) scripts/gen_amy_js_api.py
+
 clean:
 	-rm -f src/*.o
 	-rm -r src/patches.h

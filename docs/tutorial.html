@@ -131,10 +131,12 @@ amy.send(synth=1, filter_freq=[800], resonance=2.5)
         <div class="editor mb-4">
 amy.send(osc=0, wave=amy.SINE, freq=220, vel=1)
         </div>
-        <P>Now let's make more sine waves! We'll try using <code>time</code> to schedule events in the future. When you hit the play button on this page, AMY resets to time (in milliseconds) 0. In real use of AMY, you want to use <code>amy_sysclock()</code> to know what time it currently is. In this example we'll add a new sine wave every half second:</P>
+        <P>Now let's make more sine waves! We'll try using <code>ticks</code> to schedule events ahead in AMY's musical clock. In this example we'll add a new sine wave every quarter note (at the default tempo):</P>
         <div class="editor mb-4">
-for i in range(16):
-    amy.send(osc=i, wave=amy.SINE, freq=110+(i*80), vel=((16-i)/32.0), time=i*500)
+amy.send(osc=0, wave=amy.SINE, freq=110, vel=0.5)
+tick_base = amy.sequencer_ticks()
+for i in range(1, 16):
+    amy.send(osc=i, wave=amy.SINE, freq=110+(i*80), vel=((16-i)/32.0), ticks=tick_base + i*48)
         </div>
 
         <P>A classic analog tone is the filtered saw wave. Let's make one.</P>
@@ -158,18 +160,18 @@ amy.send(osc=0, vel=1, note=40)
         <h2 id="oscillators">AMY sequencer</h2>
         <P>AMY is always running a musical sequencer. You can use it to schedule events using note lengths, or have a repeating (pattern) sequencer. Very useful for things like drum machines or MIDI playback.</P>
         <div class="editor mb-4">
-amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, sequence=",24,1") # play a PCM drum every eighth note.
-amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence=",48,2") # play a different PCM drum every quarter note.
+amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, ticks=",24,1") # play a PCM drum every eighth note.
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=3, ticks=",48,2") # play a different PCM drum every quarter note.
         </div>
         <P>You can remove or update sequence events by addressing their tag number</P>
         <div class="editor mb-4">
-amy.send(sequence=",,1") # remove the eighth note sequence
-amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, note=70, sequence=",48,2") # change the quarter note event
+amy.send(ticks=",,1") # remove the eighth note sequence
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=3, note=70, ticks=",48,2") # change the quarter note event
         </div>
         <P>For patterns you want to also address their "slots", which is the offset within the pattern, like this</P>
         <div class="editor mb-4">
-amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, sequence="0,384,1") # first slot of a 16 1/8th note drum machine
-amy.send(osc=1, vel=1, wave=amy.PCM, preset=1, sequence="216,384,2") # ninth slot of a 16 1/8th note drum machine
+amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, ticks="0,384,1") # first slot of a 16 1/8th note drum machine
+amy.send(osc=1, vel=1, wave=amy.PCM, preset=3, ticks="216,384,2") # ninth slot of a 16 1/8th note drum machine
         </div>
       </div>
 

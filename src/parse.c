@@ -4,6 +4,7 @@
 #include "amy.h"
 #include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
+#include <assert.h>
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
 #endif
@@ -630,32 +631,39 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     return pos;
 }
 
+// Called from amy_add_message when the first char is 'H', indicating a ticks message.
+// It claims the rest of the message as its payload -- stored as a raw
+// wire string and only parsed when it comes due -- so a schedule command
+// is only ever honored as the first command of a message.
+void handle_ticks_message(char *message) {
+    assert(message[0] == 'H');
+    uint32_t ticks[3] = {0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
+    uint16_t schedule_len = 1 + _next_alpha(message + 1);
+    char *payload = message + schedule_len;
+    uint16_t payload_len = (uint16_t)strlen(payload);
+    char *stripped = (char *)malloc_caps(payload_len + 1, amy_global.config.ram_caps_events);
+    if (stripped == NULL) {
+        amy_oom("ticks_message");
+    } else {
+        memcpy(stripped, payload, payload_len + 1);
+        // A tag is only "given" if all 3 values were present; fewer
+        // than that (a 1- or 2-value ticks=) stores anonymously.
+        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+                           num_vals >= 3, stripped);
+    }
+}
 
 // given a string return a parsed event
+//
+// Transfer payloads never reach here: amy_add_message() traps them before
+// any parsing is attempted (see the comment there), so this only ever sees
+// real wire commands.
 int amy_parse_message(char * message, amy_event *e) {
     peek_stack("parse_message");
     int length = strlen(message);
     char cmd = '\0';
     uint16_t pos = 0;
-
-    // Check if we're in a transfer block, if so, parse it and leave this loop.
-    // FILE transfers (zT, used to write files over MIDI sysex) arrive async
-    // while a sketch may also be running, so we ONLY route them to the
-    // transfer handler when the data is sysex-originated -- otherwise a
-    // sketch calling amy.send(note=36) mid-transfer would get its wire
-    // command base64-decoded as file data and corrupt the file.
-    //
-    // AUDIO transfers (amy.load_sample / load_sample_bytes) are different:
-    // Python sends every chunk synchronously in a tight loop within the same
-    // call, so no other amy.send() can interleave. They route regardless of
-    // the sysex flag (which they don't carry, since send_raw goes through
-    // the regular wire path).
-    extern bool amy_parsing_from_sysex;
-    if (amy_global.transfer_flag == AMY_TRANSFER_TYPE_AUDIO ||
-        (amy_parsing_from_sysex && amy_global.transfer_flag == AMY_TRANSFER_TYPE_FILE)) {
-        parse_transfer_message(message, length);
-        return length;
-    }
 
     while(pos < length) {
         cmd = message[pos];
@@ -686,7 +694,8 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
             case 'G': e->filter_type = atoi(arg); break;
             /* g used for Alles for client # */
-            case 'H': parse_list_uint32_t(arg, e->sequence, 3, 0); break;
+            // 'H' is the ticks= schedule command, it's caught in amy_add_message before this.
+            //case 'H': parse_list_uint32_t(arg, e->ticks, 3, 0); break;
             case 'h': if (AMY_HAS_REVERB) {
                 float reverb_params[4];
                 parse_list_float(arg, reverb_params, 4, AMY_UNSET_VALUE(e->reverb_level));
@@ -757,8 +766,7 @@ int amy_parse_message(char * message, amy_event *e) {
                     AMY_UNSET(e->reset_osc);
                 }
                 break;
-            /* t used for time */
-            case 't': e->time=atol(arg); break;
+            /* t no longer used (was time=) */
             case 'T': e->eg_type[0] = atoi(arg); break;
             case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */

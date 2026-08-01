@@ -11,7 +11,7 @@ static PyObject * amy_capi_py_send_wire_from_sysex(PyObject *self, PyObject *arg
     (void)self;
     char *message = NULL;
     if (!PyArg_ParseTuple(args, "s", &message)) return NULL;
-    amy_add_message_from_sysex(message);
+    amy_send_wire_from_sysex(message);
     Py_RETURN_NONE;
 }
 

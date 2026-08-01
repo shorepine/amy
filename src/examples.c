@@ -371,33 +371,33 @@ void example_sequencer_drums(uint32_t start) {
     // Add patterns.
     // Hi hat every 8 ticks.
     e = amy_default_event();
-    e.sequence[SEQUENCE_TAG] = 0;
-    e.sequence[SEQUENCE_PERIOD] = 8;
-    e.sequence[SEQUENCE_TICK] = 0;
+    e.ticks[TICKS_TAG] = 0;
+    e.ticks[TICKS_PERIOD] = 8;
+    e.ticks[TICKS_TICK] = 0;
     e.osc = 2;
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Bass drum every 32 ticks.
-    e.sequence[SEQUENCE_TAG] = 1;
-    e.sequence[SEQUENCE_PERIOD] = 32;
-    e.sequence[SEQUENCE_TICK] = 0;
+    e.ticks[TICKS_TAG] = 1;
+    e.ticks[TICKS_PERIOD] = 32;
+    e.ticks[TICKS_TICK] = 0;
     e.osc = 0;
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Snare every 32 ticks, counterphase to BD.
-    e.sequence[SEQUENCE_TAG] = 2;
-    e.sequence[SEQUENCE_PERIOD] = 32;
-    e.sequence[SEQUENCE_TICK] = 16;
+    e.ticks[TICKS_TAG] = 2;
+    e.ticks[TICKS_PERIOD] = 32;
+    e.ticks[TICKS_TICK] = 16;
     e.osc = 1;
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Cow once every other cycle.
-    e.sequence[SEQUENCE_TAG] = 3;
-    e.sequence[SEQUENCE_PERIOD] = 64;
-    e.sequence[SEQUENCE_TICK] = 60;
+    e.ticks[TICKS_TAG] = 3;
+    e.ticks[TICKS_PERIOD] = 64;
+    e.ticks[TICKS_TICK] = 60;
     e.osc = 3;
     e.velocity = 1.0;
     amy_add_event(&e);
@@ -410,36 +410,36 @@ void example_sequencer_drums_synth(uint32_t start) {
     // Add patterns.
     // Hi hat every 8 ticks.
     e = amy_default_event();
-    e.sequence[SEQUENCE_TAG] = 0;
-    e.sequence[SEQUENCE_PERIOD] = 24;
-    e.sequence[SEQUENCE_TICK] = 0;
+    e.ticks[TICKS_TAG] = 0;
+    e.ticks[TICKS_PERIOD] = 24;
+    e.ticks[TICKS_TICK] = 0;
     e.synth = 10;
     e.midi_note = 42;  // Closed Hat
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Bass drum every 32 ticks.
-    e.sequence[SEQUENCE_TAG] = 1;
-    e.sequence[SEQUENCE_PERIOD] = 96;
-    e.sequence[SEQUENCE_TICK] = 0;
+    e.ticks[TICKS_TAG] = 1;
+    e.ticks[TICKS_PERIOD] = 96;
+    e.ticks[TICKS_TICK] = 0;
     e.synth = 10;
     e.midi_note = 35;  // Std kick
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Snare every 32 ticks, counterphase to BD.
-    e.sequence[SEQUENCE_TAG] = 2;
-    e.sequence[SEQUENCE_PERIOD] = 96;
-    e.sequence[SEQUENCE_TICK] = 48;
+    e.ticks[TICKS_TAG] = 2;
+    e.ticks[TICKS_PERIOD] = 96;
+    e.ticks[TICKS_TICK] = 48;
     e.synth = 10;
     e.midi_note = 38;  // Snare
     e.velocity = 1.0;
     amy_add_event(&e);
 
     // Cow once every other cycle.
-    e.sequence[SEQUENCE_TAG] = 3;
-    e.sequence[SEQUENCE_PERIOD] = 192;
-    e.sequence[SEQUENCE_TICK] = 180;
+    e.ticks[TICKS_TAG] = 3;
+    e.ticks[TICKS_PERIOD] = 192;
+    e.ticks[TICKS_TICK] = 180;
     e.synth = 10;
     e.midi_note = 56;  // Cowbell
     e.velocity = 1.0;
