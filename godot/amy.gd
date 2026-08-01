@@ -396,7 +396,7 @@ var _KW_PRIORITY: Dictionary = {
 	"start_sample": 56,
 	"stop_sample": 57,
 	"bus": 58,
-        "mode: 59,
+	"mode": 59,
 	"midi_cc": 60,
 	"midi_note_cmd": 61,
 	"cv_trigger": 62,
