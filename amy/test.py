@@ -70,6 +70,19 @@ def amy_send_at(time=0, **kwargs):
   amy.send(**kwargs)
 
 
+def amy_inject_midi_at(time, *midi_bytes):
+  """Feed MIDI bytes once amy.render() reaches the specified time (in ms).
+
+  The MIDI path has no scheduling parameter of its own -- it plays whatever it
+  is handed, when it is handed it -- so timing comes from rendering up to the
+  moment, exactly as amy_send_at() does. Goes through the real byte-stream
+  parser, so running status and interleaved realtime bytes behave as they do
+  for actual MIDI input.
+  """
+  _render_test_clock_to_ms(time)
+  amy.inject_midi_bytes(list(midi_bytes))
+
+
 class AmyTest:
 
   ref_dir = './tests/ref'
@@ -982,12 +995,12 @@ class TestMidiDrums(AmyTest):
     self.default_synths = True
 
   def run(self):
-    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
-    amy.inject_midi(100, 0x99, 35, 100)  # bass
-    amy.inject_midi(400, 0x99, 35, 100)  # bass
-    amy.inject_midi(400, 0x99, 37, 100)  # snare
-    amy.inject_midi(700, 0x99, 37, 100)  # snare
-    amy.inject_midi(900, 0x89, 37, 100)  # snare note off
+    # amy_inject_midi_at args are (time, midi_status_byte, midi_note, midi_vel)
+    amy_inject_midi_at(100, 0x99, 35, 100)  # bass
+    amy_inject_midi_at(400, 0x99, 35, 100)  # bass
+    amy_inject_midi_at(400, 0x99, 37, 100)  # snare
+    amy_inject_midi_at(700, 0x99, 37, 100)  # snare
+    amy_inject_midi_at(900, 0x89, 37, 100)  # snare note off
 
 
 class TestMidiDrumsPatch258(AmyTest):
@@ -1000,12 +1013,12 @@ class TestMidiDrumsPatch258(AmyTest):
   def run(self):
     # The MIDI drums default has amp=5
     amy_send_at(time=0, synth=1, num_voices=1, patch=258)
-    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
-    amy.inject_midi(100, 0x90, 35, 100)  # bass
-    amy.inject_midi(400, 0x90, 35, 100)  # bass
-    amy.inject_midi(400, 0x90, 37, 100)  # snare
-    amy.inject_midi(700, 0x90, 37, 100)  # snare
-    amy.inject_midi(750, 0x80, 37, 100)  # snare note off (should be ignored)
+    # amy_inject_midi_at args are (time, midi_status_byte, midi_note, midi_vel)
+    amy_inject_midi_at(100, 0x90, 35, 100)  # bass
+    amy_inject_midi_at(400, 0x90, 35, 100)  # bass
+    amy_inject_midi_at(400, 0x90, 37, 100)  # snare
+    amy_inject_midi_at(700, 0x90, 37, 100)  # snare
+    amy_inject_midi_at(750, 0x80, 37, 100)  # snare note off (should be ignored)
 
 
 class TestMidiRunningStatusClock(AmyTest):
@@ -1506,8 +1519,8 @@ ic10,1,1,100,1,i%id%vZ"""
 
 
 def send_midi(time=0, synth=1, note=60, vel=0):
-  """Wrap inject_midi with an amy.send-like interface."""
-  amy.inject_midi(time, 0x90 + (synth - 1), note, min(127, int(round(vel * 127))))
+  """Wrap MIDI note injection with an amy.send-like interface."""
+  amy_inject_midi_at(time, 0x90 + (synth - 1), note, min(127, int(round(vel * 127))))
 
 
 class TestOscResetIsScheduled(AmyTest):
@@ -1568,8 +1581,8 @@ class TestPreset257MidiCCs(AmyTest):
   def run(self):
     amy_send_at(time=0, synth=1, patch=257, num_voices=4)
     amy_send_at(time=100, synth=1, note=48, vel=1)
-    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
-    amy.inject_midi(400, 0xB0, 74, 127)  # Make the VCF freq be low - 1/4 of the way from 20 to 8000, so 89 Hz
+    # amy_inject_midi_at args are (time, midi_status_byte, midi_note, midi_vel)
+    amy_inject_midi_at(400, 0xB0, 74, 127)  # Make the VCF freq be low - 1/4 of the way from 20 to 8000, so 89 Hz
     amy_send_at(time=800, synth=1, vel=0)
 
 
@@ -1829,12 +1842,12 @@ class TestGrabMidiNotes(AmyTest):
   def run(self):
     # Disable MIDI on ch10
     amy_send_at(time=0, synth=10, grab_midi_notes=False);
-    # inject_midi args are (time, midi_event_chan, midi_note, midi_vel)
-    amy.inject_midi(100, 0x90, 48, 100)  # low note
-    amy.inject_midi(400, 0x99, 35, 100)  # bass drum (should not sound)
-    amy.inject_midi(500, 0x80, 48, 0)  # low note off
-    amy.inject_midi(700, 0x99, 37, 100)  # snare (should not sound)
-    amy.inject_midi(900, 0x89, 37, 100)  # snare note off
+    # amy_inject_midi_at args are (time, midi_status_byte, midi_note, midi_vel)
+    amy_inject_midi_at(100, 0x90, 48, 100)  # low note
+    amy_inject_midi_at(400, 0x99, 35, 100)  # bass drum (should not sound)
+    amy_inject_midi_at(500, 0x80, 48, 0)  # low note off
+    amy_inject_midi_at(700, 0x99, 37, 100)  # snare (should not sound)
+    amy_inject_midi_at(900, 0x89, 37, 100)  # snare note off
 
 
 class TestMidiNoteCmd(AmyTest):
