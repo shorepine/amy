@@ -172,6 +172,9 @@ void sequencer_recompute() {
 // instead of the given tag value, so it's stored but not addressable or
 // individually cancelable. has_tag true is the normal tag-indexed form: tick
 // and period both zero clears that tag's entry (the only way to cancel one).
+//
+// A one-off whose tick is already due or overdue is not stored at all -- it
+// plays immediately, before returning.  See the comment at that branch.
 uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool has_tag, char *wire) {
     if (sequences == NULL) {  // sequencer_init hasn't run
         free(wire);
@@ -201,11 +204,30 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     sequences[tag].tick = 0;
     sequences[tag].period = 0;
     active_unlink(tag);   // out of the list while it has nothing in it
-    if ((tick == 0 && period == 0) ||  // Non-schedulable event: just clear the tag.
-        (tick != 0 && period == 0 && tick <= amy_global.sequencer_tick_count)) {  // don't schedule things in the past.
+    if (tick == 0 && period == 0) {  // Non-schedulable event: just clear the tag.
         amy_release_lock();
         free(wire);
         return 0;
+    }
+    if (period == 0 && tick <= amy_global.sequencer_tick_count) {
+        // A one-off that is already due or overdue.  Play it NOW rather than
+        // dropping it: a caller that reads the tick clock and schedules
+        // relative to it always runs a little after the tick it read (every
+        // Python path arrives via a deferred callback), and at 48 PPQ any
+        // offset under a tick rounds straight back onto the current count.
+        // Dropping made that lost race silent -- it is what made the Tulip
+        // arpeggiator play nothing at all.  Late by a fraction of a tick beats
+        // never, and it restores what the old millisecond time= did with a
+        // past-due event.  NB tick==0 is the cancel form, handled above, so it
+        // never reaches here.
+        //
+        // Play outside the lock and free after, exactly as the tick loop does:
+        // amy_queue_lock is a plain non-recursive mutex and amy_play_message()
+        // re-enters the parser, which can land back in this function.
+        amy_release_lock();
+        amy_play_message(wire);
+        free(wire);
+        return 1;
     }
     sequences[tag].tick = tick;
     sequences[tag].period = period;
@@ -235,8 +257,15 @@ static void sequencer_process_tick(void) {
                 uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
                 if (offset == sequences[tag].tick) hit = true;
             } else {
-                // Test for absolute tick (no period set)
-                if (sequences[tag].tick == amy_global.sequencer_tick_count) { hit = true; delete = true; }
+                // Test for absolute tick (no period set).  <= rather than ==:
+                // the walk above runs without the lock, and a stale link can
+                // make it skip an entry for a single tick (see the thread
+                // safety note).  Under ==, a slot skipped on exactly its tick
+                // would sit there forever, holding an anon slot and never
+                // playing.  <= lets it fire on the next tick instead, matching
+                // the play-it-late rule sequencer_add_wire() uses for a
+                // one-off that is already due when it arrives.
+                if (sequences[tag].tick <= amy_global.sequencer_tick_count) { hit = true; delete = true; }
             }
             if(hit) {
                 // Take the message out (one-shot) or a copy of it (repeating)
