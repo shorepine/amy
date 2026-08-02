@@ -166,7 +166,7 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs)
 
 static PyObject * amystop_wrapper(PyObject *self, PyObject *args) {
     amy_stop();
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
@@ -177,7 +177,7 @@ static PyObject * amystart_wrapper(PyObject *self, PyObject *args) {
     amy_config_t amy_config = amy_global.config; // amy_default_config();
     amy_config.features.default_synths = default_synths;
     amy_start(amy_config); // initializes amy 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject * config_wrapper(PyObject *self, PyObject *args) {
@@ -205,27 +205,12 @@ static PyObject * render_wrapper(PyObject *self, PyObject *args) {
     return ret;
 }
 
-static PyObject * inject_midi_wrapper(PyObject *self, PyObject *args) {
-#define MAX_MIDI_ARGS 16
-    int data[MAX_MIDI_ARGS];
-    uint8_t byte_data[MAX_MIDI_ARGS];
-    uint32_t time = AMY_UNSET_VALUE(time);
-    // But for now we accept only exactly 3 or 4 values: [time,] midi_bytes0..2
-    if (!PyArg_ParseTuple(args, "iiii", &time, &data[0], &data[1], &data[2])
-        && !PyArg_ParseTuple(args, "iii", &data[0], &data[1], &data[2]))
-        return NULL;
-    uint8_t sysex = 0;
-    for (int i = 0; i < 3; ++i)  byte_data[i] = (uint8_t)data[i];
-    amy_event_midi_message_received(byte_data, 3, sysex, time);
-    return Py_None;
-}
-
 static PyObject * inject_midi_bytes_wrapper(PyObject *self, PyObject *args) {
     // Feed a raw MIDI byte stream through the real byte-stream parser
-    // (convert_midi_bytes_to_messages) -- exercises running status, real-time
-    // interleaving, etc. Unlike inject_midi, which hands a pre-formed 3-byte
-    // message straight to amy_event_midi_message_received, this is the only way
-    // to test the parser from Python.
+    // (convert_midi_bytes_to_messages), so running status and interleaved
+    // real-time bytes behave exactly as they do for actual MIDI input. This is
+    // the only MIDI entry point from Python: there is no scheduling parameter
+    // because live MIDI has no time of its own -- it plays when it arrives.
     PyObject *seq;
     int usb = 0;
     if (!PyArg_ParseTuple(args, "O|i", &seq, &usb))
@@ -239,7 +224,7 @@ static PyObject * inject_midi_bytes_wrapper(PyObject *self, PyObject *args) {
     Py_DECREF(fast);
     convert_midi_bytes_to_messages(buf, (size_t)n, (uint8_t)usb);
     free(buf);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef c_amyMethods[] = {
@@ -248,7 +233,6 @@ static PyMethodDef c_amyMethods[] = {
     {"start", amystart_wrapper, METH_VARARGS, "Start AMY"},
     {"stop", amystop_wrapper, METH_VARARGS, "Stop AMY"},
     {"config", config_wrapper, METH_VARARGS, "Return config"},
-    {"inject_midi", inject_midi_wrapper, METH_VARARGS, "Inject a MIDI message"},
     {"inject_midi_bytes", inject_midi_bytes_wrapper, METH_VARARGS, "Inject a raw MIDI byte stream through the parser"},
 #include "amy_c_api_py_table.inc"
     { NULL, NULL, 0, NULL }

@@ -397,16 +397,11 @@ def restart(default_synths=0):
     _amy.stop()
     _amy.start(default_synths)
 
-def inject_midi(a, b, c, d=None):
-    if d is None:
-        _amy.inject_midi(a, b, c)
-    else:
-        _amy.inject_midi(a, b, c, d)
-
 def inject_midi_bytes(data, usb=0):
     # Feed a raw MIDI byte stream (list/tuple/bytes of ints) through AMY's
-    # byte-stream parser, exercising running status and real-time interleaving --
-    # unlike inject_midi(), which injects a single pre-formed message.
+    # byte-stream parser, exercising running status and real-time interleaving
+    # just as real MIDI input does. There is no scheduling argument: live MIDI
+    # has no time of its own, it plays when it arrives.
     _amy.inject_midi_bytes(data, usb)
 
 def unload_sample(preset=0):

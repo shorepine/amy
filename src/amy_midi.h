@@ -92,8 +92,11 @@ void midi_out(uint8_t * bytes, uint16_t len);
 void midi_local(uint8_t * bytes, uint16_t len);
 void amy_send_midi_note_off(uint16_t osc);
 void amy_send_midi_note_on(uint16_t osc);
-// For pyamy inject_midi
-void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex, uint32_t time);
+// Live MIDI carries no scheduling time of its own -- a message plays when it
+// arrives. (Events that DO need a time, e.g. the wave=AMY_MIDI osc emitting
+// from a scheduled event, go through midi_message_handler_to_queue directly,
+// which still takes one.)
+void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex);
 
 #ifdef ESP_PLATFORM
 #define MIDI_TASK_COREID (0)
