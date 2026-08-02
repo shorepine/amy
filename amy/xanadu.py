@@ -58,7 +58,6 @@ def note1_patch(pan=0.5):
     """Return the setup string for note1 (guitar string)."""
     osc = 0
     modosc = 1
-    message = []
     return amy_message_of_send_args([
         {'osc': modosc, 'wave': amy.SINE, 'freq': 5, 'amp': 0.005},
         {'osc': osc, 'wave': amy.SAW_DOWN, 'freq': '440,1,0,0,0,1', 'mod_source': modosc,
