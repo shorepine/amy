@@ -360,7 +360,11 @@ void esp_fill_audio_buffer_task() {
             _rl_render_us += (_rl_render_us_unsmooth - _rl_render_us) >> 5;  // 0.03125 * delta, settle time ~30 steps
             if (_rl_now - _rl_last_print > 500000) {
                 _rl_last_print = _rl_now;
-                amy_printf("RENDER_LOAD ms=%lu render_us=%d\n", (unsigned long)(_rl_now/1000), _rl_render_us);
+                // Raw fprintf, not amy_printf: this is the load-sweep bench's
+                // instrumentation output (measure.py parses these lines over
+                // serial), already opt-in via ARDUINO_SPEEDTEST -- it must
+                // print whether or not AMY_PRINT is set.
+                fprintf(stderr, "RENDER_LOAD ms=%lu render_us=%d\n", (unsigned long)(_rl_now/1000), _rl_render_us);
                 fflush(stderr);
             }
         }
