@@ -222,6 +222,28 @@ void snprintfloat3dp(char *s, size_t max_len, float val) {
         } \
     }     \
 }
+// As _EPRINT_I_SEQ but unsigned. ticks needs this: its values are uint32_t,
+// and printing one past INT32_MAX as a negative number makes the unsigned
+// list parser on the other end stop at the '-' -- for a 3-value ticks that
+// silently turned an (invalid, should-be-rejected) tag into a 2-value
+// anonymous entry.
+#define _EPRINT_U_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
+    int last_set = -1; \
+    for (int i = 0; i < LEN; ++i) {    \
+        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
+    }                                              \
+    if (last_set >= 0) { \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        s += strlen(s);  \
+        for (int i = 0; i <= last_set; ++i) { \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
+            if (AMY_IS_SET(e->FIELD[i])) { \
+                snprintf(s, len - (size_t)(s - s_entry), "%" PRIu32, (uint32_t)e->FIELD[i]); \
+                s += strlen(s); \
+            } \
+        } \
+    }     \
+}
 #define _EPRINT_F_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
     int last_set = -1; \
     for (int i = 0; i < LEN; ++i) {    \
@@ -296,12 +318,12 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%u, addr_osc=%d adr_syn=%d adr_bus=%d): ", e->time, (unsigned)e->osc,
                  event_addresses_oscs(e), event_addresses_synth(e), event_addresses_bus(e));
         s += strlen(s);
-        _EPRINT_I_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
     } else {
         // e->time has no wire representation anymore (there's no 't' command);
         // it's only ever meaningful as this event's own near-term playback time.
         // ticks ("H") must always be the first entry in wire code if used.
-        _EPRINT_I_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
         _EPRINT_I(osc, "osc", "v");
     }
     _EPRINT_I(wave, "wave", "w");
