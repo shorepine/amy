@@ -13,8 +13,8 @@ C_SOURCES = ${AMY}/amy.c ${AMY}/oscillators.c ${AMY}/algorithms.c ${AMY}/envelop
 C_INCLUDES += -I${AMY} -DAMY_DAISY -Wno-strict-aliasing -Wextra -Wno-unused-parameter -Wpointer-arith -Wno-float-conversion -Wno-missing-declarations
 
 # Library Locations
-LIBDAISY_DIR = ${HOME}/Desktop/DaisyExamples/libDaisy
-DAISYSP_DIR = ${HOME}/Desktop/DaisyExamples/DaisySP
+LIBDAISY_DIR = ${HOME}/github/electro-smith/libDaisy
+DAISYSP_DIR = ${HOME}/github/electro-smith/DaisySP
 
 # Core location, and generic makefile.
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core
