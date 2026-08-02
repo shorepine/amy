@@ -159,7 +159,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
-void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float val) {
+void snprintcodefloat(char *s, size_t max_len, char *code, float val) {
     // Skip trailing zeros (and decimal point) when printing a float.
     float testval = val;
     char fmt[7]; // = "%s%.0f";
@@ -181,9 +181,13 @@ void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float v
     snprintf(s, max_len, fmt, code, val);
 }
 
+void snprintfloat3dp(char *s, size_t max_len, float val) {
+    // Print a single float value with up to 3 decimal places, but no more.
+    snprintcodefloat(s, max_len, "", val);
+}
 
 #define _EPRINT_I(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintf(s, len - (size_t)(s - s_entry), "%s%" PRId32, wirecode ? WIRECODE : " " NAME ": ", (int32_t)e->FIELD); s += strlen(s); }
-#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintfloat(s, len - (size_t)(s - s_entry), "%s%.3f", wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
+#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintcodefloat(s, len - (size_t)(s - s_entry), wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
 #define _EPRINT_COEF(FIELD, NAME, WIRECODE) {            \
     int last_set = -1; \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {    \
@@ -195,7 +199,7 @@ void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float v
         for (int i = 0; i <= last_set; ++i) { \
             if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }      \
             if (AMY_IS_SET(e->FIELD[i])) {        \
-                snprintfloat(s, len - (size_t)(s - s_entry), "%s%.3f", "", e->FIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->FIELD[i]); \
                 s += strlen(s);  \
             }   \
         } \
@@ -229,7 +233,7 @@ void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float v
         for (int i = 0; i <= last_set; ++i) { \
             if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->FIELD[i])) { \
-                snprintfloat(s, len - (size_t)(s - s_entry), "%s%.3f", "", e->FIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->FIELD[i]); \
                 s += strlen(s); \
             } \
         } \
@@ -253,7 +257,7 @@ void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float v
             snprintf(s, len - (size_t)(s - s_entry), ",");                   \
             s += strlen(s);    \
             if (AMY_IS_SET(e->VFIELD[i])) {       \
-                snprintfloat(s, len - (size_t)(s - s_entry), "%s%.3f", "", e->VFIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->VFIELD[i]); \
                 s += strlen(s);  \
             }  \
         }                                            \
@@ -272,7 +276,7 @@ void snprintfloat(char *s, size_t max_len, char *fmt_unused, char *code, float v
             s += strlen(s); \
             for (int j = 0; j <= last_one; ++j) {  \
                 if (AMY_IS_SET(vals[j])) { \
-                    snprintfloat(s, len - (size_t)(s - s_entry), "%s%.3f", "", vals[j]); \
+                    snprintfloat3dp(s, len - (size_t)(s - s_entry), vals[j]); \
                     s += strlen(s); \
                 } \
                 if (j < last_one) { \
