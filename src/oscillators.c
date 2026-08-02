@@ -48,7 +48,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
         // skipping lut_hop samples per sample, its bandwidth will increase 
         // proportionately.
         float interp_bandwidth = lut_bandwidth * lut_hop;
-        //printf("period=%f freq=%f lut_size=%d interp_bandwidth=%f\n", period, ((float)AMY_SAMPLE_RATE)/period, lut_size, interp_bandwidth);
+        //amy_printf("period=%f freq=%f lut_size=%d interp_bandwidth=%f\n", period, ((float)AMY_SAMPLE_RATE)/period, lut_size, interp_bandwidth);
         if (interp_bandwidth < 0.9f) {
             // No aliasing, even with a 10% buffer (i.e., 19.8 kHz).
             break;
@@ -304,7 +304,7 @@ void pulse_note_on(uint16_t osc, float freq) {
 }
 
 void _pulse_note_on(uint16_t osc) {
-    //printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, synth[osc]->logfreq, msynth[osc]->amp, msynth[osc]->last_amp);
+    //amy_printf("pulse_note_on: time %lld osc %d logfreq %f amp %f last_amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, synth[osc]->logfreq, msynth[osc]->amp, msynth[osc]->last_amp);
     if (synth[osc]->lut == NULL) {
         float freq = freq_of_logfreq(msynth[osc]->logfreq);
         float period_samples = (float)AMY_SAMPLE_RATE / freq;
@@ -375,7 +375,7 @@ void saw_note_on(uint16_t osc, int8_t direction_notused, float freq) {
 }
 
 void _saw_note_on(uint16_t osc) {
-    //printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, synth[osc]->logfreq, msynth[osc]->amp, msynth[osc]->last_amp, P2F(synth[osc]->phase));
+    //amy_printf("saw_note_on: time %lld osc %d freq %f logfreq %f amp %f last_amp %f phase %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, synth[osc]->logfreq, msynth[osc]->amp, msynth[osc]->last_amp, P2F(synth[osc]->phase));
     if (synth[osc]->lut == NULL) {
         float freq = freq_of_logfreq(msynth[osc]->logfreq);
         float period_samples = ((float)AMY_SAMPLE_RATE / freq);
@@ -393,7 +393,7 @@ void saw_up_note_on(uint16_t osc, float freq) {
 SAMPLE render_saw(SAMPLE* buf, uint16_t osc, int8_t direction) {
     _saw_note_on(osc);
     return render_lpf_lut(buf, osc, false, direction, /* dc offset */ 0);
-    //printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
+    //amy_printf("render_saw: time %lld osc %d buf[]=%f %f %f %f %f %f %f %f\n",
     //       amy_global.total_blocks*AMY_BLOCK_SIZE, osc, S2F(buf[0]), S2F(buf[1]), S2F(buf[2]), S2F(buf[3]), S2F(buf[4]), S2F(buf[5]), S2F(buf[6]), S2F(buf[7]));
 }
 
@@ -543,7 +543,7 @@ void sine_note_on(uint16_t osc, float freq) {
 }
 
 void _sine_note_on(uint16_t osc, float freq) {
-    //fprintf(stderr, "sine_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
+    //amy_printf("sine_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
     // There's really only one sine table, but for symmetry with the other ones...
     if (synth[osc]->lut == NULL) {
         float period_samples = (float)AMY_SAMPLE_RATE / freq;
@@ -557,7 +557,7 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
-    //fprintf(stderr, "render_sine: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
+    //amy_printf("render_sine: time %f osc %d freq %f last_amp %f amp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp));
     SAMPLE max_value;
     //synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
     synth[osc]->phase = render_lut_256(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
@@ -662,7 +662,7 @@ SAMPLE compute_mod_noise(uint16_t osc) {
         // phase wrapped, take new sample.
         synth[osc]->last_two[0] = MULA_SS(amy_get_random(), amp);
     }
-    //printf("mod_noise: time %lld fstep %f samp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, fstep, S2F(synth[osc]->last_two[0]));
+    //amy_printf("mod_noise: time %lld fstep %f samp %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, fstep, S2F(synth[osc]->last_two[0]));
     return synth[osc]->last_two[0];
 }
 
@@ -705,7 +705,7 @@ AMY_IRAM_ATTR SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
-    //printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc]->logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc]->lut->table_size);
+    //amy_printf("render_partial: time %.3f logfreq %f freq %f last_amp %f amp %f step %f\n", (float)amy_global.total_blocks*AMY_BLOCK_SIZE/(float)AMY_SAMPLE_RATE, msynth[osc]->logfreq, freq, S2F(last_amp), S2F(amp), P2F(step) * synth[osc]->lut->table_size);
     SAMPLE max_value;
     //synth[osc]->phase = render_lut(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     synth[osc]->phase = render_lut_256(buf, synth[osc]->phase, step, last_amp, amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
@@ -754,7 +754,7 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
             }
         }
     }
-    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, S2F(amp), S2F(max_value));
+    //amy_printf("render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, S2F(amp), S2F(max_value));
     return max_value;
 }
 
@@ -777,7 +777,7 @@ void ks_note_on(uint16_t osc) {
     }
     ks_polyphony_index++;
     if(ks_polyphony_index == AMY_KS_OSCS) ks_polyphony_index = 0;
-    //fprintf(stderr, "ks_note_on: osc %d buflen %d poly_index %d\n", osc, buflen, ks_polyphony_index);
+    //amy_printf("ks_note_on: osc %d buflen %d poly_index %d\n", osc, buflen, ks_polyphony_index);
 }
 
 void ks_note_off(uint16_t osc) {
@@ -801,7 +801,7 @@ void ks_deinit(void) {
 
 #ifdef AMY_WAVETABLE
 void wavetable_note_on(uint16_t osc, float freq) {
-    //fprintf(stderr, "wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
+    //amy_printf("wavetable_note_on: time %f osc %d freq %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, freq_of_logfreq(synth[osc]->logfreq_coefs[0]));
     //float period_samples = (float)AMY_SAMPLE_RATE / freq;
     //synth[osc]->lut = wavetable_lut;  // TODO(dpwe): choose based on synth[osc]->preset.
 }
@@ -823,7 +823,7 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     PHASOR step = F2P(freq / (float)AMY_SAMPLE_RATE);
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
-    //fprintf(stderr, "render_wavetable: time %f osc %d freq %f last_amp %f amp %f preset %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp), synth[osc]->preset);
+    //amy_printf("render_wavetable: time %f osc %d freq %f last_amp %f amp %f preset %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, AMY_SAMPLE_RATE * P2F(step), S2F(last_amp), S2F(amp), synth[osc]->preset);
     int16_t wavetable_preset = synth[osc]->preset;
     if (AMY_IS_UNSET(wavetable_preset))
         wavetable_preset = PCM_WAVETABLE_BASE;

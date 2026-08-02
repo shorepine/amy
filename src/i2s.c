@@ -213,13 +213,13 @@ amy_err_t esp32_setup_i2s(void) {
             ret = i2c_master_bus_add_device(bus_handle, &dev_conf, &dev_handle);
         }
         if (ret != ESP_OK) {
-            fprintf(stderr, "PCM9211: I2C init failed: %s\n", esp_err_to_name(ret));
+            amy_printf("PCM9211: I2C init failed: %s\n", esp_err_to_name(ret));
         } else {
             for (int i = 0; i < sizeof(pcm9211_regs) / sizeof(pcm9211_regs[0]); i++) {
                 uint8_t buf[2] = { pcm9211_regs[i][0], pcm9211_regs[i][1] };
                 ret = i2c_master_transmit(dev_handle, buf, 2, 100);
                 if (ret != ESP_OK) {
-                    fprintf(stderr, "PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
+                    amy_printf("PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
                         buf[0], buf[1], esp_err_to_name(ret));
                 }
             }
@@ -308,7 +308,7 @@ void esp_read_i2s_input() {
     i2s_channel_read(rx_handle, amy_in_block, AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(output_sample_type), &read, portMAX_DELAY);
 #endif
     if(read != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
-        fprintf(stderr,"i2s input underrun: %d vs %d\n", read, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
+        amy_printf("i2s input underrun: %d vs %d\n", read, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
     }
 }
 
@@ -360,7 +360,7 @@ void esp_fill_audio_buffer_task() {
             _rl_render_us += (_rl_render_us_unsmooth - _rl_render_us) >> 5;  // 0.03125 * delta, settle time ~30 steps
             if (_rl_now - _rl_last_print > 500000) {
                 _rl_last_print = _rl_now;
-                fprintf(stderr, "RENDER_LOAD ms=%lu render_us=%d\n", (unsigned long)(_rl_now/1000), _rl_render_us);
+                amy_printf("RENDER_LOAD ms=%lu render_us=%d\n", (unsigned long)(_rl_now/1000), _rl_render_us);
                 fflush(stderr);
             }
         }
@@ -477,7 +477,7 @@ size_t amy_i2s_write(const uint8_t *buffer, size_t nbytes) {
 #endif
 
     if(written != AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE) {
-        fprintf(stderr,"i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
+        amy_printf("i2s output underrun: %d vs %d\n", written, AMY_BLOCK_SIZE * AMY_NCHANS * I2S_BYTES_PER_SAMPLE);
     }
     return 1;
 }

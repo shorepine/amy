@@ -108,7 +108,7 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
             found = bp_r - 1; // segment before release defines sustain
             scale = F2S(synth[osc]->breakpoint_values[bp_set][found]);
             synth[osc]->last_scale[bp_set] = scale;
-            //printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, S2F(scale));
+            //amy_printf("env: time %lld bpset %d seg %d SUSTAIN %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, S2F(scale));
             //return scale;
             goto return_label;
         }
@@ -121,7 +121,7 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
         // Release starts from wherever we got to
         v0 = synth[osc]->last_scale[bp_set];
         if(elapsed > synth[osc]->breakpoint_times[bp_set][bp_r]) {
-            //printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, msynth[osc]->amp);
+            //amy_printf("cbp: time %f osc %d amp %f OFF\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, msynth[osc]->amp);
             // Synth is now turned off in hold_and_modify, which tracks when the amplitude goes to zero (and waits a bit).
             //AMY_UNSET(synth[osc]->note_off_clock);
             scale = F2S(synth[osc]->breakpoint_values[bp_set][bp_r]);
@@ -197,7 +197,7 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
                                          - exp2_lut(MUL4_SS(exponential_rate,
                                                             F2S(time_ratio)))));
             if (scale < 0)  scale = 0;  // Overshoot ramp-to-zero from limited resolution?
-            //printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, time_ratio, S2F(scale));
+            //amy_printf("false_exponential time %lld bpset %d seg %d time_ratio %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, bp_set, found, time_ratio, S2F(scale));
         }
     }
  return_label:
@@ -209,7 +209,7 @@ AMY_IRAM_ATTR SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint
     // Keep track of the most-recently returned non-release scale.
     //static int last_seg = -1;
     //if (osc < AMY_OSCS && found != -1 && last_seg != found) {
-    //  fprintf(stderr, "\renv: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
+    //  amy_printf("\renv: time %f osc %d bpset %d seg %d type %d t0 %d t1 %d elapsed %d v0 %f v1 %f scale %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, osc, bp_set, found, eg_type, t0, t1, elapsed, S2F(v0), S2F(v1), S2F(scale));
     //  last_seg = found;
     //}
     AMY_PROFILE_STOP(COMPUTE_BREAKPOINT_SCALE)

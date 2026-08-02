@@ -132,7 +132,7 @@ static inline void copy(SAMPLE* a, SAMPLE* b) {
 SAMPLE render_mod(SAMPLE *in, SAMPLE* out, uint16_t osc, SAMPLE feedback_level, uint16_t algo_osc, SAMPLE amp) {
 
     hold_and_modify(osc);
-    //printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc]->amp);
+    //amy_printf("render_mod: osc %d msynth.amp %f\n", osc, msynth[osc]->amp);
 
     // out = buf
     // in = mod
@@ -255,7 +255,7 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
             copy(out_buf, BUS_ONE);
         }
     }
-    //fprintf(stderr, "render_algo: time %.3f osc %d last_amp %f amp %f max_val=%f\n", amy_global.time, osc, (msynth[osc]->last_amp), (msynth[osc]->amp), S2F(max_value));
+    //amy_printf("render_algo: time %.3f osc %d last_amp %f amp %f max_val=%f\n", amy_global.time, osc, (msynth[osc]->last_amp), (msynth[osc]->amp), S2F(max_value));
     // TODO, i need to figure out what happens on note offs for algo_sources.. they should still render..
     return max_value;
 }

@@ -41,7 +41,7 @@ float atoff(const char *s) {
         frac /= powf(10.f, (float)fraclen);
         if (is_negative) frac = -frac;
     }
-    //fprintf(stderr, "input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
+    //amy_printf("input was %s output is %f + %f = %f\n", s_in, whole, frac, whole+frac);
     return whole + frac;
 }
 
@@ -88,7 +88,7 @@ float atoff(const char *s) {
             ++num_vals_received; \
         } \
         if (c < stop) { \
-            fprintf(stderr, "WARNING: parse__list_##type: More than %d values in \"%s\"\n", \
+            amy_printf("WARNING: parse__list_##type: More than %d values in \"%s\"\n", \
             max_num_vals, message); \
         } else { /* pad to end */       \
             for (int i = num_vals_received; i < max_num_vals; ++i) {  \
@@ -361,7 +361,7 @@ int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_c
         if (*(message + pos + skip_chars) != ',') {
             if (AMY_IS_UNSET(code) || AMY_IS_SET(is_log)) {
                 // Either parsing bailed without even a CC code, or it got past the is_log, meaning it wasn't a bare ic<NUM> command.
-                fprintf(stderr, "synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
+                amy_printf("synth_layer: midi mapping payload didn't parse for %s.\n", message - 1);
                 return pos + skip_chars;  // maybe the rest will parse?
             }
             // Else we got an incomplete message with a valid CC code - clear it
@@ -414,7 +414,7 @@ int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
     if (*(message + skip_chars) != ',') {
         if (AMY_IS_UNSET(gate_cv) || AMY_IS_SET(thresh_high)) {
             // Either parsing bailed without even a gate CV, or it got past the thresh, meaning it wasn't a bare ic<NUM> command.
-            fprintf(stderr, "cv_trigger: payload didn't parse for %s.\n", message - 1);
+            amy_printf("cv_trigger: payload didn't parse for %s.\n", message - 1);
             return skip_chars;  // maybe the rest will parse?
         }
         // Else we got an incomplete message with a valid gate_cv - clear all triggers for that CV.
@@ -457,7 +457,7 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     else if (cmd == 'V')  e->synth_level = atoff(message);  // Per-instrument level, default 1.
     else if (cmd == 'y')  e->bus = atoi(message);  // 'i1iy1' is the same as 'i1y1'.
     else if (cmd == 'c' || cmd == 'o') skip_chars = midi_mapping_from_message(message, cmd, e->synth, skip_chars);
-    else fprintf(stderr, "Unrecognized synth-level command '%s'\n", message - 1);
+    else amy_printf("Unrecognized synth-level command '%s'\n", message - 1);
     return skip_chars;
 }
 
@@ -604,7 +604,7 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         amy_external_midi_sync((uint8_t)atoi(message));
         return 1;
     }
-    else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
+    else amy_printf("Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;
 }
 
@@ -622,11 +622,11 @@ int _next_alpha(char *s) {
 
 
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
-    //fprintf(stderr, "yield_event_from_message in:  pos %d message %s\n", pos, message);
+    //amy_printf("yield_event_from_message in:  pos %d message %s\n", pos, message);
     // Parse the wire string into an event
     if (message[pos] == '\0')  pos = 0;  // Hit end of string
     else pos += amy_parse_message(message + pos, e);
-    //fprintf(stderr, "yield_event_from_message out: pos %d event\n", pos);
+    //amy_printf("yield_event_from_message out: pos %d event\n", pos);
     //fprintf_event_stderr(e);
     return pos;
 }
@@ -805,7 +805,7 @@ int amy_parse_message(char * message, amy_event *e) {
         }
         // Skip over arg, line up for the next cmd.
         ++pos;  // move over the current command.
-        if (pos > length) fprintf(stderr, "parse string overrun %d %d %s\n", pos, length, message);
+        if (pos > length) amy_printf("parse string overrun %d %d %s\n", pos, length, message);
         pos += _next_alpha(message + pos);  // Skip over any non-alpha argument to the current command.
     }
  end:

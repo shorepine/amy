@@ -235,12 +235,12 @@ void start_receiving_file_transfer(uint32_t length, const char *filename) {
     }
     if (amy_global.config.amy_external_fopen_hook == NULL || amy_global.config.amy_external_fwrite_hook == NULL || amy_global.config.amy_external_fclose_hook == NULL) {
 
-        fprintf(stderr, "file transfer hooks not enabled on platform\n");
+        amy_printf("file transfer hooks not enabled on platform\n");
         return;
     }
         uint32_t handle = amy_global.config.amy_external_fopen_hook((char *)filename, "wb");
     if (handle == HANDLE_INVALID) {
-        fprintf(stderr, "could not open file for transfer: %s\n", filename);
+        amy_printf("could not open file for transfer: %s\n", filename);
         return;
     }
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_FILE;
@@ -553,7 +553,7 @@ static int _zdump_stream_init(_zdump_stream *c) {
     c->enc     = (uint8_t *)malloc_caps(ZDUMP_CHUNK_B64_MAX + 4, amy_global.config.ram_caps_sysex);
     c->frame   = (uint8_t *)malloc_caps(ZDUMP_CHUNK_B64_MAX + 6, amy_global.config.ram_caps_sysex);
     if (!c->raw_buf || !c->enc || !c->frame) {
-        fprintf(stderr, "zD: stream init malloc failed (raw=%p enc=%p frame=%p)\n",
+        amy_printf("zD: stream init malloc failed (raw=%p enc=%p frame=%p)\n",
                 (void *)c->raw_buf, (void *)c->enc, (void *)c->frame);
         return -1;
     }
@@ -652,13 +652,13 @@ void amy_dump_file_to_sysex(const char *filename) {
     if (!amy_global.config.amy_external_fopen_hook ||
         !amy_global.config.amy_external_fread_hook  ||
         !amy_global.config.amy_external_fclose_hook) {
-        fprintf(stderr, "zD: file I/O hooks unavailable\n");
+        amy_printf("zD: file I/O hooks unavailable\n");
         sequencer_midi_start();
         return;
     }
     uint32_t fh = amy_global.config.amy_external_fopen_hook((char *)filename, "r");
     if (!fh) {
-        fprintf(stderr, "zD: could not open '%s'\n", filename);
+        amy_printf("zD: could not open '%s'\n", filename);
         sequencer_midi_start();
         return;
     }
@@ -670,7 +670,7 @@ void amy_dump_file_to_sysex(const char *filename) {
     }
     uint8_t *read_buf = (uint8_t *)malloc_caps(ZDUMP_STREAM_RAW_CHUNK, amy_global.config.ram_caps_sysex);
     if (!read_buf) {
-        fprintf(stderr, "zD: malloc read_buf(%d) FAILED\n", ZDUMP_STREAM_RAW_CHUNK);
+        amy_printf("zD: malloc read_buf(%d) FAILED\n", ZDUMP_STREAM_RAW_CHUNK);
         _zdump_stream_destroy(&stream);
         amy_global.config.amy_external_fclose_hook(fh);
         sequencer_midi_start();

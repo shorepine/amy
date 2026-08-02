@@ -147,7 +147,7 @@ AMY_IRAM_ATTR void partials_hold_and_modify(uint16_t osc) {
     //msynth[osc]->pan = p_combine_controls(ctrl_inputs, synth[osc]->pan_coefs);
     // Don't smear the pan on first frame of new note
     ///if (synth[osc]->note_on_clock == amy_global.total_samples) {
-    //    //fprintf(stderr, "time %.3f osc %d note on\n", amy_global.time, osc);
+    //    //amy_printf("time %.3f osc %d note on\n", amy_global.time, osc);
     //    // First frame for this osc since note-on, don't smooth-over the pan.
     //    // (showed up when panning drum sounds).
     //    msynth[osc]->last_pan = msynth[osc]->pan;
@@ -197,7 +197,7 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
 
     // now, render everything, add it up
     float midi_note = midi_note_for_logfreq(msynth[osc]->logfreq);
-    //fprintf(stderr, "t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
+    //amy_printf("t=%u partials o=%d msynth[osc]->logfreq=%f midi_note=%f msynth[amp]=%f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, msynth[osc]->logfreq, midi_note, msynth[osc]->amp);
     assert(osc < AMY_OSCS - (num_oscs + 1));  // We won't overrun.
     for(uint16_t o = osc + 1; o < osc + 1 + num_oscs; o++) {
         if(synth[o]->role == SYNTH_IS_ALGO_SOURCE) {
@@ -209,10 +209,10 @@ AMY_IRAM_ATTR SAMPLE render_partials(SAMPLE *buf, uint16_t osc) {
             // envelope value are delayed by 1 frame compared to other oscs
             // so that partials fade in over one frame from zero amp.
             partials_hold_and_modify(o);
-            //printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
+            //amy_printf("[%d %d] %d amp %f (%f) freq %f (%f) on %d off %d bp0 %d %f bp1 %d %f wave %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE, ms_since_started, o, synth[o]->amp, msynth[o]->amp, synth[o]->freq, msynth[o]->freq, synth[o]->note_on_clock, synth[o]->note_off_clock, synth[o]->breakpoint_times[0][0], 
             //    synth[o]->breakpoint_values[0][0], synth[o]->breakpoint_times[1][0], synth[o]->breakpoint_values[1][0], synth[o]->wave);
             SAMPLE value = render_partial(buf, o);
-            //fprintf(stderr, "render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
+            //amy_printf("render_partials: time %.3f osc %d ctl ampt %.6f msynth_amp %.6f max_val=%.6f\n", amy_global.time, o, msynth[osc]->amp, msynth[o]->amp, S2F(value));
             if (value > max_value) max_value = value;
         }
     }
@@ -340,7 +340,7 @@ void interp_partials_note_on(uint16_t osc) {
     int harmonic_base_index_ph_vh =
         _harmonic_base_index_for_pitch_vel(pitch_index + 1, vel_index + 1, partials_voice);
     float alpha_ph_vh = (pitch_alpha) * (vel_alpha);
-    //fprintf(stderr, "interp_partials@%u: osc %d note %.1f vel %.1f pitch_x %d vel_x %d numh %d harm_bi_ll %d pitch_a %.3f vel_a %.3f alphas %.2f %.2f %.2f %.2f\n",
+    //amy_printf("interp_partials@%u: osc %d note %.1f vel %.1f pitch_x %d vel_x %d numh %d harm_bi_ll %d pitch_a %.3f vel_a %.3f alphas %.2f %.2f %.2f %.2f\n",
     //        amy_global.total_blocks*AMY_BLOCK_SIZE, osc, midi_note, midi_vel, pitch_index, vel_index, num_harmonics,
     //        harmonic_base_index_pl_vl, pitch_alpha, vel_alpha,
     //        alpha_pl_vl, alpha_pl_vh, alpha_ph_vl, alpha_ph_vh);
@@ -364,7 +364,7 @@ void interp_partials_note_on(uint16_t osc) {
                                              alpha_ph_vl, partials_voice);
             _cumulate_scaled_harmonic_params(harm_param, harmonic_base_index_ph_vh + h,
                                              alpha_ph_vh, partials_voice);
-            //fprintf(stderr, "harm %d freq %.2f bps %.3f %.3f %.3f %.3f\n", h, harm_param[0], harm_param[1], harm_param[2], harm_param[3], harm_param[4]);
+            //amy_printf("harm %d freq %.2f bps %.3f %.3f %.3f %.3f\n", h, harm_param[0], harm_param[1], harm_param[2], harm_param[3], harm_param[4]);
             ++partial_osc;
             _osc_on_with_harm_param(partial_osc, harm_param, partials_voice);
         }

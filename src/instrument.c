@@ -23,18 +23,18 @@ struct voice_fifo {
 // Fifo must provide init, put, get, remove, empty
 
 void voice_fifo_debug(struct voice_fifo *fifo) {
-    fprintf(stderr, "fifo %s entries 0x%lx len %d head %d tail %d: ", fifo->name, (long)fifo->entries, fifo->length, fifo->head, fifo->tail);
+    amy_printf("fifo %s entries 0x%lx len %d head %d tail %d: ", fifo->name, (long)fifo->entries, fifo->length, fifo->head, fifo->tail);
     uint8_t current = fifo->tail;
     while(current != fifo->head) {
-        fprintf(stderr, "%d ", fifo->entries[current]);
+        amy_printf("%d ", fifo->entries[current]);
         current = (current + 1) % fifo->length;
     }
-    fprintf(stderr, "\n");
+    amy_printf("\n");
 }
 
 struct voice_fifo *voice_fifo_init(int size, const char *name) {
     if (size <=0 || size > MAX_VOICES_PER_INSTRUMENT) {
-        fprintf(stderr, "init_voice_fifo: size %d value error (max size is %d)\n", size, MAX_VOICES_PER_INSTRUMENT);
+        amy_printf("init_voice_fifo: size %d value error (max size is %d)\n", size, MAX_VOICES_PER_INSTRUMENT);
         return NULL;
     }
     struct voice_fifo *result = (struct voice_fifo *)malloc_caps(sizeof(struct voice_fifo), amy_global.config.ram_caps_synth);
@@ -61,27 +61,27 @@ void voice_fifo_put(struct voice_fifo *fifo, uint8_t val) {
     fifo->entries[fifo->head++] = val;
     if (fifo->head == fifo->length)  fifo->head = 0;
     if (fifo->head == fifo->tail) {
-        fprintf(stderr, "**fifo %s: overflow\n", fifo->name);
+        amy_printf("**fifo %s: overflow\n", fifo->name);
         // Drop the entry we just overwrote.
         fifo->tail = (fifo->tail + 1) % fifo->length;
     }
-    //fprintf(stderr, "I: fifo %s: put %d\n", fifo->name, val);
+    //amy_printf("I: fifo %s: put %d\n", fifo->name, val);
 }
 
 uint8_t voice_fifo_get(struct voice_fifo *fifo) {
     if (voice_fifo_empty(fifo)) {
-        fprintf(stderr, "**fifo %s: get on empty\n", fifo->name);
+        amy_printf("**fifo %s: get on empty\n", fifo->name);
         return 0;
     }
     uint8_t val = fifo->entries[fifo->tail++];
     if (fifo->tail == fifo->length)  fifo->tail = 0;
-    //fprintf(stderr, "I: fifo %s: get %d\n", fifo->name, val);
+    //amy_printf("I: fifo %s: get %d\n", fifo->name, val);
     return val;
 }
 
 void voice_fifo_remove(struct voice_fifo *fifo, uint8_t val) {
     // Remove the oldest instance of val in the fifo and close up.
-    //fprintf(stderr, "I: fifo %s: remove %d\n", fifo->name, val);
+    //amy_printf("I: fifo %s: remove %d\n", fifo->name, val);
     uint8_t index;
     for (index = fifo->tail; index != fifo->head; index = (index + 1) % fifo->length) {
         if (fifo->entries[index] == val) {
@@ -96,7 +96,7 @@ void voice_fifo_remove(struct voice_fifo *fifo, uint8_t val) {
             return;
         }
     }
-    fprintf(stderr, "**fifo %s: remove did not find %d (#entries=%d)\n", fifo->name, val, (fifo->head - fifo->tail) % fifo->length);
+    amy_printf("**fifo %s: remove did not find %d (#entries=%d)\n", fifo->name, val, (fifo->head - fifo->tail) % fifo->length);
 }
 
 // How many forgotten note-ons (due to repeated onsets, or note stealing) do we remember
@@ -130,11 +130,11 @@ struct instrument_info {
 };
 
 void instrument_debug(struct instrument_info *instrument) {
-    fprintf(stderr, "**instrument 0x%lx id %d bus %d num_voices %d patch %d oscs %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
+    amy_printf("**instrument 0x%lx id %d bus %d num_voices %d patch %d oscs %d bank %d flags %" PRIu32 " noteon_delay_ms %d in_sustain %d grab_midi %d\n",
             (unsigned long)instrument, instrument->id, instrument->bus, instrument->num_voices, instrument->patch_number, instrument->oscs_per_voice, instrument->bank_number, instrument->flags,
             instrument->noteon_delay_ms, instrument->in_sustain, instrument->grab_midi_notes);
     for (int i = 0; i < instrument->num_voices; ++i)
-        fprintf(stderr, "voice %d amy_voice %d note_per_voice %d pending_release %d\n",
+        amy_printf("voice %d amy_voice %d note_per_voice %d pending_release %d\n",
                 i, instrument->amy_voices[i], instrument->note_per_voice[i], instrument->pending_release[i]);
     voice_fifo_debug(instrument->active_voices);
     voice_fifo_debug(instrument->released_voices);
@@ -179,7 +179,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
     }
     instrument->id = id;
     if (num_voices <= 0 || num_voices > MAX_VOICES_PER_INSTRUMENT) {
-        fprintf(stderr, "num_voices %d not within 1 .. MAX_VOICES_PER_INSTRUMENT %d\n", num_voices, MAX_VOICES_PER_INSTRUMENT);
+        amy_printf("num_voices %d not within 1 .. MAX_VOICES_PER_INSTRUMENT %d\n", num_voices, MAX_VOICES_PER_INSTRUMENT);
         abort();
         return NULL;
     }
@@ -227,7 +227,7 @@ void _instrument_push_note_forgotten(struct instrument_info *instrument, uint16_
     for (int i = 0; i < FORGOTTEN_POOL_SIZE; ++i) {
         if (instrument->forgotten_notes[i] == note) {
             ++instrument->forgotten_note_count[i];
-            //fprintf(stderr, "synth %d: caching existing forgotten note %d/%d (%d, count %d)\n",
+            //amy_printf("synth %d: caching existing forgotten note %d/%d (%d, count %d)\n",
             //        instrument->id, note / 128, note & 0x7F, i, instrument->forgotten_note_count[i]);
             return;
         }
@@ -239,10 +239,10 @@ void _instrument_push_note_forgotten(struct instrument_info *instrument, uint16_
     if (available_index >= 0) {
         instrument->forgotten_notes[available_index] = note;
         instrument->forgotten_note_count[available_index] = 1;
-        //fprintf(stderr, "synth %d: caching new forgotten note %d/%d (%d, count %d)\n",
+        //amy_printf("synth %d: caching new forgotten note %d/%d (%d, count %d)\n",
         //        instrument->id, note / 128, note & 0x7F, available_index, instrument->forgotten_note_count[available_index]);
     } else {
-        fprintf(stderr, "**_instrument_push_forgotten_note: forgotten pool overflow synth %d note %d/%d\n",
+        amy_printf("**_instrument_push_forgotten_note: forgotten pool overflow synth %d note %d/%d\n",
                 instrument->id, note / 128, note & 0x7F);
     }
 }
@@ -251,7 +251,7 @@ bool _instrument_pop_note_forgotten(struct instrument_info *instrument, uint16_t
     // Checks forgotten_notes for this note; if found, remove it and return true; else false.
     for (int i = 0; i < FORGOTTEN_POOL_SIZE; ++i) {
         if (instrument->forgotten_notes[i] == note) {
-            //fprintf(stderr, "synth %d: uncaching forgotten note %d/%d (%d, count %d)\n",
+            //amy_printf("synth %d: uncaching forgotten note %d/%d (%d, count %d)\n",
             //        instrument->id, note / 128, note & 0x7F, i, instrument->forgotten_note_count[i]);
             --instrument->forgotten_note_count[i];
             if (instrument->forgotten_note_count[i] == 0)
@@ -295,7 +295,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
     if (voice == _INSTRUMENT_NO_VOICE) {
         // Don't report an unmatched note-off if it was a victim of stealing.
         if (!_instrument_pop_note_forgotten(instrument, note))
-            fprintf(stderr, "note off for %d/%d does not match note on\n", note / 128, note & 0x7F);
+            amy_printf("note off for %d/%d does not match note on\n", note / 128, note & 0x7F);
         //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
     }
@@ -303,7 +303,7 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
         instrument->pending_release[voice] = true;
         return _INSTRUMENT_NO_VOICE;
     }
-    //fprintf(stderr, "instr 0x%lx: patch %d voice %d note %d/%d off\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note / 128, note & 0x7F);
+    //amy_printf("instr 0x%lx: patch %d voice %d note %d/%d off\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note / 128, note & 0x7F);
     return _instrument_voice_off(instrument, voice);
 }
 
@@ -312,7 +312,7 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
     int num_voices_turned_off = 0;
     for (uint16_t voice = 0; voice < instrument->num_voices; ++voice)
         if (instrument->note_per_voice[voice] != _INSTRUMENT_NO_NOTE) {
-            //fprintf(stderr, "voice %d note %d/%d all-off\n", instrument->amy_voices[voice], instrument->note_per_voice[voice] / 128, instrument->note_per_voice[voice] & 0x7F);
+            //amy_printf("voice %d note %d/%d all-off\n", instrument->amy_voices[voice], instrument->note_per_voice[voice] / 128, instrument->note_per_voice[voice] & 0x7F);
             _instrument_voice_off(instrument, voice);
             *amy_voices++ = instrument->amy_voices[voice];
             ++num_voices_turned_off;
@@ -324,7 +324,7 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
 uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, bool *pstolen) {
     if ((note & 0x7F) == 0) {
         // note == 0 is for all-notes-off, it's not allowed for note-on (sorry, C-1).
-        fprintf(stderr, "note-on for note 0: ignored.\n");
+        amy_printf("note-on for note 0: ignored.\n");
         return _INSTRUMENT_NO_VOICE;
     }
     uint16_t voice = _instrument_voice_for_note(instrument, note);
@@ -338,7 +338,7 @@ uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, b
     }
     instrument->note_per_voice[voice] = note;
     instrument->pending_release[voice] = false;
-    //fprintf(stderr, "instr 0x%lx: patch %d voice %d note %d/%d on\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note);
+    //amy_printf("instr 0x%lx: patch %d voice %d note %d/%d on\n", (unsigned long)instrument, instrument->patch_number, instrument->amy_voices[voice], note);
     //instrument_debug(instrument);
     return instrument->amy_voices[voice];
 }
@@ -394,7 +394,7 @@ void instrument_release(int instrument_number) {
 
 bool instrument_number_ok(int instrument_number, const char *tag) {
     if (instrument_number < 0 || instrument_number >= max_instruments) {
-        if (tag) fprintf(stderr, "instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
+        if (tag) amy_printf("instrument_number %d is out of range 0..%d (%s)\n", instrument_number, max_instruments, tag);
         return false;
     }
     return true;
@@ -405,7 +405,7 @@ bool instrument_number_exists(int instrument_number, const char *tag) {
         if (instruments[instrument_number])
             return true;
         if (tag)
-            fprintf(stderr, "synth %d not defined (%s)\n", instrument_number, tag);
+            amy_printf("synth %d not defined (%s)\n", instrument_number, tag);
     }
     return false;
 }
@@ -439,7 +439,7 @@ int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices) {
     int num_voices = 0;
     struct instrument_info *instrument = instruments[instrument_number];
     if (instrument == NULL) {
-        //fprintf(stderr, "get_num_voices: instrument_number %d is not defined.\n", instrument_number);
+        //amy_printf("get_num_voices: instrument_number %d is not defined.\n", instrument_number);
     } else {
         num_voices = instrument->num_voices;
         if (amy_voices != NULL)
@@ -491,7 +491,7 @@ int instrument_sustain(int instrument_number, bool sustain, uint16_t *amy_voices
     int num_voices_turned_off = 0;
     for (uint16_t voice = 0; voice < instrument->num_voices; ++voice)
         if (instrument->pending_release[voice]) {
-            //fprintf(stderr, "voice %d note %d pedal-released\n", instrument->amy_voices[voice], instrument->note_per_voice[voice]);
+            //amy_printf("voice %d note %d pedal-released\n", instrument->amy_voices[voice], instrument->note_per_voice[voice]);
             _instrument_voice_off(instrument, voice);
             *amy_voices++ = instrument->amy_voices[voice];
             ++num_voices_turned_off;

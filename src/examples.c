@@ -154,7 +154,7 @@ void example_patches() {
         e.patch_number = i;
         e.synth = 1;
         e.num_voices = 1;
-        fprintf(stderr, "sending patch %d\n", i);
+        amy_printf("sending patch %d\n", i);
         amy_add_event(&e);
         delay_ms(250);
 
@@ -498,11 +498,11 @@ void example_fm(uint32_t start) {
 // Minimal custom oscillator
 
 void beeper_init(void) {
-    //printf("Beeper init\n");
+    //amy_printf("Beeper init\n");
 }
 
 void beeper_deinit(void) {
-    //printf("Beeper deinit\n");
+    //amy_printf("Beeper deinit\n");
 }
 
 void beeper_note_on(uint16_t osc, float freq) {

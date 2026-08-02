@@ -25,7 +25,7 @@ typedef struct cv_trigger {
 cv_trigger_t *cv_trigger_root = NULL;
 
 void cv_trigger_print(cv_trigger_t *cv_trig) {
-    fprintf(stderr, "cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, cv_trig->thresh_trigger, cv_trig->thresh_reset, cv_trig->pitch_cv, cv_trig->pitch_scale, cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
+    amy_printf("cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, cv_trig->thresh_trigger, cv_trig->thresh_reset, cv_trig->pitch_cv, cv_trig->pitch_scale, cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
 }
 
 void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
@@ -55,7 +55,7 @@ void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset
 }
 
 void cv_trigger_debug(void) {
-    fprintf(stderr, "cv_trigger_debug:\n");
+    amy_printf("cv_trigger_debug:\n");
     cv_trigger_t *cv_trig =  cv_trigger_root;
     while(cv_trig) {
         cv_trigger_print(cv_trig);
@@ -115,7 +115,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
                    }
                    char message[AMY_WIRE_COMMAND_LEN];
                    substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
-                   //fprintf(stderr, "update_external_cv_in: message %s\n", message);
+                   //amy_printf("update_external_cv_in: message %s\n", message);
                    amy_add_message(message);
                 }
             }
@@ -123,7 +123,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
             if (cv_trig->state != CV_TRIG_READY) {
                 // Reset
                 cv_trig->state = CV_TRIG_READY;
-                //fprintf(stderr, "update_external_cv_in: RESET message %s\n", cv_trig->message_template);
+                //amy_printf("update_external_cv_in: RESET message %s\n", cv_trig->message_template);
             }
         }
         cv_trig = cv_trig->next;
@@ -206,6 +206,6 @@ void set_cv_from_osc(int cv_channel, int osc) {
     osc_note_on(osc, freq_of_logfreq(synth[osc]->logfreq_coefs[COEF_CONST]));
     // Add the CV retrieval hook.
     if (amy_global.config.amy_external_coef_hook != NULL && amy_global.config.amy_external_coef_hook != cv_from_osc)
-        fprintf(stderr, "set_cv_from_osc: WARNING: overwriting existing amy_external_coef_hook\n");
+        amy_printf("set_cv_from_osc: WARNING: overwriting existing amy_external_coef_hook\n");
     amy_global.config.amy_external_coef_hook = cv_from_osc;
 }

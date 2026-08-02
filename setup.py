@@ -13,7 +13,9 @@ for i in range(len(sources)):
 os.environ["CC"] = "gcc"
 os.environ["CXX"] = "g++"
 
-comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG", "-Wno-unused-but-set-variable", "-Wno-unreachable-code", "-DAMY_WAVETABLE"]
+# AMY_PRINT: diagnostic prints are compiled out of AMY by default (they cost
+# render time and flash on microcontrollers); the CPython build keeps them.
+comp_args = ["-I/opt/homebrew/include", "-DAMY_DEBUG", "-DAMY_PRINT", "-Wno-unused-but-set-variable", "-Wno-unreachable-code", "-DAMY_WAVETABLE"]
 link_args = ["-L/opt/homebrew/lib","-lpthread"]
 
 # Bake the Gamma9001 drum banks (kits at patches 384-390) into the module, like

@@ -85,7 +85,7 @@ int16_t *amy_render_audio() {
 void amy_print_devices() {
     ma_context context;
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
-        fprintf(stderr,"Failed to setup context for device list.\n");
+        amy_printf("Failed to setup context for device list.\n");
         exit(1);
     }
 
@@ -94,17 +94,17 @@ void amy_print_devices() {
     ma_device_info* pCaptureInfos;
     ma_uint32 captureCount;
     if (ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount) != MA_SUCCESS) {
-        fprintf(stderr,"Failed to get device list.\n");
+        amy_printf("Failed to get device list.\n");
         exit(1);
     }
-    fprintf(stderr, "output devices:\n");
+    amy_printf("output devices:\n");
     for (ma_uint32 iDevice = 0; iDevice < playbackCount; iDevice += 1) {
-        fprintf(stderr,"\t%d - %s\n", iDevice, pPlaybackInfos[iDevice].name);
+        amy_printf("\t%d - %s\n", iDevice, pPlaybackInfos[iDevice].name);
     }
 
-    fprintf(stderr, "input devices:\n");
+    amy_printf("input devices:\n");
     for (ma_uint32 iDevice = 0; iDevice < captureCount; iDevice += 1) {
-        fprintf(stderr,"\t%d - %s\n", iDevice, pCaptureInfos[iDevice].name);
+        amy_printf("\t%d - %s\n", iDevice, pCaptureInfos[iDevice].name);
     }
 
     ma_context_uninit(&context);
@@ -179,7 +179,7 @@ ma_uint32 captureCount;
 amy_err_t miniaudio_init() {
     leftover_buf = malloc_caps(sizeof(int16_t)*AMY_BLOCK_SIZE*AMY_NCHANS, amy_global.config.ram_caps_fbl);
 
-    //fprintf(stderr, "miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
+    //amy_printf("miniaudio_init: has_audio_in %d playback_id %d capture_id %d\n",
     //        AMY_HAS_AUDIO_IN, amy_global.config.playback_device_id, amy_global.config.capture_device_id);
 
 #ifdef _WIN32
@@ -191,22 +191,22 @@ amy_err_t miniaudio_init() {
 #else
     if (ma_context_init(NULL, 0, NULL, &context) != MA_SUCCESS) {
 #endif
-        printf("Failed to setup context for device list.\n");
+        amy_printf("Failed to setup context for device list.\n");
         exit(1);
     }
     if (ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount) != MA_SUCCESS) {
-        printf("Failed to get device list.\n");
+        amy_printf("Failed to get device list.\n");
         exit(1);
     }
 
     if(AMY_HAS_AUDIO_IN) {
         if (amy_global.config.playback_device_id >= (int32_t)playbackCount || amy_global.config.capture_device_id >= (int32_t)captureCount) {
-            printf("invalid device\n");
+            amy_printf("invalid device\n");
             exit(1);
         }
     } else {
         if (amy_global.config.playback_device_id >= (int32_t)playbackCount) {
-            printf("invalid device\n");
+            amy_printf("invalid device\n");
             exit(1);
         }
     }
@@ -252,7 +252,7 @@ amy_err_t miniaudio_init() {
 #endif
     
     if (ma_device_init(&context, &deviceConfig, &device) != MA_SUCCESS) {
-        printf("Failed to open playback device.\n");
+        amy_printf("Failed to open playback device.\n");
         exit(1);
     }
 
@@ -278,7 +278,7 @@ amy_err_t miniaudio_init() {
     for(uint16_t i=0;i<OUTPUT_RING_LENGTH;i++) output_ring[i] = 0;
 
     if (ma_device_start(&device) != MA_SUCCESS) {
-        printf("Failed to start playback device.\n");
+        amy_printf("Failed to start playback device.\n");
         ma_device_uninit(&device);
         exit(1);
     }

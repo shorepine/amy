@@ -107,18 +107,18 @@ void midi_clock_out_stop() {
 
 #if 0
 static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t sysex) {
-    fprintf(stderr, "MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
+    amy_printf("MIDI %s len=%u:", sysex ? "sysex" : "msg", (unsigned)len);
     for (uint32_t i = 0; i < len; ++i) {
-        fprintf(stderr, " %02X", data[i]);
+        amy_printf(" %02X", data[i]);
     }
-    fprintf(stderr, "\n");
+    amy_printf("\n");
 }
 #endif
 
 // Send a MIDI note on OUT
 void amy_send_midi_note_on(uint16_t osc) {
     // don't forward on a note coming in through MIDI IN 
-    //fprintf(stderr, "amy_send_midi_note_on: osc %d source %d note %.1f vel %.3f\n",
+    //amy_printf("amy_send_midi_note_on: osc %d source %d note %.1f vel %.3f\n",
     //        osc, synth[osc]->s_note_source_channel, synth[osc]->midi_note, synth[osc]->velocity);
     if(AMY_IS_UNSET(synth[osc]->s_note_source_channel)) {
         uint8_t bytes[3];
@@ -222,15 +222,15 @@ void midi_active_channel_set(uint8_t channel, bool state) {
 }
 
 void midi_active_channels_debug(void) {
-    fprintf(stderr, "Active MIDI channels:");
+    amy_printf("Active MIDI channels:");
     for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
         if (_midi_channel_active[channel]) {
-            fprintf(stderr, " %2d", channel);
+            amy_printf(" %2d", channel);
         } else {
-            fprintf(stderr, " --");
+            amy_printf(" --");
         }
     }
-    fprintf(stderr, "\n");
+    amy_printf("\n");
 }
 
 
@@ -661,7 +661,7 @@ void on_pico_uart_rx() {
         i++;
     }
     //if (i >= midi_buffer_size)
-    //    fprintf(stderr, "midi_buffer_size %d of %d\n", i, midi_buffer_size);
+    //    amy_printf("midi_buffer_size %d of %d\n", i, midi_buffer_size);
     convert_midi_bytes_to_messages(bytes,i,0);
 }
 
@@ -725,7 +725,7 @@ void stop_midi() {
 }
 
 void run_midi() {
-    //fprintf(stderr, "no MIDI support on linux yet\n");
+    //amy_printf("no MIDI support on linux yet\n");
 }
 #endif
 
@@ -758,7 +758,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
         // tud_midi_stream_write uses a small FIFO (e.g. 64 bytes). For long
         // messages (e.g. zD sysex dumps) we must loop and yield until the
         // USB task flushes the FIFO, otherwise bytes are silently dropped.
-        if (len > 64) fprintf(stderr, "midi_out: USB gadget, want to send %d bytes\n", (int)len);
+        if (len > 64) amy_printf("midi_out: USB gadget, want to send %d bytes\n", (int)len);
         uint32_t sent = 0;
         int stall_ticks = 0;
         while (sent < len) {
@@ -774,7 +774,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
                 vTaskDelay(pdMS_TO_TICKS(1));
 #endif
                 if (++stall_ticks > 1000) {
-                    fprintf(stderr, "midi_out: STALLED after %u of %u bytes\n",
+                    amy_printf("midi_out: STALLED after %u of %u bytes\n",
                             (unsigned)sent, (unsigned)len);
                     break;
                 }
@@ -783,7 +783,7 @@ void midi_out(uint8_t * bytes, uint16_t len) {
             }
             sent += n;
         }
-        if (len > 64) fprintf(stderr, "midi_out: USB gadget sent %u/%u bytes\n",
+        if (len > 64) amy_printf("midi_out: USB gadget sent %u/%u bytes\n",
                               (unsigned)sent, (unsigned)len);
     }
 #endif

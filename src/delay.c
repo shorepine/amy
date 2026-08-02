@@ -24,9 +24,9 @@ uint8_t __attribute__((section((".sdram_bss")))) qspi_heap[QSPI_HEAP_SIZE];
 uint32_t qspi_used = 0;
 
 void *qspi_malloc(size_t num_bytes) {
-    //fprintf(stderr, "qspi_malloc: %d bytes, used = %d\n", num_bytes, qspi_used);
+    //amy_printf("qspi_malloc: %d bytes, used = %d\n", num_bytes, qspi_used);
     if ((qspi_used + num_bytes) >= QSPI_HEAP_SIZE) {
-	fprintf(stderr, "qspi_malloc: out of heap\n");
+	amy_printf("qspi_malloc: out of heap\n");
 	abort();
     }
     // Save the size of this block.
@@ -42,9 +42,9 @@ void qspi_free(void *ptr) {
     if (ptr == (void *)(qspi_heap + (qspi_used - last_alloc))) {
 	// We're just freeing the last alloc, yay.
 	qspi_used -= last_alloc + sizeof(uint32_t);
-	//fprintf(stderr, "qspi_free: %ld bytes, used = %d\n", last_alloc, qspi_used);
+	//amy_printf("qspi_free: %ld bytes, used = %d\n", last_alloc, qspi_used);
     } else {
-	fprintf(stderr, "qspi_free: punt (ptr = qspi_heap + %d)\n", (uint8_t*)ptr - (uint8_t *)qspi_heap);
+	amy_printf("qspi_free: punt (ptr = qspi_heap + %d)\n", (uint8_t*)ptr - (uint8_t *)qspi_heap);
 	// Don't actually recover the memory.
     }
 }
@@ -56,15 +56,15 @@ void qspi_free(void *ptr) {
 
 delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     // Check that len is a power of 2.
-    //printf("new_delay_line: len %d fixed_del %d\n", len, fixed_delay);
+    //amy_printf("new_delay_line: len %d fixed_del %d\n", len, fixed_delay);
     int log_2_len = is_power_of_two(len);
     if (log_2_len < 0) {
-        fprintf(stderr, "delay line len must be power of 2, not %d\n", len);
+        amy_printf("delay line len must be power of 2, not %d\n", len);
         abort();
     }
     delay_line_t *delay_line = (delay_line_t*)malloc_caps(sizeof(delay_line_t) + len * sizeof(SAMPLE), ram_type);
     if (delay_line == NULL) {
-	fprintf(stderr, "unable to alloc delay line of %d samples\n", len);
+	amy_printf("unable to alloc delay line of %d samples\n", len);
 	return NULL;
     }
     delay_line->samples = (SAMPLE*)(((uint8_t*)delay_line) + sizeof(delay_line_t));
@@ -75,12 +75,12 @@ delay_line_t *new_delay_line(int len, int fixed_delay, int ram_type) {
     for (int i = 0; i < len; ++i) {
         delay_line->samples[i] = 0;
     }
-    //fprintf(stderr, "new_delay_line: len %d fixed_del %d ->0x%x\n", len, fixed_delay, (uint32_t)delay_line);
+    //amy_printf("new_delay_line: len %d fixed_del %d ->0x%x\n", len, fixed_delay, (uint32_t)delay_line);
     return delay_line;
 }
 
 void free_delay_line(delay_line_t *delay_line) {
-    //printf("free_delay_line: 0x%x\n", (uint32_t)delay_line);
+    //amy_printf("free_delay_line: 0x%x\n", (uint32_t)delay_line);
     free(delay_line);  // the samples are part of the same malloc.
 }
 
@@ -208,7 +208,7 @@ void delete_reverb(reverb_params_t *rev) {
 }
 
 void config_stereo_reverb(reverb_params_t *rev, float a_liveness, float crossover_hz, float damping) {
-    //printf("config_stereo_reverb: liveness %f xover %f damping %f\n",
+    //amy_printf("config_stereo_reverb: liveness %f xover %f damping %f\n",
     //       a_liveness, crossover_hz, damping);
     // liveness (0..1) controls how much energy is preserved (larger = longer reverb).
     rev->liveness = F2S(a_liveness);
@@ -259,7 +259,7 @@ bool init_stereo_reverb(reverb_params_t *rev) {
     if (rev->delay_1 == NULL || rev->delay_2 == NULL || rev->delay_3 == NULL || rev->delay_4 == NULL ||
         rev->ref_1 == NULL || rev->ref_2 == NULL || rev->ref_3 == NULL ||
         rev->ref_4 == NULL || rev->ref_5 == NULL || rev->ref_6 == NULL) {
-        fprintf(stderr, "init_stereo_reverb: allocation failed, reverb disabled\n");
+        amy_printf("init_stereo_reverb: allocation failed, reverb disabled\n");
         deinit_stereo_reverb(rev);  // rolls back all partial allocations, NULLs all pointers
         return false;
     }

@@ -231,7 +231,7 @@ void pcm_note_off(uint16_t osc) {
 
 
 uint32_t fill_sample_from_file(memorypcm_preset_t *preset_p, uint32_t frames_needed) {
-    //fprintf(stderr, "fsff %ld frames\n", frames_needed);
+    //amy_printf("fsff %ld frames\n", frames_needed);
     uint32_t bytes_per_frame = preset_p->channels * 2;
     uint32_t frames_available = 0;
     if (bytes_per_frame > 0) {
@@ -350,7 +350,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             if (value < 0) value = -value;
             if (value > max_value) max_value = value;  
         }
-        //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
+        //amy_printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
         //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
         return max_value; 
         // i don't believe we ever need to detect silence in a sample. it will shut itself off at the end.
@@ -381,18 +381,18 @@ int pcm_load_file() {
         return 0;
     }
     if (amy_global.config.amy_external_fopen_hook == NULL || amy_global.config.amy_external_fclose_hook == NULL) {
-        fprintf(stderr, "fopen hook not enabled on platform\n");
+        amy_printf("fopen hook not enabled on platform\n");
         return 0;
     }
     uint32_t handle = amy_global.config.amy_external_fopen_hook((char *)filename, "rb");
     if (handle == 0) {
-        fprintf(stderr, "Could not open file %s\n", filename);
+        amy_printf("Could not open file %s\n", filename);
         return 0;
     }
     wave_info_t info = {0};
     uint32_t data_bytes = 0;
     if (!wave_parse_header(handle, &info, &data_bytes)) {
-        fprintf(stderr, "Could not parse WAVE file %s\n", filename);
+        amy_printf("Could not parse WAVE file %s\n", filename);
         amy_global.config.amy_external_fclose_hook(handle);
         return 0;
     }
@@ -405,7 +405,7 @@ int pcm_load_file() {
         sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + buffer_frames * sizeof(int16_t),
         amy_global.config.ram_caps_sample);
     if (new_preset_pointer == NULL) {
-        fprintf(stderr, "No RAM left for sample load\n");
+        amy_printf("No RAM left for sample load\n");
         return 0;
     }
     new_preset_pointer->next = memorypcm_ll_start;
@@ -426,7 +426,7 @@ int pcm_load_file() {
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),
                                                      amy_global.config.ram_caps_sample);
     new_preset_pointer->preset = memory_preset;
-    //fprintf(stderr, "read file %s frames %ld channels %d preset %d handle %ld\n", filename, total_frames, info.channels, preset_number, handle);
+    //amy_printf("read file %s frames %ld channels %d preset %d handle %ld\n", filename, total_frames, info.channels, preset_number, handle);
     return 1;
 }
 
@@ -441,7 +441,7 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memorypcm_ll_t *new_preset_pointer = malloc_caps(sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + length * channels * sizeof(int16_t),
 						     amy_global.config.ram_caps_sample);
     if(new_preset_pointer  == NULL) {
-        fprintf(stderr, "No RAM left for sample load\n");
+        amy_printf("No RAM left for sample load\n");
         return NULL; // no ram for sample
     }
     new_preset_pointer->next = memorypcm_ll_start;
@@ -484,7 +484,7 @@ void pcm_unload_preset(uint16_t preset_number) {
             preset_pointer = &(*preset_pointer)->next;
         }
     }
-    //fprintf(stderr, "pcm_unload_preset: preset %d not found\n", preset_number);  // This happens during a routine load_preset.
+    //amy_printf("pcm_unload_preset: preset %d not found\n", preset_number);  // This happens during a routine load_preset.
 }
 
 void pcm_unload_all_presets() {

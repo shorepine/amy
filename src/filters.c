@@ -69,7 +69,7 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     // Where exactly are those poles?  Impose minima on (1 - r) and w0.
     float r = -99, ww = 0;
     if (false && a2 > 0) { 
-        printf("before: r %f a %f %f %f\n", sqrtf(a2 / a0), a0, a1, a2);
+        amy_printf("before: r %f a %f %f %f\n", sqrtf(a2 / a0), a0, a1, a2);
         // Limit how close complex poles can get to the unit circle.
         r = MIN(0.99f, sqrtf(a2 / a0));
         float alphadash = (1 - r * r) / (1 + r * r);
@@ -78,7 +78,7 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
             ww = acosf(cosww);
             a1 = a0 * (-2 * r * cosf(ww));
             a2 = a0 * r * r;
-            printf(" after: r %f a %f %f %f\n", r, a0, a1, a2);
+            amy_printf(" after: r %f a %f %f %f\n", r, a0, a1, a2);
         }
     }
 
@@ -88,9 +88,9 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     coeffs[3] = F2S(a1 / a0);
     coeffs[4] = F2S(a2 / a0);
 
-    //printf("Flpf t=%f f=%f q=%f alpha %f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor, alpha, 
+    //amy_printf("Flpf t=%f f=%f q=%f alpha %f b0 %f b1 %f b2 %f a1 %f a2 %f r %f theta %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor, alpha, 
     //       b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0, r, w0);
-    //printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
+    //amy_printf("Slpf t=%f f=%f q=%f b0 %f b1 %f b2 %f a1 %f a2 %f\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, f * AMY_SAMPLE_RATE, qFactor,
     //       S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]));
 
     return 0;
@@ -304,7 +304,7 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     SAMPLE y2 = w[3];
     SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
-    //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
+    //amy_printf("e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
     for (int i = 0 ; i < len ; i++) {
         SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS);
         SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
@@ -600,7 +600,7 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice_fixedzeros(const SAMPLE
     SAMPLE a = coef[0];
     SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
-    //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
+    //amy_printf("e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
     SAMPLE max_out = 0;
     for (int i = 0 ; i < len ; i++) {
         SAMPLE x0, w0, v0;
@@ -863,7 +863,7 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
         if (val > max)  max = val;
     }
     if (maxdiff > F2S(0.2f))
-        fprintf(stderr, "Overflow at timeframe %.3f max=%.3f maxdiff=%.3f osc=%d msg=%s\n",
+        amy_printf("Overflow at timeframe %.3f max=%.3f maxdiff=%.3f osc=%d msg=%s\n",
                 (float)(amy_global.total_blocks*AMY_BLOCK_SIZE) / AMY_SAMPLE_RATE,
                 S2F(max), S2F(maxdiff), osc, msg);
 
@@ -952,13 +952,13 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
     else if(synth[osc]->filter_type==FILTER_NOTCH)
         dsps_biquad_gen_notch_f32(coeffs, ratio, msynth[osc]->resonance);
     else {
-        fprintf(stderr, "Unrecognized filter type %d\n", synth[osc]->filter_type);
+        amy_printf("Unrecognized filter type %d\n", synth[osc]->filter_type);
         return 0;
     }
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE0)
 
 #ifdef NOTDEF
-    printf("FlPr t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
+    amy_printf("FlPr t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
            amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE,
            ratio * AMY_SAMPLE_RATE, msynth[osc]->resonance, 
            S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]),
@@ -985,7 +985,7 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
     normbits = MIN(normbits, synth[osc]->last_filt_norm_bits + 1);  // Increase at most one bit per block.
     normbits = MIN(8, normbits);  // Without this, I get a weird sign flip at the end of TestLFO - intermediate overflow?
 #endif
-    //printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc]->last_filt_norm_bits, filtnormbits, normbits);
+    //amy_printf("time %f max_val %f filtmax %f lastfiltnormbits %d filtnormbits %d normbits %d\n", amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE, S2F(max_val), S2F(filtmax), synth[osc]->last_filt_norm_bits, filtnormbits, normbits);
     if(synth[osc]->filter_type==FILTER_LPF24) {
         // 24 dB/oct by running the same filter twice.
         max_val = dsps_biquad_f32_ansi_split_fb_twice_fixedzeros(block, block, AMY_BLOCK_SIZE, coeffs, synth[osc]->filter_delay, max_val);
@@ -1009,7 +1009,7 @@ AMY_IRAM_ATTR SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_val
     AMY_PROFILE_STOP(FILTER_PROCESS_STAGE1)
     AMY_PROFILE_STOP(FILTER_PROCESS)
 #ifdef NOTDEF
-    printf("FlP2 t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
+    amy_printf("FlP2 t=%.3f f=%.3f q=%.3f %.3f %.3f %.3f %.3f %.3f ST %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f B %.6f %.6f %.6f %.6f\n",
            amy_global.total_blocks*AMY_BLOCK_SIZE / (float)AMY_SAMPLE_RATE,
            ratio * AMY_SAMPLE_RATE, msynth[osc]->resonance, 
            S2F(coeffs[0]), S2F(coeffs[1]), S2F(coeffs[2]), S2F(coeffs[3]), S2F(coeffs[4]),

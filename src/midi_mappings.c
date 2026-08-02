@@ -66,7 +66,7 @@ struct midi_mapping default_note_mapping = {
 
 
 void midi_mapping_print(struct midi_mapping *mapping) {
-    fprintf(stderr, "mapping 0x%lx chan %d type %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
+    amy_printf("mapping 0x%lx chan %d type %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
             (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
 }
 
@@ -95,7 +95,7 @@ struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_l
 }
 
 void midi_mapping_debug(void) {
-    fprintf(stderr, "midi_mapping_debug:\n");
+    amy_printf("midi_mapping_debug:\n");
     for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
         struct midi_mapping **p_mapping = &midi_cc_mapping_root_by_chan[channel];
         while (*p_mapping != NULL) {
@@ -215,7 +215,7 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     //char tmp[256];
     //strncpy(tmp, message, message_len);
     //tmp[message_len] = '\0';
-    //fprintf(stderr, "midi_store_mapping: ch %d type %d code %d L %d N %.3f X %.3f O %.3f CMD (%d) '%s'\n",
+    //amy_printf("midi_store_mapping: ch %d type %d code %d L %d N %.3f X %.3f O %.3f CMD (%d) '%s'\n",
     //        channel, type, code, is_log, min_val, max_val, offset_val, message_len, tmp);
     // Strip trailing wire protocol terminator(s) so they don't accumulate on round-trips.
     while (message_len > 0 && message[message_len - 1] == 'Z') {
@@ -245,7 +245,7 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
 
 bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len) {
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
-    //fprintf(stderr, "midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
+    //amy_printf("midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
     if (p_mapping == NULL)
         return false;
     // Format the control code - ic<C>,<L>,<N>,<X>,<O>,<CODE>
@@ -307,7 +307,7 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
         } else if (src[0] == 'n') {  // 'n' is for note.
             sprintf(dest, "%d", code);
         } else {
-            fprintf(stderr, "substitute_midi: unrecognized '%%%c' in %s\n", src[0], entry_src);
+            amy_printf("substitute_midi: unrecognized '%%%c' in %s\n", src[0], entry_src);
         }
         ++src;  // skip over the code char
         nchars = strlen(dest);
@@ -324,7 +324,7 @@ struct midi_cmd_yield_state {
 };
 
 void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *event, void *state) {
-    //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
+    //amy_printf("time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
     //fprintf_event_stderr(event);
     //
     struct midi_cmd_yield_state *yield_state = (struct midi_cmd_yield_state *)state;
@@ -376,7 +376,7 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
 }
 
 void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue) {
-    //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
+    //amy_printf("time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
     //fprintf_event_stderr(base_event);
     //
     void *state = NULL;

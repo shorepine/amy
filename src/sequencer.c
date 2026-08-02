@@ -96,10 +96,10 @@ void sequencer_deinit() {
 void sequencer_debug() {
     int32_t n_active = 0;
     for (int32_t t = first_active; t != -1; t = sequences[t].next_active) ++n_active;
-    fprintf(stderr, "sequencer: max_sequences %" PRIi32" active %" PRIi32 "\n", max_sequences, n_active);
+    amy_printf("sequencer: max_sequences %" PRIi32" active %" PRIi32 "\n", max_sequences, n_active);
     for (int32_t tag = first_active; tag != -1; tag = sequences[tag].next_active) {
         if (sequences[tag].wire) {
-            fprintf(stderr, "sequence tag %" PRIi32"%s tick %" PRIu32 " period %"PRIu32 " wire \"%s\"\n",
+            amy_printf("sequence tag %" PRIi32"%s tick %" PRIu32 " period %"PRIu32 " wire \"%s\"\n",
                     tag, tag >= max_sequences ? " (anon)" : "", sequences[tag].tick, sequences[tag].period, sequences[tag].wire);
         }
     }
@@ -179,7 +179,7 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     }
     if (has_tag) {
         if (tag >= (uint32_t)max_sequences) {
-            fprintf(stderr, "sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIi32"\n",
+            amy_printf("sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIi32"\n",
                     tag, tick, period, max_sequences);
             free(wire);
             return 0;

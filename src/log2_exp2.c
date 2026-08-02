@@ -50,7 +50,7 @@ AMY_IRAM_ATTR SAMPLE sin_lut(SAMPLE x) {
         x_frac2 = F2S(1.f) - x_frac2;
     if (quadrant & 2)
         sign = -1;
-    //printf("x=%f quadrant=%d x_frac=%f x_frac2=%f\n", S2F(x), quadrant, S2F(x_frac), S2F(x_frac2));
+    //amy_printf("x=%f quadrant=%d x_frac=%f x_frac2=%f\n", S2F(x), quadrant, S2F(x_frac), S2F(x_frac2));
     return -sign * lut_val(x_frac2, qsin_fxpt_lutable, 8);
 }
 

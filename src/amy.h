@@ -29,6 +29,20 @@ static inline int __builtin_clz(unsigned int x) {
 #endif
 #include <inttypes.h>
 
+// Diagnostic prints -- warnings ("note off does not match note on"), parse
+// errors, debug dumps. On microcontrollers these blocking serial writes cost
+// render time, and their format strings cost flash, so they compile away
+// unless AMY_PRINT is defined. The CPython build (setup.py) defines it;
+// define it in your own build to get the messages back.
+#ifdef AMY_PRINT
+#define amy_printf(...) fprintf(stderr, __VA_ARGS__)
+#else
+// if (0): the arguments stay type- and format-checked and count as used
+// (no -Wunused warnings), but the call and its strings are dead code that
+// every optimizing build strips.
+#define amy_printf(...) do { if (0) fprintf(stderr, __VA_ARGS__); } while (0)
+#endif
+
 #ifndef __EMSCRIPTEN__
 #ifdef _WIN32
 #include <windows.h>
