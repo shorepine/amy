@@ -233,14 +233,30 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     return 1;
 }
 
+#define SNPRINT3DPCOMMA(val) \
+    snprintfloat3dp(s, len, val); \
+    len -= strlen(s); \
+    s += strlen(s); \
+    if (len) { \
+        s[0] = ','; \
+        ++s; \
+        --len; \
+    }
+
 bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len) {
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
     //fprintf(stderr, "midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
     if (p_mapping == NULL)
         return false;
     // Format the control code - ic<C>,<L>,<N>,<X>,<O>,<CODE>
-    sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
-    assert(strlen(s) < len);
+    //sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
+    snprintf(s, len, "i%c%d,%d,", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log);
+    len -= strlen(s);
+    s += strlen(s);
+    SNPRINT3DPCOMMA((*p_mapping)->min_val);
+    SNPRINT3DPCOMMA((*p_mapping)->max_val);
+    SNPRINT3DPCOMMA((*p_mapping)->offset_val);
+    snprintf(s, len, "%sZ", (*p_mapping)->message_template);
     return true;
 }
 

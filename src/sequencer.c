@@ -25,7 +25,7 @@ int32_t highest_tag = -1;
 // user-supplied tag (bounds-checked against max_sequences) can never reach
 // or clobber one. Allocated round-robin; a new anonymous entry silently
 // evicts the oldest one once the pool wraps around.
-#define AMY_ANON_SEQUENCE_SLOTS 32
+#define AMY_ANON_SEQUENCE_SLOTS 256
 static int32_t anon_cursor = 0;
 static volatile bool sequencer_running = true;
 static volatile bool sequencer_external_clock = false;

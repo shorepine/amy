@@ -1411,9 +1411,9 @@ class TestGetSynthCommandsGetsBus(AmyTest):
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """iv4in2Z
-v0f110.000c1Z
-v1w3f880.000Z
-y2V0.100x0.000,0.000,0.000M0.500,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
+v0f110c1Z
+v1w3f880Z
+y2V0.1x0,0,0M0.5,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z"""
     if commands != expected:
       is_ok = False
       message = self.__class__.__name__ + ': get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
@@ -1436,11 +1436,11 @@ class TestGetSynthCommandsGetsMidiCcs(AmyTest):
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """iv4in2Z
-v0f110.000c1Z
-v1w3f880.000Z
-y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
-ic5,0,0.000,10.000,0.000,helloZ
-ic10,1,1.000,100.000,1.000,i%id%vZ"""
+v0f110c1Z
+v1w3f880Z
+y0V1x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z
+ic5,0,0,10,0,helloZ
+ic10,1,1,100,1,i%id%vZ"""
     if commands != expected:
       is_ok = False
       message = self.__class__.__name__ + ': get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
@@ -1466,9 +1466,9 @@ class TestClearMidiCCs(AmyTest):
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """iv4in2Z
-v0f220.000c1Z
-v1w3f880.000Z
-y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z"""
+v0f220c1Z
+v1w3f880Z
+y0V1x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z"""
     if commands != expected:
       is_ok = False
       message = self.__class__.__name__ + ' : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
@@ -1492,10 +1492,10 @@ class TestClearOneMidiCC(AmyTest):
     amy.render(1)  # Let the events execute.
     commands = amy.get_synth_commands(1)
     expected = """iv4in2Z
-v0f220.000c1Z
-v1w3f880.000Z
-y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
-ic10,1,1.000,100.000,1.000,i%id%vZ"""
+v0f220c1Z
+v1w3f880Z
+y0V1x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z
+ic10,1,1,100,1,i%id%vZ"""
     if commands != expected:
       is_ok = False
       message = self.__class__.__name__ + ' : get_synth_commands mismatch: expected:\n++\n%s\n--\n;saw:\n++\n%s\n--;' % (expected, commands)
@@ -1940,15 +1940,15 @@ class TestDumpState(AmyTest):
     commands = amy.dump_state()
     expected = """i1ic255Z
 i1iv4in2Z
-i1v0f110.000c1Z
-i1v1w3f880.000Z
-i1ic10,1,1.000,100.000,1.000,i%id%vZ
-i1io39,0,0.000,1.000,0.000,i%in40l%vZ
+i1v0f110c1Z
+i1v1w3f880Z
+i1ic10,1,1,100,1,i%id%vZ
+i1io39,0,0,1,0,i%in40l%vZ
 i2ic255Z
 i2iv1in1y1Z
 i2v0Z
-y0V1.000x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
-y1V0.500x0.000,0.000,0.000M0.000,500.000,,0.000,0.000k0.000,320.000,0.500,0.500h0.000,0.850,0.500,3000.000Z
+y0V1x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z
+y1V0.5x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z
 """
     if commands != expected:
       is_ok = False
