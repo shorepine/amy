@@ -106,9 +106,7 @@ timed_note chord_notes[] = {
   { 11.0, 0.2, 81, 1.0},
 };
 
-float amy_ticks_per_tick = 24.0;
-
-int grace_ticks = 8;  // Scheduled events in the past are ignored, make sure we're aiming at the future.
+float amy_ticks_per_tick = 24.0f;
 
 void schedule_notes(int time, int channel, struct timed_note *notes, int num_notes) {
   amy_event e = amy_default_event();
@@ -116,7 +114,7 @@ void schedule_notes(int time, int channel, struct timed_note *notes, int num_not
   for (int i = 0; i < num_notes; ++i) {
     e.midi_note = notes[i].note;
     e.velocity = notes[i].velocity;
-    e.ticks[0] = time + grace_ticks + amy_ticks_per_tick * notes[i].start_time;
+    e.ticks[0] = time + amy_ticks_per_tick * notes[i].start_time;
     amy_add_event(&e);
     // Add note-off too if duration > 0
     if (notes[i].duration > 0) {
