@@ -52,15 +52,13 @@ void test_audio_in() {
 
 void midi_polyphony(uint16_t patch) {
     // Play mulitple notes via note-ons to MIDI channel 1.
-    // These all sound at once: a MIDI message carries no scheduling time, it
-    // plays when it arrives. To stagger them, space the calls in real time --
-    // or drive amy_events with e.time, as event_polyphony() below does.
     uint8_t data[3] = {0x90, 0x00, 0x7f};
     uint8_t note = 40;
     for(uint8_t i=0;i<15;i++) {
 	data[1] = note;
 	amy_event_midi_message_received(data, 3, 0);
         note += 2;
+        System::DelayMs(1000);
     }
 }
 
