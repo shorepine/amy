@@ -1336,11 +1336,12 @@ class TestDiskSampleStereo(AmyTest):
 
 
 class TestLoadSample(AmyTest):
-  """amy.load_sample streams base64 chunks via send_raw -> amy_add_message
-  (no sysex flag). Regression coverage for the parse.c transfer-routing
-  guard: AUDIO transfers must route to parse_transfer_message even when
-  amy_parsing_from_sysex is false, otherwise every chunk gets dropped as
-  an "Unrecognized transfer-level command"."""
+  """amy.load_sample streams base64 chunks via _send_transfer_chunk ->
+  _send_wire_from_sysex, which is the only route that marks them as
+  transfer payload (amy_add_message_with_sysex_flag -> parse_transfer_message).
+  Regression coverage for that routing: send them unmarked and every chunk
+  is parsed as ordinary wire commands instead, so the preset never gets its
+  sample data and this renders silence."""
 
   def run(self):
     amy.reset()

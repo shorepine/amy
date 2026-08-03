@@ -7,6 +7,14 @@ static mp_obj_t amy_capi_mp_send_wire(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(amy_capi_mp_send_wire_obj, 1, 1, amy_capi_mp_send_wire);
 
+static mp_obj_t amy_capi_mp_send_wire_from_sysex(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    char *message = (char *)mp_obj_str_get_str(args[0]);
+    amy_send_wire_from_sysex(message);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(amy_capi_mp_send_wire_from_sysex_obj, 1, 1, amy_capi_mp_send_wire_from_sysex);
+
 static mp_obj_t amy_capi_mp_ticks_ms(size_t n_args, const mp_obj_t *args) {
     (void)n_args; (void)args;
     return mp_obj_new_int_from_uint(amy_sysclock());

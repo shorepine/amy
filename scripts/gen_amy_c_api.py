@@ -70,7 +70,7 @@ API = [
     dict(py='send_wire_from_sysex', c='amy_send_wire_from_sysex',
          args=[('message', 'str', None)], ret='void',
          doc='Send a wire message as if from sysex (file-transfer routing applies)',
-         platforms={'py'}),
+         platforms={'py', 'mp', 'web'}),
     dict(py='ticks_ms', c='amy_sysclock',
          args=[], ret='u32',
          doc='Read the AMY millisecond clock',
