@@ -27,7 +27,6 @@ typedef struct {
     uint8_t midinote;
     uint32_t samplerate;
     float log2sr;
-    uint8_t loop_warned;  // AMY_PCM_TYPE_FILE: warned once that PCM_LOOP* can't loop
 } memorypcm_preset_t;
 
 // linked list of memorypcm presets
@@ -161,34 +160,55 @@ static void fclose_if_file(memorypcm_preset_t *preset) {
     }
 }
 
+static bool mode_is_looping(uint16_t mode) {
+    return mode == PCM_LOOP || mode == PCM_LOOP_STOP || mode == PCM_LOOP_FOREVER;
+}
+
+// True if `preset_number` streams from a file rather than sitting in memory.
+// `filename_out`, when non-NULL, receives the file name for the message.
+static bool preset_is_file(uint16_t preset_number, const char **filename_out) {
+    if (AMY_IS_UNSET(preset_number)) return false;
+    memorypcm_preset_t rom_local;
+    memorypcm_preset_t *preset = get_preset_for_preset_number(preset_number, &rom_local);
+    if (preset == NULL || preset->type != AMY_PCM_TYPE_FILE) return false;
+    if (filename_out != NULL) *filename_out = preset->filename;
+    return true;
+}
+
 // A file-backed preset streams through a small sliding buffer rather than
 // sitting in a table we can index freely, so there is nothing to loop back
 // into: render_pcm refills from the file each block and rewinds phase to the
-// top of the fresh buffer. Rather than accept a PCM_LOOP* mode and then
-// silently play the clip once, degrade to the nearest non-looping mode -- same
-// note-off behavior, no loop -- and say so once per preset.
+// top of the fresh buffer. A PCM_LOOP* mode on such a preset can never do
+// what it says.
+//
+// Rather than accept the command and quietly do something else at note-on,
+// refuse it where it is issued -- when the mode changes, and when the preset
+// number changes -- so the configuration never reaches a state it can't
+// honor, and the user hears about it while the offending command is still in
+// front of them. Called with the *proposed* mode and preset; returns false if
+// the command should be dropped.
 //
 // (Whole-file looping *would* be implementable on top of the fseek+re-parse
 // rewind pcm_note_on already does; what a stream can never honor is the
 // loopstart/loopend marks. That's a bigger change than this one.)
-static uint16_t pcm_effective_mode(uint16_t osc, memorypcm_preset_t *preset) {
-    uint16_t mode = synth[osc]->mode;
-    if (preset == NULL || preset->type != AMY_PCM_TYPE_FILE)
-        return mode;
-    uint16_t degraded = mode;
-    if (mode == PCM_LOOP || mode == PCM_LOOP_FOREVER) {
-        // Both play on through a note-off; PCM_PLAY is that without the loop.
-        degraded = PCM_PLAY;
-    } else if (mode == PCM_LOOP_STOP) {
-        degraded = PCM_PLAY_STOP;
+bool pcm_loop_config_allowed(uint16_t osc, uint16_t mode, uint16_t preset_number,
+                             bool mode_is_the_new_part) {
+    // mode means nothing outside PCM, so don't second-guess other waves.
+    if (synth[osc]->wave != PCM) return true;
+    if (!mode_is_looping(mode)) return true;
+    const char *filename = NULL;
+    if (!preset_is_file(preset_number, &filename)) return true;
+    if (mode_is_the_new_part) {
+        fprintf(stderr, "amy: osc %d preset %d streams from %s, which cannot loop; "
+                        "ignoring mode=%d. Use load_sample() to loop.\n",
+                osc, preset_number, filename ? filename : "a file", mode);
+    } else {
+        fprintf(stderr, "amy: preset %d streams from %s, which cannot loop, but osc %d "
+                        "is in mode=%d; ignoring preset=%d. Set a non-loop mode first, "
+                        "or use load_sample().\n",
+                preset_number, filename ? filename : "a file", osc, mode, preset_number);
     }
-    if (degraded != mode && !preset->loop_warned) {
-        preset->loop_warned = 1;
-        fprintf(stderr, "amy: preset %d streams from %s, so it cannot loop; "
-                        "playing it once instead. Use load_sample() to loop.\n",
-                synth[osc]->preset, preset->filename);
-    }
-    return degraded;
+    return false;
 }
 
 void pcm_note_on(uint16_t osc) {
@@ -223,7 +243,7 @@ void pcm_note_on(uint16_t osc) {
             synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
         // Copy the looping mode from the wave mode field.  Can be updated on note_off.
-        msynth[osc]->state = pcm_effective_mode(osc, preset);
+        msynth[osc]->state = synth[osc]->mode;
         // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }
@@ -460,7 +480,6 @@ int pcm_load_file() {
     memory_preset->midinote = midinote;
     memory_preset->length = total_frames;
     memory_preset->type = AMY_PCM_TYPE_FILE;
-    memory_preset->loop_warned = 0;
     memory_preset->file_bytes_remaining = total_frames * info.channels * 2;
     memory_preset->file_handle = handle;
     memory_preset->sample_ram = malloc_caps(buffer_frames * info.channels * sizeof(int16_t),

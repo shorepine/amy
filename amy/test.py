@@ -1308,20 +1308,22 @@ class TestDiskSampleStopsOnNoteOff(AmyTest):
 
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
-    amy.send(time=100, osc=0, vel=0)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57)
+    amy_send_at(time=100, osc=0, vel=0)
 
 
-class TestDiskSampleLoopModeDegrades(AmyTest):
-  """PCM_LOOP on a streamed preset can't loop (no seekable table), so it
-  degrades to PCM_PLAY: one pass, note-off doesn't cut it short. Rendered
-  output should match a plain PCM_PLAY of the same clip."""
+class TestDiskSampleLoopModeRefused(AmyTest):
+  """A streamed preset can't loop (no seekable table), so asking for PCM_LOOP
+  is refused outright rather than accepted and quietly not looped. The mode
+  is the half that gets dropped, so the osc keeps the preset and its default
+  PCM_PLAY_STOP -- which means note-off stops it. Output should therefore be
+  identical to TestDiskSampleStopsOnNoteOff, which asks for no mode at all."""
 
   def run(self):
     amy.disk_sample('sounds/partial_sources/CL SHCI A3.wav', preset=1024, midinote=57)
-    amy.send(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57,
-             mode=amy.PCM_LOOP)
-    amy.send(time=100, osc=0, vel=0)
+    amy_send_at(time=50, osc=0, preset=1024, wave=amy.PCM_MIX, vel=2, note=57,
+                mode=amy.PCM_LOOP)
+    amy_send_at(time=100, osc=0, vel=0)
 
 
 class TestDiskSampleStereo(AmyTest):

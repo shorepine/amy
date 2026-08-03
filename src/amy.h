@@ -1235,6 +1235,12 @@ extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
 extern const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint32_t *length);
 extern int pcm_load_file();
+// Guard against configuring a PCM loop on a file-backed (streamed) preset,
+// which can never loop. Called with the PROPOSED mode and preset as each is
+// set; returns false if that command should be dropped (having warned).
+// mode_is_the_new_part picks which of the two the message blames.
+extern bool pcm_loop_config_allowed(uint16_t osc, uint16_t mode, uint16_t preset_number,
+                                    bool mode_is_the_new_part);
 extern void pcm_unload_preset(uint16_t preset_number);
 extern void pcm_unload_all_presets();
 
