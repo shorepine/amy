@@ -256,25 +256,20 @@ void pcm_mod_trigger(uint16_t osc) {
 
 void pcm_note_off(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
-        uint32_t length = 0;
-        memorypcm_preset_t rom_local;
-        memorypcm_preset_t *preset =
-            get_preset_for_preset_number(synth[osc]->preset, &rom_local);
-        if(preset != NULL) {
-            length = preset->length;
-        }
         if (msynth[osc]->state == PCM_PLAY_STOP
             || msynth[osc]->state == PCM_LOOP_STOP) {
-            // PCM mode where note off causes immediate stop: Set phase to the end
-            synth[osc]->phase = F2P(length / (float)(1 << PCM_INDEX_BITS));
-            if (preset != NULL && preset->type == AMY_PCM_TYPE_FILE) {
-                // ...except a streamed preset re-reads the file and resets
-                // phase to 0 every block, which throws that away -- the clip
-                // would keep playing to end-of-file, note-off ignored. This is
-                // the default mode, so it hit every disk_sample() note-off,
-                // not just the LOOP ones. Stop the osc outright instead.
-                synth[osc]->status = SYNTH_OFF;
-            }
+            // PCM mode where note off causes immediate stop.
+            //
+            // This used to seek phase past the end of the sample and let
+            // render_pcm notice on the next block. That worked only for
+            // in-memory presets: a streamed one refills from the file and
+            // resets phase to 0 every block, so the seek was thrown away and
+            // the clip played on to end-of-file, ignoring note-off entirely.
+            // PCM_PLAY_STOP is the DEFAULT mode, so that hit every
+            // disk_sample() note-off. Stopping the osc says what we mean and
+            // works for both kinds -- and it no longer needs the preset
+            // lookup that the seek needed just to find the sample length.
+            synth[osc]->status = SYNTH_OFF;
         } else if (msynth[osc]->state == PCM_LOOP_FOREVER) {
             // Sending one note-off to a LOOP_FOREVER loop downgrades it to a stoppable loop.
             msynth[osc]->state = PCM_LOOP;
