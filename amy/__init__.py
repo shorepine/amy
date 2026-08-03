@@ -453,17 +453,26 @@ def stop_sample():
     send(stop_sample=1)
 
 def _send_transfer_chunk(message):
-    """Send one chunk of an AUDIO or FILE transfer's payload. Always routed
-    via the sysex-marked path (see amy_message_is_transfer_chunk() in
-    api.c) so the C side can unambiguously identify it as transfer data
-    rather than risk misinterpreting -- or having misinterpreted -- a
-    regular wire command as such, regardless of what else might be calling
-    amy.send() concurrently (e.g. a sketch's own loop() on hardware during a
-    live transfer)."""
+    """Send one chunk of an AUDIO or FILE transfer's payload.
+
+    When AMY is linked in-process, this goes via the sysex-marked path
+    (amy_send_wire_from_sysex) so amy_add_message_with_sysex_flag() can
+    unambiguously identify it as transfer payload rather than risk
+    misinterpreting -- or having misinterpreted -- a regular wire command
+    as such, regardless of what else might be calling amy.send()
+    concurrently (e.g. a sketch's own loop() on hardware during a live
+    transfer). _send_wire_from_sysex resolves to the local AMY on every
+    backend (CPython c_amy, linked MicroPython, web), so the flag is never
+    dropped just because the platform reaches AMY differently.
+
+    override_send means the user has redirected AMY somewhere else
+    entirely -- another board over MIDI sysex or i2c -- so chunks follow
+    the same route as the rest of the transfer and get their sysex marking
+    from the transport at the far end."""
     if override_send is not None:
         override_send(message)
     else:
-        _amy.send_wire_from_sysex(message)
+        _send_wire_from_sysex(message)
 
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
     # takes in a python bytes obj instead of filename
