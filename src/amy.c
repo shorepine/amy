@@ -1372,15 +1372,20 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc]->logfreq_coefs[COEF_CONST]));
         }
     }
-    // MODE and PRESET are checked as a pair rather than assigned blind: a
-    // PCM_LOOP* mode on a file-backed preset is a configuration AMY cannot
-    // honor, so whichever command would create it is refused with a warning
-    // instead of being accepted and quietly doing something else at note-on.
-    // WAVE is applied above, so synth[]->wave is already current here.
-    if (d->param == MODE) {
-        if (pcm_loop_config_allowed(d->osc, (uint16_t)d->data.i,
-                                    synth[d->osc]->preset, true))
-            synth[d->osc]->mode = d->data.i;
+    // MODE and PRESET are assigned together, because neither is valid on its
+    // own: a PCM_LOOP* mode on a file-backed preset is a configuration AMY
+    // cannot honor. Whichever of the pair this delta carries is checked
+    // against the value already on the osc, and refused with a warning rather
+    // than accepted and quietly doing something else at note-on. (Only one
+    // param matches per delta, so this reads as two cases but runs as one.)
+    if (d->param == MODE || d->param == PRESET) {
+        bool setting_mode = (d->param == MODE);
+        uint16_t mode = setting_mode ? (uint16_t)d->data.i : synth[d->osc]->mode;
+        uint16_t preset = setting_mode ? synth[d->osc]->preset : (uint16_t)d->data.i;
+        if (pcm_loop_config_allowed(d->osc, mode, preset, setting_mode)) {
+            if (setting_mode) synth[d->osc]->mode = mode;
+            else synth[d->osc]->preset = preset;
+        }
     }
     DELTA_TO_SYNTH_I(BUS, bus)
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
@@ -1390,11 +1395,6 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-    if (d->param == PRESET) {
-        if (pcm_loop_config_allowed(d->osc, synth[d->osc]->mode,
-                                    (uint16_t)d->data.i, false))
-            synth[d->osc]->preset = (uint16_t)d->data.i;
-    }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) {
         // Phase sets the *initial* phase of the osc.
