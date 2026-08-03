@@ -723,8 +723,14 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             amy_global.highest_bus = e->bus;
     }
     EVENT_TO_DELTA_I(wave, WAVE)
-    EVENT_TO_DELTA_I(mode, MODE)
+    // PRESET before MODE, and it matters: pcm_loop_config_allowed() refuses
+    // whichever of the pair arrives second and makes the configuration
+    // impossible. A single message asking for a file-backed preset AND a
+    // PCM_LOOP* mode is the common way to hit that, and refusing the *mode*
+    // leaves something useful (the sample, playing once) where refusing the
+    // preset would leave a loop mode pointing at nothing.
     EVENT_TO_DELTA_I(preset, PRESET)
+    EVENT_TO_DELTA_I(mode, MODE)
     EVENT_TO_DELTA_F(midi_note, MIDI_NOTE)
     EVENT_TO_DELTA_COEFS(amp_coefs, AMP)
     EVENT_TO_DELTA_FREQ_COEFS(freq_coefs, FREQ)
@@ -1366,7 +1372,21 @@ void play_delta(struct delta *d) {
             sine_note_on(d->osc, freq_of_logfreq(synth[d->osc]->logfreq_coefs[COEF_CONST]));
         }
     }
-    DELTA_TO_SYNTH_I(MODE, mode)
+    // MODE and PRESET are assigned together, because neither is valid on its
+    // own: a PCM_LOOP* mode on a file-backed preset is a configuration AMY
+    // cannot honor. Whichever of the pair this delta carries is checked
+    // against the value already on the osc, and refused with a warning rather
+    // than accepted and quietly doing something else at note-on. (Only one
+    // param matches per delta, so this reads as two cases but runs as one.)
+    if (d->param == MODE || d->param == PRESET) {
+        bool setting_mode = (d->param == MODE);
+        uint16_t mode = setting_mode ? (uint16_t)d->data.i : synth[d->osc]->mode;
+        uint16_t preset = setting_mode ? synth[d->osc]->preset : (uint16_t)d->data.i;
+        if (pcm_loop_config_allowed(d->osc, mode, preset, setting_mode)) {
+            if (setting_mode) synth[d->osc]->mode = mode;
+            else synth[d->osc]->preset = preset;
+        }
+    }
     DELTA_TO_SYNTH_I(BUS, bus)
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
@@ -1375,9 +1395,6 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
-    if (d->param == PRESET) {
-        synth[d->osc]->preset = (uint16_t)d->data.i;
-    }
     if (d->param == PORTAMENTO) synth[d->osc]->portamento_alpha = portamento_ms_to_alpha(d->data.i);
     if (d->param == PHASE) {
         // Phase sets the *initial* phase of the osc.
