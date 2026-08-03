@@ -15,7 +15,13 @@ void sequencer_check_and_fill();  // called once per block from amy_execute_delt
 #ifdef __EMSCRIPTEN__
 void sequencer_check_and_call_js_hook();  // called from the browser main loop
 #endif
-uint8_t sequencer_add_event(amy_event *e);
+// Store a wire message (with its leading 'H' already stripped) in the
+// sequencer.  If has_tag is true, it's stored under tag (replacing/clearing
+// any existing entry there, addressable later by that same tag); clears the
+// tag if tick and period are both 0. If has_tag is false, it's stored
+// anonymously (round-robin in a small reserved pool) and can't be addressed
+// or cancelled by any tag. Takes ownership of wire.
+uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool has_tag, char *wire);
 void sequencer_midi_clock_tick();
 void sequencer_midi_start();
 void sequencer_midi_stop();

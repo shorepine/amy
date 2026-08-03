@@ -159,8 +159,35 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     }
 }
 
+void snprintcodefloat(char *s, size_t max_len, char *code, float val) {
+    // Skip trailing zeros (and decimal point) when printing a float.
+    float testval = val;
+    char fmt[7]; // = "%s%.0f";
+    fmt[0] = '%';
+    fmt[1] = 's';
+    fmt[2] = '%';
+    fmt[3] = '.';
+    fmt[4] = '0';
+    fmt[5] = 'f';
+    fmt[6] = 0;
+    for (int dp = 0; dp < 3; ++dp) {
+        if (testval == roundf(testval)) {
+            snprintf(s, max_len, fmt, code, val);
+            return;
+        }
+        testval *= 10.0f;
+        ++fmt[4];  // increase the DP digit
+    }
+    snprintf(s, max_len, fmt, code, val);
+}
+
+void snprintfloat3dp(char *s, size_t max_len, float val) {
+    // Print a single float value with up to 3 decimal places, but no more.
+    snprintcodefloat(s, max_len, "", val);
+}
+
 #define _EPRINT_I(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintf(s, len - (size_t)(s - s_entry), "%s%" PRId32, wirecode ? WIRECODE : " " NAME ": ", (int32_t)e->FIELD); s += strlen(s); }
-#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintf(s, len - (size_t)(s - s_entry), "%s%.3f", wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
+#define _EPRINT_F(FIELD, NAME, WIRECODE) if (AMY_IS_SET(e->FIELD)) { snprintcodefloat(s, len - (size_t)(s - s_entry), wirecode ? WIRECODE : " " NAME ": ", e->FIELD); s += strlen(s); }
 #define _EPRINT_COEF(FIELD, NAME, WIRECODE) {            \
     int last_set = -1; \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {    \
@@ -172,7 +199,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         for (int i = 0; i <= last_set; ++i) { \
             if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }      \
             if (AMY_IS_SET(e->FIELD[i])) {        \
-                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->FIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->FIELD[i]); \
                 s += strlen(s);  \
             }   \
         } \
@@ -195,6 +222,28 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         } \
     }     \
 }
+// As _EPRINT_I_SEQ but unsigned. ticks needs this: its values are uint32_t,
+// and printing one past INT32_MAX as a negative number makes the unsigned
+// list parser on the other end stop at the '-' -- for a 3-value ticks that
+// silently turned an (invalid, should-be-rejected) tag into a 2-value
+// anonymous entry.
+#define _EPRINT_U_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
+    int last_set = -1; \
+    for (int i = 0; i < LEN; ++i) {    \
+        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
+    }                                              \
+    if (last_set >= 0) { \
+        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");       \
+        s += strlen(s);  \
+        for (int i = 0; i <= last_set; ++i) { \
+            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
+            if (AMY_IS_SET(e->FIELD[i])) { \
+                snprintf(s, len - (size_t)(s - s_entry), "%" PRIu32, (uint32_t)e->FIELD[i]); \
+                s += strlen(s); \
+            } \
+        } \
+    }     \
+}
 #define _EPRINT_F_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
     int last_set = -1; \
     for (int i = 0; i < LEN; ++i) {    \
@@ -206,7 +255,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
         for (int i = 0; i <= last_set; ++i) { \
             if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
             if (AMY_IS_SET(e->FIELD[i])) { \
-                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->FIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->FIELD[i]); \
                 s += strlen(s); \
             } \
         } \
@@ -230,7 +279,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
             snprintf(s, len - (size_t)(s - s_entry), ",");                   \
             s += strlen(s);    \
             if (AMY_IS_SET(e->VFIELD[i])) {       \
-                snprintf(s, len - (size_t)(s - s_entry), "%.3f", e->VFIELD[i]); \
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->VFIELD[i]); \
                 s += strlen(s);  \
             }  \
         }                                            \
@@ -249,7 +298,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
             s += strlen(s); \
             for (int j = 0; j <= last_one; ++j) {  \
                 if (AMY_IS_SET(vals[j])) { \
-                    snprintf(s, len - (size_t)(s - s_entry), "%.3f", vals[j]);   \
+                    snprintfloat3dp(s, len - (size_t)(s - s_entry), vals[j]); \
                     s += strlen(s); \
                 } \
                 if (j < last_one) { \
@@ -269,9 +318,13 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%u, addr_osc=%d adr_syn=%d adr_bus=%d): ", e->time, (unsigned)e->osc,
                  event_addresses_oscs(e), event_addresses_synth(e), event_addresses_bus(e));
         s += strlen(s);
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
     } else {
-        if (AMY_IS_SET(e->time)) { snprintf(s, len - (size_t)(s - s_entry), "t%" PRIu32, (int32_t)e->time); s += strlen(s); }
-        if (AMY_IS_SET(e->osc)) { snprintf(s, len - (size_t)(s - s_entry), "v%u", (unsigned)e->osc); s += strlen(s); }
+        // e->time has no wire representation anymore (there's no 't' command);
+        // it's only ever meaningful as this event's own near-term playback time.
+        // ticks ("H") must always be the first entry in wire code if used.
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
+        _EPRINT_I(osc, "osc", "v");
     }
     _EPRINT_I(wave, "wave", "w");
     _EPRINT_I(preset, "preset", "p");
@@ -313,7 +366,6 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(pedal, "pedal", "ip");  // MIDI pedal value.
     _EPRINT_I(num_voices, "num_voices", "iv");
     _EPRINT_I(oscs_per_voice, "oscs_per_voice", "in");
-    _EPRINT_I_SEQ(sequence, "sequence", 3, "H"); // tick, period, tag
     //
     //_EPRINT_I(status, "status");
     _EPRINT_I(reset_osc, "reset_osc", "S");
@@ -417,7 +469,7 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(eg_type[0]);
     _RET_TRUE_IF_SET(eg_type[1]);
     // We don't know
-    _RET_TRUE_IF_SET_SEQ(sequence, 3); // tick, period, tag
+    _RET_TRUE_IF_SET_SEQ(ticks, 3); // tick, period, tag
     //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);
@@ -1024,8 +1076,8 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
         AMY_UNSET(e->midi_note);
         AMY_UNSET(e->velocity);
-        // Pass the target queue through: if this event is being stored (e.g. it came
-        // from sequencer_add_event), its deltas must land in that queue, not play now.
+        // Pass the target queue through: if this event is being stored (e.g. into
+        // a patch), its deltas must land in that queue, not play now.
         midi_message_handler_to_queue(bytes, 3, e->time, e, queue);
     } else {
         uint16_t voices[MAX_VOICES_PER_INSTRUMENT];

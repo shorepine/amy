@@ -23,7 +23,7 @@ void setup() {
   amy_config.i2s_lrc = 9;
   amy_config.i2s_dout = 10;
   #endif
-  
+
   amy_start(amy_config);
 
   // Reconfigure synth 1 as a 6-note polyphonic synth (for chords)
@@ -41,7 +41,17 @@ void setup() {
   amy_add_event(&e);
 
   // Turn on reverb
-  config_reverb(/* bus */ 0, 0.5f, 0.85f, 0.5f, 3000.0f);
+  e = amy_default_event();
+  e.reverb_level = 0.5f;
+  e.reverb_liveness = 0.85f;
+  e.reverb_damping = 0.5f;
+  e.reverb_xover_hz = 3000.0f;
+  amy_add_event(&e);
+
+  // Set tempo for Billie Jean
+  e = amy_default_event();
+  e.tempo = 116.0f;
+  amy_add_event(&e);
 }
 
 struct timed_note {
@@ -96,7 +106,7 @@ timed_note chord_notes[] = {
   { 11.0, 0.2, 81, 1.0},
 };
 
-float millis_per_tick = 250;
+float amy_ticks_per_tick = 24.0f;
 
 void schedule_notes(int time, int channel, struct timed_note *notes, int num_notes) {
   amy_event e = amy_default_event();
@@ -104,26 +114,26 @@ void schedule_notes(int time, int channel, struct timed_note *notes, int num_not
   for (int i = 0; i < num_notes; ++i) {
     e.midi_note = notes[i].note;
     e.velocity = notes[i].velocity;
-    e.time = time + millis_per_tick * notes[i].start_time;
+    e.ticks[0] = time + amy_ticks_per_tick * notes[i].start_time;
     amy_add_event(&e);
     // Add note-off too if duration > 0
     if (notes[i].duration > 0) {
-      e.time += millis_per_tick * notes[i].duration;
+      e.ticks[0] += amy_ticks_per_tick * notes[i].duration;
       e.velocity = 0;
       amy_add_event(&e);
     }
   }
 }
 
-int start_millis = 3000;
+int start_tick = 192;
 int last_cycle = -1;
 
 void loop() {
   // Let amy do its processing for this moment.
   amy_update();
 
-  int now = millis();
-  int current_cycle = floor((now - start_millis) / (millis_per_tick * cycle_len));
+  int now = sequencer_ticks();
+  int current_cycle = floor((now - start_tick) / (amy_ticks_per_tick * cycle_len));
   if (current_cycle > last_cycle) {
     // A new cycle began, issue notes.
     // Drums

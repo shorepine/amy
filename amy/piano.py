@@ -1,32 +1,42 @@
-
 # piano.py
 # examples from piano.html
 import amy
+from time import sleep
 from . import piano_params
 
 def piano_example(base_note=72, volume=5, send_command=amy.send, init_command=lambda: None, synth=1):
+    # Live demo playback of piano notes.
     amy.send(reset=amy.RESET_TIMEBASE)
-    amy.send(time=0, volume=volume)
+    amy.send(volume=volume)
     init_command()
-    send_command(time=50, synth=synth, note=base_note, vel=0.05)
-    send_command(time=435, synth=synth, note=base_note, vel=0)
-    send_command(time=450, synth=synth, note=base_note, vel=0.63)
-    send_command(time=835, synth=synth, note=base_note, vel=0)
-    send_command(time=850, synth=synth, note=base_note, vel=1.0)
-    send_command(time=1485, synth=synth, note=base_note, vel=0)
-    send_command(time=1500, synth=synth, note=base_note - 24, vel=0.6)
-    send_command(time=2100, synth=synth, note=base_note + 24, vel=1.0)
-    send_command(time=3000, synth=synth, note=base_note - 24, vel=0)
-    send_command(time=3000, synth=synth, note=base_note + 24, vel=0)
+    sleep(0.050)
+    send_command(synth=synth, note=base_note, vel=0.05)
+    sleep(0.385)
+    send_command(synth=synth, note=base_note, vel=0)
+    sleep(0.015)
+    send_command(synth=synth, note=base_note, vel=0.63)
+    sleep(0.385)
+    send_command(synth=synth, note=base_note, vel=0)
+    sleep(0.015)
+    send_command(synth=synth, note=base_note, vel=1.0)
+    sleep(0.635)
+    send_command(synth=synth, note=base_note, vel=0)
+    sleep(0.015)
+    send_command(synth=synth, note=base_note - 24, vel=0.6)
+    sleep(0.600)
+    send_command(synth=synth, note=base_note + 24, vel=1.0)
+    sleep(0.900)
+    send_command(synth=synth, note=base_note - 24, vel=0)
+    send_command(synth=synth, note=base_note + 24, vel=0)
 
 
 def juno_example():
-	piano_example(base_note=74, volume=10, 
-		init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=7))
+	piano_example(base_note=74, volume=10,
+		init_command=lambda: amy.send(synth=1, num_voices=3, patch=7))
 
 def dx7_example():
-	piano_example(base_note=50, volume=25, 
-              init_command=lambda: amy.send(time=0, synth=1, num_voices=3, patch=137))
+	piano_example(base_note=50, volume=25,
+              init_command=lambda: amy.send(synth=1, num_voices=3, patch=137))
 
 
 """Piano notes generated on amy/tulip."""

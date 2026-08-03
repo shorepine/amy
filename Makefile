@@ -104,7 +104,7 @@ amy-message: $(OBJECTS) src/amy-message.o
 
 # Plain C tests for things the audio-rendering suite can't reach -- e.g. clock
 # rollovers 50 days out, which you can only hit by fast-forwarding the counters.
-CTESTS = tests/test_clock_wrap
+CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
@@ -181,6 +181,9 @@ deploy-web: web
 # source of truth). Run on release and verified in CI so godot/amy.gd can't drift.
 godot-api:
 	$(PYTHON) scripts/gen_amy_gd_api.py
+
+js-api:
+	$(PYTHON) scripts/gen_amy_js_api.py
 
 clean:
 	-rm -f src/*.o

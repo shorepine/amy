@@ -50,15 +50,15 @@ void test_audio_in() {
     amy_add_event(&e);
 }
 
-void midi_polyphony(uint32_t start, uint16_t patch) {
+void midi_polyphony(uint16_t patch) {
     // Play mulitple notes via note-ons to MIDI channel 1.
     uint8_t data[3] = {0x90, 0x00, 0x7f};
     uint8_t note = 40;
     for(uint8_t i=0;i<15;i++) {
 	data[1] = note;
-	amy_event_midi_message_received(data, 3, 0, start);
-        start += 1000;
+	amy_event_midi_message_received(data, 3, 0);
         note += 2;
+        System::DelayMs(1000);
     }
 }
 
@@ -116,8 +116,7 @@ void HandleMidiMessage(MidiEvent m) {
 	    break;
     }
     if (good_event) {
-	uint32_t time = UINT32_MAX;
-	amy_event_midi_message_received(data, 3, 0, time);
+	amy_event_midi_message_received(data, 3, 0);
     }
 }
 

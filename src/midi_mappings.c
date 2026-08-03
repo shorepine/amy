@@ -233,14 +233,30 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     return 1;
 }
 
+#define SNPRINT3DPCOMMA(val) \
+    snprintfloat3dp(s, len, val); \
+    len -= strlen(s); \
+    s += strlen(s); \
+    if (len) { \
+        s[0] = ','; \
+        ++s; \
+        --len; \
+    }
+
 bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len) {
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
     //fprintf(stderr, "midi_fetch_mapping_command chan %d type %d code %d mapping 0x%llx\n", channel, type, code, (uint64_t)p_mapping);
     if (p_mapping == NULL)
         return false;
     // Format the control code - ic<C>,<L>,<N>,<X>,<O>,<CODE>
-    sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
-    assert(strlen(s) < len);
+    //sprintf(s, "i%c%d,%d,%.3f,%.3f,%.3f,%sZ", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log, (*p_mapping)->min_val, (*p_mapping)->max_val, (*p_mapping)->offset_val, (*p_mapping)->message_template);
+    snprintf(s, len, "i%c%d,%d,", (*p_mapping)->type == MIDI_MAP_TYPE_CC? 'c' : 'o', (*p_mapping)->code, (*p_mapping)->is_log);
+    len -= strlen(s);
+    s += strlen(s);
+    SNPRINT3DPCOMMA((*p_mapping)->min_val);
+    SNPRINT3DPCOMMA((*p_mapping)->max_val);
+    SNPRINT3DPCOMMA((*p_mapping)->offset_val);
+    snprintf(s, len, "%sZ", (*p_mapping)->message_template);
     return true;
 }
 
@@ -340,14 +356,12 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
                     status = 0x90;
                     value = 0;
                 }
-                // Mark message as already passed through mapping for this channel (synth).
-                sprintf(message, "iM%d", channel);
-                int offset = strlen(message);
-                if (AMY_IS_SET(time)) {
-                    sprintf(message + offset, "t%" PRId32, time);
-                    offset = strlen(message);
-                }
-                substitute_midi_special_values(message + offset, mapping->message_template, channel, code, value);
+                substitute_midi_special_values(message, mapping->message_template, channel, code, value);
+                // Mark the event as already passed through mapping for this
+                // channel, so we don't send it back out again.
+                event->note_source_channel = channel;
+                // If we're given a time, set it in the event.
+                if (AMY_IS_SET(time)) event->time = time;
             }  // If state is non-null, assume we're working through the later yields.
             // Layer each parsed event on top of the caller's base event, if any.
             yield_state->pos = yield_event_from_message(yield_state->message, event, yield_state->pos);

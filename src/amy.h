@@ -280,6 +280,7 @@ enum coefs{
 #define FILTER_HPF 3
 #define FILTER_LPF24 4
 #define FILTER_NOTCH 5
+#define FILTER_PHASER 6
 // synth[].wave values
 #define SINE 0
 #define PULSE 1
@@ -331,10 +332,10 @@ enum coefs{
 #define ENVELOPE_DX7 2
 #define ENVELOPE_TRUE_EXPONENTIAL 3
 
-// Sequence enum
-#define SEQUENCE_TICK 0
-#define SEQUENCE_PERIOD 1
-#define SEQUENCE_TAG 2
+// Ticks enum
+#define TICKS_TICK 0
+#define TICKS_PERIOD 1
+#define TICKS_TAG 2
 
 // Reset masks
 #define RESET_SEQUENCER 4096
@@ -583,7 +584,7 @@ typedef struct amy_event {
     uint16_t num_voices;
     uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
     //
-    uint32_t sequence[3]; // tick, period, tag
+    uint32_t ticks[3]; // tick, period, tag
     //
     uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
@@ -672,15 +673,6 @@ struct mod_synthinfo {
     float feedback;
     uint16_t state;    // Used for PCM looping state.
 };
-
-
-typedef struct sequence_entry_ll_t {
-    struct delta d;
-    uint32_t tag;
-    uint32_t tick; // 0 means not used 
-    uint32_t period; // 0 means not used 
-    struct sequence_entry_ll_t *next;
-} sequence_entry_ll_t;
 
 
 typedef struct delay_line {
@@ -890,7 +882,6 @@ typedef struct global_state {
     uint32_t sequencer_tick_count;
     uint64_t next_amy_tick_us;
     uint32_t us_per_tick;
-    sequence_entry_ll_t * sequence_entry_ll_start;
 
     // Buses
     bus_state_t *bus[AMY_NUM_BUSES];
@@ -980,7 +971,6 @@ void patches_init(int max_memory_patches);
 void patches_deinit();
 void parse_algo_source(char* message, int16_t *vals);
 void hold_and_modify(uint16_t osc) ;
-void amy_execute_delta();
 void amy_execute_deltas();
 int16_t * amy_fill_buffer();
 int16_t * amy_simple_fill_buffer();  // excute_deltas + render + fill_buffer
@@ -990,11 +980,14 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Parse and play a stored wire message now (a fired sequencer entry).
+void amy_play_message(char *message);
 // Like amy_add_message but the data is treated as coming from an external
 // sysex source, so file transfer routing (transfer_flag) applies.
-void amy_add_message_from_sysex(char *message);
+void amy_send_wire_from_sysex(char *message);
 void amy_add_event(amy_event *e);
 size_t yield_event_from_message(char *message, amy_event *e, size_t pos);
+void handle_ticks_message(char *message);
 int amy_parse_message(char * message, amy_event *e);
 void amy_start(amy_config_t);
 void amy_stop();
@@ -1146,6 +1139,7 @@ extern void patches_load_patch(amy_event *e);
 extern void patches_event_has_voices(amy_event *e, struct delta **queue);
 extern void patches_reset_patch(int patch_number);
 extern void patches_reset();
+extern void snprintfloat3dp(char *s, size_t max_len, float val);
 extern int sprint_event(amy_event *e, char *s, size_t len, bool wirecode);
 extern void fprintf_event_stderr(amy_event *e);
 extern void *yield_synth_events(uint8_t synth, struct amy_event *event, bool include_fx, void *state);
