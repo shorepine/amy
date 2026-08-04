@@ -75,7 +75,7 @@ const ENVELOPE_TRUE_EXPONENTIAL: int = 3
 @export var audio_in: bool = false
 ## Maximum number of oscillators.
 @export var max_oscs: int = 180
-## Number of FX buses (1..AMY_MAX_BUSES, 8 by default in the C build).
+## Number of FX buses (1..AMY_MAX_BUSES, 32 in the C build).
 @export var max_buses: int = 4
 ## Maximum number of voices.
 @export var max_voices: int = 64

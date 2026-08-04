@@ -122,18 +122,21 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 // actually runs is a runtime setting, amy_config.max_buses (AMY_NUM_BUSES
 // below), so a host can trade RAM for buses without rebuilding.
 //
-// AMY_MAX_BUSES is the compile-time ceiling on that setting.  It only sizes
-// the parts that can't be allocated once max_buses is known: the amy_event
-// volume vector, the pointer tables in global_state, and the VOLUME_* param
-// ids.  That's ~50 bytes per bus of fixed overhead (most of it in amy_event,
-// which lives on the stack in the parse and patch paths), so the ceiling is
-// deliberately modest -- raise it here or with -DAMY_MAX_BUSES=n if you need
-// more, and raise max_buses to actually use them.
+// AMY_MAX_BUSES is the compile-time ceiling on that setting, and it's set to
+// the largest value the params enum can express, so in practice max_buses
+// alone decides how many buses you get.  The ceiling exists because a few
+// things can't wait until max_buses is known: the amy_event volume vector,
+// the pointer tables in global_state, and the VOLUME_* param ids.  Raising it
+// from 4 to 32 costs 112 bytes in amy_event (which is stack-resident in the
+// parse and patch paths, a few live at once) and 440 bytes in the single
+// global_state -- turn it down with -DAMY_MAX_BUSES=n if you're counting
+// stack bytes on a small part.
 #ifndef AMY_MAX_BUSES
-#define AMY_MAX_BUSES 8
+#define AMY_MAX_BUSES 32
 #endif
 // VOLUME_BASE (65) + AMY_MAX_BUSES has to stay below MODE (99): the volume
-// params occupy one id per bus in the middle of the params enum.
+// params occupy one id per bus in the middle of the params enum.  Going past
+// 33 buses means reworking those ids, not just raising this.
 #if AMY_MAX_BUSES < 1 || AMY_MAX_BUSES > 33
 #error "AMY_MAX_BUSES must be in 1..33 (VOLUME_BASE + AMY_MAX_BUSES must stay below MODE)"
 #endif

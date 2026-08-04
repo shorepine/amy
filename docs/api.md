@@ -198,7 +198,7 @@ amy_start(amy_config);
 | `audio` | `AMY_AUDIO_IS_NONE`, `AMY_AUDIO_IS_I2S`, `AMY_AUDIO_IS_USB_GADGET`, `AMY_AUDIO_IS_MINIAUDIO`| I2S or miniaudio | Which audio interface(s) are active |
 | `write_samples_fn` | fn ptr | `NULL` | If provided, `amy_update` will call this with each new block of samples | 
 | `max_oscs` | Int | 180 | How many oscillators to support |
-| `max_buses` | Int | 4 | How many FX buses to support, 1..`AMY_MAX_BUSES` (8 at compile time; raise with `-DAMY_MAX_BUSES=n`). Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
+| `max_buses` | Int | 4 | How many FX buses to support, 1..`AMY_MAX_BUSES` (32, the most the params enum can express). Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
 | `max_sequencer_tags` | Int | 256 | How many sequencer items to handle |
 | `max_voices` | Int | 64 | How many voices |
 | `max_synths` | Int | 64 | How many synths |
@@ -387,7 +387,7 @@ Each of the `y` buses has separate effects units.  You set their parameters with
 
 The final mixdown of the buses onto the AMY output is controlled by one value per bus passed to the `volume` (`V`) command.
 
-Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_start` to run more or fewer — up to `AMY_MAX_BUSES`, which is 8 unless you raise it at compile time.  A bus number outside the configured range is rejected with a warning and treated as bus 0.  If the bus (`y`) is not specified for one of these commands, it defaults to 0.
+Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_start` to run more or fewer, up to `AMY_MAX_BUSES` (32).  A bus number outside the configured range is rejected with a warning and treated as bus 0.  If the bus (`y`) is not specified for one of these commands, it defaults to 0.
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
