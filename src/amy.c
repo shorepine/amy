@@ -167,8 +167,8 @@ struct synthinfo ** synth;
 struct mod_synthinfo ** msynth;
 
 // Two mixing blocks, one per core of rendering
-SAMPLE *fbl[AMY_MAX_CORES][AMY_NUM_BUSES];
-SAMPLE *per_osc_fb[AMY_MAX_CORES][AMY_NUM_BUSES];
+SAMPLE *fbl[AMY_MAX_CORES][AMY_MAX_BUSES];  // Only [0, config.max_buses) are allocated.
+SAMPLE *per_osc_fb[AMY_MAX_CORES][AMY_MAX_BUSES];
 SAMPLE core_max[AMY_MAX_CORES];
 
 // Public pointer to recently-emitted waveform block.
@@ -237,6 +237,15 @@ void amy_oom(const char *fmt, ...) {
 
 uint32_t amy_get_oom_count() {
     return amy_global.oom_count;
+}
+
+uint8_t amy_validate_bus(int bus) {
+    if (bus < 0 || bus >= AMY_NUM_BUSES) {
+        fprintf(stderr, "bus %d out of range 0..%d, using bus %d\n",
+                bus, AMY_NUM_BUSES - 1, AMY_DEFAULT_BUS);
+        return AMY_DEFAULT_BUS;
+    }
+    return (uint8_t)bus;
 }
 
 
@@ -485,6 +494,17 @@ void buses_reset() {
 int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
+    // Everything below -- and every AMY_NUM_BUSES in the rest of AMY -- reads
+    // max_buses back out of the config, so pin it into range first.  A caller
+    // that built its config by hand rather than from amy_default_config()
+    // arrives here with a zero, which would otherwise mean no buses at all.
+    if (amy_global.config.max_buses == 0)
+        amy_global.config.max_buses = AMY_DEFAULT_NUM_BUSES;
+    if (amy_global.config.max_buses > AMY_MAX_BUSES) {
+        fprintf(stderr, "max_buses %d > AMY_MAX_BUSES %d, using %d\n",
+                amy_global.config.max_buses, AMY_MAX_BUSES, AMY_MAX_BUSES);
+        amy_global.config.max_buses = AMY_MAX_BUSES;
+    }
     // Precompute implications of overload thresholds.
     //amy_global.overload_threshold_us = (uint32_t)(c.overload_threshold * ((float)AMY_BLOCK_US));
     amy_set_render_load_threshold(c.overload_threshold);
@@ -657,8 +677,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // If this is a bus-directed event, use d->osc to store the bus number instead.
     if (event_addresses_bus(e)) {
         // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
-        uint8_t bus = AMY_IS_SET(e->bus) ? e->bus :
-            ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS);
+        uint8_t bus = amy_validate_bus(AMY_IS_SET(e->bus) ? e->bus :
+            ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS));
         if (bus > amy_global.highest_bus) amy_global.highest_bus = bus;
         // Issue deltas for the bus-directed commands.
         d.osc = bus;
@@ -718,9 +738,10 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // Only propagate bus if osc was explicit, not for default-zero-osc.
     if (AMY_IS_SET(e->bus) && AMY_IS_SET(e->osc)) {
-        EVENT_TO_DELTA_I(bus, BUS)
-        if(e->bus > amy_global.highest_bus)
-            amy_global.highest_bus = e->bus;
+        uint8_t bus = amy_validate_bus(e->bus);
+        d.param = BUS; d.data.i = bus; add_delta_to_queue(&d, queue);
+        if(bus > amy_global.highest_bus)
+            amy_global.highest_bus = bus;
     }
     EVENT_TO_DELTA_I(wave, WAVE)
     // PRESET before MODE, and it matters: pcm_loop_config_allowed() refuses
@@ -1180,7 +1201,12 @@ void show_debug(uint8_t type) {
     if(type>1) {
         // print out all the osc data
         //printf("global: filter %f resonance %f volume %f bend %f status %d\n", amy_global.filter_freq, amy_global.resonance, amy_global.volume, amy_global.pitch_bend, amy_global.status);
-        fprintf(stderr,"global: volume %.3f %.3f %.3f %.3f bend %f bus 0 eq: %f %f %f \n", amy_global.volume[0], amy_global.volume[1], amy_global.volume[2], amy_global.volume[3], amy_global.pitch_bend, S2F(amy_global.bus[0]->eq.eq[0]), S2F(amy_global.bus[0]->eq.eq[1]), S2F(amy_global.bus[0]->eq.eq[2]));
+        // One volume per configured bus -- this used to print four whatever
+        // max_buses is, which reads past the end of a build with fewer.
+        fprintf(stderr, "global: volume");
+        for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
+            fprintf(stderr, " %.3f", amy_global.volume[bus]);
+        fprintf(stderr, " bend %f bus 0 eq: %f %f %f \n", amy_global.pitch_bend, S2F(amy_global.bus[0]->eq.eq[0]), S2F(amy_global.bus[0]->eq.eq[1]), S2F(amy_global.bus[0]->eq.eq[2]));
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
             print_osc_debug(i, (type > 3) /* show_eg */);
         }
@@ -1387,7 +1413,10 @@ void play_delta(struct delta *d) {
             else synth[d->osc]->preset = preset;
         }
     }
-    DELTA_TO_SYNTH_I(BUS, bus)
+    // Not DELTA_TO_SYNTH_I: the render loop indexes fbl[core][synth[osc]->bus]
+    // directly, and a delta can arrive from a patch stored when max_buses was
+    // higher than it is now, so this is the last place to catch a stale bus.
+    if (d->param == BUS) synth[d->osc]->bus = amy_validate_bus(d->data.i);
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
@@ -1533,6 +1562,10 @@ void play_delta(struct delta *d) {
     }
     // for global changes, just make the change, no need to update the per-osc synth
     uint8_t bus = d->osc;  // We assume d.osc was hijacked in amy_event_to_deltas_queue
+    // ...but only for the bus-directed params below; for every other delta
+    // d->osc is an osc number, so clamp quietly rather than complaining about
+    // osc 12 not being a bus.
+    if (bus >= AMY_NUM_BUSES) bus = AMY_DEFAULT_BUS;
     if(d->param >= VOLUME_BASE && (d->param - VOLUME_BASE) < AMY_NUM_BUSES) amy_global.volume[d->param - VOLUME_BASE] = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
     if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
@@ -2158,7 +2191,7 @@ int16_t * amy_fill_buffer() {
         #endif
     }  // end of per-bus FX
     // global volume is supposed to max out at 10, so scale by 0.1.
-    SAMPLE volume_scale[AMY_NUM_BUSES];
+    SAMPLE volume_scale[AMY_MAX_BUSES];  // Fixed size: AMY_NUM_BUSES is runtime, and MSVC has no VLAs.
     for (int bus = 0; bus <= amy_global.highest_bus; ++bus)
         volume_scale[bus] = MUL4_SS(F2S(0.1f), F2S(amy_global.volume[bus]));
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {

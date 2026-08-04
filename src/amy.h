@@ -118,8 +118,27 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #define SAMPLE_FROM_OUTPUT 1
 #define SAMPLE_FROM_AUDIO_IN 2
 
-// Each bus has separate FX (EQ, chorus, reverb, echo)
-#define AMY_NUM_BUSES 4
+// Each bus has separate FX (EQ, chorus, reverb, echo).  How many buses AMY
+// actually runs is a runtime setting, amy_config.max_buses (AMY_NUM_BUSES
+// below), so a host can trade RAM for buses without rebuilding.
+//
+// AMY_MAX_BUSES is the compile-time ceiling on that setting.  It only sizes
+// the parts that can't be allocated once max_buses is known: the amy_event
+// volume vector, the pointer tables in global_state, and the VOLUME_* param
+// ids.  That's ~50 bytes per bus of fixed overhead (most of it in amy_event,
+// which lives on the stack in the parse and patch paths), so the ceiling is
+// deliberately modest -- raise it here or with -DAMY_MAX_BUSES=n if you need
+// more, and raise max_buses to actually use them.
+#ifndef AMY_MAX_BUSES
+#define AMY_MAX_BUSES 8
+#endif
+// VOLUME_BASE (65) + AMY_MAX_BUSES has to stay below MODE (99): the volume
+// params occupy one id per bus in the middle of the params enum.
+#if AMY_MAX_BUSES < 1 || AMY_MAX_BUSES > 33
+#error "AMY_MAX_BUSES must be in 1..33 (VOLUME_BASE + AMY_MAX_BUSES must stay below MODE)"
+#endif
+#define AMY_DEFAULT_NUM_BUSES 4
+#define AMY_NUM_BUSES (amy_global.config.max_buses)
 #define AMY_DEFAULT_BUS 0
 
 // How many external CV inputs to contemplate.
@@ -392,8 +411,8 @@ enum params{
     MOD_SOURCE, FILTER_TYPE,             // 57, 58
     EQ_L, EQ_M, EQ_H,                    // 59, 60, 61
     ALGORITHM, LATENCY, TEMPO,           // 62, 63, 64
-    VOLUME_BASE,                         // 65..68
-    VOLUME_END=VOLUME_BASE + AMY_NUM_BUSES, // 69
+    VOLUME_BASE,                         // 65..65+AMY_MAX_BUSES-1
+    VOLUME_END=VOLUME_BASE + AMY_MAX_BUSES, // one id per possible bus, not per configured bus
     MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
@@ -551,7 +570,7 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float trigger_phase;
-    float volume[AMY_NUM_BUSES];  // event_only
+    float volume[AMY_MAX_BUSES];  // event_only
     float pitch_bend;  // event_only
     float tempo;  // event_only
     uint16_t latency_ms;  // event_only
@@ -734,6 +753,11 @@ typedef struct  {
 
     // variables
     uint16_t max_oscs;
+    // How many FX buses to run, 1..AMY_MAX_BUSES.  Each costs a few KB of
+    // always-allocated mix buffers even when idle, plus whatever its FX
+    // allocate once they're switched on (a couple of hundred KB for a bus
+    // running echo and reverb), so this is worth turning down on small parts.
+    uint8_t max_buses;
     uint8_t ks_oscs;
     uint32_t max_sequencer_tags;
     uint32_t max_voices;
@@ -860,7 +884,7 @@ typedef struct global_state {
     amy_config_t config;
     uint8_t running;
     uint8_t i2s_is_in_background;  // Flag not to handle I2S in amy_update.
-    float volume[AMY_NUM_BUSES];  // Volume controls mix of buses into final output.
+    float volume[AMY_MAX_BUSES];  // Volume controls mix of buses into final output.
     float pitch_bend;  // Legacy global pitch bend, will be subsumed per-synth (instrument).
     
     uint16_t delta_qsize;
@@ -889,10 +913,10 @@ typedef struct global_state {
     uint32_t us_per_tick;
 
     // Buses
-    bus_state_t *bus[AMY_NUM_BUSES];
+    bus_state_t *bus[AMY_MAX_BUSES];  // Only [0, config.max_buses) are allocated.
 
     // Final output mix
-    float bus_gain[AMY_NUM_BUSES];
+    float bus_gain[AMY_MAX_BUSES];
 
     // Smoothed microseconds per render execution.
     uint32_t render_us;
@@ -952,6 +976,11 @@ int8_t check_init(amy_err_t (*fn)(), const char *name);
 void * malloc_caps(uint32_t size, uint32_t flags);
 void * malloc_caps_block(uint32_t size, uint32_t flags);
 void amy_oom(const char *fmt, ...);
+// Bus numbers arrive unchecked from the API and the wire protocol ('y9' is
+// just an atoi), and every one of them ends up subscripting amy_global.bus[]
+// or fbl[], so they have to be range-checked before they're stored anywhere.
+// Returns the bus, or AMY_DEFAULT_BUS (with a complaint) if it's out of range.
+uint8_t amy_validate_bus(int bus);
 void config_reverb(uint8_t bus, float level, float liveness, float damping, float xover_hz);
 void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);

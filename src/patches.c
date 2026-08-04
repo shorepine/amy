@@ -371,7 +371,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
     _EPRINT_I(bus, "bus", "y");
-    _EPRINT_F_SEQ(volume, "volume", AMY_NUM_BUSES, "V");
+    _EPRINT_F_SEQ(volume, "volume", AMY_MAX_BUSES, "V");
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
     _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
@@ -412,7 +412,7 @@ void fprintf_event_stderr(amy_event *e) {
 bool event_addresses_bus(amy_event *e) {
     // Global effects
     //is_empty &= AMY_IS_UNSET(e->bus);
-    for (int b = 0; b < AMY_NUM_BUSES; ++b)
+    for (int b = 0; b < AMY_MAX_BUSES; ++b)
         _RET_TRUE_IF_SET(volume[b]);
     _RET_TRUE_IF_5_F_SET(eq_l, eq_m, eq_h, eq_h, eq_h);
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
@@ -557,7 +557,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
       _TEST_COEFS(duty_coefs, DUTY)
       _TEST_COEFS(pan_coefs, PAN)
-      for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
+      for (int bus = 0; bus < AMY_MAX_BUSES; ++bus) {
           if ((int)queue->param == (int)VOLUME_BASE + bus)
               event->volume[bus] = queue->data.f;
       }

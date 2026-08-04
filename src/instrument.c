@@ -187,7 +187,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
     instrument->patch_number = patch_number;
     instrument->oscs_per_voice = oscs_per_voice;
     instrument->bank_number = -1;
-    instrument->bus = bus;
+    instrument->bus = amy_validate_bus(bus);
     instrument->flags = flags;
     instrument->level = 1.0f;
     instrument->noteon_delay_ms = 0;
@@ -508,7 +508,9 @@ int instrument_get_bus(int instrument_number) {
 void instrument_set_bus(int instrument_number, uint8_t bus) {
     if (!instrument_number_exists(instrument_number, "set_bus")) return;
     struct instrument_info *instrument = instruments[instrument_number];
-    instrument->bus = bus;
+    // An instrument's bus is read back later and used to index the bus tables
+    // (set_event_for_bus_fx), so it can't be allowed to go stale or wild.
+    instrument->bus = amy_validate_bus(bus);
 }
 
 float instrument_get_level(int instrument_number) {
