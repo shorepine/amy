@@ -148,6 +148,12 @@ void pcm_deinit() {
 // The number of bits used to hold the table index.
 #define PCM_INDEX_BITS (31 - PCM_INDEX_FRAC_BITS)
 
+// Retrigger declick: re-onset of a still-sounding PCM osc snaps the phase,
+// stepping the output hard. Cancel the step with a decaying compensator
+// (declick -= declick >> shift per sample; shift 6 = tau 1.3 ms at 48 kHz,
+// completing within one block). Zero except just after a phase jump.
+#define PCM_DECLICK_SHIFT 6
+
 static void fclose_if_file(memorypcm_preset_t *preset) {
     if (preset == NULL) {
         return;
@@ -235,6 +241,9 @@ void pcm_note_on(uint16_t osc) {
             if(synth[osc]->preset >= pcm_samples) synth[osc]->preset = 0;
         }
         
+        // Arm the declick before the phase snap below steps the output.
+        if (synth[osc]->status == SYNTH_AUDIBLE)
+            synth[osc]->pcm_declick += synth[osc]->pcm_last_out;
         if (AMY_IS_SET(synth[osc]->trigger_phase)) {
             // trigger_phase (P) sets the sample start point for this
             // note-on (start_frame / 2^PCM_INDEX_BITS).
@@ -339,6 +348,9 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << PCM_INDEX_BITS));
         const LUTSAMPLE* table = preset->sample_ram;
         uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+        // Retrigger declick state, see PCM_DECLICK_SHIFT.
+        SAMPLE declick = synth[osc]->pcm_declick;
+        SAMPLE last_out = synth[osc]->pcm_last_out;
         for(uint16_t i=0; i < AMY_BLOCK_SIZE; i++) {
             SAMPLE frac = S_FRAC_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
             LUTSAMPLE b = 0;
@@ -348,7 +360,10 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 if (preset->type != AMY_PCM_TYPE_FILE) {
                     synth[osc]->status = SYNTH_OFF;
                 }
-                buf[i] = 0;
+                // Silent past the end, but let an armed compensator decay.
+                buf[i] = declick;
+                declick -= declick >> PCM_DECLICK_SHIFT;
+                last_out = 0;
                 continue;
             }
             if (preset->channels == 2) {
@@ -399,11 +414,17 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                     }
                 }
             }
-            SAMPLE value = buf[i] + MUL4_SS(amp, sample);
-            buf[i] = value;   
+            last_out = MUL4_SS(amp, sample);
+            SAMPLE value = buf[i] + last_out + declick;
+            declick -= declick >> PCM_DECLICK_SHIFT;
+            buf[i] = value;
             if (value < 0) value = -value;
-            if (value > max_value) max_value = value;  
+            if (value > max_value) max_value = value;
         }
+        // Snap sub-audible residue to zero so the shift decay terminates.
+        if (declick > -(1 << 8) && declick < (1 << 8)) declick = 0;
+        synth[osc]->pcm_declick = declick;
+        synth[osc]->pcm_last_out = last_out;
         //printf("render_pcm: osc %d preset %d len %d base_ix %d phase %f step %f tablestep %f amp %f\n",
         //       osc, synth[osc]->preset, preset->length, base_index, P2F(synth[osc]->phase), P2F(step), (1 << PCM_INDEX_BITS) * P2F(step), S2F(msynth[osc]->amp));
         return max_value; 

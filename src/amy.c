@@ -914,6 +914,8 @@ void reset_osc_state(struct synthinfo *psynth) {
     psynth->last_two[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
+    psynth->pcm_last_out = 0;
+    psynth->pcm_declick = 0;
 }
 
 void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
