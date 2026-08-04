@@ -211,7 +211,7 @@ void start_receiving_transfer(uint32_t length, uint8_t * storage) {
     b64_buf_malloc(&decbuf);
 }
 
-void start_receiving_sample(uint32_t frames, uint8_t bus, int16_t *storage) {
+void start_receiving_sample(uint32_t frames, uint16_t bus, int16_t *storage) {
     amy_global.transfer_flag = AMY_TRANSFER_TYPE_SAMPLE;
     amy_global.transfer_storage = (uint8_t *)storage;
     amy_global.transfer_length_bytes = frames*sizeof(int16_t)*AMY_NCHANS;

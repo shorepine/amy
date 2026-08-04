@@ -167,8 +167,9 @@ struct synthinfo ** synth;
 struct mod_synthinfo ** msynth;
 
 // Two mixing blocks, one per core of rendering
-SAMPLE *fbl[AMY_MAX_CORES][AMY_MAX_BUSES];  // Only [0, config.max_buses) are allocated.
-SAMPLE *per_osc_fb[AMY_MAX_CORES][AMY_MAX_BUSES];
+// Inner arrays are max_buses long, allocated in oscs_init.
+SAMPLE **fbl[AMY_MAX_CORES];
+SAMPLE **per_osc_fb[AMY_MAX_CORES];
 SAMPLE core_max[AMY_MAX_CORES];
 
 // Public pointer to recently-emitted waveform block.
@@ -239,17 +240,17 @@ uint32_t amy_get_oom_count() {
     return amy_global.oom_count;
 }
 
-uint8_t amy_validate_bus(int bus) {
+uint16_t amy_validate_bus(int bus) {
     if (bus < 0 || bus >= AMY_NUM_BUSES) {
         fprintf(stderr, "bus %d out of range 0..%d, using bus %d\n",
                 bus, AMY_NUM_BUSES - 1, AMY_DEFAULT_BUS);
         return AMY_DEFAULT_BUS;
     }
-    return (uint8_t)bus;
+    return (uint16_t)bus;
 }
 
 
-void dealloc_echo_delay_lines(uint8_t bus) {
+void dealloc_echo_delay_lines(uint16_t bus) {
     for (int c = AMY_NCHANS - 1; c >= 0; --c) {
         if (amy_global.bus[bus]->echo.echo_delay_lines[c])
             free_delay_line(amy_global.bus[bus]->echo.echo_delay_lines[c]);
@@ -257,7 +258,7 @@ void dealloc_echo_delay_lines(uint8_t bus) {
     }
 }
 
-bool alloc_echo_delay_lines(uint8_t bus, uint32_t max_delay_samples) {
+bool alloc_echo_delay_lines(uint16_t bus, uint32_t max_delay_samples) {
     bool success = true;
     for (int c = 0; c < AMY_NCHANS; ++c) {
         delay_line_t *delay_line = new_delay_line(max_delay_samples, 0, amy_global.config.ram_caps_delay);
@@ -282,7 +283,7 @@ uint32_t enclosing_power_of_2(uint32_t n) {
     return result;
 }
 
-void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
+void config_echo(uint16_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef) {
     if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->echo.level);
     if (AMY_IS_UNSET(delay_ms)) delay_ms = (amy_global.bus[bus]->echo.delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
     if (AMY_IS_UNSET(max_delay_ms)) max_delay_ms = (amy_global.bus[bus]->echo.max_delay_samples + 0.5f) / (AMY_SAMPLE_RATE / 1000.f);
@@ -318,7 +319,7 @@ void config_echo(uint8_t bus, float level, float delay_ms, float max_delay_ms, f
     //fprintf(stderr, "config_echo: delay_samples=%d level=%.3f feedback=%.3f filter_coef=%.3f fc0=%.3f\n", delay_samples, level, feedback, filter_coef, S2F(echo.filter_coef));
 }
 
-void dealloc_chorus_delay_lines(uint8_t bus) {
+void dealloc_chorus_delay_lines(uint16_t bus) {
     for(int c = AMY_NCHANS - 1; c >= 0; --c) {
         if (amy_global.bus[bus]->chorus.chorus_delay_lines[c]) free_delay_line(amy_global.bus[bus]->chorus.chorus_delay_lines[c]);
         amy_global.bus[bus]->chorus.chorus_delay_lines[c] = NULL;
@@ -327,7 +328,7 @@ void dealloc_chorus_delay_lines(uint8_t bus) {
     amy_global.bus[bus]->chorus.delay_mod = NULL;
 }
 
-void alloc_chorus_delay_lines(uint8_t bus) {
+void alloc_chorus_delay_lines(uint16_t bus) {
     amy_global.bus[bus]->chorus.delay_mod = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_delay);
     bool success = (amy_global.bus[bus]->chorus.delay_mod != NULL);
     for(int c = 0; success && c < AMY_NCHANS; ++c) {
@@ -345,7 +346,7 @@ void alloc_chorus_delay_lines(uint8_t bus) {
     }
 }
 
-void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq, float depth) {
+void config_chorus(uint16_t bus, float level, uint16_t max_delay, float lfo_freq, float depth) {
     if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->chorus.level);
     if (AMY_IS_UNSET(max_delay)) max_delay = amy_global.bus[bus]->chorus.max_delay;
     if (AMY_IS_UNSET(lfo_freq)) lfo_freq = amy_global.bus[bus]->chorus.lfo_freq;
@@ -394,20 +395,20 @@ void config_chorus(uint8_t bus, float level, uint16_t max_delay, float lfo_freq,
     amy_global.bus[bus]->chorus.depth = depth;
 }
 
-bool alloc_reverb_delay_lines(uint8_t bus) {
+bool alloc_reverb_delay_lines(uint16_t bus) {
     if (amy_global.bus[bus]->reverb.rev == NULL)
         amy_global.bus[bus]->reverb.rev = new_reverb();
     return init_stereo_reverb(amy_global.bus[bus]->reverb.rev);
 }
 
-void dealloc_reverb_delay_lines(uint8_t bus) {
+void dealloc_reverb_delay_lines(uint16_t bus) {
     if (amy_global.bus[bus]->reverb.rev != NULL) {
         deinit_stereo_reverb(amy_global.bus[bus]->reverb.rev);
         delete_reverb(amy_global.bus[bus]->reverb.rev);
     }
 }
 
-void config_reverb(uint8_t bus, float level, float liveness, float damping, float xover_hz) {
+void config_reverb(uint16_t bus, float level, float liveness, float damping, float xover_hz) {
     if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->reverb.level);
     if (AMY_IS_UNSET(liveness)) liveness = amy_global.bus[bus]->reverb.liveness;
     if (AMY_IS_UNSET(damping)) damping = amy_global.bus[bus]->reverb.damping;
@@ -467,14 +468,14 @@ int peek_stack(const char *tag)  { return 0; }
 #endif
 
 
-void config_eq(uint8_t bus, SAMPLE eq_l, SAMPLE eq_m, SAMPLE eq_h) {
+void config_eq(uint16_t bus, SAMPLE eq_l, SAMPLE eq_m, SAMPLE eq_h) {
     amy_global.bus[bus]->eq.eq[0] = eq_l;
     amy_global.bus[bus]->eq.eq[1] = eq_m;
     amy_global.bus[bus]->eq.eq[2] = eq_h;
 }
 
 
-void bus_reset(uint8_t bus) {
+void bus_reset(uint16_t bus) {
     config_eq(bus, F2S(1.0f), F2S(1.0f), F2S(1.0f));
     filters_init(bus);
     reset_parametric(bus);
@@ -495,16 +496,11 @@ int8_t global_init(amy_config_t c) {
     peek_stack("init");
     amy_global.config = c;
     // Everything below -- and every AMY_NUM_BUSES in the rest of AMY -- reads
-    // max_buses back out of the config, so pin it into range first.  A caller
-    // that built its config by hand rather than from amy_default_config()
-    // arrives here with a zero, which would otherwise mean no buses at all.
+    // max_buses back out of the config, so settle it first.  A caller that
+    // built its config by hand rather than from amy_default_config() arrives
+    // here with a zero, which would otherwise mean no buses at all.
     if (amy_global.config.max_buses == 0)
         amy_global.config.max_buses = AMY_DEFAULT_NUM_BUSES;
-    if (amy_global.config.max_buses > AMY_MAX_BUSES) {
-        fprintf(stderr, "max_buses %d > AMY_MAX_BUSES %d, using %d\n",
-                amy_global.config.max_buses, AMY_MAX_BUSES, AMY_MAX_BUSES);
-        amy_global.config.max_buses = AMY_MAX_BUSES;
-    }
     // Precompute implications of overload thresholds.
     //amy_global.overload_threshold_us = (uint32_t)(c.overload_threshold * ((float)AMY_BLOCK_US));
     amy_set_render_load_threshold(c.overload_threshold);
@@ -513,6 +509,18 @@ int8_t global_init(amy_config_t c) {
     amy_global.i2s_is_in_background = 0;
     amy_global.delta_queue = NULL;
     amy_global.delta_qsize = 0;
+    // The per-bus tables are sized from max_buses; nothing about a bus is a
+    // fixed-width array any more.
+    amy_global.volume = (float *)malloc_caps(sizeof(float) * AMY_NUM_BUSES,
+                                             amy_global.config.ram_caps_synth);
+    amy_global.volume_scale = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * AMY_NUM_BUSES,
+                                                    amy_global.config.ram_caps_synth);
+    amy_global.bus = (bus_state_t **)malloc_caps(sizeof(bus_state_t *) * AMY_NUM_BUSES,
+                                                 amy_global.config.ram_caps_synth);
+    if (amy_global.volume == NULL || amy_global.volume_scale == NULL || amy_global.bus == NULL) {
+        fprintf(stderr, "unable to alloc %d buses\n", AMY_NUM_BUSES);
+        return -1;
+    }
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
         amy_global.volume[bus] = 1.0f;
     amy_global.pitch_bend = 0;
@@ -537,6 +545,10 @@ int8_t global_init(amy_config_t c) {
 
     struct bus_state *bus_configs = malloc_caps(sizeof(struct bus_state) * AMY_NUM_BUSES,
                                                 amy_global.config.ram_caps_synth);
+    if (bus_configs == NULL) {
+        fprintf(stderr, "unable to alloc %d bus states\n", AMY_NUM_BUSES);
+        return -1;
+    }
     bzero(bus_configs, sizeof(struct bus_state) * AMY_NUM_BUSES);
     for (int i = 0; i < AMY_NUM_BUSES; ++i) {
         amy_global.bus[i] = bus_configs;
@@ -552,7 +564,13 @@ int8_t global_init(amy_config_t c) {
 
 void global_deinit(void) {
     for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)  filters_deinit(bus);
-    free(amy_global.bus[0]);
+    free(amy_global.bus[0]);  // One allocation for every bus_state; bus[i] points into it.
+    free(amy_global.bus);
+    free(amy_global.volume_scale);
+    free(amy_global.volume);
+    amy_global.bus = NULL;
+    amy_global.volume_scale = NULL;
+    amy_global.volume = NULL;
 }
 
 // Convert to and from the log-frequency scale.
@@ -677,14 +695,24 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // If this is a bus-directed event, use d->osc to store the bus number instead.
     if (event_addresses_bus(e)) {
         // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
-        uint8_t bus = amy_validate_bus(AMY_IS_SET(e->bus) ? e->bus :
+        uint16_t bus = amy_validate_bus(AMY_IS_SET(e->bus) ? e->bus :
             ((AMY_IS_SET(e->synth) && instrument_get_bus(e->synth) >= 0) ? instrument_get_bus(e->synth) : AMY_DEFAULT_BUS));
         if (bus > amy_global.highest_bus) amy_global.highest_bus = bus;
         // Issue deltas for the bus-directed commands.
         d.osc = bus;
-        // Volume is still a vector, but starts at the current bus number.
-        for (int b = 0; b < AMY_NUM_BUSES - bus; ++b)
-            EVENT_TO_DELTA_F(volume[b], VOLUME_BASE + bus + b)
+        // Volume is still a vector -- "V1,0.5" sets this bus and the next --
+        // but each entry now goes out as its own VOLUME delta naming its bus
+        // in d.osc, rather than as one of a block of per-bus param ids.
+        // Anything past the last bus is dropped.
+        for (int b = 0; b < AMY_MAX_VOLUME_LIST && bus + b < AMY_NUM_BUSES; ++b) {
+            if (AMY_IS_SET(e->volume[b])) {
+                d.osc = bus + b;
+                d.param = VOLUME;
+                d.data.f = e->volume[b];
+                add_delta_to_queue(&d, queue);
+            }
+        }
+        d.osc = bus;  // The rest of the bus-directed params below read this back.
         EVENT_TO_DELTA_F(eq_l, EQ_L)
         EVENT_TO_DELTA_F(eq_m, EQ_M)
         EVENT_TO_DELTA_F(eq_h, EQ_H)
@@ -738,7 +766,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
 
     // Only propagate bus if osc was explicit, not for default-zero-osc.
     if (AMY_IS_SET(e->bus) && AMY_IS_SET(e->osc)) {
-        uint8_t bus = amy_validate_bus(e->bus);
+        uint16_t bus = amy_validate_bus(e->bus);
         d.param = BUS; d.data.i = bus; add_delta_to_queue(&d, queue);
         if(bus > amy_global.highest_bus)
             amy_global.highest_bus = bus;
@@ -1128,6 +1156,12 @@ int8_t oscs_init() {
 
     // clear out both as local mode won't use fbl[1] 
     for(uint16_t core=0;core<AMY_CORES;++core) {
+        fbl[core] = (SAMPLE**)malloc_caps(sizeof(SAMPLE*) * AMY_NUM_BUSES, amy_global.config.ram_caps_fbl);
+        per_osc_fb[core] = (SAMPLE**)malloc_caps(sizeof(SAMPLE*) * AMY_NUM_BUSES, amy_global.config.ram_caps_fbl);
+        if (fbl[core] == NULL || per_osc_fb[core] == NULL) {
+            fprintf(stderr, "unable to alloc mix buffers for %d buses\n", AMY_NUM_BUSES);
+            return -1;
+        }
         for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
             per_osc_fb[core][bus] = (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE, amy_global.config.ram_caps_fbl);
             fbl[core][bus] = (SAMPLE*)malloc_caps(sizeof(SAMPLE) * AMY_BLOCK_SIZE * AMY_NCHANS, amy_global.config.ram_caps_fbl);
@@ -1252,6 +1286,10 @@ void oscs_deinit() {
             free(fbl[core][bus]);
             free(per_osc_fb[core][bus]);
         }
+        free(fbl[core]);
+        free(per_osc_fb[core]);
+        fbl[core] = NULL;
+        per_osc_fb[core] = NULL;
     }
     deltas_pool_free();
     // Include chorus osc (osc=AMY_OSCS)
@@ -1561,12 +1599,12 @@ void play_delta(struct delta *d) {
         }
     }
     // for global changes, just make the change, no need to update the per-osc synth
-    uint8_t bus = d->osc;  // We assume d.osc was hijacked in amy_event_to_deltas_queue
+    uint16_t bus = d->osc;  // We assume d.osc was hijacked in amy_event_to_deltas_queue
     // ...but only for the bus-directed params below; for every other delta
     // d->osc is an osc number, so clamp quietly rather than complaining about
     // osc 12 not being a bus.
     if (bus >= AMY_NUM_BUSES) bus = AMY_DEFAULT_BUS;
-    if(d->param >= VOLUME_BASE && (d->param - VOLUME_BASE) < AMY_NUM_BUSES) amy_global.volume[d->param - VOLUME_BASE] = d->data.f;
+    if(d->param == VOLUME) amy_global.volume[bus] = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
     if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
     if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
@@ -1991,7 +2029,7 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     SAMPLE max_max = 0;
     for(uint16_t osc=start; osc<end; osc++) {
         if(synth[osc] != NULL && synth[osc]->status == SYNTH_AUDIBLE) { // skip oscs that are silent or mod sources from playback
-            uint8_t bus = synth[osc]->bus;
+            uint16_t bus = synth[osc]->bus;
             bzero(per_osc_fb[core][bus], AMY_BLOCK_SIZE * sizeof(SAMPLE));
             SAMPLE max_val = render_osc_wave(osc, core, per_osc_fb[core][bus]);
             if (synth[osc]->status != SYNTH_AUDIBLE) {
@@ -2191,7 +2229,7 @@ int16_t * amy_fill_buffer() {
         #endif
     }  // end of per-bus FX
     // global volume is supposed to max out at 10, so scale by 0.1.
-    SAMPLE volume_scale[AMY_MAX_BUSES];  // Fixed size: AMY_NUM_BUSES is runtime, and MSVC has no VLAs.
+    SAMPLE *volume_scale = amy_global.volume_scale;  // max_buses long, allocated at start.
     for (int bus = 0; bus <= amy_global.highest_bus; ++bus)
         volume_scale[bus] = MUL4_SS(F2S(0.1f), F2S(amy_global.volume[bus]));
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
