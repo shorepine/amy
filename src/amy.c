@@ -643,6 +643,8 @@ float map_01_to_60dBf(float log) {
 #define EVENT_TO_DELTA_FREQ_COEFS(FIELD, FLAG) \
     EVENT_TO_DELTA_COEFS_COEF0_SPECIAL(FIELD, FLAG, logfreq_of_freq)
 
+static void flush_due_deltas();  // definition next to amy_execute_deltas()
+
 // Add a API facing event, convert into delta directly
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
     // fprintf(stderr, "time %.3f amy_event_to_deltas: base_osc %d\n", amy_global.time, base_osc);
@@ -694,7 +696,10 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // you must set both synth & load_patch together to load a patch 
     if (AMY_IS_SET(e->synth)) {
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices) || AMY_IS_SET(e->oscs_per_voice)) {
-            amy_execute_deltas();
+            // Settle pending deltas without running the sequencer tick
+            // service - this can execute on any sending thread (see
+            // flush_due_deltas).
+            flush_due_deltas();
             patches_load_patch(e);
         }
         // Execute any other commands in this event.
@@ -2031,15 +2036,13 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
 }
 
 
-// this takes scheduled deltas and plays them at the right time
-void amy_execute_deltas() {
-    AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
-    // Advance the sequencer on AMY (sample) time and play any due sequence
-    // events, so sequencing works in any rendering context, real-time or not.
-    sequencer_check_and_fill();
-    // Make sure any CV-triggered events are added to delta queue
-    update_external_cv_in();
-
+// Play any deltas that are due, without advancing the sequencer. Split out
+// of amy_execute_deltas() so the event-ingest path can settle deltas before
+// a patch load: events may arrive on any thread, and the sequencer tick
+// service is rendering-context-only (unguarded RMW on next_amy_tick_us, and
+// the external hook expects audio-thread context). Everything here is under
+// the queue lock - safe from any thread.
+static void flush_due_deltas() {
     // check to see which sounds to play
     uint32_t sysclock = amy_sysclock();
     amy_grab_lock();
@@ -2054,7 +2057,17 @@ void amy_execute_deltas() {
     amy_global.delta_queue = d;
 
     amy_release_lock();
+}
 
+// this takes scheduled deltas and plays them at the right time
+void amy_execute_deltas() {
+    AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
+    // Advance the sequencer on AMY (sample) time and play any due sequence
+    // events, so sequencing works in any rendering context, real-time or not.
+    sequencer_check_and_fill();
+    // Make sure any CV-triggered events are added to delta queue
+    update_external_cv_in();
+    flush_due_deltas();
     AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
 
 }
