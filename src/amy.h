@@ -81,12 +81,14 @@ extern const uint32_t pcm_wavetable_len;
 #define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
 #endif
 
+#ifndef AMY_SAMPLE_RATE
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
 #elif defined __EMSCRIPTEN__
 #define AMY_SAMPLE_RATE 48000
 #else
-#define AMY_SAMPLE_RATE 44100 
+#define AMY_SAMPLE_RATE 44100
+#endif
 #endif
 
 #define PCM_AMY_SAMPLE_RATE 22050
@@ -133,8 +135,16 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #define AMY_MAX_CORES 2          
 #define AMY_MAX_CHANNELS 2
 
-// Always use 2 channels. Clients that want mono can deinterleave
+// Default to 2 channels. Constrained MCUs (e.g. ESP32-C3, single-core RISC-V)
+// default to mono; override with -DAMY_NCHANS=N.
+// Note: i2s.c picks the I2S slot mode based on this value.
+#ifndef AMY_NCHANS
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#define AMY_NCHANS 1
+#else
 #define AMY_NCHANS 2
+#endif
+#endif
 
 // Use dual cores on supported platforms
 #if (defined (ESP_PLATFORM) || defined (ARDUINO_ARCH_RP2040) ||defined(ARDUINO_ARCH_RP2350))
