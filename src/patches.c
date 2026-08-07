@@ -371,7 +371,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
     _EPRINT_I(bus, "bus", "y");
-    _EPRINT_F_SEQ(volume, "volume", AMY_NUM_BUSES, "V");
+    _EPRINT_F_SEQ(volume, "volume", AMY_MAX_VOLUME_LIST, "V");
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
     _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
@@ -412,7 +412,7 @@ void fprintf_event_stderr(amy_event *e) {
 bool event_addresses_bus(amy_event *e) {
     // Global effects
     //is_empty &= AMY_IS_UNSET(e->bus);
-    for (int b = 0; b < AMY_NUM_BUSES; ++b)
+    for (int b = 0; b < AMY_MAX_VOLUME_LIST; ++b)
         _RET_TRUE_IF_SET(volume[b]);
     _RET_TRUE_IF_5_F_SET(eq_l, eq_m, eq_h, eq_h, eq_h);
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
@@ -551,16 +551,16 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(eg_type[1], EG1_TYPE)
       _CASE_F(velocity, VELOCITY)
       _CASE_I(bus, BUS)
+      // A VOLUME delta names its bus in osc, like the other bus-directed
+      // params, so it comes back as "this bus, one volume" rather than as a
+      // position in a vector.
+      case VOLUME: event->bus = queue->osc; event->volume[0] = queue->data.f; break;
     default:  // blocks, not handled by case
       _TEST_COEFS(amp_coefs, AMP)
       _TEST_FREQ_COEFS(freq_coefs, FREQ)
       _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
       _TEST_COEFS(duty_coefs, DUTY)
       _TEST_COEFS(pan_coefs, PAN)
-      for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
-          if ((int)queue->param == (int)VOLUME_BASE + bus)
-              event->volume[bus] = queue->data.f;
-      }
       for (int i = 0; i < MAX_ALGO_OPS; ++i) {
           if ((int)queue->param == (int)ALGO_SOURCE_START + i)
               event->algo_source[i] = queue->data.i;
@@ -699,7 +699,7 @@ float lin_to_db(float lin) {
     return 20.0f * log10f(lin);
 }
 
-void set_event_for_bus_fx(amy_event *event, uint8_t bus, global_state_t *state) {
+void set_event_for_bus_fx(amy_event *event, uint16_t bus, global_state_t *state) {
     // Always emit all FX fields so saved patches are fully self-describing.
     // Set the bus
     event->bus = bus;
@@ -751,7 +751,7 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
         return NULL;  // instrument not allocated.
     }
     uint32_t flags = instrument_get_flags(instr_num);
-    uint8_t bus = instrument_get_bus(instr_num);
+    uint16_t bus = instrument_get_bus(instr_num);
     uint16_t voice = voices[0];
     uint16_t base_osc = voice_to_base_osc[voice];
     int num_oscs = num_oscs_for_voice(voice);
@@ -835,7 +835,7 @@ void *yield_bus_commands(char *s, size_t len, void *state) {
         state_val = 0;
     } else {
         // Return a wire command to set up a bus.
-        uint8_t bus = state_val;
+        uint16_t bus = state_val;
         amy_event e = amy_default_event();
         set_event_for_bus_fx(&e, bus, &amy_global);
         sprint_event(&e, s, len, /* wirecode= */ true);
@@ -1328,7 +1328,7 @@ void patches_load_patch(amy_event *e) {
     if (AMY_IS_SET(e->synth)) {
         uint32_t flags = 0;
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
-        uint8_t bus = 0;
+        uint16_t bus = 0;
         if (AMY_IS_SET(e->bus)) bus = e->bus;
         instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
     }

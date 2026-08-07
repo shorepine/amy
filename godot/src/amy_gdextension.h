@@ -26,6 +26,7 @@ private:
 	bool startup_bleep = false;
 	bool audio_in = false;
 	int max_oscs = 180;
+	int max_buses = 4;
 	int max_voices = 64;
 	int max_synths = 64;
 
@@ -65,6 +66,8 @@ public:
 	bool get_audio_in() const;
 	void set_max_oscs(int p_val);
 	int get_max_oscs() const;
+	void set_max_buses(int p_val);
+	int get_max_buses() const;
 	void set_max_voices(int p_val);
 	int get_max_voices() const;
 	void set_max_synths(int p_val);

@@ -109,7 +109,7 @@ struct instrument_info {
     uint8_t num_voices;
     uint8_t oscs_per_voice; // How many oscs each voice uses.  Stored for convenience.
     uint8_t id;             // synth number assigned by client.
-    uint8_t bus;            // which bus this instrument ends up on.
+    uint16_t bus;           // which bus this instrument ends up on.
     uint16_t patch_number;  // What patch this instrument is currently set to.  Stored for convenience.
     int16_t bank_number;    // Optional top-7-bit word of Program, set by MIDI CC 0 (-1 if not set).
     uint32_t flags;         // Bitmask of special instrument properties (for MIDI Drums translation).
@@ -170,7 +170,7 @@ float instrument_level_for_voice(uint16_t voice) {
     return voice_level[voice];
 }
 
-struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags) {
+struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint16_t bus, uint32_t flags) {
     struct instrument_info *instrument = (struct instrument_info *)malloc_caps(sizeof(struct instrument_info), amy_global.config.ram_caps_synth);
     // NULL already means "synth not defined" to all callers.
     if (instrument == NULL) {
@@ -187,7 +187,7 @@ struct instrument_info *instrument_init(int id, int num_voices, uint16_t* amy_vo
     instrument->patch_number = patch_number;
     instrument->oscs_per_voice = oscs_per_voice;
     instrument->bank_number = -1;
-    instrument->bus = bus;
+    instrument->bus = amy_validate_bus(bus);
     instrument->flags = flags;
     instrument->level = 1.0f;
     instrument->noteon_delay_ms = 0;
@@ -410,7 +410,7 @@ bool instrument_number_exists(int instrument_number, const char *tag) {
     return false;
 }
 
-void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint8_t bus, uint32_t flags) {
+void instrument_add_new(int instrument_number, int num_voices, uint16_t *amy_voices, uint16_t patch_number, uint16_t oscs_per_voice, uint16_t bus, uint32_t flags) {
     if (!instrument_number_ok(instrument_number, "add_new")) return;
     if(instruments[instrument_number]) {
         instrument_free(instruments[instrument_number]);
@@ -505,10 +505,12 @@ int instrument_get_bus(int instrument_number) {
     return instrument->bus;
 }
 
-void instrument_set_bus(int instrument_number, uint8_t bus) {
+void instrument_set_bus(int instrument_number, uint16_t bus) {
     if (!instrument_number_exists(instrument_number, "set_bus")) return;
     struct instrument_info *instrument = instruments[instrument_number];
-    instrument->bus = bus;
+    // An instrument's bus is read back later and used to index the bus tables
+    // (set_event_for_bus_fx), so it can't be allowed to go stale or wild.
+    instrument->bus = amy_validate_bus(bus);
 }
 
 float instrument_get_level(int instrument_number) {

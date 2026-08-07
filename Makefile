@@ -104,7 +104,8 @@ amy-message: $(OBJECTS) src/amy-message.o
 
 # Plain C tests for things the audio-rendering suite can't reach -- e.g. clock
 # rollovers 50 days out, which you can only hit by fast-forwarding the counters.
-CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds
+CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds \
+         tests/test_bus_config
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
