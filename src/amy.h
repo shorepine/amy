@@ -642,8 +642,6 @@ struct synthinfo {
     uint8_t status;  // not in event
     uint8_t role;  // not in event
     PHASOR phase;  // not in event
-    float step;  // not in event
-    float substep;  // not in event
     uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;

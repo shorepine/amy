@@ -348,7 +348,6 @@ void pulse_mod_trigger(uint16_t osc) {
     //float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     //float freq = freq_of_logfreq(synth[osc]->logfreq);
     //float period = 1. / (freq/mod_sr);
-    //synth[osc]->step = period * synth[osc]->phase;
 }
 
 // dpwe sez to use this method for low-freq mod pulse still 
@@ -409,7 +408,6 @@ void saw_mod_trigger(uint16_t osc) {
     //float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     //float freq = freq_of_logfreq(synth[osc]->logfreq);
     //float period = 1. / (freq/mod_sr);
-    //synth[osc]->step = period * synth[osc]->phase;
 }
 
 void saw_up_mod_trigger(uint16_t osc) {
@@ -468,7 +466,6 @@ void triangle_mod_trigger(uint16_t osc) {
     // float mod_sr = (float)AMY_SAMPLE_RATE / (float)AMY_BLOCK_SIZE;
     // float freq = freq_of_logfreq(synth[osc]->logfreq);
     // float period = 1. / (freq/mod_sr);
-    // synth[osc]->step = period * synth[osc]->phase;
 }
 
 // TODO -- this should use dpwe code 
@@ -714,7 +711,6 @@ AMY_IRAM_ATTR SAMPLE render_partial(SAMPLE * buf, uint16_t osc) {
 }
 
 void partial_note_off(uint16_t osc) {
-    synth[osc]->substep = 2;
     AMY_UNSET(synth[osc]->note_on_clock);
     synth[osc]->note_off_clock = amy_global.total_blocks*AMY_BLOCK_SIZE;
     msynth[osc]->last_amp = 0;
@@ -737,13 +733,13 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     if(freq >= 55) { // lowest note we can play
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
         for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
-            uint16_t index = (uint16_t)(synth[osc]->step);
+            uint16_t index = (uint16_t)synth[osc]->phase;
             SAMPLE sample = ks_buffer[ks_polyphony_index][index];
             ks_buffer[ks_polyphony_index][index] =                 
                 SMULR7(
                     (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
                     half);
-            synth[osc]->step = (index + 1) % buflen;
+            synth[osc]->phase = (PHASOR)((index + 1) % buflen);
             SAMPLE value = SMULR7(sample, amp);
             buf[i] += value;
             if (i == 0) {
