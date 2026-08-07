@@ -172,6 +172,18 @@ class TestNoiseOsc(AmyTest):
     amy_send_at(time=500, vel=0)
 
 
+class TestKarplusStrong(AmyTest):
+
+  def run(self):
+    amy_send_at(time=0, osc=0, wave=amy.KS, freq=220, feedback=0.98)
+    amy_send_at(time=100, note=60, vel=1)
+    amy_send_at(time=300, note=62, vel=1)
+    amy_send_at(time=500, note=64, vel=1)
+    amy_send_at(time=700, note=65, vel=1)
+    amy_send_at(time=900, vel=0)
+
+
+
 class TestPcm(AmyTest):
 
   def run(self):

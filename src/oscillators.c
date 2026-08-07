@@ -754,9 +754,7 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     return max_value;
 }
 
-void ks_note_on(uint16_t osc) {
-    float freq = freq_of_logfreq(msynth[osc]->logfreq);
-    if(freq <= 1.f) freq = 1.f;
+void ks_note_on(uint16_t osc, float freq) {
     uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
     if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
     // init KS buffer with noise up to max

@@ -1257,7 +1257,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     //        synth[osc]->midi_note, synth[osc]->velocity);
     // take care of fm & ks first -- no special treatment for bp/mod
     switch (synth[osc]->wave) {
-    case KS: if(amy_global.config.ks_oscs) ks_note_on(osc); break;
+    case KS: if(amy_global.config.ks_oscs) ks_note_on(osc, initial_freq); break;
     case SINE: sine_note_on(osc, initial_freq); break;
     case SAW_DOWN: saw_down_note_on(osc, initial_freq); break;
     case SAW_UP: saw_up_note_on(osc, initial_freq); break;
