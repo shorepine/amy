@@ -907,8 +907,6 @@ void reset_osc_state(struct synthinfo *psynth) {
     psynth->role = SYNTH_IS_NORMAL;
     psynth->status = SYNTH_OFF;
     psynth->phase = F2P(0);
-    psynth->step = 0;
-    psynth->substep = 0;
     AMY_UNSET(psynth->render_clock);
     AMY_UNSET(psynth->note_on_clock);
     psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
@@ -1140,9 +1138,9 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
-    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f step %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
             i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source,
-            synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, P2F(synth[i]->step), synth[i]->chained_osc,
+            synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
     fprint_combo_coefs("amp_coefs", synth[i]->amp_coefs);
@@ -1259,7 +1257,7 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     //        synth[osc]->midi_note, synth[osc]->velocity);
     // take care of fm & ks first -- no special treatment for bp/mod
     switch (synth[osc]->wave) {
-    case KS: if(amy_global.config.ks_oscs) ks_note_on(osc); break;
+    case KS: if(amy_global.config.ks_oscs) ks_note_on(osc, initial_freq); break;
     case SINE: sine_note_on(osc, initial_freq); break;
     case SAW_DOWN: saw_down_note_on(osc, initial_freq); break;
     case SAW_UP: saw_up_note_on(osc, initial_freq); break;

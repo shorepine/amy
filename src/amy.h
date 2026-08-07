@@ -642,8 +642,6 @@ struct synthinfo {
     uint8_t status;  // not in event
     uint8_t role;  // not in event
     PHASOR phase;  // not in event
-    float step;  // not in event
-    float substep;  // not in event
     uint32_t render_clock;
     uint32_t note_on_clock;
     uint32_t note_off_clock;
@@ -1228,7 +1226,7 @@ extern void partial_note_on(uint16_t osc);
 extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc, float freq);
 extern void algo_note_off(uint16_t osc);
-extern void ks_note_on(uint16_t osc); 
+extern void ks_note_on(uint16_t osc, float freq);
 extern void ks_note_off(uint16_t osc);
 extern void sine_mod_trigger(uint16_t osc);
 extern void saw_down_mod_trigger(uint16_t osc);
