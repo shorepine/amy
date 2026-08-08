@@ -136,7 +136,7 @@ amy.send(osc=0, wave=amy.SINE, freq=220, vel=1)
 amy.send(osc=0, wave=amy.SINE, freq=110, vel=0.5)
 amy.send(reset=amy.RESET_TIMEBASE)  # Reset ticks timing to start from zero.
 for i in range(1, 16):
-    amy.send(osc=i, wave=amy.SINE, freq=110+(i*80), vel=((16-i)/32.0), ticks=tick_base + i*48)
+    amy.send(osc=i, wave=amy.SINE, freq=110+(i*80), vel=((16-i)/32.0), ticks=i*48)
         </div>
 
         <P>A classic analog tone is the filtered saw wave. Let's make one.</P>
