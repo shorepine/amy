@@ -526,7 +526,15 @@ extern void miniaudio_start();
 extern void miniaudio_stop();
 #endif
 
+// Tracks whether the allocations made by amy_start() are still live, so that
+// amy_stop() is idempotent: calling it twice in a row (e.g. a rejected live()
+// followed by another live(), or amy.stop() twice from Python) would otherwise
+// double-free the bus, filter, and osc arrays, which the deinit paths free
+// without NULLing.
+static uint8_t amy_started = 0;
+
 void amy_start(amy_config_t c) {
+    amy_started = 1;
     global_init(c);
     amy_profiles_init();
     transfer_init();
@@ -547,6 +555,8 @@ void amy_start(amy_config_t c) {
 }
 
 void amy_stop() {
+    if (!amy_started) return;
+    amy_started = 0;
 #if !defined(ESP_PLATFORM) && !defined(PICO_ON_DEVICE) && !defined(ARDUINO) && !defined(AMY_NO_MINIAUDIO)
     if (amy_global.config.audio == AMY_AUDIO_IS_MINIAUDIO)
         miniaudio_stop();

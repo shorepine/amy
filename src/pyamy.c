@@ -140,7 +140,9 @@ static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value)
 }
 
 static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs) {
-    amy_stop();
+    // Parse and validate every kwarg into a local config BEFORE tearing down the
+    // running AMY: a rejected kwarg then leaves audio playing instead of
+    // silently killing it (and leaving AMY stopped for the next live() call).
     amy_config_t amy_config = amy_default_config();
     Py_ssize_t pos = 0;
     PyObject *key_obj = NULL;
@@ -160,7 +162,8 @@ static PyObject * live_wrapper(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     amy_config.audio = AMY_AUDIO_IS_MINIAUDIO;
-    amy_start(amy_config); // initializes amy 
+    amy_stop();
+    amy_start(amy_config); // initializes amy
     Py_RETURN_NONE;
 }
 
