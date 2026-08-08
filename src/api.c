@@ -531,7 +531,7 @@ extern void miniaudio_stop();
 // followed by another live(), or amy.stop() twice from Python) would otherwise
 // double-free the bus, filter, and osc arrays, which the deinit paths free
 // without NULLing.
-static uint8_t amy_started = 0;
+static int amy_started = 0;  // Must be int; uint8_t or bool causes bootloop (?).
 
 void amy_start(amy_config_t c) {
     amy_started = 1;
