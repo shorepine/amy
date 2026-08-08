@@ -134,7 +134,7 @@ amy.send(osc=0, wave=amy.SINE, freq=220, vel=1)
         <P>Now let's make more sine waves! We'll try using <code>ticks</code> to schedule events ahead in AMY's musical clock. In this example we'll add a new sine wave every quarter note (at the default tempo):</P>
         <div class="editor mb-4">
 amy.send(osc=0, wave=amy.SINE, freq=110, vel=0.5)
-tick_base = amy.sequencer_ticks()
+amy.send(reset=amy.RESET_TIMEBASE)  # Reset ticks timing to start from zero.
 for i in range(1, 16):
     amy.send(osc=i, wave=amy.SINE, freq=110+(i*80), vel=((16-i)/32.0), ticks=tick_base + i*48)
         </div>
