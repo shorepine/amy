@@ -1673,7 +1673,9 @@ class TestBuses(AmyTest):
     amy_send_at(time=0, synth=2, num_voices=4, patch=22)
     amy_send_at(time=0, synth=2, bus=1, pan=0.8)
     amy_send_at(time=0, bus=1, reverb=0, echo='1,100,,0.5,0.5')
-    amy_send_at(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
+    # Mixdown for buses 0 and 1: volume is a scalar addressed at a bus.
+    amy_send_at(time=0, bus=0, volume=2)
+    amy_send_at(time=0, bus=1, volume=0.5)
     amy_send_at(time=100, synth=1, note=60, vel=5)
     amy_send_at(time=300, synth=2, note=63, vel=5)
     amy_send_at(time=500, synth=1, note=67, vel=5)
@@ -1815,7 +1817,9 @@ class TestSynthBusCmds(AmyTest):
     amy_send_at(time=0, bus=0, reverb=1, echo=0)
     amy_send_at(time=0, synth=2, num_voices=4, patch=22, bus=1, pan=0.8)
     amy_send_at(time=0, synth=2, reverb=0, echo='1,100,,0.5,0.5')  # Bus implied by synth.
-    amy_send_at(time=0, volume='2,0.5')  # Mixdown for buses 0 and 1.
+    # Mixdown for buses 0 and 1: volume is a scalar addressed at a bus.
+    amy_send_at(time=0, bus=0, volume=2)
+    amy_send_at(time=0, bus=1, volume=0.5)
     amy_send_at(time=100, synth=1, note=60, vel=5)
     amy_send_at(time=300, synth=2, note=63, vel=5)
     amy_send_at(time=500, synth=1, note=67, vel=5)

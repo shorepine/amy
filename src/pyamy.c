@@ -73,8 +73,8 @@ static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value)
     } else if (strcmp(key, "max_buses") == 0) {
         lv = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;
-        if (lv < 1 || lv > AMY_MAX_POSSIBLE_BUSES) {
-            PyErr_Format(PyExc_ValueError, "max_buses must be in range [1, %d]", AMY_MAX_POSSIBLE_BUSES);
+        if (lv < 1 || lv > UINT16_MAX) {
+            PyErr_Format(PyExc_ValueError, "invalid max_buses %ld", lv);
             return -1;
         }
         cfg->max_buses = (uint16_t)lv;

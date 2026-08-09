@@ -287,7 +287,7 @@ var _KW_MAP: Dictionary = {
 	"phase":               ["P", "F"],
 	"pan":                 ["Q", "C"],
 	"client":              ["g", "I"],
-	"volume":              ["V", "L"],
+	"volume":              ["V", "F"],
 	"pitch_bend":          ["s", "F"],
 	"filter_freq":         ["F", "C"],
 	"resonance":           ["R", "F"],

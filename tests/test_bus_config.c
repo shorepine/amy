@@ -1,6 +1,6 @@
 // Tests for the runtime bus count (amy_config.max_buses) and bus range checks.
 //
-// AMY_NUM_BUSES used to be a compile-time 4; it's now amy_config.max_buses,
+// The bus count used to be a compile-time 4; it's now amy_config.max_buses,
 // with no compile-time ceiling at all -- every bus-indexed table is allocated
 // from it, and a bus-directed delta names its bus in the uint16_t delta.osc.
 // Three things are worth pinning down, none of which the audio-rendering
@@ -12,8 +12,8 @@
 //    in unchecked from the API and the wire protocol ('y9' is an atoi), and
 //    every one of them subscripts amy_global.bus[] and fbl[], so before the
 //    range check "y9" on a 4-bus build wrote off the end of both;
-//  - the volume vector ("V1,0.5" sets this bus and the next) still lands on
-//    the right buses now that each entry is its own VOLUME delta.
+//  - volume ("bus=N, volume=X", "yNVX" on the wire) lands on the addressed
+//    bus, since a VOLUME delta now names its bus in delta.osc.
 //
 // Build/run with `make ctest`.
 
@@ -59,15 +59,15 @@ static void test_config_is_honored(void) {
     printf("max_buses is honored, with no compile-time ceiling\n");
 
     restart_with_buses(AMY_DEFAULT_NUM_BUSES);
-    CHECK(AMY_NUM_BUSES == AMY_DEFAULT_NUM_BUSES,
+    CHECK(amy_global.config.max_buses == AMY_DEFAULT_NUM_BUSES,
           "the default is %d buses", AMY_DEFAULT_NUM_BUSES);
 
     restart_with_buses(1);
-    CHECK(AMY_NUM_BUSES == 1, "max_buses = 1 is taken as-is");
+    CHECK(amy_global.config.max_buses == 1, "max_buses = 1 is taken as-is");
 
     // The point of the exercise: a count no compile-time constant allows for.
     restart_with_buses(LOTS_OF_BUSES);
-    CHECK(AMY_NUM_BUSES == LOTS_OF_BUSES, "max_buses = %d is taken as-is", LOTS_OF_BUSES);
+    CHECK(amy_global.config.max_buses == LOTS_OF_BUSES, "max_buses = %d is taken as-is", LOTS_OF_BUSES);
     for (int bus = 0; bus < LOTS_OF_BUSES; ++bus)
         if (amy_global.bus[bus] == NULL) {
             CHECK(false, "bus %d state is allocated", bus);
@@ -78,31 +78,25 @@ static void test_config_is_honored(void) {
 
     // A hand-rolled config that never set the field still gets a working AMY.
     restart_with_buses(0);
-    CHECK(AMY_NUM_BUSES == AMY_DEFAULT_NUM_BUSES,
+    CHECK(amy_global.config.max_buses == AMY_DEFAULT_NUM_BUSES,
           "0 (e.g. a config not built from amy_default_config) falls back to the default");
 }
 
-// "V<a>,<b>" sets this bus and the next; each entry is now its own VOLUME
-// delta carrying its bus in delta.osc, so this is where an off-by-one in that
-// rework would show up.
-static void test_volume_vector(void) {
+// Volume is a scalar addressed at a bus ("bus=N, volume=X"); the delta
+// carries the bus in delta.osc, so this is where a mixup in that plumbing
+// would show up.
+static void test_volume_per_bus(void) {
     restart_with_buses(4);
-    printf("the volume vector lands on the right buses\n");
+    printf("volume lands on the addressed bus\n");
 
-    amy_add_message("y0V0.25,0.5,0.75,1.0Z");
+    amy_add_message("V0.25Z");  // No bus given: the default bus, 0.
+    amy_add_message("y2V0.5Z");
     amy_execute_deltas();
-    CHECK(amy_global.volume[0] == 0.25f, "V from bus 0 set volume[0] (%.2f)", amy_global.volume[0]);
-    CHECK(amy_global.volume[3] == 1.0f, "...through volume[3] (%.2f)", amy_global.volume[3]);
+    CHECK(amy_global.volume[0] == 0.25f, "V with no bus set volume[0] (%.2f)", amy_global.volume[0]);
+    CHECK(amy_global.volume[2] == 0.5f, "V from bus 2 set volume[2] (%.2f)", amy_global.volume[2]);
+    CHECK(amy_global.volume[1] == 1.0f, "...and left volume[1] alone (%.2f)", amy_global.volume[1]);
 
-    // Starting partway up, and running off the end, which must just stop.
-    amy_add_message("y2V0.1,0.2,0.3,0.4Z");
-    amy_execute_deltas();
-    CHECK(amy_global.volume[2] == 0.1f, "V from bus 2 set volume[2] (%.2f)", amy_global.volume[2]);
-    CHECK(amy_global.volume[3] == 0.2f, "...and volume[3] (%.2f)", amy_global.volume[3]);
-    CHECK(amy_global.volume[0] == 0.25f, "...and left volume[0] alone (%.2f)", amy_global.volume[0]);
-
-    // A single volume on a high bus, which is how any bus is reachable however
-    // long the vector is.
+    // A volume on a high bus: every bus is reachable this way.
     restart_with_buses(LOTS_OF_BUSES);
     amy_add_message("y250V0.6Z");
     amy_execute_deltas();
@@ -113,7 +107,7 @@ static void test_volume_vector(void) {
 
 static void test_bus_range_is_enforced(void) {
     restart_with_buses(2);
-    printf("bus numbers are range-checked (max_buses = %d)\n", AMY_NUM_BUSES);
+    printf("bus numbers are range-checked (max_buses = %d)\n", amy_global.config.max_buses);
 
     CHECK(osc_bus_after_send(0, 0) == 0, "osc on bus 0 stays on bus 0");
     CHECK(osc_bus_after_send(1, 1) == 1, "osc on bus 1 stays on bus 1");
@@ -135,7 +129,7 @@ static void test_bus_range_is_enforced(void) {
     amy_add_message("y5M0.5Z"); // echo on bus 5
     amy_execute_deltas();
     render_a_bit();
-    CHECK(amy_global.highest_bus < AMY_NUM_BUSES,
+    CHECK(amy_global.highest_bus < amy_global.config.max_buses,
           "highest_bus (%d) stays inside the configured range", amy_global.highest_bus);
 
     // An instrument's bus is stored and read back later to index the bus
@@ -165,9 +159,9 @@ static void test_bus_range_is_enforced(void) {
 // ever disagreed about how many buses there are.
 static void test_all_buses_render(void) {
     restart_with_buses(64);
-    printf("all %d buses render with FX on\n", AMY_NUM_BUSES);
+    printf("all %d buses render with FX on\n", amy_global.config.max_buses);
 
-    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus) {
+    for (int bus = 0; bus < amy_global.config.max_buses; ++bus) {
         char msg[128];
         snprintf(msg, sizeof(msg), "v%dy%dw0n%dl1Z", bus, bus, 60 + bus);
         amy_add_message(msg);
@@ -177,9 +171,9 @@ static void test_all_buses_render(void) {
     amy_execute_deltas();
     render_a_bit();
 
-    CHECK(amy_global.highest_bus == AMY_NUM_BUSES - 1,
-          "highest_bus reached the top bus (%d)", AMY_NUM_BUSES - 1);
-    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
+    CHECK(amy_global.highest_bus == amy_global.config.max_buses - 1,
+          "highest_bus reached the top bus (%d)", amy_global.config.max_buses - 1);
+    for (int bus = 0; bus < amy_global.config.max_buses; ++bus)
         CHECK(amy_global.bus[bus]->reverb.level > 0, "bus %d kept its reverb", bus);
     CHECK(amy_get_oom_count() == 0, "no allocation failures");
 }
@@ -193,7 +187,7 @@ int main(void) {
     amy_start(c);
 
     test_config_is_honored();
-    test_volume_vector();
+    test_volume_per_bus();
     test_bus_range_is_enforced();
     test_all_buses_render();
 

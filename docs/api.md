@@ -385,7 +385,7 @@ Switch kits with `amy.send(synth=10, patch=38x)`, or over MIDI with bank select 
 
 Each of the `y` buses has separate effects units.  You set their parameters with commands such as `amy.send(bus=0, reverb=1)` (or `y0h1`).
 
-The final mixdown of the buses onto the AMY output is controlled by one value per bus passed to the `volume` (`V`) command.
+The final mixdown of the buses onto the AMY output is controlled per bus by the `volume` (`V`) command: `bus=N, volume=X` (`yNVX` on the wire) sets bus N's volume, and with no `bus` it sets bus 0.
 
 Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_start` to run as many as you have RAM for — there is no compile-time limit.  A bus number outside the configured range is rejected with a warning and treated as bus 0.  If the bus (`y`) is not specified for one of these commands, it defaults to 0.
 
@@ -406,7 +406,7 @@ Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_st
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
 | `N`    | `latency_ms`| `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `s`    | `pitch_bend` | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
-| `V`    | `volume`| `volume` | float, float, ...  | Volume knob for each bus in the final mixdown, default 1.0.  The list sets consecutive buses starting at `bus` (`y2V0.1,0.2` sets buses 2 and 3) and is capped at `AMY_MAX_VOLUME_LIST` (8) entries per message; any single bus is reachable on its own with `bus=n, volume=x` |
+| `V`    | `volume`| `volume` | float  | Volume knob for the addressed bus (`bus`/`y`, default 0) in the final mixdown, default 1.0 |
 | `g`    | `client` | `client` | uint | Client number for Alles distributed synthesis. |
 | `W`    | `external_channel` | `external_channel` | uint | External channel routing (used by Tulip for CV output). |
 | `D`    | **TODO** | `debug`  |  uint, 2-4  | 2 shows queue sample, 3 shows oscillator data, 4 shows modified oscillator. Will interrupt audio! |

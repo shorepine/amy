@@ -244,24 +244,6 @@ void snprintfloat3dp(char *s, size_t max_len, float val) {
         } \
     }     \
 }
-#define _EPRINT_F_SEQ(FIELD, NAME, LEN, WIRECODE) {      \
-    int last_set = -1; \
-    for (int i = 0; i < LEN; ++i) {    \
-        if (AMY_IS_SET(e->FIELD[i])) last_set = i; \
-    }                                              \
-    if (last_set >= 0) { \
-        snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": ");       \
-        s += strlen(s);  \
-        for (int i = 0; i <= last_set; ++i) { \
-            if (i > 0) { snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s); }        \
-            if (AMY_IS_SET(e->FIELD[i])) { \
-                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->FIELD[i]); \
-                s += strlen(s); \
-            } \
-        } \
-    }     \
-}
-
 #define _EPRINT_BP(TFIELD, VFIELD, NAME, WIRECODE) {         \
     int last_set = -1;                              \
     for (int i = 0; i < MAX_BPS; ++i) {             \
@@ -371,7 +353,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I(reset_osc, "reset_osc", "S");
     // Global effects
     _EPRINT_I(bus, "bus", "y");
-    _EPRINT_F_SEQ(volume, "volume", AMY_MAX_VOLUME_LIST, "V");
+    _EPRINT_F(volume, "volume", "V");
     _EPRINT_VALS_5(e->eq_l, e->eq_m, e->eq_h, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, "eq_{l,m,h}", "x");
     _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
@@ -412,8 +394,7 @@ void fprintf_event_stderr(amy_event *e) {
 bool event_addresses_bus(amy_event *e) {
     // Global effects
     //is_empty &= AMY_IS_UNSET(e->bus);
-    for (int b = 0; b < AMY_MAX_VOLUME_LIST; ++b)
-        _RET_TRUE_IF_SET(volume[b]);
+    _RET_TRUE_IF_SET(volume);
     _RET_TRUE_IF_5_F_SET(eq_l, eq_m, eq_h, eq_h, eq_h);
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
     _RET_TRUE_IF_5_F_SET(chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth, chorus_depth);
@@ -552,9 +533,8 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(velocity, VELOCITY)
       _CASE_I(bus, BUS)
       // A VOLUME delta names its bus in osc, like the other bus-directed
-      // params, so it comes back as "this bus, one volume" rather than as a
-      // position in a vector.
-      case VOLUME: event->bus = queue->osc; event->volume[0] = queue->data.f; break;
+      // params, so it comes back as "this bus, one volume".
+      case VOLUME: event->bus = queue->osc; event->volume = queue->data.f; break;
     default:  // blocks, not handled by case
       _TEST_COEFS(amp_coefs, AMP)
       _TEST_FREQ_COEFS(freq_coefs, FREQ)
@@ -703,8 +683,7 @@ void set_event_for_bus_fx(amy_event *event, uint16_t bus, global_state_t *state)
     // Always emit all FX fields so saved patches are fully self-describing.
     // Set the bus
     event->bus = bus;
-    // Volume for this bus alone, confusingly sits in slot 0 because bus=X volume=Y writes volume[X] = Y.
-    event->volume[0] = state->volume[bus];
+    event->volume = state->volume[bus];
     // EQ
     event->eq_l = lin_to_db(S2F(state->bus[bus]->eq.eq[0]));
     event->eq_m = lin_to_db(S2F(state->bus[bus]->eq.eq[1]));

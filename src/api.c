@@ -129,11 +129,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);
-    // The whole array, not just [0, AMY_NUM_BUSES): events get built before
-    // amy_start() has settled max_buses, and an unset volume slot that never
-    // got its AMY_UNSET sentinel would read as a real value later.
-    for (int bus = 0; bus < AMY_MAX_VOLUME_LIST; ++bus)
-        AMY_UNSET(e->volume[bus]);
+    AMY_UNSET(e->volume);
     AMY_UNSET(e->pitch_bend);
     AMY_UNSET(e->tempo);
     AMY_UNSET(e->latency_ms);

@@ -119,26 +119,15 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #define SAMPLE_FROM_AUDIO_IN 2
 
 // Each bus has separate FX (EQ, chorus, reverb, echo).  How many buses AMY
-// actually runs is a runtime setting, amy_config.max_buses (AMY_NUM_BUSES
-// below), so a host can trade RAM for buses without rebuilding.
+// actually runs is a runtime setting, amy_config.max_buses, so a host can
+// trade RAM for buses without rebuilding.
 //
 // There is no compile-time ceiling.  Everything indexed by bus is allocated
 // from max_buses at amy_start, and a bus-directed parameter carries its bus
 // in the delta's uint16_t osc field (see amy_event_to_deltas_queue), so the
-// only limits are RAM and the 65535 that field holds.
+// only limits are RAM and what that field holds.
 #define AMY_DEFAULT_NUM_BUSES 4
-#define AMY_NUM_BUSES (amy_global.config.max_buses)
-#define AMY_MAX_POSSIBLE_BUSES 65535  // What a delta's uint16_t osc can address.
 #define AMY_DEFAULT_BUS 0
-
-// How many buses one `volume` (V) command can set at a time: "V1,0.5" sets
-// this bus and the next.  This bounds a single message's payload, exactly as
-// MAX_ALGO_OPS and NUM_COMBO_COEFS do -- it is not a limit on how many buses
-// exist.  Every bus is reachable one at a time (bus=500, volume=0.5) no
-// matter what this is.
-#ifndef AMY_MAX_VOLUME_LIST
-#define AMY_MAX_VOLUME_LIST 8
-#endif
 
 // How many external CV inputs to contemplate.
 #define AMY_MAX_CV_IN 2
@@ -572,7 +561,7 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float trigger_phase;
-    float volume[AMY_MAX_VOLUME_LIST];  // event_only; volumes for bus, bus+1, ...
+    float volume;  // event_only; the mixdown volume of `bus` (default bus 0)
     float pitch_bend;  // event_only
     float tempo;  // event_only
     uint16_t latency_ms;  // event_only
