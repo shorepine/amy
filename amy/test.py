@@ -1089,6 +1089,26 @@ class TestSynthDrums(AmyTest):
     amy_send_at(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
+class TestBlueMonday(AmyTest):
+  """Re-initing PCM samples was leading to discontinuity; test new mechanism to delay until zero crossing."""
+
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
+  def run(self):
+    amy_send_at(time=50, chorus=0)
+    amy_send_at(time=100, synth=10, note=36, vel=120/127)  # bass
+    amy_send_at(time=190, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=280, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=370, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=460, synth=10, note=36, vel=120/127)  # bass
+    amy_send_at(time=550, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=640, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=730, synth=10, note=36, vel=100/127)  # bass
+    amy_send_at(time=820, synth=10, note=36, vel=120/127)  # bass
+
+
 class TestSynthDrumsPanning(AmyTest):
   """Test synth-level note translation propagates other fields."""
 

@@ -1249,8 +1249,6 @@ void oscs_deinit() {
         ks_deinit();
 }
 
-
-
 void osc_note_on(uint16_t osc, float initial_freq) {
     //fprintf(stderr,"Note on: osc %d wav %d note %.3f vel %.3f\n",
     //        osc, synth[osc]->wave,
@@ -1404,7 +1402,7 @@ void play_delta(struct delta *d) {
         synth[d->osc]->trigger_phase = d->data.f;
         // .. but also warps the current phase to that value.
         // Skip for PCM because it doesn't really make much sense and causes brrr on web drum editor (#916).
-        if (synth[d->osc]->wave != PCM)
+        if (!AMY_WAVE_IS_PCM(synth[d->osc]->wave))
             synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
     }
     DELTA_TO_COEFS(AMP, amp_coefs)
@@ -1574,6 +1572,7 @@ void play_delta(struct delta *d) {
             //fprintf(stderr, "t %.3f: delta note_on: osc %d vel %.3f\n\r", amy_global.time, osc, d->data.f);
             while(AMY_IS_SET(osc)) {
                 //fprintf(stderr, "osc: %d wave %d role %d\n\r", osc, synth[osc]->wave, synth[osc]->role);
+                // Ignore velocity events for mod source / algo / partial notes.
                 if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
                       || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
                       || synth[osc]->wave == PARTIAL)
@@ -1581,10 +1580,6 @@ void play_delta(struct delta *d) {
                         || synth[osc]->amp_coefs[COEF_VEL] == 0
                         || synth[osc]->amp_coefs[COEF_VEL] > AMP_THRESH)) {
                     synth[osc]->velocity = d->data.f;  // was map_60dB_to_01f
-                    //fprintf(stderr, "osc: %d status -> AUDIBLE\n\r", osc);
-                    // Ignore velocity events for mod source or algo notes.
-                    synth[osc]->status = SYNTH_AUDIBLE;
-                    // ** no_amp_001
                     // an osc came in with a note on.
                     // start the bp clock
                     synth[osc]->note_on_clock = amy_global.total_samples; //esp_timer_get_time() / 1000;
@@ -1593,9 +1588,10 @@ void play_delta(struct delta *d) {
                     //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
                     // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
                     // But if a trigger_phase is set, use that.
-                    if (AMY_IS_SET(synth[osc]->trigger_phase))
+                    if (AMY_IS_SET(synth[osc]->trigger_phase) && !AMY_WAVE_IS_PCM(synth[d->osc]->wave)) {
+                        // PCM handles trigger_phase its own way in pcm_note_on.
                         synth[osc]->phase = F2P(synth[osc]->trigger_phase);
-
+                    }
                     // restart the waveforms
                     // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
                     float initial_logfreq = synth[osc]->logfreq_coefs[COEF_CONST] + synth[osc]->logfreq_coefs[COEF_NOTE] * note_logfreq;
@@ -1627,6 +1623,9 @@ void play_delta(struct delta *d) {
                         case CUSTOM: custom_mod_trigger(mod_osc); break;
                         }
                     }
+                    // Set the AUDIBLE flag *after* osc_note_on.  pcm_note_on wants to know if osc was already active, looks at status.
+                    //fprintf(stderr, "osc: %d status -> AUDIBLE\n\r", osc);
+                    synth[osc]->status = SYNTH_AUDIBLE;
                 }
                 osc = synth[osc]->chained_osc;
             }
