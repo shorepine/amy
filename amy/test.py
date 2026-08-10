@@ -1089,6 +1089,19 @@ class TestSynthDrums(AmyTest):
     amy_send_at(time=900, synth=10, note=37, vel=0)  # snare note off - ignored with current setup.
 
 
+class TestSynthDrumsChan20(AmyTest):
+  """Test MIDI drums using synth-level note translation on channel beyond base MIDI 16."""
+
+  def run(self):
+    synth = 20
+    amy_send_at(time=50, synth=synth, patch=384)
+    amy_send_at(time=100, synth=synth, note=35, vel=100/127)  # bass
+    amy_send_at(time=400, synth=synth, note=35, vel=100/127)  # bass
+    amy_send_at(time=400, synth=synth, note=37, vel=100/127)  # snare
+    amy_send_at(time=700, synth=synth, note=37, vel=100/127)  # snare
+    amy_send_at(time=900, synth=synth, note=37, vel=0)  # snare note off - ignored with current setup.
+
+
 class TestBlueMonday(AmyTest):
   """Re-initing PCM samples was leading to discontinuity; test new mechanism to delay until zero crossing."""
 
