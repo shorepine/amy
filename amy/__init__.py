@@ -160,10 +160,11 @@ def parse_ctrl_coefs(coefs):
 
     ControlCoefficients determine how amplitude, frequency, filter frequency, PWM duty, and pan
     are calculated from underlying parameters on the fly.  For each control input, they specify
-    nine coefficients which are multiplied by (0) a constant value of 1, (1) the log-frequency from
+    ten coefficients which are multiplied by (0) a constant value of 1, (1) the log-frequency from
     the note-on command, (2) the velocity from the note-on command, (3) Envelope Generator 0's value,
-    (4) Envelope Generator 1's value, (5) the modulating oscillator input, (6) the global pitch
-    bend value, (7) external input 0, and (8) external input 1.  The sum of these scaled values is used as the control input. (Amplitude is a special
+    (4) Envelope Generator 1's value, (5) the first modulating oscillator input, (6) the global pitch
+    bend value, (7) external input 0, (8) external input 1, and (9) the second modulating oscillator
+    input.  The sum of these scaled values is used as the control input. (Amplitude is a special
     case where the individual values are *multiplied* rather than added, and values whose coefficients
     are zero are skipped).
 
@@ -172,11 +173,15 @@ def parse_ctrl_coefs(coefs):
     will add EG1 modulation to pitch but not change its base value etc.  As a special case, a single value
     (e.g. "f440") will change the constant offset for a parameter but leave its other modulations in place.
 
+    Prefer the dict form below to positional vectors.  New control inputs get appended to keep the
+    existing positions stable, which is why the second modulator is coefficient 9 rather than sitting
+    beside the first at 6 -- an ordering you have to remember with a vector and never with a dict.
+
     The Python API accepts multiple kinds of input:
      * A scalar numeric value: freq=440
      * A list of values in the format accepted by the wire protocol: freq=',,,,0.01'.
-     * A Python list (or tuple) of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 7 values, the remainder are treated as None (analogous to the wire-protocol string).
-     * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend', 'ext0', and 'ext1'.
+     * A Python list (or tuple) of values, where None can be used to indicate "unspecified": freq=[None, None, None, None, 0.01].  Where the list is shorter than the expected 10 values, the remainder are treated as None (analogous to the wire-protocol string).
+     * A Python dict providing values for some subset of the coefficients.  The only acceptable keys are 'const', 'note', 'vel', 'eg0', 'eg1', 'mod0', 'mod1', 'bend', 'ext0', and 'ext1'.  'mod' is accepted as an alias for 'mod0'.
     """
     # Pass through ready-formed strings, and convert single values to single value strings
     if isinstance(coefs, str):
@@ -184,10 +189,15 @@ def parse_ctrl_coefs(coefs):
     if isinstance(coefs, int) or isinstance(coefs, float):
         return trunc(coefs)
     # Convert a dict into a list of values.
-    dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod', 'bend', 'ext0', 'ext1']
+    # Wire order, which is not a nice order: 'mod1' is appended rather than
+    # sitting next to 'mod0' so that no existing coef changes position.
+    dict_fields = ['const', 'note', 'vel', 'eg0', 'eg1', 'mod0', 'bend', 'ext0', 'ext1', 'mod1']
+    # 'mod' predates the second modulator, and named what is now 'mod0'.
+    dict_aliases = {'mod': 'mod0'}
     if isinstance(coefs, dict):
         coef_list = [None] * len(dict_fields)
         for key, value in coefs.items():
+            key = dict_aliases.get(key, key)
             if key not in dict_fields:
                 raise ValueError('\'%s\' is not a recognized CtrlCoef field %s' % (key, str(dict_fields)))
             coef_list[dict_fields.index(key)] = value
@@ -230,7 +240,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('bp0', 'AL'), ('bp1', 'BL'),
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
     ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
-    ('mod_source', 'LI'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
+    ('mod_source', 'LL'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),

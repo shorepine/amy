@@ -29,7 +29,7 @@ var AMY_KW_MAP = {
   eg1_type: {wire: "X", type: "I"},
   debug: {wire: "D", type: "I"},
   chained_osc: {wire: "c", type: "I"},
-  mod_source: {wire: "L", type: "I"},
+  mod_source: {wire: "L", type: "L"},
   eq: {wire: "x", type: "L"},
   filter_type: {wire: "G", type: "I"},
   ratio: {wire: "I", type: "F"},
@@ -137,7 +137,10 @@ var AMY_KW_PRIORITY = {
   patch_string: 63
 };
 
-var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod", "bend", "ext0", "ext1"];
+var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];
+
+// Superseded coef names, kept working: {old: new}.
+var AMY_COEF_ALIASES = {mod: "mod0"};
 
 // --- type handlers (mirror Python's str_of_int, trunc, parse_list_or_comma_string, parse_ctrl_coefs) ---
 
@@ -183,7 +186,8 @@ function _parse_ctrl_coefs(coefs) {
     var list = new Array(AMY_COEF_FIELDS.length).fill(null);
     for (var key in coefs) {
       if (!coefs.hasOwnProperty(key)) continue;
-      var idx = AMY_COEF_FIELDS.indexOf(key);
+      var name = AMY_COEF_ALIASES.hasOwnProperty(key) ? AMY_COEF_ALIASES[key] : key;
+      var idx = AMY_COEF_FIELDS.indexOf(name);
       if (idx < 0) throw new Error("Unknown ctrl_coef field: " + key + ". Valid: " + AMY_COEF_FIELDS.join(", "));
       list[idx] = coefs[key];
     }
@@ -326,7 +330,8 @@ var AMY = {
   ZERO_LOGFREQ_IN_HZ: 440.0,
   ZERO_MIDI_NOTE: 69,
   MIN_FILTER_LOGFREQ: -2.75,
-  NUM_COMBO_COEFS: 9,
+  NUM_MOD_SOURCES: 2,
+  NUM_COMBO_COEFS: 10,
   MAX_MESSAGE_LEN: 1024,
   MAX_PARAM_LEN: 256,
   FILTER_NONE: 0,

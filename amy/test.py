@@ -807,6 +807,34 @@ class TestModSourceLoopRejected(AmyTest):
     amy_send_at(time=900, vel=0)
 
 
+class TestTwoModSources(AmyTest):
+  """Both mod slots on one osc, driven by different LFOs and routed to
+  different parameters: osc 1 (3 Hz) is mod0 -> vibrato, osc 2 (11 Hz) is
+  mod1 -> tremolo.  Each slot has to reach its own oscillator."""
+
+  def run(self):
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=3, amp={'const': 0.5, 'vel': 0, 'eg0': 0})
+    amy_send_at(time=0, osc=2, wave=amy.SINE, freq=11, amp={'const': 0.5, 'vel': 0, 'eg0': 0})
+    amy_send_at(time=0, osc=0, wave=amy.SINE, mod_source=[1, 2],
+                freq={'const': 220, 'mod0': 0.1}, amp={'const': 1, 'mod1': 0.5})
+    amy_send_at(time=100, osc=0, note=60, vel=1)
+    amy_send_at(time=900, osc=0, vel=0)
+
+
+class TestSecondModSourceOnly(AmyTest):
+  """Naming only the second slot (mod_source=[None, 2]) must leave slot 0
+  unset rather than shifting osc 2 into it."""
+
+  def run(self):
+    amy_send_at(time=0, osc=1, wave=amy.SINE, freq=3, amp={'const': 0.5, 'vel': 0, 'eg0': 0})
+    amy_send_at(time=0, osc=2, wave=amy.SINE, freq=11, amp={'const': 0.5, 'vel': 0, 'eg0': 0})
+    # mod0 coef is set but no mod0 source, so only the mod1 tremolo is heard.
+    amy_send_at(time=0, osc=0, wave=amy.SINE, mod_source=[None, 2],
+                freq={'const': 220, 'mod0': 0.1}, amp={'const': 1, 'mod1': 0.5})
+    amy_send_at(time=100, osc=0, note=60, vel=1)
+    amy_send_at(time=900, osc=0, vel=0)
+
+
 class TestJunoTrumpetPatch(AmyTest):
   """I'm hearing a click in the Juno Trumpet patch.  Catch it."""
 
@@ -986,7 +1014,7 @@ class TestOwBassClick(AmyTest):
     # Ow Bass reproduced by hand on AMYboard Editor.
     amy_send_at(time=10, synth=0, osc=0, wave=amy.SILENT, amp='1,,1,1', freq=220, filter_freq='20,1,,,5.443', resonance=4.381,
              filter_type=amy.FILTER_LPF24, bp0='13,1,0,1,16,0', bp1='16,1,0,0.878,52,0', mod_source=1, chained_osc=2)
-    amy_send_at(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq='2.3,0,,,,,0', bp0='5,1,100,1,10000,0')
+    amy_send_at(time=10, synth=0, osc=1, wave=amy.TRIANGLE, amp=',,0', freq={'const': 2.3, 'note': 0, 'bend': 0}, bp0='5,1,100,1,10000,0')
     amy_send_at(time=10, synth=0, osc=2, wave=amy.PULSE, amp='0.551,,0', freq=220, duty=0.697, chained_osc=3, mod_source=1)
     amy_send_at(time=10, synth=0, osc=3, wave=amy.SAW_UP, amp='0.551,,0', freq=110, mod_source=1)
     amy_send_at(time=10, eq='7,-3,-3', echo='M0,500,,0,0', chorus='0,320,0.5,0.5')

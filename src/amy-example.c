@@ -101,7 +101,7 @@ void test_stored_patch() {
     e.patch_number = patch_number;
     e.osc = 0;
     e.wave = PULSE;
-    e.mod_source = 2;
+    e.mod_source[0] = 2;
     e.amp_coefs[COEF_VEL] = 1.0f;
     e.amp_coefs[COEF_EG0] = 1.0f;
     e.amp_coefs[COEF_EG1] = 0;
@@ -131,7 +131,7 @@ void test_stored_patch() {
     e.patch_number = patch_number;
     e.osc = 1;
     e.wave = SAW_UP;
-    e.mod_source = 2;
+    e.mod_source[0] = 2;
     e.amp_coefs[COEF_VEL] = 1.0f;
     e.amp_coefs[COEF_EG0] = 1.0f;
     e.amp_coefs[COEF_EG1] = 0;
@@ -147,7 +147,7 @@ void test_stored_patch() {
     e.patch_number = patch_number;
     e.osc = 2;
     e.wave = TRIANGLE;
-    e.mod_source = 2;
+    e.mod_source[0] = 2;
     e.amp_coefs[COEF_CONST] = 1.f;
     e.amp_coefs[COEF_VEL] = 0;
     e.amp_coefs[COEF_EG0] = 1.0f;

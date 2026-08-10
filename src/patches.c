@@ -148,7 +148,8 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delt
     while(d) {
         d_offset = *d;
         d_offset.osc += base_osc;
-        if (d_offset.param == CHAINED_OSC || d_offset.param == MOD_SOURCE || d_offset.param == RESET_OSC
+        if (d_offset.param == CHAINED_OSC || d_offset.param == RESET_OSC
+            || (d_offset.param >= MOD_SOURCE_START && d_offset.param < MOD_SOURCE_END)
             || (d_offset.param >= ALGO_SOURCE_START && d_offset.param < ALGO_SOURCE_START + MAX_ALGO_OPS))
             if (!(AMY_IS_UNSET((int16_t)d_offset.data.i) || AMY_IS_UNSET((uint16_t)d_offset.data.i)))  // CHAINED_OSC is uint16_t, but ALGO_SOURCE is int16_t.
                 d_offset.data.i += base_osc;
@@ -327,7 +328,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_F(resonance, "resonance", "R");
     _EPRINT_I(portamento_ms, "portamento_ms", "m");
     _EPRINT_I(chained_osc, "chained_osc", "c");
-    _EPRINT_I(mod_source, "mod_source", "L");
+    _EPRINT_I_SEQ(mod_source, "mod_source", NUM_MOD_SOURCES, "L");
     _EPRINT_I(algorithm, "algorithm", "o");
     _EPRINT_I(filter_type, "filter_type", "G");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
@@ -439,7 +440,7 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(resonance);
     _RET_TRUE_IF_SET(portamento_ms);
     _RET_TRUE_IF_SET(chained_osc);
-    _RET_TRUE_IF_SET(mod_source);
+    _RET_TRUE_IF_SET_SEQ(mod_source, NUM_MOD_SOURCES);
     _RET_TRUE_IF_SET(algorithm);
     _RET_TRUE_IF_SET(filter_type);
     _RET_TRUE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
@@ -508,7 +509,6 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(portamento_ms, PORTAMENTO)
       _CASE_I(chained_osc, CHAINED_OSC)
       _CASE_I(reset_osc, RESET_OSC)
-      _CASE_I(mod_source, MOD_SOURCE)
       _CASE_I(note_source_channel, NOTE_SOURCE_CHANNEL)
       _CASE_I(filter_type, FILTER_TYPE)
       _CASE_I(algorithm, ALGORITHM)
@@ -544,6 +544,10 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       for (int i = 0; i < MAX_ALGO_OPS; ++i) {
           if ((int)queue->param == (int)ALGO_SOURCE_START + i)
               event->algo_source[i] = queue->data.i;
+      }
+      for (int i = 0; i < NUM_MOD_SOURCES; ++i) {
+          if ((int)queue->param == (int)MOD_SOURCE_START + i)
+              event->mod_source[i] = queue->data.i;
       }
       for (int i = 0; i < MAX_BREAKPOINT_SETS; ++i) {
           for (int j = 0; j < MAX_BREAKPOINTS; ++j) {
@@ -664,7 +668,7 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     EVENT_FROM_OSC(resonance);
     EVENT_FROM_OSC_MAPPED(portamento_alpha, portamento_ms, alpha_to_portamento_ms);
     EVENT_FROM_OSC_BASEOSC(chained_osc);
-    EVENT_FROM_OSC_BASEOSC(mod_source);
+    EVENT_FROM_OSC_ARRAY_BASEOSC(mod_source, NUM_MOD_SOURCES);
     EVENT_FROM_OSC(algorithm);
     EVENT_FROM_OSC(filter_type);
     EVENT_FROM_OSC_ARRAY_BASEOSC(algo_source, MAX_ALGO_OPS);

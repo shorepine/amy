@@ -265,18 +265,30 @@ typedef int16_t output_sample_type;
 #define ZERO_MIDI_NOTE 69  // 60
 #define MIN_FILTER_LOGFREQ -2.75f  // -2.0  // LPF cutoff cannot go below w = 0.01 rad/samp in filters.c = 72 Hz, so clip it here at ~65 Hz.
 
-#define NUM_COMBO_COEFS 9  // 9 control-mixing params: const, note, velocity, env1, env2, mod, pitchbend, ext0, ext1
+// How many modulating oscillators each osc can have.  Each one gets its own
+// ctrl_input column (COEF_MOD0, COEF_MOD1), so this and NUM_COMBO_COEFS move
+// together.
+#define NUM_MOD_SOURCES 2
+
+#define NUM_COMBO_COEFS 10  // 10 control-mixing params: const, note, velocity, env1, env2, mod0, pitchbend, ext0, ext1, mod1
 enum coefs{
     COEF_CONST = 0,
     COEF_NOTE = 1,
     COEF_VEL = 2,
     COEF_EG0 = 3,
     COEF_EG1 = 4,
-    COEF_MOD = 5,
+    COEF_MOD0 = 5,
     COEF_BEND = 6,
     COEF_EXT0 = 7,
     COEF_EXT1 = 8,
+    // The second mod source is appended rather than slotted in next to the
+    // first, so that every coef index before it keeps its value: a stored patch
+    // string is a positional list, so inserting a column mid-way would silently
+    // re-read every saved "bend" as a modulator depth.
+    COEF_MOD1 = 9,
 };
+// Before there were two mod sources there was just COEF_MOD; it names the first.
+#define COEF_MOD COEF_MOD0
 
 #define MAX_MESSAGE_LEN 1024
 #define MAX_PARAM_LEN 256
@@ -387,24 +399,29 @@ typedef int amy_err_t;
 
 enum params{
     WAVE, PRESET, MIDI_NOTE,              // 0, 1, 2
-    AMP,                                 // 3..11
-    DUTY=AMP + NUM_COMBO_COEFS,          // 12..20
-    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 21
-    FREQ,                                // 22..30
-    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 31
-    PHASE, DETUNE, PITCH_BEND,           // 32, 33, 34
-    PAN,                                 // 35..43
-    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 44..52
-    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 53
-    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 54, 55, 56
-    MOD_SOURCE, FILTER_TYPE,             // 57, 58
-    EQ_L, EQ_M, EQ_H,                    // 59, 60, 61
-    ALGORITHM, LATENCY, TEMPO,           // 62, 63, 64
+    AMP,                                 // 3..12
+    DUTY=AMP + NUM_COMBO_COEFS,          // 13..22
+    FEEDBACK=DUTY + NUM_COMBO_COEFS,     // 23
+    FREQ,                                // 24..33
+    VELOCITY=FREQ + NUM_COMBO_COEFS,     // 34
+    PHASE, DETUNE, PITCH_BEND,           // 35, 36, 37
+    PAN,                                 // 38..47
+    FILTER_FREQ=PAN + NUM_COMBO_COEFS,   // 48..57
+    RATIO=FILTER_FREQ + NUM_COMBO_COEFS, // 58
+    RESONANCE, PORTAMENTO, CHAINED_OSC,  // 59, 60, 61
+    // One id per mod source, indexed as MOD_SOURCE_START + slot, exactly like
+    // ALGO_SOURCE_START below.  MOD_SOURCE names slot 0, for the code (and the
+    // callers) that only ever mean the first one.
+    MOD_SOURCE_START,                    // 62..63
+    MOD_SOURCE_END = MOD_SOURCE_START + NUM_MOD_SOURCES,  // 64
+    FILTER_TYPE = MOD_SOURCE_END,        // 64
+    EQ_L, EQ_M, EQ_H,                    // 65, 66, 67
+    ALGORITHM, LATENCY, TEMPO,           // 68, 69, 70
     // One id, not one per bus: like every other bus-directed param (EQ_*,
     // ECHO_*, REVERB_*), a VOLUME delta names its bus in delta.osc.  It used
     // to be VOLUME_BASE..VOLUME_BASE+n, which is what capped the bus count --
-    // the ids would have run into MODE below.  66..98 are now free.
-    VOLUME,                              // 65
+    // the ids would have run into MODE below.  72..98 are now free.
+    VOLUME,                              // 71
     MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
@@ -430,6 +447,8 @@ enum params{
     BUS,
     NO_PARAM                    // 210
 };
+// Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
+#define MOD_SOURCE MOD_SOURCE_START
 
 ///////////////////////////////////////
 // Profiler setup
@@ -570,7 +589,7 @@ typedef struct amy_event {
     float resonance;
     uint16_t portamento_ms;  // synth is alpha
     uint16_t chained_osc;
-    uint16_t mod_source;
+    uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
     uint8_t filter_type;
     float eq_l;  // not in synth
@@ -639,7 +658,7 @@ struct synthinfo {
     float resonance;
     uint8_t filter_type;
     uint16_t chained_osc;
-    uint16_t mod_source;
+    uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
     int16_t algo_source[MAX_ALGO_OPS];  // int16 not uint because -1 specified to indicate no osc 
     uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
@@ -1310,7 +1329,7 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 
 // envelopes
 extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset);
-extern SAMPLE compute_mod_scale(uint16_t osc);
+extern SAMPLE compute_mod_scale(uint16_t osc, uint16_t which_source);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);
 
