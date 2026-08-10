@@ -1043,21 +1043,22 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     if (synth_flags & SYNTH_FLAGS_NOTES_VIA_MIDI
         && AMY_IS_SET(e->midi_note)
         && (e->note_source_channel != e->synth)) {
-        // Route note-on event via MIDI to invoke midi_note_cmds
-        uint8_t bytes[3];
-        // Note: nonzero synth_flags means e->synth was set.
-        bytes[0] = 0x90 + (0x0F & (e->synth - 1));
-        bytes[1] = 0x7F & (uint8_t)(e->midi_note);
+        // Route note-on event via MIDI to invoke midi_note_cmds.  We pass the synth
+        // number straight through as the channel rather than packing it into a MIDI
+        // status byte, so synths above 16 reach their own mappings.
+        uint8_t data[2];
+        data[0] = 0x7F & (uint8_t)(e->midi_note);
         uint8_t velocity = 255;   // fake-note-on magic value.
         if (AMY_IS_SET(e->velocity)) velocity = (uint8_t) MIN(127, 127.1f * e->velocity);
-        bytes[2] = velocity;
-        //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x%02x 0x%02x 0x%02x\n", amy_global.time, instrument, synth_flags, e->midi_note, e->velocity, bytes[0], bytes[1], bytes[2]);
+        data[1] = velocity;
+        //fprintf(stderr, "time %.3f synth %d flags %d note %.1f vel %.3f: MIDI cmd 0x90 chan %d 0x%02x 0x%02x\n", amy_global.time, synth, synth_flags, e->midi_note, e->velocity, e->synth, data[0], data[1]);
         // Remove the note and vel that we've put in the MIDI event, but keep any other event flags.
         AMY_UNSET(e->midi_note);
         AMY_UNSET(e->velocity);
         // Pass the target queue through: if this event is being stored (e.g. into
         // a patch), its deltas must land in that queue, not play now.
-        midi_message_handler_to_queue(bytes, 3, e->time, e, queue);
+        // Note: nonzero synth_flags means e->synth was set.
+        midi_message_handler_to_queue(0x90, e->synth, data, 2, e->time, e, queue);
     } else {
         uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
         uint8_t num_voices = patches_voices_for_event(e, voices);
