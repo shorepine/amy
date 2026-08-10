@@ -213,6 +213,61 @@ bool pcm_loop_config_allowed(uint16_t osc, uint16_t mode, uint16_t preset_number
     return false;
 }
 
+// Sample value close enough to zero to stop sample
+#define PCM_ZERO_THRESH 16
+// How far forward to search for a zero crossing
+#define PCM_MAX_ZERO_SEARCH_LEN 512
+
+int pcm_find_zero_crossing(uint16_t osc) {
+    int index = -1;
+    if(AMY_IS_SET(synth[osc]->preset)) {
+        memorypcm_preset_t rom_local;
+        memorypcm_preset_t *preset =
+            get_preset_for_preset_number(synth[osc]->preset, &rom_local);
+        uint32_t sample_length = preset->length;
+        const LUTSAMPLE* table = preset->sample_ram;
+        int last_sign = 0;
+        int sign;
+        if (preset->type != AMY_PCM_TYPE_FILE
+            && table != NULL
+            && sample_length != 0) {
+            const LUTSAMPLE* table = preset->sample_ram;
+            uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+            //uint32_t start_index = base_index;  // for debug only
+            LUTSAMPLE min_val = SAMPLE_MAX;
+            LUTSAMPLE val;
+            for(uint16_t i=0; i < PCM_MAX_ZERO_SEARCH_LEN; i++) {
+                // For non-file samples, we have to check for end of sample/looping.
+                if (base_index >= sample_length) break;
+                if (preset->channels == 2) {
+                    if (synth[osc]->wave == PCM_LEFT) {
+                        val = table[base_index * 2];
+                    } else if (synth[osc]->wave == PCM_RIGHT) {
+                        val = table[base_index * 2 + 1];
+                    } else { // PCM or PCM_MIX
+                        val = (LUTSAMPLE)(((int32_t)table[base_index * 2] + (int32_t)table[base_index * 2 + 1]) / 2);
+                    }
+                } else {
+                    val = table[base_index];
+                }
+                sign = 1;
+                if (val < 0) {sign = -1; val = -val;}
+                if (val < min_val) {
+                    min_val = val;
+                    index = base_index;
+                }
+                if ((val <= PCM_ZERO_THRESH) || ((sign * last_sign) == -1))
+                    break;
+                last_sign = sign;
+                ++base_index;
+            }
+            //fprintf(stderr, "time %.3f: pcm_find_zero: osc %d start %d base %d len %d min_val %d index %d sign %d last %d\n",
+            //        amy_global.time, osc, start_index, base_index, sample_length, min_val, index, sign, last_sign);
+        }
+    }
+    return index;
+}
+
 void pcm_note_on(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t rom_local;
@@ -236,16 +291,27 @@ void pcm_note_on(uint16_t osc) {
             // baked-in PCM - don't overrun.
             if(synth[osc]->preset >= pcm_samples) synth[osc]->preset = 0;
         }
-        
+        PHASOR phase;
         if (AMY_IS_SET(synth[osc]->trigger_phase)) {
             // trigger_phase (P) sets the sample start point for this
             // note-on (start_frame / 2^PCM_INDEX_BITS).
-            synth[osc]->phase = F2P(synth[osc]->trigger_phase);
+            phase = F2P(synth[osc]->trigger_phase);
         } else {
-            synth[osc]->phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
+            phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
-        // Copy the looping mode from the wave mode field.  Can be updated on note_off.
-        msynth[osc]->state = synth[osc]->mode;
+        if (synth[osc]->status == SYNTH_AUDIBLE) {
+            msynth[osc]->loopstart = INT_OF_P(phase, PCM_INDEX_BITS);;
+            msynth[osc]->loopend = pcm_find_zero_crossing(osc);
+            msynth[osc]->state = PCM_LOOP_ONCE_INTERNAL;
+            msynth[osc]->next_state = synth[osc]->mode;
+            //fprintf(stderr, "time %.3f osc %d RESTART amp %.3f last_amp %.3f\n", amy_global.time, osc, msynth[osc]->amp, msynth[osc]->last_amp);
+        } else {
+            synth[osc]->phase = phase;
+            msynth[osc]->loopstart = preset->loopstart;
+            msynth[osc]->loopend = preset->loopend;
+            // Copy the looping mode from the wave mode field.  Can be updated on note_off.
+            msynth[osc]->state = synth[osc]->mode;
+        }
         // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }
@@ -351,15 +417,17 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             // For non-file samples, we have to check for end of sample/looping.
             if(preset->type != AMY_PCM_TYPE_FILE) {
                 if ((msynth[osc]->state == PCM_LOOP
+                     || msynth[osc]->state == PCM_LOOP_ONCE_INTERNAL
                      || msynth[osc]->state == PCM_LOOP_STOP
                      || msynth[osc]->state == PCM_LOOP_FOREVER)
-                    && base_index >= preset->loopend) { // loopend
+                    && base_index >= msynth[osc]->loopend) { // loopend
                     // still looping.  The state may be modified by pcm_note_off.
                     // back to loopstart
                     phase &= ((1L << (PCM_INDEX_FRAC_BITS + PCM_INDEX_STEP_EXTRA_BITS)) - 1);
-                    base_index_base = preset->loopstart + (base_index - preset->loopend);
+                    base_index_base = msynth[osc]->loopstart + (base_index - msynth[osc]->loopend);
+                    if (msynth[osc]->state == PCM_LOOP_ONCE_INTERNAL)  msynth[osc]->state = msynth[osc]->next_state;  // Only loops once.
+                    //fprintf(stderr, "time %.3f sample %d LOOP: old_index %d new_index %d phase 0x%lx\n", amy_global.time, i, base_index, base_index_base, phase);
                     base_index = base_index_base;
-                    //fprintf(stderr, "time %.3f sample %d LOOP: base_index %d base_index_base %d phase 0x%lx\n", amy_global.time, i, base_index, base_index_base, phase);
                 } else if(base_index >= sample_length) { // end
                     synth[osc]->status = SYNTH_OFF;// is this right?
                     buf[i] = 0;
@@ -392,13 +460,12 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 c = (next_index < sample_length) ? table[next_index] : b;
             }
             SAMPLE sample = L2S(b) + MUL4_SS(L2S(c - b), frac);
-            phase = P_WRAPPED_SUM(phase, step);
-            base_index = base_index_base + INT_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS);
-
             SAMPLE value = buf[i] + MUL4_SS(amp, sample);
             buf[i] = value;   
             if (value < 0) value = -value;
             if (value > max_value) max_value = value;  
+            phase = P_WRAPPED_SUM(phase, step);
+            base_index = base_index_base + INT_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS);
         }
         //synth[osc]->phase = phase;
         synth[osc]->phase = I2P(base_index, PCM_INDEX_BITS) + (S_FRAC_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS) >> (S_FRAC_BITS - (PCM_INDEX_FRAC_BITS)) ); //  + PCM_INDEX_STEP_EXTRA_BITS

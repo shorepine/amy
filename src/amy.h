@@ -313,6 +313,7 @@ enum coefs{
 #define PCM_LOOP 2
 #define PCM_LOOP_STOP 3
 #define PCM_LOOP_FOREVER 4
+#define PCM_LOOP_ONCE_INTERNAL 5  // Special internal state for retriggering wav files at zero crossing
 
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
@@ -669,7 +670,10 @@ struct mod_synthinfo {
     float last_filter_logfreq;  // filter freq history for smoothing.
     float resonance;
     float feedback;
-    uint16_t state;    // Used for PCM looping state.
+    uint16_t state;      // Used for PCM looping state.
+    uint16_t next_state; // Used for PCM looping state.
+    uint32_t loopstart;  // Used for PCM looping.
+    uint32_t loopend;    // Used for PCM looping.
 };
 
 
