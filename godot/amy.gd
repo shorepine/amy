@@ -75,6 +75,8 @@ const ENVELOPE_TRUE_EXPONENTIAL: int = 3
 @export var audio_in: bool = false
 ## Maximum number of oscillators.
 @export var max_oscs: int = 180
+## Number of FX buses. No upper limit beyond available memory.
+@export var max_buses: int = 4
 ## Maximum number of voices.
 @export var max_voices: int = 64
 ## Maximum number of synths.
@@ -114,6 +116,7 @@ func _init_native() -> void:
 	_synth.set("startup_bleep", startup_bleep)
 	_synth.set("audio_in", audio_in)
 	_synth.set("max_oscs", max_oscs)
+	_synth.set("max_buses", max_buses)
 	_synth.set("max_voices", max_voices)
 	_synth.set("max_synths", max_synths)
 
@@ -284,7 +287,7 @@ var _KW_MAP: Dictionary = {
 	"phase":               ["P", "F"],
 	"pan":                 ["Q", "C"],
 	"client":              ["g", "I"],
-	"volume":              ["V", "L"],
+	"volume":              ["V", "F"],
 	"pitch_bend":          ["s", "F"],
 	"filter_freq":         ["F", "C"],
 	"resonance":           ["R", "F"],

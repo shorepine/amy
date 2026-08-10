@@ -771,7 +771,7 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'u': patches_store_patch(e, arg); pos = strlen(message) - 1; break;  // patches_store_patch processes the patch as all the rest of the message and maybe sets patch.
             /* U used by Alles for sync */
             case 'v': e->osc=((atoi(arg)) % (AMY_OSCS+1));  break; // allow osc wraparound
-            case 'V': parse_list_float(arg, e->volume, AMY_NUM_BUSES, AMY_UNSET_VALUE(e->volume[0])); break;
+            case 'V': e->volume = atoff(arg); break;
             case 'w': if (arg[0] == 'w') {  // 'ww' is wave submode.
                     e->mode=atoi(arg + 1);
                     ++pos;

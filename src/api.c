@@ -46,6 +46,7 @@ amy_config_t amy_default_config() {
     c.ks_oscs = 1;
 
     c.max_oscs = 250;
+    c.max_buses = AMY_DEFAULT_NUM_BUSES;
     c.max_sequencer_tags = 256;
     c.max_voices = 64;
     c.max_synths = 64;
@@ -128,8 +129,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);
-    for (int bus = 0; bus < AMY_NUM_BUSES; ++bus)
-        AMY_UNSET(e->volume[bus]);
+    AMY_UNSET(e->volume);
     AMY_UNSET(e->pitch_bend);
     AMY_UNSET(e->tempo);
     AMY_UNSET(e->latency_ms);

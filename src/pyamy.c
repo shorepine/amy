@@ -70,6 +70,15 @@ static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value)
         }
         cfg->max_oscs = (uint16_t)lv;
         return 0;
+    } else if (strcmp(key, "max_buses") == 0) {
+        lv = PyLong_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (lv < 1 || lv > UINT16_MAX) {
+            PyErr_Format(PyExc_ValueError, "invalid max_buses %ld", lv);
+            return -1;
+        }
+        cfg->max_buses = (uint16_t)lv;
+        return 0;
     } else if (strcmp(key, "ks_oscs") == 0) {
         lv = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;

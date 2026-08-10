@@ -51,8 +51,8 @@ void test_patch_set() {
 
     // Change the global volume for bus 0.
     e = amy_default_event();
-    int bus = 0;
-    e.volume[bus] = 2.0f;
+    e.bus = 0;
+    e.volume = 2.0f;
     amy_add_event(&e);
 }
 

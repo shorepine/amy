@@ -102,6 +102,7 @@ private:
 	bool startup_bleep = false;
 	bool audio_in = false;
 	int max_oscs = 180;
+	int max_buses = 4;
 	int max_voices = 64;
 	int max_synths = 64;
 
@@ -141,6 +142,8 @@ public:
 	bool get_audio_in() const;
 	void set_max_oscs(int p_val);
 	int get_max_oscs() const;
+	void set_max_buses(int p_val);
+	int get_max_buses() const;
 	void set_max_voices(int p_val);
 	int get_max_voices() const;
 	void set_max_synths(int p_val);
@@ -221,6 +224,10 @@ void AmySynth::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_max_oscs"), &AmySynth::get_max_oscs);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_oscs"), "set_max_oscs", "get_max_oscs");
 
+	ClassDB::bind_method(D_METHOD("set_max_buses", "count"), &AmySynth::set_max_buses);
+	ClassDB::bind_method(D_METHOD("get_max_buses"), &AmySynth::get_max_buses);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_buses"), "set_max_buses", "get_max_buses");
+
 	ClassDB::bind_method(D_METHOD("set_max_voices", "count"), &AmySynth::set_max_voices);
 	ClassDB::bind_method(D_METHOD("get_max_voices"), &AmySynth::get_max_voices);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_voices"), "set_max_voices", "get_max_voices");
@@ -244,6 +251,7 @@ void AmySynth::start() {
 	config.features.startup_bleep = startup_bleep ? 1 : 0;
 	config.features.audio_in = audio_in ? 1 : 0;
 	config.max_oscs = max_oscs;
+	config.max_buses = max_buses;
 	config.max_voices = max_voices;
 	config.max_synths = max_synths;
 	amy_start(config);
@@ -338,6 +346,8 @@ void AmySynth::set_audio_in(bool p_val) { audio_in = p_val; }
 bool AmySynth::get_audio_in() const { return audio_in; }
 void AmySynth::set_max_oscs(int p_val) { max_oscs = p_val; }
 int AmySynth::get_max_oscs() const { return max_oscs; }
+void AmySynth::set_max_buses(int p_val) { max_buses = p_val; }
+int AmySynth::get_max_buses() const { return max_buses; }
 void AmySynth::set_max_voices(int p_val) { max_voices = p_val; }
 int AmySynth::get_max_voices() const { return max_voices; }
 void AmySynth::set_max_synths(int p_val) { max_synths = p_val; }

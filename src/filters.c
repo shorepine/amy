@@ -636,7 +636,7 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice_fixedzeros(const SAMPLE
 
 #endif
 
-void filters_deinit(uint8_t bus) {
+void filters_deinit(uint16_t bus) {
     SAMPLE **eq_coeffs = amy_global.bus[bus]->eq.eq_coeffs;
     SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
     for(uint16_t i=0;i<AMY_NCHANS;i++) {
@@ -651,7 +651,7 @@ void filters_deinit(uint8_t bus) {
 }
 
 
-void filters_init(uint8_t bus) {
+void filters_init(uint16_t bus) {
     SAMPLE ***p_eq_coeffs = &amy_global.bus[bus]->eq.eq_coeffs;
     SAMPLE ****p_eq_delay = &amy_global.bus[bus]->eq.eq_delay;
     *p_eq_coeffs = malloc_caps(sizeof(SAMPLE*)*3, amy_global.config.ram_caps_fbl);
@@ -684,7 +684,7 @@ void filters_init(uint8_t bus) {
 #ifdef AMY_HAS_MUL64
 
 // No need for block-floating-point
-AMY_IRAM_ATTR void parametric_eq_process(uint8_t bus, SAMPLE *block) {
+AMY_IRAM_ATTR void parametric_eq_process(uint16_t bus, SAMPLE *block) {
     // was void parametric_eq_process_top16block
     // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
     AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
@@ -755,7 +755,7 @@ inline static SAMPLE MAXABS2(SAMPLE a, SAMPLE b) {
     return b;
 }
 
-AMY_IRAM_ATTR void parametric_eq_process(uint8_t bus, SAMPLE *block) {
+AMY_IRAM_ATTR void parametric_eq_process(uint16_t bus, SAMPLE *block) {
     // was void parametric_eq_process_top16block
     // Optimized to run all 3 filters interleaved, to avoid extra buffers/buf accesses.
     AMY_PROFILE_START(PARAMETRIC_EQ_PROCESS)
@@ -1037,7 +1037,7 @@ void reset_filter(uint16_t osc) {
 }
 
 
-void reset_parametric(uint8_t bus) {
+void reset_parametric(uint16_t bus) {
     SAMPLE ***eq_delay = amy_global.bus[bus]->eq.eq_delay;
     for (int c = 0; c < AMY_NCHANS; ++c) {
         for (int b = 0; b < 3; ++b) {
