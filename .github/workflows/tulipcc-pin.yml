@@ -154,33 +154,44 @@ jobs:
             core.setOutput('merger', merger);
             core.setOutput('amy_pr', String(pr.number));
 
-      - name: Refresh tulipcc's refdocs/amy snapshot for the new pin
+      - name: Refresh tulipcc's amy-derived files for the new pin
         env:
           AMY_SHA: ${{ steps.gather.outputs.amy_sha }}
         run: |
-          # tulipcc CI's refdocs-fresh check fails any PR that moves the amy gitlink
-          # without regenerating tulip/server/refdocs/amy (its _VENDORED_FROM.txt
-          # stamps the source SHA). Run tulipcc's own sync script against the new pin
-          # and hand the changed files to the next step to fold into the bump commit.
+          # tulipcc's amy-pin-check fails any PR that moves the amy gitlink without
+          # regenerating BOTH files it derives from the pinned commit:
+          #
+          #   tulip/server/refdocs/amy/   (sync_amy_docs.py; _VENDORED_FROM.txt
+          #                                stamps the source SHA)
+          #   tulip/shared/amy_kwmap.h    (gen_amy_kwmap.py; the C copy of
+          #                                _KW_MAP_LIST that tulip.amy_message() walks)
+          #
+          # Refreshing only the first is what left tulipcc#1302 red: amy#1075 changed
+          # mod_source from an int to a list ('I' -> 'L'), and with a stale kwmap every
+          # message carrying a mod_source silently fell back from the C fast path to
+          # Python. Run both scripts, or the pin PR opens un-mergeable.
           #
           # SAFE under pull_request_target: this clones shorepine/tulipcc@main
-          # (trusted) and the script reads amy docs via GitHub raw at the merged
-          # main SHA — it never checks out or executes this PR's code.
+          # (trusted) and both scripts read amy via GitHub raw at the merged main SHA
+          # — it never checks out or executes this PR's code.
           #
-          # Best-effort: on any failure (e.g. a tulipcc@main sync_amy_docs.py
-          # without the --sha flag), leave the changes list empty and open the
-          # pin PR without the snapshot, exactly as before this step existed.
-          : > "$GITHUB_WORKSPACE/refdocs_changes.txt"
+          # Best-effort and all-or-nothing: on any failure (e.g. a tulipcc@main script
+          # without the --sha flag) leave the changes list empty and open the pin PR
+          # with the gitlink alone. A half-refresh would fail CI just the same, so
+          # there is nothing to gain by keeping one script's output when the other
+          # fails.
+          : > "$GITHUB_WORKSPACE/derived_changes.txt"
           if git clone --depth 1 https://github.com/shorepine/tulipcc "$RUNNER_TEMP/tulipcc" \
-              && python3 "$RUNNER_TEMP/tulipcc/tulip/server/sync_amy_docs.py" --sha "$AMY_SHA"; then
-            git -C "$RUNNER_TEMP/tulipcc" add -A tulip/server/refdocs/amy
+              && python3 "$RUNNER_TEMP/tulipcc/tulip/server/sync_amy_docs.py" --sha "$AMY_SHA" \
+              && python3 "$RUNNER_TEMP/tulipcc/tulip/shared/gen_amy_kwmap.py" --sha "$AMY_SHA"; then
+            git -C "$RUNNER_TEMP/tulipcc" add -A tulip/server/refdocs/amy tulip/shared/amy_kwmap.h
             git -C "$RUNNER_TEMP/tulipcc" -c diff.renames=false diff --cached --name-status \
-              -- tulip/server/refdocs/amy > "$GITHUB_WORKSPACE/refdocs_changes.txt"
+              -- tulip/server/refdocs/amy tulip/shared/amy_kwmap.h > "$GITHUB_WORKSPACE/derived_changes.txt"
           else
-            echo "::warning::refdocs refresh failed; opening the pin PR without a snapshot refresh"
+            echo "::warning::amy-derived refresh failed; opening the pin PR without it (it will need a manual regen to go green)"
           fi
-          echo "refdocs changes for the bump commit:"
-          cat "$GITHUB_WORKSPACE/refdocs_changes.txt"
+          echo "amy-derived changes for the bump commit:"
+          cat "$GITHUB_WORKSPACE/derived_changes.txt"
 
       - name: Open the bump PR on tulipcc
         id: pin
@@ -219,17 +230,20 @@ jobs:
             const baseSha = baseRef.data.object.sha;
             const baseCommit = await github.rest.git.getCommit({ owner, repo, commit_sha: baseSha });
 
-            // The gitlink bump, plus the refreshed refdocs/amy snapshot (if the
-            // previous step produced one) so the refdocs-fresh check passes.
+            // The gitlink bump, plus the refreshed amy-derived files (if the previous
+            // step produced them) so tulipcc's amy-pin-check passes.
             const entries = [{ path: 'amy', mode: '160000', type: 'commit', sha: amySha }];
-            let refdocsChanges = [];
+            // Allow-list, so a script that ever starts touching something else can't
+            // smuggle an unrelated file into the bump commit.
+            const DERIVED_PREFIXES = ['tulip/server/refdocs/amy/', 'tulip/shared/amy_kwmap.h'];
+            let derivedChanges = [];
             try {
-              refdocsChanges = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/refdocs_changes.txt`, 'utf8')
+              derivedChanges = fs.readFileSync(`${process.env.GITHUB_WORKSPACE}/derived_changes.txt`, 'utf8')
                 .split('\n').map(l => l.trim()).filter(Boolean);
             } catch (e) { /* no refresh available; bump the gitlink alone */ }
-            for (const line of refdocsChanges) {
+            for (const line of derivedChanges) {
               const [status, file] = line.split('\t');
-              if (!file || !file.startsWith('tulip/server/refdocs/amy/')) continue;
+              if (!file || !DERIVED_PREFIXES.some(p => file.startsWith(p))) continue;
               if (status === 'D') {
                 // sha: null deletes the path from the tree.
                 entries.push({ path: file, mode: '100644', type: 'blob', sha: null });
@@ -250,12 +264,12 @@ jobs:
               return;
             }
 
-            const refdocsNote = entries.length > 1
-              ? '\n\nIncludes the regenerated tulip/server/refdocs/amy snapshot for this pin.'
+            const derivedNote = entries.length > 1
+              ? '\n\nIncludes the regenerated amy-derived files for this pin\n(tulip/server/refdocs/amy, tulip/shared/amy_kwmap.h).'
               : '';
             const commit = await github.rest.git.createCommit({
               owner, repo,
-              message: `Bump amy submodule to ${short} (amy#${amyPr})` + refdocsNote,
+              message: `Bump amy submodule to ${short} (amy#${amyPr})` + derivedNote,
               tree: tree.data.sha,
               parents: [baseSha],
             });
