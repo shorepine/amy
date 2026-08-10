@@ -62,7 +62,7 @@ AMY supports
  * Multi-core (including microcontrollers) for rendering if available
  * File transfer to the host 
 
-The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/amy/fm.py) that can convert any DX7 patch into an AMY patch.
+The FM synth provides a Python library, [`fm.py`](https://github.com/shorepine/amy/blob/main/amy/fm.py) that can convert any DX7 patch into an AMY patch, including directly from DX7 sysex (`.SYX`) files with `fm.load_syx()` — see [Loading DX7 sysex files](https://shorepine.github.io/amy/synth.html#loading-dx7-sysex-syx-files-as-user-patches).
 
 The Juno-6 emulation provides [`juno.py`](https://github.com/shorepine/amy/blob/main/amy/juno.py) and can read in Juno-6 SYSEX patches and convert them into AMY patches.
 
