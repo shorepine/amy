@@ -47,8 +47,19 @@ struct midi_mapping {
 
 bool mappings_inited = false;
 
-struct midi_mapping *midi_cc_mapping_root_by_chan[AMY_NUM_MIDI_CHANNELS + 1];
-struct midi_mapping *midi_note_mapping_root_by_chan[AMY_NUM_MIDI_CHANNELS + 1];
+// Mappings are indexed by channel, but "channel" here means a synth number as
+// well as a MIDI channel -- patches.c routes synth note-ons through the mapping
+// machinery, and synth numbers run up to config.max_synths, well past the 16
+// channels a MIDI cable can carry.  So these are sized at init, not compiled in.
+// Channel 0 is a valid synth (it just isn't reachable from a MIDI cable, whose
+// channels are numbered from 1), so valid channels are 0..num_mapping_channels.
+struct midi_mapping **midi_cc_mapping_root_by_chan = NULL;
+struct midi_mapping **midi_note_mapping_root_by_chan = NULL;
+int num_mapping_channels = 0;
+
+static bool mapping_channel_ok(int channel) {
+    return mappings_inited && channel >= 0 && channel <= num_mapping_channels;
+}
 
 // Built-in default for note commands
 struct midi_mapping default_note_mapping = {
@@ -71,7 +82,7 @@ void midi_mapping_print(struct midi_mapping *mapping) {
 }
 
 struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return NULL;
+    if (!mapping_channel_ok(channel))  return NULL;
     struct midi_mapping **p_root;
     if (type == MIDI_MAP_TYPE_CC)
         p_root = &midi_cc_mapping_root_by_chan[channel];
@@ -96,7 +107,7 @@ struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_l
 
 void midi_mapping_debug(void) {
     fprintf(stderr, "midi_mapping_debug:\n");
-    for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+    for (int channel = 0; channel < num_mapping_channels + 1; ++channel) {
         struct midi_mapping **p_mapping = &midi_cc_mapping_root_by_chan[channel];
         while (*p_mapping != NULL) {
             midi_mapping_print(*p_mapping);
@@ -125,7 +136,25 @@ void midi_mappings_free(struct midi_mapping **p_mapping) {
 }
 
 void midi_mappings_init(void) {
-    for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+    midi_mappings_deinit();  // Release any earlier allocation; init is called more than once.
+    // A mapping channel is a synth number, so cover every synth, but never fewer
+    // than the 16 channels that can arrive over a MIDI cable.
+    num_mapping_channels = AMY_NUM_MIDI_CHANNELS;
+    if ((int)amy_global.config.max_synths > num_mapping_channels)
+        num_mapping_channels = (int)amy_global.config.max_synths;
+    size_t num_bytes = sizeof(struct midi_mapping *) * (num_mapping_channels + 1);
+    midi_cc_mapping_root_by_chan = (struct midi_mapping **)malloc_caps(num_bytes, amy_global.config.ram_caps_synth);
+    midi_note_mapping_root_by_chan = (struct midi_mapping **)malloc_caps(num_bytes, amy_global.config.ram_caps_synth);
+    if (midi_cc_mapping_root_by_chan == NULL || midi_note_mapping_root_by_chan == NULL) {
+        fprintf(stderr, "unable to alloc midi mappings for %d channels\n", num_mapping_channels);
+        free(midi_cc_mapping_root_by_chan);
+        midi_cc_mapping_root_by_chan = NULL;
+        free(midi_note_mapping_root_by_chan);
+        midi_note_mapping_root_by_chan = NULL;
+        num_mapping_channels = 0;
+        return;
+    }
+    for (int channel = 0; channel < num_mapping_channels + 1; ++channel) {
         midi_cc_mapping_root_by_chan[channel] = NULL;
         midi_note_mapping_root_by_chan[channel] = NULL;
     }
@@ -134,39 +163,34 @@ void midi_mappings_init(void) {
 
 void midi_mappings_deinit(void) {
     if (mappings_inited) {
-        for (int channel = 1; channel < AMY_NUM_MIDI_CHANNELS + 1; ++channel) {
+        for (int channel = 0; channel < num_mapping_channels + 1; ++channel) {
             midi_mappings_free(&midi_cc_mapping_root_by_chan[channel]);
             midi_mappings_free(&midi_note_mapping_root_by_chan[channel]);
         }
         mappings_inited = false;
     }
+    free(midi_cc_mapping_root_by_chan);
+    midi_cc_mapping_root_by_chan = NULL;
+    free(midi_note_mapping_root_by_chan);
+    midi_note_mapping_root_by_chan = NULL;
+    num_mapping_channels = 0;
 }
 
 void midi_clear_channel_mappings(int channel, int type) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return;
-    if (type == MIDI_MAP_TYPE_ANY) {
-        midi_clear_channel_mappings(channel, MIDI_MAP_TYPE_CC);
-        midi_clear_channel_mappings(channel, MIDI_MAP_TYPE_NOTE);
-    }
-    struct midi_mapping **p_mapping;
-    if (type == MIDI_MAP_TYPE_CC)
-        p_mapping = &midi_cc_mapping_root_by_chan[channel];
-    else
-        p_mapping = &midi_note_mapping_root_by_chan[channel];
-    while (*p_mapping != NULL) {
-        if ((*p_mapping)->channel == channel && ((type == MIDI_MAP_TYPE_ANY) || ((*p_mapping)->type == type))) {
-            midi_mapping_free(p_mapping);
-        } else {
-            p_mapping = &((*p_mapping)->next);
-        }
-    }
+    if (!mapping_channel_ok(channel))  return;
+    // Each root list holds only mappings of its own type on this one channel, so
+    // clearing a type is just emptying its list -- no filtering, no recursion.
+    if (type == MIDI_MAP_TYPE_ANY || type == MIDI_MAP_TYPE_CC)
+        midi_mappings_free(&midi_cc_mapping_root_by_chan[channel]);
+    if (type == MIDI_MAP_TYPE_ANY || type == MIDI_MAP_TYPE_NOTE)
+        midi_mappings_free(&midi_note_mapping_root_by_chan[channel]);
     // Stop listening to this MIDI channel unless there's a synth on it.
     if (!instrument_number_exists(channel, NULL))
         midi_active_channel_set(channel, false);
 }
 
 struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return NULL;
+    if (!mapping_channel_ok(channel))  return NULL;
     // Retrieve the mapping associated with a midi channel + code, if any.
     struct midi_mapping **result;
     if (type == MIDI_MAP_TYPE_ANY) {
@@ -191,7 +215,7 @@ struct midi_mapping **midi_mapping_find(int channel, int type, int code) {
 }
 
 int midi_clear_mapping(int channel, int type, int code) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return 0;
+    if (!mapping_channel_ok(channel))  return 0;
     // Backwards compatibility
     if (code == 255) code = MIDI_MAP_CODE_ANY;
     if (code == MIDI_MAP_CODE_ANY) {
@@ -210,7 +234,7 @@ int midi_clear_mapping(int channel, int type, int code) {
 }
 
 int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return 0;
+    if (!mapping_channel_ok(channel))  return 0;
     // Register a MIDI mapping and a wire code template.
     //char tmp[256];
     //strncpy(tmp, message, message_len);
@@ -261,7 +285,7 @@ bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t
 }
 
 bool midi_mappings_exist_for_channel(int channel) {
-    if (channel < 1 || channel > AMY_NUM_MIDI_CHANNELS)  return false;
+    if (!mapping_channel_ok(channel))  return false;
     if (midi_mapping_find(channel, MIDI_MAP_TYPE_ANY, MIDI_MAP_CODE_ANY)) return true;
     return false;
 }
@@ -323,18 +347,17 @@ struct midi_cmd_yield_state {
     char *message;
 };
 
-void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *event, void *state) {
-    //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x\n", amy_global.time, bytes[0], bytes[1], bytes[2]);
+void *yield_midi_message_handler_events(uint8_t status, uint16_t channel, uint8_t * data, uint16_t len, uint32_t time, amy_event *event, void *state) {
+    //fprintf(stderr, "time %.3f midi_msg_handler: status 0x%x chan %d 0x%x 0x%x\n", amy_global.time, status, channel, data[0], data[1]);
     //fprintf_event_stderr(event);
     //
     struct midi_cmd_yield_state *yield_state = (struct midi_cmd_yield_state *)state;
-    uint8_t status = bytes[0] & 0xF0;
-    uint8_t channel = (bytes[0] & 0x0F) + 1;
+    if (len < 2)  return NULL;  // Every status we act on carries two data bytes.
     if (status == 0xB0
         || ((!instrument_number_exists(channel, NULL) || instrument_grab_midi_notes(channel))
             && (status == 0x90 || status == 0x80))) {  // CC or note-on with grab_midi set.
         int type = (status == 0xB0) ? MIDI_MAP_TYPE_CC : MIDI_MAP_TYPE_NOTE;
-        int code = bytes[1];  // note for note-on events
+        int code = data[0];  // note for note-on events
         struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
         struct midi_mapping *mapping = &default_note_mapping;
         if (type == MIDI_MAP_TYPE_NOTE || p_mapping != NULL) {
@@ -351,7 +374,7 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
                 char *message = yield_state->message = (char *)(yield_state + 1);
                 yield_state->pos = 0;
                 // And now set up the message
-                float value = map_midi_value(mapping, (bytes[2] == 0xFF)? 0 : bytes[2]);  // suppress "fake note on" value.
+                float value = map_midi_value(mapping, (data[1] == 0xFF)? 0 : data[1]);  // suppress "fake note on" value.
                 if (status == 0x80) {  // Translate note-off to note-on with vel 0.
                     status = 0x90;
                     value = 0;
@@ -375,18 +398,18 @@ void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t 
     return (void *)yield_state;
 }
 
-void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue) {
-    //fprintf(stderr, "time %.3f midi_msg_handler: 0x%x 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, bytes[0], bytes[1], bytes[2], (unsigned long)base_event, (unsigned long)queue);
+void midi_message_handler_to_queue(uint8_t status, uint16_t channel, uint8_t * data, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue) {
+    //fprintf(stderr, "time %.3f midi_msg_handler: status 0x%x chan %d 0x%x 0x%x base_event 0x%lx queue 0x%lx\n", amy_global.time, status, channel, data[0], data[1], (unsigned long)base_event, (unsigned long)queue);
     //fprintf_event_stderr(base_event);
     //
     void *state = NULL;
     if (queue == NULL)  queue = &amy_global.delta_queue;
     amy_event e;
-    bool fake_note_on = (((bytes[0] & 0xF0) == 0x90) && (bytes[2] == 0xFF));
+    bool fake_note_on = (status == 0x90) && (len >= 2) && (data[1] == 0xFF);
     do {
         if (base_event) e = *base_event;
         else amy_clear_event(&e);
-        state = yield_midi_message_handler_events(bytes, len, time, &e, state);
+        state = yield_midi_message_handler_events(status, channel, data, len, time, &e, state);
         if (state != NULL) {
             if (fake_note_on) {
                 AMY_UNSET(e.velocity);
@@ -397,5 +420,7 @@ void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time,
 }
 
 void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex_unused, uint32_t time) {
-    midi_message_handler_to_queue(bytes, len, time, NULL, NULL);
+    // The external entry point still takes raw MIDI bytes; unpack byte 0 here.
+    if (len < 1)  return;
+    midi_message_handler_to_queue(bytes[0] & 0xF0, (bytes[0] & 0x0F) + 1, bytes + 1, len - 1, time, NULL, NULL);
 }

@@ -251,7 +251,7 @@ void amy_event_midi_message_received(uint8_t * data, uint32_t len, uint8_t sysex
             // midi_message_handler_to_queue keeps its time parameter -- patches.c drives
             // it with a real e->time for the wave=AMY_MIDI osc. Live MIDI has no time
             // of its own: it plays when it arrives.
-            midi_message_handler_to_queue(data, len, AMY_UNSET_VALUE((uint32_t)0), NULL, NULL);
+            midi_message_handler_to_queue(status, channel, data + 1, (uint16_t)(len - 1), AMY_UNSET_VALUE((uint32_t)0), NULL, NULL);
         }
     }
 

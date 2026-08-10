@@ -1092,9 +1092,16 @@ class TestSynthDrums(AmyTest):
 class TestSynthDrumsChan20(AmyTest):
   """Test MIDI drums using synth-level note translation on channel beyond base MIDI 16."""
 
+  def __init__(self):
+    super().__init__()
+    self.default_synths = True
+
   def run(self):
     synth = 20
-    amy_send_at(time=50, synth=synth, patch=384)
+    # The same GM drum kit the default synths put on channel 10, but on a synth
+    # number no MIDI status byte could carry -- output should be identical to
+    # TestSynthDrums.
+    amy_send_at(time=50, synth=synth, patch=258)
     amy_send_at(time=100, synth=synth, note=35, vel=100/127)  # bass
     amy_send_at(time=400, synth=synth, note=35, vel=100/127)  # bass
     amy_send_at(time=400, synth=synth, note=37, vel=100/127)  # snare

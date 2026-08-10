@@ -1098,12 +1098,17 @@ extern void midi_mappings_deinit();
 extern void midi_clear_channel_mappings(int channel, int type);
 extern bool midi_mappings_exist_for_channel(int channel);
 extern void substitute_midi_special_values(char *dest, const char *src, int channel, int code, float value);
+// Entry point for raw MIDI bytes: unpacks byte 0 and hands off below.
 extern void midi_msg_handler(uint8_t * bytes, uint16_t len, uint8_t is_sysex_unused, uint32_t time);
+// The functions below take the MIDI status byte already decoded -- `status` is the
+// status nibble (0x80/0x90/0xB0...) and `channel` the 1-based channel -- with `data`
+// pointing at the `len` data bytes that follow.  Callers unpack byte 0 themselves,
+// which lets patches.c pass a synth number larger than the 16 a status byte can hold.
 // As midi_message_handler, but any events produced by the mapping are converted to deltas
 // on `queue` instead of being played, unless queue is NULL or the global delta queue.
-extern void midi_message_handler_to_queue(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue);
+extern void midi_message_handler_to_queue(uint8_t status, uint16_t channel, uint8_t * data, uint16_t len, uint32_t time, amy_event *base_event, struct delta **queue);
 // Generator function for midi_message_handler.  Returns series of modified events while state is returned non-NULL.
-extern void *yield_midi_message_handler_events(uint8_t * bytes, uint16_t len, uint32_t time, amy_event *event, void *state);
+extern void *yield_midi_message_handler_events(uint8_t status, uint16_t channel, uint8_t * data, uint16_t len, uint32_t time, amy_event *event, void *state);
 
 extern float cv_inputs[AMY_MAX_CV_IN];
 #ifdef __EMSCRIPTEN__
