@@ -2056,6 +2056,49 @@ y1V0.5x0,0,0M0,500,,0,0k0,320,0.5,0.5h0,0.85,0.5,3000Z
     return is_ok, message
 
 
+class TestLoadSyx(AmyTest):
+  """fm.load_syx: DX7 bank sysex -> user patch, checked against the direct conversion path."""
+
+  def test(self):
+    from . import fm
+    _amy.stop()
+    _amy.start(0)
+    voice_num = 213  # 'TUB BELLS ', not one of the 128 built-ins
+    dx7_patch = fm.DX7Patch.from_patch_number(voice_num)
+    # Round-trip through a real bank sysex (pack, header, checksum).
+    syx = fm.make_bank_syx([dx7_patch.get_bytestream()])
+    # Capture the stored-patch wire message so we can compare it.
+    captured = []
+    saved_override = amy.override_send
+    amy.override_send = captured.append
+    name = fm.load_syx(syx, voice=0, patch=1024)
+    amy.override_send = saved_override
+    # The stored patch must match what the direct (non-sysex) path produces.
+    amy.log_patch()
+    fm.AMYPatch.from_dx7(dx7_patch).send_to_AMY(reset=False)
+    expected = 'u1024' + amy.retrieve_patch()
+    problems = []
+    if name != 'TUB BELLS ':
+      problems.append('bad name %r' % name)
+    if len(captured) != 1:
+      problems.append('expected 1 wire message, got %d' % len(captured))
+    elif captured[0] != expected:
+      problems.append('stored %r != direct %r' % (captured[0][:60], expected[:60]))
+    else:
+      amy.send_raw(captured[0])  # actually store it this time
+    # And it must make sound.
+    amy.send(synth=1, num_voices=1, patch=1024)
+    amy.send(synth=1, note=64, vel=1)
+    _reset_test_clock()
+    samples = _finish_test_clock(1.0)
+    level = dB(rms(samples))
+    if level < -60:
+      problems.append('rendered level %.1f dB, expected audible' % level)
+    if problems:
+      return False, self.__class__.__name__ + ': ' + '; '.join(problems)
+    return True, self.__class__.__name__ + ' : ok (%.1f dB)' % level
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True
