@@ -253,12 +253,30 @@ func _format_list(val: Variant) -> String:
 	return str(val)
 
 ## Format a control coefficient value.
-## Can be a number (treated as const), a string, or an array.
+## Can be a number (treated as const), a string, an array, or a dictionary
+## keyed by COEF_FIELDS name, e.g. {"const": 220, "mod0": 0.1}.
 func _format_ctrl(val: Variant) -> String:
 	if val is float or val is int:
 		return _trunc(float(val))
 	if val is String:
 		return str(val)
+	if val is Dictionary:
+		var vals: Array = []
+		vals.resize(COEF_FIELDS.size())
+		for key: Variant in val:
+			var name: String = COEF_ALIASES.get(str(key), str(key))
+			var idx: int = COEF_FIELDS.find(name)
+			if idx < 0:
+				push_error("Unknown ctrl_coef field: %s. Valid: %s" % [key, ", ".join(COEF_FIELDS)])
+				return ""
+			vals[idx] = val[key]
+		# Trailing unset coefs can just be left off the wire string.
+		while vals.size() > 0 and vals[vals.size() - 1] == null:
+			vals.resize(vals.size() - 1)
+		var coefs: PackedStringArray = PackedStringArray()
+		for item: Variant in vals:
+			coefs.append("" if item == null else _trunc(float(item)))
+		return ",".join(coefs)
 	if val is Array:
 		var parts: PackedStringArray = PackedStringArray()
 		for item: Variant in val:
@@ -299,7 +317,7 @@ var _KW_MAP: Dictionary = {
 	"eg1_type":            ["X", "I"],
 	"debug":               ["D", "I"],
 	"chained_osc":         ["c", "I"],
-	"mod_source":          ["L", "I"],
+	"mod_source":          ["L", "L"],
 	"eq":                  ["x", "L"],
 	"filter_type":         ["G", "I"],
 	"ratio":               ["I", "F"],
@@ -406,6 +424,14 @@ var _KW_PRIORITY: Dictionary = {
 	"cv_trigger": 62,
 	"patch_string": 63,
 }
+
+## The control coefficient inputs, in wire order.  Prefer naming these in a
+## Dictionary over writing a positional Array: anything past the modulators
+## shifts position whenever a new control input is added.
+const COEF_FIELDS: PackedStringArray = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"]
+
+## Superseded coef names, kept working: {old: new}.
+const COEF_ALIASES: Dictionary = {"mod": "mod0"}
 # END GENERATED
 
 # ============================================================

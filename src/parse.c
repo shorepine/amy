@@ -279,6 +279,17 @@ static void parse_event_breakpoints(char *message, uint32_t *times_ms, float *va
     }
 }
 
+// helper to parse the list of modulating oscs ("L3", or "L3,4" for both slots)
+void parse_mod_source(char *message, uint16_t *vals) {
+    int num_parsed = parse_list_uint16_t(message, vals, NUM_MOD_SOURCES,
+                                         AMY_UNSET_VALUE(vals[0]));
+    // Slots this message didn't mention keep whatever they already had, so
+    // clear them in the *event* (an unset event field is "don't change").
+    for (int i = num_parsed; i < NUM_MOD_SOURCES; ++i) {
+        AMY_UNSET(vals[i]);
+    }
+}
+
 // helper to parse the list of source oscs for an algorithm
 void parse_algo_source(char *message, int16_t *vals) {
     int num_parsed = parse_list_int16_t(message, vals, MAX_ALGO_OPS,
@@ -722,7 +733,7 @@ int amy_parse_message(char * message, amy_event *e) {
             break;
             case 'K': e->patch_number = atoi(arg); break;
             case 'l': e->velocity=atoff(arg); break;
-            case 'L': e->mod_source=atoi(arg); break;
+            case 'L': parse_mod_source(arg, e->mod_source); break;
             case 'm': e->portamento_ms=atoi(arg); break;
             case 'M': if (AMY_HAS_ECHO) {
                 float echo_params[5];

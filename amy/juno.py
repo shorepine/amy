@@ -324,9 +324,11 @@ class JunoPatch:
   def _amp_coef_string(self, level):
     return '%s,,1,1,0' % ffmt(to_level(level))
 
-  def _freq_coef_string(self, base_freq):
-    return '%s,1,,,,%s,1' % (
-      ffmt(base_freq), ffmt(0.03 * to_level(self.dco_lfo)))
+  def _freq_coef_coefs(self, base_freq):
+    # Dict form, not a positional vector: 'bend' sits past the modulators, so
+    # its index moves whenever a modulator input is added.
+    return {'const': ffmt(base_freq), 'note': 1,
+            'mod0': ffmt(0.03 * to_level(self.dco_lfo)), 'bend': 1}
 
   def base_freq(self):
     # Only one of stop_{16,8,4} should be set.
@@ -389,7 +391,7 @@ class JunoPatch:
 
   def update_dco(self):
     base_freq = self.base_freq()
-    freq_str = self._freq_coef_string(base_freq)
+    freq_coefs = self._freq_coef_coefs(base_freq)
     # PWM square wave.
     const_duty = 0
     lfo_duty = to_level(self.dco_pwm)
@@ -400,7 +402,7 @@ class JunoPatch:
     self.amy_send(
       osc=self.pwm_osc,
       amp='%s,,0,0' % ffmt(to_level(self.pulse)),
-      freq=freq_str,
+      freq=freq_coefs,
       portamento=port_ms,
       duty='%s,,,,,%s' % (
         ffmt(0.5 + 0.5 * const_duty), ffmt(0.5 * lfo_duty)
@@ -409,13 +411,13 @@ class JunoPatch:
     self.amy_send(
       osc=self.saw_osc,
       amp='%s,,0,0' % ffmt(to_level(self.saw)),
-      freq=freq_str,
+      freq=freq_coefs,
       portamento=port_ms,
     )
     self.amy_send(
       osc=self.sub_osc,
       amp='%s,,0,0' % ffmt(to_level(self.dco_sub)),
-      freq=self._freq_coef_string(base_freq / 2.0),
+      freq=self._freq_coef_coefs(base_freq / 2.0),
       portamento=port_ms,
     )
     self.amy_send(

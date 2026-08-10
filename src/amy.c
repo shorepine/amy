@@ -789,7 +789,11 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_I(portamento_ms, PORTAMENTO)
     EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
     EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
-    EVENT_TO_DELTA_WITH_BASEOSC(mod_source, MOD_SOURCE)
+    // One delta per mod source slot, and only for the slots this event actually
+    // names, so `mod_source=3` still means "slot 0 = osc 3, leave slot 1 alone".
+    for (int i = 0; i < NUM_MOD_SOURCES; ++i) {
+        EVENT_TO_DELTA_WITH_BASEOSC(mod_source[i], MOD_SOURCE_START + i)
+    }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
@@ -918,7 +922,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->resonance = 0.7f;
     psynth->filter_type = FILTER_NONE;
     AMY_UNSET(psynth->chained_osc);
-    AMY_UNSET(psynth->mod_source);
+    for(uint8_t j=0;j<NUM_MOD_SOURCES;j++) AMY_UNSET(psynth->mod_source[j]);
     psynth->algorithm = 0;
     for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(psynth->algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
@@ -1181,8 +1185,8 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
-    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
-            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source,
+    fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 ",%" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
+            i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source[0], synth[i]->mod_source[1],
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, synth[i]->chained_osc,
             synth[i]->algorithm,
             synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
@@ -1352,23 +1356,35 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     return false;
 }
 
+// Does `from` reach `target` by following mod_source edges?  With one mod
+// source per osc this was a walk down a chain; with NUM_MOD_SOURCES of them it
+// is a walk over a DAG, so it branches.  `budget` counts nodes visited: a
+// cycle-free graph of N oscs has at most NUM_MOD_SOURCES * N edges, so running
+// out means either a cycle or a graph too tangled to be worth chasing, and both
+// answer "yes" -- refusing a legal-but-absurd assignment is the safe direction.
+static bool mod_osc_reaches(uint16_t from, uint16_t target, int *budget) {
+    if (!AMY_IS_SET(from)) return false;
+    if ((*budget)-- <= 0) return true;
+    // An osc we can't allocate can't be linked.
+    if (!ensure_osc_allocd(from, NULL)) return true;
+    if (from == target) return true;
+    for (int i = 0; i < NUM_MOD_SOURCES; ++i)
+        if (mod_osc_reaches(synth[from]->mod_source[i], target, budget)) return true;
+    return false;
+}
+
 int mod_osc_would_cause_loop(uint16_t osc, uint16_t mod_osc) {
-    // Check to see if setting osc's mod_source to mod_osc would close a cycle.
-    // Modulators may themselves be modulated (chained modulators):
-    // hold_and_modify() evaluates an osc's mod_source recursively, so a cycle
+    // Check to see if setting one of osc's mod_sources to mod_osc would close a
+    // cycle.  Modulators may themselves be modulated (chained modulators):
+    // hold_and_modify() evaluates an osc's mod_sources recursively, so a cycle
     // (e.g. a->b->a) would recurse without bound. Mirrors
     // chained_osc_would_cause_loop() above.
-    uint16_t next_osc = mod_osc;
-    do {
-        // An osc we can't allocate can't be linked.
-        if (!ensure_osc_allocd(next_osc, NULL)) return true;
-        if (next_osc == osc) {
-            fprintf(stderr, "osc %d as mod_source for osc %d would cause loop.\n",
-                    mod_osc, osc);
-            return true;
-        }
-        next_osc = synth[next_osc]->mod_source;
-    } while(AMY_IS_SET(next_osc));
+    int budget = NUM_MOD_SOURCES * AMY_OSCS;
+    if (mod_osc_reaches(mod_osc, osc, &budget)) {
+        fprintf(stderr, "osc %d as mod_source for osc %d would cause loop.\n",
+                mod_osc, osc);
+        return true;
+    }
     return false;
 }
 
@@ -1540,16 +1556,17 @@ void play_delta(struct delta *d) {
             reset_osc(d->data.i);
         }
     }
-    if(d->param == MOD_SOURCE) {
+    if(d->param >= MOD_SOURCE_START && d->param < MOD_SOURCE_END) {
+        uint16_t which_source = d->param - MOD_SOURCE_START;
         int mod_osc = d->data.i;
-        // Modulators may themselves have a mod_source (chained modulators, e.g.
+        // Modulators may themselves have mod_sources (chained modulators, e.g.
         // a slow LFO varying a vibrato LFO's rate or depth). That works because
-        // hold_and_modify() evaluates mod_source recursively, so - as with
+        // hold_and_modify() evaluates mod_sources recursively, so - as with
         // CHAINED_OSC above - a cycle must be rejected before it is stored or
         // the recursion never terminates.
         if (mod_osc >= 0 && mod_osc < AMY_OSCS &&
             !mod_osc_would_cause_loop(d->osc, mod_osc)) {
-            synth[d->osc]->mod_source = mod_osc;
+            synth[d->osc]->mod_source[which_source] = mod_osc;
             // NOTE: These are delta-only side effects.  A purist would strive to remove them.
             // When an oscillator is named as a modulator, we change its state.
             ensure_osc_allocd(mod_osc, NULL);
@@ -1562,7 +1579,7 @@ void play_delta(struct delta *d) {
             synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.. not that we care about envelope
             osc_note_on(mod_osc, freq_of_logfreq(synth[mod_osc]->logfreq_coefs[COEF_CONST]));
         } else {
-            AMY_UNSET(synth[d->osc]->mod_source);
+            AMY_UNSET(synth[d->osc]->mod_source[which_source]);
         }
     }
     if(d->param == ALGORITHM) {
@@ -1662,24 +1679,26 @@ void play_delta(struct delta *d) {
 
                     float initial_freq = freq_of_logfreq(initial_logfreq);
                     osc_note_on(osc, initial_freq);
-                    // trigger the mod source, if we have one
-                    uint16_t mod_osc = synth[osc]->mod_source;
-                    if(AMY_IS_SET(mod_osc)) {
-                        if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
-                            synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
-                        synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.
-                        switch(synth[mod_osc]->wave) {
-                        case SINE: sine_mod_trigger(mod_osc); break;
-                        case SAW_DOWN: saw_up_mod_trigger(mod_osc); break;
-                        case SAW_UP: saw_down_mod_trigger(mod_osc); break;
-                        case TRIANGLE: triangle_mod_trigger(mod_osc); break;
-                        case PULSE: pulse_mod_trigger(mod_osc); break;
-                        case PCM:
-                        case PCM_LEFT:
-                        case PCM_RIGHT:
-                            pcm_mod_trigger(mod_osc);
-                            break;
-                        case CUSTOM: custom_mod_trigger(mod_osc); break;
+                    // trigger the mod sources, for however many we have
+                    for (int m = 0; m < NUM_MOD_SOURCES; ++m) {
+                        uint16_t mod_osc = synth[osc]->mod_source[m];
+                        if(AMY_IS_SET(mod_osc)) {
+                            if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
+                                synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
+                            synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.
+                            switch(synth[mod_osc]->wave) {
+                            case SINE: sine_mod_trigger(mod_osc); break;
+                            case SAW_DOWN: saw_up_mod_trigger(mod_osc); break;
+                            case SAW_UP: saw_down_mod_trigger(mod_osc); break;
+                            case TRIANGLE: triangle_mod_trigger(mod_osc); break;
+                            case PULSE: pulse_mod_trigger(mod_osc); break;
+                            case PCM:
+                            case PCM_LEFT:
+                            case PCM_RIGHT:
+                                pcm_mod_trigger(mod_osc);
+                                break;
+                            case CUSTOM: custom_mod_trigger(mod_osc); break;
+                            }
                         }
                     }
                     // Set the AUDIBLE flag *after* osc_note_on.  pcm_note_on wants to know if osc was already active, looks at status.
@@ -1756,7 +1775,7 @@ float amp_combine_controls(float *controls, float *coefs) {
         if (coef == 0)  continue;
         float val = controls[i];
         if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
-        if (i != COEF_MOD) {
+        if (i != COEF_MOD0 && i != COEF_MOD1) {
             val = map_60dB_to_01f(MAX(0, val)) - 1.0;    // const, vel, eg0, eg1 get log-compressed.
             // make 0 mean "no amp" and 1 mean "regular (full) amp".
         }
@@ -1786,7 +1805,8 @@ void hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_VEL] = synth[osc]->velocity;
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, 0));
     ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
-    ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
+    ctrl_inputs[COEF_MOD0] = S2F(compute_mod_scale(osc, 0));
+    ctrl_inputs[COEF_MOD1] = S2F(compute_mod_scale(osc, 1));
     ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
     ctrl_inputs[COEF_EXT0] = cv_inputs[0];
     ctrl_inputs[COEF_EXT1] = cv_inputs[1];

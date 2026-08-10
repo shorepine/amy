@@ -145,7 +145,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->portamento_ms);
     AMY_UNSET(e->filter_type);
     AMY_UNSET(e->chained_osc);
-    AMY_UNSET(e->mod_source);
+    for (int i = 0; i < NUM_MOD_SOURCES; ++i) AMY_UNSET(e->mod_source[i]);
     AMY_UNSET(e->algorithm);
     AMY_UNSET(e->bp_is_set[0]);
     AMY_UNSET(e->bp_is_set[1]);

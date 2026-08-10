@@ -89,7 +89,7 @@ static inline float p_amp_combine_controls(float *controls, float *coefs) {
     //    if (coef == 0)  continue;
     //    float val = controls[i];
     //    if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
-    //    if (i != COEF_MOD) {
+    //    if (i != COEF_MOD0 && i != COEF_MOD1) {
     //        val = map_60dB_to_01f(MAX(0, val)) - 1.0;    // const, vel, eg0, eg1 get log-compressed.
             // make 0 mean "no amp" and 1 mean "regular (full) amp".
     //    }
@@ -115,7 +115,8 @@ AMY_IRAM_ATTR void partials_hold_and_modify(uint16_t osc) {
     ctrl_inputs[COEF_VEL] = synth[osc]->velocity;
     ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, 0));
     //ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, 0));
-    //ctrl_inputs[COEF_MOD] = S2F(compute_mod_scale(osc));
+    //ctrl_inputs[COEF_MOD0] = S2F(compute_mod_scale(osc, 0));
+    //ctrl_inputs[COEF_MOD1] = S2F(compute_mod_scale(osc, 1));
     //ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
     //ctrl_inputs[COEF_EXT0] = cv_inputs[0];
     //ctrl_inputs[COEF_EXT1] = cv_inputs[1];
