@@ -923,6 +923,12 @@ typedef struct global_state {
     uint32_t sequencer_tick_count;
     uint64_t next_amy_tick_us;
     uint32_t us_per_tick;
+    // Set by amy_reset_sysclock() on whatever thread asked for the reset;
+    // read by the clock getters so the reset is visible immediately; applied
+    // and cleared by the render thread between blocks in amy_fill_buffer().
+    // See amy_reset_sysclock() for why the zeroing itself must not happen on
+    // the calling thread.
+    volatile uint8_t reset_timebase_pending;
 
     // Buses
     bus_state_t **bus;  // max_buses entries, allocated at amy_start.
@@ -1050,6 +1056,10 @@ void amy_clear_event(amy_event *e);
 amy_event amy_default_event();
 uint32_t amy_sysclock();
 uint64_t amy_sysclock64();
+// The raw counter-derived clock, ignoring a pending timebase reset.
+// Internal: the reset machinery needs the pre-reset value while the public
+// getters above already read as reset.  Everything else wants the public ones.
+uint64_t amy_sysclock64_raw();
 
 // Wrap-relative comparison for the 32-bit millisecond clock. amy_sysclock()
 // rolls over every 2^32 ms (49.7 days), so a plain `now >= then` strands every

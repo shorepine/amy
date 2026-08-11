@@ -199,7 +199,7 @@ AMY provides a musical sequencer, on `ticks`, for both one-off future scheduling
 
 ### The sequencer
 
-AMY starts a musical sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. Note this will happen immediately, ignoring any pending `ticks=`.
+AMY starts a musical sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. Note this happens immediately from the caller's point of view -- `amy.sequencer_ticks()` and `amy.sysclock()` read 0 right away, ignoring any pending `ticks=` -- while the counters themselves restart at the next audio block boundary, so the reset cannot race the render thread. Events already queued with `time=` keep their relative timing across the reset (send `RESET_EVENTS` too if you want them dropped).
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
