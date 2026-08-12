@@ -252,6 +252,24 @@ class TestPcmLoopForever(AmyTest):
     amy_send_at(time=200, osc=0, vel=0)  # Should keep looping and decay over 700ms
 
 
+class TestPcmMemoryStereo(AmyTest):
+  """Stereo memory PCM preset: PCM_LEFT/PCM_RIGHT pick a channel, PCM mixes.
+
+  The fixture has 440 Hz in the left channel, 220 Hz in the right."""
+
+  def run(self):
+    amy.load_sample('sounds/220_440_stereo.wav', preset=1024, midinote=60, stereo=True)
+    amy_send_at(time=0, osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0)
+    amy_send_at(time=0, osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1)
+    amy_send_at(time=100, osc=0, vel=1)
+    amy_send_at(time=100, osc=1, vel=1)
+    amy_send_at(time=500, osc=0, vel=0)
+    amy_send_at(time=500, osc=1, vel=0)
+    amy_send_at(time=600, osc=2, wave=amy.PCM, preset=1024)  # mixes both channels
+    amy_send_at(time=600, osc=2, vel=1)
+    amy_send_at(time=1000, osc=2, vel=0)
+
+
 class TestPcmMemoryFractionalMidinote(AmyTest):
   """Memory PCM presets accept a fractional base midinote (sample tuning).
 
