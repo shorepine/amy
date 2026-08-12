@@ -486,20 +486,18 @@ def _send_transfer_chunk(message):
         _send_wire_from_sysex(message)
 
 def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loopend=0, sr=AMY_SAMPLE_RATE):
-    # takes in a python bytes obj instead of filename
-    from math import ceil
-    if(stereo):
-        # just choose first channel
-        b = bytes([b[j] for i in range(0,len(b),4) for j in (i,i+1)])
-    n_frames = len(b)/2
-    s = "%d,%d,%d,%g,%d,%d" % (preset, n_frames, sr, midinote, loopstart, loopend)
+    # takes in a python bytes obj instead of filename.
+    # stereo=True: b is interleaved L/R frames, loaded as a stereo preset --
+    # play it with wave=amy.PCM_LEFT / amy.PCM_RIGHT on panned oscs, or
+    # wave=amy.PCM to mix both channels. loopstart/loopend are in frames.
+    channels = 2 if stereo else 1
+    n_frames = len(b) // (2 * channels)
+    s = "%d,%d,%d,%g,%d,%d,%d" % (preset, n_frames, sr, midinote, loopstart, loopend, channels)
     send(load_sample=s)
-    last_f = 0
-    for i in range(ceil(n_frames/94)):
-        frames_bytes = b[last_f:last_f+188]
-        message = b64(frames_bytes)
+    # 188 bytes -> 252 chars of base64; amy's max message size is currently 255.
+    for i in range(0, n_frames * 2 * channels, 188):
+        message = b64(b[i:i+188])
         _send_transfer_chunk(message.decode('ascii'))
-        last_f = last_f + 188
 
 def disk_sample(wavfilename, preset=0, midinote=60):
     try:
@@ -531,7 +529,10 @@ def transfer_file(source_filename, dest_filename=None):
         _send_transfer_chunk(message.decode('ascii'))
     w.close()
 
-def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
+def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0, stereo=False):
+    # stereo=False downmixes a stereo WAV to its first channel (the historical
+    # behavior); stereo=True keeps both channels as a stereo preset, played
+    # with wave=amy.PCM_LEFT / amy.PCM_RIGHT (or amy.PCM to mix).
     from math import ceil
     from . import wave
     # tulip has ubinascii, normal has base64
@@ -549,19 +550,22 @@ def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
         else:
             midinote=60
 
+    channels = 2 if (stereo and w.getnchannels() == 2) else 1
     # Tell AMY we're sending over a sample
-    s = "%d,%d,%d,%g,%d,%d" % (preset, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
+    s = "%d,%d,%d,%g,%d,%d,%d" % (preset, w.getnframes(), w.getframerate(), midinote, loopstart, loopend, channels)
     send(load_sample=s)
-    # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
+    # Now generate the base64 encoded segments, 188 bytes at a time (94 mono / 47 stereo frames)
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
-    for i in range(ceil(w.getnframes()/94)):
-        frames_bytes = w.readframes(94)
-        if(w.getnchannels()==2):
+    frames_per_chunk = 94 // channels
+    for i in range(ceil(w.getnframes()/frames_per_chunk)):
+        frames_bytes = w.readframes(frames_per_chunk)
+        if(w.getnchannels()==2 and channels==1):
             # de-interleave and just choose the first channel
             frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
         message = b64(frames_bytes)
         _send_transfer_chunk(message.decode('ascii'))
-    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %g" % (preset, w.getnframes()*2, w.getnframes(), midinote))
+    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, %d channel(s), midinote %g" % (
+        preset, w.getnframes()*2*channels, w.getnframes(), channels, midinote))
 
 
 """

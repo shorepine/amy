@@ -494,17 +494,21 @@ static void parse_sample_load_params(char *message, uint32_t *vals, int num_vals
 uint16_t amy_parse_transfer_layer_message(char *message) {
 
     if (message[0] >= '0' && message[0] <= '9') {
-        // z: Signal to start loading sample. 
-        // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
-        uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
+        // z: Signal to start loading sample.
+        // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend, channels.
+        // channels is optional: absent or 0 means mono (the pre-stereo message layout);
+        // 2 means the transfer payload is interleaved L/R frames. Play a stereo
+        // preset with wave=PCM_LEFT/PCM_RIGHT (or PCM to mix both channels).
+        uint32_t sm[7]; // preset, length, SR, midinote, loop_start, loopend, channels
         float midinote;
-        parse_sample_load_params(message, sm, 6, 3, &midinote);
+        parse_sample_load_params(message, sm, 7, 3, &midinote);
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
             amy_execute_deltas();
-            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, midinote, sm[4], sm[5]);
-            start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
+            uint8_t channels = (sm[6] == 2) ? 2 : 1;
+            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], channels, midinote, sm[4], sm[5]);
+            start_receiving_transfer(sm[1]*2*channels, (uint8_t*)ram);
         }
         return 0;
     }
