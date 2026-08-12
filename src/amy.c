@@ -1865,15 +1865,6 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc]->feedback = synth[osc]->feedback;
     msynth[osc]->resonance = synth[osc]->resonance;
 
-    if (osc == 999) {
-        fprintf(stderr, "h&m: time %f osc %d note %f vel %f eg0 %f eg1 %f ampc %.3f %.3f %.3f %.3f %.3f %.3f lfqc %.3f %.3f %.3f %.3f %.3f %.3f amp %f logfreq %f\n",
-               amy_global.time, osc,
-               ctrl_inputs[COEF_NOTE], ctrl_inputs[COEF_VEL], ctrl_inputs[COEF_EG0], ctrl_inputs[COEF_EG1],
-               synth[osc]->amp_coefs[0], synth[osc]->amp_coefs[1], synth[osc]->amp_coefs[2], synth[osc]->amp_coefs[3], synth[osc]->amp_coefs[4], synth[osc]->amp_coefs[5],
-               synth[osc]->logfreq_coefs[0], synth[osc]->logfreq_coefs[1], synth[osc]->logfreq_coefs[2], synth[osc]->logfreq_coefs[3], synth[osc]->logfreq_coefs[4], synth[osc]->logfreq_coefs[5],
-               msynth[osc]->amp, msynth[osc]->logfreq);
-
-    }
     AMY_PROFILE_STOP(HOLD_AND_MODIFY)
 
 }
