@@ -843,21 +843,13 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
         }
         pos = yield_event_from_message(message, &e, pos);
         if (pos > 0) {
-            // A patch's own FX settings (a Juno patch's chorus, "k1" --
-            // 127 of the ROM Juno patches carry one) ride in 'v'
-            // messages with no synth attached, so their bus-directed
-            // params fell to the default bus 0: chorus configured on a
-            // bus the loading synth isn't on colours whoever IS there
-            // and leaves the patch itself dry. They belong to the synth
-            // being loaded, so aim them at its bus. Live loads only
-            // (the global queue): a patch being STORED keeps its params
-            // unresolved, to be aimed at whichever synth later loads it.
-            if (queue == &amy_global.delta_queue
-                && event_addresses_bus(&e) && AMY_IS_UNSET(e.bus)
-                && instrument_number_exists(synth, NULL)) {
-                int fx_bus = instrument_get_bus(synth);
-                if (fx_bus > 0) e.bus = (uint16_t)fx_bus;
-            }
+            // A patch's global FX phrase (a Juno patch's trailing
+            // "x...k1..." -- 127 of the ROM Juno patches carry one) is
+            // bus-directed but has no synth attached, so its params fell
+            // to the default bus 0.  Give it the synth being loaded and
+            // the bus resolves from the synth, exactly as if the synth
+            // had sent it itself.
+            if (event_addresses_bus(&e))  e.synth = synth;
             if (event_addresses_oscs(&e) || is_first_voice)
                 amy_event_to_deltas_queue(&e, base_osc, queue);
         }
