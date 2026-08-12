@@ -1664,7 +1664,7 @@ void play_delta(struct delta *d) {
                     //if(synth[osc]->filter_type != FILTER_NONE) reset_filter(osc);
                     // We no longer reset the phase here; instead, we reset phase when an oscillator falls silent.
                     // But if a trigger_phase is set, use that.
-                    if (AMY_IS_SET(synth[osc]->trigger_phase) && !AMY_WAVE_IS_PCM(synth[d->osc]->wave)) {
+                    if (AMY_IS_SET(synth[osc]->trigger_phase) && !AMY_WAVE_IS_PCM(synth[osc]->wave)) {
                         // PCM handles trigger_phase its own way in pcm_note_on.
                         synth[osc]->phase = F2P(synth[osc]->trigger_phase);
                     }
