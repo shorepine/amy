@@ -242,8 +242,9 @@ void _instrument_push_note_forgotten(struct instrument_info *instrument, uint16_
         //fprintf(stderr, "synth %d: caching new forgotten note %d/%d (%d, count %d)\n",
         //        instrument->id, note / 128, note & 0x7F, available_index, instrument->forgotten_note_count[available_index]);
     } else {
-        fprintf(stderr, "**_instrument_push_forgotten_note: forgotten pool overflow synth %d note %d/%d\n",
-                instrument->id, note / 128, note & 0x7F);
+        if (!(instrument->flags & SYNTH_FLAGS_NO_NOTE_WARNINGS))
+            fprintf(stderr, "**_instrument_push_forgotten_note: forgotten pool overflow synth %d note %d/%d\n",
+                    instrument->id, note / 128, note & 0x7F);
     }
 }
 
@@ -294,7 +295,8 @@ uint16_t instrument_note_off(struct instrument_info *instrument, uint16_t note) 
     uint16_t voice = _instrument_voice_for_note(instrument, note);
     if (voice == _INSTRUMENT_NO_VOICE) {
         // Don't report an unmatched note-off if it was a victim of stealing.
-        if (!_instrument_pop_note_forgotten(instrument, note))
+        if (!_instrument_pop_note_forgotten(instrument, note)
+            && !(instrument->flags & SYNTH_FLAGS_NO_NOTE_WARNINGS))
             fprintf(stderr, "note off for %d/%d does not match note on\n", note / 128, note & 0x7F);
         //instrument_debug(instrument);
         return _INSTRUMENT_NO_VOICE;  // We could just fall through, but this is more explicit.
@@ -324,7 +326,8 @@ int _instrument_all_notes_off(struct instrument_info *instrument, uint16_t *amy_
 uint16_t instrument_note_on(struct instrument_info *instrument, uint16_t note, bool *pstolen) {
     if ((note & 0x7F) == 0) {
         // note == 0 is for all-notes-off, it's not allowed for note-on (sorry, C-1).
-        fprintf(stderr, "note-on for note 0: ignored.\n");
+        if (!(instrument->flags & SYNTH_FLAGS_NO_NOTE_WARNINGS))
+            fprintf(stderr, "note-on for note 0: ignored.\n");
         return _INSTRUMENT_NO_VOICE;
     }
     uint16_t voice = _instrument_voice_for_note(instrument, note);
