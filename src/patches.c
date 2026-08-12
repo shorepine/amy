@@ -843,6 +843,13 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
         }
         pos = yield_event_from_message(message, &e, pos);
         if (pos > 0) {
+            // A patch's global FX phrase (a Juno patch's trailing
+            // "x...k1..." -- 127 of the ROM Juno patches carry one) is
+            // bus-directed but has no synth attached, so its params fell
+            // to the default bus 0.  Give it the synth being loaded and
+            // the bus resolves from the synth, exactly as if the synth
+            // had sent it itself.
+            if (event_addresses_bus(&e))  e.synth = synth;
             if (event_addresses_oscs(&e) || is_first_voice)
                 amy_event_to_deltas_queue(&e, base_osc, queue);
         }
@@ -1195,6 +1202,17 @@ void patches_load_patch(amy_event *e) {
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
     // This means to set/reset the voices and load the messages (from ROM or memory) and set them.
     peek_stack("load_patch");
+    // A RE-PATCH KEEPS THE INSTRUMENT'S BUS. Loading a patch rebuilds the
+    // voices' oscs (reset to bus 0) and re-registers the instrument, so a
+    // patch change that didn't re-state the bus dropped the synth out of
+    // its own mix and onto the default bus, into everybody else's FX.
+    // Inheriting the standing bus here makes the rest of the pipeline
+    // (instrument_add_new below, the per-osc BUS deltas fanned out by
+    // patches_event_has_voices) re-route exactly as an explicit bus would.
+    if (AMY_IS_UNSET(e->bus) && instrument_number_exists(e->synth, NULL)) {
+        int prev_bus = instrument_get_bus(e->synth);
+        if (prev_bus > 0) e->bus = (uint16_t)prev_bus;
+    }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
