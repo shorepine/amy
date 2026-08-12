@@ -22,17 +22,21 @@ amy_add_event(amy_event *e);
 amy_add_message(char *message);
 ```
 
-To schedule an event for the future, set the `time` field (milliseconds on
-AMY's clock; see `amy_sysclock()`). This field only exists on the C struct --
-wire messages play as they arrive, and the sequencer (`ticks`) handles
-musical-time scheduling:
+To schedule an event for the future, use the sequencer: the `ticks[3]`
+fields (tick, period, tag) mirror the wire `H<tick>,<period>,<tag>` and
+Python's `ticks=` exactly -- `amy_add_event()` hands any event with a
+`ticks` entry set to the sequencer (see "AMY's sequencer" in
+[synth.md](synth.md)):
 
 ```c
 amy_event e = amy_default_event();
 e.osc = 0;
 e.midi_note = 60;
 e.velocity = 1;
-e.time = amy_sysclock() + 1000;   // play one second from now
+// One-off: fire one beat (48 PPQ) from now.  Like wire "H<tick>" / Python
+// ticks=N.  Set ticks[TICKS_PERIOD] to repeat, ticks[TICKS_TAG] to make it
+// cancelable, just as with the wire's other two values.
+e.ticks[TICKS_TICK] = sequencer_ticks() + AMY_SEQUENCER_PPQ;
 amy_add_event(&e);
 ```
 
@@ -306,7 +310,7 @@ Python and JavaScript use identical parameter names (shown in the **Python / JS*
 Wire commands come in two kinds, and the **C** column tells you which:
 
 - **Event parameters** name an `amy_event` struct field. They can be combined
-  in one event/message and scheduled (`time` in C, `ticks` via the sequencer).
+  in one event/message and scheduled via the sequencer (`ticks` / `e.ticks[]`).
 - **Immediate commands** act the moment they are parsed and have no
   `amy_event` field -- the column instead names the C function the command
   calls, which a host linking AMY can call directly (or send the wire string
@@ -439,7 +443,7 @@ Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_st
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
-| `H`    | wire only (schedule C events with `e.time`) | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. The `H` **must** be the first character of the message; the rest of the message is stored as the sequenced payload. (The `amy_event.ticks[3]` field exists but is not read by `amy_add_event` -- from C, send a wire string.) |
+| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message; the rest of the message is stored as the sequenced payload. From C, `e.ticks[3]` (tick, period, tag; leave unused entries unset) works exactly like Python's `ticks=` -- `amy_add_event` serializes the event to an `H` wire message and hands it to the sequencer. |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | `sequencer_midi_start()` / `sequencer_midi_stop()` | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | `amy_external_midi_sync()` | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
