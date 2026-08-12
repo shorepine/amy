@@ -843,6 +843,21 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
         }
         pos = yield_event_from_message(message, &e, pos);
         if (pos > 0) {
+            // A patch's own FX settings (a Juno patch's chorus, "k1" --
+            // 127 of the ROM Juno patches carry one) ride in 'v'
+            // messages with no synth attached, so their bus-directed
+            // params fell to the default bus 0: chorus configured on a
+            // bus the loading synth isn't on colours whoever IS there
+            // and leaves the patch itself dry. They belong to the synth
+            // being loaded, so aim them at its bus. Live loads only
+            // (the global queue): a patch being STORED keeps its params
+            // unresolved, to be aimed at whichever synth later loads it.
+            if (queue == &amy_global.delta_queue
+                && event_addresses_bus(&e) && AMY_IS_UNSET(e.bus)
+                && instrument_number_exists(synth, NULL)) {
+                int fx_bus = instrument_get_bus(synth);
+                if (fx_bus > 0) e.bus = (uint16_t)fx_bus;
+            }
             if (event_addresses_oscs(&e) || is_first_voice)
                 amy_event_to_deltas_queue(&e, base_osc, queue);
         }
@@ -1195,6 +1210,17 @@ void patches_load_patch(amy_event *e) {
     // (also called if instrument & num_voices even if no patch specified, to change #voices).
     // This means to set/reset the voices and load the messages (from ROM or memory) and set them.
     peek_stack("load_patch");
+    // A RE-PATCH KEEPS THE INSTRUMENT'S BUS. Loading a patch rebuilds the
+    // voices' oscs (reset to bus 0) and re-registers the instrument, so a
+    // patch change that didn't re-state the bus dropped the synth out of
+    // its own mix and onto the default bus, into everybody else's FX.
+    // Inheriting the standing bus here makes the rest of the pipeline
+    // (instrument_add_new below, the per-osc BUS deltas fanned out by
+    // patches_event_has_voices) re-route exactly as an explicit bus would.
+    if (AMY_IS_UNSET(e->bus) && instrument_number_exists(e->synth, NULL)) {
+        int prev_bus = instrument_get_bus(e->synth);
+        if (prev_bus > 0) e->bus = (uint16_t)prev_bus;
+    }
     uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
     uint8_t num_voices = 0;
     uint16_t oscs_per_voice = 0;
