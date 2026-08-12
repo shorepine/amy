@@ -12,13 +12,7 @@ static inline SAMPLE lut_val(SAMPLE frac, const LUTSAMPLE *table, const int log2
 
 
 AMY_IRAM_ATTR SAMPLE log2_lut(SAMPLE x) {
-    // Wire-derived params (freq, velocity, envelope levels) can be zero or
-    // negative (or NaN/inf in the float build); the normalization loops below
-    // never terminate for those.  Clamp instead of hanging.
-    if (!(x > 0)) return F2S(-24.0f);  // ~log2 of the smallest positive SAMPLE.
-#ifndef AMY_USE_FIXEDPOINT
-    if (isinf(x)) return F2S(128.0f);  // +inf never exits the >=2 loop.
-#endif
+    // assert(x > 0);
     int scale = 0;
     while (x < F2S(1.0f)) {
         x = SHIFTL(x, 1);

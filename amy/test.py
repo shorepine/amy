@@ -2141,7 +2141,7 @@ class TestFuzzWireParser(AmyTest):
 
   # Each of these crashed or hung an earlier AMY (segfault, abort, or
   # infinite loop) -- see the fixes in patches.c, parse.c, amy.c,
-  # sequencer.c, log2_exp2.c, custom.c.
+  # sequencer.c, custom.c.
   DIRECTED = [
       'i8x2y4u',            # store-patch auto-assign out of range, then load
       'i1v1Z',              # load with patch number unset (reads back 0xffff)
@@ -2150,8 +2150,8 @@ class TestFuzzWireParser(AmyTest):
       '2SEUCio',            # 'i'+'c'/'o' with empty payload wedged the parser
       'TKozm/y/FdRFsl82OfxrzdJKiAHf0rpwlqio',
       'j0Z', 'j-1Z', 'j99999999Z',      # tempo: div-by-zero us_per_tick
-      'v0f-2147483648Z',    # negative freq hung log2_lut
-      'v0l-1Z',             # negative velocity hits log2_lut too
+      'v0f-2147483648Z',    # negative freq hung log2_lut (guarded in logfreq_of_freq)
+      'v0l-1Z',             # negative velocity
       'v0O30000,30001Z',    # algo_source osc out of range
       'h-14342Z', 'h86586Z',  # negative then positive reverb level: NULL rev
       'k-1Z', 'k1Z',        # same for chorus (NULL delay_mod in render)
