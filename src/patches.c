@@ -12,6 +12,13 @@
 uint32_t max_num_memory_patches = 0;
 struct delta **memory_patch_deltas = NULL;
 uint16_t *memory_patch_oscs = NULL;
+// Nonzero when the slot's number was invented by patches_store_patch
+// rather than chosen by the caller. Only auto-assigned slots may be
+// recycled (reused on a re-store to the same instrument, freed when
+// that instrument is released): an explicitly numbered patch may be
+// loaded again later by anyone who knows the number, so it is never
+// freed behind the caller's back.
+uint8_t *memory_patch_auto = NULL;
 uint16_t next_user_patch_index = 0;
 uint16_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
@@ -19,6 +26,7 @@ uint16_t *voice_to_base_osc = NULL;
 void patches_deinit() {
     memory_patch_deltas = NULL;
     memory_patch_oscs = NULL;
+    memory_patch_auto = NULL;
     osc_to_voice = NULL;
     voice_to_base_osc = NULL;
 }
@@ -29,14 +37,17 @@ void patches_init(int max_memory_patches) {
             max_num_memory_patches * sizeof(struct delta *)
 	    + max_num_memory_patches * sizeof(uint16_t)
             + AMY_OSCS * sizeof(uint16_t)
-            + amy_global.config.max_voices * sizeof(uint16_t),
+            + amy_global.config.max_voices * sizeof(uint16_t)
+            + max_num_memory_patches * sizeof(uint8_t),
 	    amy_global.config.ram_caps_synth
     );
     memory_patch_deltas = (struct delta **)alloc_base;
     memory_patch_oscs = (uint16_t *)(memory_patch_deltas + max_num_memory_patches);
     osc_to_voice = (uint16_t *)(memory_patch_oscs + max_num_memory_patches);
     voice_to_base_osc = (uint16_t *)(osc_to_voice + AMY_OSCS);
+    memory_patch_auto = (uint8_t *)(voice_to_base_osc + amy_global.config.max_voices);
     bzero(memory_patch_deltas, max_num_memory_patches * sizeof(struct delta *));
+    bzero(memory_patch_auto, max_num_memory_patches * sizeof(uint8_t));
     patches_reset();
 }
 
@@ -52,6 +63,7 @@ void patches_reset_patch(int patch_number) {
     if (memory_patch_deltas[patch_index] != NULL)  delta_release_list(memory_patch_deltas[patch_index]);
     memory_patch_deltas[patch_index] = NULL;
     memory_patch_oscs[patch_index] = 0;
+    memory_patch_auto[patch_index] = 0;
 }
 
 void patches_reset() {
@@ -866,10 +878,35 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     // amy patch string. Either pull patch_number from e, or allocate a new one and write it to e.
     // Patch is stored in ram.
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch, patch_string);
-    if (!AMY_IS_SET(e->patch_number)) {
-        // We need to allocate a new number.
-        e->patch_number = next_user_patch_index + _PATCHES_FIRST_USER_PATCH;
-        // next_user_patch_index is updated as needed at the bottom of the function (so it can reflect user-defined numbers too).
+    bool auto_assigned = !AMY_IS_SET(e->patch_number);
+    if (auto_assigned) {
+        // We need a number. Recycle before extending, in this order:
+        // (a) the addressed instrument's own auto-assigned patch — a
+        //     reconfigure (a sample change, a re-sent config) sends a
+        //     fresh patch_string for the same synth, and burning a new
+        //     slot each time emptied the whole pool in
+        //     max_num_memory_patches sends;
+        // (b) any free slot (never used, or freed when its instrument
+        //     was released);
+        // (c) refusal — the deliberately out-of-range number falls to
+        //     the range check below, which prints and drops the store.
+        if (AMY_IS_SET(e->synth) && instrument_number_exists(e->synth, NULL)) {
+            int prev = instrument_get_patch_number(e->synth);
+            int prev_index = prev - _PATCHES_FIRST_USER_PATCH;
+            if (prev_index >= 0 && prev_index < (int)max_num_memory_patches
+                && memory_patch_auto[prev_index])
+                e->patch_number = prev;
+        }
+        if (!AMY_IS_SET(e->patch_number)) {
+            for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
+                if (memory_patch_deltas[i] == NULL && memory_patch_oscs[i] == 0) {
+                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
+                    break;
+                }
+            }
+        }
+        if (!AMY_IS_SET(e->patch_number))
+            e->patch_number = _PATCHES_FIRST_USER_PATCH + max_num_memory_patches;
         //fprintf(stderr, "store_patch: auto-assigning patch number %d for '%s'\n", e->patch_number, patch_string);
     }
     int patch_index = (int)e->patch_number - _PATCHES_FIRST_USER_PATCH;
@@ -881,6 +918,12 @@ void patches_store_patch(amy_event *e, char * patch_string) {
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
+    // A re-store REPLACES the slot's contents. parse_patch_string_to_queue
+    // appends to whatever list is standing, so without this a second store
+    // to the same number merged two patches into one slot.
+    if (memory_patch_deltas[patch_index] != NULL || memory_patch_oscs[patch_index])
+        patches_reset_patch(e->patch_number);
+    memory_patch_auto[patch_index] = auto_assigned ? 1 : 0;
     // Store the patch as deltas and find out how many oscs this message uses
     parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time, true);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
@@ -981,6 +1024,14 @@ uint8_t patches_voices_for_event(amy_event *e, uint16_t voices[]) {
     // Convert an event that may specify a synth into a number of specific voices.
     uint8_t num_voices = 0;
     uint32_t synth_flags = 0;
+    // The synth may have been CONSUMED earlier in this event's processing:
+    // releasing an instrument (num_voices=0) unsets e->synth precisely so
+    // the rest of the event is not forwarded to it
+    // (patches_voices_for_load_synth). Without this guard the unset
+    // sentinel (255) reached instrument_get_num_voices below and printed
+    // "instrument_number 255 is out of range" once per released synth —
+    // and on a device stderr is a blocking UART line in the audio path.
+    if (AMY_IS_UNSET(e->synth)) return 0;
     // We have an instrument specified - decide which of its voices are actually to be used.
         if (AMY_IS_SET(e->pedal)) {
         // Pedal events are a special case
@@ -1180,6 +1231,17 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
             // Clear all the midi mappings.
             int type = MIDI_MAP_TYPE_ANY;
             midi_clear_channel_mappings(e->synth, type);
+            // Free the instrument's AUTO-ASSIGNED memory patch: its number
+            // was invented in patches_store_patch, so nothing can ask for
+            // it again, and leaving it pinned leaked a slot per
+            // configure/release cycle until the pool ran dry. A patch the
+            // caller numbered explicitly is left alone — it may be loaded
+            // again by anyone who knows the number.
+            int prev = instrument_get_patch_number(e->synth);
+            int prev_index = prev - _PATCHES_FIRST_USER_PATCH;
+            if (prev_index >= 0 && prev_index < (int)max_num_memory_patches
+                && memory_patch_auto[prev_index])
+                patches_reset_patch(prev);
             // Delete the instrument
             instrument_release(e->synth);
             // Delete the instrument number so we don't forward the 'rest' of the event to it.
@@ -1267,6 +1329,18 @@ void patches_load_patch(amy_event *e) {
         } else {
             // User-defined patch
             int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
+            // Range-check before indexing. patches_store_patch refuses a
+            // number past the pool, but the event still carries it and
+            // arrives here — and indexing the tables with it read past
+            // their ends and walked a garbage delta pointer (a segfault
+            // on the desktop, a Guru Meditation on the device).
+            if (patch_index >= (int32_t)max_num_memory_patches) {
+                fprintf(stderr, "load patch_number %" PRIu16 " is out of range (%" PRId32 " .. %" PRId32 ") (synth %" PRId32 "), ignored\n",
+                        patch_number, (int32_t)_PATCHES_FIRST_USER_PATCH,
+                        (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches - 1),
+                        (int32_t)e->synth);
+                return;
+            }
             oscs_per_voice = memory_patch_oscs[patch_index];
             if(oscs_per_voice > 0){
                 deltas = memory_patch_deltas[patch_index];
