@@ -652,6 +652,14 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     // We assume event has already been cleared.
     // We do not set the osc field of the event.
     int osc = base_osc + rel_osc;
+    // synth[] entries are NULL until ensure_osc_allocd() allocates them, and a
+    // voice can own oscs that were never touched -- a synth configured with
+    // oscs_per_voice= and no patch reserves the oscs without allocating any of
+    // them.  Reading such an osc's config is not an error: it is at its
+    // defaults, so there is nothing to emit.  Dereferencing it, which is what
+    // this did, segfaulted amy_get_synth_commands()/amy_dump_state() for every
+    // such synth.
+    if (osc < 0 || osc >= AMY_OSCS || synth[osc] == NULL)  return;
     // Generate the reference "empty synth".
     struct synthinfo empty_synth;
     // We need to have space for the breakpoints.
