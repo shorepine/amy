@@ -1200,6 +1200,33 @@ void release_voice_oscs(int32_t voice, uint32_t time) {
     }
 }
 
+uint16_t snapshot_voice_config(uint8_t instr_num, struct delta **queue, uint32_t time) {
+    // Capture the CURRENT per-osc config of an instrument's first voice into a
+    // base-osc-relative delta list, in the same form as a stored patch, so it
+    // can be replayed into any voice with add_deltas_to_queue_with_baseosc().
+    // Returns the number of oscs captured (0 if there was nothing to capture);
+    // the caller owns the list and must delta_release_list() it.
+    // Note and velocity are deliberately not part of an osc's config (see
+    // set_event_for_osc), so snapshotting a voice that is mid-note captures the
+    // sound, not the note being played.
+    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+    int num_voices = instrument_get_num_voices(instr_num, voices);
+    if (num_voices < 1)  return 0;
+    uint16_t voice = voices[0];
+    if (AMY_IS_UNSET(voice_to_base_osc[voice]))  return 0;
+    uint16_t base_osc = voice_to_base_osc[voice];
+    int num_oscs = num_oscs_for_voice(voice);
+    for (int rel_osc = 0; rel_osc < num_oscs; ++rel_osc) {
+        amy_event e;
+        amy_clear_event(&e);
+        e.time = time;
+        e.osc = rel_osc;
+        set_event_for_osc(base_osc, rel_osc, &e);
+        amy_event_to_deltas_queue(&e, 0, queue);
+    }
+    return (uint16_t)num_oscs;
+}
+
 uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     // When load_patch specifies a synth, convert that into voices.
     // e->synth is assumed to be set.
@@ -1288,8 +1315,23 @@ void patches_load_patch(amy_event *e) {
     uint16_t oscs_per_voice = 0;
     uint16_t patch_number = e->patch_number;   // Need to match type of e->patch_number so AMY_IS_UNSET(patch_number) will work.
     //fprintf(stderr, "load_patch synth %d patch_number %d num_voices %d oscs_per_voice %d\n", e->synth, e->patch_number, e->num_voices, e->oscs_per_voice);
+    // CLONE ON GROW. Changing num_voices on a synth that already has voices
+    // rebuilds every voice, and the only config to rebuild them from used to be
+    // the synth's stored patch -- so growing a synth silently threw away every
+    // edit made since the patch was loaded, and reverted voice 0 to the pristine
+    // patch. Snapshot the live voice instead, BEFORE the reallocation below
+    // resets its oscs, and use that as the source for all the new voices. A
+    // synth that was configured osc-by-osc (or with oscs_per_voice= and no patch
+    // at all) can now grow too; before, it had no usable patch to reload and the
+    // whole event was dropped.
+    struct delta *clone_deltas = NULL;
+    uint16_t clone_oscs_per_voice = 0;
+    if (AMY_IS_UNSET(patch_number) && AMY_IS_UNSET(e->oscs_per_voice)
+        && AMY_IS_SET(e->synth) && instrument_number_exists(e->synth, NULL))
+        clone_oscs_per_voice = snapshot_voice_config(e->synth, &clone_deltas, e->time);
     num_voices = patches_voices_for_load_synth(e, voices);
     if (num_voices == 0) {
+        if (clone_deltas)  delta_release_list(clone_deltas);
         if (AMY_IS_UNSET(e->num_voices)) {
             // Print a warning unless we deliberately set the voices to zero to release the synth.
             fprintf(stderr, "synth %" PRId32 ": no voices selected, ignored (e->num_voices %" PRId32 "...)\n",
@@ -1320,6 +1362,14 @@ void patches_load_patch(amy_event *e) {
             fprintf(stderr, "WARN: synth %" PRId32 ": oscs_per_voice %" PRIu16 " made me ignore patch number %" PRIu16 "\n",
                     (int32_t)e->synth, e->oscs_per_voice, patch_number);
         }
+    } else if (clone_oscs_per_voice > 0) {
+        // Reshaping a live synth: every voice comes from the snapshot of the
+        // existing voice taken above, not from the stored patch. The synth keeps
+        // whatever patch number it had (nothing here changes it) -- it is no
+        // longer what defines the sound.
+        oscs_per_voice = clone_oscs_per_voice;
+        deltas = clone_deltas;
+        patch_number = instrument_get_patch_number(e->synth);
     } else {
         if (AMY_IS_UNSET(patch_number))
             patch_number = instrument_get_patch_number(e->synth);
@@ -1429,4 +1479,6 @@ void patches_load_patch(amy_event *e) {
             is_first_voice = false;
         }
     }
+    // add_deltas_to_queue_with_baseosc copies, so the snapshot is ours to free.
+    if (clone_deltas)  delta_release_list(clone_deltas);
 }
