@@ -178,6 +178,70 @@ static void test_all_buses_render(void) {
     CHECK(amy_get_oom_count() == 0, "no allocation failures");
 }
 
+static int oscs_on_bus(int bus) {
+    int n = 0;
+    for (int i = 0; i < amy_global.config.max_oscs; ++i)
+        if (synth[i] != NULL && synth[i]->bus == bus) ++n;
+    return n;
+}
+
+// Loading a patch rebuilds the voices' oscs, and it used to rebuild them
+// on bus 0: a patch change that didn't re-state the bus dropped the synth
+// out of its own mix and into everybody's FX -- reported from Tulip as a
+// drum machine picking up its neighbour's chorus after a sample change.
+static void test_repatch_keeps_bus(void) {
+    restart_with_buses(4);
+    printf("a re-patch keeps the synth on its bus\n");
+
+    amy_event e = amy_default_event();
+    e.synth = 5;
+    e.num_voices = 1;
+    e.patch_number = 2;      // Juno Trumpet: k0, keeps chorus out of this
+    e.bus = 2;
+    amy_add_event(&e);
+    amy_execute_deltas();
+    CHECK(instrument_get_bus(5) == 2, "setup put synth 5 on bus 2");
+    int before = oscs_on_bus(2);
+    CHECK(before > 0, "its oscs render into bus 2 (%d there)", before);
+
+    e = amy_default_event();
+    e.synth = 5;
+    e.patch_number = 3;      // the re-patch: no bus named
+    amy_add_event(&e);
+    amy_execute_deltas();
+    CHECK(instrument_get_bus(5) == 2, "re-patch kept the instrument's bus");
+    int after = oscs_on_bus(2);
+    CHECK(after > 0, "...and its rebuilt oscs (%d on bus 2)", after);
+    render_a_bit();
+    CHECK(amy_get_oom_count() == 0, "no allocation failures");
+}
+
+// A patch's own FX settings (a Juno patch's chorus, "k1" in its string --
+// 127 of the ROM Juno patches carry one) belong to the synth being loaded.
+// They used to fall to bus 0, since the 'v' messages carrying them have no
+// synth attached: chorus configured on a bus the loading synth isn't on
+// colours whoever IS there and leaves the patch itself dry.
+static void test_patch_fx_on_synth_bus(void) {
+    restart_with_buses(4);
+    printf("a patch's chorus lands on the loading synth's bus\n");
+
+    SAMPLE bus0_before = amy_global.bus[0]->chorus.level;
+    amy_event e = amy_default_event();
+    e.synth = 5;
+    e.num_voices = 1;
+    e.patch_number = 0;      // Juno Brass Set 1 carries "k1"
+    e.bus = 2;
+    amy_add_event(&e);
+    amy_execute_deltas();
+    CHECK(amy_global.bus[2]->chorus.level > 0,
+          "bus 2 chorus is on (level %.2f)",
+          S2F(amy_global.bus[2]->chorus.level));
+    CHECK(amy_global.bus[0]->chorus.level == bus0_before,
+          "bus 0 chorus untouched");
+    render_a_bit();
+    CHECK(amy_get_oom_count() == 0, "no allocation failures");
+}
+
 // examples.c calls this; the platform normally provides it.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -190,6 +254,8 @@ int main(void) {
     test_volume_per_bus();
     test_bus_range_is_enforced();
     test_all_buses_render();
+    test_repatch_keeps_bus();
+    test_patch_fx_on_synth_bus();
 
     if (failures) {
         printf("\n%d check(s) FAILED\n", failures);

@@ -252,6 +252,22 @@ class TestPcmLoopForever(AmyTest):
     amy_send_at(time=200, osc=0, vel=0)  # Should keep looping and decay over 700ms
 
 
+class TestPcmMemoryFractionalMidinote(AmyTest):
+  """Memory PCM presets accept a fractional base midinote (sample tuning).
+
+  The explicit loop points also guard the wire parse: every field after the
+  fractional midinote must survive (they were once silently zeroed)."""
+
+  def run(self):
+    amy.load_sample('sounds/partial_sources/CL SHCI A3 LP.wav', preset=1024, midinote=60.5,
+                    loopstart=4000, loopend=11000)
+    amy_send_at(time=0, osc=0, wave=amy.PCM, preset=1024, mode=amy.PCM_LOOP)
+    amy_send_at(time=100, osc=0, note=60.5, vel=1)  # at root: unshifted playback
+    amy_send_at(time=500, osc=0, vel=0)
+    amy_send_at(time=600, osc=0, note=60, vel=1)    # half a semitone below root
+    amy_send_at(time=900, osc=0, vel=0)
+
+
 class TestPcmLoopEnvFilt(AmyTest):
   """Check that filter, amp-env, and pitch mod apply to PCM."""
 

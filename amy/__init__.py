@@ -456,7 +456,8 @@ except ImportError:
         return ubinascii.b2a_base64(b)[:-1]
 
 def start_sample(preset=0, source=SAMPLE_FROM_OUTPUT,  max_frames=0, midinote=60, loopstart=0, loopend=0):
-    s = "%d,%d,%d,%d,%d,%d" % (preset, source, max_frames, midinote, loopstart, loopend)
+    # midinote may be fractional, e.g. a sample tuned 4 cents sharp of C4 is 60.04
+    s = "%d,%d,%d,%g,%d,%d" % (preset, source, max_frames, midinote, loopstart, loopend)
     send(start_sample=s)
 
 def stop_sample():
@@ -491,7 +492,7 @@ def load_sample_bytes(b, stereo=False, preset=0, midinote=60, loopstart=0, loope
         # just choose first channel
         b = bytes([b[j] for i in range(0,len(b),4) for j in (i,i+1)])
     n_frames = len(b)/2
-    s = "%d,%d,%d,%d,%d,%d" % (preset, n_frames, sr, midinote, loopstart, loopend)
+    s = "%d,%d,%d,%g,%d,%d" % (preset, n_frames, sr, midinote, loopstart, loopend)
     send(load_sample=s)
     last_f = 0
     for i in range(ceil(n_frames/94)):
@@ -549,7 +550,7 @@ def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
             midinote=60
 
     # Tell AMY we're sending over a sample
-    s = "%d,%d,%d,%d,%d,%d" % (preset, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
+    s = "%d,%d,%d,%g,%d,%d" % (preset, w.getnframes(), w.getframerate(), midinote, loopstart, loopend)
     send(load_sample=s)
     # Now generate the base64 encoded segments, 188 bytes / 94 frames at a time
     # why 188? that generates 252 bytes of base64 text. amy's max message size is currently 255.
@@ -560,7 +561,7 @@ def load_sample(wavfilename, preset=0, midinote=0, loopstart=0, loopend=0):
             frames_bytes = bytes([frames_bytes[j] for i in range(0,len(frames_bytes),4) for j in (i,i+1)])
         message = b64(frames_bytes)
         _send_transfer_chunk(message.decode('ascii'))
-    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %d" % (preset, w.getnframes()*2, w.getnframes(), midinote))
+    print("Loaded sample over wire protocol. Preset #%d. %d bytes, %d frames, midinote %g" % (preset, w.getnframes()*2, w.getnframes(), midinote))
 
 
 """

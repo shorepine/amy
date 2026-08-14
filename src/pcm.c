@@ -24,7 +24,7 @@ typedef struct {
     uint32_t length;
     uint32_t loopstart;
     uint32_t loopend;
-    uint8_t midinote;
+    float midinote;   // fractional, so a sample's tuning correction can live in the preset
     uint32_t samplerate;
     float log2sr;
 } memorypcm_preset_t;
@@ -559,7 +559,7 @@ int pcm_load_file() {
 // load mono samples (let python parse wave files) into preset # 
 // set loopstart, loopend, midinote, samplerate (and log2sr)
 // return the allocated sample ram that AMY will fill in.
-int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend) {
+int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, float midinote, uint32_t loopstart, uint32_t loopend) {
     // if preset was already a memorypcm, we need to unload it
     pcm_unload_preset(preset_number); // this is a no-op if preset doesn't exist or is a const pcm
     // now alloc a new LL entry and preset (the old LL entry is removed with pcm_unload_preset)
