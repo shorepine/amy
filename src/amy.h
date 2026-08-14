@@ -367,6 +367,7 @@ enum coefs{
 #define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
 #define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
 #define RESET_QUEUE 1048576 // resets the amy queue
+#define RESET_FREE_OSC 2097152  // Or'd with an osc number: free the osc's storage instead of resetting in place.
 
 // Bits for synth_flags=
 #define SYNTH_FLAGS_NOTES_VIA_MIDI 1    // Note-on/off events are routed through the MIDI interface (to pick up MIDI note cmds)

@@ -1174,6 +1174,22 @@ void schedule_osc_reset(uint32_t time, uint16_t osc, struct delta **queue) {
     add_delta_to_queue(&d, queue);
 }
 
+// Like schedule_osc_reset, but the executed delta also returns the osc's
+// storage to the heap. Only for oscs whose *ownership* is ending: release
+// already discards the state (the reset wiped it in place), so freeing is
+// behaviorally identical -- an unallocated osc reads as defaults, and the
+// next touch re-allocates lazily -- it just gives the memory back.
+static void schedule_osc_free(uint32_t time, uint16_t osc) {
+    struct delta d = {
+        .time = time,
+        .osc = 0,
+        .param = RESET_OSC,
+        .data.i = (uint32_t)osc | RESET_FREE_OSC,
+        .next = NULL,
+    };
+    add_delta_to_queue(&d, &amy_global.delta_queue);
+}
+
 void release_voice_oscs(int32_t voice, uint32_t time) {
     if(AMY_IS_SET(voice_to_base_osc[voice])) {
         //fprintf(stderr, "Already set voice %d, removing it\n", voice);
@@ -1182,8 +1198,8 @@ void release_voice_oscs(int32_t voice, uint32_t time) {
             if(osc_to_voice[i]==voice) {
                 //fprintf(stderr, "Already set voice %d osc %d, removing it\n", voices[v], i);
                 AMY_UNSET(osc_to_voice[i]);
-                // Make sure the osc is cleared.
-                schedule_osc_reset(time, i, NULL);
+                // Ownership ends here: clear the osc and return its storage.
+                schedule_osc_free(time, i);
             }
         }
         AMY_UNSET(voice_to_base_osc[voice]);
@@ -1316,7 +1332,10 @@ void patches_load_patch(amy_event *e) {
     // whole event was dropped.
     struct delta *clone_deltas = NULL;
     uint16_t clone_oscs_per_voice = 0;
+    // num_voices=0 is a deletion: nothing will ever replay the snapshot, so
+    // don't spend delta-pool churn capturing one.
     if (AMY_IS_UNSET(patch_number) && AMY_IS_UNSET(e->oscs_per_voice)
+        && (AMY_IS_UNSET(e->num_voices) || e->num_voices > 0)
         && AMY_IS_SET(e->synth) && instrument_number_exists(e->synth, NULL))
         clone_oscs_per_voice = snapshot_voice_config(e->synth, &clone_deltas, e->time);
     // An AUTO-ASSIGNED memory patch is a courier, not a patch. Its number was

@@ -670,7 +670,7 @@ float map_01_to_60dBf(float log) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -734,8 +734,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     if(AMY_IS_UNSET(e->osc)) { d.osc = 0; }
     // First, adapt the osc in this event with base_osc offsets for voices
     d.osc += base_osc;
-    // Ensure this osc has its synthinfo allocated.
-    ensure_osc_allocd(d.osc, NULL);
+    // The osc's synthinfo is allocated below, once the destination queue is
+    // known - see there.
 
     // Voices / patches gets set up here 
     // you must set both synth & load_patch together to load a patch 
@@ -761,7 +761,16 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
             // The patch number was invalid (e.g., not in user range 1024+), so we got no queue, so ignore the event.
             fprintf(stderr, "event ignored\n");
             goto end;
-        }            
+        }
+    }
+
+    // Ensure the addressed osc's synthinfo only when these deltas are headed
+    // for live execution. Describing an osc - into a stored patch's delta
+    // list or a voice snapshot, both built base-osc-relative - must not
+    // allocate low osc numbers nothing is playing; play_delta ensures at
+    // execution for everything that actually plays.
+    if (queue == &amy_global.delta_queue) {
+        ensure_osc_allocd(d.osc, NULL);
     }
 
     // Everything else only added to queue if set
@@ -1570,7 +1579,15 @@ void play_delta(struct delta *d) {
             // If we got here, it's a full reset of patches.
             patches_reset();
         }
-        if(d->data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+        if(d->data.i & RESET_FREE_OSC) {
+            // Voice release: ownership ended and the state is discarded
+            // either way, so return the storage too. Reading an unallocated
+            // osc yields defaults, and the next touch re-allocates lazily.
+            uint32_t osc = d->data.i & ~(uint32_t)RESET_FREE_OSC;
+            if(osc < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+                free_osc(osc);
+            }
+        } else if(d->data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
             reset_osc(d->data.i);
         }
     }
