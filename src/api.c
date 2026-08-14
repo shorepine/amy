@@ -70,6 +70,8 @@ amy_config_t amy_default_config() {
     c.ram_caps_sample = MALLOC_CAP_DEFAULT;
     c.ram_caps_sysex = MALLOC_CAP_DEFAULT;
     #endif    
+    // Per-osc synth state follows the event pool unless a target overrides.
+    c.ram_caps_oscs = c.ram_caps_events;
 
     c.capture_device_id = -1;
     c.playback_device_id = -1;
