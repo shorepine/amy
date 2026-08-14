@@ -888,29 +888,16 @@ void patches_store_patch(amy_event *e, char * patch_string) {
     //fprintf(stderr, "store_patch: synth %d patch_num %d patch '%s'\n", e->synth, e->patch, patch_string);
     bool auto_assigned = !AMY_IS_SET(e->patch_number);
     if (auto_assigned) {
-        // We need a number. Recycle before extending, in this order:
-        // (a) the addressed instrument's own auto-assigned patch — a
-        //     reconfigure (a sample change, a re-sent config) sends a
-        //     fresh patch_string for the same synth, and burning a new
-        //     slot each time emptied the whole pool in
-        //     max_num_memory_patches sends;
-        // (b) any free slot (never used, or freed when its instrument
-        //     was released);
-        // (c) refusal — the deliberately out-of-range number falls to
-        //     the range check below, which prints and drops the store.
-        if (AMY_IS_SET(e->synth) && instrument_number_exists(e->synth, NULL)) {
-            int prev = instrument_get_patch_number(e->synth);
-            int prev_index = prev - _PATCHES_FIRST_USER_PATCH;
-            if (prev_index >= 0 && prev_index < (int)max_num_memory_patches
-                && memory_patch_auto[prev_index])
-                e->patch_number = prev;
-        }
-        if (!AMY_IS_SET(e->patch_number)) {
-            for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
-                if (memory_patch_deltas[i] == NULL && memory_patch_oscs[i] == 0) {
-                    e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
-                    break;
-                }
+        // We need a number, and it only has to live long enough to carry this
+        // patch_string into patches_load_patch, which frees the slot as soon as
+        // it has loaded it. So: take any free slot (never used, or handed back
+        // by an earlier load), else refuse — the deliberately out-of-range
+        // number falls to the range check below, which prints and drops the
+        // store.
+        for (uint32_t i = 0; i < max_num_memory_patches; ++i) {
+            if (memory_patch_deltas[i] == NULL && memory_patch_oscs[i] == 0) {
+                e->patch_number = i + _PATCHES_FIRST_USER_PATCH;
+                break;
             }
         }
         if (!AMY_IS_SET(e->patch_number))
@@ -1266,17 +1253,10 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
             // Clear all the midi mappings.
             int type = MIDI_MAP_TYPE_ANY;
             midi_clear_channel_mappings(e->synth, type);
-            // Free the instrument's AUTO-ASSIGNED memory patch: its number
-            // was invented in patches_store_patch, so nothing can ask for
-            // it again, and leaving it pinned leaked a slot per
-            // configure/release cycle until the pool ran dry. A patch the
-            // caller numbered explicitly is left alone — it may be loaded
-            // again by anyone who knows the number.
-            int prev = instrument_get_patch_number(e->synth);
-            int prev_index = prev - _PATCHES_FIRST_USER_PATCH;
-            if (prev_index >= 0 && prev_index < (int)max_num_memory_patches
-                && memory_patch_auto[prev_index])
-                patches_reset_patch(prev);
+            // No memory patch to free here: an auto-assigned slot is released
+            // by patches_load_patch as soon as it has been loaded, so an
+            // instrument never holds one, and a patch the caller numbered
+            // explicitly is never freed behind their back.
             // Delete the instrument
             instrument_release(e->synth);
             // Delete the instrument number so we don't forward the 'rest' of the event to it.
@@ -1329,15 +1309,27 @@ void patches_load_patch(amy_event *e) {
     if (AMY_IS_UNSET(patch_number) && AMY_IS_UNSET(e->oscs_per_voice)
         && AMY_IS_SET(e->synth) && instrument_number_exists(e->synth, NULL))
         clone_oscs_per_voice = snapshot_voice_config(e->synth, &clone_deltas, e->time);
+    // An AUTO-ASSIGNED memory patch is a courier, not a patch. Its number was
+    // invented by patches_store_patch so a patch_string could be handed to this
+    // load; the caller never saw it and can never ask for it again. So it is
+    // consumed here: the number is not stored on the instrument (the voices
+    // themselves are the synth's config now that growth clones them), and the
+    // slot goes back to the pool on the way out, whether this load worked or
+    // not.
+    bool auto_patch = false;
+    if (AMY_IS_SET(patch_number)) {
+        int patch_index = (int)patch_number - _PATCHES_FIRST_USER_PATCH;
+        auto_patch = (patch_index >= 0 && patch_index < (int)max_num_memory_patches
+                      && memory_patch_auto[patch_index]);
+    }
     num_voices = patches_voices_for_load_synth(e, voices);
     if (num_voices == 0) {
-        if (clone_deltas)  delta_release_list(clone_deltas);
         if (AMY_IS_UNSET(e->num_voices)) {
             // Print a warning unless we deliberately set the voices to zero to release the synth.
             fprintf(stderr, "synth %" PRId32 ": no voices selected, ignored (e->num_voices %" PRId32 "...)\n",
                     (int32_t)e->synth, (int32_t)e->num_voices);
         }
-        return;
+        goto done;
     } else {
         // Reset every osc belonging to each voice so stale state doesn't persist
         // before we reallocate and reinitialize them below.
@@ -1380,7 +1372,7 @@ void patches_load_patch(amy_event *e) {
             if (patch_number >= _PATCHES_NUM_BUILTIN || patch_commands[patch_number] == NULL) {
                 fprintf(stderr, "patch_number %" PRIu16 " is not a defined built-in patch (synth %" PRId32 "), ignored\n",
                         patch_number, (int32_t)e->synth);
-                return;
+                goto done;
             }
             message = (char*)patch_commands[patch_number];
             oscs_per_voice = patch_oscs[patch_number];
@@ -1397,7 +1389,7 @@ void patches_load_patch(amy_event *e) {
                         patch_number, (int32_t)_PATCHES_FIRST_USER_PATCH,
                         (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches - 1),
                         (int32_t)e->synth);
-                return;
+                goto done;
             }
             oscs_per_voice = memory_patch_oscs[patch_index];
             if(oscs_per_voice > 0){
@@ -1406,7 +1398,7 @@ void patches_load_patch(amy_event *e) {
                 fprintf(stderr, "patch_number %" PRIu16 " has %" PRIu16 " num_deltas %" PRIi32 " (synth %" PRId32 " num_voices %" PRId32 "), ignored\n",
                         patch_number, oscs_per_voice, delta_list_len(memory_patch_deltas[patch_index]),
                         (int32_t)e->synth, (int32_t)e->num_voices);
-                return;
+                goto done;
             }
         }
     }
@@ -1464,7 +1456,11 @@ void patches_load_patch(amy_event *e) {
         if (AMY_IS_SET(e->synth_flags)) flags = e->synth_flags;
         uint16_t bus = 0;
         if (AMY_IS_SET(e->bus)) bus = e->bus;
-        instrument_add_new(e->synth, num_voices, voices, patch_number, oscs_per_voice, bus, flags);
+        // An auto-assigned number is an allocator artifact, so the instrument
+        // records no patch at all rather than a number nobody can use.
+        uint16_t stored_patch_number = patch_number;
+        if (auto_patch)  AMY_UNSET(stored_patch_number);
+        instrument_add_new(e->synth, num_voices, voices, stored_patch_number, oscs_per_voice, bus, flags);
     }
     // Now actually initialize the newly-allocated osc blocks with the patch
     bool is_first_voice = true;  // flag for once-only messages.
@@ -1479,6 +1475,10 @@ void patches_load_patch(amy_event *e) {
             is_first_voice = false;
         }
     }
+done:
     // add_deltas_to_queue_with_baseosc copies, so the snapshot is ours to free.
     if (clone_deltas)  delta_release_list(clone_deltas);
+    // Likewise the courier slot: its deltas have been copied into the queue (or
+    // this load failed), and nothing can ask for it by number, so hand it back.
+    if (auto_patch)  patches_reset_patch(e->patch_number);
 }

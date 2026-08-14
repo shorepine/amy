@@ -158,7 +158,17 @@ void amy_received_program_change(uint8_t channel, uint8_t program) {
     if (bank_number < 0) {
         // If the bank hasn't been set, stay within the block of 128 of the current patch
         // (so e.g. DX7 voices remain DX7).
-        bank_number = (instrument_get_patch_number(e.synth) & 0xFF80) >> 7;
+        int synth_patch = instrument_get_patch_number(e.synth);
+        // ...but only if there IS a current patch. A synth built from a
+        // patch_string carries no patch number (the auto-assigned one is an
+        // allocator artifact, released as soon as it is loaded), and a synth
+        // that doesn't exist reports -1. Both used to be masked and shifted
+        // into a nonsense bank -- 511 for the unset sentinel -- which put the
+        // program change hundreds of patches past anything defined, so a bare
+        // PC on such a channel did nothing at all. Default to bank 0 (Juno).
+        uint16_t synth_patch_u16 = (uint16_t)synth_patch;
+        if (synth_patch < 0 || AMY_IS_UNSET(synth_patch_u16))  synth_patch = 0;
+        bank_number = (synth_patch & 0xFF80) >> 7;
         // Banks 0 (Juno, patches 0-127) and 1 (DX7, 128-255) are full 128-patch
         // banks, and bank 3 (384+) is the Gamma9001 drum kit bank -- a synth
         // sitting on a drum kit patch should stay in the kit bank so a bare PC

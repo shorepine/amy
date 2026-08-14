@@ -37,6 +37,8 @@ extern struct delta **memory_patch_deltas;
 extern uint16_t *memory_patch_oscs;
 extern int instrument_get_patch_number(int instrument_number);
 extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
+extern void patches_reset_patch(int patch_number);
+extern void amy_received_program_change(uint8_t channel, uint8_t program);
 
 #define FIRST_USER 1024
 
@@ -56,47 +58,75 @@ static int used_slots(void) {
     return n;
 }
 
-static void test_reconfigure_reuses_slot(void) {
-    printf("a reconfigure reuses the instrument's own slot\n");
-    send("i17iv1uv0w7p3Z");
-    int first = instrument_get_patch_number(17);
-    CHECK(first >= FIRST_USER && first < FIRST_USER + (int)max_num_memory_patches,
-          "first store lands in the user range (%d)", first);
+static void test_auto_slot_is_released_on_load(void) {
+    printf("an auto-assigned slot is a courier: it is gone once it is loaded\n");
     int before = used_slots();
+    send("i17iv1uv0w7p3Z");
+    CHECK(used_slots() == before, "the config left no slot standing (%d used)",
+          used_slots());
+    uint16_t p = (uint16_t)instrument_get_patch_number(17);
+    CHECK(AMY_IS_UNSET(p),
+          "and the synth records no patch number (%d)", (int)p);
     for (int i = 0; i < 40; ++i) {
         char m[64];
         snprintf(m, sizeof(m), "i17iv1uv0w7p%dZ", i % 5);
         send(m);
     }
-    CHECK(instrument_get_patch_number(17) == first,
-          "40 reconfigures still on patch %d", first);
-    CHECK(used_slots() == before, "and no extra slots burned (%d used)",
+    CHECK(used_slots() == before, "40 reconfigures burned nothing (%d used)",
           used_slots());
 }
 
-static void test_release_frees_auto_slot(void) {
-    printf("releasing an instrument frees its auto-assigned slot\n");
-    send("i17iv0Z");          // release the previous test's holding first
+static void test_configure_release_cycles_leak_nothing(void) {
+    printf("configure/release cycles never run the pool dry\n");
+    send("i17iv0Z");          // release the previous test's synth first
     int before = used_slots();
     send("i18iv1uv0w7p3Z");
-    CHECK(used_slots() == before + 1, "config took one slot");
     send("i18iv0Z");
-    CHECK(used_slots() == before, "release gave it back");
-    // 40 configure/release cycles across synths: the pool never runs dry.
+    CHECK(used_slots() == before, "a configure/release round trip is neutral");
+    // 40 cycles across synths: the pool never runs dry, and every config
+    // actually takes (a refused store would leave the synth with no voices).
     for (int i = 0; i < 40; ++i) {
         char m[64];
         int s = 17 + (i % 8);
         snprintf(m, sizeof(m), "i%div1uv0w7p%dZ", s, i % 5);
         send(m);
-        int p = instrument_get_patch_number(s);
-        if (!(p >= FIRST_USER && p < FIRST_USER + (int)max_num_memory_patches)) {
-            CHECK(0, "cycle %d: synth %d got patch %d", i, s, p);
+        if (instrument_get_num_voices(s, NULL) != 1) {
+            CHECK(0, "cycle %d: synth %d did not configure", i, s);
             return;
         }
         snprintf(m, sizeof(m), "i%div0Z", s);
         send(m);
     }
     CHECK(used_slots() == before, "40 configure/release cycles leaked nothing");
+}
+
+static void test_program_change_without_a_patch_number(void) {
+    printf("a bare program change on a patch_string synth lands in bank 0\n");
+    // A synth built from a patch_string has no patch number to infer a bank
+    // from. That used to be masked and shifted anyway -- the unset sentinel
+    // gives bank 511 -- putting the program change 65408 patches past anything
+    // defined, so the PC silently did nothing.
+    send("i9iv1uv0w7p3Z");
+    CHECK(instrument_get_num_voices(9, NULL) == 1, "synth 9 configured");
+    amy_received_program_change(9, 3);
+    render_a_bit();
+    CHECK(instrument_get_patch_number(9) == 3,
+          "PC 3 loaded built-in patch 3 (got %d)", instrument_get_patch_number(9));
+    // An explicitly numbered patch DOES carry a bank, and that still works:
+    // 1030 is bank 8, so PC 5 there means patch 8*128 + 5 = 1029.
+    send("K1029uv0w7p3Z");
+    send("K1030uv0w7p4Z");
+    send("K1030i10iv1Z");
+    CHECK(instrument_get_patch_number(10) == 1030, "synth 10 sits on patch 1030");
+    amy_received_program_change(10, 5);
+    render_a_bit();
+    CHECK(instrument_get_patch_number(10) == 1029,
+          "PC 5 stayed in the synth's own bank (got %d)",
+          instrument_get_patch_number(10));
+    send("i9iv0Z");
+    send("i10iv0Z");
+    patches_reset_patch(1029);
+    patches_reset_patch(1030);
 }
 
 static void test_explicit_slot_survives_release(void) {
@@ -167,8 +197,9 @@ int main(void) {
     amy_start(c);
     render_a_bit();
 
-    test_reconfigure_reuses_slot();
-    test_release_frees_auto_slot();
+    test_auto_slot_is_released_on_load();
+    test_configure_release_cycles_leak_nothing();
+    test_program_change_without_a_patch_number();
     test_explicit_slot_survives_release();
     test_release_is_quiet();
     test_pool_dry_is_safe();
