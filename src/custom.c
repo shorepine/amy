@@ -22,27 +22,30 @@ void custom_deinit() {
     }
 }
 
+// A wire message can select wave=CUSTOM whether or not a custom oscillator
+// has been registered, so these are guards, not asserts: with no custom osc
+// installed the osc just renders silence.
 void custom_note_on(uint16_t osc, float freq) {
-    assert(custom_osc != NULL);
+    if (custom_osc == NULL) return;
     custom_osc->note_on(osc, freq);
 }
 
 void custom_note_off(uint16_t osc) {
-    assert(custom_osc != NULL);
+    if (custom_osc == NULL) return;
     custom_osc->note_off(osc);
 }
 
 void custom_mod_trigger(uint16_t osc) {
-    assert(custom_osc != NULL);
+    if (custom_osc == NULL) return;
     custom_osc->mod_trigger(osc);
 }
 
 SAMPLE render_custom(SAMPLE* buf, uint16_t osc) {
-    assert(custom_osc != NULL);
+    if (custom_osc == NULL) return 0;
     return custom_osc->render(buf, osc);
 }
 
 SAMPLE compute_mod_custom(uint16_t osc) {
-    assert(custom_osc != NULL);
+    if (custom_osc == NULL) return 0;
     return custom_osc->compute_mod(osc);
 }

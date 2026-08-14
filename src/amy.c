@@ -348,6 +348,10 @@ void alloc_chorus_delay_lines(uint16_t bus) {
 
 void config_chorus(uint16_t bus, float level, uint16_t max_delay, float lfo_freq, float depth) {
     if (AMY_IS_UNSET(level)) level = S2F(amy_global.bus[bus]->chorus.level);
+    // A negative level (possible from the wire) would store as nonzero
+    // without allocating the delay lines, and the render path treats
+    // nonzero level as "chorus is on".
+    if (level < 0) level = 0;
     if (AMY_IS_UNSET(max_delay)) max_delay = amy_global.bus[bus]->chorus.max_delay;
     if (AMY_IS_UNSET(lfo_freq)) lfo_freq = amy_global.bus[bus]->chorus.lfo_freq;
     if (AMY_IS_UNSET(depth)) depth = amy_global.bus[bus]->chorus.depth;
@@ -416,8 +420,11 @@ void config_reverb(uint16_t bus, float level, float liveness, float damping, flo
     if (level > 0) {
         //printf("config_reverb: level %f liveness %f xover %f damping %f\n",
         //      level, liveness, xover_hz, damping);
-        if (amy_global.bus[bus]->reverb.level == 0) {
-            if (!alloc_reverb_delay_lines(bus)) {
+        // Gate allocation on the reverb state itself, not on level == 0: a
+        // negative wire level is stored below without allocating, which used
+        // to let a later positive level skip the alloc and configure NULL.
+        if (amy_global.bus[bus]->reverb.rev == NULL) {
+            if (!alloc_reverb_delay_lines(bus) || amy_global.bus[bus]->reverb.rev == NULL) {
                 amy_global.bus[bus]->reverb.level = 0;
                 return;
             }
@@ -579,7 +586,9 @@ float logfreq_of_freq(float freq) {
     // logfreq is defined as log_2(freq / 8.18 Hz)
     //if (freq==0) return ZERO_HZ_LOG_VAL;
     // Actually, special-case zero to mean middle C, for convenience.
-    if (freq==0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ).
+    // Negative frequencies (possible from wire messages) get the same
+    // treatment; log2 of them is undefined.
+    if (freq<=0) return 0;  // i.e. == logfreq_of_freq(ZERO_LOGFREQ_IN_HZ).
     //return log2f(freq / ZERO_LOGFREQ_IN_HZ);
     return 2.0f + S2F(log2_lut(F2S(freq / (4 * ZERO_LOGFREQ_IN_HZ))));
 }
@@ -1056,6 +1065,15 @@ void free_osc(int osc) {
 // Returns false on OOM: the osc is still NULL, or (for a grow) keeps its old,
 // smaller vectors.
 bool ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints) {
+    // The osc number can come from wire data (directly, or shifted by
+    // base_osc/algo_source arithmetic), so bounds-check before indexing
+    // synth[], which has AMY_OSCS + max_buses (chorus mod oscs) entries.
+    // Callers treat false the same as OOM: they drop the delta.
+    if (osc < 0 || osc >= (int)(AMY_OSCS + amy_global.config.max_buses)) {
+        fprintf(stderr, "osc %d out of range 0..%d, dropped\n",
+                osc, (int)(AMY_OSCS + amy_global.config.max_buses) - 1);
+        return false;
+    }
     if (synth[osc] == NULL) {
         alloc_osc(osc, max_num_breakpoints);
         return synth[osc] != NULL;
@@ -1613,7 +1631,11 @@ void play_delta(struct delta *d) {
     if(d->param == VOLUME) amy_global.volume[bus] = d->data.f;
     if(d->param == PITCH_BEND) amy_global.pitch_bend = d->data.f;
     if(d->param == LATENCY) amy_global.latency_ms = d->data.i;
-    if(d->param == TEMPO) { amy_global.tempo = d->data.f; sequencer_recompute(); }
+    if(d->param == TEMPO) {
+        // Reject zero/negative/NaN tempo: sequencer_recompute divides by it.
+        if (d->data.f > 0) { amy_global.tempo = d->data.f; sequencer_recompute(); }
+        else fprintf(stderr, "bad tempo %f ignored\n", d->data.f);
+    }
     if(d->param == EQ_L) amy_global.bus[bus]->eq.eq[0] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_M) amy_global.bus[bus]->eq.eq[1] = F2S(powf(10, d->data.f / 20.0));
     if(d->param == EQ_H) amy_global.bus[bus]->eq.eq[2] = F2S(powf(10, d->data.f / 20.0));
@@ -2085,7 +2107,7 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
         for(int bus = 0; bus <= amy_global.highest_bus; ++bus) {
             if (!ensure_osc_allocd(CHORUS_MOD_SOURCE + bus, NULL)) continue;
             hold_and_modify(CHORUS_MOD_SOURCE + bus);
-            if(amy_global.bus[bus]->chorus.level!=0)  {
+            if(amy_global.bus[bus]->chorus.level!=0 && amy_global.bus[bus]->chorus.delay_mod != NULL)  {
                 bzero(amy_global.bus[bus]->chorus.delay_mod, AMY_BLOCK_SIZE * sizeof(SAMPLE));
                 render_osc_wave(CHORUS_MOD_SOURCE + bus, 0 /* core */, amy_global.bus[bus]->chorus.delay_mod);
             }

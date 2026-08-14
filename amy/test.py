@@ -2143,6 +2143,105 @@ class TestLoadSyx(AmyTest):
     return True, self.__class__.__name__ + ' : ok (%.1f dB)' % level
 
 
+class TestFuzzWireParser(AmyTest):
+  """Arbitrary junk fed to amy.send_wire() must never crash the engine.
+
+  Regression for a SIGSEGV observed when base64 payload chunks from a
+  desynchronized sample transfer leaked into the wire-message parser: at
+  worst the parser should complain and drop the message.  Runs a list of
+  directed repros for previously-crashing messages, then a deterministic
+  pseudo-random fuzz loop.  The failure mode is a crash or hang of the
+  process, not an audio diff; afterwards the engine is restarted and must
+  still render a sine to pass.
+  """
+
+  # Each of these crashed or hung an earlier AMY (segfault, abort, or
+  # infinite loop) -- see the fixes in patches.c, parse.c, amy.c,
+  # sequencer.c, custom.c.
+  DIRECTED = [
+      'i8x2y4u',            # store-patch auto-assign out of range, then load
+      'i1v1Z',              # load with patch number unset (reads back 0xffff)
+      'i1v1K2000Z',         # load explicit out-of-range user patch
+      'i1v33Z',             # num_voices > MAX_VOICES_PER_INSTRUMENT
+      '2SEUCio',            # 'i'+'c'/'o' with empty payload wedged the parser
+      'TKozm/y/FdRFsl82OfxrzdJKiAHf0rpwlqio',
+      'j0Z', 'j-1Z', 'j99999999Z',      # tempo: div-by-zero us_per_tick
+      'v0f-2147483648Z',    # negative freq hung log2_lut (guarded in logfreq_of_freq)
+      'v0l-1Z',             # negative velocity
+      'v0O30000,30001Z',    # algo_source osc out of range
+      'h-14342Z', 'h86586Z',  # negative then positive reverb level: NULL rev
+      'k-1Z', 'k1Z',        # same for chorus (NULL delay_mod in render)
+      'i6v2Z', 'D9Z',       # debug dump walked unallocated voice oscs
+      'zC2Z',               # MIDI clock master with MIDI not started
+  ]
+
+  N_RANDOM = 2000
+
+  def test(self):
+    name = self.__class__.__name__
+    _amy.stop()
+    _amy.start(0)
+    _reset_test_clock()
+    rng = random.Random(0x20260812)
+    b64 = string.ascii_uppercase + string.ascii_lowercase + string.digits + '+/='
+    cmds = 'abBcdDfFGhiIjkKlLmMnNoOpPqQrRsSTuUvVwWxXyYzZ'
+    valid = ['v0w0f440l1Z', 'K1024uv0w7p10Zv1w4ZZ', 'i0K130v6Z',
+             'H1000,500,3v0l0Z', 'z0,1000,44100,60,0,999Z', 'i1ic1,0,0,1,0,vXZZ',
+             'i2ig1,0.5,0.1,2,1,0,vXZZ', 'S16384Z', 'O2,3,4,5,6,7Z',
+             'L1,2Z', 'A0,0,100,1,200,0Z', 'M1,100,200,0.5,0.1Z', 'G2R2P0.5Z']
+    big = [0, 1, -1, 255, 1023, 1024, 1056, 65535, 2**31 - 1, -2**31]
+    def random_message(i):
+      kind = i % 4
+      if kind == 0:    # pure base64 noise (a leaked transfer chunk)
+        return ''.join(rng.choice(b64) for _ in range(rng.randint(1, 250)))
+      elif kind == 1:  # command chars followed by noise
+        return ''.join(rng.choice(cmds)
+                       + ''.join(rng.choice(b64) for _ in range(rng.randint(0, 12)))
+                       for _ in range(rng.randint(1, 12)))
+      elif kind == 2:  # a valid message with a few corrupted chars
+        m = list(rng.choice(valid))
+        for _ in range(rng.randint(1, 5)):
+          m[rng.randrange(len(m))] = rng.choice(b64)
+        return ''.join(m)
+      else:            # commands with extreme numeric arguments
+        return ''.join(rng.choice(cmds)
+                       + str(rng.choice(big + [rng.randint(-99999, 99999)]))
+                       + rng.choice([',', '', '.', '-'])
+                       for _ in range(rng.randint(1, 10)))
+    # Junk 'zT<name>,..' messages legitimately open files for transfer, so run
+    # in a temp dir.  The junk also provokes thousands of parser complaints on
+    # stderr, so silence it for the duration.
+    old_cwd = os.getcwd()
+    tmp_dir = tempfile.mkdtemp()
+    saved_stderr = os.dup(2)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.chdir(tmp_dir)
+    os.dup2(devnull, 2)
+    try:
+      for msg in self.DIRECTED:
+        amy.send_wire(msg)
+        _amy.render_to_list()
+      for i in range(self.N_RANDOM):
+        amy.send_wire(random_message(i))
+        _amy.render_to_list()
+    finally:
+      os.dup2(saved_stderr, 2)
+      os.close(saved_stderr)
+      os.close(devnull)
+      os.chdir(old_cwd)
+    # Surviving the junk isn't enough: a restarted engine must still play.
+    _amy.stop()
+    _amy.start(0)
+    _reset_test_clock()
+    amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000, vel=1)
+    samples = _finish_test_clock(0.5)
+    level = dB(rms(samples))
+    if level < -60:
+      return False, name + ': engine silent after fuzz (%.1f dB)' % level
+    return True, ('%-32s:' % name) + (' ok (%d messages, post-fuzz sine %.1f dB)'
+                                      % (len(self.DIRECTED) + self.N_RANDOM, level))
+
+
 def main(argv):
   if len(argv) > 1 and argv[1] == 'quiet':
     quiet = True

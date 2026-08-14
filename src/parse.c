@@ -348,6 +348,10 @@ int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_c
     // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
     size_t pos = 0;
     size_t mlen = strlen(message);
+    // An empty payload ("ic"/"io" at end of message) would return -1 below,
+    // which exactly cancels the outer parser's advance and wedges it in an
+    // infinite loop on the same 'i'.
+    if (mlen == 0) return 0;
     while (pos < mlen) {
         // Break the mapping on ZZs (for K257).
         size_t sub_mlen, next_pos;

@@ -910,6 +910,9 @@ void patches_store_patch(amy_event *e, char * patch_string) {
                 (int32_t)(patch_index + _PATCHES_FIRST_USER_PATCH),
                 (int32_t)_PATCHES_FIRST_USER_PATCH,
                 (int32_t)(_PATCHES_FIRST_USER_PATCH + (int32_t)max_num_memory_patches));
+        // Don't leave the rejected (possibly auto-assigned) number in the
+        // event, or the rest of event handling would try to load it.
+        AMY_UNSET(e->patch_number);
         return;
     }
     if (patch_index >= next_user_patch_index)  next_user_patch_index = patch_index + 1;
@@ -1218,6 +1221,13 @@ uint8_t patches_voices_for_load_synth(amy_event *e, uint16_t voices[]) {
     // When load_patch specifies a synth, convert that into voices.
     // e->synth is assumed to be set.
     uint16_t requested_voices = e->num_voices;
+    // The voices[] array (and instrument_init, which aborts) can only take
+    // MAX_VOICES_PER_INSTRUMENT; the wire can ask for anything.
+    if (AMY_IS_SET(requested_voices) && requested_voices > MAX_VOICES_PER_INSTRUMENT) {
+        fprintf(stderr, "synth %" PRId32 ": num_voices %" PRIu16 " clamped to %d\n",
+                (int32_t)e->synth, requested_voices, MAX_VOICES_PER_INSTRUMENT);
+        requested_voices = MAX_VOICES_PER_INSTRUMENT;
+    }
     // If the instrument is alread initialized, copy the voice numbers.
     int num_voices = instrument_get_num_voices(e->synth, voices);
     //fprintf(stderr, "patches_voices_for_load: e->num_voices %d num_voices %d\n", e->num_voices, num_voices);
@@ -1377,7 +1387,9 @@ void patches_load_patch(amy_event *e) {
             message = (char*)patch_commands[patch_number];
             oscs_per_voice = patch_oscs[patch_number];
         } else {
-            // User-defined patch
+            // User-defined patch.  patch_number can be out of range here (an
+            // unset instrument patch reads back as UNSET/0xffff, and a wire
+            // message can name any number), so bounds-check before indexing.
             int32_t patch_index = patch_number - _PATCHES_FIRST_USER_PATCH;
             // Range-check before indexing. patches_store_patch refuses a
             // number past the pool, but the event still carries it and
