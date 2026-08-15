@@ -24,7 +24,7 @@ typedef struct {
     uint32_t length;
     uint32_t loopstart;
     uint32_t loopend;
-    uint8_t midinote;
+    float midinote;   // fractional, so a sample's tuning correction can live in the preset
     uint32_t samplerate;
     float log2sr;
 } memorypcm_preset_t;
@@ -218,7 +218,8 @@ bool pcm_loop_config_allowed(uint16_t osc, uint16_t mode, uint16_t preset_number
 // How far forward to search for a zero crossing
 #define PCM_MAX_ZERO_SEARCH_LEN 512
 
-int pcm_find_zero_crossing(uint16_t osc) {
+int pcm_find_next_zero_crossing(uint16_t osc, uint32_t base_index) {
+    // Find next zero or zero crossing beyond base_index in PCM under osc.
     int index = -1;
     if(AMY_IS_SET(synth[osc]->preset)) {
         memorypcm_preset_t rom_local;
@@ -232,7 +233,6 @@ int pcm_find_zero_crossing(uint16_t osc) {
             && table != NULL
             && sample_length != 0) {
             const LUTSAMPLE* table = preset->sample_ram;
-            uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
             //uint32_t start_index = base_index;  // for debug only
             LUTSAMPLE min_val = SAMPLE_MAX;
             LUTSAMPLE val;
@@ -299,9 +299,11 @@ void pcm_note_on(uint16_t osc) {
         } else {
             phase = 0; // s16.15 index into the table; as if a PHASOR into a 16 bit sample table.
         }
-        if (synth[osc]->status == SYNTH_AUDIBLE) {
+        if (synth[osc]->status == SYNTH_AUDIBLE && preset->type != AMY_PCM_TYPE_FILE) {
+            // Restarting a currently-playing (non-file) PCM, delay reonset to next zero crossing to avoid click.
+            uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
+            msynth[osc]->loopend = pcm_find_next_zero_crossing(osc, base_index);
             msynth[osc]->loopstart = INT_OF_P(phase, PCM_INDEX_BITS);;
-            msynth[osc]->loopend = pcm_find_zero_crossing(osc);
             msynth[osc]->state = PCM_LOOP_ONCE_INTERNAL;
             msynth[osc]->next_state = synth[osc]->mode;
             //fprintf(stderr, "time %.3f osc %d RESTART amp %.3f last_amp %.3f\n", amy_global.time, osc, msynth[osc]->amp, msynth[osc]->last_amp);
@@ -425,7 +427,11 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                     // back to loopstart
                     phase &= ((1L << (PCM_INDEX_FRAC_BITS + PCM_INDEX_STEP_EXTRA_BITS)) - 1);
                     base_index_base = msynth[osc]->loopstart + (base_index - msynth[osc]->loopend);
-                    if (msynth[osc]->state == PCM_LOOP_ONCE_INTERNAL)  msynth[osc]->state = msynth[osc]->next_state;  // Only loops once.
+                    if (msynth[osc]->state == PCM_LOOP_ONCE_INTERNAL) {
+                        msynth[osc]->state = msynth[osc]->next_state;  // Only loops once.
+                        msynth[osc]->loopstart = preset->loopstart;
+                        msynth[osc]->loopend = preset->loopend;
+                    }
                     //fprintf(stderr, "time %.3f sample %d LOOP: old_index %d new_index %d phase 0x%lx\n", amy_global.time, i, base_index, base_index_base, phase);
                     base_index = base_index_base;
                 } else if(base_index >= sample_length) { // end
@@ -553,7 +559,7 @@ int pcm_load_file() {
 // load mono samples (let python parse wave files) into preset # 
 // set loopstart, loopend, midinote, samplerate (and log2sr)
 // return the allocated sample ram that AMY will fill in.
-int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend) {
+int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, float midinote, uint32_t loopstart, uint32_t loopend) {
     // if preset was already a memorypcm, we need to unload it
     pcm_unload_preset(preset_number); // this is a no-op if preset doesn't exist or is a const pcm
     // now alloc a new LL entry and preset (the old LL entry is removed with pcm_unload_preset)

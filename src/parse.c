@@ -348,6 +348,10 @@ int midi_mapping_from_message(char *message, char cmd, int instr_num, int skip_c
     // ic255 clears all MIDI CC mappings for this synth (short form, no extra fields needed).
     size_t pos = 0;
     size_t mlen = strlen(message);
+    // An empty payload ("ic"/"io" at end of message) would return -1 below,
+    // which exactly cancels the outer parser's advance and wedges it in an
+    // infinite loop on the same 'i'.
+    if (mlen == 0) return 0;
     while (pos < mlen) {
         // Break the mapping on ZZs (for K257).
         size_t sub_mlen, next_pos;
@@ -472,6 +476,24 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     return skip_chars;
 }
 
+// Parse a sample-load parameter list ('z'/'zS' messages): comma-separated
+// unsigned integers, except the midinote field which may be fractional (e.g.
+// a sample tuned 4 cents sharp of C4 is "60.04"). parse_list_uint32_t cannot
+// parse these lists: its leading charset scan treats the list as ending at
+// the first '.', which would silently zero every field after a fractional
+// midinote. Absent fields parse as 0.
+static void parse_sample_load_params(char *message, uint32_t *vals, int num_vals,
+                                     int midinote_field, float *midinote) {
+    *midinote = 0;
+    uint16_t c = 0;
+    for (int f = 0; f < num_vals; ++f) {
+        vals[f] = (uint32_t)strtoul(message + c, NULL, 10);
+        if (f == midinote_field) *midinote = atoff(message + c);
+        while (message[c] != ',' && message[c] != 0 && c < MAX_MESSAGE_LEN) c++;
+        if (message[c] == ',') c++;
+    }
+}
+
 // Parser for transfer-layer ('z') prefix. Returns how much of a message to skip
 uint16_t amy_parse_transfer_layer_message(char *message) {
 
@@ -479,12 +501,13 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         // z: Signal to start loading sample. 
         // Params: preset number, length(frames), samplerate, midinote, loopstart, loopend. 
         uint32_t sm[6]; // preset, length, SR, midinote, loop_start, loopend
-        parse_list_uint32_t(message, sm, 6, 0);
+        float midinote;
+        parse_sample_load_params(message, sm, 6, 3, &midinote);
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
             amy_execute_deltas();
-            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, sm[3], sm[4], sm[5]);
+            int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, midinote, sm[4], sm[5]);
             start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
         }
         return 0;
@@ -530,8 +553,9 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         // zS: sample from BUS[1] to a memorypcm patch. 
         // Params: Preset number,  bus, max length in frames,midinote,loopstart,loopend
         uint32_t sm[6]; // preset, bus, max frames, midinote, loop_start, loopend
-        parse_list_uint32_t(message, sm, 6, 0);
-        int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, sm[3], sm[4], sm[5]);
+        float midinote;
+        parse_sample_load_params(message, sm, 6, 3, &midinote);
+        int16_t * ram = pcm_load(sm[0], sm[2], AMY_SAMPLE_RATE, 2, midinote, sm[4], sm[5]);
         start_receiving_sample(sm[2], sm[1], ram);
         return 1;
     }

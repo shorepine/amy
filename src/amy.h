@@ -372,6 +372,7 @@ enum coefs{
 #define SYNTH_FLAGS_NOTES_VIA_MIDI 1    // Note-on/off events are routed through the MIDI interface (to pick up MIDI note cmds)
 #define SYNTH_FLAGS_IGNORE_NOTE_OFFS 2  // Note offs are ignored (for drums with long decays)
 #define SYNTH_FLAGS_NEGATE_PEDAL 4      // Flip interpretation of MIDI pedals
+#define SYNTH_FLAGS_NO_NOTE_WARNINGS 8  // Don't print note-on/off warnings (unmatched note-off etc). For hosts where a sequencer joining mid-bar makes them by design, and stderr is a slow UART in the audio path.
 
 #define true 1
 #define false 0
@@ -1293,7 +1294,7 @@ extern void triangle_mod_trigger(uint16_t osc);
 extern void pulse_mod_trigger(uint16_t osc);
 extern void pcm_mod_trigger(uint16_t osc);
 extern void custom_mod_trigger(uint16_t osc);
-extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, uint8_t midinote, uint32_t loopstart, uint32_t loopend);
+extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, float midinote, uint32_t loopstart, uint32_t loopend);
 extern const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint32_t *length);
 extern int pcm_load_file();
 // Guard against configuring a PCM loop on a file-backed (streamed) preset,

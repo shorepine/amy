@@ -167,6 +167,9 @@ void sequencer_recompute() {
     // 60000000 us/min / (bpm * ticks per beat); keep it single-precision -
     // unsuffixed double literals pull in software double emulation on 32-bit.
     amy_global.us_per_tick = (uint32_t) (60000000.0f / (amy_global.tempo * (float)AMY_SEQUENCER_PPQ));
+    // A wire message can set an absurd tempo; us_per_tick == 0 would make the
+    // catch-up loop in sequencer_check_and_fill spin forever.
+    if (amy_global.us_per_tick < 50) amy_global.us_per_tick = 50;
     amy_global.next_amy_tick_us = (amy_sysclock64() * 1000ULL) + (uint64_t)amy_global.us_per_tick;
 }
 
