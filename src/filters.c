@@ -1047,3 +1047,112 @@ void reset_parametric(uint16_t bus) {
         }
     }
 }
+
+
+// Per-osc distortion (synth[].dist_type), applied post-render, pre-filter.
+// Params arrive range-clamped from play_delta(); loop bodies are call-free
+// so they take the Xtensa zero-overhead-loop form.  Returns the abs max of
+// what it wrote (folding can amplify a quiet input, so the pre-distortion
+// max must not be reused).  Pre-gain needs MUL6A_SS: drive * x overflows
+// MUL4_SS's [-16, 16) range and wraps sign.
+AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
+    AMY_PROFILE_START(DIST_PROCESS)
+    struct synthinfo *psynth = synth[osc];
+    SAMPLE drive = F2S(psynth->dist_drive);
+    SAMPLE mix = F2S(psynth->dist_mix);
+    SAMPLE dry = F2S(1.0f) - mix;
+    SAMPLE max_out = 0;
+    switch (psynth->dist_type) {
+    case DIST_CLIP:
+        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+            SAMPLE x = block[i];
+            SAMPLE v = MUL6A_SS(x, drive);
+            if (v > F2S(1.0f)) v = F2S(1.0f);
+            if (v < F2S(-1.0f)) v = F2S(-1.0f);
+            // Cubic soft knee y = v - v^3/3: unity small-signal gain, 2/3 at the rails.
+            SAMPLE y = MUL4_SS(v, F2S(1.0f) - MUL4_SS(MUL4_SS(v, v), F2S(0.33333334f)));
+            y = MUL4_SS(dry, x) + MUL4_SS(mix, y);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        break;
+    case DIST_FOLD:
+        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+            SAMPLE x = block[i];
+            SAMPLE v = MUL6A_SS(x, drive);
+            // Triangle wavefolder: y = 1 - |((v + 1) mod 4) - 2|, identity on [-1, 1].
+            SAMPLE y;
+#ifdef AMY_USE_FIXEDPOINT
+            // AND is a nonnegative mod-4 in two's complement.
+            SAMPLE fold = (v + F2S(1.0f)) & ((4 << S_FRAC_BITS) - 1);
+            y = fold - F2S(2.0f);
+            if (y < 0) y = -y;
+            y = F2S(1.0f) - y;
+#else
+            SAMPLE fold = v + 1.0f;
+            fold -= 4.0f * floorf(fold * 0.25f);
+            y = 1.0f - fabsf(fold - 2.0f);
+#endif
+            y = MUL4_SS(dry, x) + MUL4_SS(mix, y);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        break;
+    case DIST_CRUSH: {
+        // Bit-depth + sample-rate reduction.
+        SAMPLE hold = psynth->dist_hold;
+        uint16_t count = psynth->dist_hold_count;
+        uint16_t rate = (uint16_t)psynth->dist_rate;
+        int bits = (int)psynth->dist_bits;
+        // Quantize to `bits` magnitude bits, rounding to nearest: truncation
+        // is a half-step DC offset that the echo feedback loop integrates.
+#ifdef AMY_USE_FIXEDPOINT
+        SAMPLE qmask = (SAMPLE)~0;
+        SAMPLE qhalf = 0;
+        if (bits <= S_FRAC_BITS) {
+            qmask = ~((1 << (S_FRAC_BITS + 1 - bits)) - 1);
+            qhalf = 1 << (S_FRAC_BITS - bits);   // half a quantization step
+        }
+#else
+        float qscale = 0;  // 0 = no quantization
+        float qinv = 0;
+        if (bits <= 23) {
+            qscale = (float)(1 << (bits - 1));
+            qinv = 1.0f / qscale;
+        }
+#endif
+        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+            SAMPLE x = block[i];
+            if (count == 0) {
+                SAMPLE v = MUL6A_SS(x, drive);
+                // Saturate before quantizing: keeps hold on the CLIP/FOLD
+                // level scale and mix * hold inside MUL4_SS's [-16, 16).
+                if (v > F2S(1.0f)) v = F2S(1.0f);
+                if (v < F2S(-1.0f)) v = F2S(-1.0f);
+#ifdef AMY_USE_FIXEDPOINT
+                v = (v + qhalf) & qmask;
+#else
+                if (qscale != 0)  v = floorf(v * qscale + 0.5f) * qinv;
+#endif
+                hold = v;
+                count = rate;
+            }
+            --count;
+            SAMPLE y = MUL4_SS(dry, x) + MUL4_SS(mix, hold);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        psynth->dist_hold = hold;
+        psynth->dist_hold_count = count;
+        break;
+    }
+    default:  // unreachable; keep the return contract anyway
+        max_out = scan_max(block, AMY_BLOCK_SIZE);
+        break;
+    }
+    AMY_PROFILE_STOP(DIST_PROCESS)
+    return max_out;
+}

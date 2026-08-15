@@ -722,7 +722,17 @@ int amy_parse_message(char * message, amy_event *e) {
             }
             case 'b': e->feedback = atoff(arg); break;
             case 'c': e->chained_osc = atoi(arg); break;
-            /* C available */
+            // dist.{type,drive,bits,rate,mix}
+            case 'C': {
+                float dist_params[5];
+                parse_list_float(arg, dist_params, 5, AMY_UNSET_FLOAT);
+                e->dist_type = dist_params[0];
+                e->dist_drive = dist_params[1];
+                e->dist_bits = dist_params[2];
+                e->dist_rate = dist_params[3];
+                e->dist_mix = dist_params[4];
+                break;
+            }
             case 'd': parse_coef_message(arg, e->duty_coefs);break;
             case 'D': show_debug(atoi(arg)); break;
             case 'f': parse_coef_message(arg, e->freq_coefs);break;
