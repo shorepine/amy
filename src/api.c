@@ -240,21 +240,11 @@ output_sample_type * amy_simple_fill_buffer() {
 // ~219 years at 44.1 kHz.  Anything that stores an absolute deadline and
 // compares it later must use this rather than amy_sysclock(); see
 // sequencer_check_and_fill().
-uint64_t amy_sysclock64_raw() {
+uint64_t amy_sysclock64() {
     // Integer math: computing this through float quantizes the clock once
     // total samples exceed the 24-bit mantissa (~6 min at 48 kHz), and the
     // u32 samples-domain multiply wrapped after 2^32 samples (~25 h).
     return ((uint64_t)amy_global.total_blocks * (AMY_BLOCK_SIZE * 1000u)) / AMY_SAMPLE_RATE;
-}
-
-uint64_t amy_sysclock64() {
-    // A requested-but-not-yet-applied timebase reset reads as already applied,
-    // so a caller that sends reset=RESET_TIMEBASE and immediately reads the
-    // clock or schedules against the new timeline gets consistent answers.
-    // The counters themselves are zeroed by the render thread at the next
-    // block boundary; see amy_reset_sysclock().
-    if (amy_global.reset_timebase_pending) return 0;
-    return amy_sysclock64_raw();
 }
 
 uint32_t amy_sysclock() {

@@ -5,12 +5,7 @@
 #include <emscripten.h>
 #endif
 
-uint32_t sequencer_ticks() {
-    // A pending timebase reset reads as already applied, like amy_sysclock():
-    // the counter itself is zeroed at the next block boundary.
-    if (amy_global.reset_timebase_pending) return 0;
-    return amy_global.sequencer_tick_count;
-}
+uint32_t sequencer_ticks() { return amy_global.sequencer_tick_count; }
 
 // Sequenced ticks events are stored as the raw wire-message string (with its
 // leading 'H' command stripped) plus the scheduling metadata needed to play
@@ -217,11 +212,7 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
         free(wire);
         return 0;
     }
-    // A pending timebase reset means the tick clock is about to restart at 0:
-    // judge "already due" against the new timeline, or a one-off scheduled
-    // for the near future right after reset=RESET_TIMEBASE fires immediately.
-    uint32_t cur_tick_count = amy_global.reset_timebase_pending ? 0 : amy_global.sequencer_tick_count;
-    if (period == 0 && tick <= cur_tick_count) {
+    if (period == 0 && tick <= amy_global.sequencer_tick_count) {
         // A one-off that is already due or overdue.  Play it NOW rather than
         // dropping it: a caller that reads the tick clock and schedules
         // relative to it always runs a little after the tick it read (every

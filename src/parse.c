@@ -790,7 +790,7 @@ int amy_parse_message(char * message, amy_event *e) {
                     }
                     // if we're resetting timebase, request it now; the render
                     // thread applies it at the next block boundary (see
-                    // amy_reset_sysclock), though the clock reads 0 already
+                    // amy_reset_sysclock)
                     if(e->reset_osc & RESET_TIMEBASE) {
                         amy_reset_sysclock();
                     }

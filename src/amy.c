@@ -2187,11 +2187,22 @@ int16_t * amy_fill_buffer() {
     // thread, so it cannot race this thread's own sequencer pacing
     // (sequencer_check_and_fill's read-modify-write of next_amy_tick_us) or
     // the block counting below.  The lock orders it against a concurrent
-    // amy_reset_sysclock() and publishes the zeroed counters before the flag
-    // clears.  The getters read 0 while the flag is up, so from every other
-    // thread's point of view the reset already happened.
+    // amy_reset_sysclock().
     if (amy_global.reset_timebase_pending) {
         amy_grab_lock();
+        // Rebase queued deltas onto the new timeline so their relative timing
+        // survives the reset: a delta due 200 ms from now is still due 200 ms
+        // from now, and one already due plays on this block.  (RESET_EVENTS is
+        // the way to drop them instead.)  Doing this here rather than when the
+        // reset was requested also covers deltas queued in between, which were
+        // scheduled against the clock as it still read then.
+        uint32_t old_sysclock = (uint32_t)amy_sysclock64();
+        struct delta *d = amy_global.delta_queue;
+        while (d != NULL) {
+            if (AMY_TIME_GEQ(old_sysclock, d->time)) d->time = 0;
+            else d->time = d->time - old_sysclock;  // unsigned wrap keeps "in the future by k ms"
+            d = d->next;
+        }
         amy_global.total_blocks = 0;
         amy_global.total_samples = 0;
         amy_global.time = 0;
@@ -2374,32 +2385,17 @@ int16_t * amy_fill_buffer() {
 }
 
 // Request a timebase reset: the millisecond clock and the sequencer tick
-// count restart from zero.  The visible clock (amy_sysclock(),
-// amy_sysclock64(), sequencer_ticks()) reads as reset the moment this
-// returns; the counters themselves are zeroed by the render thread at the
-// next block boundary (amy_fill_buffer()).  Zeroing them here -- this runs
-// on whichever thread called amy_add_message() -- raced the render thread:
+// count restart from zero, and queued events keep their relative timing.
+// The render thread applies it at the next block boundary (amy_fill_buffer()),
+// within a few ms.  Zeroing the counters here -- this runs on whichever
+// thread called amy_add_message() -- raced the render thread:
 // sequencer_check_and_fill() had already computed now_us against the old
 // clock, this call re-anchored next_amy_tick_us near zero underneath it, and
 // its catch-up loop then replayed thousands of ticks in one block, smearing
 // every periodic sequence into a continuous roll for seconds.
 void amy_reset_sysclock() {
     amy_grab_lock();
-    if (!amy_global.reset_timebase_pending) {
-        // Rebase queued deltas onto the new timeline so their relative timing
-        // survives the reset: a delta due 200 ms from now is still due 200 ms
-        // from now.  One already due is due at 0.  (RESET_EVENTS is the way
-        // to drop them instead.)  Deltas queued after this call need no
-        // fixup: they are scheduled against a clock that already reads 0.
-        uint32_t old_sysclock = (uint32_t)amy_sysclock64_raw();
-        struct delta *d = amy_global.delta_queue;
-        while (d != NULL) {
-            if (AMY_TIME_GEQ(old_sysclock, d->time)) d->time = 0;
-            else d->time = d->time - old_sysclock;  // unsigned wrap keeps "in the future by k ms"
-            d = d->next;
-        }
-        amy_global.reset_timebase_pending = 1;
-    }
+    amy_global.reset_timebase_pending = 1;
     amy_release_lock();
 }
 
