@@ -78,4 +78,5 @@ dkms.conf
 godot/.sconsign.dblite
 godot/src/*.os
 tests/test_clone_on_grow
+tests/test_log2_lut
 tests/test_timebase_reset

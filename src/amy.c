@@ -653,9 +653,18 @@ void add_delta_to_queue(struct delta *d, struct delta **queue) {
 
 }
 
+// The smallest amplitude this maps rather than treating as silence. log2_lut
+// requires a strictly positive argument -- it normalizes by shifting, so zero
+// shifts to zero forever -- and `lin == 0` did not cover everything that
+// reaches it as zero or worse: a negative amplitude, a NaN, or (in fixed-point
+// builds, 23 fractional bits) any amplitude that underflows the conversion.
+// This is 60 dB below the quietest amplitude the mapping describes, so
+// nothing audible changes. Written as !(lin > MIN) so NaN takes the guard too.
+#define MAP_60DB_MIN_LIN 1e-6f
+
 float map_60dB_to_01f(float lin) {
     // Map .001 to 0, 1 to 1 logarithmically.
-    if (lin == 0) return -10.0f;
+    if (!(lin > MAP_60DB_MIN_LIN)) return -10.0f;
     // Use AMY's fast log2 LUT instead of libm log2f (called per-osc per-block).
     float result = 1.0f + 0.10034333188799373f * S2F(log2_lut(F2S(lin)));  // 0.100343 = 1 / (3 * log2(10))
     return result;
