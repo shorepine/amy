@@ -124,6 +124,55 @@ static void test_already_due_event_is_not_lost(void) {
           "played immediately on the new timeline (%lld ms)", (long long)landed);
 }
 
+static void test_reset_via_the_c_event_api(void) {
+    printf("reset=RESET_TIMEBASE works through amy_add_event(), not just the wire\n");
+    // RESET_TIMEBASE used to be handled only where a wire string is turned
+    // into an event, so a C caller who set reset_osc on an amy_event had it
+    // silently dropped: the RESET_OSC delta reached play_delta, which knew
+    // nothing about the bit, and the clock just kept running. The only way in
+    // was to call amy_reset_sysclock() by hand.
+    render_ms(400);
+    uint32_t before = amy_sysclock();
+    CHECK(before >= 300, "clock has run on (%" PRIu32 " ms)", before);
+    amy_event e = amy_default_event();
+    e.reset_osc = RESET_TIMEBASE;
+    amy_add_event(&e);
+    amy_simple_fill_buffer();
+    amy_simple_fill_buffer();
+    CHECK(amy_sysclock() < before / 2,
+          "the clock restarted (%" PRIu32 " ms, was %" PRIu32 ")", amy_sysclock(), before);
+}
+
+static void test_scheduled_reset_waits_for_its_time(void) {
+    printf("a reset with time= happens at that time, like any other event\n");
+    render_ms(400);
+    uint32_t now = amy_sysclock();
+    amy_event e = amy_default_event();
+    e.time = now + 200;
+    e.reset_osc = RESET_TIMEBASE;
+    amy_add_event(&e);
+    render_ms(100);
+    CHECK(amy_sysclock() > now, "not reset yet at +100 ms (%" PRIu32 " ms)", amy_sysclock());
+    render_ms(150);
+    CHECK(amy_sysclock() < 200, "reset by +250 ms (%" PRIu32 " ms)", amy_sysclock());
+}
+
+static void test_combined_reset_bits_all_take_effect(void) {
+    printf("a reset bit handled in the parse doesn't swallow the ones that aren't\n");
+    // The parse handles RESET_AMY / RESET_EVENTS / RESET_SYNTHS itself and
+    // then used to unset the WHOLE field, so anything combined with them never
+    // reached play_delta -- RESET_EVENTS|RESET_ALL_OSCS reset the queue but
+    // left every osc exactly as it was.
+    amy_add_message((char *)"v0w2f550Z");
+    render_ms(20);
+    CHECK(osc0_wave() == SAW_DOWN, "osc 0 set to wave 2");
+    char m[32];
+    snprintf(m, sizeof(m), "S%dZ", RESET_EVENTS | RESET_ALL_OSCS);
+    amy_add_message(m);
+    render_ms(20);
+    CHECK(osc0_wave() != SAW_DOWN, "RESET_ALL_OSCS still took effect alongside RESET_EVENTS");
+}
+
 // AMY calls these; the test binary has to provide them.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -136,6 +185,9 @@ int main(void) {
     test_reset_applies_at_a_block_boundary();
     test_queued_event_keeps_its_relative_time();
     test_already_due_event_is_not_lost();
+    test_reset_via_the_c_event_api();
+    test_scheduled_reset_waits_for_its_time();
+    test_combined_reset_bits_all_take_effect();
 
     if (failures) { printf("%d FAILURES\n", failures); return 1; }
     printf("all ok\n");

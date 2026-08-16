@@ -1556,9 +1556,21 @@ void play_delta(struct delta *d) {
             AMY_UNSET(synth[d->osc]->chained_osc);
         }
     }
-    if(d->param == RESET_OSC) { 
-        // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS are handled at parse time (RESET_TIMEBASE by
-        // flagging the render thread to re-zero the counters between blocks), so we don't deal with them here.
+    if(d->param == RESET_OSC) {
+        // Remember that RESET_AMY, RESET_EVENTS and RESET_SYNTHS are handled at parse time -- they can't be
+        // carried in a delta -- so we don't deal with them here.
+        if(d->data.i & RESET_TIMEBASE) {
+            // Raise the flag only; the render thread re-zeroes the counters at
+            // the next block boundary.  That is what lets the timebase reset be
+            // an ordinary delta at all: play_delta is reachable from parse
+            // threads too (patch/transfer loads), and a flag is safe to raise
+            // from any of them, where the zeroing would not be.
+            // NOT amy_reset_sysclock(): we are inside flush_due_deltas(), which
+            // holds the amy lock that it grabs -- that self-deadlocks (a hang,
+            // not a crash).  Setting the flag here is already ordered by that
+            // same lock.
+            amy_global.reset_timebase_pending = 1;
+        }
         if(d->data.i & RESET_ALL_OSCS) {
             amy_reset_oscs();
         }
