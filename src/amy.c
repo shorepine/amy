@@ -1381,8 +1381,10 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
     // Check to see if chaining this osc would cause a loop.
     uint16_t next_osc = chained_osc;
     do {
-        // An osc we can't allocate can't be linked.
-        if (!ensure_osc_allocd(next_osc, NULL)) return true;
+        // Walk without allocating: an osc with no storage is at its defaults,
+        // so its chained_osc is unset and the chain ends here -- no loop. The
+        // link site allocates what it is about to write to.
+        if (synth[next_osc] == NULL) return false;
         if (next_osc == osc) {
             fprintf(stderr, "chaining osc %d to osc %d would cause loop.\n",
                     chained_osc, osc);
@@ -1402,8 +1404,9 @@ int chained_osc_would_cause_loop(uint16_t osc, uint16_t chained_osc) {
 static bool mod_osc_reaches(uint16_t from, uint16_t target, int *budget) {
     if (!AMY_IS_SET(from)) return false;
     if ((*budget)-- <= 0) return true;
-    // An osc we can't allocate can't be linked.
-    if (!ensure_osc_allocd(from, NULL)) return true;
+    // Walk without allocating (see chained_osc_would_cause_loop): an osc with
+    // no storage has no mod_sources, so it reaches nothing.
+    if (synth[from] == NULL) return false;
     if (from == target) return true;
     for (int i = 0; i < NUM_MOD_SOURCES; ++i)
         if (mod_osc_reaches(synth[from]->mod_source[i], target, budget)) return true;
@@ -1576,7 +1579,8 @@ void play_delta(struct delta *d) {
     if(d->param == CHAINED_OSC) {
         int chained_osc = d->data.i;
         if (chained_osc >=0 && chained_osc < AMY_OSCS &&
-            !chained_osc_would_cause_loop(d->osc, chained_osc)) {
+            !chained_osc_would_cause_loop(d->osc, chained_osc) &&
+            ensure_osc_allocd(chained_osc, NULL)) {
             synth[d->osc]->chained_osc = chained_osc;
             synth[chained_osc]->role = SYNTH_IS_CHAINED;
         } else {
@@ -1629,11 +1633,11 @@ void play_delta(struct delta *d) {
         // CHAINED_OSC above - a cycle must be rejected before it is stored or
         // the recursion never terminates.
         if (mod_osc >= 0 && mod_osc < AMY_OSCS &&
-            !mod_osc_would_cause_loop(d->osc, mod_osc)) {
+            !mod_osc_would_cause_loop(d->osc, mod_osc) &&
+            ensure_osc_allocd(mod_osc, NULL)) {
             synth[d->osc]->mod_source[which_source] = mod_osc;
             // NOTE: These are delta-only side effects.  A purist would strive to remove them.
             // When an oscillator is named as a modulator, we change its state.
-            ensure_osc_allocd(mod_osc, NULL);
             synth[mod_osc]->role = SYNTH_IS_MOD_SOURCE;
             // Remove default amplitude dependence on velocity when an oscillator is made a modulator.
             synth[mod_osc]->amp_coefs[COEF_VEL] = 0;
