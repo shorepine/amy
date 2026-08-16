@@ -100,7 +100,7 @@ amy.send(synth=1, note=60, vel=1)
 
 ### Changing a synth's voice count
 
-You can change `num_voices` on a synth that is already running, and the synth keeps the sound it has *now* -- not the patch it started from:
+You can change `num_voices` on a synth that is already running. The synth keeps the sound it has at that moment, including any changes you made since loading its patch:
 
 ```python
 amy.send(synth=0, num_voices=1, patch=1)
@@ -108,11 +108,11 @@ amy.send(synth=0, osc=0, filter_freq=2000, resonance=4)  # tweak the live synth
 amy.send(synth=0, num_voices=4)                          # 4 voices of the TWEAKED sound
 ```
 
-Changing the voice count rebuilds all of the synth's voices, so AMY copies one of the existing voices into the new ones; everything you configured after the patch was loaded comes along, and the patch is not reloaded.  Note and velocity aren't part of an osc's configuration, so resizing a synth while it's playing copies the sound, not the notes.  This works for a synth that never had a patch at all -- one built with `oscs_per_voice` or a `patch_string` and then configured osc by osc resizes like any other.
+Changing the voice count rebuilds all of the synth's voices by copying one of the existing voices into the new ones, so every osc setting the synth currently holds comes along.  Note and velocity aren't part of an osc's configuration, so resizing a synth while it's playing copies the sound, not the notes.  A synth with no patch at all -- one built with `oscs_per_voice` or a `patch_string` and then configured osc by osc -- resizes like any other.
 
-To load a *different* sound, name it: `amy.send(synth=0, patch=13)`, or a fresh `patch_string`, replaces the voices' configuration as before.
+To load a *different* sound, name it: `amy.send(synth=0, patch=13)`, or a fresh `patch_string`, replaces the voices' configuration.
 
-A synth built from a `patch_string` carries no patch *number* (the one AMY assigns internally is released as soon as the patch is loaded, so it never occupies a user patch slot).  Anything that asks such a synth for its patch number gets "none": in particular, a bare MIDI program change on that channel selects from bank 0 (the Juno patches) instead of inferring a bank from the current patch.  Synths sitting on a numbered patch -- built-in, or one of your own at 1024+ -- infer their bank as before.
+A synth built from a `patch_string` carries no patch *number*: the number AMY assigns internally is released as soon as the patch is loaded, so it never occupies a user patch slot.  A bare MIDI program change on such a channel therefore selects from bank 0, the Juno patches.  A synth sitting on a numbered patch -- built-in, or one of your own at 1024+ -- infers its bank from that number.
 
 ### User patches
 
@@ -213,7 +213,7 @@ AMY provides a musical sequencer, on `ticks`, for both one-off future scheduling
 
 ### The sequencer
 
-AMY starts a musical sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. The reset travels as an ordinary event, so you can schedule it with `ticks=` like anything else, and it works the same from the C `amy_add_event()` API. The counters restart at the next audio block boundary rather than the instant the event plays, so the reset cannot race the render thread -- for those few ms `amy.sysclock()` and `amy.sequencer_ticks()` still report the old timeline. Anything already queued for a future moment -- a note-off waiting on a note-on delay, an event scheduled through the C API's `amy_event.time`, anything held back by `latency_ms` -- keeps its relative timing across the reset, so a note due 200 ms from now is still due 200 ms from now (send `RESET_EVENTS` too if you want them dropped).
+AMY starts a musical sequencer that works on `ticks` from startup. You can reset the `ticks` to 0 with an `amy.send(reset=amy.RESET_TIMEBASE)`. The reset travels as an ordinary event, so you can schedule it with `ticks=` like anything else, and it works the same from the C `amy_add_event()` API. The counters restart at the next audio block boundary, which keeps the reset off the render thread's toes; until that boundary `amy.sysclock()` and `amy.sequencer_ticks()` report the running timeline. Anything already queued for a future moment -- a note-off waiting on a note-on delay, an event scheduled through the C API's `amy_event.time`, anything held back by `latency_ms` -- keeps its relative timing across the reset, so a note due 200 ms from now is still due 200 ms from now (send `RESET_EVENTS` too if you want them dropped).
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 

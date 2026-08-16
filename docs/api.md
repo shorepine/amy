@@ -83,10 +83,10 @@ To add a function: edit the table in `scripts/gen_amy_c_api.py`, run
 `make c-api`, and commit the regenerated files (CI runs `make check-c-api`).
 The table below is generated from the same source.
 
-Not everything needs to be here. `amy.reset_sysclock()` (and its GDScript and
-JS equivalents) is written natively in each binding as a `send()` of
-`reset=RESET_TIMEBASE`, because the reset is an ordinary event -- binding a C
-entry point on four platforms bought nothing over sending the event.
+Not everything belongs here. `amy.reset_sysclock()` (and its GDScript and JS
+equivalents) is written natively in each binding as a `send()` of
+`reset=RESET_TIMEBASE`: the reset is an ordinary event, so no C entry point is
+needed.
 
 <!-- BEGIN GENERATED C API DOCS - scripts/gen_amy_c_api.py -->
 | Python (all platforms) | C function | MicroPython alias | Godot (`AmySynth`) | What it does |
@@ -313,7 +313,7 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `v`    | `osc` | `osc` | uint 0 to OSCS-1 | Which oscillator to control |
 | `w`    | `wave` | `wave` | uint 0-21 | Waveform: [0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE, KS, PCM, ALGO, PARTIAL, BYO_PARTIALS, INTERP_PARTIALS, AUDIO_IN0, AUDIO_IN1, AUDIO_EXT0, AUDIO_EXT1, AMY_MIDI, PCM_LEFT, PCM_RIGHT, WAVETABLE, CUSTOM, OFF]. default: 0/SINE |
 | `ww`   | `mode` | `mode` | uint | Wave-specific modes.  For PCM, we have `PCM_PLAY` (plays through to end), `PCM_PLAY_STOP` (stops immediately on note-off, default), `PCM_LOOP` (observes loop marks in wave, plays through release on note-off), `PCM_LOOP_STOP` (plays loop, stops immediately on note-off), `PCM_LOOP_FOREVER` (loops, and ignores note-offs, expected to be used with an EG). |
-| `S`    | `reset_osc`| `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock and sequencer tick count to zero. It is an ordinary event, so it works from `amy_add_event()` as well as the wire, and can be scheduled with `ticks=` (or `amy_event.time` from the C API) like any other event; the counters themselves restart at the next audio block boundary, so the reset cannot race the render thread, and events already queued for a future time keep their relative timing across it. (RESET_AMY and RESET_EVENTS are the exceptions: they act the moment the message is parsed, since neither restarting AMY nor emptying the event queue can be carried in a queued event.) RESET_SYNTHS is a deprecated alias for RESET_ALL_OSCS -- it always ran the same teardown, only from the parse rather than the event queue; prefer RESET_ALL_OSCS. RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
+| `S`    | `reset_osc`| `reset`  | uint | Resets given oscillator. set to RESET_ALL_OSCS to reset all oscillators, gain and EQ. RESET_TIMEBASE resets the clock and sequencer tick count to zero. It is an ordinary event, so it works from `amy_add_event()` as well as the wire, and can be scheduled with `ticks=` (or `amy_event.time` from the C API) like any other event; the counters restart at the next audio block boundary, so the reset cannot race the render thread, and events already queued for a future time keep their relative timing across it. (RESET_AMY and RESET_EVENTS are the exceptions: they act the moment the message is parsed, since neither restarting AMY nor emptying the event queue can be carried in a queued event.) RESET_SYNTHS is a deprecated alias for RESET_ALL_OSCS; prefer RESET_ALL_OSCS. RESET_AMY restarts AMY. RESET_SEQUENCER clears the sequencer.|
 | `A`    | `eg0_times[]`, `eg0_values[]` | `bp0`    | string (wire) / arrays (`amy_event`)      | Envelope Generator 0 breakpoints as time(ms),value pairs. Wire/Python format remains comma-separated, e.g. `100,0.5,50,0.25,200,0`. In C `amy_event`, use typed arrays (`eg0_times[i]`, `eg0_values[i]`). The last pair is release (triggers on note off). |
 | `B`    | `eg1_times[]`, `eg1_values[]` | `bp1`    | string (wire) / arrays (`amy_event`)      | Envelope Generator 1 breakpoints. Wire/Python format remains comma-separated; in C `amy_event`, use typed arrays (`eg1_times[i]`, `eg1_values[i]`). |
 | `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
