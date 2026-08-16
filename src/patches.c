@@ -1179,15 +1179,16 @@ void schedule_osc_reset(uint32_t time, uint16_t osc, struct delta **queue) {
 // already discards the state (the reset wiped it in place), so freeing is
 // behaviorally identical -- an unallocated osc reads as defaults, and the
 // next touch re-allocates lazily -- it just gives the memory back.
-static void schedule_osc_free(uint32_t time, uint16_t osc) {
+void schedule_osc_free(uint32_t time, uint16_t osc, struct delta **queue) {
+    if (queue == NULL)  queue = &amy_global.delta_queue;
     struct delta d = {
         .time = time,
         .osc = 0,
-        .param = RESET_OSC,
-        .data.i = (uint32_t)osc | RESET_FREE_OSC,
+        .param = FREE_OSC,
+        .data.i = osc,
         .next = NULL,
     };
-    add_delta_to_queue(&d, &amy_global.delta_queue);
+    add_delta_to_queue(&d, queue);
 }
 
 void release_voice_oscs(int32_t voice, uint32_t time) {
@@ -1199,7 +1200,7 @@ void release_voice_oscs(int32_t voice, uint32_t time) {
                 //fprintf(stderr, "Already set voice %d osc %d, removing it\n", voices[v], i);
                 AMY_UNSET(osc_to_voice[i]);
                 // Ownership ends here: clear the osc and return its storage.
-                schedule_osc_free(time, i);
+                schedule_osc_free(time, i, NULL);
             }
         }
         AMY_UNSET(voice_to_base_osc[voice]);

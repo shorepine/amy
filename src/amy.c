@@ -1436,6 +1436,18 @@ void play_delta(struct delta *d) {
     //uint8_t trig=0;
     // todo: delta-only side effect, remove
 
+    if (d->param == FREE_OSC) {
+        // Voice release: ownership has ended and the state is discarded either
+        // way, so return the storage too. Reading an unallocated osc yields
+        // defaults, and the next touch re-allocates lazily. Handled before the
+        // ensure below so we don't allocate an osc on the way to freeing it.
+        if(d->data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+            free_osc(d->data.i);
+        }
+        AMY_PROFILE_STOP(PLAY_DELTA)
+        return;
+    }
+
     if (d->param != RESET_OSC) {
         // On OOM drop the delta; every branch below dereferences synth[d->osc].
         if (!ensure_osc_allocd(d->osc, NULL)) {
@@ -1579,15 +1591,7 @@ void play_delta(struct delta *d) {
             // If we got here, it's a full reset of patches.
             patches_reset();
         }
-        if(d->data.i & RESET_FREE_OSC) {
-            // Voice release: ownership ended and the state is discarded
-            // either way, so return the storage too. Reading an unallocated
-            // osc yields defaults, and the next touch re-allocates lazily.
-            uint32_t osc = d->data.i & ~(uint32_t)RESET_FREE_OSC;
-            if(osc < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
-                free_osc(osc);
-            }
-        } else if(d->data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+        if(d->data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
             reset_osc(d->data.i);
         }
     }
