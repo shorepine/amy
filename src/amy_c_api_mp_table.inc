@@ -2,7 +2,6 @@
 { MP_ROM_QSTR(MP_QSTR_amy_send), MP_ROM_PTR(&amy_capi_mp_send_wire_obj) },
 { MP_ROM_QSTR(MP_QSTR_amy_send_wire_from_sysex), MP_ROM_PTR(&amy_capi_mp_send_wire_from_sysex_obj) },
 { MP_ROM_QSTR(MP_QSTR_amy_ticks_ms), MP_ROM_PTR(&amy_capi_mp_ticks_ms_obj) },
-{ MP_ROM_QSTR(MP_QSTR_amy_reset_sysclock), MP_ROM_PTR(&amy_capi_mp_reset_sysclock_obj) },
 { MP_ROM_QSTR(MP_QSTR_amy_render_load), MP_ROM_PTR(&amy_capi_mp_render_load_obj) },
 { MP_ROM_QSTR(MP_QSTR_amy_set_render_load_threshold), MP_ROM_PTR(&amy_capi_mp_set_render_load_threshold_obj) },
 { MP_ROM_QSTR(MP_QSTR_amy_bleep), MP_ROM_PTR(&amy_capi_mp_bleep_obj) },

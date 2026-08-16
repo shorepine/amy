@@ -106,8 +106,8 @@ amy-message: $(OBJECTS) src/amy-message.o
 # rollovers 50 days out, which you can only hit by fast-forwarding the counters.
 CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds \
          tests/test_bus_config tests/test_patch_slots \
-         tests/test_synth_readout tests/test_clone_on_grow \
-         tests/test_osc_free_on_release
+         tests/test_synth_readout tests/test_log2_lut tests/test_clone_on_grow \
+         tests/test_timebase_reset tests/test_osc_free_on_release
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
@@ -149,13 +149,13 @@ speedtest:
 	echo "Compiling LoadTestChord.ino..."
 	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
-	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
+	${PYTHON} tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
 speedtest-piano:
 	echo "Compiling LoadTestChord.ino..."
 	arduino-cli compile --fqbn esp32:esp32:amyboard --build-path ./build --build-property "compiler.c.extra_flags=-DARDUINO_SPEEDTEST" --build-property "compiler.cpp.extra_flags=-DSPEEDTEST_PATCH=256 -DSPEEDTEST_NUM_NOTES=6" tools/arduino_loadsweep/LoadTestChord
 	echo 'Running measure.py.  Press RESET on board after seeing "[flash] ok (attempt 1)"'
-	python tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
+	${PYTHON} tools/arduino_loadsweep/measure.py --out ./load --port ${USBSERIAL} ./build
 
 valgrind: amy-example
 	valgrind --leak-check=full --show-reachable=yes --suppressions=valgrind.suppressions ./amy-example

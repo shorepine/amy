@@ -21,13 +21,6 @@ static PyObject * amy_capi_py_ticks_ms(PyObject *self, PyObject *args) {
     return Py_BuildValue("I", (unsigned int)amy_sysclock());
 }
 
-static PyObject * amy_capi_py_reset_sysclock(PyObject *self, PyObject *args) {
-    (void)self;
-    (void)args;
-    amy_reset_sysclock();
-    Py_RETURN_NONE;
-}
-
 static PyObject * amy_capi_py_render_load(PyObject *self, PyObject *args) {
     (void)self;
     (void)args;

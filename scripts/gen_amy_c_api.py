@@ -62,6 +62,10 @@ ROOT = Path(__file__).resolve().parents[1]
 #   doc        one-line docstring / method-table doc
 # ----------------------------------------------------------------------------
 
+# NOTE: reset_sysclock is deliberately NOT here. RESET_TIMEBASE travels as an
+# ordinary event now, so each binding implements reset_sysclock() natively as
+# a send() of that reset bit -- no C entry point, one less thing to bind on
+# four platforms. See amy/__init__.py, godot/amy.gd, src/amy_connector.js.
 API = [
     dict(py='send_wire', c='amy_add_message', mp='amy_send',
          args=[('message', 'str', None)], ret='void',
@@ -75,10 +79,6 @@ API = [
          args=[], ret='u32',
          doc='Read the AMY millisecond clock',
          platforms={'py', 'mp', 'web'}),
-    dict(py='reset_sysclock', c='amy_reset_sysclock',
-         args=[], ret='void',
-         doc='Reset the AMY millisecond clock to zero',
-         platforms={'py', 'mp', 'web', 'gd'}),
     dict(py='render_load', c='amy_get_render_load',
          args=[], ret='f32',
          doc='Smoothed fraction of real time AMY spends rendering (0..1)',
