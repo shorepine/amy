@@ -11,8 +11,17 @@ static inline SAMPLE lut_val(SAMPLE frac, const LUTSAMPLE *table, const int log2
 }
 
 
+// Smallest argument log2_lut will take. Anything at or below it -- zero, a
+// negative, a NaN, an amplitude that underflowed the conversion to SAMPLE --
+// is treated as this instead. log2 of it is -20, i.e. -120 dB, far below
+// anything audible, and the alternative is not returning at all: the
+// normalizing loop below shifts zero left forever.
+#define LOG2_LUT_MIN F2S(1.0f / (1 << 20))
+
 AMY_IRAM_ATTR SAMPLE log2_lut(SAMPLE x) {
-    // assert(x > 0);
+    // Branch-free floor rather than a test-and-return: this runs per-osc
+    // per-block. MAX takes the floor for NaN too, since NaN > y is false.
+    x = MAX(x, LOG2_LUT_MIN);
     int scale = 0;
     while (x < F2S(1.0f)) {
         x = SHIFTL(x, 1);
