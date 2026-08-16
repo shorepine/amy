@@ -83,13 +83,17 @@ To add a function: edit the table in `scripts/gen_amy_c_api.py`, run
 `make c-api`, and commit the regenerated files (CI runs `make check-c-api`).
 The table below is generated from the same source.
 
+Not everything needs to be here. `amy.reset_sysclock()` (and its GDScript and
+JS equivalents) is written natively in each binding as a `send()` of
+`reset=RESET_TIMEBASE`, because the reset is an ordinary event -- binding a C
+entry point on four platforms bought nothing over sending the event.
+
 <!-- BEGIN GENERATED C API DOCS - scripts/gen_amy_c_api.py -->
 | Python (all platforms) | C function | MicroPython alias | Godot (`AmySynth`) | What it does |
 |---|---|---|---|---|
 | `amy.send_wire(message)` | `void amy_add_message(char * message)` | `tulip.amy_send` | — | Send a wire-protocol message to AMY |
 | `amy.send_wire_from_sysex(message)` | `void amy_send_wire_from_sysex(char * message)` | `tulip.amy_send_wire_from_sysex` | — | Send a wire message as if from sysex (file-transfer routing applies) |
 | `amy.ticks_ms()` | `uint32_t amy_sysclock()` | `tulip.amy_ticks_ms` | — | Read the AMY millisecond clock |
-| `amy.reset_sysclock()` | `void amy_reset_sysclock()` | `tulip.amy_reset_sysclock` | `reset_sysclock` | Reset the AMY millisecond clock to zero |
 | `amy.render_load()` | `float amy_get_render_load()` | `tulip.amy_render_load` | `render_load` | Smoothed fraction of real time AMY spends rendering (0..1) |
 | `amy.set_render_load_threshold(threshold)` | `void amy_set_render_load_threshold(float threshold)` | `tulip.amy_set_render_load_threshold` | `set_render_load_threshold` | Set the render-load fraction that trips the overload failsafe (0 disables) |
 | `amy.bleep(start=0)` | `void amy_bleep(uint32_t start)` | `tulip.amy_bleep` | `bleep` | Play the startup bleep |

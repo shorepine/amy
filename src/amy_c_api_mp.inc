@@ -21,13 +21,6 @@ static mp_obj_t amy_capi_mp_ticks_ms(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(amy_capi_mp_ticks_ms_obj, 0, 0, amy_capi_mp_ticks_ms);
 
-static mp_obj_t amy_capi_mp_reset_sysclock(size_t n_args, const mp_obj_t *args) {
-    (void)n_args; (void)args;
-    amy_reset_sysclock();
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(amy_capi_mp_reset_sysclock_obj, 0, 0, amy_capi_mp_reset_sysclock);
-
 static mp_obj_t amy_capi_mp_render_load(size_t n_args, const mp_obj_t *args) {
     (void)n_args; (void)args;
     return mp_obj_new_float(amy_get_render_load());

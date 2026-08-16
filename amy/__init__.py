@@ -37,7 +37,6 @@ def _capi_resolve(py_name, mp_name):
 _send_wire = _capi_resolve('send_wire', 'amy_send')
 _send_wire_from_sysex = _capi_resolve('send_wire_from_sysex', 'amy_send_wire_from_sysex')
 _ticks_ms = _capi_resolve('ticks_ms', 'amy_ticks_ms')
-_reset_sysclock = _capi_resolve('reset_sysclock', 'amy_reset_sysclock')
 _render_load = _capi_resolve('render_load', 'amy_render_load')
 _set_render_load_threshold = _capi_resolve('set_render_load_threshold', 'amy_set_render_load_threshold')
 _bleep = _capi_resolve('bleep', 'amy_bleep')
@@ -60,10 +59,6 @@ def send_wire_from_sysex(message):
 def ticks_ms():
     """Read the AMY millisecond clock"""
     return _ticks_ms()
-
-def reset_sysclock():
-    """Reset the AMY millisecond clock to zero"""
-    return _reset_sysclock()
 
 def render_load():
     """Smoothed fraction of real time AMY spends rendering (0..1)"""
@@ -102,6 +97,14 @@ def get_input_buffer():
     return _get_input_buffer()
 
 # END GENERATED - scripts/gen_amy_c_api.py
+
+
+def reset_sysclock():
+    """Reset the AMY millisecond clock and sequencer tick count to zero"""
+    # Native rather than a C binding: RESET_TIMEBASE is an ordinary event, so
+    # this is just a send(), and the reset then follows the same path (and the
+    # same ordering with everything else you have sent) as any other event.
+    send(reset=RESET_TIMEBASE)
 
 
 # If set, calls this instead of amy.send()
