@@ -549,6 +549,7 @@ int8_t global_init(amy_config_t c) {
     amy_global.sequencer_tick_count = 0;
     amy_global.next_amy_tick_us = 0;
     amy_global.us_per_tick = 0;
+    amy_global.reset_timebase_pending = 0;
 
     struct bus_state *bus_configs = malloc_caps(sizeof(struct bus_state) * amy_global.config.max_buses,
                                                 amy_global.config.ram_caps_synth);
@@ -1564,9 +1565,24 @@ void play_delta(struct delta *d) {
             AMY_UNSET(synth[d->osc]->chained_osc);
         }
     }
-    if(d->param == RESET_OSC) { 
-        // Remember that RESET_AMY, RESET_TIMEBASE and RESET_EVENTS happens immediately in the parse, so we don't deal with it here.
-        if(d->data.i & RESET_ALL_OSCS) {
+    if(d->param == RESET_OSC) {
+        // Remember that RESET_AMY and RESET_EVENTS are handled at parse time -- they can't be
+        // carried in a delta -- so we don't deal with them here.
+        if(d->data.i & RESET_TIMEBASE) {
+            // Raise the flag only; the render thread re-zeroes the counters at
+            // the next block boundary.  That is what lets the timebase reset be
+            // an ordinary delta at all: play_delta is reachable from parse
+            // threads too (patch/transfer loads), and a flag is safe to raise
+            // from any of them, where the zeroing would not be.
+            // NOT amy_reset_sysclock(): we are inside flush_due_deltas(), which
+            // holds the amy lock that it grabs -- that self-deadlocks (a hang,
+            // not a crash).  Setting the flag here is already ordered by that
+            // same lock.
+            amy_global.reset_timebase_pending = 1;
+        }
+        // RESET_SYNTHS is a deprecated alias: it always did exactly this,
+        // just from the parse instead of from here.
+        if(d->data.i & (RESET_ALL_OSCS | RESET_SYNTHS)) {
             amy_reset_oscs();
         }
         if(d->data.i & RESET_SEQUENCER) {
@@ -2190,6 +2206,34 @@ void amy_block_processed(void) {
 
 int16_t * amy_fill_buffer() {
     AMY_PROFILE_START(AMY_FILL_BUFFER)
+    // A requested timebase reset lands here, between blocks on the render
+    // thread, so it cannot race this thread's own sequencer pacing
+    // (sequencer_check_and_fill's read-modify-write of next_amy_tick_us) or
+    // the block counting below.  The lock orders it against a concurrent
+    // amy_reset_sysclock().
+    if (amy_global.reset_timebase_pending) {
+        amy_grab_lock();
+        // Rebase queued deltas onto the new timeline so their relative timing
+        // survives the reset: a delta due 200 ms from now is still due 200 ms
+        // from now, and one already due plays on this block.  (RESET_EVENTS is
+        // the way to drop them instead.)  Doing this here rather than when the
+        // reset was requested also covers deltas queued in between, which were
+        // scheduled against the clock as it still read then.
+        uint32_t old_sysclock = (uint32_t)amy_sysclock64();
+        struct delta *d = amy_global.delta_queue;
+        while (d != NULL) {
+            if (AMY_TIME_GEQ(old_sysclock, d->time)) d->time = 0;
+            else d->time = d->time - old_sysclock;  // unsigned wrap keeps "in the future by k ms"
+            d = d->next;
+        }
+        amy_global.total_blocks = 0;
+        amy_global.total_samples = 0;
+        amy_global.time = 0;
+        amy_global.sequencer_tick_count = 0;
+        sequencer_recompute();
+        amy_global.reset_timebase_pending = 0;
+        amy_release_lock();
+    }
     #ifdef __EMSCRIPTEN__
     // post a message to the main thread of the audioworklet (amy main, in this case) that a block has been finished
     //emscripten_audio_worklet_post_function_v(0, amy_block_processed);
@@ -2363,12 +2407,19 @@ int16_t * amy_fill_buffer() {
     return output_block;
 }
 
+// Request a timebase reset: the millisecond clock and the sequencer tick
+// count restart from zero, and queued events keep their relative timing.
+// The render thread applies it at the next block boundary (amy_fill_buffer()),
+// within a few ms.  Zeroing the counters here -- this runs on whichever
+// thread called amy_add_message() -- raced the render thread:
+// sequencer_check_and_fill() had already computed now_us against the old
+// clock, this call re-anchored next_amy_tick_us near zero underneath it, and
+// its catch-up loop then replayed thousands of ticks in one block, smearing
+// every periodic sequence into a continuous roll for seconds.
 void amy_reset_sysclock() {
-    amy_global.total_blocks = 0;
-    amy_global.total_samples = 0;
-    amy_global.time = 0;
-    amy_global.sequencer_tick_count = 0;
-    sequencer_recompute();
+    amy_grab_lock();
+    amy_global.reset_timebase_pending = 1;
+    amy_release_lock();
 }
 
 

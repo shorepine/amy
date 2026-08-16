@@ -393,7 +393,7 @@ class TestInterpPartialsOutOfRange(AmyTest):
   out-of-range path runs, not how it sounds."""
 
   def run(self):
-    amy_send_at(time=0, reset=amy.RESET_SYNTHS)
+    amy_send_at(time=0, reset=amy.RESET_ALL_OSCS)
     amy_send_at(time=0, synth=1, num_voices=6, patch=256)
     t = 50
     for i in range(4):
@@ -1291,7 +1291,7 @@ class TestSustainPedal(AmyTest):
   """Test sustain pedal."""
 
   def run(self):
-    amy_send_at(time=0, reset=amy.RESET_SYNTHS)
+    amy_send_at(time=0, reset=amy.RESET_ALL_OSCS)
     amy_send_at(time=0, synth=1, num_voices=4, patch=256)
     amy_send_at(time=50, synth=1, note=76, vel=1)
     amy_send_at(time=100, synth=1, note=76, vel=0)

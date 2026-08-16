@@ -3,7 +3,12 @@
 
 var amy_add_message = null;
 var amy_c_api = null;
-var amy_reset_sysclock = null
+// Native, not a C binding: RESET_TIMEBASE is an ordinary event, so this is
+// just a wire message, and the reset follows the same path as anything else
+// sent. Kept as a global function so existing callers keep working.
+function amy_reset_sysclock() {
+  if (amy_add_message) amy_add_message('S' + AMY.RESET_TIMEBASE + 'Z');
+}
 var amy_module = null;
 var amy_started = false;
 var amy_live_start_web = null;
@@ -41,7 +46,6 @@ amyModule().then(async function(am) {
     'amy_start_web_no_synths', null, null
   );
   amy_add_message = amy_c_api.send_wire;
-  amy_reset_sysclock = amy_c_api.reset_sysclock;
   amy_ticks = amy_c_api.sequencer_ticks;
   amy_sysclock = amy_c_api.ticks_ms;
   amy_process_single_midi_byte = amy_c_api.process_single_midi_byte;

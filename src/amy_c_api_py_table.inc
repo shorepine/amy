@@ -2,7 +2,6 @@
 {"send_wire", amy_capi_py_send_wire, METH_VARARGS, "Send a wire-protocol message to AMY"},
 {"send_wire_from_sysex", amy_capi_py_send_wire_from_sysex, METH_VARARGS, "Send a wire message as if from sysex (file-transfer routing applies)"},
 {"ticks_ms", amy_capi_py_ticks_ms, METH_VARARGS, "Read the AMY millisecond clock"},
-{"reset_sysclock", amy_capi_py_reset_sysclock, METH_VARARGS, "Reset the AMY millisecond clock to zero"},
 {"render_load", amy_capi_py_render_load, METH_VARARGS, "Smoothed fraction of real time AMY spends rendering (0..1)"},
 {"set_render_load_threshold", amy_capi_py_set_render_load_threshold, METH_VARARGS, "Set the render-load fraction that trips the overload failsafe (0 disables)"},
 {"bleep", amy_capi_py_bleep, METH_VARARGS, "Play the startup bleep"},

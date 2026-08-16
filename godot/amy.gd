@@ -434,17 +434,13 @@ const COEF_FIELDS: PackedStringArray = ["const", "note", "vel", "eg0", "eg1", "m
 const COEF_ALIASES: Dictionary = {"mod": "mod0"}
 # END GENERATED
 
+## Reset bit for the timebase, mirroring RESET_TIMEBASE in src/amy.h.
+const RESET_TIMEBASE: int = 16384
+
 # ============================================================
 #  Table-driven C API (native + web). Regenerate: make c-api
 # ============================================================
 # BEGIN GENERATED C API - scripts/gen_amy_c_api.py
-## Reset the AMY millisecond clock to zero
-func reset_sysclock() -> void:
-	if _is_web:
-		JavaScriptBridge.eval("amy_c_api && amy_c_api.reset_sysclock()")
-	elif _synth:
-		_synth.call("reset_sysclock")
-
 ## Smoothed fraction of real time AMY spends rendering (0..1)
 func render_load() -> float:
 	if _is_web:
@@ -487,3 +483,10 @@ func dump_state() -> String:
 	return ""
 
 # END GENERATED C API
+
+
+## Reset the AMY millisecond clock and sequencer tick count to zero.
+## Native rather than a C binding: RESET_TIMEBASE is an ordinary event, so this
+## is just a send(), and the reset follows the same path as anything else sent.
+func reset_sysclock() -> void:
+	send({"reset": RESET_TIMEBASE})
