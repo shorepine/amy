@@ -1557,7 +1557,7 @@ void play_delta(struct delta *d) {
         }
     }
     if(d->param == RESET_OSC) {
-        // Remember that RESET_AMY, RESET_EVENTS and RESET_SYNTHS are handled at parse time -- they can't be
+        // Remember that RESET_AMY and RESET_EVENTS are handled at parse time -- they can't be
         // carried in a delta -- so we don't deal with them here.
         if(d->data.i & RESET_TIMEBASE) {
             // Raise the flag only; the render thread re-zeroes the counters at
@@ -1571,7 +1571,9 @@ void play_delta(struct delta *d) {
             // same lock.
             amy_global.reset_timebase_pending = 1;
         }
-        if(d->data.i & RESET_ALL_OSCS) {
+        // RESET_SYNTHS is a deprecated alias: it always did exactly this,
+        // just from the parse instead of from here.
+        if(d->data.i & (RESET_ALL_OSCS | RESET_SYNTHS)) {
             amy_reset_oscs();
         }
         if(d->data.i & RESET_SEQUENCER) {

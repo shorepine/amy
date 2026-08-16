@@ -38,6 +38,7 @@ static int failures = 0;
 } while (0)
 
 extern void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event);
+extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
 
 #define MS_PER_BLOCK ((AMY_BLOCK_SIZE * 1000.0f) / AMY_SAMPLE_RATE)
 
@@ -159,10 +160,10 @@ static void test_scheduled_reset_waits_for_its_time(void) {
 
 static void test_combined_reset_bits_all_take_effect(void) {
     printf("a reset bit handled in the parse doesn't swallow the ones that aren't\n");
-    // The parse handles RESET_AMY / RESET_EVENTS / RESET_SYNTHS itself and
-    // then used to unset the WHOLE field, so anything combined with them never
-    // reached play_delta -- RESET_EVENTS|RESET_ALL_OSCS reset the queue but
-    // left every osc exactly as it was.
+    // The parse handles RESET_AMY / RESET_EVENTS itself and then used to unset
+    // the WHOLE field, so anything combined with them never reached play_delta
+    // -- RESET_EVENTS|RESET_ALL_OSCS reset the queue but left every osc exactly
+    // as it was.
     amy_add_message((char *)"v0w2f550Z");
     render_ms(20);
     CHECK(osc0_wave() == SAW_DOWN, "osc 0 set to wave 2");
@@ -171,6 +172,30 @@ static void test_combined_reset_bits_all_take_effect(void) {
     amy_add_message(m);
     render_ms(20);
     CHECK(osc0_wave() != SAW_DOWN, "RESET_ALL_OSCS still took effect alongside RESET_EVENTS");
+}
+
+static void test_reset_synths_is_an_alias(void) {
+    printf("RESET_SYNTHS still tears down, now via the event queue\n");
+    // RESET_SYNTHS ran the identical teardown (amy_reset_oscs()) as
+    // RESET_ALL_OSCS, just from the parse. It is deprecated but still has to
+    // work: saved sketches and the AMYboard web editor emit S262144Z.
+    amy_add_message((char *)"i3iv1K1Z");
+    render_ms(20);
+    CHECK(instrument_get_num_voices(3, NULL) == 1, "synth 3 configured");
+    char m[32];
+    snprintf(m, sizeof(m), "S%dZ", RESET_SYNTHS);
+    amy_add_message(m);
+    render_ms(20);
+    CHECK(instrument_get_num_voices(3, NULL) == 0, "RESET_SYNTHS tore the synth down");
+    // And the ordering the parse-time version used to guarantee still holds at
+    // the default zero latency: a teardown immediately followed by a patch
+    // load leaves the load standing, because a due delta is flushed before
+    // patches_load_patch runs.
+    amy_add_message(m);
+    amy_add_message((char *)"i3iv2K1Z");
+    render_ms(200);
+    CHECK(instrument_get_num_voices(3, NULL) == 2,
+          "a patch loaded right after the teardown survives it");
 }
 
 // AMY calls these; the test binary has to provide them.
@@ -188,6 +213,7 @@ int main(void) {
     test_reset_via_the_c_event_api();
     test_scheduled_reset_waits_for_its_time();
     test_combined_reset_bits_all_take_effect();
+    test_reset_synths_is_an_alias();
 
     if (failures) { printf("%d FAILURES\n", failures); return 1; }
     printf("all ok\n");

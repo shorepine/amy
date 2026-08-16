@@ -782,14 +782,14 @@ int amy_parse_message(char * message, amy_event *e) {
             case 's': e->pitch_bend = atoff(arg); break;
             case 'S':
                 e->reset_osc = atoi(arg);
-                // These three can only happen here, on the parse side, because
+                // These two can only happen here, on the parse side, because
                 // neither survives being carried IN a delta: RESET_AMY tears
                 // AMY down and restarts it, and RESET_EVENTS empties the very
                 // queue the delta would be sitting in.  Every other reset bit
                 // -- RESET_TIMEBASE included -- travels as an ordinary delta,
                 // so it works identically from amy_add_event() and honours
                 // time=/ticks= like the rest of the API.
-                if (e->reset_osc & (RESET_AMY | RESET_EVENTS | RESET_SYNTHS)) {
+                if (e->reset_osc & (RESET_AMY | RESET_EVENTS)) {
                     if(e->reset_osc & RESET_AMY) {
                         amy_stop();
                         amy_start(amy_global.config);
@@ -797,15 +797,12 @@ int amy_parse_message(char * message, amy_event *e) {
                     if(e->reset_osc & RESET_EVENTS) {
                         amy_deltas_reset();
                     }
-                    if(e->reset_osc & RESET_SYNTHS) {
-                        amy_reset_oscs();
-                    }
                     // Clear only the bits handled here.  Unsetting the whole
                     // field dropped everything it was combined with, so e.g.
                     // RESET_EVENTS|RESET_ALL_OSCS silently skipped the osc
                     // reset.  Unset it entirely if nothing is left, since a
                     // reset_osc of 0 means "reset oscillator 0".
-                    e->reset_osc &= ~(uint32_t)(RESET_AMY | RESET_EVENTS | RESET_SYNTHS);
+                    e->reset_osc &= ~(uint32_t)(RESET_AMY | RESET_EVENTS);
                     if (e->reset_osc == 0)  AMY_UNSET(e->reset_osc);
                 }
                 break;

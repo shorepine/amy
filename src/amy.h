@@ -364,7 +364,11 @@ enum coefs{
 #define RESET_AMY 32768
 #define RESET_EVENTS 65536
 #define RESET_ALL_NOTES 131072
-#define RESET_SYNTHS 262144  // Non-scheduled release of all synths, voices, oscs prior to load_patch
+// DEPRECATED alias for RESET_ALL_OSCS, kept so wire strings and sketches that
+// already say 262144 keep working.  It ran the identical teardown
+// (amy_reset_oscs()); the only difference was that it happened in the parse
+// rather than on the delta queue.  See docs/api.md.
+#define RESET_SYNTHS 262144
 #define RESET_PATCH 524288  // Clear one patch if patch_number provided, otherwise clear all patches.
 #define RESET_QUEUE 1048576 // resets the amy queue
 
