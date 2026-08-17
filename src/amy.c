@@ -809,6 +809,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_COEFS(pan_coefs, PAN)
     EVENT_TO_DELTA_F(feedback, FEEDBACK)
     EVENT_TO_DELTA_F(trigger_phase, PHASE)
+    EVENT_TO_DELTA_I(sample_offset, SAMPLE_OFFSET)
+    EVENT_TO_DELTA_F(fit_ticks, FIT)
     EVENT_TO_DELTA_F(pitch_bend, PITCH_BEND)
     EVENT_TO_DELTA_I(latency_ms, LATENCY)
     EVENT_TO_DELTA_F(tempo, TEMPO)
@@ -918,6 +920,7 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
         pmsynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
         pmsynth->resonance = 0.7f;
         pmsynth->state = 0;
+        pmsynth->pcm_delay = 0;
     }
 }
 
@@ -945,6 +948,8 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->pan_coefs[COEF_CONST] = 0.5f;
     psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     AMY_UNSET(psynth->trigger_phase);
+    AMY_UNSET(psynth->sample_offset);
+    AMY_UNSET(psynth->fit_ticks);
     AMY_UNSET(psynth->logratio);
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
@@ -984,6 +989,7 @@ void reset_osc_state(struct synthinfo *psynth) {
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
     psynth->last_two[0] = 0;
     psynth->last_two[1] = 0;
+    memset(&psynth->stretch, 0, sizeof(psynth->stretch));
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
 }
@@ -1527,6 +1533,13 @@ void play_delta(struct delta *d) {
         // Skip for PCM because it doesn't really make much sense and causes brrr on web drum editor (#916).
         if (!AMY_WAVE_IS_PCM(synth[d->osc]->wave))
             synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
+    }
+    DELTA_TO_SYNTH_I(SAMPLE_OFFSET, sample_offset)
+    if (d->param == FIT) {
+        // Negative fit turns the feature back off; 0 means "pitch-shift at
+        // original length"; > 0 is a target duration in sequencer ticks.
+        if (d->data.f < 0) AMY_UNSET(synth[d->osc]->fit_ticks);
+        else synth[d->osc]->fit_ticks = d->data.f;
     }
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)

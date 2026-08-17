@@ -328,6 +328,8 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `p`    | `preset` | `preset` | int | Which predefined PCM or wavetable preset patch to use, or number of partials if < 0. For `wave=WAVETABLE`, use the wavetable presets appended to PCM. (Juno/DX7 patches are different - see `patch_number`). |
 | `p`    | `preset` | `num_partials` | int | Alias for `preset`. Must be used with `wave=BYO_PARTIALS`. Cannot be combined with `preset` in the same message. |
 | `P`    | `phase` | `phase` | float 0-1 | Where in the oscillator's cycle to begin the waveform (also works on the PCM buffer). default 0. For PCM oscs, a phase sent with (or before) a note-on sets the sample start point for that note-on (`start_frame / 2^23`) and is consumed by it; later note-ons without a phase start from 0 again. |
+| `J`    | `sample_offset` | `sample_offset` | uint 0 to BLOCK_SIZE-1 | PCM only. Start this note-on at a sample offset *within* the render block it fires in, leaving the head of the block silent. Events fire on block (256-sample) boundaries; `sample_offset` supplies the sub-block remainder, so slices of arbitrary length can be scheduled to butt-join sample-accurately (e.g. reconstructing a chopped break with no gaps). Sticky per osc like other params; set 0 to clear. |
+| `Y`    | `fit_ticks` | `fit` | float | PCM only, in-memory presets. Engage the granular time/pitch engine at the next note-on. `fit=N` (N>0): play the sample in exactly N sequencer ticks with a pitch-invariant time stretch; `note` still transposes without changing duration. `fit=0`: time-invariant pitch shift — `note` transposes but the sample keeps its original duration. `fit=-1`: turn the engine off. Non-destructive and real-time (~2.5x the render cost of plain PCM). |
 | `R`    | `resonance` | `resonance` | float | Q factor of variable filter, 0.5-16.0. default 0.7 |
 | `T`    | `eg_type[0]` | `eg0_type` | uint 0-3 | Type for Envelope Generator 0 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
 | `X`    | `eg_type[1]` | `eg1_type` | uint 0-3 | Type for Envelope Generator 1 - 0: Normal (RC-like) / 1: Linear / 2: DX7-style / 3: True exponential. |
@@ -354,6 +356,31 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
 | `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from source. Params: preset number, source, max length in frames, midinote, loopstart, loopend. source = 1 is AMY mixed output. source = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
 | `zO`   | **TODO**| `stop_sample` | uint | Stop sampling. Does nothing if no sampling active. param ignored. | 
+
+### Sampler timing and time-stretch (experimental)
+
+Two parameters turn AMY's PCM oscillators into a "real" sampler (see
+`experiments/sampler/` for worked examples):
+
+- **`sample_offset` (`J`)** gives note-ons sub-block placement. AMY events
+  execute on block boundaries (256 samples, ~5.8 ms); a PCM note-on with
+  `sample_offset=k` starts at sample `k` of its block. Schedule a slice of
+  length `L` starting at absolute sample `S`, then its successor at
+  `S + L` (block `(S+L)//256`, offset `(S+L)%256`), and the two butt-join
+  with no gap — a chopped break plays back bit-exact against the original.
+  Untransposed playback (no `note`, no freq mods) is drift-free: AMY uses
+  the preset's native rate exactly in that case.
+
+- **`fit` (`Y`)** decouples duration from pitch, non-destructively, at
+  note-on time. `fit=N` plays the sample over exactly N sequencer ticks
+  (so it tracks `tempo`) without changing pitch; `fit=0` changes pitch
+  (via `note`) without changing duration. The engine is a fixed-point
+  granular overlap-add (two 1024-sample Hann grains, 50% overlap) with a
+  WSOLA-style correlation search aligning each new grain's phase against
+  the one still playing — no FFT, no float in the render path, so it
+  targets every AMY platform. Looping modes (`ww`) work: the input
+  timeline wraps at the loop marks. Streamed `disk_sample` presets can't
+  `fit` (no random access).
 
 ### WAVETABLE wave type
 

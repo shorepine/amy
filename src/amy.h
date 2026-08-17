@@ -451,6 +451,8 @@ enum params{
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
     BUS,
+    SAMPLE_OFFSET,              // PCM note-on start offset in samples within its block
+    FIT,                        // PCM time-stretch/pitch-shift target in sequencer ticks
     NO_PARAM                    // 210
 };
 // Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
@@ -587,6 +589,8 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float trigger_phase;
+    uint16_t sample_offset;  // PCM: start this note-on at a sample offset within its block (0..AMY_BLOCK_SIZE-1)
+    float fit_ticks;  // PCM: >0 = time-stretch to this many sequencer ticks; 0 = pitch-shift at original length; <0 = off
     float volume;  // event_only; the mixdown volume of `bus` (default bus 0)
     float pitch_bend;  // event_only
     float tempo;  // event_only
@@ -641,6 +645,28 @@ typedef struct amy_event {
     float reverb_xover_hz;
 } amy_event;
 
+// Real-time granular time-stretch / pitch-shift state for PCM oscs ("fit",
+// see pcm.c).  Two overlapping Hann-windowed grains; the input read position
+// advances at a rate decoupled from the per-grain (pitch) read step, so
+// duration and pitch are independent.  All fixed point: positions are Q16
+// sample-frame indices (32.16 for the input timeline).
+#define PCM_STRETCH_GRAINS 2
+#define PCM_STRETCH_GRAIN 1024   // grain length in output samples
+#define PCM_STRETCH_HOP (PCM_STRETCH_GRAIN / 2)  // 50% overlap: Hann sums to 1
+typedef struct {
+    uint8_t active;         // fit engaged for the current note
+    uint8_t ended;          // input exhausted, no more grains will spawn
+    uint16_t hop_counter;   // output samples until the next grain spawn
+    uint64_t in_pos_q16;    // input timeline: frame index of the next grain, Q16
+    uint32_t hop_advance_q16;  // input frames the timeline advances per hop, Q16
+    struct {
+        uint8_t active;
+        uint16_t win_pos;       // 0..PCM_STRETCH_GRAIN-1, position in window
+        uint32_t start_frame;   // input frame where this grain began
+        uint32_t phase_q16;     // frames advanced since start_frame, Q16
+    } grain[PCM_STRETCH_GRAINS];
+} pcm_stretch_t;
+
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
     uint16_t osc; // self-reference
@@ -659,6 +685,8 @@ struct synthinfo {
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
     float trigger_phase;
+    uint16_t sample_offset;  // PCM note-on start offset in samples within its block
+    float fit_ticks;  // PCM fit target in sequencer ticks (0 = pitch-shift at original length)
     float logratio;
     float portamento_alpha;
     float resonance;
@@ -689,6 +717,8 @@ struct synthinfo {
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
+    // Granular time-stretch/pitch-shift state (PCM "fit", see pcm.c).
+    pcm_stretch_t stretch;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
@@ -709,6 +739,7 @@ struct mod_synthinfo {
     uint16_t next_state; // Used for PCM looping state.
     uint32_t loopstart;  // Used for PCM looping.
     uint32_t loopend;    // Used for PCM looping.
+    uint16_t pcm_delay;  // Samples of silence to leave at the head of the note-on block (sample_offset).
 };
 
 
