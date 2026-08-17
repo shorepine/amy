@@ -435,7 +435,8 @@ enum params{
     EG0_TYPE, EG1_TYPE,                  // 204, 205
     CLONE_OSC,                           // 206
     RESET_OSC,                           // 207
-    NOTE_SOURCE_CHANNEL,                 // 208
+    FREE_OSC,                            // 208: like RESET_OSC, but returns the osc's storage to the heap
+    NOTE_SOURCE_CHANNEL,                 // 209
     ECHO_LEVEL,
     ECHO_DELAY_MS,
     ECHO_MAX_DELAY_MS,
