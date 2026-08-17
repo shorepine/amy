@@ -99,8 +99,28 @@ python3 play_sampler.py loops amen thinking --bpm 120 # both breaks fit= to the 
 python3 play_sampler.py pitch thinking --slice 1      # fit=0 semitone ladder, length fixed
 ```
 
+There's also a pair of scripts for whole break *collections*:
+
+```
+python3 clean_breaks.py                     # ~/sounds/breaks -> ~/sounds/cleanbreaks
+python3 play_cleanbreaks.py --live --bpm 96 # random breaks fit to one tempo, back to back
+```
+
+`clean_breaks.py` normalizes a folder of mixed-format recordings (WAV/AIFF,
+extensionless AIFF, Sun .snd, MPC2000 .SND...) into uniform loopable breaks:
+mono 16-bit 44.1 kHz WAV, peak-normalized, trimmed to a whole number of bars
+(2-10 s) with zero-crossing ends. Pre-cut breaks are trusted (silence-trimmed,
+bpm derived from their length and bar count); full songs get their most
+rhythmically dense whole-bar window, with the loop length refined by seam
+autocorrelation. Non-break files (no steady tempo, too short, not audio) are
+skipped and reported; a manifest.json carries file/bpm/bars.
+`play_cleanbreaks.py` then picks `--count` random breaks and plays them one
+after another, each `fit=` to its bar count at the session `--bpm` — the
+mixed-tempo crate locks to one grid, transitions on bar boundaries via the
+sequencer.
+
 All modes render deterministic WAVs by default; `--live` plays through the
-sound device (loops/hits/pitch). Offline scheduling uses the fact that an
+sound device (loops/hits/pitch/cleanbreaks). Offline scheduling uses the fact that an
 event sent when N blocks have rendered fires in block N: the `Conductor`
 sends each event in its exact block with `sample_offset` carrying the
 remainder.
