@@ -108,12 +108,17 @@ python3 play_cleanbreaks.py --live --bpm 96 # random breaks fit to one tempo, ba
 
 `clean_breaks.py` normalizes a folder of mixed-format recordings (WAV/AIFF,
 extensionless AIFF, Sun .snd, MPC2000 .SND...) into uniform loopable breaks:
-mono 16-bit 44.1 kHz WAV, peak-normalized, trimmed to a whole number of bars
-(2-10 s) with zero-crossing ends. Pre-cut breaks are trusted (silence-trimmed,
-bpm derived from their length and bar count); full songs get their most
-rhythmically dense whole-bar window, with the loop length refined by seam
-autocorrelation. Non-break files (no steady tempo, too short, not audio) are
-skipped and reported; a manifest.json carries file/bpm/bars.
+each output is exactly **one 4-beat bar**, cut on a detected downbeat — mono
+16-bit 44.1 kHz WAV, peak-normalized, zero-crossing ends, seam refined by
+autocorrelation. The beat grid is *verified*, not just estimated: beat period
+by (overlap-normalized) autocorrelation of the onset envelope, a meter check
+requiring the envelope to repeat better at 4 beats than 3 (rejects 3/4 and
+unsteady time; files too short to test qualify only if they are exactly one
+4-beat bar), a comb-aligned beat phase, the downbeat as the strongest of the
+4 bar phases, and an onset present on all 4 beats of the chosen bar. Anything
+failing a step is skipped and reported, so every surviving break carries a
+trustworthy bars=1/bpm pair and mixes at a stable meter; a manifest.json
+carries file/bpm/bars.
 `play_cleanbreaks.py` then picks `--count` random breaks and plays them one
 after another, each `fit=` to its bar count at the session `--bpm` — the
 mixed-tempo crate locks to one grid, transitions on bar boundaries via the

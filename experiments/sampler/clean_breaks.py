@@ -2,17 +2,23 @@
 """Normalize a folder of break-beat recordings into uniform, loopable WAVs.
 
 Reads everything soundfile can decode from --in (WAV/AIFF, extensionless
-AIFF, Sun .snd, MPC2000 .SND, ...), keeps the "break-like" ones (audible,
->= ~2s, with a detectable steady tempo), and writes each to --out as:
+AIFF, Sun .snd, MPC2000 .SND, ...), keeps only material with a *verified*
+4/4 beat grid, and writes each to --out as:
 
-    mono, 16-bit, 44100 Hz WAV, peak-normalized,
-    trimmed to a whole number of bars (2-10 s), both ends snapped to zero
-    crossings, loop length refined by waveform autocorrelation so the seam
-    actually loops.
+    exactly ONE BAR (4 beats), cut starting on a detected downbeat,
+    mono, 16-bit, 44100 Hz WAV, peak-normalized, zero-crossing ends,
+    seam refined by waveform autocorrelation when content allows.
 
-Long files (full songs) get the most rhythmically dense whole-bar window --
-usually the break. A manifest.json (file, bpm, bars, frames, source) is
-written alongside for players like play_cleanbreaks.py.
+Analysis per file: spectral-flux onset envelope -> beat period by
+autocorrelation (parabolic-refined, folded to 75-150 bpm) -> meter check
+(the envelope must repeat better at 4 beats than at 3 beats; rejects 3/4,
+free time, and unsteady playing) -> beat phase by comb alignment ->
+downbeat as the strongest of the 4 bar phases. Anything that fails a step
+is skipped and reported, so every surviving break carries a trustworthy
+bars=1 / bpm pair and players can lock them all to one grid.
+
+A manifest.json (file, bpm, bars, beats, frames, source) is written
+alongside for players like play_cleanbreaks.py.
 
     python3 clean_breaks.py            # ~/sounds/breaks -> ~/sounds/cleanbreaks
 """
@@ -25,8 +31,8 @@ import numpy as np
 import soundfile as sf
 
 TARGET_SR = 44100
-MIN_SECONDS = 1.8
-MAX_SECONDS = 10.0
+MIN_INPUT_SECONDS = 1.5
+BEATS_PER_BAR = 4
 
 
 def load_mono(path):
@@ -54,26 +60,98 @@ def spectral_flux(x, nfft=1024, hop=256):
     return flux, hop
 
 
-def estimate_bpm(flux, hop, lo_bpm=75, hi_bpm=150):
-    # Autocorrelation of the onset envelope; returns (bpm, confidence).
-    env = flux - flux.mean()
-    if len(env) < 32 or env.std() == 0:
+def norm_autocorr(env):
+    e = env - env.mean()
+    ac = np.correlate(e, e, 'full')[len(e) - 1:]
+    return ac / (ac[0] + 1e-9)
+
+
+def overlap_ac(flux):
+    # Overlap-normalized autocorrelation lookup: without the (n-lag)
+    # correction, a perfectly bar-periodic 2-bar file can never score above
+    # ~0.5 at its own bar lag, and every threshold lies.
+    n = len(flux)
+    e = flux - flux.mean()
+    ac = np.correlate(e, e, 'full')[n - 1:]
+    def r(lag):
+        li = int(round(lag))
+        if li < 1 or li + 8 >= n:
+            return None
+        return float((ac[li] / (n - li)) / (ac[0] / n + 1e-12))
+    return r
+
+
+def beat_period(flux, fps, lo_bpm=75, hi_bpm=150):
+    # Beat period in (fractional) flux frames, folded into lo..hi bpm,
+    # with a parabolic refinement of the autocorrelation peak.
+    if len(flux) < 32 or flux.std() == 0:
         return None, 0.0
-    ac = np.correlate(env, env, 'full')[len(env) - 1:]
-    fps = TARGET_SR / hop
-    lo_lag = max(1, int(fps * 60 / hi_bpm))
-    hi_lag = min(int(fps * 60 / lo_bpm), len(ac) - 1)
+    ac = norm_autocorr(flux)
+    lo_lag = max(2, int(fps * 60 / hi_bpm))
+    hi_lag = min(int(fps * 60 / lo_bpm), len(ac) - 2)
     if hi_lag <= lo_lag:
         return None, 0.0
-    seg = ac[lo_lag:hi_lag]
-    lag = lo_lag + int(np.argmax(seg))
-    conf = float(ac[lag] / ac[0]) if ac[0] > 0 else 0.0
-    bpm = 60 * fps / lag
-    while bpm < lo_bpm:
-        bpm *= 2
-    while bpm > hi_bpm:
-        bpm /= 2
-    return round(bpm, 2), conf
+    lag = lo_lag + int(np.argmax(ac[lo_lag:hi_lag]))
+    y0, y1, y2 = ac[lag - 1], ac[lag], ac[lag + 1]
+    denom = y0 - 2 * y1 + y2
+    d = 0.5 * (y0 - y2) / denom if abs(denom) > 1e-12 else 0.0
+    d = max(-0.5, min(0.5, d))
+    return lag + d, float(ac[lag])
+
+
+def meter_is_duple(flux, tau):
+    # 4/4 check. Long enough files: the onset envelope must repeat at a
+    # 4-beat lag (and at least as well as at 3 beats -- rejects 3/4 and
+    # unsteady time). Files too short for that lag qualify only if they
+    # ARE one 4-beat bar, i.e. a pre-cut single bar.
+    # Returns (ok, is_precut_bar, why).
+    r = overlap_ac(flux)
+    r4 = r(4 * tau)
+    if r4 is None:
+        beats_total = len(flux) / tau
+        if 3.5 <= beats_total <= 4.5:
+            return True, True, None
+        return False, False, f"short file is {beats_total:.1f} beats, not one 4-beat bar"
+    r3 = r(3 * tau)
+    if r4 < 0.05:
+        return False, False, f"bar-length self-similarity too weak (r4={r4:.2f})"
+    if r3 is not None and r4 < r3 - 0.02:
+        return False, False, f"repeats at 3 beats, not 4 (r3={r3:.2f} r4={r4:.2f}) - not 4/4?"
+    return True, False, None
+
+
+def bar_has_four_beats(flux, start_frame, tau):
+    # The bar we cut must itself contain an onset at every beat slot.
+    w = max(1, int(tau * 0.15))
+    vals = []
+    for k in range(BEATS_PER_BAR):
+        i = int(round(start_frame + k * tau))
+        if i >= len(flux):
+            return False
+        vals.append(float(flux[max(0, i - w):i + w + 1].max()))
+    return max(vals) > 0.05 and min(vals) >= 0.1 * max(vals)
+
+
+def beat_grid(flux, tau):
+    # Comb-align the beat phase, then pick the strongest of the 4 bar
+    # phases as the downbeat. Returns beat positions (frames) and the
+    # index of the first downbeat within them.
+    n_slots = int(tau)
+    best_p, best_s = 0, -1.0
+    for p in range(n_slots):
+        idx = np.round(np.arange(p, len(flux) - 1, tau)).astype(int)
+        s = float(flux[idx].sum() / max(1, len(idx)))
+        if s > best_s:
+            best_p, best_s = p, s
+    beats = np.round(np.arange(best_p, len(flux) - 1, tau)).astype(int)
+    if len(beats) < BEATS_PER_BAR:
+        return beats, 0
+    best_o, best_s = 0, -1.0
+    for o in range(BEATS_PER_BAR):
+        s = float(flux[beats[o::BEATS_PER_BAR]].mean())
+        if s > best_s:
+            best_o, best_s = o, s
+    return beats, best_o
 
 
 def snap_zero(x, pos, search=256):
@@ -88,17 +166,18 @@ def snap_zero(x, pos, search=256):
     return int(lo + np.argmin(np.abs(seg)))
 
 
-def refine_loop_len(x, start, nominal, slack=0.06, probe=4096):
+def refine_loop_len(x, start, nominal, slack=0.02, probe=4096):
     # The loop seam wants x[start:start+p] ~ x[start+L:start+L+p]; search L
-    # around nominal for the best normalized correlation.
+    # around nominal for the best normalized correlation. Only possible when
+    # the source continues past the seam; otherwise keep nominal.
     lo = int(nominal * (1 - slack))
     hi = min(int(nominal * (1 + slack)), len(x) - start - probe)
-    if hi <= lo or start + lo < probe:
+    if hi <= lo:
         return nominal
     a = x[start:start + probe]
     na = np.linalg.norm(a) + 1e-9
     best, best_l = -2.0, nominal
-    for L in range(lo, hi, 16):
+    for L in range(lo, hi, 8):
         b = x[start + L:start + L + probe]
         c = float(np.dot(a, b) / (na * (np.linalg.norm(b) + 1e-9)))
         if c > best:
@@ -106,64 +185,52 @@ def refine_loop_len(x, start, nominal, slack=0.06, probe=4096):
     return best_l
 
 
-def best_window(flux, hop, win_frames):
-    # Rhythmic density score: total onset strength over a sliding window.
-    if len(flux) <= win_frames:
-        return 0
-    csum = np.cumsum(flux)
-    scores = csum[win_frames:] - csum[:-win_frames]
-    return int(np.argmax(scores)) * hop
-
-
 def clean_one(path, outdir):
     x = load_mono(path)
-    if len(x) < MIN_SECONDS * TARGET_SR:
+    if len(x) < MIN_INPUT_SECONDS * TARGET_SR:
         return None, "too short"
     peak = np.abs(x).max()
     if peak < 1e-3:
         return None, "silent"
     x = x / peak * 0.89
     flux, hop = spectral_flux(x)
-    bpm, conf = estimate_bpm(flux, hop)
-    if bpm is None or conf < 0.08:
-        return None, f"no steady tempo (conf {conf:.2f})"
-    bar = 4 * 60 / bpm * TARGET_SR   # samples per 4/4 bar
-    if len(x) <= MAX_SECONDS * TARGET_SR * 1.02:
-        # Already a cut break: trust the cut. Trim leading/trailing digital
-        # silence, snap the ends to zero crossings, and call the result a
-        # whole number of bars; the bpm estimate only picks *which* number.
+    fps = TARGET_SR / hop
+    tau, conf = beat_period(flux, fps)
+    if tau is None or conf < 0.08:
+        return None, f"no steady beat (conf {conf:.2f})"
+    ok, is_precut_bar, why = meter_is_duple(flux, tau)
+    if not ok:
+        return None, why
+
+    if is_precut_bar:
+        # The file already is one 4-beat bar: trim silence and keep it.
         audible = np.nonzero(np.abs(x) > 0.008)[0]
         start = snap_zero(x, int(audible[0]))
         tail = np.nonzero(np.abs(x) > 0.003)[0]
         end = snap_zero(x, min(len(x) - 1, int(tail[-1]) + 1))
-        if end - start < MIN_SECONDS * TARGET_SR:
-            return None, "too short after silence trim"
-        bars = max(1, round((end - start) / bar))
     else:
-        # Full song: cut whole bars from its most rhythmically dense stretch.
-        for bars in (8, 4, 2, 1):
-            if MIN_SECONDS * TARGET_SR <= bars * bar <= MAX_SECONDS * TARGET_SR:
+        beats, o0 = beat_grid(flux, tau)
+        bar_len = int(round(BEATS_PER_BAR * tau * hop))  # samples
+        # Try each downbeat in order; take the first full bar that also has
+        # an onset on every one of its 4 beats.
+        start = None
+        for b in beats[o0::BEATS_PER_BAR]:
+            s = int(b * hop)
+            if s + bar_len > len(x) + int(0.03 * bar_len):  # allow a 3% tail shortfall
                 break
-        else:
-            return None, f"no whole-bar cut fits ({bpm} bpm)"
-        nominal = int(round(bars * bar))
-        start = best_window(flux, hop, int(nominal / hop))
-        start = min(start, len(x) - nominal - 1)
-        # Nudge the start onto the first strong onset at/after it.
-        f0 = start // hop
-        seg = flux[f0:f0 + int(TARGET_SR / hop)]  # look ahead up to 1s
-        if len(seg) and seg.max() > 0:
-            start = (f0 + int(np.argmax(seg > 0.5 * seg.max()))) * hop
+            if bar_has_four_beats(flux, b, tau):
+                start = s
+                break
+        if start is None:
+            return None, "no downbeat bar with onsets on all 4 beats"
         start = snap_zero(x, start)
-        L = refine_loop_len(x, start, nominal)
-        end = snap_zero(x, start + L)
-        if end - start < MIN_SECONDS * TARGET_SR:
-            return None, "refined loop too short"
+        L = refine_loop_len(x, start, bar_len)
+        end = snap_zero(x, min(len(x) - 1, start + L))
     y = x[start:end]
-    # The authoritative bpm is the one the cut implies.
-    bpm = round(bars * 4 * 60 / (len(y) / TARGET_SR), 2)
-    if not (55 <= bpm <= 200):
-        return None, f"implied tempo implausible ({bpm} bpm, {bars} bars)"
+    bpm = round(BEATS_PER_BAR * 60 * TARGET_SR / len(y), 2)
+    if not (70 <= bpm <= 160):
+        return None, f"implied tempo implausible ({bpm} bpm)"
+
     name = re.sub(r'[^A-Za-z0-9]+', '_', os.path.splitext(os.path.basename(path))[0]).strip('_')
     name = re.sub(r'_?dup$', '', name, flags=re.I)
     out = os.path.join(outdir, name + '.wav')
@@ -171,7 +238,8 @@ def clean_one(path, outdir):
     return {
         'file': name + '.wav',
         'bpm': bpm,
-        'bars': bars,
+        'bars': 1,
+        'beats': BEATS_PER_BAR,
         'frames': int(len(y)),
         'seconds': round(len(y) / TARGET_SR, 3),
         'tempo_confidence': round(conf, 3),
@@ -209,7 +277,7 @@ def main():
         else:
             seen.add(stem)
             entries.append(entry)
-            print(f"ok   {fn!r:44s} -> {entry['file']:36s} {entry['bpm']:6.1f} bpm {entry['bars']} bars {entry['seconds']:5.2f}s")
+            print(f"ok   {fn!r:44s} -> {entry['file']:36s} {entry['bpm']:6.1f} bpm 1 bar {entry['seconds']:5.2f}s")
     with open(os.path.join(args.outdir, 'manifest.json'), 'w') as f:
         json.dump({'samplerate': TARGET_SR, 'breaks': entries}, f, indent=1)
     print(f"\n{len(entries)} converted, {len(skipped)} skipped -> {args.outdir}")
