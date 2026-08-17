@@ -20,8 +20,9 @@ Demos (see slice_breaks.py first -- it writes slices/ and manifests):
   loops NAME [NAME..]   90s/00s style: each break is trimmed to whole beats,
                         loaded whole, and looped with `fit=` so it plays at
                         the session --bpm with pitch-invariant time stretch,
-                        all locked together by the AMY sequencer. --live or
-                        offline render to loops.wav.
+                        all locked together by the AMY sequencer. Starts
+                        immediately and plays --loops cycles of the longest
+                        break. --live or offline render to loops.wav.
 
   pitch NAME            fit=0: a semitone ladder on one slice -- pitch moves,
                         duration doesn't. Writes NAME_pitch.wav or --live.
@@ -216,21 +217,34 @@ def demo_loops(args):
     if not args.live:
         _ = render_blocks(4)
 
-    bars = args.bars
+    # Re-zero the clock and sequencer tick count so tick 0 lines up with the
+    # note-ons we're about to send (loading above consumed blocks/ticks).
+    amy.send(reset=amy.RESET_TIMEBASE)
     for i, (name, p, beats, dur, fit) in enumerate(loops):
-        # One note-on per loop cycle, repeating every `fit` ticks, forever.
-        amy.send(ticks=[0, fit, i + 1], osc=i + 1, wave=amy.PCM, preset=p,
-                 fit=fit, vel=1, pan=0.2 + 0.6 * (i / max(1, len(loops) - 1)))
+        kw = dict(osc=i + 1, wave=amy.PCM, preset=p, fit=fit, vel=1,
+                  pan=0.2 + 0.6 * (i / max(1, len(loops) - 1)))
+        # First cycle starts now: a periodic sequencer entry with offset 0
+        # first fires at tick `period`, not tick 0, so send cycle 1 directly...
+        amy.send(**kw)
+        # ...and let the sequencer re-trigger every `fit` ticks after that.
+        if args.loops > 1:
+            amy.send(ticks=[0, fit, i + 1], **kw)
+    # "N loops" = N cycles of the longest break.
+    total_ticks = max(l[4] for l in loops) * args.loops
+    total = int(total_ticks * tick_samples(args.bpm))
     if args.live:
-        print("looping... ctrl-c to stop")
+        print(f"looping {args.loops}x ({total * 1.0 / SR:.1f}s)... ctrl-c to stop early")
         try:
-            time.sleep(bars * 4 * 60 / args.bpm * 4)
+            time.sleep(total / SR + 0.5)
         except KeyboardInterrupt:
             pass
+        finally:
+            amy.send(reset=amy.RESET_SEQUENCER)
+            for i in range(len(loops)):
+                amy.send(osc=i + 1, vel=0)
         return
-    total_ticks = bars * 4 * PPQ
-    total = int(total_ticks * tick_samples(args.bpm))
     out = render_blocks(int(np.ceil(total / BLOCK)))
+    out = out[:total]  # drop the sliver of cycle N+1 the sequencer fires at the end
     write_wav(args.out or "loops.wav", out)
 
 
@@ -277,7 +291,7 @@ def main():
 
     l = sub.add_parser('loops'); l.add_argument('names', nargs='+')
     l.add_argument('--bpm', type=float, default=120)
-    l.add_argument('--bars', type=int, default=8, help='offline render length in bars')
+    l.add_argument('--loops', type=int, default=2, help='how many cycles of the longest break to play/render')
     l.add_argument('--beats', type=int, default=None, help='force beats per break (default: estimate)')
 
     pz = sub.add_parser('pitch'); pz.add_argument('name')
