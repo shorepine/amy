@@ -192,12 +192,17 @@ def demo_hits(args):
         time.sleep(len(order) * step + 2)
         return
     cond = Conductor()
+    src_to_out = SR / m['samplerate']
+    last_end = 0
     for i, k in enumerate(order):
         s = int(round(i * step_samples))
         cond.at(s, osc=(i % 24) + 1, wave=amy.PCM, preset=presets[k], vel=1)
+        sl = m['slices'][k]
+        last_end = max(last_end, s + (sl['end'] - sl['start']) * src_to_out)
         if args.verbose:
             print(f"hit {i:3d} slice {k:3d} at sample {s} = block {s//BLOCK} + offset {s%BLOCK}")
-    total = int(len(order) * step_samples + SR)
+    # Render until the longest-ringing hit actually finishes, plus a breath.
+    total = int(last_end + 0.15 * SR)
     out = cond.render(total)
     write_wav(args.out or f"{args.name}_hits{'_shuffled' if args.shuffle else ''}.wav", out)
 
