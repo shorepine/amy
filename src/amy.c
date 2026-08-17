@@ -1048,7 +1048,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
     for (int i=0; i < MAX_BREAKPOINT_SETS; ++i)  total_num_breakpoints += max_num_breakpoints[i];
     uint8_t *ptr = malloc_caps(sizeof(struct synthinfo) + sizeof(struct mod_synthinfo)
                                + total_num_breakpoints * (sizeof(float) + sizeof(uint32_t)),
-                               amy_global.config.ram_caps_events);
+                               amy_global.config.ram_caps_oscs);
     // On OOM leave the osc NULL; the voice goes silent instead of crashing.
     if (ptr == NULL) {
         amy_oom("alloc_osc: out of memory allocating osc %d\n", osc);
