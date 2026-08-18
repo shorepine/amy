@@ -1049,22 +1049,26 @@ void reset_parametric(uint16_t bus) {
 }
 
 
-// Per-osc distortion (synth[].dist_type), applied post-render, pre-filter.
+// Distortion over one channel of `len` samples, in place.  Scope-agnostic:
+// `cfg` and `st` are the caller's, so the same shaper serves the per-osc
+// timbral stage and a chained-osc head shaping a whole voice.  `st` carries
+// only DIST_CRUSH's sample-and-hold, so every independent signal path needs
+// its own (channels included - sharing one across a stereo pair smears them).
 // Params arrive range-clamped from play_delta(); loop bodies are call-free
 // so they take the Xtensa zero-overhead-loop form.  Returns the abs max of
 // what it wrote (folding can amplify a quiet input, so the pre-distortion
 // max must not be reused).  Pre-gain needs MUL6A_SS: drive * x overflows
 // MUL4_SS's [-16, 16) range and wraps sign.
-AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
+AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
+                                const dist_config_t *cfg, dist_state_t *st) {
     AMY_PROFILE_START(DIST_PROCESS)
-    struct synthinfo *psynth = synth[osc];
-    SAMPLE drive = F2S(psynth->dist_drive);
-    SAMPLE mix = F2S(psynth->dist_mix);
+    SAMPLE drive = F2S(cfg->drive);
+    SAMPLE mix = F2S(cfg->mix);
     SAMPLE dry = F2S(1.0f) - mix;
     SAMPLE max_out = 0;
-    switch (psynth->dist_type) {
+    switch (cfg->type) {
     case DIST_CLIP:
-        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+        for (uint16_t i = 0; i < len; ++i) {
             SAMPLE x = block[i];
             SAMPLE v = MUL6A_SS(x, drive);
             if (v > F2S(1.0f)) v = F2S(1.0f);
@@ -1078,7 +1082,7 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
         }
         break;
     case DIST_FOLD:
-        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+        for (uint16_t i = 0; i < len; ++i) {
             SAMPLE x = block[i];
             SAMPLE v = MUL6A_SS(x, drive);
             // Triangle wavefolder: y = 1 - |((v + 1) mod 4) - 2|, identity on [-1, 1].
@@ -1102,10 +1106,10 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
         break;
     case DIST_CRUSH: {
         // Bit-depth + sample-rate reduction.
-        SAMPLE hold = psynth->dist_hold;
-        uint16_t count = psynth->dist_hold_count;
-        uint16_t rate = (uint16_t)psynth->dist_rate;
-        int bits = (int)psynth->dist_bits;
+        SAMPLE hold = st->hold;
+        uint16_t count = st->hold_count;
+        uint16_t rate = (uint16_t)cfg->rate;
+        int bits = (int)cfg->bits;
         // Quantize to `bits` magnitude bits, rounding to nearest: truncation
         // is a half-step DC offset that the echo feedback loop integrates.
 #ifdef AMY_USE_FIXEDPOINT
@@ -1123,7 +1127,7 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
             qinv = 1.0f / qscale;
         }
 #endif
-        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+        for (uint16_t i = 0; i < len; ++i) {
             SAMPLE x = block[i];
             if (count == 0) {
                 SAMPLE v = MUL6A_SS(x, drive);
@@ -1145,14 +1149,20 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
             if (y < 0) y = -y;
             if (y > max_out) max_out = y;
         }
-        psynth->dist_hold = hold;
-        psynth->dist_hold_count = count;
+        st->hold = hold;
+        st->hold_count = count;
         break;
     }
     default:  // unreachable; keep the return contract anyway
-        max_out = scan_max(block, AMY_BLOCK_SIZE);
+        max_out = scan_max(block, len);
         break;
     }
     AMY_PROFILE_STOP(DIST_PROCESS)
     return max_out;
+}
+
+// Per-osc entry point: the osc owns both its config and its hold state.
+AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
+    return dist_block(block, AMY_BLOCK_SIZE, &synth[osc]->dist,
+                      &synth[osc]->dist_state);
 }

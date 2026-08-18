@@ -658,6 +658,24 @@ typedef struct amy_event {
     float reverb_xover_hz;
 } amy_event;
 
+// Distortion stage.  Split from synthinfo so the same shaper can run at any
+// summing scope: per-osc (timbral, inside the envelope/filter chain) and, on a
+// chained-osc head, per-voice.  Config is what the caller sets; state is only
+// what DIST_CRUSH's sample-and-hold carries between blocks, and each
+// independent signal path needs its own.
+typedef struct dist_config {
+    uint8_t type;    // One of the DIST_ values.
+    float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
+    float bits;      // DIST_CRUSH bit depth; >= 24 disables quantization.
+    float rate;      // DIST_CRUSH sample-hold length in samples; 1 disables.
+    float mix;       // Wet/dry, 0..1.
+} dist_config_t;
+
+typedef struct dist_state {
+    SAMPLE hold;          // DIST_CRUSH held sample,
+    uint16_t hold_count;  // and samples left to hold it.
+} dist_state_t;
+
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
     uint16_t osc; // self-reference
@@ -680,12 +698,9 @@ struct synthinfo {
     float portamento_alpha;
     float resonance;
     uint8_t filter_type;
-    // Per-osc distortion, applied pre-filter.
-    uint8_t dist_type;    // One of the DIST_ values.
-    float dist_drive;     // Pre-gain, 0..DIST_MAX_DRIVE (fold depth for DIST_FOLD).
-    float dist_bits;      // DIST_CRUSH bit depth; >= 24 disables quantization.
-    float dist_rate;      // DIST_CRUSH sample-hold length in samples; 1 disables.
-    float dist_mix;       // Wet/dry, 0..1.
+    // Distortion, applied pre-filter.  On a normal osc this is the per-osc
+    // timbral stage; on a SILENT chained-osc head it shapes the summed voice.
+    dist_config_t dist;
     uint16_t chained_osc;
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
@@ -712,9 +727,8 @@ struct synthinfo {
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
-    // DIST_CRUSH sample-rate reducer: held sample, samples left to hold it.
-    SAMPLE dist_hold;
-    uint16_t dist_hold_count;
+    // DIST_CRUSH sample-rate reducer state.
+    dist_state_t dist_state;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
@@ -1364,6 +1378,8 @@ extern void pcm_unload_all_presets();
 extern void filters_init(uint16_t bus);
 extern void filters_deinit(uint16_t bus);
 extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
+extern SAMPLE dist_block(SAMPLE * block, uint16_t len,
+                         const dist_config_t *cfg, dist_state_t *st);
 extern SAMPLE dist_process(SAMPLE * block, uint16_t osc);
 extern void parametric_eq_process(uint16_t bus, SAMPLE *block);
 extern void reset_filter(uint16_t osc);

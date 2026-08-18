@@ -990,11 +990,11 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
     psynth->filter_type = FILTER_NONE;
-    psynth->dist_type = DIST_OFF;
-    psynth->dist_drive = 1.0f;
-    psynth->dist_bits = 16.0f;
-    psynth->dist_rate = 1.0f;
-    psynth->dist_mix = 1.0f;
+    psynth->dist.type = DIST_OFF;
+    psynth->dist.drive = 1.0f;
+    psynth->dist.bits = 16.0f;
+    psynth->dist.rate = 1.0f;
+    psynth->dist.mix = 1.0f;
     AMY_UNSET(psynth->chained_osc);
     for(uint8_t j=0;j<NUM_MOD_SOURCES;j++) AMY_UNSET(psynth->mod_source[j]);
     psynth->algorithm = 0;
@@ -1032,8 +1032,8 @@ void reset_osc_state(struct synthinfo *psynth) {
     psynth->last_two[1] = 0;
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
-    psynth->dist_hold = 0;
-    psynth->dist_hold_count = 0;
+    psynth->dist_state.hold = 0;
+    psynth->dist_state.hold_count = 0;
 }
 
 void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
@@ -1568,34 +1568,34 @@ void play_delta(struct delta *d) {
         // Range-check as float before the cast (huge values are UB to cast).
         // Restart the rate reducer so a type change can't replay a stale held sample.
         float type = d->data.f;
-        synth[d->osc]->dist_type = (type >= DIST_OFF && type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
-        synth[d->osc]->dist_hold = 0;
-        synth[d->osc]->dist_hold_count = 0;
+        synth[d->osc]->dist.type = (type >= DIST_OFF && type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
+        synth[d->osc]->dist_state.hold = 0;
+        synth[d->osc]->dist_state.hold_count = 0;
     }
     // Clamp here so dist_process doesn't range-check per block.
     if (d->param == DIST_DRIVE) {
         float drive = d->data.f;
         if (drive < 0.0f) drive = 0.0f;
         if (drive > DIST_MAX_DRIVE) drive = DIST_MAX_DRIVE;
-        synth[d->osc]->dist_drive = drive;
+        synth[d->osc]->dist.drive = drive;
     }
     if (d->param == DIST_BITS) {
         float bits = d->data.f;
         if (bits < 1.0f) bits = 1.0f;
         if (bits > 24.0f) bits = 24.0f;  // > S_FRAC_BITS: quantization off
-        synth[d->osc]->dist_bits = bits;
+        synth[d->osc]->dist.bits = bits;
     }
     if (d->param == DIST_RATE) {
         float rate = d->data.f;
         if (rate < 1.0f) rate = 1.0f;
         if (rate > 1024.0f) rate = 1024.0f;
-        synth[d->osc]->dist_rate = rate;
+        synth[d->osc]->dist.rate = rate;
     }
     if (d->param == DIST_MIX) {
         float mix = d->data.f;
         if (mix < 0.0f) mix = 0.0f;
         if (mix > 1.0f) mix = 1.0f;
-        synth[d->osc]->dist_mix = mix;
+        synth[d->osc]->dist.mix = mix;
     }
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
@@ -2120,7 +2120,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if (synth[osc]->wave != SILENT) {
             // apply distortion to osc if set, pre-filter; returns its own max
             // (folding can amplify a quiet release tail).
-            if (synth[osc]->dist_type != DIST_OFF) {
+            if (synth[osc]->dist.type != DIST_OFF) {
                 max_val = dist_process(buf, osc);
             }
             // apply filter to osc if set
@@ -2143,6 +2143,14 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
         if (synth[osc]->wave == SILENT) {
             max_val = render_envelope(buf, osc);
+            // Distortion on a SILENT head shapes the whole voice: buf now holds
+            // the summed chain, and chained_osc is base-osc-relative, so this
+            // runs once per voice on that voice's mix alone.  After the
+            // envelope, so note dynamics drive the shaper as they do per-osc;
+            // before the filter, keeping the per-osc dist -> filter order.
+            if (synth[osc]->dist.type != DIST_OFF) {
+                max_val = dist_process(buf, osc);
+            }
             // apply filter to osc if set
             if (synth[osc]->filter_type != FILTER_NONE) {
                 max_val = filter_process(buf, osc, max_val);
