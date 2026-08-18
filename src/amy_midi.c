@@ -826,3 +826,22 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 }
 
 #endif // check for macos desktop 
+
+#ifndef MACOS
+/* Which MIDI port -- amy_midi.h's four, for every platform that is not
+ * the macOS desktop (macos_midi.m). Answering "no ports, no choice"
+ * rather than being absent is what lets a host call these
+ * unconditionally: a settings pane draws an empty list and says so,
+ * instead of the host needing a #ifdef of its own. */
+uint32_t amy_midi_port_count(uint8_t dir) { (void)dir; return 0; }
+
+uint32_t amy_midi_port_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen) {
+    (void)dir; (void)index;
+    if (buflen) buf[0] = 0;
+    return 0;
+}
+
+int32_t amy_midi_port_selected(uint8_t dir) { (void)dir; return -1; }
+
+void amy_midi_port_select(uint8_t dir, int32_t index) { (void)dir; (void)index; }
+#endif
