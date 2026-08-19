@@ -379,11 +379,18 @@ void esp_fill_audio_buffer_task() {
         // i2s DMA write (or the update-sync wait) above, which is when lower-priority
         // tasks on this core get to run.
         amy_overload_check(busy_us);
-        // If the audio output didn't block at all, we're past overloaded, and this
-        // max-priority task would starve everything else on this core (USB, MIDI,
-        // the host app).  Audio is already breaking up, so give the rest of the
-        // system a tick.
-        if (blocked_us < 150) vTaskDelay(1);
+        // If rendering genuinely can't keep up (a block costs at least its own
+        // real-time budget) AND the audio output didn't block, we're past
+        // overloaded, and this max-priority task would starve everything else
+        // on this core (USB, MIDI, the host app).  Audio is already breaking
+        // up, so give the rest of the system a tick.
+        //
+        // Both conditions matter: with a small DMA ring a healthy just-in-time
+        // iteration can also see blocked_us == 0, and one tick here (10 ms at
+        // a 100 Hz tick rate) can be bigger than the whole ring -- a single
+        // spurious delay underruns it, the drained ring makes the next write
+        // not block either, and the delay re-arms forever (#1118).
+        if (busy_us >= AMY_BLOCK_US && blocked_us < 150) vTaskDelay(1);
     }
 }
 
