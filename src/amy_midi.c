@@ -743,12 +743,10 @@ void stop_midi() {
 
 
 #ifdef __linux__
-void stop_midi() {
-}
-
-void run_midi() {
-    //fprintf(stderr, "no MIDI support on linux yet\n");
-}
+/* src/linux_midi.c (ALSA raw MIDI) is the host layer here, the way
+ * macos_midi.m is on macOS. It said "no MIDI support on linux yet". */
+extern void stop_midi();
+extern void run_midi();
 #endif
 
 #ifdef AMY_DAISY
@@ -766,6 +764,11 @@ void run_midi() {
 }
 #endif
 
+#ifdef __linux__
+/* ...and its midi_out too, which writes to an ALSA handle and has to
+ * take the lock the read thread holds. */
+extern void midi_out(uint8_t * bytes, uint16_t len);
+#else
 void midi_out(uint8_t * bytes, uint16_t len) {
     midi_out_external_hook(bytes, len);
 
@@ -825,14 +828,17 @@ void midi_out(uint8_t * bytes, uint16_t len) {
 
 }
 
+#endif  // __linux__ brings its own midi_out (src/linux_midi.c)
+
 #endif // check for macos desktop 
 
-#ifndef MACOS
-/* Which MIDI port -- amy_midi.h's four, for every platform that is not
- * the macOS desktop (macos_midi.m). Answering "no ports, no choice"
- * rather than being absent is what lets a host call these
- * unconditionally: a settings pane draws an empty list and says so,
- * instead of the host needing a #ifdef of its own. */
+#if !defined(MACOS) && !defined(__linux__)
+/* Which MIDI port -- amy_midi.h's four, for every platform that has no
+ * ports to choose between. The two desktops implement them for real
+ * (macos_midi.m, linux_midi.c); everything else is a soldered-on UART.
+ * Answering "no ports, no choice" rather than being absent is what lets
+ * a host call these unconditionally: a settings pane draws an empty
+ * list and says so, instead of the host needing a #ifdef of its own. */
 uint32_t amy_midi_port_count(uint8_t dir) { (void)dir; return 0; }
 
 uint32_t amy_midi_port_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen) {

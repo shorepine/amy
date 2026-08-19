@@ -15,6 +15,14 @@ else
 	CC = gcc
 endif
 
+# Linux MIDI is ALSA raw MIDI (src/linux_midi.c), the counterpart of
+# src/macos_midi.m. libasound is the one new dependency:
+#   apt install libasound2-dev
+ifeq ($(UNAME_S),Linux)
+	SOURCES += src/linux_midi.c
+	LIBS += -lasound
+endif
+
 
 # on Raspberry Pi, at least under 32-bit mode, libatomic and libdl are needed.
 ifeq ($(shell uname -m), armv7l)

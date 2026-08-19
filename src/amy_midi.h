@@ -3,6 +3,14 @@
 #ifndef __MIDI_H
 #define __MIDI_H
 
+/* This header declares bool and fixed-width ints of its own accord --
+ * midi_active_channel_set(), the port chooser below -- and used to get
+ * them only from whatever the includer had already pulled in. That held
+ * while every caller reached it through amy.h; it stops holding the
+ * moment anything includes it on its own. */
+#include <stdbool.h>
+#include <stdint.h>
+
 // AMY_HOST_MIDI: the embedding host owns the MIDI device layer (run_midi /
 // stop_midi / midi_out) and amy_midi.c compiles only the platform-neutral
 // message parsing. MACOS implies it — the macOS desktop host layer is
@@ -16,7 +24,13 @@
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
 #include "esp_task.h"
-#else
+#endif
+
+#ifdef __linux__
+#include <alsa/asoundlib.h>
+#endif
+
+#ifdef MACOS
 // virtualmidi Cocoa stubs
 #endif
 #define MIDI_SLOTS 4
@@ -112,6 +126,9 @@ void run_midi();
 void stop_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
+#endif
+#ifdef __linux__
+void *run_midi_linux(void *vargp);
 #endif
 
 // ---- Which MIDI port -------------------------------------------------
