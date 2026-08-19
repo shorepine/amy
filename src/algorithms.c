@@ -153,7 +153,8 @@ void note_on_mod(uint16_t osc, uint16_t algo_osc) {
 
 void algo_note_off(uint16_t osc) {
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(AMY_IS_SET(synth[osc]->algo_source[i])) {
+        if(AMY_IS_SET(synth[osc]->algo_source[i])
+           && synth[synth[osc]->algo_source[i]] != NULL) {
             uint16_t o = synth[osc]->algo_source[i];
             AMY_UNSET(synth[o]->note_on_clock);
             synth[o]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
@@ -168,7 +169,8 @@ void algo_note_off(uint16_t osc) {
 void algo_note_on(uint16_t osc, float freq) {
     msynth[osc]->logfreq = logfreq_of_freq(freq);
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
-        if(AMY_IS_SET(synth[osc]->algo_source[i])) {
+        if(AMY_IS_SET(synth[osc]->algo_source[i])
+           && synth[synth[osc]->algo_source[i]] != NULL) {
             note_on_mod(synth[osc]->algo_source[i], osc);
         }
     }
@@ -244,7 +246,11 @@ SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
         }
 
         SAMPLE value = 0;
+        // As with mod_source, an algo_source osc can have been freed since it
+        // was named, leaving synth[] NULL; render_algo is reached past
+        // amy_render's null skip.
         if(AMY_IS_SET(synth[osc]->algo_source[op])
+           && synth[synth[osc]->algo_source[op]] != NULL
            && synth[synth[osc]->algo_source[op]]->role == SYNTH_IS_ALGO_SOURCE) {
             value = render_mod(in_buf, out_buf, synth[osc]->algo_source[op], feedback_level, osc, mod_amp);
         } // If osc is not set, output has already been cleared.

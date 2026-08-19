@@ -1479,7 +1479,7 @@ void play_delta(struct delta *d) {
               || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
               || synth[osc]->role == SYNTH_IS_CHAINED
               || synth[osc]->wave == PARTIAL)) {
-            while(AMY_IS_SET(osc)) {
+            while(AMY_IS_SET(osc) && synth[osc] != NULL) {  // a freed link ends the chain
                 synth[osc]->midi_note = d->data.f;
                 osc = synth[osc]->chained_osc;
             }
@@ -1718,7 +1718,7 @@ void play_delta(struct delta *d) {
             // Loop through chained oscs
             uint16_t osc = d->osc;
             //fprintf(stderr, "t %.3f: delta note_on: osc %d vel %.3f\n\r", amy_global.time, osc, d->data.f);
-            while(AMY_IS_SET(osc)) {
+            while(AMY_IS_SET(osc) && synth[osc] != NULL) {  // a freed link ends the chain
                 //fprintf(stderr, "osc: %d wave %d role %d\n\r", osc, synth[osc]->wave, synth[osc]->role);
                 // Ignore velocity events for mod source / algo / partial notes.
                 if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
@@ -1754,7 +1754,8 @@ void play_delta(struct delta *d) {
                     // trigger the mod sources, for however many we have
                     for (int m = 0; m < NUM_MOD_SOURCES; ++m) {
                         uint16_t mod_osc = synth[osc]->mod_source[m];
-                        if(AMY_IS_SET(mod_osc)) {
+                        // A modulator named by this osc may have been freed.
+                        if(AMY_IS_SET(mod_osc) && synth[mod_osc] != NULL) {
                             if (AMY_IS_SET(synth[mod_osc]->trigger_phase))
                                 synth[mod_osc]->phase = F2P(synth[mod_osc]->trigger_phase);
                             synth[mod_osc]->note_on_clock = amy_global.total_samples;  // Need a note_on_clock to have envelope work correctly.
@@ -1781,7 +1782,7 @@ void play_delta(struct delta *d) {
             }
         } else if(synth[d->osc]->velocity > 0 && d->data.f == 0) { // new note off
             uint16_t osc = d->osc;
-            while(AMY_IS_SET(osc)) {
+            while(AMY_IS_SET(osc) && synth[osc] != NULL) {  // a freed link ends the chain
                 if (!(synth[osc]->role == SYNTH_IS_MOD_SOURCE
                       || synth[osc]->role == SYNTH_IS_ALGO_SOURCE
                       || synth[osc]->wave == PARTIAL)) {
@@ -2073,7 +2074,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             //printf("h&m: time %.3f osc %d OFF\n", amy_global.time, osc);
             // Oscillator has fallen silent, stop executing it.
             uint16_t osc_to_stop = osc;  // Type must match synthinfo.chained_osc
-            while (AMY_IS_SET(osc_to_stop)) {
+            while (AMY_IS_SET(osc_to_stop) && synth[osc_to_stop] != NULL) {  // a freed link ends the chain
                 synth[osc_to_stop]->status = SYNTH_INAUDIBLE;  // It *could* come back...
                 // 2026-03-22: It's necessary to reset these two fields in msynth to get OwBass to restart without click...
                 msynth[osc_to_stop]->filter_logfreq = 0;  // (a)

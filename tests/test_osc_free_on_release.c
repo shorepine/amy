@@ -156,6 +156,98 @@ static void test_builtin_patch_release(void) {
     CHECK(all_null(owned, n), "and freed them on release");
 }
 
+// --- References held by OTHER oscs -------------------------------------
+//
+// Freeing an osc NULLs its synth[] slot, but nothing walks the rest of the
+// array to clear the references to it: mod_source, algo_source and
+// chained_osc are all stored as bare osc numbers. amy_render skips a NULL
+// osc at the top of its loop, so the referrer itself is safe -- but the
+// recursive descents past that skip (compute_mod_scale -> hold_and_modify,
+// render_algo -> render_mod) and the note-on mod trigger in play_delta all
+// dereferenced the referenced osc without rechecking, which is a segfault
+// on the render thread. render_osc_wave already rechecks before following
+// chained_osc, for exactly this reason.
+//
+// The dangling reference is built the way it arises in the field: a bare
+// osc names an osc that no voice owns yet, and the voice allocator -- which
+// only skips oscs with osc_to_voice set -- later hands that same osc to a
+// voice, whose release then frees it.
+
+// An osc currently owned by instrument `instr`, or AMY_UNSET_VALUE on none.
+static uint16_t an_owned_osc(int instr) {
+    uint16_t owned[MAX_OWNED];
+    int n = collect_owned(instr, owned);
+    return n ? owned[0] : (uint16_t)0xFFFF;
+}
+
+static void test_render_survives_freed_mod_source(void) {
+    printf("rendering an osc whose mod_source was freed does not crash\n");
+    send("i36iv1uv0w0f220Zv1w0f330Z");
+    uint16_t victim = an_owned_osc(36);
+    CHECK(victim != 0xFFFF, "found an osc owned by the synth (%d)", victim);
+    char m[64];
+    // A bare osc, modulated by an osc the synth owns.
+    snprintf(m, sizeof(m), "v0w0f220L%dZ", victim);
+    send(m);
+    send("v0f220l1Z");
+    CHECK(synth[0] != NULL && synth[0]->mod_source[0] == victim,
+          "bare osc 0 is modulated by osc %d", victim);
+    // Release the synth: the modulator goes away, osc 0 keeps its number.
+    send("i36iv0Z");   // <- rendered past a NULL modulator before the fix
+    CHECK(synth[victim] == NULL, "the modulator was freed");
+    CHECK(synth[0] != NULL, "the osc that named it is still here");
+    render_a_bit();
+    CHECK(1, "rendered with a dangling mod_source");
+    send("v0l0Z");
+}
+
+static void test_note_on_survives_freed_mod_source(void) {
+    printf("a note-on whose mod_source was freed does not crash\n");
+    send("i37iv1uv0w0f220Zv1w0f330Z");
+    uint16_t victim = an_owned_osc(37);
+    char m[64];
+    snprintf(m, sizeof(m), "v2w0f220L%dZ", victim);
+    send(m);
+    send("i37iv0Z");
+    CHECK(synth[victim] == NULL, "the modulator was freed");
+    // play_delta's note-on walks mod_source[] to trigger the modulators.
+    send("v2f220l1Z");
+    CHECK(1, "note-on with a dangling mod_source");
+    send("v2l0Z");
+}
+
+static void test_render_survives_freed_algo_source(void) {
+    printf("rendering an algo osc whose algo_source was freed does not crash\n");
+    send("i38iv1uv0w0f220Zv1w0f330Z");
+    uint16_t victim = an_owned_osc(38);
+    char m[64];
+    snprintf(m, sizeof(m), "v3w%do1O%dZ", ALGO, victim);
+    send(m);
+    send("v3l1Z");
+    send("i38iv0Z");
+    CHECK(synth[victim] == NULL, "the algo source was freed");
+    render_a_bit();
+    CHECK(1, "rendered with a dangling algo_source");
+    send("v3l0Z");
+}
+
+static void test_note_survives_freed_chained_osc(void) {
+    printf("a note on an osc whose chained_osc was freed does not crash\n");
+    send("i39iv1uv0w0f220Zv1w0f330Z");
+    uint16_t victim = an_owned_osc(39);
+    char m[64];
+    snprintf(m, sizeof(m), "v4w0f220c%dZ", victim);
+    send(m);
+    send("i39iv0Z");
+    CHECK(synth[victim] == NULL, "the chained osc was freed");
+    // play_delta walks the chain on note, velocity and note-off.
+    send("v4n60Z");
+    send("v4f220l1Z");
+    render_a_bit();
+    send("v4l0Z");
+    CHECK(1, "note on/off walked a chain ending in a freed osc");
+}
+
 // AMY calls these; the test binary has to provide them.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -170,6 +262,10 @@ int main(void) {
     test_freed_oscs_come_back();
     test_cycles_reach_steady_state();
     test_builtin_patch_release();
+    test_render_survives_freed_mod_source();
+    test_note_on_survives_freed_mod_source();
+    test_render_survives_freed_algo_source();
+    test_note_survives_freed_chained_osc();
 
     if (failures) { printf("%d FAILURES\n", failures); return 1; }
     printf("all ok\n");
