@@ -23,6 +23,19 @@
  * shape that crashes rarely and unreproducibly. midi_out is the one
  * crossing and takes the lock.
  */
+/* AMY_ALSA IS THE SWITCH, AND THE WHOLE FILE IS BEHIND IT — the same
+ * shape libminiaudio-audio.c and macos_midi.m already have, and for a
+ * blunter reason than portability taste: the Arduino builds compile
+ * every .c in src/ whatever the target is, so without this the Pico and
+ * the Teensy try to include <poll.h> and stop. emscripten defines
+ * __linux__ too, which is why the platform macro is not the guard.
+ *
+ * The Makefile sets it only when libasound is actually present, so a
+ * Linux box without the dev package builds amy exactly as it always
+ * did, minus MIDI — a synth library may not make itself unbuildable
+ * over an optional device layer. */
+#if defined(AMY_ALSA) && !defined(__EMSCRIPTEN__)
+
 #include <poll.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -382,3 +395,5 @@ void stop_midi(void)
         midi_linux_should_exit = false;
     }
 }
+
+#endif  // AMY_ALSA && !__EMSCRIPTEN__

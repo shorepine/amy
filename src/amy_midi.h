@@ -26,10 +26,6 @@
 #include "esp_task.h"
 #endif
 
-#ifdef __linux__
-#include <alsa/asoundlib.h>
-#endif
-
 #ifdef MACOS
 // virtualmidi Cocoa stubs
 #endif
@@ -127,7 +123,7 @@ void stop_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
 #endif
-#ifdef __linux__
+#ifdef AMY_ALSA
 void *run_midi_linux(void *vargp);
 #endif
 
