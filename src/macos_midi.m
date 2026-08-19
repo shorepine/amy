@@ -37,6 +37,13 @@ static ItemCount connected_n;
 
 static ItemCount port_count(uint8_t dir)
 {
+    /* NOT MERELY A "not started yet" SHORTCUT. A CoreMIDI call from a
+     * process that has never made a client BLOCKS -- midi_out() has
+     * carried a guard for this for the same reason, and the first host
+     * to ask for the list before amy_start() got a machine that hung
+     * with no output and no error. With no client there are no ports,
+     * which is also true. */
+    if (midi_client == 0) return 0;
     return dir == AMY_MIDI_PORT_OUT ? MIDIGetNumberOfDestinations()
                                     : MIDIGetNumberOfSources();
 }
@@ -263,7 +270,7 @@ uint32_t amy_midi_port_name(uint8_t dir, uint32_t index, char *buf, uint32_t buf
 }
 
 int32_t amy_midi_port_selected(uint8_t dir) {
-    if (dir > AMY_MIDI_PORT_OUT) return -1;
+    if (dir > AMY_MIDI_PORT_OUT || midi_client == 0) return -1;
     if (sel_uid[dir] == 0) return -1;
     ItemCount n = port_count(dir);
     for (ItemCount i = 0; i < n; i++)
@@ -274,7 +281,7 @@ int32_t amy_midi_port_selected(uint8_t dir) {
 }
 
 void amy_midi_port_select(uint8_t dir, int32_t index) {
-    if (dir > AMY_MIDI_PORT_OUT) return;
+    if (dir > AMY_MIDI_PORT_OUT || midi_client == 0) return;
     if (index < 0 || (ItemCount)index >= port_count(dir)) {
         sel_uid[dir] = 0;
         return;
