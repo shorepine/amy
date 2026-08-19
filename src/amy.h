@@ -1101,6 +1101,26 @@ void amy_bleep_synth(uint32_t start);
 void amy_restart();
 void amy_reset_oscs();
 void amy_print_devices();
+
+// ---- Which audio device ---------------------------------------------
+//
+// config.playback_device_id / capture_device_id are INDICES into
+// miniaudio's enumeration, and amy_print_devices() has been the only way
+// to see that list -- fine for a command line, no use to a host with a
+// menu or a settings pane to fill in. These name it.
+//
+// The order is exactly the one those two ids index, so a host can list
+// the names, take a pick, and store the index straight into the config.
+// Answers 0 on a platform whose audio is not miniaudio (the ESP32, the
+// Pico, Arduino), so a host may call them unconditionally.
+#define AMY_AUDIO_DEVICE_OUT 0
+#define AMY_AUDIO_DEVICE_IN  1
+
+uint32_t amy_audio_device_count(uint8_t dir);
+// The device name, into buf. Returns the length written, or 0 for an
+// index that is out of range -- in which case buf is left holding an
+// empty string, so a caller may skip the check.
+uint32_t amy_audio_device_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen);
 void amy_set_custom(struct custom_oscillator* custom);
 void amy_reset_sysclock();
 

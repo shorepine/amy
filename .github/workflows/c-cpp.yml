@@ -25,6 +25,13 @@ jobs:
     - name: Install dependencies
       run: pip install numpy soundfile
 
+    # The one Linux job that HAS libasound, so src/linux_midi.c (ALSA raw
+    # MIDI) is actually compiled somewhere. It is optional and detected,
+    # so every other Linux job here builds the without-ALSA path -- which
+    # is the arrangement that keeps both honest.
+    - name: Install ALSA headers
+      run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
     - name: Build and test
       env:
         AMY_TEST_THRESHOLD_DB: "-70.0"

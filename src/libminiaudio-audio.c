@@ -111,6 +111,51 @@ void amy_print_devices() {
 }
 
 
+/* ---- Which audio device (see amy.h) --------------------------------
+ *
+ * A context of its own, made once and kept: the device context above is
+ * torn down and rebuilt every time the device changes, which is exactly
+ * when a host is asking what the choices are. Enumerating is a read, so
+ * two contexts coexisting is fine (OpenSL is the one backend that
+ * objects, and it has no business here).
+ *
+ * ma_context_get_devices hands back arrays IT owns, valid only until the
+ * next call, so both functions below copy what they want immediately. */
+static ma_context enum_context;
+static ma_bool32 enum_context_ready = MA_FALSE;
+
+static ma_bool32 enum_devices(ma_device_info **playback, ma_uint32 *n_playback,
+                              ma_device_info **capture, ma_uint32 *n_capture) {
+    if (!enum_context_ready) {
+        if (ma_context_init(NULL, 0, NULL, &enum_context) != MA_SUCCESS) return MA_FALSE;
+        enum_context_ready = MA_TRUE;
+    }
+    return ma_context_get_devices(&enum_context, playback, n_playback,
+                                  capture, n_capture) == MA_SUCCESS;
+}
+
+uint32_t amy_audio_device_count(uint8_t dir) {
+    ma_device_info *playback, *capture;
+    ma_uint32 n_playback, n_capture;
+    if (!enum_devices(&playback, &n_playback, &capture, &n_capture)) return 0;
+    return dir == AMY_AUDIO_DEVICE_IN ? (uint32_t)n_capture : (uint32_t)n_playback;
+}
+
+uint32_t amy_audio_device_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen) {
+    if (buflen == 0) return 0;
+    buf[0] = 0;
+    ma_device_info *playback, *capture;
+    ma_uint32 n_playback, n_capture;
+    if (!enum_devices(&playback, &n_playback, &capture, &n_capture)) return 0;
+    ma_device_info *list = dir == AMY_AUDIO_DEVICE_IN ? capture : playback;
+    ma_uint32 n = dir == AMY_AUDIO_DEVICE_IN ? n_capture : n_playback;
+    if (index >= n) return 0;
+    strncpy(buf, list[index].name, buflen - 1);
+    buf[buflen - 1] = 0;
+    return (uint32_t)strlen(buf);
+}
+
+
 // I've seen frame counts as big as 1440. *16 leaves room for the larger
 // Windows ring lead (see miniaudio_init) needed when the device period isn't
 // a multiple of AMY_BLOCK_SIZE.
@@ -359,5 +404,20 @@ void amy_live_stop() {
     miniaudio_deinit();
 }
 #endif  // __EMSCRIPTEN__
+
+#else  // ESP_PLATFORM / PICO_ON_DEVICE / ARDUINO: audio is not miniaudio
+
+#include "amy.h"
+
+/* No enumeration to do -- the audio device is soldered on. Answering
+ * "no devices" rather than being absent is what lets a host call these
+ * without an #ifdef of its own. */
+uint32_t amy_audio_device_count(uint8_t dir) { (void)dir; return 0; }
+
+uint32_t amy_audio_device_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen) {
+    (void)dir; (void)index;
+    if (buflen) buf[0] = 0;
+    return 0;
+}
 
 #endif  // Not ESP_PLATFORM or PICO_ON_DEVICE or ARDUINO

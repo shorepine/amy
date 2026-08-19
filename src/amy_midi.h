@@ -3,6 +3,14 @@
 #ifndef __MIDI_H
 #define __MIDI_H
 
+/* This header declares bool and fixed-width ints of its own accord --
+ * midi_active_channel_set(), the port chooser below -- and used to get
+ * them only from whatever the includer had already pulled in. That held
+ * while every caller reached it through amy.h; it stops holding the
+ * moment anything includes it on its own. */
+#include <stdbool.h>
+#include <stdint.h>
+
 // AMY_HOST_MIDI: the embedding host owns the MIDI device layer (run_midi /
 // stop_midi / midi_out) and amy_midi.c compiles only the platform-neutral
 // message parsing. MACOS implies it — the macOS desktop host layer is
@@ -16,7 +24,9 @@
 #include "driver/uart.h"
 #include "soc/uart_reg.h"
 #include "esp_task.h"
-#else
+#endif
+
+#ifdef MACOS
 // virtualmidi Cocoa stubs
 #endif
 #define MIDI_SLOTS 4
@@ -113,6 +123,38 @@ void stop_midi();
 #ifdef MACOS
 void *run_midi_macos(void*vargp);
 #endif
+#ifdef AMY_ALSA
+void *run_midi_linux(void *vargp);
+#endif
+
+// ---- Which MIDI port -------------------------------------------------
+//
+// amy has always listened to EVERY CoreMIDI source and sent to EVERY
+// destination, which is the right default -- a plugged-in keyboard just
+// works -- and is what -1 still means here. A host with somewhere to put
+// the choice (a menu, a settings pane) needs to name the ports and pick
+// one, which is what these four are for.
+//
+// Selection is by INDEX into the same order the count/name pair reports,
+// matching amy's other device selectors (config.playback_device_id).
+// Indices SHIFT when something is plugged or unplugged, so the selection
+// is pinned by NAME as well: if the name at the stored index no longer
+// matches, the name is looked for elsewhere in the list, and a port that
+// has really gone falls back to -1 rather than silently becoming
+// whichever device inherited its number.
+//
+// Implemented for macOS (macos_midi.m); every other platform answers 0
+// ports and -1, so a host may call these unconditionally.
+#define AMY_MIDI_PORT_IN  0
+#define AMY_MIDI_PORT_OUT 1
+
+uint32_t amy_midi_port_count(uint8_t dir);
+// The display name, into buf. Returns the length written, or 0 for an
+// index that is out of range (in which case buf is left with an empty
+// string, so a caller may skip the check).
+uint32_t amy_midi_port_name(uint8_t dir, uint32_t index, char *buf, uint32_t buflen);
+int32_t amy_midi_port_selected(uint8_t dir);   // -1 = all of them
+void amy_midi_port_select(uint8_t dir, int32_t index);
 
 void check_tusb_midi();
 void init_tusb_midi();
