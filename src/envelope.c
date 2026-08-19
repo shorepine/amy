@@ -41,7 +41,12 @@ AMY_IRAM_ATTR SAMPLE compute_mod_scale(uint16_t osc, uint16_t which_source) {
     // mod slots.
     uint16_t source = synth[osc]->mod_source[which_source];
     if(AMY_IS_SET(source)) {
-        if(source != osc) {  // belt-and-braces; assignment already rejects this
+        // synth[source] can be NULL: FREE_OSC returns a released voice's osc
+        // storage to the heap, while every osc that named it as a modulator
+        // still holds its number.  amy_render's own null skip doesn't cover
+        // this descent, so recheck here -- the same reason render_osc_wave
+        // rechecks before following chained_osc.
+        if(source != osc && synth[source] != NULL) {  // belt-and-braces; assignment already rejects self as source
             hold_and_modify(source);
             return compute_mod_value(source);
         }
