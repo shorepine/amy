@@ -388,6 +388,27 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     }
     _EPRINT_COEF(dist_drive_coefs, "dist_drive_coefs", "GD");
     _EPRINT_COEF(dist_mix_coefs, "dist_mix_coefs", "GM");
+    // Bus distortion rides 'J' with the same per-stage grammar; JD/JM stay
+    // scalar at bus scope.
+    _EPRINT_I(bus_dist_clip, "bus_dist_clip", "JC");
+    _EPRINT_I(bus_dist_fold, "bus_dist_fold", "JF");
+    if (AMY_IS_SET(e->bus_dist_crush)) {
+        if (!wirecode) {
+            snprintf(s, len - (size_t)(s - s_entry), " bus_dist_crush: %d", e->bus_dist_crush); s += strlen(s);
+        } else if (!e->bus_dist_crush) {
+            snprintf(s, len - (size_t)(s - s_entry), "JH0"); s += strlen(s);
+        } else {
+            snprintf(s, len - (size_t)(s - s_entry), "JH"); s += strlen(s);
+            if (AMY_IS_SET(e->bus_dist_bits)) { snprintf(s, len - (size_t)(s - s_entry), "%d", e->bus_dist_bits); s += strlen(s); }
+            if (AMY_IS_SET(e->bus_dist_rate)) { snprintf(s, len - (size_t)(s - s_entry), ",%d", e->bus_dist_rate); s += strlen(s); }
+        }
+    }
+    if (!wirecode) {
+        _EPRINT_I(bus_dist_bits, "bus_dist_bits", "");
+        _EPRINT_I(bus_dist_rate, "bus_dist_rate", "");
+    }
+    _EPRINT_F(bus_dist_drive, "bus_dist_drive", "JD");
+    _EPRINT_F(bus_dist_mix, "bus_dist_mix", "JM");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
@@ -457,6 +478,15 @@ bool event_addresses_bus(amy_event *e) {
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
     _RET_TRUE_IF_5_F_SET(chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth, chorus_depth);
     _RET_TRUE_IF_5_F_SET(reverb_level, reverb_liveness, reverb_damping, reverb_xover_hz, reverb_xover_hz);
+    // Not _RET_TRUE_IF_5_F_SET: the int fields' unset sentinels cast to
+    // ordinary floats rather than NaN.
+    _RET_TRUE_IF_SET(bus_dist_clip);
+    _RET_TRUE_IF_SET(bus_dist_fold);
+    _RET_TRUE_IF_SET(bus_dist_crush);
+    _RET_TRUE_IF_SET(bus_dist_drive);
+    _RET_TRUE_IF_SET(bus_dist_bits);
+    _RET_TRUE_IF_SET(bus_dist_rate);
+    _RET_TRUE_IF_SET(bus_dist_mix);
     return false;
 }
 
@@ -615,6 +645,13 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(reverb_liveness, REVERB_LIVENESS)
       _CASE_F(reverb_damping, REVERB_DAMPING)
       _CASE_F(reverb_xover_hz, REVERB_XOVER_HZ)
+      _CASE_I(bus_dist_clip, BUS_DIST_CLIP_EN)
+      _CASE_I(bus_dist_fold, BUS_DIST_FOLD_EN)
+      _CASE_I(bus_dist_crush, BUS_DIST_CRUSH_EN)
+      _CASE_F(bus_dist_drive, BUS_DIST_DRIVE)
+      _CASE_I(bus_dist_bits, BUS_DIST_BITS)
+      _CASE_I(bus_dist_rate, BUS_DIST_RATE)
+      _CASE_F(bus_dist_mix, BUS_DIST_MIX)
       _CASE_I(eg_type[0], EG0_TYPE)
       _CASE_I(eg_type[1], EG1_TYPE)
       _CASE_F(velocity, VELOCITY)

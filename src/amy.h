@@ -465,6 +465,12 @@ enum params{
     REVERB_LIVENESS,
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
+    // Per-bus distortion stage; bus in delta.osc like the params above.
+    // Same per-stage enables as the per-osc stage.
+    BUS_DIST_CLIP_EN,
+    BUS_DIST_FOLD_EN, BUS_DIST_CRUSH_EN,
+    BUS_DIST_DRIVE, BUS_DIST_BITS,
+    BUS_DIST_RATE, BUS_DIST_MIX,
     BUS,
     SAMPLE_OFFSET,              // PCM note-on start offset in samples within its block
     FIT,                        // PCM time-stretch/pitch-shift target in sequencer ticks
@@ -672,6 +678,13 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
+    uint8_t bus_dist_clip;
+    uint8_t bus_dist_fold;
+    uint8_t bus_dist_crush;
+    float bus_dist_drive;
+    uint8_t bus_dist_bits;
+    uint16_t bus_dist_rate;
+    float bus_dist_mix;
 } amy_event;
 
 // Distortion stage.  Split from synthinfo so the same shaper can run at any
@@ -991,6 +1004,10 @@ typedef struct bus_state {
     reverb_state_t reverb;
     chorus_config_t chorus;
     echo_config_t echo;
+    // Distortion, first in the bus FX chain; per-channel state per
+    // dist_block's contract.
+    dist_config_t dist;
+    dist_state_t dist_state[AMY_MAX_CHANNELS];
 } bus_state_t;
 
 // global synth state
@@ -1438,6 +1455,7 @@ extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
 extern SAMPLE dist_block(SAMPLE * block, uint16_t len,
                          const dist_config_t *cfg, dist_state_t *st);
 extern SAMPLE dist_process(SAMPLE * block, uint16_t osc);
+extern void dist_process_bus(uint16_t bus, SAMPLE *busbuf);
 extern void parametric_eq_process(uint16_t bus, SAMPLE *block);
 extern void reset_filter(uint16_t osc);
 extern void reset_parametric(uint16_t bus);

@@ -476,6 +476,32 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     return skip_chars;
 }
 
+// Stage letters shared by the per-osc ('G') and per-bus ('J') distortion
+// grammars; the caller hands over whichever scope's event fields the letter
+// addresses. C<v> and F<v> enable clip and fold (0 turns the stage off);
+// H<bits>[,<rate>] enables the bitcrusher (H0 turns it off).  Stages are
+// independent - each letter touches only its own enable.  Returns 1 if cmd
+// was a stage letter.
+static int parse_dist_stage_message(char cmd, char *message, uint8_t *clip,
+                                    uint8_t *fold, uint8_t *crush,
+                                    uint8_t *bits, uint16_t *rate) {
+    if (cmd == 'C') { *clip = (atoff(message) != 0); return 1; }
+    if (cmd == 'F') { *fold = (atoff(message) != 0); return 1; }
+    if (cmd == 'H') {
+        uint16_t vals[2];
+        parse_list_uint16_t(message, vals, 2, AMY_UNSET_VALUE(vals[0]));
+        if (vals[0] == 0) {
+            *crush = 0;
+        } else {
+            *crush = 1;
+            if (AMY_IS_SET(vals[0])) *bits = (uint8_t)MIN(vals[0], 24);
+            if (AMY_IS_SET(vals[1])) *rate = vals[1];
+        }
+        return 1;
+    }
+    return 0;
+}
+
 // Parser for the 'G' prefix: a digit is filter_type as ever; a letter is a
 // distortion sub-command. GC<v> and GF<v> enable clip and fold (0 turns the
 // stage off), GH<bits>[,<rate>] enables the bitcrusher (GH0 turns it off),
@@ -491,22 +517,28 @@ int amy_parse_dist_layer_message(char *message, amy_event *e) {
     }
     char cmd = message[0];
     message++;
-    if (cmd == 'C')  e->dist_clip = (atoff(message) != 0);
-    else if (cmd == 'F')  e->dist_fold = (atoff(message) != 0);
-    else if (cmd == 'H') {
-        uint16_t vals[2];
-        parse_list_uint16_t(message, vals, 2, AMY_UNSET_VALUE(vals[0]));
-        if (vals[0] == 0) {
-            e->dist_crush = 0;
-        } else {
-            e->dist_crush = 1;
-            if (AMY_IS_SET(vals[0])) e->dist_bits = (uint8_t)MIN(vals[0], 24);
-            if (AMY_IS_SET(vals[1])) e->dist_rate = vals[1];
-        }
+    if (!parse_dist_stage_message(cmd, message, &e->dist_clip, &e->dist_fold,
+                                  &e->dist_crush, &e->dist_bits, &e->dist_rate)) {
+        if (cmd == 'D')  parse_coef_message(message, e->dist_drive_coefs);
+        else if (cmd == 'M')  parse_coef_message(message, e->dist_mix_coefs);
+        else fprintf(stderr, "Unrecognized distortion command '%s'\n", message - 1);
     }
-    else if (cmd == 'D')  parse_coef_message(message, e->dist_drive_coefs);
-    else if (cmd == 'M')  parse_coef_message(message, e->dist_mix_coefs);
-    else fprintf(stderr, "Unrecognized distortion command '%s'\n", message - 1);
+    return 1;  // skip the sub-command letter.
+}
+
+// Parser for the 'J' prefix: the per-osc 'G' stage grammar at bus scope
+// ('y' picks the bus).  JD<drive> and JM<mix> stay scalar - a bus has no
+// per-note modulation sources to feed a coef vector.
+static int amy_parse_bus_dist_layer_message(char *message, amy_event *e) {
+    char cmd = message[0];
+    message++;
+    if (!parse_dist_stage_message(cmd, message, &e->bus_dist_clip,
+                                  &e->bus_dist_fold, &e->bus_dist_crush,
+                                  &e->bus_dist_bits, &e->bus_dist_rate)) {
+        if (cmd == 'D')  e->bus_dist_drive = atoff(message);
+        else if (cmd == 'M')  e->bus_dist_mix = atoff(message);
+        else fprintf(stderr, "Unrecognized bus distortion command '%s'\n", message - 1);
+    }
     return 1;  // skip the sub-command letter.
 }
 
@@ -778,6 +810,9 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atoff(arg); break;
+            // Per-bus distortion: the 'G' stage grammar at bus scope
+            // ('y' picks the bus).
+            case 'J': pos += amy_parse_bus_dist_layer_message(arg, e); break;
             // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
                 float chorus_params[4];

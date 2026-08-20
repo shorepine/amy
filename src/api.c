@@ -158,6 +158,13 @@ void amy_clear_event(amy_event *e) {
         AMY_UNSET(e->dist_drive_coefs[i]);
         AMY_UNSET(e->dist_mix_coefs[i]);
     }
+    AMY_UNSET(e->bus_dist_clip);
+    AMY_UNSET(e->bus_dist_fold);
+    AMY_UNSET(e->bus_dist_crush);
+    AMY_UNSET(e->bus_dist_drive);
+    AMY_UNSET(e->bus_dist_bits);
+    AMY_UNSET(e->bus_dist_rate);
+    AMY_UNSET(e->bus_dist_mix);
     AMY_UNSET(e->chained_osc);
     for (int i = 0; i < NUM_MOD_SOURCES; ++i) AMY_UNSET(e->mod_source[i]);
     AMY_UNSET(e->algorithm);
