@@ -333,8 +333,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
     _EPRINT_F(trigger_phase, "phase", "P");
-    _EPRINT_I(sample_offset, "sample_offset", "J");
-    _EPRINT_F(fit_ticks, "fit", "Y");
+    _EPRINT_I(sample_offset, "sample_offset", "po");
+    _EPRINT_F(fit_ticks, "fit", "pF");
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
     _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
     _EPRINT_I(latency_ms, "latency_ms", "N");  // NOT osc-dep

@@ -542,7 +542,7 @@ void pcm_note_on(uint16_t osc) {
             // Copy the looping mode from the wave mode field.  Can be updated on note_off.
             msynth[osc]->state = synth[osc]->mode;
         }
-        // sample_offset (J): begin this note-on partway into its render
+        // sample_offset (po): begin this note-on partway into its render
         // block, so slices of arbitrary length can butt-join sample-
         // accurately.  Only meaningful on a fresh start; a zero-crossing
         // restart already has fuzzy timing by design.
@@ -660,7 +660,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         uint32_t base_index_base = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
         uint32_t base_index = base_index_base;
         PHASOR phase = (synth[osc]->phase - (base_index_base << PCM_INDEX_FRAC_BITS)) << PCM_INDEX_STEP_EXTRA_BITS;
-        // sample_offset (J): a fresh note-on starts partway into this block,
+        // sample_offset (po): a fresh note-on starts partway into this block,
         // leaving the head silent, so slices can butt-join sample-accurately.
         uint16_t start_i = 0;
         if (msynth[osc]->pcm_delay) {

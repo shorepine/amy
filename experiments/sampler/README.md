@@ -3,7 +3,7 @@
 An experiment (branch `sampler-features`) adding the two missing pieces
 between AMY's PCM oscillators and a 90s techno / D&B sampler rig:
 
-1. **Sample-accurate note-on placement** — `sample_offset` (wire `J`).
+1. **Sample-accurate note-on placement** — `sample_offset` (wire `po`).
    AMY events execute on render-block boundaries (256 samples, ~5.8 ms).
    That's fine for notes, fatal for chopped breaks: slices of arbitrary
    length can't butt-join, so you can't "recreate" a break from its cuts.
@@ -12,7 +12,7 @@ between AMY's PCM oscillators and a 90s techno / D&B sampler rig:
    offset `S%256` and joins are gapless.
 
 2. **Pitch-invariant time stretch / time-invariant pitch shift** — `fit`
-   (wire `Y`), non-destructive and computed at note-on:
+   (wire `pF`), non-destructive and computed at note-on:
    - `fit=N` (N>0): play the sample over exactly N sequencer ticks
      (so it follows `tempo`), pitch untouched; `note` transposes as pure
      tuning without changing duration. The Ableton-style loop case.

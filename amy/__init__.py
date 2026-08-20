@@ -238,7 +238,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     # 'ticks' must come first: 'H' is recognized only as first char in wire message.
     ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
-    ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('sample_offset', 'JI'), ('fit', 'YF'), ('pan', 'QC'), ('client', 'gI'),
+    ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('sample_offset', 'poI'), ('fit', 'pFF'), ('pan', 'QC'), ('client', 'gI'),
     ('volume', 'VF'), ('pitch_bend', 'sF'), ('filter_freq', 'FC'), ('resonance', 'RF'),
     ('bp0', 'AL'), ('bp1', 'BL'),
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
