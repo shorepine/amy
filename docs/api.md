@@ -393,6 +393,16 @@ Two parameters turn AMY's PCM oscillators into a "real" sampler (see
   timeline wraps at the loop marks. Streamed `disk_sample` presets can't
   `fit` (no random access).
 
+`fit` composes with `phase` to start a sample part-way through, which is what
+a "drop the playhead into the middle of a loop" transport needs. `phase` sets
+the note-on's start frame (`start_frame / 2^23`) and the stretcher picks the
+input up from there — but it stretches *whatever input is left* over
+*whatever `fit` it is given*, so `fit` has to be the REMAINING ticks, not the
+clip's full length; pass the full value and the tail plays at half speed.
+Entering a 16-beat loop at its midpoint is `phase = (frames/2) / 2^23` with
+`fit` set to 8 beats of ticks, and it ends on the same grid line the
+uninterrupted loop would have.
+
 ### WAVETABLE wave type
 
 `wave=WAVETABLE` is available when AMY is built with `-DAMY_WAVETABLE`.
