@@ -1034,6 +1034,7 @@ void reset_osc_state(struct synthinfo *psynth) {
     psynth->last_filt_norm_bits = 0;
     psynth->dist_state.hold = 0;
     psynth->dist_state.hold_count = 0;
+    psynth->dist_state.hpf_yn1 = 0;
 }
 
 void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
@@ -1566,11 +1567,13 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
     if (d->param == DIST_TYPE) {
         // Range-check as float before the cast (huge values are UB to cast).
-        // Restart the rate reducer so a type change can't replay a stale held sample.
+        // Restart the rate reducer and DC blocker so a type change can't
+        // replay stale state.
         float type = d->data.f;
         synth[d->osc]->dist.type = (type >= DIST_OFF && type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
         synth[d->osc]->dist_state.hold = 0;
         synth[d->osc]->dist_state.hold_count = 0;
+        synth[d->osc]->dist_state.hpf_yn1 = 0;
     }
     // Clamp here so dist_process doesn't range-check per block.
     if (d->param == DIST_DRIVE) {

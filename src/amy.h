@@ -660,9 +660,9 @@ typedef struct amy_event {
 
 // Distortion stage.  Split from synthinfo so the same shaper can run at any
 // summing scope: per-osc (timbral, inside the envelope/filter chain) and, on a
-// chained-osc head, per-voice.  Config is what the caller sets; state is only
-// what DIST_CRUSH's sample-and-hold carries between blocks, and each
-// independent signal path needs its own.
+// chained-osc head, per-voice.  Config is what the caller sets; state is what
+// DIST_CRUSH carries between blocks - its sample-and-hold plus the DC blocker
+// that follows it - and each independent signal path needs its own.
 typedef struct dist_config {
     uint8_t type;    // One of the DIST_ values.
     float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
@@ -674,6 +674,7 @@ typedef struct dist_config {
 typedef struct dist_state {
     SAMPLE hold;          // DIST_CRUSH held sample,
     uint16_t hold_count;  // and samples left to hold it.
+    SAMPLE hpf_yn1;       // Wet-path DC blocker output (dist_block()).
 } dist_state_t;
 
 // This is the state of each oscillator, set by the sequencer from deltas
