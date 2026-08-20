@@ -81,3 +81,4 @@ tests/test_clone_on_grow
 tests/test_log2_lut
 tests/test_osc_free_on_release
 tests/test_timebase_reset
+tests/test_voice_osc_range
