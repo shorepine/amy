@@ -609,7 +609,7 @@ typedef struct amy_event {
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
     uint8_t filter_type;
-    // Per-osc distortion ('C' wire message).
+    // Per-osc distortion ('G' distortion sub-commands on the wire).
     float dist_type;
     float dist_drive;
     float dist_bits;

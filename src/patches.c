@@ -360,7 +360,35 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I_SEQ(mod_source, "mod_source", NUM_MOD_SOURCES, "L");
     _EPRINT_I(algorithm, "algorithm", "o");
     _EPRINT_I(filter_type, "filter_type", "G");
-    _EPRINT_VALS_5(e->dist_type, e->dist_drive, e->dist_bits, e->dist_rate, e->dist_mix, "dist_{type,drive,bits,rate,mix}", "C");
+    // Distortion rides 'G' sub-commands: GC/GF/GH pick the type (a zero
+    // value is the off switch, printed canonically as GC0), GD/GM carry the
+    // shared drive and mix.
+    if (AMY_IS_SET(e->dist_type)) {
+        uint8_t dist_type = (uint8_t)e->dist_type;
+        if (wirecode && dist_type == DIST_CRUSH) {
+            snprintf(s, len - (size_t)(s - s_entry), "GH"); s += strlen(s);
+            if (AMY_IS_SET(e->dist_bits)) { snprintfloat3dp(s, len - (size_t)(s - s_entry), e->dist_bits); s += strlen(s); }
+            if (AMY_IS_SET(e->dist_rate)) {
+                snprintf(s, len - (size_t)(s - s_entry), ","); s += strlen(s);
+                snprintfloat3dp(s, len - (size_t)(s - s_entry), e->dist_rate); s += strlen(s);
+            }
+        } else if (wirecode) {
+            snprintf(s, len - (size_t)(s - s_entry), "G%c%d",
+                     (dist_type == DIST_FOLD) ? 'F' : 'C', (dist_type != DIST_OFF) ? 1 : 0);
+            s += strlen(s);
+        } else {
+            snprintf(s, len - (size_t)(s - s_entry), " dist_type: %d", dist_type); s += strlen(s);
+        }
+    }
+    if (!wirecode) {
+        // Wire mode prints bits/rate inside GH above; they mean nothing to
+        // the other types, so an event carrying them without DIST_CRUSH
+        // drops them from the wire form.
+        _EPRINT_F(dist_bits, "dist_bits", "");
+        _EPRINT_F(dist_rate, "dist_rate", "");
+    }
+    _EPRINT_F(dist_drive, "dist_drive", "GD");
+    _EPRINT_F(dist_mix, "dist_mix", "GM");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");

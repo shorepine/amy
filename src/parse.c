@@ -476,6 +476,37 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     return skip_chars;
 }
 
+// Parser for the 'G' prefix: a digit is filter_type as ever; a letter is a
+// distortion sub-command. GC<v> and GF<v> enable clip and fold (0 turns the
+// stage off), GH<bits>[,<rate>] enables the bitcrusher (GH0 turns it off),
+// GD<drive> and GM<mix> set the drive and wet/dry shared by every type.
+int amy_parse_dist_layer_message(char *message, amy_event *e) {
+    if (message[0] >= '0' && message[0] <= '9') {
+        // It's just the filter type.
+        e->filter_type = atoi(message);
+        return 0;  // no extra skip.
+    }
+    char cmd = message[0];
+    message++;
+    if (cmd == 'C')  e->dist_type = (atoff(message) != 0) ? DIST_CLIP : DIST_OFF;
+    else if (cmd == 'F')  e->dist_type = (atoff(message) != 0) ? DIST_FOLD : DIST_OFF;
+    else if (cmd == 'H') {
+        float vals[2];
+        parse_list_float(message, vals, 2, AMY_UNSET_FLOAT);
+        if (AMY_IS_SET(vals[0]) && vals[0] == 0) {
+            e->dist_type = DIST_OFF;
+        } else {
+            e->dist_type = DIST_CRUSH;
+            e->dist_bits = vals[0];
+            e->dist_rate = vals[1];
+        }
+    }
+    else if (cmd == 'D')  e->dist_drive = atoff(message);
+    else if (cmd == 'M')  e->dist_mix = atoff(message);
+    else fprintf(stderr, "Unrecognized distortion command '%s'\n", message - 1);
+    return 1;  // skip the sub-command letter.
+}
+
 // Parse a sample-load parameter list ('z'/'zS' messages): comma-separated
 // unsigned integers, except the midinote field which may be fractional (e.g.
 // a sample tuned 4 cents sharp of C4 is "60.04"). parse_list_uint32_t cannot
@@ -722,22 +753,12 @@ int amy_parse_message(char * message, amy_event *e) {
             }
             case 'b': e->feedback = atoff(arg); break;
             case 'c': e->chained_osc = atoi(arg); break;
-            // dist.{type,drive,bits,rate,mix}
-            case 'C': {
-                float dist_params[5];
-                parse_list_float(arg, dist_params, 5, AMY_UNSET_FLOAT);
-                e->dist_type = dist_params[0];
-                e->dist_drive = dist_params[1];
-                e->dist_bits = dist_params[2];
-                e->dist_rate = dist_params[3];
-                e->dist_mix = dist_params[4];
-                break;
-            }
+            /* C available */
             case 'd': parse_coef_message(arg, e->duty_coefs);break;
             case 'D': show_debug(atoi(arg)); break;
             case 'f': parse_coef_message(arg, e->freq_coefs);break;
             case 'F': parse_coef_message(arg, e->filter_freq_coefs); break;
-            case 'G': e->filter_type = atoi(arg); break;
+            case 'G': pos += amy_parse_dist_layer_message(arg, e); break;  // Skip over second cmd letter, if any.
             /* g used for Alles for client # */
             // 'H' is the ticks= schedule command, it's caught in amy_add_message before this.
             //case 'H': parse_list_uint32_t(arg, e->ticks, 3, 0); break;
