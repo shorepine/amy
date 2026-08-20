@@ -154,19 +154,16 @@ void all_notes_off() {
     }
 }
 
-static uint16_t oscs_in_voice_now(int base_osc, uint16_t oscs_per_voice);  // defined below, with the voice helpers
-
 void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, uint16_t oscs_per_voice, struct delta **queue, uint32_t time) {
     //fprintf(stderr, "add_deltas_to_queue_with_baseosc: added %d baseosc %d time %d\n", delta_list_len(d), base_osc, time);
     struct delta d_offset;
-    uint16_t live_oscs = oscs_in_voice_now(base_osc, oscs_per_voice);
     while(d) {
         d_offset = *d;
         // These deltas are voice-relative, so they answer to the same bound as
         // a live event does (see osc_ref_within_voice): a stored patch that
         // names more oscs than the voice it is being replayed into has, or
         // points one of them outside it, must not write into the neighbours.
-        if (!osc_ref_within_voice((int)d_offset.osc, live_oscs, "stored")) {
+        if (!osc_ref_within_voice((int)d_offset.osc, oscs_per_voice, "stored")) {
             d = d->next;
             continue;
         }
@@ -179,7 +176,7 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, uint16_t os
                 // is an osc number, so it is not range-checked (as in
                 // EVENT_TO_DELTA_WITH_BASEOSC).
                 if (d_offset.param != RESET_OSC &&
-                    !osc_ref_within_voice((int)d_offset.data.i, live_oscs, "stored reference")) {
+                    !osc_ref_within_voice((int)d_offset.data.i, oscs_per_voice, "stored reference")) {
                     d = d->next;
                     continue;
                 }
@@ -868,25 +865,18 @@ void *yield_bus_commands(char *s, size_t len, void *state) {
 }
 
 
-// How many oscs the voice owning base_osc has right now. A patch string can
-// re-shape its own voice as it runs -- a drum kit's first command is
-// `if3iv1in38Z`, which turns a 1-osc voice into a 38-osc one before the
-// per-drum commands that follow -- so a bound captured before the string ran
-// would reject the rest of that very patch. Only consulted when the caller
-// says we are in a voice context; a bound of 0 stays 0.
-static uint16_t oscs_in_voice_now(int base_osc, uint16_t oscs_per_voice) {
-    if (oscs_per_voice == 0)  return 0;
-    if (base_osc < 0 || base_osc >= AMY_OSCS)  return oscs_per_voice;
-    if (AMY_IS_UNSET(osc_to_voice[base_osc]))  return oscs_per_voice;
-    return (uint16_t)num_oscs_for_voice(osc_to_voice[base_osc]);
-}
-
 void parse_patch_string_to_queue(char *message, int base_osc, uint16_t oscs_per_voice, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     //fprintf(stderr, "parse_patch_string: message %s base_osc %d synth %d time %d is_first_voice %d\n", message, base_osc, synth, time, is_first_voice);
     amy_event e;
     size_t pos = 0;
+    // A patch string can re-shape the voice it is being loaded into, partway
+    // through itself: the drum kits open with `if3iv1in38Z`, which turns the
+    // 1-osc voice patch_oscs promised into a 38-osc one before the per-drum
+    // commands that follow. So the bound the rest of the string is held to is
+    // whatever the string last said, not what we were told before it ran.
+    uint16_t voice_oscs = oscs_per_voice;
     do {
         amy_clear_event(&e);
         e.time = time;
@@ -896,6 +886,11 @@ void parse_patch_string_to_queue(char *message, int base_osc, uint16_t oscs_per_
         }
         pos = yield_event_from_message(message, &e, pos);
         if (pos > 0) {
+            // This event re-shapes the voice; everything after it answers to
+            // the new size. (Taking effect from this event on, not the next
+            // one, is right: the event that carries oscs_per_voice is
+            // synth-level and names no oscs of its own.)
+            if (AMY_IS_SET(e.oscs_per_voice))  voice_oscs = e.oscs_per_voice;
             // A patch's global FX phrase (a Juno patch's trailing
             // "x...k1..." -- 127 of the ROM Juno patches carry one) is
             // bus-directed but has no synth attached, so its params fell
@@ -904,7 +899,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, uint16_t oscs_per_
             // had sent it itself.
             if (event_addresses_bus(&e))  e.synth = synth;
             if (event_addresses_oscs(&e) || is_first_voice)
-                amy_event_to_deltas_queue(&e, base_osc, oscs_in_voice_now(base_osc, oscs_per_voice), queue);
+                amy_event_to_deltas_queue(&e, base_osc, voice_oscs, queue);
         }
     } while (pos > 0);
 }
