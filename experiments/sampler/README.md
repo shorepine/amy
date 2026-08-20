@@ -14,8 +14,10 @@ between AMY's PCM oscillators and a 90s techno / D&B sampler rig:
 2. **Pitch-invariant time stretch / time-invariant pitch shift** — `fit`
    (wire `pF`), non-destructive and computed at note-on:
    - `fit=N` (N>0): play the sample over exactly N sequencer ticks
-     (so it follows `tempo`), pitch untouched; `note` transposes as pure
-     tuning without changing duration. The Ableton-style loop case.
+     (so it follows `tempo`, live -- a tempo change part-way through a
+     note rescales the rate so the note still ends on the tick it was
+     aimed at), pitch untouched; `note` transposes as pure tuning
+     without changing duration. The Ableton-style loop case.
    - `fit=0`: `note` transposes but duration stays the original. The
      "pitch the chord stab without re-timing the groove" case.
    - `fit=-1`: off (back to plain varispeed PCM).

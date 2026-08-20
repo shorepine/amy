@@ -659,6 +659,8 @@ typedef struct {
     uint16_t hop_counter;   // output samples until the next grain spawn
     uint64_t in_pos_q16;    // input timeline: frame index of the next grain, Q16
     uint32_t hop_advance_q16;  // input frames the timeline advances per hop, Q16
+    uint32_t us_per_tick_ref;  // us_per_tick hop_advance was computed against;
+                               // 0 when the note is not tempo-locked (fit=0)
     struct {
         uint8_t active;
         uint16_t win_pos;       // 0..PCM_STRETCH_GRAIN-1, position in window

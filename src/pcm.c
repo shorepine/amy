@@ -337,6 +337,11 @@ static void pcm_stretch_note_on(uint16_t osc, memorypcm_preset_t *preset) {
         st->grain[g].win_pos = (g == 0) ? PCM_STRETCH_HOP : 0;
     }
     st->hop_counter = PCM_STRETCH_HOP;
+    // fit=N ticks is tempo-locked, so remember what a tick was worth here;
+    // render_pcm_stretch rescales the rate if that changes mid-note.  fit=0
+    // asks for the sample's own duration, which no tempo can move, so it is
+    // flagged (0) as not tempo-locked.
+    st->us_per_tick_ref = (synth[osc]->fit_ticks > 0) ? amy_global.us_per_tick : 0;
     st->ended = 0;
     st->active = 1;
 }
@@ -426,6 +431,23 @@ static void pcm_stretch_spawn(pcm_stretch_t *st, memorypcm_preset_t *preset, uin
 
 static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *preset) {
     pcm_stretch_t *st = &synth[osc]->stretch;
+    // A tempo change has to reach notes that are ALREADY sounding: fit= locks
+    // a note to a number of ticks, and a tick just got longer or shorter, so
+    // a note left alone would run on at the old tempo and land off the grid.
+    //
+    // The timeline rate is (input frames / target output samples) and the
+    // target is proportional to us_per_tick, so following the change is a
+    // rescale of the existing rate, not a recomputation from what is left.
+    // That distinction matters: "input frames remaining" is a finite quantity
+    // only for a one-shot, while a looping preset wraps forever -- the
+    // rescale is correct for both, and stays correct across repeated changes
+    // because the reference is updated each time.
+    if (st->us_per_tick_ref != 0 && st->us_per_tick_ref != amy_global.us_per_tick
+        && amy_global.us_per_tick > 0) {
+        st->hop_advance_q16 = (uint32_t)(((uint64_t)st->hop_advance_q16
+                                          * st->us_per_tick_ref) / amy_global.us_per_tick);
+        st->us_per_tick_ref = amy_global.us_per_tick;
+    }
     SAMPLE max_value = 0;
     float logfreq = msynth[osc]->logfreq;
     if (AMY_IS_SET(synth[osc]->midi_note)) {

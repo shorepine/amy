@@ -365,7 +365,7 @@ sub-letter after `p` addresses a PCM parameter instead.
 | code | AMY parameter | Python/JS keyword | type | description |
 | ---- | ------------- | ----------------- | ---- | ----------- |
 | `po`   | `sample_offset` | `sample_offset` | uint 0 to BLOCK_SIZE-1 | PCM only. Start this note-on at a sample offset *within* the render block it fires in, leaving the head of the block silent. Events fire on block (256-sample) boundaries; `sample_offset` supplies the sub-block remainder, so slices of arbitrary length can be scheduled to butt-join sample-accurately (e.g. reconstructing a chopped break with no gaps). Sticky per osc like other params; set 0 to clear. |
-| `pF`   | `fit_ticks` | `fit` | float | PCM only, in-memory presets. Engage the granular time/pitch engine at the next note-on. `fit=N` (N>0): play the sample in exactly N sequencer ticks with a pitch-invariant time stretch; `note` still transposes without changing duration. `fit=0`: time-invariant pitch shift — `note` transposes but the sample keeps its original duration. `fit=-1`: turn the engine off. Non-destructive and real-time (~2.5x the render cost of plain PCM). |
+| `pF`   | `fit_ticks` | `fit` | float | PCM only, in-memory presets. Engage the granular time/pitch engine at the next note-on. `fit=N` (N>0): play the sample in exactly N sequencer ticks with a pitch-invariant time stretch; `note` still transposes without changing duration. Because the target is in ticks, it tracks `tempo` *while the note is sounding*, not just at note-on: change the tempo mid-note and the stretch rate follows, so the note still ends N ticks after it started. `fit=0`: time-invariant pitch shift — `note` transposes but the sample keeps its original duration. `fit=-1`: turn the engine off. Non-destructive and real-time (~2.5x the render cost of plain PCM). |
 
 Two parameters turn AMY's PCM oscillators into a "real" sampler (see
 `experiments/sampler/` for worked examples):
@@ -381,7 +381,10 @@ Two parameters turn AMY's PCM oscillators into a "real" sampler (see
 
 - **`fit` (`pF`)** decouples duration from pitch, non-destructively, at
   note-on time. `fit=N` plays the sample over exactly N sequencer ticks
-  (so it tracks `tempo`) without changing pitch; `fit=0` changes pitch
+  (so it tracks `tempo`, including tempo changes that land part-way
+  through a note -- the timeline rate is rescaled in the render loop, so
+  a sounding note re-aims at the same tick rather than finishing at the
+  tempo it started under) without changing pitch; `fit=0` changes pitch
   (via `note`) without changing duration. The engine is a fixed-point
   granular overlap-add (two 1024-sample Hann grains, 50% overlap) with a
   WSOLA-style correlation search aligning each new grain's phase against
