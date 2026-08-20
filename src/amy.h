@@ -983,7 +983,14 @@ void amy_release_lock();
 void amy_deltas_reset();
 void add_delta_to_queue(struct delta *d, struct delta **queue);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
-void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue);
+// True if a voice-relative osc number lands inside a voice of oscs_per_voice
+// oscs; otherwise prints what was out of range and returns false. An
+// oscs_per_voice of 0 means there is no voice context and nothing is checked.
+bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what);
+
+// oscs_per_voice bounds any osc reference in the event to the voice being
+// configured (0 = no voice context, no bound). See osc_ref_within_voice().
+void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_per_voice, struct delta **queue);
 int web_audio_buffer(float *samples, int length);
 void amy_render(uint16_t start, uint16_t end, uint8_t core);
 void print_osc_debug(uint16_t i /* osc */, bool show_eg);

@@ -2065,6 +2065,26 @@ class TestSequencerOsc(AmyTest):
     amy_send_at(time=900, osc=1, vel=0)
 
 
+class TestModOscOOB(AmyTest):
+  """If a synth config attempts to reference an osc out of range, don't do it."""
+
+  def run(self):
+    amy_send_at(time=0, synth=1, num_voices=2, oscs_per_voice=1)
+    amy_send_at(time=0, synth=2, num_voices=2, oscs_per_voice=1)
+    # synth 1 should have 2 voices of 1 osc, probably at AMY_OSCS / 2 and 0.
+    # synth 2 should also have 2 oscs, prob at one above synth 1's
+    # Configure synth 2 to slow sine.
+    amy_send_at(time=0, synth=2, osc=0, freq=4)
+    # Attempt to have synth 1 use an (out-of-bounds) osc 1 provide FM
+    amy_send_at(time=0, synth=1, osc=0, freq={'mod': 0.1}, mod_source=1)
+    # Notes on both synth 1 voices
+    amy_send_at(time=100, synth=1, note=60, vel=1)
+    amy_send_at(time=300, synth=1, note=66, vel=1)
+    # End the notes
+    amy_send_at(time=900, synth=1, vel=0)  # All notes off.
+    # Result should NOT have FM, because the reference to mod_source=1 should be ignored.
+
+
 class TestDumpState(AmyTest):
   """Exercise amy.dump_state() against a golden."""
 

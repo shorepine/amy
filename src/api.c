@@ -335,7 +335,7 @@ void amy_add_event(amy_event *e) {
         // event doesn't read back as having no time at all.
         if(AMY_IS_UNSET(playback_time)) playback_time++;
         e->time = playback_time;
-        amy_event_to_deltas_queue(e, 0, &amy_global.delta_queue);
+        amy_event_to_deltas_queue(e, 0, /* oscs_per_voice= */ 0, &amy_global.delta_queue);
     }
 }
 
