@@ -697,13 +697,12 @@ bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what
     return false;
 }
 
-// Same as EVENT_TO_DELTA_WITH_BASEOSC, but for a field naming another osc
-// *within the voice* (chained_osc, mod_source), so it is range-checked.
-// RESET_OSC deliberately keeps the unchecked macro: its payload is an osc
-// number only sometimes -- the rest of the time it is a mask of RESET_* bits,
-// which would fail any range check.
-#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue); } }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+// For a field naming another osc within the voice (chained_osc, mod_source,
+// and reset_osc when it carries an osc number): range-check it, then offset it
+// by base_osc to reach the real osc. Resets don't allocate what they are about
+// to clear -- reset_osc() is a no-op on an unallocated osc, which is already
+// at its defaults.
+#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue); } }
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -841,7 +840,16 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     EVENT_TO_DELTA_F(resonance, RESONANCE)
     EVENT_TO_DELTA_I(portamento_ms, PORTAMENTO)
     EVENT_TO_DELTA_OSC_REF(chained_osc, CHAINED_OSC, "chained_osc")
-    EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
+    // reset_osc's payload is an osc number sometimes and a mask of RESET_*
+    // bits the rest of the time -- play_delta tells them apart by the same
+    // test. Only the osc-number form is voice-relative, so only it gets
+    // base_osc added and the voice's range enforced; a mask goes through
+    // untouched (adding base_osc to one, as we used to, was meaningless).
+    if (AMY_IS_SET(e->reset_osc) && e->reset_osc < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+        EVENT_TO_DELTA_OSC_REF(reset_osc, RESET_OSC, "reset")
+    } else {
+        EVENT_TO_DELTA_I(reset_osc, RESET_OSC)
+    }
     // One delta per mod source slot, and only for the slots this event actually
     // names, so `mod_source=3` still means "slot 0 = osc 3, leave slot 1 alone".
     for (int i = 0; i < NUM_MOD_SOURCES; ++i) {
