@@ -154,17 +154,34 @@ void all_notes_off() {
     }
 }
 
-void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, struct delta **queue, uint32_t time) {
+void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, uint16_t oscs_per_voice, struct delta **queue, uint32_t time) {
     //fprintf(stderr, "add_deltas_to_queue_with_baseosc: added %d baseosc %d time %d\n", delta_list_len(d), base_osc, time);
     struct delta d_offset;
     while(d) {
         d_offset = *d;
+        // These deltas are voice-relative, so they answer to the same bound as
+        // a live event does (see osc_ref_within_voice): a stored patch that
+        // names more oscs than the voice it is being replayed into has, or
+        // points one of them outside it, must not write into the neighbours.
+        if (!osc_ref_within_voice((int)d_offset.osc, oscs_per_voice, "stored")) {
+            d = d->next;
+            continue;
+        }
         d_offset.osc += base_osc;
         if (d_offset.param == CHAINED_OSC || d_offset.param == RESET_OSC
             || (d_offset.param >= MOD_SOURCE_START && d_offset.param < MOD_SOURCE_END)
             || (d_offset.param >= ALGO_SOURCE_START && d_offset.param < ALGO_SOURCE_START + MAX_ALGO_OPS))
-            if (!(AMY_IS_UNSET((int16_t)d_offset.data.i) || AMY_IS_UNSET((uint16_t)d_offset.data.i)))  // CHAINED_OSC is uint16_t, but ALGO_SOURCE is int16_t.
+            if (!(AMY_IS_UNSET((int16_t)d_offset.data.i) || AMY_IS_UNSET((uint16_t)d_offset.data.i))) {  // CHAINED_OSC is uint16_t, but ALGO_SOURCE is int16_t.
+                // RESET_OSC's payload is a mask of RESET_* bits as often as it
+                // is an osc number, so it is not range-checked (as in
+                // EVENT_TO_DELTA_WITH_BASEOSC).
+                if (d_offset.param != RESET_OSC &&
+                    !osc_ref_within_voice((int)d_offset.data.i, oscs_per_voice, "stored reference")) {
+                    d = d->next;
+                    continue;
+                }
                 d_offset.data.i += base_osc;
+            }
         d_offset.time = time;
         // assume the d->time is 0 and that's good.
         add_delta_to_queue(&d_offset, &amy_global.delta_queue);
@@ -848,12 +865,18 @@ void *yield_bus_commands(char *s, size_t len, void *state) {
 }
 
 
-void parse_patch_string_to_queue(char *message, int base_osc, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
+void parse_patch_string_to_queue(char *message, int base_osc, uint16_t oscs_per_voice, struct delta **queue, uint8_t synth, uint32_t time, bool is_first_voice) {
     // Work though the patch string and send to voices.
     // Now actually initialize the newly-allocated osc blocks with the patch
     //fprintf(stderr, "parse_patch_string: message %s base_osc %d synth %d time %d is_first_voice %d\n", message, base_osc, synth, time, is_first_voice);
     amy_event e;
     size_t pos = 0;
+    // A patch string can re-shape the voice it is being loaded into, partway
+    // through itself: the drum kits open with `if3iv1in38Z`, which turns the
+    // 1-osc voice patch_oscs promised into a 38-osc one before the per-drum
+    // commands that follow. So the bound the rest of the string is held to is
+    // whatever the string last said, not what we were told before it ran.
+    uint16_t voice_oscs = oscs_per_voice;
     do {
         amy_clear_event(&e);
         e.time = time;
@@ -863,6 +886,11 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
         }
         pos = yield_event_from_message(message, &e, pos);
         if (pos > 0) {
+            // This event re-shapes the voice; everything after it answers to
+            // the new size. (Taking effect from this event on, not the next
+            // one, is right: the event that carries oscs_per_voice is
+            // synth-level and names no oscs of its own.)
+            if (AMY_IS_SET(e.oscs_per_voice))  voice_oscs = e.oscs_per_voice;
             // A patch's global FX phrase (a Juno patch's trailing
             // "x...k1..." -- 127 of the ROM Juno patches carry one) is
             // bus-directed but has no synth attached, so its params fell
@@ -871,7 +899,7 @@ void parse_patch_string_to_queue(char *message, int base_osc, struct delta **que
             // had sent it itself.
             if (event_addresses_bus(&e))  e.synth = synth;
             if (event_addresses_oscs(&e) || is_first_voice)
-                amy_event_to_deltas_queue(&e, base_osc, queue);
+                amy_event_to_deltas_queue(&e, base_osc, voice_oscs, queue);
         }
     } while (pos > 0);
 }
@@ -923,7 +951,7 @@ void patches_store_patch(amy_event *e, char * patch_string) {
         patches_reset_patch(e->patch_number);
     memory_patch_auto[patch_index] = auto_assigned ? 1 : 0;
     // Store the patch as deltas and find out how many oscs this message uses
-    parse_patch_string_to_queue(patch_string, 0, &memory_patch_deltas[patch_index], e->synth, e->time, true);
+    parse_patch_string_to_queue(patch_string, 0, /* oscs_per_voice= */ 0, &memory_patch_deltas[patch_index], e->synth, e->time, true);
     update_num_oscs_for_patch_number(patch_index + _PATCHES_FIRST_USER_PATCH);
     //fprintf(stderr, "store_patch: patch %d max_osc %d patch %s #deltas %d (e->num_vx=%d)\n", patch_index, max_osc, patch_string, delta_list_len(memory_patch_deltas[patch_index]), e->num_voices);
 }
@@ -1133,16 +1161,17 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
         for(uint8_t i = 0; i < num_voices; i++) {
             if(AMY_IS_SET(voice_to_base_osc[voices[i]])) {
                 uint16_t target_osc = voice_to_base_osc[voices[i]];
+                uint16_t voice_oscs = (uint16_t)num_oscs_for_voice(voices[i]);
                 if (AMY_IS_SET(e->osc) || !event_addresses_oscs(e)) {
                     // Osc is specified, or not osc-relevant so only needs writing once.
-                    amy_event_to_deltas_queue(e, target_osc, queue);
+                    amy_event_to_deltas_queue(e, target_osc, voice_oscs, queue);
                 } else {
                     // Osc-related but osc is not specified - send to all oscs in voice.
                     int num_oscs = num_oscs_for_voice(voices[i]);
                     for (int osc = 0; osc < num_oscs; ++osc) {
                         e->osc = osc;
                         //if (osc != 1)
-                        amy_event_to_deltas_queue(e, target_osc, queue);
+                        amy_event_to_deltas_queue(e, target_osc, voice_oscs, queue);
                     }
                     AMY_UNSET(e->osc);
                 }
@@ -1229,7 +1258,7 @@ uint16_t snapshot_voice_config(uint8_t instr_num, struct delta **queue, uint32_t
         e.time = time;
         e.osc = rel_osc;
         set_event_for_osc(base_osc, rel_osc, &e);
-        amy_event_to_deltas_queue(&e, 0, queue);
+        amy_event_to_deltas_queue(&e, 0, /* oscs_per_voice= */ 0, queue);
     }
     return (uint16_t)num_oscs;
 }
@@ -1499,9 +1528,9 @@ void patches_load_patch(amy_event *e) {
     for(uint8_t v = 0; v < num_voices; v++) {
         if(AMY_IS_SET(voice_to_base_osc[voices[v]])) {
             if (deltas) {
-                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->time);
+                add_deltas_to_queue_with_baseosc(deltas, voice_to_base_osc[voices[v]], oscs_per_voice, &amy_global.delta_queue, e->time);
             } else if (message) {
-                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], &amy_global.delta_queue, e->synth, e->time, is_first_voice);
+                parse_patch_string_to_queue(message, voice_to_base_osc[voices[v]], oscs_per_voice, &amy_global.delta_queue, e->synth, e->time, is_first_voice);
             }
             // Or maybe there's no deltas and no message, in which case we just set oscs_per_voice, waiting for config.
             is_first_voice = false;

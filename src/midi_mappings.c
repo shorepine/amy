@@ -414,7 +414,7 @@ void midi_message_handler_to_queue(uint8_t status, uint16_t channel, uint8_t * d
             if (fake_note_on) {
                 AMY_UNSET(e.velocity);
             }
-            amy_event_to_deltas_queue(&e, 0, queue);
+            amy_event_to_deltas_queue(&e, 0, /* oscs_per_voice= */ 0, queue);
         }
     } while (state != NULL);
 }

@@ -680,7 +680,29 @@ float map_01_to_60dBf(float log) {
 
 #define EVENT_TO_DELTA_F(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = e->FIELD; add_delta_to_queue(&d, queue); }
 #define EVENT_TO_DELTA_I(FIELD, FLAG) if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD; add_delta_to_queue(&d, queue); }
-#define EVENT_TO_DELTA_WITH_BASEOSC(FIELD, FLAG)    if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue);}
+// An osc reference written while configuring a synth's voices is
+// voice-relative: base_osc is added to reach the real osc. oscs_per_voice is
+// how many oscs that voice has, so a reference at or past it names an osc
+// belonging to some other voice (or to another synth entirely) -- the caller
+// meant something inside this voice and there is nothing sensible to point at,
+// so say so and drop that one parameter rather than reaching into a stranger.
+// oscs_per_voice == 0 means there is no voice context (base_osc is 0 and the
+// osc numbers are absolute, or we are describing a patch rather than playing
+// it), and nothing is checked.
+bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what) {
+    if (oscs_per_voice == 0)  return true;
+    if (rel_osc >= 0 && rel_osc < (int)oscs_per_voice)  return true;
+    fprintf(stderr, "%s osc %d is outside this voice's %" PRIu16 " osc%s, ignored\n",
+            what, rel_osc, oscs_per_voice, oscs_per_voice == 1 ? "" : "s");
+    return false;
+}
+
+// For a field naming another osc within the voice (chained_osc, mod_source,
+// and reset_osc when it carries an osc number): range-check it, then offset it
+// by base_osc to reach the real osc. Resets don't allocate what they are about
+// to clear -- reset_osc() is a no-op on an unallocated osc, which is already
+// at its defaults.
+#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue); } }
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -703,7 +725,7 @@ float map_01_to_60dBf(float log) {
 static void flush_due_deltas();  // definition next to amy_execute_deltas()
 
 // Add a API facing event, convert into delta directly
-void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **queue) {
+void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_per_voice, struct delta **queue) {
     // fprintf(stderr, "time %.3f amy_event_to_deltas: base_osc %d\n", amy_global.time, base_osc);
     // fprintf_event_stderr(e);
     AMY_PROFILE_START(AMY_ADD_DELTA)
@@ -742,6 +764,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     // Hereafter, d.osc refers to an osc
     d.osc = e->osc;
     if(AMY_IS_UNSET(e->osc)) { d.osc = 0; }
+    // The osc this event addresses has to be one of the voice's own.
+    if (!osc_ref_within_voice((int)d.osc, oscs_per_voice, "addressed"))  goto end;
     // First, adapt the osc in this event with base_osc offsets for voices
     d.osc += base_osc;
     // The osc's synthinfo is allocated below, once the destination queue is
@@ -815,12 +839,21 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
     EVENT_TO_DELTA_LOG(ratio, RATIO)
     EVENT_TO_DELTA_F(resonance, RESONANCE)
     EVENT_TO_DELTA_I(portamento_ms, PORTAMENTO)
-    EVENT_TO_DELTA_WITH_BASEOSC(chained_osc, CHAINED_OSC)
-    EVENT_TO_DELTA_WITH_BASEOSC(reset_osc, RESET_OSC)
+    EVENT_TO_DELTA_OSC_REF(chained_osc, CHAINED_OSC, "chained_osc")
+    // reset_osc's payload is an osc number sometimes and a mask of RESET_*
+    // bits the rest of the time -- play_delta tells them apart by the same
+    // test. Only the osc-number form is voice-relative, so only it gets
+    // base_osc added and the voice's range enforced; a mask goes through
+    // untouched (adding base_osc to one, as we used to, was meaningless).
+    if (AMY_IS_SET(e->reset_osc) && e->reset_osc < (uint32_t)AMY_OSCS + amy_global.config.max_buses) {
+        EVENT_TO_DELTA_OSC_REF(reset_osc, RESET_OSC, "reset")
+    } else {
+        EVENT_TO_DELTA_I(reset_osc, RESET_OSC)
+    }
     // One delta per mod source slot, and only for the slots this event actually
     // names, so `mod_source=3` still means "slot 0 = osc 3, leave slot 1 alone".
     for (int i = 0; i < NUM_MOD_SOURCES; ++i) {
-        EVENT_TO_DELTA_WITH_BASEOSC(mod_source[i], MOD_SOURCE_START + i)
+        EVENT_TO_DELTA_OSC_REF(mod_source[i], MOD_SOURCE_START + i, "mod_source")
     }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
@@ -839,6 +872,8 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, struct delta **q
         for(uint8_t i = 0; i < MAX_ALGO_OPS; i++) {
             d.param = ALGO_SOURCE_START + i;
             if (AMY_IS_SET(e->algo_source[i])) {
+                if (!osc_ref_within_voice((int)e->algo_source[i], oscs_per_voice, "algo_source"))
+                    continue;   // leave this operator's source as it was
                 d.data.i = e->algo_source[i] + base_osc;
             } else{
                 d.data.i = e->algo_source[i];
