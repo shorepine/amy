@@ -487,6 +487,17 @@ void bus_reset(uint16_t bus) {
     config_eq(bus, F2S(1.0f), F2S(1.0f), F2S(1.0f));
     filters_init(bus);
     reset_parametric(bus);
+    // Distortion defaults match the per-osc stage; state clears with them.
+    amy_global.bus[bus]->dist.stages = 0;
+    amy_global.bus[bus]->dist.drive = 1.0f;
+    amy_global.bus[bus]->dist.bits = 16;
+    amy_global.bus[bus]->dist.rate = 1;
+    amy_global.bus[bus]->dist.mix = 1.0f;
+    for (int c = 0; c < AMY_MAX_CHANNELS; ++c) {
+        amy_global.bus[bus]->dist_state[c].hold = 0;
+        amy_global.bus[bus]->dist_state[c].hold_count = 0;
+        amy_global.bus[bus]->dist_state[c].hpf_yn1 = 0;
+    }
 
     if (AMY_HAS_CHORUS) config_chorus(bus, CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if (AMY_HAS_REVERB) config_reverb(bus, REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
@@ -783,6 +794,13 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
         EVENT_TO_DELTA_F(reverb_liveness, REVERB_LIVENESS)
         EVENT_TO_DELTA_F(reverb_damping, REVERB_DAMPING)
         EVENT_TO_DELTA_F(reverb_xover_hz, REVERB_XOVER_HZ)
+        EVENT_TO_DELTA_I(bus_dist_clip, BUS_DIST_CLIP_EN)
+        EVENT_TO_DELTA_I(bus_dist_fold, BUS_DIST_FOLD_EN)
+        EVENT_TO_DELTA_I(bus_dist_crush, BUS_DIST_CRUSH_EN)
+        EVENT_TO_DELTA_F(bus_dist_drive, BUS_DIST_DRIVE)
+        EVENT_TO_DELTA_I(bus_dist_bits, BUS_DIST_BITS)
+        EVENT_TO_DELTA_I(bus_dist_rate, BUS_DIST_RATE)
+        EVENT_TO_DELTA_F(bus_dist_mix, BUS_DIST_MIX)
     }
     // Hereafter, d.osc refers to an osc
     d.osc = e->osc;
@@ -1827,6 +1845,31 @@ void play_delta(struct delta *d) {
     if(d->param == REVERB_LIVENESS) config_reverb(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     if(d->param == REVERB_DAMPING) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
     if(d->param == REVERB_XOVER_HZ) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
+    // Per-bus distortion: same range rules as the per-osc stage (clamped here
+    // so dist_process_bus doesn't range-check per block).
+    if(d->param == BUS_DIST_CLIP_EN) {
+        if (d->data.i) amy_global.bus[bus]->dist.stages |= DIST_CLIP;
+        else           amy_global.bus[bus]->dist.stages &= ~DIST_CLIP;
+    }
+    if(d->param == BUS_DIST_FOLD_EN) {
+        if (d->data.i) amy_global.bus[bus]->dist.stages |= DIST_FOLD;
+        else           amy_global.bus[bus]->dist.stages &= ~DIST_FOLD;
+    }
+    if(d->param == BUS_DIST_CRUSH_EN) {
+        if (d->data.i) amy_global.bus[bus]->dist.stages |= DIST_CRUSH;
+        else           amy_global.bus[bus]->dist.stages &= ~DIST_CRUSH;
+        // Restart the rate reducer and DC blocker on toggle, exactly as the
+        // per-osc crush enable does.
+        for (int c = 0; c < AMY_MAX_CHANNELS; ++c) {
+            amy_global.bus[bus]->dist_state[c].hold = 0;
+            amy_global.bus[bus]->dist_state[c].hold_count = 0;
+            amy_global.bus[bus]->dist_state[c].hpf_yn1 = 0;
+        }
+    }
+    if(d->param == BUS_DIST_DRIVE) { float v = d->data.f; if (v < 0.0f) v = 0.0f; if (v > DIST_MAX_DRIVE) v = DIST_MAX_DRIVE; amy_global.bus[bus]->dist.drive = v; }
+    if(d->param == BUS_DIST_BITS)  { int32_t v = (int32_t)d->data.i; if (v < 1) v = 1; if (v > 24) v = 24; amy_global.bus[bus]->dist.bits = v; }
+    if(d->param == BUS_DIST_RATE)  { int32_t v = (int32_t)d->data.i; if (v < 1) v = 1; if (v > 1024) v = 1024; amy_global.bus[bus]->dist.rate = v; }
+    if(d->param == BUS_DIST_MIX)   { float v = d->data.f; if (v < 0.0f) v = 0.0f; if (v > 1.0f) v = 1.0f; amy_global.bus[bus]->dist.mix = v; }
 
     // triggers / envelopes
     // the only way a sound is made is if velocity (note on) is >0.
@@ -2431,6 +2474,10 @@ int16_t * amy_fill_buffer() {
     //if (max_val > 0) {      // NO - see #629
         // apply the eq filters if there is some signal and EQ is non-default.
     for (int bus=0; bus <= amy_global.highest_bus; ++bus) {
+        // Per-bus distortion, first so echo/reverb take clean tails.
+        if (amy_global.bus[bus]->dist.stages) {
+            dist_process_bus(bus, fbl[0][bus]);
+        }
         // Per-bus EQ
         if (amy_global.bus[bus]->eq.eq[0] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[1] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[2] != F2S(1.0f)) {
             parametric_eq_process(bus, fbl[0][bus]);

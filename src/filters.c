@@ -1219,3 +1219,26 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
     };
     return dist_block(block, AMY_BLOCK_SIZE, &cfg, &synth[osc]->dist_state);
 }
+
+// Wrap guard: the bus sum is unbounded, and SMULR6's 32x32 fallback caps the
+// drive product at [-128, 128), so pre-clamp to 8x full scale - the edge of
+// the mixdown's usable range anyway.
+#ifdef AMY_USE_FIXEDPOINT
+#define DIST_BUS_MAX (F2S(8.0f) - 1)   // one LSB inside the fallback's domain
+#else
+#define DIST_BUS_MAX F2S(8.0f)
+#endif
+
+// Per-bus entry point, first in the bus FX chain so echo/reverb take clean
+// tails of the shaped signal; per-channel state per dist_block's contract.
+AMY_IRAM_ATTR void dist_process_bus(uint16_t bus, SAMPLE *busbuf) {
+    for (uint16_t c = 0; c < AMY_NCHANS; ++c) {
+        SAMPLE *block = busbuf + c * AMY_BLOCK_SIZE;
+        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+            if (block[i] > DIST_BUS_MAX) block[i] = DIST_BUS_MAX;
+            if (block[i] < -DIST_BUS_MAX) block[i] = -DIST_BUS_MAX;
+        }
+        dist_block(block, AMY_BLOCK_SIZE, &amy_global.bus[bus]->dist,
+                   &amy_global.bus[bus]->dist_state[c]);
+    }
+}
