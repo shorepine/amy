@@ -175,10 +175,17 @@ amy.send(osc=0, wave=amy.SINE, bp1='0,0,4000,1,600,0',
 
 The same stage chain runs per bus, first in the bus FX chain - before EQ,
 chorus, echo and reverb - so the delays and reverb take tails of the shaped
-signal. It rides `J` with the same sub-command grammar as `G` (`JC`/`JF`/
-`JH` per-stage enables, `JD` drive, `JM` mix - scalar at bus scope), and
+signal. It rides `J` with the same sub-command grammar as `G`, and
 bus-directed messages pick their bus with the `y` prefix, like the other
 bus FX:
+
+| Wire | Python kwarg | Values | Meaning |
+| ---- | ------------ | ------ | ------- |
+| `JC1` / `JC0` | `bus_dist_clip=1` / `0` | 0 or 1 | Enable / disable the bus soft clipper. |
+| `JF1` / `JF0` | `bus_dist_fold=1` / `0` | 0 or 1 | Enable / disable the bus wavefolder. |
+| `JH<bits>,<rate>` | `bus_dist_crush=[bits, rate]` | ints; bits 1-24, rate 1-1024 | Enable the bus bitcrusher, exactly as `GH`. `JH0` disables. |
+| `JD<drive>` | `bus_dist_drive=` | float 0-16 | Pre-gain into the enabled stages; default 1. Scalar - a bus has no per-note modulation sources, so no coef rail at this scope. |
+| `JM<mix>` | `bus_dist_mix=` | float 0-1 | Wet/dry mix; default 1 (full wet). Scalar. |
 
 ```python
 amy.send(bus=0, bus_dist_clip=1, bus_dist_drive=4, bus_dist_mix=1)
