@@ -479,7 +479,9 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
 // Parser for the 'G' prefix: a digit is filter_type as ever; a letter is a
 // distortion sub-command. GC<v> and GF<v> enable clip and fold (0 turns the
 // stage off), GH<bits>[,<rate>] enables the bitcrusher (GH0 turns it off),
-// GD<drive> and GM<mix> set the drive and wet/dry shared by every type.
+// GD<drive> and GM<mix> set the drive and wet/dry shared by every stage.
+// Stages are independent: enabled stages stack in clip -> fold -> crush
+// order, and each command touches only its own stage.
 int amy_parse_dist_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the filter type.
@@ -488,15 +490,15 @@ int amy_parse_dist_layer_message(char *message, amy_event *e) {
     }
     char cmd = message[0];
     message++;
-    if (cmd == 'C')  e->dist_type = (atoff(message) != 0) ? DIST_CLIP : DIST_OFF;
-    else if (cmd == 'F')  e->dist_type = (atoff(message) != 0) ? DIST_FOLD : DIST_OFF;
+    if (cmd == 'C')  e->dist_clip = (atoff(message) != 0);
+    else if (cmd == 'F')  e->dist_fold = (atoff(message) != 0);
     else if (cmd == 'H') {
         uint16_t vals[2];
         parse_list_uint16_t(message, vals, 2, AMY_UNSET_VALUE(vals[0]));
         if (vals[0] == 0) {
-            e->dist_type = DIST_OFF;
+            e->dist_crush = 0;
         } else {
-            e->dist_type = DIST_CRUSH;
+            e->dist_crush = 1;
             if (AMY_IS_SET(vals[0])) e->dist_bits = (uint8_t)MIN(vals[0], 24);
             if (AMY_IS_SET(vals[1])) e->dist_rate = vals[1];
         }

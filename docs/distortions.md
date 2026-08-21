@@ -25,8 +25,9 @@ Distortion rides `G` sub-commands on the wire (a digit after `G` is
 | `GD<drive>` | `dist_drive=` | float 0-16 | Pre-gain into the shaper (fold depth for the wavefolder), shared by all types. Default 1. |
 | `GM<mix>` | `dist_mix=` | float 0-1 | Wet/dry mix, shared by all types. Default 1 (full wet). |
 
-One type is active per osc; enabling one replaces another. Drive and mix keep
-their values across type changes.
+Stages are independent: each command toggles only its own stage, and enabled
+stages stack in a fixed clip -> fold -> crush order. Drive and mix are shared
+across the chain.
 
 ```python
 amy.send(osc=0, wave=amy.SINE, dist_clip=1, dist_drive=3, dist_mix=1)

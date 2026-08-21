@@ -149,7 +149,9 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->resonance);
     AMY_UNSET(e->portamento_ms);
     AMY_UNSET(e->filter_type);
-    AMY_UNSET(e->dist_type);
+    AMY_UNSET(e->dist_clip);
+    AMY_UNSET(e->dist_fold);
+    AMY_UNSET(e->dist_crush);
     AMY_UNSET(e->dist_drive);
     AMY_UNSET(e->dist_bits);
     AMY_UNSET(e->dist_rate);

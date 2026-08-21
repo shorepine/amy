@@ -861,7 +861,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
-    EVENT_TO_DELTA_I(dist_type, DIST_TYPE)
+    EVENT_TO_DELTA_I(dist_clip, DIST_CLIP_EN)
+    EVENT_TO_DELTA_I(dist_fold, DIST_FOLD_EN)
+    EVENT_TO_DELTA_I(dist_crush, DIST_CRUSH_EN)
     EVENT_TO_DELTA_F(dist_drive, DIST_DRIVE)
     EVENT_TO_DELTA_I(dist_bits, DIST_BITS)
     EVENT_TO_DELTA_I(dist_rate, DIST_RATE)
@@ -997,7 +999,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
     psynth->filter_type = FILTER_NONE;
-    psynth->dist.type = DIST_OFF;
+    psynth->dist.stages = 0;
     psynth->dist.drive = 1.0f;
     psynth->dist.bits = 16;
     psynth->dist.rate = 1;
@@ -1577,11 +1579,19 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
-    if (d->param == DIST_TYPE) {
-        // Not DELTA_TO_SYNTH_I: a type change also restarts the rate reducer
-        // and DC blocker so it can't replay stale state.
-        uint32_t type = d->data.i;
-        synth[d->osc]->dist.type = (type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
+    if (d->param == DIST_CLIP_EN) {
+        if (d->data.i) synth[d->osc]->dist.stages |= DIST_CLIP;
+        else           synth[d->osc]->dist.stages &= ~DIST_CLIP;
+    }
+    if (d->param == DIST_FOLD_EN) {
+        if (d->data.i) synth[d->osc]->dist.stages |= DIST_FOLD;
+        else           synth[d->osc]->dist.stages &= ~DIST_FOLD;
+    }
+    if (d->param == DIST_CRUSH_EN) {
+        if (d->data.i) synth[d->osc]->dist.stages |= DIST_CRUSH;
+        else           synth[d->osc]->dist.stages &= ~DIST_CRUSH;
+        // The crusher is the only stage with state; restart its rate reducer
+        // and DC blocker on toggle so a re-enable can't replay stale state.
         synth[d->osc]->dist_state.hold = 0;
         synth[d->osc]->dist_state.hold_count = 0;
         synth[d->osc]->dist_state.hpf_yn1 = 0;
@@ -2122,7 +2132,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if (synth[osc]->wave != SILENT) {
             // apply distortion to osc if set, pre-filter; returns its own max
             // (folding can amplify a quiet release tail).
-            if (synth[osc]->dist.type != DIST_OFF) {
+            if (synth[osc]->dist.stages) {
                 max_val = dist_process(buf, osc);
             }
             // apply filter to osc if set
@@ -2150,7 +2160,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             // runs once per voice on that voice's mix alone.  After the
             // envelope, so note dynamics drive the shaper as they do per-osc;
             // before the filter, keeping the per-osc dist -> filter order.
-            if (synth[osc]->dist.type != DIST_OFF) {
+            if (synth[osc]->dist.stages) {
                 max_val = dist_process(buf, osc);
             }
             // apply filter to osc if set
