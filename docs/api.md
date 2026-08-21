@@ -319,8 +319,8 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | `c`    | `chained_osc` | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | `G`    | `filter_type` | `filter_type` | 0-6 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass, 5 = notch, 6 = phaser. A letter instead of a digit selects a distortion sub-command; see the `G` distortion rows below. |
-| `GC` / `GF` | `dist_type` | `dist_clip` / `dist_fold` | 0 or 1 | Per-oscillator distortion, applied before the filter. `GC1` enables soft clip, `GF1` enables wavefold; 0 turns the stage off. Stages are independent and enabled stages stack in clip, fold, crush order. |
-| `GH`   | `dist_type`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 ints | Enables the bitcrusher as [bits, rate]. bits: bit depth 1-24, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
+| `GC` / `GF` | `dist_clip` / `dist_fold` | `dist_clip` / `dist_fold` | 0 or 1 | Per-oscillator distortion, applied before the filter. `GC1` enables soft clip, `GF1` enables wavefold; 0 turns the stage off. Stages are independent and enabled stages stack in clip, fold, crush order. |
+| `GH`   | `dist_crush`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 ints | Enables the bitcrusher as [bits, rate]. bits: bit depth 1-24, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
 | `GD`   | `dist_drive` | `dist_drive` | coefs | Distortion pre-gain (fold depth for wavefold), shared by all stages; default 1, range 1/16-16. A control-coefficient list like `freq`: the constant is linear drive, the modulation coefs are octaves of it. |
 | `GM`   | `dist_mix` | `dist_mix` | coefs | Distortion wet/dry, shared by all stages; default 1 (full wet). A control-coefficient list, combined linearly and clamped to 0-1. |
 | `I`    | `ratio` | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency  |
@@ -481,6 +481,10 @@ Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_st
 | `k`    | `chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth` | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `M`    | `echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef` | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, filter_coef (-1 is HPF, 0 is flat, +1 is LPF). |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Hz) -15 to 15. 0 is off. default 0. |
+| `JC` / `JF` | `bus_dist_clip` / `bus_dist_fold` | `bus_dist_clip` / `bus_dist_fold` | 0 or 1 | Per-bus distortion, first in the bus FX chain (`y` picks the bus). `JC1` enables soft clip, `JF1` wavefold; 0 turns the stage off. Same stage grammar as `G`: stages are independent and stack in clip, fold, crush order. |
+| `JH`   | `bus_dist_crush`, `bus_dist_bits`, `bus_dist_rate` | `bus_dist_crush` | list of 2 ints | Enables the bus bitcrusher as [bits, rate], exactly as `GH`. `JH0` turns the stage off. |
+| `JD`   | `bus_dist_drive` | `bus_dist_drive` | float 0-16 | Bus distortion pre-gain (fold depth for wavefold), shared by the enabled stages; default 1. Scalar - a bus has no per-note modulation sources, so no coef rail at this scope. |
+| `JM`   | `bus_dist_mix` | `bus_dist_mix` | float 0-1 | Bus distortion wet/dry; default 1 (full wet). Scalar. |
 
 ### Other
 

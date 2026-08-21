@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/4ee6da09-899a-4a46-bb04-e5c1a43b16d5
-
 # Distortion in AMY
 
 AMY has a per-oscillator distortion stage with three waveshapers: a soft
@@ -184,8 +180,15 @@ signal. It rides `J` with the same sub-command grammar as `G` (`JC`/`JF`/
 bus-directed messages pick their bus with the `y` prefix, like the other
 bus FX:
 
+```python
+amy.send(bus=0, bus_dist_clip=1, bus_dist_drive=4, bus_dist_mix=1)
+```
 
-
+A bus stage responds to the whole bus level - which is what a mixbus
+saturator is for. A quiet sustained tone and a loud pulsing bass through the
+same clip settings: per-osc leaves the quiet tone static, on the bus the
+bass drags the sum into the knee and the quiet tone ducks and buzzes
+whenever the bass sounds:
 
 https://github.com/user-attachments/assets/a88bcf1c-e19e-4d66-8dc8-59685b6ad54e
 
@@ -204,17 +207,6 @@ https://github.com/user-attachments/assets/3de002c5-57d0-40a9-b246-b7843094872b
 
 
 </details>
-
-
-```python
-amy.send(bus=0, bus_dist_clip=1, bus_dist_drive=4, bus_dist_mix=1)
-```
-
-A bus stage responds to the whole bus level - which is what a mixbus
-saturator is for. A quiet sustained tone and a loud pulsing bass through the
-same clip settings: per-osc leaves the quiet tone static, on the bus the
-bass drags the sum into the knee and the quiet tone ducks and buzzes
-whenever the bass sounds:
 
 One drive knob over a whole held chord blooms the intermodulation fan out of
 three pure tones in a single gesture:
