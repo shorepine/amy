@@ -610,10 +610,10 @@ typedef struct amy_event {
     uint8_t algorithm;
     uint8_t filter_type;
     // Per-osc distortion ('G' distortion sub-commands on the wire).
-    float dist_type;
+    uint8_t dist_type;
     float dist_drive;
-    float dist_bits;
-    float dist_rate;
+    uint8_t dist_bits;
+    uint16_t dist_rate;
     float dist_mix;
     float eq_l;  // not in synth
     float eq_m;  // not in synth
@@ -666,8 +666,8 @@ typedef struct amy_event {
 typedef struct dist_config {
     uint8_t type;    // One of the DIST_ values.
     float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
-    float bits;      // DIST_CRUSH bit depth; >= 24 disables quantization.
-    float rate;      // DIST_CRUSH sample-hold length in samples; 1 disables.
+    uint8_t bits;    // DIST_CRUSH bit depth; >= 24 disables quantization.
+    uint16_t rate;   // DIST_CRUSH sample-hold length in samples; 1 disables.
     float mix;       // Wet/dry, 0..1.
 } dist_config_t;
 

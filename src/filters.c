@@ -1117,8 +1117,8 @@ AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
         // Bit-depth + sample-rate reduction.
         SAMPLE hold = st->hold;
         uint16_t count = st->hold_count;
-        uint16_t rate = (uint16_t)cfg->rate;
-        int bits = (int)cfg->bits;
+        uint16_t rate = cfg->rate;
+        int bits = cfg->bits;
         // Quantize to `bits` magnitude bits, rounding to nearest: truncation
         // is a half-step DC offset that the echo feedback loop integrates.
 #ifdef AMY_USE_FIXEDPOINT

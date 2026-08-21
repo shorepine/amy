@@ -320,7 +320,7 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `c`    | `chained_osc` | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | `G`    | `filter_type` | `filter_type` | 0-6 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass, 5 = notch, 6 = phaser. A letter instead of a digit selects a distortion sub-command; see the `G` distortion rows below. |
 | `GC` / `GF` | `dist_type` | `dist_clip` / `dist_fold` | 0 or 1 | Per-oscillator distortion, applied before the filter. `GC1` enables soft clip, `GF1` enables wavefold; 0 turns the stage off. |
-| `GH`   | `dist_type`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 floats | Enables the bitcrusher as [bits, rate]. bits: bit depth, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
+| `GH`   | `dist_type`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 ints | Enables the bitcrusher as [bits, rate]. bits: bit depth 1-24, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
 | `GD`   | `dist_drive` | `dist_drive` | float 0-16 | Distortion pre-gain (fold depth for wavefold), shared by all types; default 1. |
 | `GM`   | `dist_mix` | `dist_mix` | float 0-1 | Distortion wet/dry, shared by all types; default 1 (full wet). |
 | `I`    | `ratio` | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency  |

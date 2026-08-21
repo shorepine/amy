@@ -858,10 +858,10 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
-    EVENT_TO_DELTA_F(dist_type, DIST_TYPE)
+    EVENT_TO_DELTA_I(dist_type, DIST_TYPE)
     EVENT_TO_DELTA_F(dist_drive, DIST_DRIVE)
-    EVENT_TO_DELTA_F(dist_bits, DIST_BITS)
-    EVENT_TO_DELTA_F(dist_rate, DIST_RATE)
+    EVENT_TO_DELTA_I(dist_bits, DIST_BITS)
+    EVENT_TO_DELTA_I(dist_rate, DIST_RATE)
     EVENT_TO_DELTA_F(dist_mix, DIST_MIX)
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
@@ -992,8 +992,8 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->filter_type = FILTER_NONE;
     psynth->dist.type = DIST_OFF;
     psynth->dist.drive = 1.0f;
-    psynth->dist.bits = 16.0f;
-    psynth->dist.rate = 1.0f;
+    psynth->dist.bits = 16;
+    psynth->dist.rate = 1;
     psynth->dist.mix = 1.0f;
     AMY_UNSET(psynth->chained_osc);
     for(uint8_t j=0;j<NUM_MOD_SOURCES;j++) AMY_UNSET(psynth->mod_source[j]);
@@ -1487,6 +1487,10 @@ uint16_t alpha_to_portamento_ms(float alpha) {
 
 #define DELTA_TO_SYNTH_I(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc]->FIELD = d->data.i;
 #define DELTA_TO_SYNTH_F(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc]->FIELD = d->data.f;
+#define DELTA_TO_SYNTH_F_CLAMPED(FLAG, FIELD, MINVAL, MAXVAL) \
+    if (d->param == FLAG) { synth[d->osc]->FIELD = MAX(MINVAL, MIN(MAXVAL, d->data.f)); }
+#define DELTA_TO_SYNTH_I_CLAMPED(FLAG, FIELD, MINVAL, MAXVAL) \
+    if (d->param == FLAG) { synth[d->osc]->FIELD = MAX(MINVAL, MIN(MAXVAL, (int32_t)d->data.i)); }
 #define DELTA_TO_COEFS(FLAG, FIELD) \
     if (PARAM_IS_COMBO_COEF(d->param, FLAG)) \
         synth[d->osc]->FIELD[d->param - FLAG] = d->data.f;
@@ -1566,40 +1570,19 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
     if (d->param == DIST_TYPE) {
-        // Range-check as float before the cast (huge values are UB to cast).
-        // Restart the rate reducer and DC blocker so a type change can't
-        // replay stale state.
-        float type = d->data.f;
-        synth[d->osc]->dist.type = (type >= DIST_OFF && type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
+        // Not DELTA_TO_SYNTH_I: a type change also restarts the rate reducer
+        // and DC blocker so it can't replay stale state.
+        uint32_t type = d->data.i;
+        synth[d->osc]->dist.type = (type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
         synth[d->osc]->dist_state.hold = 0;
         synth[d->osc]->dist_state.hold_count = 0;
         synth[d->osc]->dist_state.hpf_yn1 = 0;
     }
-    // Clamp here so dist_process doesn't range-check per block.
-    if (d->param == DIST_DRIVE) {
-        float drive = d->data.f;
-        if (drive < 0.0f) drive = 0.0f;
-        if (drive > DIST_MAX_DRIVE) drive = DIST_MAX_DRIVE;
-        synth[d->osc]->dist.drive = drive;
-    }
-    if (d->param == DIST_BITS) {
-        float bits = d->data.f;
-        if (bits < 1.0f) bits = 1.0f;
-        if (bits > 24.0f) bits = 24.0f;  // > S_FRAC_BITS: quantization off
-        synth[d->osc]->dist.bits = bits;
-    }
-    if (d->param == DIST_RATE) {
-        float rate = d->data.f;
-        if (rate < 1.0f) rate = 1.0f;
-        if (rate > 1024.0f) rate = 1024.0f;
-        synth[d->osc]->dist.rate = rate;
-    }
-    if (d->param == DIST_MIX) {
-        float mix = d->data.f;
-        if (mix < 0.0f) mix = 0.0f;
-        if (mix > 1.0f) mix = 1.0f;
-        synth[d->osc]->dist.mix = mix;
-    }
+    // Clamped so dist_process doesn't range-check per block.
+    DELTA_TO_SYNTH_F_CLAMPED(DIST_DRIVE, dist.drive, 0.0f, DIST_MAX_DRIVE)
+    DELTA_TO_SYNTH_I_CLAMPED(DIST_BITS, dist.bits, 1, 24)  // > S_FRAC_BITS: quantization off
+    DELTA_TO_SYNTH_I_CLAMPED(DIST_RATE, dist.rate, 1, 1024)
+    DELTA_TO_SYNTH_F_CLAMPED(DIST_MIX, dist.mix, 0.0f, 1.0f)
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])

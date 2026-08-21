@@ -491,14 +491,14 @@ int amy_parse_dist_layer_message(char *message, amy_event *e) {
     if (cmd == 'C')  e->dist_type = (atoff(message) != 0) ? DIST_CLIP : DIST_OFF;
     else if (cmd == 'F')  e->dist_type = (atoff(message) != 0) ? DIST_FOLD : DIST_OFF;
     else if (cmd == 'H') {
-        float vals[2];
-        parse_list_float(message, vals, 2, AMY_UNSET_FLOAT);
-        if (AMY_IS_SET(vals[0]) && vals[0] == 0) {
+        uint16_t vals[2];
+        parse_list_uint16_t(message, vals, 2, AMY_UNSET_VALUE(vals[0]));
+        if (vals[0] == 0) {
             e->dist_type = DIST_OFF;
         } else {
             e->dist_type = DIST_CRUSH;
-            e->dist_bits = vals[0];
-            e->dist_rate = vals[1];
+            if (AMY_IS_SET(vals[0])) e->dist_bits = (uint8_t)MIN(vals[0], 24);
+            if (AMY_IS_SET(vals[1])) e->dist_rate = vals[1];
         }
     }
     else if (cmd == 'D')  e->dist_drive = atoff(message);
