@@ -40,15 +40,15 @@
 //      - render the other half of oscs
 //      - Wait for notification (indicating that esp_render_task is done)
 //      - call amy_fill_buffer (to combine the rendered oscs into output samples)
-//      - Notify amy_update_handle that the new block is ready
+//      - Notify amy_update_handle that the new block is ready (if not I2S, first
+//        waiting for the amy_update task to have registered itself)
 //      - If I2S enabled, write samples to I2S.
 //      - loop
 //   * ESP's amy_platform_init
 //      - if multicore, launch esp_render_task
 //      - if multithread, launch esp_fill_audio_buffer_task
-//      - if not I2S, Notify fill_buffer to get it started
 //   * ESP's amy_render_audio
-//      - If multithread, wait for Notification (from fill_audio_buffer)
+//      - If multithread, register as amy_update_handle, wait for Notification (from fill_audio_buffer)
 //      - If not I2S, Notify fill_buffer
 //      - If not multithread
 //        - If multicore, Notify amy_render_handle to get task on second core to render
@@ -350,6 +350,12 @@ void esp_fill_audio_buffer_task() {
         last_audio_buffer = block;
 
         // Notify amy_update() that a block is ready (so it can return from amy_render_audio).
+        if (!AMY_HAS_I2S) {
+            // With no I2S the amy_update() caller is the only consumer, so this
+            // block must not be dropped: hold it until that task has registered
+            // (amy_render_audio's first call), else the handoff below deadlocks.
+            while (amy_update_handle == NULL) vTaskDelay(1);
+        }
         if (amy_update_handle)
             xTaskNotifyGive(amy_update_handle);  // to amy_render_audio
 
@@ -396,13 +402,7 @@ void esp_fill_audio_buffer_task() {
 
 // init AMY from the esp. wraps some amy funcs in a task to do multicore rendering on the ESP32 
 void amy_platform_init() {
-    // If we're running amy_update, this should be the task we need to return to.
-    // However, if we're not using amy_update (e.g., Tulip/AMYboard native), we don't
-    // want to do this - the un-handled xTaskNotifyGives cause Tulip to crash when it
-    // turns on WiFi.
-#ifdef ARDUINO
-    amy_update_handle = xTaskGetCurrentTaskHandle();
-#endif
+    // amy_update_handle is not set here but by amy_render_audio() itself - see there.
     if (AMY_HAS_I2S) {
         // Start i2s
         esp32_setup_i2s();
@@ -450,9 +450,16 @@ void amy_update_tasks() {
 }
 
 int16_t *amy_render_audio() {
-    // Called by api.amy_update() to render the audio.  Not used for non-Arduino.
+    // Called by api.amy_update() to render the audio.  Not used by builds with their
+    // own audio loop (e.g. Tulip/AMYboard native).
     int16_t *buf = NULL;
     if (amy_global.config.platform.multithread) {
+        // Register as the task esp_fill_audio_buffer_task notifies when a block is
+        // ready.  Registering here rather than in amy_platform_init() means builds
+        // that never call amy_update() never see the notifies (un-handled ones used
+        // to crash Tulip when it turned on WiFi), and it captures the right task
+        // even when init ran somewhere other than the amy_update() task.
+        amy_update_handle = xTaskGetCurrentTaskHandle();
         // Wait for esp_fill_audio_buffer_task to indicate a buffer is ready.
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_fill_audio_buffer_task
         buf = last_audio_buffer;
