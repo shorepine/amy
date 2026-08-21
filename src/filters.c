@@ -1054,7 +1054,7 @@ void reset_parametric(uint16_t bus) {
 // of AMY_SAMPLE_RATE/rate down to sub-audio DC swings, and nothing downstream
 // removes DC.  The corner sits below the lowest musical fundamental, so only
 // the fold-down goes, not the audible grit.
-#define DIST_HPF_HZ 15.0f
+#define DIST_HPF_HZ 10.0f
 #define DIST_HPF_POLE (1.0f - 2 * (float)M_PI * DIST_HPF_HZ / AMY_SAMPLE_RATE)
 
 // Distortion over one channel of `len` samples, in place.  Scope-agnostic:
