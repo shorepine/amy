@@ -39,6 +39,7 @@ const char* profile_tag_name(enum itags tag) {
         case FILTER_PROCESS: return "FILTER_PROCESS";
         case FILTER_PROCESS_STAGE0: return "FILTER_PROCESS_STAGE0";
         case FILTER_PROCESS_STAGE1: return "FILTER_PROCESS_STAGE1";
+        case DIST_PROCESS: return "DIST_PROCESS";
         case ADD_DELTA_TO_QUEUE: return "ADD_DELTA_TO_QUEUE";
         case AMY_ADD_DELTA: return "AMY_ADD_DELTA";
         case PLAY_DELTA: return "PLAY_DELTA";
@@ -860,6 +861,11 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
+    EVENT_TO_DELTA_I(dist_type, DIST_TYPE)
+    EVENT_TO_DELTA_F(dist_drive, DIST_DRIVE)
+    EVENT_TO_DELTA_I(dist_bits, DIST_BITS)
+    EVENT_TO_DELTA_I(dist_rate, DIST_RATE)
+    EVENT_TO_DELTA_F(dist_mix, DIST_MIX)
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)
@@ -991,6 +997,11 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
     psynth->filter_type = FILTER_NONE;
+    psynth->dist.type = DIST_OFF;
+    psynth->dist.drive = 1.0f;
+    psynth->dist.bits = 16;
+    psynth->dist.rate = 1;
+    psynth->dist.mix = 1.0f;
     AMY_UNSET(psynth->chained_osc);
     for(uint8_t j=0;j<NUM_MOD_SOURCES;j++) AMY_UNSET(psynth->mod_source[j]);
     psynth->algorithm = 0;
@@ -1029,6 +1040,9 @@ void reset_osc_state(struct synthinfo *psynth) {
     memset(&psynth->stretch, 0, sizeof(psynth->stretch));
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
+    psynth->dist_state.hold = 0;
+    psynth->dist_state.hold_count = 0;
+    psynth->dist_state.hpf_yn1 = 0;
 }
 
 void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
@@ -1481,6 +1495,10 @@ uint16_t alpha_to_portamento_ms(float alpha) {
 
 #define DELTA_TO_SYNTH_I(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc]->FIELD = d->data.i;
 #define DELTA_TO_SYNTH_F(FLAG, FIELD)  if (d->param == FLAG) synth[d->osc]->FIELD = d->data.f;
+#define DELTA_TO_SYNTH_F_CLAMPED(FLAG, FIELD, MINVAL, MAXVAL) \
+    if (d->param == FLAG) { synth[d->osc]->FIELD = MAX(MINVAL, MIN(MAXVAL, d->data.f)); }
+#define DELTA_TO_SYNTH_I_CLAMPED(FLAG, FIELD, MINVAL, MAXVAL) \
+    if (d->param == FLAG) { synth[d->osc]->FIELD = MAX(MINVAL, MIN(MAXVAL, (int32_t)d->data.i)); }
 #define DELTA_TO_COEFS(FLAG, FIELD) \
     if (PARAM_IS_COMBO_COEF(d->param, FLAG)) \
         synth[d->osc]->FIELD[d->param - FLAG] = d->data.f;
@@ -1559,6 +1577,20 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
     DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
+    if (d->param == DIST_TYPE) {
+        // Not DELTA_TO_SYNTH_I: a type change also restarts the rate reducer
+        // and DC blocker so it can't replay stale state.
+        uint32_t type = d->data.i;
+        synth[d->osc]->dist.type = (type <= DIST_CRUSH) ? (uint8_t)type : DIST_OFF;
+        synth[d->osc]->dist_state.hold = 0;
+        synth[d->osc]->dist_state.hold_count = 0;
+        synth[d->osc]->dist_state.hpf_yn1 = 0;
+    }
+    // Clamped so dist_process doesn't range-check per block.
+    DELTA_TO_SYNTH_F_CLAMPED(DIST_DRIVE, dist.drive, 0.0f, DIST_MAX_DRIVE)
+    DELTA_TO_SYNTH_I_CLAMPED(DIST_BITS, dist.bits, 1, 24)  // > S_FRAC_BITS: quantization off
+    DELTA_TO_SYNTH_I_CLAMPED(DIST_RATE, dist.rate, 1, 1024)
+    DELTA_TO_SYNTH_F_CLAMPED(DIST_MIX, dist.mix, 0.0f, 1.0f)
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
@@ -2088,6 +2120,11 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
             if(synth[osc]->wave == CUSTOM) max_val = render_custom(buf, osc);
         }
         if (synth[osc]->wave != SILENT) {
+            // apply distortion to osc if set, pre-filter; returns its own max
+            // (folding can amplify a quiet release tail).
+            if (synth[osc]->dist.type != DIST_OFF) {
+                max_val = dist_process(buf, osc);
+            }
             // apply filter to osc if set
             if (synth[osc]->filter_type != FILTER_NONE) {
                 max_val = filter_process(buf, osc, max_val);
@@ -2108,6 +2145,14 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
         if (synth[osc]->wave == SILENT) {
             max_val = render_envelope(buf, osc);
+            // Distortion on a SILENT head shapes the whole voice: buf now holds
+            // the summed chain, and chained_osc is base-osc-relative, so this
+            // runs once per voice on that voice's mix alone.  After the
+            // envelope, so note dynamics drive the shaper as they do per-osc;
+            // before the filter, keeping the per-osc dist -> filter order.
+            if (synth[osc]->dist.type != DIST_OFF) {
+                max_val = dist_process(buf, osc);
+            }
             // apply filter to osc if set
             if (synth[osc]->filter_type != FILTER_NONE) {
                 max_val = filter_process(buf, osc, max_val);

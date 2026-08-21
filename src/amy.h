@@ -300,6 +300,13 @@ enum coefs{
 #define FILTER_LPF24 4
 #define FILTER_NOTCH 5
 #define FILTER_PHASER 6
+// synth[].dist_type values
+#define DIST_OFF 0
+#define DIST_CLIP 1
+#define DIST_FOLD 2
+#define DIST_CRUSH 3
+// Pre-gain ceiling; dist_process computes drive * x with MUL6A_SS to hold it.
+#define DIST_MAX_DRIVE 16.0f
 // synth[].wave values
 #define SINE 0
 #define PULSE 1
@@ -425,8 +432,12 @@ enum params{
     // One id, not one per bus: like every other bus-directed param (EQ_*,
     // ECHO_*, REVERB_*), a VOLUME delta names its bus in delta.osc.  It used
     // to be VOLUME_BASE..VOLUME_BASE+n, which is what capped the bus count --
-    // the ids would have run into MODE below.  72..98 are now free.
+    // the ids would have run into MODE below.  77..98 are now free.
     VOLUME,                              // 71
+    // Per-osc distortion stage (see dist_process).
+    DIST_TYPE,                           // 72
+    DIST_DRIVE, DIST_BITS,               // 73, 74
+    DIST_RATE, DIST_MIX,                 // 75, 76
     MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
@@ -466,7 +477,7 @@ enum params{
       
 enum itags{
     RENDER_OSC_WAVE, COMPUTE_BREAKPOINT_SCALE, HOLD_AND_MODIFY, FILTER_PROCESS, FILTER_PROCESS_STAGE0,
-    FILTER_PROCESS_STAGE1, ADD_DELTA_TO_QUEUE, AMY_ADD_DELTA, PLAY_DELTA,  MIX_WITH_PAN, AMY_RENDER, 
+    FILTER_PROCESS_STAGE1, DIST_PROCESS, ADD_DELTA_TO_QUEUE, AMY_ADD_DELTA, PLAY_DELTA,  MIX_WITH_PAN, AMY_RENDER, 
     AMY_EXECUTE_DELTAS, AMY_FILL_BUFFER, RENDER_LUT_FM, RENDER_LUT_FB, RENDER_LUT, 
     RENDER_LUT_CUB, RENDER_LUT_FM_FB, RENDER_LPF_LUT, DSPS_BIQUAD_F32_ANSI_SPLIT_FB, DSPS_BIQUAD_F32_ANSI_SPLIT_FB_TWICE, DSPS_BIQUAD_F32_ANSI_COMMUTED, 
     PARAMETRIC_EQ_PROCESS, HPF_BUF, SCAN_MAX, DSPS_BIQUAD_F32_ANSI, BLOCK_NORM, CALIBRATE, AMY_ESP_FILL_BUFFER, NO_TAG
@@ -604,6 +615,12 @@ typedef struct amy_event {
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
     uint8_t filter_type;
+    // Per-osc distortion ('G' distortion sub-commands on the wire).
+    uint8_t dist_type;
+    float dist_drive;
+    uint8_t dist_bits;
+    uint16_t dist_rate;
+    float dist_mix;
     float eq_l;  // not in synth
     float eq_m;  // not in synth
     float eq_h;  // not in synth
@@ -646,6 +663,25 @@ typedef struct amy_event {
     float reverb_damping;
     float reverb_xover_hz;
 } amy_event;
+
+// Distortion stage.  Split from synthinfo so the same shaper can run at any
+// summing scope: per-osc (timbral, inside the envelope/filter chain) and, on a
+// chained-osc head, per-voice.  Config is what the caller sets; state is what
+// DIST_CRUSH carries between blocks - its sample-and-hold plus the DC blocker
+// that follows it - and each independent signal path needs its own.
+typedef struct dist_config {
+    uint8_t type;    // One of the DIST_ values.
+    float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
+    uint8_t bits;    // DIST_CRUSH bit depth; >= 24 disables quantization.
+    uint16_t rate;   // DIST_CRUSH sample-hold length in samples; 1 disables.
+    float mix;       // Wet/dry, 0..1.
+} dist_config_t;
+
+typedef struct dist_state {
+    SAMPLE hold;          // DIST_CRUSH held sample,
+    uint16_t hold_count;  // and samples left to hold it.
+    SAMPLE hpf_yn1;       // Wet-path DC blocker output (dist_block()).
+} dist_state_t;
 
 // Real-time granular time-stretch / pitch-shift state for PCM oscs ("fit",
 // see pcm.c).  Two overlapping Hann-windowed grains; the input read position
@@ -696,6 +732,9 @@ struct synthinfo {
     float portamento_alpha;
     float resonance;
     uint8_t filter_type;
+    // Distortion, applied pre-filter.  On a normal osc this is the per-osc
+    // timbral stage; on a SILENT chained-osc head it shapes the summed voice.
+    dist_config_t dist;
     uint16_t chained_osc;
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
@@ -722,6 +761,8 @@ struct synthinfo {
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
+    // DIST_CRUSH sample-rate reducer state.
+    dist_state_t dist_state;
     // Granular time-stretch/pitch-shift state (PCM "fit", see pcm.c).
     pcm_stretch_t stretch;
 };
@@ -1374,6 +1415,9 @@ extern void pcm_unload_all_presets();
 extern void filters_init(uint16_t bus);
 extern void filters_deinit(uint16_t bus);
 extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
+extern SAMPLE dist_block(SAMPLE * block, uint16_t len,
+                         const dist_config_t *cfg, dist_state_t *st);
+extern SAMPLE dist_process(SAMPLE * block, uint16_t osc);
 extern void parametric_eq_process(uint16_t bus, SAMPLE *block);
 extern void reset_filter(uint16_t osc);
 extern void reset_parametric(uint16_t bus);

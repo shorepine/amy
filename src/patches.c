@@ -363,6 +363,34 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I_SEQ(mod_source, "mod_source", NUM_MOD_SOURCES, "L");
     _EPRINT_I(algorithm, "algorithm", "o");
     _EPRINT_I(filter_type, "filter_type", "G");
+    // Distortion rides 'G' sub-commands: GC/GF/GH pick the type (a zero
+    // value is the off switch, printed canonically as GC0), GD/GM carry the
+    // shared drive and mix.
+    if (AMY_IS_SET(e->dist_type)) {
+        uint8_t dist_type = e->dist_type;
+        if (wirecode && dist_type == DIST_CRUSH) {
+            snprintf(s, len - (size_t)(s - s_entry), "GH"); s += strlen(s);
+            if (AMY_IS_SET(e->dist_bits)) { snprintf(s, len - (size_t)(s - s_entry), "%d", e->dist_bits); s += strlen(s); }
+            if (AMY_IS_SET(e->dist_rate)) {
+                snprintf(s, len - (size_t)(s - s_entry), ",%d", e->dist_rate); s += strlen(s);
+            }
+        } else if (wirecode) {
+            snprintf(s, len - (size_t)(s - s_entry), "G%c%d",
+                     (dist_type == DIST_FOLD) ? 'F' : 'C', (dist_type != DIST_OFF) ? 1 : 0);
+            s += strlen(s);
+        } else {
+            snprintf(s, len - (size_t)(s - s_entry), " dist_type: %d", dist_type); s += strlen(s);
+        }
+    }
+    if (!wirecode) {
+        // Wire mode prints bits/rate inside GH above; they mean nothing to
+        // the other types, so an event carrying them without DIST_CRUSH
+        // drops them from the wire form.
+        _EPRINT_I(dist_bits, "dist_bits", "");
+        _EPRINT_I(dist_rate, "dist_rate", "");
+    }
+    _EPRINT_F(dist_drive, "dist_drive", "GD");
+    _EPRINT_F(dist_mix, "dist_mix", "GM");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
@@ -478,6 +506,13 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET_SEQ(mod_source, NUM_MOD_SOURCES);
     _RET_TRUE_IF_SET(algorithm);
     _RET_TRUE_IF_SET(filter_type);
+    // Not _RET_TRUE_IF_5_F_SET: type/bits/rate are ints, and their unset
+    // sentinels cast to ordinary floats rather than NaN.
+    _RET_TRUE_IF_SET(dist_type);
+    _RET_TRUE_IF_SET(dist_drive);
+    _RET_TRUE_IF_SET(dist_bits);
+    _RET_TRUE_IF_SET(dist_rate);
+    _RET_TRUE_IF_SET(dist_mix);
     _RET_TRUE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
     // Convert these two at least to vectors of ints, save several hundred bytes
     _RET_TRUE_IF_SET_SEQ(algo_source, MAX_ALGO_OPS);
@@ -549,6 +584,11 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(reset_osc, RESET_OSC)
       _CASE_I(note_source_channel, NOTE_SOURCE_CHANNEL)
       _CASE_I(filter_type, FILTER_TYPE)
+      _CASE_I(dist_type, DIST_TYPE)
+      _CASE_F(dist_drive, DIST_DRIVE)
+      _CASE_I(dist_bits, DIST_BITS)
+      _CASE_I(dist_rate, DIST_RATE)
+      _CASE_F(dist_mix, DIST_MIX)
       _CASE_I(algorithm, ALGORITHM)
       _CASE_F(eq_l, EQ_L)
       _CASE_F(eq_m, EQ_M)

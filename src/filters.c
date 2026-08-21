@@ -1047,3 +1047,144 @@ void reset_parametric(uint16_t bus) {
         }
     }
 }
+
+
+// DIST_CRUSH's wet path is DC-blocked (pole at DIST_HPF_POLE, zero at 1,
+// corner at DIST_HPF_HZ): the sample-and-hold folds partials near multiples
+// of AMY_SAMPLE_RATE/rate down to sub-audio DC swings, and nothing downstream
+// removes DC.  The corner sits below the lowest musical fundamental, so only
+// the fold-down goes, not the audible grit.
+#define DIST_HPF_HZ 10.0f
+#define DIST_HPF_POLE (1.0f - 2 * (float)M_PI * DIST_HPF_HZ / AMY_SAMPLE_RATE)
+
+// Distortion over one channel of `len` samples, in place.  Scope-agnostic:
+// `cfg` and `st` are the caller's, so the same shaper serves the per-osc
+// timbral stage and a chained-osc head shaping a whole voice.  `st` carries
+// DIST_CRUSH's sample-and-hold and DC blocker, so every independent signal path
+// needs its own (channels included - sharing one across a stereo pair smears
+// them).
+// Params arrive range-clamped from play_delta(); loop bodies are call-free
+// so they take the Xtensa zero-overhead-loop form.  Returns the abs max of
+// what it wrote (folding can amplify a quiet input, so the pre-distortion
+// max must not be reused).  Pre-gain uses SMULR6: a SILENT-head chain sum
+// runs several oscs' worth of full scale, so drive * x can pass MUL6A_SS's
+// [-64, 64) product range and wrap sign; SMULR6 is exact on 64-bit-mul
+// hardware, and its 32x32 fallback keeps [-128, 128).
+AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
+                                const dist_config_t *cfg, dist_state_t *st) {
+    AMY_PROFILE_START(DIST_PROCESS)
+    SAMPLE drive = F2S(cfg->drive);
+    SAMPLE mix = F2S(cfg->mix);
+    SAMPLE dry = F2S(1.0f) - mix;
+    SAMPLE max_out = 0;
+    switch (cfg->type) {
+    case DIST_CLIP:
+        for (uint16_t i = 0; i < len; ++i) {
+            SAMPLE x = block[i];
+            SAMPLE v = SMULR6(x, drive);
+            if (v > F2S(1.0f)) v = F2S(1.0f);
+            if (v < F2S(-1.0f)) v = F2S(-1.0f);
+            // Cubic soft knee y = v - v^3/3: unity small-signal gain, 2/3 at the rails.
+            SAMPLE y = MUL4_SS(v, F2S(1.0f) - MUL4_SS(MUL4_SS(v, v), F2S(0.33333334f)));
+            y = MUL4_SS(dry, x) + MUL4_SS(mix, y);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        break;
+    case DIST_FOLD:
+        for (uint16_t i = 0; i < len; ++i) {
+            SAMPLE x = block[i];
+            SAMPLE v = SMULR6(x, drive);
+            // Triangle wavefolder: y = 1 - |((v + 1) mod 4) - 2|, identity on [-1, 1].
+            SAMPLE y;
+#ifdef AMY_USE_FIXEDPOINT
+            // AND is a nonnegative mod-4 in two's complement.
+            SAMPLE fold = (v + F2S(1.0f)) & ((4 << S_FRAC_BITS) - 1);
+            y = fold - F2S(2.0f);
+            if (y < 0) y = -y;
+            y = F2S(1.0f) - y;
+#else
+            SAMPLE fold = v + 1.0f;
+            fold -= 4.0f * floorf(fold * 0.25f);
+            y = 1.0f - fabsf(fold - 2.0f);
+#endif
+            y = MUL4_SS(dry, x) + MUL4_SS(mix, y);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        break;
+    case DIST_CRUSH: {
+        // Bit-depth + sample-rate reduction.
+        SAMPLE hold = st->hold;
+        uint16_t count = st->hold_count;
+        uint16_t rate = cfg->rate;
+        int bits = cfg->bits;
+        // Quantize to `bits` magnitude bits, rounding to nearest: truncation
+        // is a half-step DC offset that the echo feedback loop integrates.
+#ifdef AMY_USE_FIXEDPOINT
+        SAMPLE qmask = (SAMPLE)~0;
+        SAMPLE qhalf = 0;
+        if (bits <= S_FRAC_BITS) {
+            qmask = ~((1 << (S_FRAC_BITS + 1 - bits)) - 1);
+            qhalf = 1 << (S_FRAC_BITS - bits);   // half a quantization step
+        }
+#else
+        float qscale = 0;  // 0 = no quantization
+        float qinv = 0;
+        if (bits <= 23) {
+            qscale = (float)(1 << (bits - 1));
+            qinv = 1.0f / qscale;
+        }
+#endif
+        // DC blocker, wet path only, so mix still crossfades to bit-exact
+        // dry.  Only `yn1` is carried: x[n] - x[n-1] is nonzero only at a
+        // capture (that is when the held value moves).  Impulse response l1
+        // norm is 2, keeping the wet term inside MUL4_SS's range.
+        SAMPLE pole = F2S(DIST_HPF_POLE);
+        SAMPLE yn1 = st->hpf_yn1;
+        for (uint16_t i = 0; i < len; ++i) {
+            SAMPLE x = block[i];
+            // Advance the pole, then let a capture inject the step:
+            // y[n] = pole * y[n-1] + (hold[n] - hold[n-1]).
+            yn1 = FILT_MUL_SS(pole, yn1);
+            if (count == 0) {
+                SAMPLE v = SMULR6(x, drive);
+                // Saturate before quantizing: keeps hold on the CLIP/FOLD
+                // level scale and the wet term inside MUL4_SS's [-16, 16).
+                if (v > F2S(1.0f)) v = F2S(1.0f);
+                if (v < F2S(-1.0f)) v = F2S(-1.0f);
+#ifdef AMY_USE_FIXEDPOINT
+                v = (v + qhalf) & qmask;
+#else
+                if (qscale != 0)  v = floorf(v * qscale + 0.5f) * qinv;
+#endif
+                yn1 += v - hold;
+                hold = v;
+                count = rate;
+            }
+            --count;
+            SAMPLE y = MUL4_SS(dry, x) + MUL4_SS(mix, yn1);
+            block[i] = y;
+            if (y < 0) y = -y;
+            if (y > max_out) max_out = y;
+        }
+        st->hold = hold;
+        st->hold_count = count;
+        st->hpf_yn1 = yn1;
+        break;
+    }
+    default:  // unreachable; keep the return contract anyway
+        max_out = scan_max(block, len);
+        break;
+    }
+    AMY_PROFILE_STOP(DIST_PROCESS)
+    return max_out;
+}
+
+// Per-osc entry point: the osc owns both its config and its hold state.
+AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
+    return dist_block(block, AMY_BLOCK_SIZE, &synth[osc]->dist,
+                      &synth[osc]->dist_state);
+}
