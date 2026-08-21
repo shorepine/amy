@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/4ee6da09-899a-4a46-bb04-e5c1a43b16d5
+
 # Distortion in AMY
 
 AMY has a per-oscillator distortion stage with three waveshapers: a soft
@@ -34,6 +38,10 @@ member and the clipper on its `SILENT` head). Drive and mix are shared
 across the chain, and each stage applies drive as its own pre-gain, so
 stacking re-amplifies per pass. One riff with the stage set changing on each
 downbeat - dry, clip, clip+fold, all three, crusher alone:
+
+
+https://github.com/user-attachments/assets/b66d66b6-22b1-4074-9295-0551db2e01a2
+
 
 ```python
 amy.send(osc=0, wave=amy.TRIANGLE, dist_drive=4, dist_mix=1)
@@ -130,6 +138,12 @@ also the natural unit for the wavefolder, where it buys one more fold).
 Velocity into drive is what makes the shaper respond like part of the
 voice - soft hits play a near-pure tone, hard hits bark:
 
+
+
+https://github.com/user-attachments/assets/39d34301-3422-4e5d-b4a7-6065adf0d0c2
+
+
+
 ```python
 # drive = 1 * 2^(3 * velocity): about 1.5 soft, 8 at full velocity
 amy.send(osc=0, wave=amy.SINE, dist_clip=1, dist_mix=1,
@@ -141,8 +155,20 @@ exactly the same (that is the drive the vel-coef arm reaches there), but the
 soft hits buzz just as hard relative to their level - static drive can't
 tell touch apart:
 
+
+
+
+https://github.com/user-attachments/assets/23fa611d-74c5-49d6-b8e7-68ac94d6d03a
+
+
 Any modulation source works. Drive on EG1, swelling a single held note from
 pure tone into growl with no parameter events after the note-on:
+
+
+
+
+https://github.com/user-attachments/assets/d45b9dd6-5c0d-47ad-83c6-a5e7bb10024a
+
 
 ```python
 amy.send(osc=0, wave=amy.SINE, bp1='0,0,4000,1,600,0',
@@ -158,6 +184,28 @@ signal. It rides `J` with the same sub-command grammar as `G` (`JC`/`JF`/
 bus-directed messages pick their bus with the `y` prefix, like the other
 bus FX:
 
+
+
+
+https://github.com/user-attachments/assets/a88bcf1c-e19e-4d66-8dc8-59685b6ad54e
+
+<details><summary>dry twin</summary>
+
+
+https://github.com/user-attachments/assets/8778d836-46af-41a9-b6f1-1f74a71d24f2
+
+
+</details>
+
+<details><summary>per osc</summary>
+
+
+https://github.com/user-attachments/assets/3de002c5-57d0-40a9-b246-b7843094872b
+
+
+</details>
+
+
 ```python
 amy.send(bus=0, bus_dist_clip=1, bus_dist_drive=4, bus_dist_mix=1)
 ```
@@ -171,8 +219,10 @@ whenever the bass sounds:
 One drive knob over a whole held chord blooms the intermodulation fan out of
 three pure tones in a single gesture:
 
-And the whole-mix-through-a-sampler move - a sparse groove, dry for a bar,
-the bus crusher switching in on the bar-2 downbeat:
+
+
+https://github.com/user-attachments/assets/86182961-81e9-4c7f-83e4-f4020776d349
+
 
 ## Per-osc versus the voice's sum
 
