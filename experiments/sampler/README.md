@@ -48,6 +48,15 @@ including ESP32-S3/RP2350:
   about to play, and start there. The timeline itself is never adjusted, so
   alignment jitter can't accumulate into tempo error. Verified: a 220 Hz
   tone shifted +7 semitones lands within 2% of the target pitch.
+- **How wide to search** — `fit_search` (wire `pS`), per osc, default 64,
+  0 to disable, clamped to 512. The search has to reach half a period or it
+  can't find the aligned splice at all, so ±64 covers periods down to
+  `AMY_SAMPLE_RATE/128` (~345 Hz) and nothing below: a 110 Hz tone comes out
+  of a 2x stretch at 141 Hz, sitting on a comb line instead of the note.
+  `fit_search=256` fixes it. The comparison window widens with the setting
+  (it also has to span about a period) but the tap count stays at 64 and the
+  stride opens up, so cost stays linear at `(2·pS+1)·64` MACs per hop.
+  Read every block, so it can be swept while a note sounds.
 - Note-on transient trick: the first hop starts *both* grains at the same
   input position, one window ascending, one at its peak — their sum is 1,
   so the first ~12 ms reproduce the input exactly and drum transients don't
@@ -57,8 +66,9 @@ including ESP32-S3/RP2350:
   timeline at the loop marks.
 
 Cost: ~2.5× plain PCM rendering per voice, plus the spawn-time correlation
-search ((2·64+1)·64 int MACs per 512 output samples ≈ 16 MACs/sample).
-`PCM_STRETCH_SEARCH 0` in pcm.c disables the search for very small parts.
+search ((2·64+1)·64 int MACs per 512 output samples ≈ 16 MACs/sample at the
+default `fit_search`, linear in it above that). `PCM_STRETCH_SEARCH 0` in
+pcm.c compiles the search out entirely for very small parts.
 State is ~48 bytes per osc, embedded in `synthinfo`; the Hann table is 2 KB.
 
 Why not a phase vocoder: an FFT PV needs FFTs (which AMY doesn't ship),
@@ -69,6 +79,14 @@ degrades gracefully. If we ever want FFT quality on desktop/web, it can slot
 in behind the same `fit=` API.
 
 ## What was verified (offline renders are deterministic)
+
+- `fit_search` (`experiments/sampler/fit_search_test.py`, self-asserting): a
+  110 Hz tone stretched 2x reads 141.4 Hz at the default search and 110.0 Hz
+  at `fit_search=256`; in-band vs out-of-band energy goes −15 dB → +26 dB.
+  440 Hz, already inside the default's reach, goes 20 dB → 38 dB on the
+  wider comparison window alone. `fit_search=0` (fixed-grid, no alignment —
+  roughly what the Akai CYCLIC stretch did) reads −99 dB, i.e. essentially
+  none of the output is at the input pitch.
 
 - `sample_offset=k` starts playback at exactly sample `k` of its block
   (impulse test).
@@ -140,6 +158,7 @@ remainder.
 | `fit=N` | `YN` | stretch sample to N sequencer ticks, pitch-invariant |
 | `fit=0` | `Y0` | pitch-shift via `note`, duration unchanged |
 | `fit=-1` | `Y-1` | disable the fit engine |
+| `fit_search=N` | `pSN` | grain alignment search half-width, frames (0 = off) |
 
 Both are ordinary osc params: settable from C (`amy_event.sample_offset`,
 `.fit_ticks`), wire, Python, JS, and Godot (generated APIs rebuilt with
@@ -167,3 +186,10 @@ Both are ordinary osc params: settable from C (`amy_event.sample_offset`,
   S3.
 - **Stereo grains** read L/R/mix like plain PCM (`PCM_LEFT`/`PCM_RIGHT`
   pairs work), but the WSOLA search correlates the mixed signal only.
+- **Picking `fit_search` automatically**: the right width is half the period
+  of the lowest pitch in the sample, which the loader could estimate once
+  (autocorrelation over a few frames) instead of leaving to the caller.
+- **Normalized correlation**: the search maximizes a plain dot product, which
+  is biased toward loud candidates. It doesn't show at ±64, but the wide
+  settings can reach far enough to be pulled onto a transient. Dividing by
+  the candidate's energy (running sum, cheap) would fix it.

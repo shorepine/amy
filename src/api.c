@@ -130,6 +130,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->trigger_phase);
     AMY_UNSET(e->sample_offset);
     AMY_UNSET(e->fit_ticks);
+    AMY_UNSET(e->fit_search);
     AMY_UNSET(e->feedback);
     AMY_UNSET(e->velocity);
     AMY_UNSET(e->midi_note);

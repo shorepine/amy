@@ -453,6 +453,7 @@ enum params{
     BUS,
     SAMPLE_OFFSET,              // PCM note-on start offset in samples within its block
     FIT,                        // PCM time-stretch/pitch-shift target in sequencer ticks
+    FIT_SEARCH,                 // PCM fit engine: WSOLA correlation search half-width, in frames
     NO_PARAM                    // 210
 };
 // Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
@@ -591,6 +592,7 @@ typedef struct amy_event {
     float trigger_phase;
     uint16_t sample_offset;  // PCM: start this note-on at a sample offset within its block (0..AMY_BLOCK_SIZE-1)
     float fit_ticks;  // PCM: >0 = time-stretch to this many sequencer ticks; 0 = pitch-shift at original length; <0 = off
+    uint16_t fit_search;  // PCM fit engine: grain alignment search half-width in frames (0 = off, unset = PCM_STRETCH_SEARCH)
     float volume;  // event_only; the mixdown volume of `bus` (default bus 0)
     float pitch_bend;  // event_only
     float tempo;  // event_only
@@ -689,6 +691,7 @@ struct synthinfo {
     float trigger_phase;
     uint16_t sample_offset;  // PCM note-on start offset in samples within its block
     float fit_ticks;  // PCM fit target in sequencer ticks (0 = pitch-shift at original length)
+    uint16_t fit_search;  // PCM fit grain alignment search half-width in frames (0 = off)
     float logratio;
     float portamento_alpha;
     float resonance;

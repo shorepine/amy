@@ -349,29 +349,61 @@ static void pcm_stretch_note_on(uint16_t osc, memorypcm_preset_t *preset) {
 // WSOLA-style spawn alignment: search this many frames either side of the
 // nominal grain start for the best phase match with the still-playing grain.
 // Without it, a pure tone through the stretcher lands on the nearest line of
-// a comb spaced at the hop rate (~86 Hz) instead of the exact target pitch;
-// broadband drums barely care, tonal material does.  Costs
-// (2*SEARCH+1)*SEARCH_WIN int multiplies per hop; set SEARCH to 0 to disable
-// on very small parts.
+// a comb spaced at the hop rate (~86 Hz at 44.1 kHz) instead of the exact
+// target pitch; broadband drums barely care, tonal material does.
+//
+// The half-width is per-osc at runtime (fit_search / 'pS'); PCM_STRETCH_SEARCH
+// is the default when it's unset and PCM_STRETCH_SEARCH_MAX the ceiling any
+// request is clamped to.  Setting PCM_STRETCH_SEARCH to 0 compiles the search
+// out entirely for very small parts, and then 'pS' does nothing.
+//
+// How wide it needs to be is set by the lowest pitch present: the search has
+// to be able to reach half a period, so the default 64 covers periods down to
+// about AMY_SAMPLE_RATE/128 -- fine from ~345 Hz up (at 44.1 kHz), useless on
+// a bass line, where the aligner lands on a comb line instead of the note.  A
+// 110 Hz tone needs 200 frames of reach, and sounds like 141 Hz without them
+// (experiments/sampler/fit_search_test.py measures it).
 #define PCM_STRETCH_SEARCH 64
-#define PCM_STRETCH_SEARCH_WIN 64
+#define PCM_STRETCH_SEARCH_MAX 512
+// Multiplies per candidate offset, so the whole search costs
+// (2*search+1)*TAPS per hop no matter how wide it is: the comparison window
+// grows with the search (it also has to span about a period, or the
+// correlation can't tell one lag from another) but the stride opens up to
+// match, keeping the tap count fixed.  Decimating like that aliases, which
+// would matter if the wide settings were for bright material -- they're for
+// bass, where the taps still land many per period.
+#define PCM_STRETCH_SEARCH_TAPS 64
+
+// Resolve the per-osc request ('pS'): unset means the default, anything over
+// the ceiling is clamped rather than refused so a part can ask for "as wide
+// as you can" without knowing the build's budget.
+static inline uint16_t pcm_stretch_search_width(uint16_t osc) {
+    uint16_t s = synth[osc]->fit_search;
+    if (AMY_IS_UNSET(s)) return PCM_STRETCH_SEARCH;
+    if (s > PCM_STRETCH_SEARCH_MAX) return PCM_STRETCH_SEARCH_MAX;
+    return s;
+}
 
 static int32_t pcm_stretch_best_offset(const LUTSAMPLE *table, uint8_t channels, uint16_t wave,
-                                       uint32_t length, uint32_t target, uint32_t nominal) {
+                                       uint32_t length, uint32_t target, uint32_t nominal,
+                                       uint16_t search) {
 #if PCM_STRETCH_SEARCH > 0
+    if (search == 0) return 0;
+    uint32_t stride = (search > PCM_STRETCH_SEARCH_TAPS) ? (search / PCM_STRETCH_SEARCH_TAPS) : 1;
+    uint32_t win = stride * PCM_STRETCH_SEARCH_TAPS;   // == 64 at the default
     // Bail if either segment would run off the sample.
-    if (target + PCM_STRETCH_SEARCH_WIN >= length) return 0;
-    int32_t lo = -(int32_t)PCM_STRETCH_SEARCH, hi = PCM_STRETCH_SEARCH;
+    if (target + win >= length) return 0;
+    int32_t lo = -(int32_t)search, hi = (int32_t)search;
     if ((int32_t)nominal + lo < 0) lo = -(int32_t)nominal;
-    if (nominal + hi + PCM_STRETCH_SEARCH_WIN >= length) {
-        if (nominal + PCM_STRETCH_SEARCH_WIN >= length) return 0;
-        hi = (int32_t)(length - PCM_STRETCH_SEARCH_WIN - 1 - nominal);
+    if (nominal + hi + win >= length) {
+        if (nominal + win >= length) return 0;
+        hi = (int32_t)(length - win - 1 - nominal);
     }
     if (lo > hi) return 0;
     int32_t best_d = 0, best_corr = INT32_MIN;
     for (int32_t d = lo; d <= hi; ++d) {
         int32_t corr = 0;
-        for (int32_t i = 0; i < PCM_STRETCH_SEARCH_WIN; ++i) {
+        for (uint32_t i = 0; i < win; i += stride) {
             int32_t a = pcm_stretch_read(table, channels, wave, target + i) >> 4;
             int32_t b = pcm_stretch_read(table, channels, wave, nominal + d + i) >> 4;
             corr += a * b;
@@ -381,13 +413,14 @@ static int32_t pcm_stretch_best_offset(const LUTSAMPLE *table, uint8_t channels,
     return best_d;
 #else
     (void)table; (void)channels; (void)wave; (void)length; (void)target; (void)nominal;
+    (void)search;
     return 0;
 #endif
 }
 
 // Spawn a replacement grain at the current input timeline position.
 static void pcm_stretch_spawn(pcm_stretch_t *st, memorypcm_preset_t *preset, uint16_t wave,
-                              bool looping, uint32_t loopstart, uint32_t loopend) {
+                              bool looping, uint32_t loopstart, uint32_t loopend, uint16_t search) {
     uint32_t length = preset->length;
     st->hop_counter = PCM_STRETCH_HOP;
     if (st->ended) return;
@@ -420,7 +453,8 @@ static void pcm_stretch_spawn(pcm_stretch_t *st, memorypcm_preset_t *preset, uin
     int other = 1 - gi;  // PCM_STRETCH_GRAINS == 2
     if (st->grain[other].active) {
         uint32_t target = st->grain[other].start_frame + (st->grain[other].phase_q16 >> 16);
-        d = pcm_stretch_best_offset(preset->sample_ram, preset->channels, wave, length, target, frame);
+        d = pcm_stretch_best_offset(preset->sample_ram, preset->channels, wave, length, target, frame,
+                                    search);
     }
     st->grain[gi].active = 1;
     st->grain[gi].start_frame = (uint32_t)((int32_t)frame + d);
@@ -463,6 +497,8 @@ static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *
     SAMPLE amp = F2S(msynth[osc]->amp);
     const LUTSAMPLE *table = preset->sample_ram;
     uint32_t length = preset->length;
+    // Re-read each block, so 'pS' can be swept while the note is sounding.
+    uint16_t search = pcm_stretch_search_width(osc);
     bool looping = mode_is_looping(msynth[osc]->state);
     uint32_t loopstart = msynth[osc]->loopstart;
     uint32_t loopend = (msynth[osc]->loopend > loopstart && msynth[osc]->loopend <= length) ? msynth[osc]->loopend : length;
@@ -474,7 +510,7 @@ static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *
     }
     for (; i < AMY_BLOCK_SIZE; i++) {
         if (st->hop_counter == 0)
-            pcm_stretch_spawn(st, preset, synth[osc]->wave, looping, loopstart, loopend);
+            pcm_stretch_spawn(st, preset, synth[osc]->wave, looping, loopstart, loopend, search);
         st->hop_counter--;
         SAMPLE out = 0;
         uint8_t any_active = 0;
