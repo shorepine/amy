@@ -479,9 +479,10 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
 // Parser for the 'G' prefix: a digit is filter_type as ever; a letter is a
 // distortion sub-command. GC<v> and GF<v> enable clip and fold (0 turns the
 // stage off), GH<bits>[,<rate>] enables the bitcrusher (GH0 turns it off),
-// GD<drive> and GM<mix> set the drive and wet/dry shared by every stage.
-// Stages are independent: enabled stages stack in clip -> fold -> crush
-// order, and each command touches only its own stage.
+// GD<coefs> and GM<coefs> carry the drive and wet/dry coef vectors shared by
+// every stage - a single value sets just the constant term, so scalar use
+// reads as before.  Stages are independent: enabled stages stack in
+// clip -> fold -> crush order, and each command touches only its own stage.
 int amy_parse_dist_layer_message(char *message, amy_event *e) {
     if (message[0] >= '0' && message[0] <= '9') {
         // It's just the filter type.
@@ -503,8 +504,8 @@ int amy_parse_dist_layer_message(char *message, amy_event *e) {
             if (AMY_IS_SET(vals[1])) e->dist_rate = vals[1];
         }
     }
-    else if (cmd == 'D')  e->dist_drive = atoff(message);
-    else if (cmd == 'M')  e->dist_mix = atoff(message);
+    else if (cmd == 'D')  parse_coef_message(message, e->dist_drive_coefs);
+    else if (cmd == 'M')  parse_coef_message(message, e->dist_mix_coefs);
     else fprintf(stderr, "Unrecognized distortion command '%s'\n", message - 1);
     return 1;  // skip the sub-command letter.
 }

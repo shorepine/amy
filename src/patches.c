@@ -386,8 +386,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         _EPRINT_I(dist_bits, "dist_bits", "");
         _EPRINT_I(dist_rate, "dist_rate", "");
     }
-    _EPRINT_F(dist_drive, "dist_drive", "GD");
-    _EPRINT_F(dist_mix, "dist_mix", "GM");
+    _EPRINT_COEF(dist_drive_coefs, "dist_drive_coefs", "GD");
+    _EPRINT_COEF(dist_mix_coefs, "dist_mix_coefs", "GM");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
@@ -508,10 +508,10 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(dist_clip);
     _RET_TRUE_IF_SET(dist_fold);
     _RET_TRUE_IF_SET(dist_crush);
-    _RET_TRUE_IF_SET(dist_drive);
     _RET_TRUE_IF_SET(dist_bits);
     _RET_TRUE_IF_SET(dist_rate);
-    _RET_TRUE_IF_SET(dist_mix);
+    _RET_TRUE_IF_SET_COEF(dist_drive_coefs);
+    _RET_TRUE_IF_SET_COEF(dist_mix_coefs);
     _RET_TRUE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
     // Convert these two at least to vectors of ints, save several hundred bytes
     _RET_TRUE_IF_SET_SEQ(algo_source, MAX_ALGO_OPS);
@@ -536,6 +536,16 @@ bool event_addresses_oscs(amy_event *e) {
 #define _TEST_COEFS(FIELD, PARAM)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {                          \
         if ((int)queue->param == (int)PARAM + i) event->FIELD[i] = queue->data.f; \
+    }
+// Const drive coef is linear drive, rest are octaves.
+#define _TEST_DRIVE_COEFS(FIELD, PARAM) \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
+        if ((int)queue->param == (int)PARAM + i) {   \
+            if (i == COEF_CONST)  \
+                event->FIELD[i] = drive_of_logdrive(queue->data.f);   \
+            else \
+                event->FIELD[i] = queue->data.f; \
+        }                                    \
     }
 // Const freq coef is in Hz, rest are linear.
 #define _TEST_FREQ_COEFS(FIELD, PARAM) \
@@ -586,10 +596,8 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(dist_clip, DIST_CLIP_EN)
       _CASE_I(dist_fold, DIST_FOLD_EN)
       _CASE_I(dist_crush, DIST_CRUSH_EN)
-      _CASE_F(dist_drive, DIST_DRIVE)
       _CASE_I(dist_bits, DIST_BITS)
       _CASE_I(dist_rate, DIST_RATE)
-      _CASE_F(dist_mix, DIST_MIX)
       _CASE_I(algorithm, ALGORITHM)
       _CASE_F(eq_l, EQ_L)
       _CASE_F(eq_m, EQ_M)
@@ -620,6 +628,8 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
       _TEST_COEFS(duty_coefs, DUTY)
       _TEST_COEFS(pan_coefs, PAN)
+      _TEST_DRIVE_COEFS(dist_drive_coefs, DIST_LOGDRIVE)
+      _TEST_COEFS(dist_mix_coefs, DIST_MIX)
       for (int i = 0; i < MAX_ALGO_OPS; ++i) {
           if ((int)queue->param == (int)ALGO_SOURCE_START + i)
               event->algo_source[i] = queue->data.i;

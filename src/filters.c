@@ -1181,11 +1181,12 @@ static AMY_IRAM_ATTR SAMPLE dist_pass_crush(SAMPLE *block, uint16_t len,
 // Enabled stages stack in a fixed clip -> fold -> crush order (shaping
 // before lo-fi; the reverse order is reachable per voice by putting the
 // crusher on a chain member and the clipper on its SILENT head).  Drive and
-// mix are shared across the chain.  Params arrive range-clamped from
-// play_delta().  Pre-gain uses SMULR6: a SILENT-head chain sum runs several
-// oscs' worth of full scale, so drive * x can pass MUL6A_SS's [-64, 64)
-// product range and wrap sign; SMULR6 is exact on 64-bit-mul hardware, and
-// its 32x32 fallback keeps [-128, 128).
+// mix are shared across the chain.  Params arrive range-clamped: bits and
+// rate from play_delta(), drive and mix from the coef combine in
+// hold_and_modify().  Pre-gain uses SMULR6: a SILENT-head chain sum runs
+// several oscs' worth of full scale, so drive * x can pass MUL6A_SS's
+// [-64, 64) product range and wrap sign; SMULR6 is exact on 64-bit-mul
+// hardware, and its 32x32 fallback keeps [-128, 128).
 AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
                                 const dist_config_t *cfg, dist_state_t *st) {
     AMY_PROFILE_START(DIST_PROCESS)
@@ -1205,6 +1206,16 @@ AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
 
 // Per-osc entry point: the osc owns both its config and its hold state.
 AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
-    return dist_block(block, AMY_BLOCK_SIZE, &synth[osc]->dist,
-                      &synth[osc]->dist_state);
+    // Stages, bits and rate are authored on the osc; drive and mix are
+    // combined from their coef vectors once per block in hold_and_modify.
+    // Composing the config here rather than storing one keeps modulated
+    // state in msynth, where the rest of the per-block values live.
+    const dist_config_t cfg = {
+        .stages = synth[osc]->dist_stages,
+        .drive = msynth[osc]->dist_drive,
+        .bits = synth[osc]->dist_bits,
+        .rate = synth[osc]->dist_rate,
+        .mix = msynth[osc]->dist_mix,
+    };
+    return dist_block(block, AMY_BLOCK_SIZE, &cfg, &synth[osc]->dist_state);
 }
