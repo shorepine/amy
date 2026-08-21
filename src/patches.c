@@ -350,6 +350,8 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
     _EPRINT_F(trigger_phase, "phase", "P");
+    _EPRINT_I(sample_offset, "sample_offset", "po");
+    _EPRINT_F(fit_ticks, "fit", "pF");
     _EPRINT_F(pitch_bend, "pitch_bend", "s");  // NOT osc-dep
     _EPRINT_F(tempo, "tempo", "j");  // NOT osc-dep
     _EPRINT_I(latency_ms, "latency_ms", "N");  // NOT osc-dep
@@ -462,6 +464,8 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET_COEF(pan_coefs);
     _RET_TRUE_IF_SET(feedback);
     _RET_TRUE_IF_SET(trigger_phase);
+    _RET_TRUE_IF_SET(sample_offset);
+    _RET_TRUE_IF_SET(fit_ticks);
     _RET_TRUE_IF_SET(pitch_bend);  // NOT osc-dep
     _RET_TRUE_IF_SET(tempo);  // NOT osc-dep
     _RET_TRUE_IF_SET(latency_ms);  // NOT osc-dep
@@ -530,6 +534,8 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(midi_note, MIDI_NOTE)
       _CASE_F(feedback, FEEDBACK)
       _CASE_F(trigger_phase, PHASE)
+      _CASE_I(sample_offset, SAMPLE_OFFSET)
+      _CASE_F(fit_ticks, FIT)
       _CASE_F(pitch_bend, PITCH_BEND)
       _CASE_I(latency_ms, LATENCY)
       _CASE_F(tempo, TEMPO)
@@ -701,6 +707,8 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     EVENT_FROM_OSC_ARRAY(pan_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC(feedback);
     EVENT_FROM_OSC(trigger_phase);
+    EVENT_FROM_OSC(sample_offset);
+    EVENT_FROM_OSC(fit_ticks);
     EVENT_FROM_OSC_MAPPED(logratio, ratio, exp2f);
     EVENT_FROM_OSC(resonance);
     EVENT_FROM_OSC_MAPPED(portamento_alpha, portamento_ms, alpha_to_portamento_ms);

@@ -744,7 +744,6 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atoff(arg); break;
-            /* J available */
             // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
                 float chorus_params[4];
@@ -773,7 +772,21 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'N': e->latency_ms = atoi(arg);  break;
             case 'o': e->algorithm=atoi(arg); break;
             case 'O': parse_algo_source(arg, e->algo_source); break;
-            case 'p': e->preset=atoi(arg); break;
+            case 'p':
+                // 'p' is the preset/sampler layer: a bare number is the preset,
+                // a sub-letter addresses a PCM param.  Sampler params live here
+                // rather than at the top level because single letters are nearly
+                // exhausted (44 of 52 allocated) and this corner keeps growing.
+                if (arg[0] == 'o') {  // 'po' is PCM sample_offset.
+                    e->sample_offset = atoi(arg + 1);
+                    ++pos;
+                } else if (arg[0] == 'F') {  // 'pF' is PCM fit (ticks).
+                    e->fit_ticks = atoff(arg + 1);
+                    ++pos;
+                } else {
+                    e->preset = atoi(arg);
+                }
+                break;
             case 'P': e->trigger_phase=atoff(arg); break;
             /* q unused */
             case 'Q': parse_coef_message(arg, e->pan_coefs); break;
@@ -830,7 +843,6 @@ int amy_parse_message(char * message, amy_event *e) {
                 }
                 break;
             case 'y': e->bus = atoi(arg); break;
-            /* Y still available */
             case 'z': {
                 pos += amy_parse_transfer_layer_message(arg);
                 break;
