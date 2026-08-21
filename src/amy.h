@@ -300,11 +300,11 @@ enum coefs{
 #define FILTER_LPF24 4
 #define FILTER_NOTCH 5
 #define FILTER_PHASER 6
-// synth[].dist_type values
-#define DIST_OFF 0
+// synth[].dist.stages bits - each stage toggles independently and enabled
+// stages stack in clip -> fold -> crush order.
 #define DIST_CLIP 1
 #define DIST_FOLD 2
-#define DIST_CRUSH 3
+#define DIST_CRUSH 4
 // Pre-gain ceiling; dist_process computes drive * x with MUL6A_SS to hold it.
 #define DIST_MAX_DRIVE 16.0f
 // synth[].wave values
@@ -434,10 +434,11 @@ enum params{
     // to be VOLUME_BASE..VOLUME_BASE+n, which is what capped the bus count --
     // the ids would have run into MODE below.  77..98 are now free.
     VOLUME,                              // 71
-    // Per-osc distortion stage (see dist_process).
-    DIST_TYPE,                           // 72
-    DIST_DRIVE, DIST_BITS,               // 73, 74
-    DIST_RATE, DIST_MIX,                 // 75, 76
+    // Per-osc distortion stage (see dist_process); one enable per stage.
+    DIST_CLIP_EN,                        // 72
+    DIST_FOLD_EN, DIST_CRUSH_EN,         // 73, 74
+    DIST_DRIVE, DIST_BITS,               // 75, 76
+    DIST_RATE, DIST_MIX,                 // 77, 78
     MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
@@ -616,7 +617,11 @@ typedef struct amy_event {
     uint8_t algorithm;
     uint8_t filter_type;
     // Per-osc distortion ('G' distortion sub-commands on the wire).
-    uint8_t dist_type;
+    // One enable per stage, so an event can toggle one stage without
+    // naming the others.
+    uint8_t dist_clip;
+    uint8_t dist_fold;
+    uint8_t dist_crush;
     float dist_drive;
     uint8_t dist_bits;
     uint16_t dist_rate;
@@ -670,11 +675,11 @@ typedef struct amy_event {
 // DIST_CRUSH carries between blocks - its sample-and-hold plus the DC blocker
 // that follows it - and each independent signal path needs its own.
 typedef struct dist_config {
-    uint8_t type;    // One of the DIST_ values.
-    float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
+    uint8_t stages;  // DIST_ stage bits; 0 = no stage enabled, distortion bypassed.
+    float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD), shared.
     uint8_t bits;    // DIST_CRUSH bit depth; >= 24 disables quantization.
     uint16_t rate;   // DIST_CRUSH sample-hold length in samples; 1 disables.
-    float mix;       // Wet/dry, 0..1.
+    float mix;       // Wet/dry per pass, 0..1, shared.
 } dist_config_t;
 
 typedef struct dist_state {
