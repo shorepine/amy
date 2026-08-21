@@ -835,6 +835,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     EVENT_TO_DELTA_F(trigger_phase, PHASE)
     EVENT_TO_DELTA_I(sample_offset, SAMPLE_OFFSET)
     EVENT_TO_DELTA_F(fit_ticks, FIT)
+    EVENT_TO_DELTA_I(fit_search, FIT_SEARCH)
     EVENT_TO_DELTA_F(pitch_bend, PITCH_BEND)
     EVENT_TO_DELTA_I(latency_ms, LATENCY)
     EVENT_TO_DELTA_F(tempo, TEMPO)
@@ -985,6 +986,7 @@ void reset_osc_params(struct synthinfo *psynth) {
     AMY_UNSET(psynth->trigger_phase);
     AMY_UNSET(psynth->sample_offset);
     AMY_UNSET(psynth->fit_ticks);
+    AMY_UNSET(psynth->fit_search);
     AMY_UNSET(psynth->logratio);
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
@@ -1576,6 +1578,7 @@ void play_delta(struct delta *d) {
         if (d->data.f < 0) AMY_UNSET(synth[d->osc]->fit_ticks);
         else synth[d->osc]->fit_ticks = d->data.f;
     }
+    DELTA_TO_SYNTH_I(FIT_SEARCH, fit_search)
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)
     DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)

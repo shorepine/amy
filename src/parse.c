@@ -783,6 +783,9 @@ int amy_parse_message(char * message, amy_event *e) {
                 } else if (arg[0] == 'F') {  // 'pF' is PCM fit (ticks).
                     e->fit_ticks = atoff(arg + 1);
                     ++pos;
+                } else if (arg[0] == 'S') {  // 'pS' is PCM fit grain search half-width.
+                    e->fit_search = atoi(arg + 1);
+                    ++pos;
                 } else {
                     e->preset = atoi(arg);
                 }

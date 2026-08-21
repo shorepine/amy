@@ -366,6 +366,7 @@ sub-letter after `p` addresses a PCM parameter instead.
 | ---- | ------------- | ----------------- | ---- | ----------- |
 | `po`   | `sample_offset` | `sample_offset` | uint 0 to BLOCK_SIZE-1 | PCM only. Start this note-on at a sample offset *within* the render block it fires in, leaving the head of the block silent. Events fire on block (256-sample) boundaries; `sample_offset` supplies the sub-block remainder, so slices of arbitrary length can be scheduled to butt-join sample-accurately (e.g. reconstructing a chopped break with no gaps). Sticky per osc like other params; set 0 to clear. |
 | `pF`   | `fit_ticks` | `fit` | float | PCM only, in-memory presets. Engage the granular time/pitch engine at the next note-on. `fit=N` (N>0): play the sample in exactly N sequencer ticks with a pitch-invariant time stretch; `note` still transposes without changing duration. Because the target is in ticks, it tracks `tempo` *while the note is sounding*, not just at note-on: change the tempo mid-note and the stretch rate follows, so the note still ends N ticks after it started. `fit=0`: time-invariant pitch shift — `note` transposes but the sample keeps its original duration. `fit=-1`: turn the engine off. Non-destructive and real-time (~2.5x the render cost of plain PCM). |
+| `pS`   | `fit_search` | `fit_search` | uint frames, 0 to 512 | PCM only, and only meaningful while the `fit` engine is running. Half-width, in input frames, of the WSOLA correlation search that aligns each new grain against the one still playing (see `fit` below). Default 64; `0` turns the search off entirely, leaving a fixed-grid overlap-add. Read every block, so it can be changed while a note sounds. Clamped to 512. |
 
 Two parameters turn AMY's PCM oscillators into a "real" sampler (see
 `experiments/sampler/` for worked examples):
@@ -392,6 +393,35 @@ Two parameters turn AMY's PCM oscillators into a "real" sampler (see
   targets every AMY platform. Looping modes (`ww`) work: the input
   timeline wraps at the loop marks. Streamed `disk_sample` presets can't
   `fit` (no random access).
+
+- **`fit_search` (`pS`)** sets how far that correlation search may roam. It
+  has to be able to reach half a period of the lowest pitch in the sample or
+  it can't find the aligned splice at all, and the default 64 frames only
+  covers periods down to about `AMY_SAMPLE_RATE/128` — ~345 Hz at 44.1 kHz.
+  Below that the aligner locks onto the nearest line of the comb spaced at the
+  hop rate (~86 Hz at 44.1 kHz) instead of the note: a 110 Hz tone stretched 2x
+  comes out at 141 Hz. `fit_search=256` puts it back at 110 Hz, and takes the
+  ratio of energy at the tone to everything else from −15 dB to +26 dB (a
+  440 Hz tone, already in reach of the default, goes from 20 dB to 38 dB —
+  `experiments/sampler/fit_search_test.py` measures both). The cost
+  is `(2 * fit_search + 1) * 64` multiplies per 512-sample hop — linear in the
+  setting, so 256 is 4x the default's search cost — which is why it is opt-in
+  rather than the default. Broadband material (drums, breaks) has no
+  periodicity to align to and does not care; leave it alone there.
+
+  The comparison window widens with the setting (it also has to span roughly a
+  period), but the number of taps stays at 64 and the stride opens up instead,
+  so the cost stays linear rather than quadratic. That decimation aliases —
+  acceptable because wide settings exist for bass, where the taps still land
+  many per period.
+
+  `fit_search=0` disables alignment and gives you a plain fixed-grid
+  overlap-add: every grain lands on the nominal hop no matter what the
+  waveform is doing. That is roughly what the 90s Akai samplers' CYCLIC time
+  stretch did, and it fails the same characteristic way — the splice error
+  repeats at exactly the hop rate, so the artifact is a stable pitched comb
+  rather than WSOLA's diffuse warble. On tonal material it is wrong by tens of
+  dB; as an effect it is the "sampler timestretch" sound.
 
 `fit` composes with `phase` to start a sample part-way through, which is what
 a "drop the playhead into the middle of a loop" transport needs. `phase` sets
