@@ -1066,8 +1066,10 @@ void reset_parametric(uint16_t bus) {
 // Params arrive range-clamped from play_delta(); loop bodies are call-free
 // so they take the Xtensa zero-overhead-loop form.  Returns the abs max of
 // what it wrote (folding can amplify a quiet input, so the pre-distortion
-// max must not be reused).  Pre-gain needs MUL6A_SS: drive * x overflows
-// MUL4_SS's [-16, 16) range and wraps sign.
+// max must not be reused).  Pre-gain uses SMULR6: a SILENT-head chain sum
+// runs several oscs' worth of full scale, so drive * x can pass MUL6A_SS's
+// [-64, 64) product range and wrap sign; SMULR6 is exact on 64-bit-mul
+// hardware, and its 32x32 fallback keeps [-128, 128).
 AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
                                 const dist_config_t *cfg, dist_state_t *st) {
     AMY_PROFILE_START(DIST_PROCESS)
@@ -1079,7 +1081,7 @@ AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
     case DIST_CLIP:
         for (uint16_t i = 0; i < len; ++i) {
             SAMPLE x = block[i];
-            SAMPLE v = MUL6A_SS(x, drive);
+            SAMPLE v = SMULR6(x, drive);
             if (v > F2S(1.0f)) v = F2S(1.0f);
             if (v < F2S(-1.0f)) v = F2S(-1.0f);
             // Cubic soft knee y = v - v^3/3: unity small-signal gain, 2/3 at the rails.
@@ -1093,7 +1095,7 @@ AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
     case DIST_FOLD:
         for (uint16_t i = 0; i < len; ++i) {
             SAMPLE x = block[i];
-            SAMPLE v = MUL6A_SS(x, drive);
+            SAMPLE v = SMULR6(x, drive);
             // Triangle wavefolder: y = 1 - |((v + 1) mod 4) - 2|, identity on [-1, 1].
             SAMPLE y;
 #ifdef AMY_USE_FIXEDPOINT
@@ -1148,7 +1150,7 @@ AMY_IRAM_ATTR SAMPLE dist_block(SAMPLE * block, uint16_t len,
             // y[n] = pole * y[n-1] + (hold[n] - hold[n-1]).
             yn1 = FILT_MUL_SS(pole, yn1);
             if (count == 0) {
-                SAMPLE v = MUL6A_SS(x, drive);
+                SAMPLE v = SMULR6(x, drive);
                 // Saturate before quantizing: keeps hold on the CLIP/FOLD
                 // level scale and the wet term inside MUL4_SS's [-16, 16).
                 if (v > F2S(1.0f)) v = F2S(1.0f);
