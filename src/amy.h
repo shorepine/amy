@@ -300,12 +300,12 @@ enum coefs{
 #define FILTER_LPF24 4
 #define FILTER_NOTCH 5
 #define FILTER_PHASER 6
-// synth[].dist_type values
-#define DIST_OFF 0
+// synth[].dist.stages bits - each stage toggles independently and enabled
+// stages stack in clip -> fold -> crush order.
 #define DIST_CLIP 1
 #define DIST_FOLD 2
-#define DIST_CRUSH 3
-// Pre-gain ceiling; dist_process computes drive * x with MUL6A_SS to hold it.
+#define DIST_CRUSH 4
+// Pre-gain ceiling, = 2^MAX_DIST_LOGDRIVE: the top of the drive coef rail.
 #define DIST_MAX_DRIVE 16.0f
 // synth[].wave values
 #define SINE 0
@@ -434,10 +434,14 @@ enum params{
     // to be VOLUME_BASE..VOLUME_BASE+n, which is what capped the bus count --
     // the ids would have run into MODE below.  77..98 are now free.
     VOLUME,                              // 71
-    // Per-osc distortion stage (see dist_process).
-    DIST_TYPE,                           // 72
-    DIST_DRIVE, DIST_BITS,               // 73, 74
-    DIST_RATE, DIST_MIX,                 // 75, 76
+    // Per-osc distortion stage (see dist_process); one enable per stage.
+    // Drive and mix are modulatable, so each claims a full coef vector out
+    // of the free block; 97..98 remain.
+    DIST_CLIP_EN,                        // 72
+    DIST_FOLD_EN, DIST_CRUSH_EN,         // 73, 74
+    DIST_BITS, DIST_RATE,                // 75, 76
+    DIST_LOGDRIVE,                       // 77..86
+    DIST_MIX=DIST_LOGDRIVE + NUM_COMBO_COEFS,  // 87..96
     MODE=99,                             // 99
     ALGO_SOURCE_START=100,               // 100..105
     ALGO_SOURCE_END=100+MAX_ALGO_OPS,    // 106
@@ -461,6 +465,12 @@ enum params{
     REVERB_LIVENESS,
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
+    // Per-bus distortion stage; bus in delta.osc like the params above.
+    // Same per-stage enables as the per-osc stage.
+    BUS_DIST_CLIP_EN,
+    BUS_DIST_FOLD_EN, BUS_DIST_CRUSH_EN,
+    BUS_DIST_DRIVE, BUS_DIST_BITS,
+    BUS_DIST_RATE, BUS_DIST_MIX,
     BUS,
     SAMPLE_OFFSET,              // PCM note-on start offset in samples within its block
     FIT,                        // PCM time-stretch/pitch-shift target in sequencer ticks
@@ -616,11 +626,17 @@ typedef struct amy_event {
     uint8_t algorithm;
     uint8_t filter_type;
     // Per-osc distortion ('G' distortion sub-commands on the wire).
-    uint8_t dist_type;
-    float dist_drive;
+    // One enable per stage, so an event can toggle one stage without
+    // naming the others.
+    uint8_t dist_clip;
+    uint8_t dist_fold;
+    uint8_t dist_crush;
     uint8_t dist_bits;
     uint16_t dist_rate;
-    float dist_mix;
+    // Like freq_coefs, the CONST coef is in the natural unit -- linear drive,
+    // 1 = unity -- and the modulation coefs are octaves of it.
+    float dist_drive_coefs[NUM_COMBO_COEFS];
+    float dist_mix_coefs[NUM_COMBO_COEFS];
     float eq_l;  // not in synth
     float eq_m;  // not in synth
     float eq_h;  // not in synth
@@ -662,6 +678,13 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
+    uint8_t bus_dist_clip;
+    uint8_t bus_dist_fold;
+    uint8_t bus_dist_crush;
+    float bus_dist_drive;
+    uint8_t bus_dist_bits;
+    uint16_t bus_dist_rate;
+    float bus_dist_mix;
 } amy_event;
 
 // Distortion stage.  Split from synthinfo so the same shaper can run at any
@@ -670,11 +693,11 @@ typedef struct amy_event {
 // DIST_CRUSH carries between blocks - its sample-and-hold plus the DC blocker
 // that follows it - and each independent signal path needs its own.
 typedef struct dist_config {
-    uint8_t type;    // One of the DIST_ values.
-    float drive;     // Pre-gain, 0..16 (fold depth for DIST_FOLD).
+    uint8_t stages;  // DIST_ stage bits; 0 = no stage enabled, distortion bypassed.
+    float drive;     // Pre-gain, 2^-4..2^4 (fold depth for DIST_FOLD), shared.
     uint8_t bits;    // DIST_CRUSH bit depth; >= 24 disables quantization.
     uint16_t rate;   // DIST_CRUSH sample-hold length in samples; 1 disables.
-    float mix;       // Wet/dry, 0..1.
+    float mix;       // Wet/dry per pass, 0..1, shared.
 } dist_config_t;
 
 typedef struct dist_state {
@@ -734,7 +757,13 @@ struct synthinfo {
     uint8_t filter_type;
     // Distortion, applied pre-filter.  On a normal osc this is the per-osc
     // timbral stage; on a SILENT chained-osc head it shapes the summed voice.
-    dist_config_t dist;
+    // Drive and mix are combined per block into msynth, so what an osc stores
+    // is the authored coef vectors, not a ready-made dist_config_t.
+    uint8_t dist_stages;
+    uint8_t dist_bits;
+    uint16_t dist_rate;
+    float dist_logdrive_coefs[NUM_COMBO_COEFS];
+    float dist_mix_coefs[NUM_COMBO_COEFS];
     uint16_t chained_osc;
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
@@ -781,6 +810,8 @@ struct mod_synthinfo {
     float last_filter_logfreq;  // filter freq history for smoothing.
     float resonance;
     float feedback;
+    float dist_drive;   // Combined per block; dist_block reads it once.
+    float dist_mix;
     uint16_t state;      // Used for PCM looping state.
     uint16_t next_state; // Used for PCM looping state.
     uint32_t loopstart;  // Used for PCM looping.
@@ -973,6 +1004,10 @@ typedef struct bus_state {
     reverb_state_t reverb;
     chorus_config_t chorus;
     echo_config_t echo;
+    // Distortion, first in the bus FX chain; per-channel state per
+    // dist_block's contract.
+    dist_config_t dist;
+    dist_state_t dist_state[AMY_MAX_CHANNELS];
 } bus_state_t;
 
 // global synth state
@@ -1078,6 +1113,8 @@ float logfreq_for_midi_note(float midi_note);
 float midi_note_for_logfreq(float logfreq);
 float logfreq_of_freq(float freq);
 float freq_of_logfreq(float logfreq);
+float logdrive_of_drive(float drive);
+float drive_of_logdrive(float logdrive);
 float portamento_ms_to_alpha(uint16_t portamento_ms);
 uint16_t alpha_to_portamento_ms(float alpha);
 int8_t check_init(amy_err_t (*fn)(), const char *name);
@@ -1418,6 +1455,7 @@ extern SAMPLE filter_process(SAMPLE * block, uint16_t osc, SAMPLE max_value);
 extern SAMPLE dist_block(SAMPLE * block, uint16_t len,
                          const dist_config_t *cfg, dist_state_t *st);
 extern SAMPLE dist_process(SAMPLE * block, uint16_t osc);
+extern void dist_process_bus(uint16_t bus, SAMPLE *busbuf);
 extern void parametric_eq_process(uint16_t bus, SAMPLE *block);
 extern void reset_filter(uint16_t osc);
 extern void reset_parametric(uint16_t bus);

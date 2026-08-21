@@ -244,7 +244,8 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('eg0', 'AL'), ('eg1', 'BL'),  # Aliases for bp0 and bp1
     ('eg0_type', 'TI'), ('eg1_type', 'XI'), ('debug', 'DI'), ('chained_osc', 'cI'),
     ('mod_source', 'LL'),  ('eq', 'xL'), ('filter_type', 'GI'), ('ratio', 'IF'), ('latency_ms', 'NI'),
-    ('dist_clip', 'GCI'), ('dist_fold', 'GFI'), ('dist_crush', 'GHL'), ('dist_drive', 'GDF'), ('dist_mix', 'GMF'),
+    ('dist_clip', 'GCI'), ('dist_fold', 'GFI'), ('dist_crush', 'GHL'), ('dist_drive', 'GDC'), ('dist_mix', 'GMC'),
+    ('bus_dist_clip', 'JCI'), ('bus_dist_fold', 'JFI'), ('bus_dist_crush', 'JHL'), ('bus_dist_drive', 'JDF'), ('bus_dist_mix', 'JMF'),
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
