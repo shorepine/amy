@@ -1,0 +1,109 @@
+name: Android AMY
+
+on:
+  pull_request:
+    paths:
+      - "android/**"
+      - "src/**"
+      - "tests/test_amy_unix_socket.c"
+      - "tests/run_amy_unix_socket_test.sh"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  socket-transport:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and run private Unix socket test
+        run: bash tests/run_amy_unix_socket_test.sh
+
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Build AMY Android AAR and hello-world APK
+        working-directory: android
+        run: gradle :amy-service:assembleDebug :hello-world:assembleDebug --stacktrace
+
+      - name: Upload AMY Android AAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-service-debug-aar
+          path: android/amy-service/build/outputs/aar/amy-service-debug.aar
+          if-no-files-found: error
+
+      - name: Upload AMY hello-world APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-hello-world-debug-apk
+          path: android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+          if-no-files-found: error
+
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Emulator end-to-end smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
+          script: |
+            adb uninstall org.amy.hello >/dev/null 2>&1 || true
+            adb install android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+            adb logcat -c
+            adb shell am start -W -n org.amy.hello/.MainActivity
+            sleep 10
+            adb logcat -d -s AmyAndroid:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-first.log
+            test "$(grep -c 'AMY/Oboe started' /tmp/amy-first.log)" -eq 1
+            grep -q 'AMY output route: deviceId=' /tmp/amy-first.log
+            test "$(grep -c 'C scale complete' /tmp/amy-first.log)" -eq 1
+            ! grep -q 'C scale failed' /tmp/amy-first.log
+            grep -q 'wire: v0w0V2.0Z' /tmp/amy-first.log
+            test "$(grep -Ec 'wire: v0n(60|62|64|65|67|69|71|72)l1Z' /tmp/amy-first.log)" -eq 8
+            grep -q 'wire: v0n60l1Z' /tmp/amy-first.log
+            grep -q 'wire: v0n72l1Z' /tmp/amy-first.log
+            adb uninstall org.amy.hello
+            adb install android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+            adb logcat -c
+            adb shell am start -W -n org.amy.hello/.MainActivity
+            sleep 10
+            adb logcat -d -s AmyAndroid:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-second.log
+            test "$(grep -c 'AMY/Oboe started' /tmp/amy-second.log)" -eq 1
+            grep -q 'AMY output route: deviceId=' /tmp/amy-second.log
+            test "$(grep -c 'C scale complete' /tmp/amy-second.log)" -eq 1
+            ! grep -q 'C scale failed' /tmp/amy-second.log
+            grep -q 'wire: v0w0V2.0Z' /tmp/amy-second.log
+            test "$(grep -Ec 'wire: v0n(60|62|64|65|67|69|71|72)l1Z' /tmp/amy-second.log)" -eq 8
+            grep -q 'wire: v0n60l1Z' /tmp/amy-second.log
+            grep -q 'wire: v0n72l1Z' /tmp/amy-second.log
