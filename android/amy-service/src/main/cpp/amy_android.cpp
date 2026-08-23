@@ -12,6 +12,8 @@
 #include <mutex>
 #include <thread>
 
+#include "amy_android_capture.h"
+
 extern "C" {
 #include "amy.h"
 #include "amy_unix_socket.h"
@@ -72,6 +74,12 @@ public:
 
         amy_start(config);
         mAmyStarted = true;
+
+        // The helper remains dormant unless the hello-world test has created
+        // its one-shot private capture marker. It captures the exact samples
+        // returned by AMY and the exact I16 samples handed to Oboe.
+        mCapture = std::make_unique<AmyAndroidAudioCapture>(
+            socketPath, AMY_SAMPLE_RATE, AMY_NCHANS);
 
         oboe::AudioStreamBuilder builder;
         builder.setDirection(oboe::Direction::Output);
@@ -188,6 +196,12 @@ public:
             mStream.reset();
         }
 
+        // No callback can touch the capture buffers after the stream closes.
+        if (mCapture) {
+            mCapture->stop();
+            mCapture.reset();
+        }
+
         cleanupSocketAndAmy();
         mAudioCallbackSeen.store(false, std::memory_order_release);
         mBlock = nullptr;
@@ -206,6 +220,7 @@ public:
         }
 
         mAudioCallbackSeen.store(true, std::memory_order_release);
+        if (mCapture && mCapture->enabled()) mCapture->beginCallback(numFrames);
 
         int32_t outputFrame = 0;
         while (outputFrame < numFrames) {
@@ -223,6 +238,10 @@ public:
 
             const int32_t available = AMY_BLOCK_SIZE - mBlockFrame;
             const int32_t frames = std::min(available, numFrames - outputFrame);
+            if (mCapture && mCapture->enabled()) {
+                mCapture->captureAmyChunk(
+                    mBlock + mBlockFrame * AMY_NCHANS, frames, outputFrame);
+            }
             std::memcpy(
                 output + outputFrame * AMY_NCHANS,
                 mBlock + mBlockFrame * AMY_NCHANS,
@@ -231,6 +250,7 @@ public:
             mBlockFrame += frames;
         }
 
+        if (mCapture && mCapture->enabled()) mCapture->finishCallback(output, numFrames);
         return oboe::DataCallbackResult::Continue;
     }
 
@@ -281,6 +301,7 @@ private:
     bool mAmyStarted = false;
     std::atomic<amy_unix_socket_server_t *> mSocket{nullptr};
     std::shared_ptr<oboe::AudioStream> mStream;
+    std::unique_ptr<AmyAndroidAudioCapture> mCapture;
     int16_t *mBlock = nullptr;
     int32_t mBlockFrame = AMY_BLOCK_SIZE;
 };

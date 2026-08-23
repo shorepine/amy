@@ -31,6 +31,7 @@ set(AMY_SOURCES
 
 add_library(amy_android SHARED
     amy_android.cpp
+    amy_android_capture.cpp
     amy_android_profile.cpp
     ${AMY_SOURCES}
 )

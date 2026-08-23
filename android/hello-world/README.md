@@ -6,7 +6,7 @@ On launch it:
 
 1. starts `org.amy.audio.AmyService` from the `amy-service` AAR/module;
 2. retries a connection to the app-private `<filesDir>/amy.sock` Unix-domain `SOCK_SEQPACKET` socket until the AMY/Oboe service publishes its ready socket;
-3. configures raw oscillator 0 as a sine wave and sets AMY global output gain to `V2.0`;
+3. configures raw oscillator 0 as a sine wave and sets AMY global output gain to `V10.0`;
 4. waits 30 ms so that setup is committed on a fresh AMY instance before the first note-on;
 5. sends AMY wire commands for C4, D4, E4, F4, G4, A4, B4, C5;
 6. shows `C scale complete` when all packets have been sent.
@@ -20,10 +20,10 @@ The generic AMY Android service also logs Oboe's actual output device ID and res
 Setup:
 
 ```text
-v0w0V2.0Z
+v0w0V10.0Z
 ```
 
-`V` is AMY's global output gain. It is intentionally set above unity in this audible hello-world test; it is not an oscillator-local amplitude control.
+`V` is AMY's bus/master output-volume control, not an oscillator-local amplitude control. AMY's final mixer scales this 0..10 control by 0.1, so `V10.0` selects full master gain for this audible hello-world test. `V2.0`, used by an earlier version of this example, was only 20% linear master gain (about -14 dB relative to `V10.0`).
 
 Notes use MIDI note numbers and velocity, e.g. middle C:
 
@@ -48,4 +48,4 @@ APK:
 hello-world/build/outputs/apk/debug/hello-world-debug.apk
 ```
 
-The CI Android emulator smoke test builds the AAR/APK and performs two clean install/launch cycles. Each cycle must show exactly one AMY/Oboe startup, an output-route diagnostic, exactly one completed C scale, all eight note-on packets, and no socket failure.
+The CI Android emulator smoke test builds the AAR/APK and performs two clean install/launch cycles. Each cycle must show exactly one AMY/Oboe startup, an output-route diagnostic, exactly one completed C scale, all eight note-on packets, and no socket failure. The Android audio-level regression also captures the raw AMY signed-16-bit render stream and the exact signed-16-bit callback buffer handed to Oboe, verifies that they are sample-for-sample identical, and checks their measured peak/RMS level.

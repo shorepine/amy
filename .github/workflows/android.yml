@@ -7,6 +7,7 @@ on:
       - "src/**"
       - "tests/test_amy_unix_socket.c"
       - "tests/run_amy_unix_socket_test.sh"
+      - "tests/check_android_audio_capture.py"
       - ".github/workflows/android.yml"
 
 permissions:
@@ -84,26 +85,51 @@ jobs:
             adb logcat -c
             adb shell am start -W -n org.amy.hello/.MainActivity
             sleep 10
-            adb logcat -d -s AmyAndroid:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-first.log
+            adb logcat -d -s AmyAndroid:I AmyAudioCapture:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-first.log
             test "$(grep -c 'AMY/Oboe started' /tmp/amy-first.log)" -eq 1
             grep -q 'AMY output route: deviceId=' /tmp/amy-first.log
             test "$(grep -c 'C scale complete' /tmp/amy-first.log)" -eq 1
             ! grep -q 'C scale failed' /tmp/amy-first.log
-            grep -q 'wire: v0w0V2.0Z' /tmp/amy-first.log
+            grep -q 'wire: v0w0V10.0Z' /tmp/amy-first.log
             test "$(grep -Ec 'wire: v0n(60|62|64|65|67|69|71|72)l1Z' /tmp/amy-first.log)" -eq 8
             grep -q 'wire: v0n60l1Z' /tmp/amy-first.log
             grep -q 'wire: v0n72l1Z' /tmp/amy-first.log
+            grep -q 'Audio capture complete:' /tmp/amy-first.log
+
             adb uninstall org.amy.hello
             adb install android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
             adb logcat -c
             adb shell am start -W -n org.amy.hello/.MainActivity
             sleep 10
-            adb logcat -d -s AmyAndroid:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-second.log
+            adb logcat -d -s AmyAndroid:I AmyAudioCapture:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-second.log
             test "$(grep -c 'AMY/Oboe started' /tmp/amy-second.log)" -eq 1
             grep -q 'AMY output route: deviceId=' /tmp/amy-second.log
             test "$(grep -c 'C scale complete' /tmp/amy-second.log)" -eq 1
             ! grep -q 'C scale failed' /tmp/amy-second.log
-            grep -q 'wire: v0w0V2.0Z' /tmp/amy-second.log
+            grep -q 'wire: v0w0V10.0Z' /tmp/amy-second.log
             test "$(grep -Ec 'wire: v0n(60|62|64|65|67|69|71|72)l1Z' /tmp/amy-second.log)" -eq 8
             grep -q 'wire: v0n60l1Z' /tmp/amy-second.log
             grep -q 'wire: v0n72l1Z' /tmp/amy-second.log
+            grep -q 'Audio capture complete:' /tmp/amy-second.log
+
+            mkdir -p android/audio-capture
+            adb exec-out run-as org.amy.hello cat files/amy-render.wav > android/audio-capture/amy-render.wav
+            adb exec-out run-as org.amy.hello cat files/amy-oboe.wav > android/audio-capture/amy-oboe.wav
+            adb exec-out run-as org.amy.hello cat files/amy-audio-levels.txt > android/audio-capture/amy-audio-levels.txt
+            test -s android/audio-capture/amy-render.wav
+            test -s android/audio-capture/amy-oboe.wav
+            test -s android/audio-capture/amy-audio-levels.txt
+            cat android/audio-capture/amy-audio-levels.txt
+
+      - name: Analyze captured AMY and Oboe audio levels
+        run: |
+          python3 tests/check_android_audio_capture.py \
+            android/audio-capture/amy-render.wav \
+            android/audio-capture/amy-oboe.wav
+
+      - name: Upload Android audio captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-android-audio-capture
+          path: android/audio-capture/
+          if-no-files-found: error

@@ -2,6 +2,7 @@ package org.amy.hello;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -11,10 +12,13 @@ import android.widget.TextView;
 import org.amy.audio.AmyService;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
+    private static final String TAG = "AmyHelloWorld";
+    private static final String AUDIO_CAPTURE_MARKER = "amy-audio-capture.enable";
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
 
     private TextView status;
@@ -61,6 +65,18 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
         setContentView(root);
+
+        // The hello-world app is also the Android integration test client. Arm
+        // one diagnostic capture before starting the service. The generic AAR
+        // does not capture anything unless this private marker exists.
+        try {
+            File marker = new File(getFilesDir(), AUDIO_CAPTURE_MARKER);
+            if (!marker.createNewFile() && !marker.isFile()) {
+                Log.e(TAG, "Unable to arm AMY audio capture: " + marker);
+            }
+        } catch (IOException ex) {
+            Log.e(TAG, "Unable to arm AMY audio capture", ex);
+        }
 
         AmyService.start(this);
         if (state == null) {

@@ -54,10 +54,11 @@ int play_c_scale(const char *path) {
     int fd = connect_with_retry(path);
     if (fd < 0) return fd;
 
-    // Raw oscillator 0, sine wave. V is AMY's global output gain, not an
-    // oscillator-local amplitude; use 2.0 here so the hello-world is easy to hear.
+    // Raw oscillator 0, sine wave. AMY's V control is a 0..10 bus/master
+    // volume scale; the final mixer multiplies V by 0.1. Use V10.0 so this
+    // audible hello-world exercises the full AMY output level.
     // Every packet is an ordinary AMY wire command sent through amy.sock.
-    int rc = send_wire(fd, "v0w0V2.0Z");
+    int rc = send_wire(fd, "v0w0V10.0Z");
     if (rc < 0) {
         close(fd);
         return rc;
