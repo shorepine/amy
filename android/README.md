@@ -23,11 +23,13 @@ Android :amy service process
           AAudio
 ```
 
-The AAR is intended to be embedded by an Android application that wants to use
-AMY as its local synth engine. The client can be written with the Android SDK,
-Kotlin/Java, native code, Qt, another framework, or any other environment able
-to start the service and use an Android Unix-domain `SOCK_SEQPACKET` socket.
-AMY itself has no dependency on the client UI framework.
+The AAR is embedded in an Android application package. Its private
+`AmyAutoStartProvider` starts the separate `:amy` service process as part of
+Android package initialization; client application code does not start or stop
+AMY. A client can therefore be Java/Kotlin, native code, Godot, Qt, another
+framework, or any other environment that can package an Android AAR and open an
+Android Unix-domain `SOCK_SEQPACKET` socket. No AMY headers, AMY source, JNI
+bindings, or language-specific AMY API are required in the client code.
 
 The service declaration uses `android:exported="false"` and
 `android:process=":amy"`. Consequently the service runs in a separate process
@@ -36,7 +38,9 @@ under the same application UID.
 
 The service only accepts the exact pathname `<Context.getFilesDir()>/amy.sock`.
 The native transport creates that node mode `0600` and additionally verifies
-accepted peers with `SO_PEERCRED` against the service effective UID. See
+accepted peers with `SO_PEERCRED` against the service effective UID. The AAR
+must therefore be packaged into the same application/UID as the client; this is
+intentional and preserves the private-socket security model. See
 `docs/android_unix_socket.md` for the transport/security contract.
 
 ## Audio profile
@@ -67,19 +71,20 @@ reserves 16 Karplus-Strong oscillators.
 
 ## JNI boundary
 
-JNI is lifecycle glue only. `AmyService` calls the native library to start and
-stop AMY/Oboe with the validated socket pathname. Notes, patches, sequencer
-commands and other musical control do not cross JNI; they use the unchanged AMY
-wire protocol through `amy.sock`.
+JNI exists only inside the service implementation. `AmyService` calls the
+native library to start and stop AMY/Oboe and to report its actual Oboe output
+device. Musical control never crosses JNI: notes, patches, sequencer commands,
+and other control are unchanged AMY wire packets sent through `amy.sock`.
 
-The client-facing architecture is therefore deliberately transport-oriented:
+The client-facing architecture is deliberately transport-only:
 
 ```text
 client application -> amy.sock -> AMY/Oboe service
 ```
 
-A client does not need AMY-specific JNI bindings. It only needs to start the
-service and exchange AMY wire packets over the private socket.
+The minimal Java hello-world demonstrates this literally with Android's public
+`LocalSocket(SOCKET_SEQPACKET)` API. It neither imports `AmyService` nor loads a
+native client library.
 
 ## Socket client contract
 
@@ -110,19 +115,16 @@ introspection/status replies when that functionality is integrated.
 A client application needs to:
 
 1. package the `amy-service` AAR/module in the Android application;
-2. start `org.amy.audio.AmyService` while synthesis is required;
-3. obtain the application's actual private files directory rather than
+2. obtain the application's actual private files directory rather than
    hard-code `/data/user/...`;
-4. retry an `AF_UNIX` / `SOCK_SEQPACKET` connection to `<filesDir>/amy.sock`
+3. retry an `AF_UNIX` / `SOCK_SEQPACKET` connection to `<filesDir>/amy.sock`
    until the service publishes its ready socket;
-5. send one ordinary AMY wire message per packet;
-6. optionally receive response packets over the same bidirectional socket;
-7. stop and reconnect cleanly across Android application/audio lifecycle
-   events.
+4. send one ordinary AMY wire message per packet;
+5. optionally receive response packets over the same bidirectional socket;
+6. reconnect cleanly when its own Android/application lifecycle requires it.
 
-The transport deliberately does not prescribe a programming language or UI
-framework. A minimal example client is provided separately by the Android
-hello-world application.
+Starting AMY is deliberately absent from the client contract. The packaged AAR
+owns that Android lifecycle responsibility.
 
 ## Building the AAR
 
@@ -162,8 +164,9 @@ oversized-packet rejection, cleanup, and protection against deleting an
 existing non-socket path.
 
 `.github/workflows/android.yml` runs that regression plus a complete Android
-AAR/NDK/Oboe build. The earlier `.github/workflows/android-unix-socket.yml`
-continues to isolate the transport regression itself.
+AAR/NDK/Oboe build and emulator end-to-end test. The emulator arms its own
+one-shot audio-capture marker before starting the client; the hello-world
+application itself remains transport-only.
 
 ## Hardware-test items
 

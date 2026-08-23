@@ -5,7 +5,6 @@ plugins {
 android {
     namespace = "org.amy.hello"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "org.amy.hello"
@@ -13,26 +12,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
-        ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-            }
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 }
 
 dependencies {
+    // Package the independent :amy Android service in the APK. MainActivity
+    // has no Java/JNI dependency on AmyService or on AMY itself; it only uses
+    // the app-private amy.sock wire transport.
     implementation(project(":amy-service"))
 }

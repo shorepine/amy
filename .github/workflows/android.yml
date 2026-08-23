@@ -50,6 +50,13 @@ jobs:
         working-directory: android
         run: gradle :amy-service:assembleDebug :hello-world:assembleDebug --stacktrace
 
+      - name: Verify transport-only hello-world packaging
+        run: |
+          APK=android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+          test -s "$APK"
+          ! unzip -l "$APK" | grep -q 'libamy_hello_client.so'
+          test ! -e android/hello-world/src/main/cpp
+
       - name: Upload AMY Android AAR
         uses: actions/upload-artifact@v4
         with:
@@ -82,12 +89,15 @@ jobs:
           script: |
             adb uninstall org.amy.hello >/dev/null 2>&1 || true
             adb install android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+            adb shell run-as org.amy.hello mkdir -p files
+            adb shell run-as org.amy.hello touch files/amy-audio-capture.enable
             adb logcat -c
             adb shell am start -W -n org.amy.hello/.MainActivity
             sleep 10
             adb logcat -d -s AmyAndroid:I AmyAudioCapture:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-first.log
             test "$(grep -c 'AMY/Oboe started' /tmp/amy-first.log)" -eq 1
             grep -q 'AMY output route: deviceId=' /tmp/amy-first.log
+            grep -q 'connected to amy.sock' /tmp/amy-first.log
             test "$(grep -c 'C scale complete' /tmp/amy-first.log)" -eq 1
             ! grep -q 'C scale failed' /tmp/amy-first.log
             grep -q 'wire: v0w0V10.0Z' /tmp/amy-first.log
@@ -98,12 +108,15 @@ jobs:
 
             adb uninstall org.amy.hello
             adb install android/hello-world/build/outputs/apk/debug/hello-world-debug.apk
+            adb shell run-as org.amy.hello mkdir -p files
+            adb shell run-as org.amy.hello touch files/amy-audio-capture.enable
             adb logcat -c
             adb shell am start -W -n org.amy.hello/.MainActivity
             sleep 10
             adb logcat -d -s AmyAndroid:I AmyAudioCapture:I AmyService:I AmyHelloWorld:I '*:S' > /tmp/amy-second.log
             test "$(grep -c 'AMY/Oboe started' /tmp/amy-second.log)" -eq 1
             grep -q 'AMY output route: deviceId=' /tmp/amy-second.log
+            grep -q 'connected to amy.sock' /tmp/amy-second.log
             test "$(grep -c 'C scale complete' /tmp/amy-second.log)" -eq 1
             ! grep -q 'C scale failed' /tmp/amy-second.log
             grep -q 'wire: v0w0V10.0Z' /tmp/amy-second.log

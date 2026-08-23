@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <provider
+            android:name="org.amy.audio.AmyAutoStartProvider"
+            android:authorities="${applicationId}.amy-autostart"
+            android:exported="false"
+            android:initOrder="100" />
+
         <service
             android:name="org.amy.audio.AmyService"
             android:exported="false"
