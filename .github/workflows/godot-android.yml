@@ -1,0 +1,189 @@
+name: Godot Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "godot/**"
+      - "android/amy-service/**"
+      - "src/amy_unix_socket.*"
+      - "tests/check_android_audio_capture.py"
+      - ".github/workflows/godot-android.yml"
+  pull_request:
+    paths:
+      - "godot/**"
+      - "android/amy-service/**"
+      - "src/amy_unix_socket.*"
+      - "tests/check_android_audio_capture.py"
+      - ".github/workflows/godot-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;35.0.1" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Prepare Android service and shared Godot API
+        run: bash godot/android-hello-world/prepare.sh
+
+      - name: Verify transport-only Godot packaging inputs
+        run: |
+          AAR=godot/android-hello-world/addons/amy_android/amy-service-debug.aar
+          test -s "$AAR"
+          cmp godot/amy.gd godot/android-hello-world/amy.gd
+          unzip -l "$AAR" | tee /tmp/amy-aar.txt
+          grep -q 'jni/arm64-v8a/libamy_android.so' /tmp/amy-aar.txt
+          grep -q 'jni/x86_64/libamy_android.so' /tmp/amy-aar.txt
+          ! grep -q 'libamy_android_client.so' /tmp/amy-aar.txt
+          unzip -p "$AAR" classes.jar > /tmp/amy-classes.jar
+          unzip -l /tmp/amy-classes.jar | tee /tmp/amy-classes.txt
+          grep -q 'org/amy/audio/AmyClient.class' /tmp/amy-classes.txt
+          ! grep -q 'JavaClassWrapper' godot/android-hello-world/main.gd
+          ! grep -q 'AmyClient' godot/android-hello-world/main.gd
+          ! grep -q 'sendWire' godot/android-hello-world/main.gd
+          ! grep -Eq '^android\.' godot/amy.gdextension
+          test ! -e godot/android-hello-world/amy.gdextension
+          test ! -d godot/android-hello-world/addons/amy/bin
+
+      - name: Install Godot 4.7.2 and Android export templates
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          GODOT_BIN="$(find /tmp/godot -maxdepth 1 -type f -name 'Godot*' | head -n1)"
+          chmod +x "$GODOT_BIN"
+          sudo cp "$GODOT_BIN" /usr/local/bin/godot
+
+          curl -L --fail --retry 3 -o /tmp/godot-templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz
+          rm -rf /tmp/godot-templates
+          mkdir -p /tmp/godot-templates
+          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          cp -a /tmp/godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+
+      - name: Import project and reject GDScript errors
+        run: |
+          godot --headless --path godot/android-hello-world --import --quit 2>&1 | tee /tmp/godot-import.log
+          ! grep -q 'SCRIPT ERROR' /tmp/godot-import.log
+          ! grep -q 'ERROR: Failed to load script' /tmp/godot-import.log
+
+      - name: Export Android APKs
+        run: |
+          mkdir -p godot/android-hello-world/build
+          godot --headless --path godot/android-hello-world --install-android-build-template \
+            --export-debug "Android CI x86_64" build/amy-godot-android-x86_64.apk
+          godot --headless --path godot/android-hello-world \
+            --export-debug "Android ARM64" build/amy-godot-android-arm64.apk
+          test -s godot/android-hello-world/build/amy-godot-android-x86_64.apk
+          test -s godot/android-hello-world/build/amy-godot-android-arm64.apk
+
+      - name: Verify APKs contain only the service AMY implementation
+        run: |
+          ARM=godot/android-hello-world/build/amy-godot-android-arm64.apk
+          X86=godot/android-hello-world/build/amy-godot-android-x86_64.apk
+          unzip -l "$ARM" | tee /tmp/arm-apk.txt
+          grep -q 'lib/arm64-v8a/libamy_android.so' /tmp/arm-apk.txt
+          ! grep -q 'libamy_android_client.so' /tmp/arm-apk.txt
+          test "$(grep -Ec 'lib/arm64-v8a/libamy[^ ]*\.so' /tmp/arm-apk.txt)" -eq 1
+          ! zipinfo -1 "$ARM" | grep -q 'amy.gdextension'
+
+          unzip -l "$X86" | tee /tmp/x86-apk.txt
+          grep -q 'lib/x86_64/libamy_android.so' /tmp/x86-apk.txt
+          ! grep -q 'libamy_android_client.so' /tmp/x86-apk.txt
+          test "$(grep -Ec 'lib/x86_64/libamy[^ ]*\.so' /tmp/x86-apk.txt)" -eq 1
+          ! zipinfo -1 "$X86" | grep -q 'amy.gdextension'
+
+      - name: Upload ARM64 test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-godot-android-arm64
+          path: godot/android-hello-world/build/amy-godot-android-arm64.apk
+          if-no-files-found: error
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Amy.gd socket/audio smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
+          script: |
+            set -e
+            adb uninstall org.amy.godothello >/dev/null 2>&1 || true
+            adb install godot/android-hello-world/build/amy-godot-android-x86_64.apk
+            adb shell run-as org.amy.godothello mkdir -p files
+            adb shell run-as org.amy.godothello touch files/amy-audio-capture.enable
+            adb logcat -c
+            adb shell am start -W -n org.amy.godothello/com.godot.game.GodotAppLauncher || true
+            sleep 12
+            adb logcat -d > /tmp/amy-godot.log
+            adb shell ps -A > /tmp/amy-processes.txt
+
+            # This is deliberately an AMY transport/audio regression, not a Godot
+            # renderer regression. Godot/SwiftShader UI errors after these events
+            # are irrelevant as long as Amy.gd reached the service and audio exists.
+            grep -q 'AMY listening on private socket' /tmp/amy-godot.log
+            grep -q 'AMY/Oboe started:' /tmp/amy-godot.log
+            grep -q 'AMY Android connected to amy.sock' /tmp/amy-godot.log
+            grep -q 'Godot Amy.gd Android backend ready' /tmp/amy-godot.log
+            grep -q 'AMY Android wire: v0w0V10' /tmp/amy-godot.log
+            grep -q 'AMY Android wire: v0n60l1' /tmp/amy-godot.log
+            ! grep -q 'AmyClient.sendWire exception:' /tmp/amy-godot.log
+            ! grep -q 'amy.sock send failed:' /tmp/amy-godot.log
+            grep -q 'org.amy.godothello:amy' /tmp/amy-processes.txt
+
+            mkdir -p android/godot-audio-capture
+            adb exec-out run-as org.amy.godothello cat files/amy-render.wav > android/godot-audio-capture/amy-render.wav
+            adb exec-out run-as org.amy.godothello cat files/amy-oboe.wav > android/godot-audio-capture/amy-oboe.wav
+            test -s android/godot-audio-capture/amy-render.wav
+            test -s android/godot-audio-capture/amy-oboe.wav
+
+      - name: Analyze captured audio
+        run: |
+          python3 tests/check_android_audio_capture.py \
+            android/godot-audio-capture/amy-render.wav \
+            android/godot-audio-capture/amy-oboe.wav
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-godot-android-diagnostics
+          path: |
+            /tmp/amy-godot.log
+            /tmp/amy-processes.txt
+            android/godot-audio-capture/
+          if-no-files-found: warn
