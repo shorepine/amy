@@ -3,7 +3,8 @@ extends Node
 ## AMY Synthesizer for Godot.
 ##
 ## High-level GDScript API that mirrors AMY's Python interface.
-## Works on native (GDExtension) and web (WASM via JavaScriptBridge).
+## Works on native (GDExtension), Android (private AMY service socket), and web
+## (WASM via JavaScriptBridge).
 ##
 ## Usage:
 ##   var amy := Amy.new()
@@ -13,6 +14,9 @@ extends Node
 ##
 ## Or use wire protocol directly:
 ##   amy.send_raw("v0w0f440l1")
+
+signal backend_ready
+signal backend_error(message: String)
 
 # ============================================================
 #  Wave types
@@ -81,20 +85,31 @@ const ENVELOPE_TRUE_EXPONENTIAL: int = 3
 @export var max_voices: int = 64
 ## Maximum number of synths.
 @export var max_synths: int = 64
+## Log each successfully sent Android wire packet. Intended for diagnostics/tests.
+@export var debug_wire: bool = false
 
 # ============================================================
-#  Internals — audio bridge
+#  Internals — audio / transport bridge
 # ============================================================
 var _synth: Node = null
 var _stream_player: AudioStreamPlayer = null
 var _playback: AudioStreamGeneratorPlayback = null
 var _started: bool = false
 var _is_web: bool = false
+var _is_android: bool = false
+# Deliberately leave Java wrappers as Variant. Typing the wrapped class as
+# Object makes GDScript bind connect() to Object.connect(signal, callable)
+# instead of dynamically dispatching to AmyClient.connect(Context).
+var _amy_client
+var _android_context
 
 func _ready() -> void:
 	_is_web = OS.get_name() == "Web"
+	_is_android = OS.get_name() == "Android"
 	if _is_web:
 		_init_web()
+	elif _is_android:
+		_init_android()
 	else:
 		_init_native()
 
@@ -103,7 +118,9 @@ func _init_native() -> void:
 		_synth = ClassDB.instantiate(&"AmySynth")
 		add_child(_synth)
 	else:
-		push_warning("AmySynth GDExtension not loaded — audio disabled")
+		var message := "AmySynth GDExtension not loaded — audio disabled"
+		push_warning(message)
+		backend_error.emit(message)
 		return
 
 	# Apply config before starting
@@ -132,6 +149,45 @@ func _init_native() -> void:
 	_stream_player.play()
 	_playback = _stream_player.get_stream_playback() as AudioStreamGeneratorPlayback
 	_started = true
+	backend_ready.emit()
+
+func _init_android() -> void:
+	# The AAR owns AmyService lifecycle. Amy.gd is only an ordinary same-UID
+	# client of filesDir/amy.sock; it never starts or stops the service.
+	var runtime = Engine.get_singleton("AndroidRuntime")
+	if runtime == null:
+		_android_fail("AndroidRuntime unavailable")
+		return
+
+	_android_context = runtime.getApplicationContext()
+	if _android_context == null:
+		_android_fail("Android application context unavailable")
+		return
+
+	_amy_client = JavaClassWrapper.wrap("org.amy.audio.AmyClient")
+	if _amy_client == null:
+		_android_fail("AmyClient class unavailable")
+		return
+	if not _amy_client.has_java_method("connect") or not _amy_client.has_java_method("sendWire") or not _amy_client.has_java_method("close"):
+		_android_fail("AmyClient methods unavailable")
+		return
+
+	# The service publishes amy.sock only after Oboe has delivered its first
+	# realtime callback, so a successful connect is also the readiness boundary.
+	for _attempt in range(200):
+		var rc: int = int(_amy_client.connect(_android_context))
+		var exception = JavaClassWrapper.get_exception()
+		if exception != null:
+			_android_fail("AmyClient.connect exception: %s" % str(exception))
+			return
+		if rc == 0:
+			_started = true
+			print("AMY Android connected to amy.sock")
+			backend_ready.emit()
+			return
+		await get_tree().create_timer(0.05).timeout
+
+	_android_fail("Could not connect to amy.sock")
 
 func _init_web() -> void:
 	# Pass config to JS bridge before AMY starts
@@ -144,12 +200,15 @@ func _init_web() -> void:
 		if ready:
 			_started = true
 			print("AMY web synth ready")
+			backend_ready.emit()
 			return
 		await get_tree().create_timer(0.1).timeout
-	push_warning("AMY web module failed to load after 10 s")
+	var message := "AMY web module failed to load after 10 s"
+	push_warning(message)
+	backend_error.emit(message)
 
 func _process(_delta: float) -> void:
-	if _started and not _is_web:
+	if _started and not _is_web and not _is_android:
 		_fill_audio()
 
 func _fill_audio() -> void:
@@ -162,8 +221,18 @@ func _fill_audio() -> void:
 		_playback.push_buffer(buffer as PackedVector2Array)
 
 func _exit_tree() -> void:
-	if not _is_web and _synth:
+	if _is_android:
+		if _amy_client != null:
+			_amy_client.close()
+		_amy_client = null
+		_started = false
+	elif not _is_web and _synth:
 		_synth.call("stop")
+
+func _android_fail(message: String) -> void:
+	_started = false
+	push_error(message)
+	backend_error.emit(message)
 
 # ============================================================
 #  Public API
@@ -202,7 +271,18 @@ func message(params: Dictionary) -> String:
 func send_raw(msg: String) -> void:
 	if not _started or msg.is_empty():
 		return
-	if _is_web:
+	if _is_android:
+		var rc: int = int(_amy_client.sendWire(msg))
+		var exception = JavaClassWrapper.get_exception()
+		if exception != null:
+			_android_fail("AmyClient.sendWire exception: %s" % str(exception))
+			return
+		if rc != 0:
+			_android_fail("amy.sock send failed: %d" % rc)
+			return
+		if debug_wire:
+			print("AMY Android wire: %s" % msg)
+	elif _is_web:
 		var safe: String = msg.replace("\\", "\\\\").replace("'", "\\'")
 		JavaScriptBridge.eval("godot_amy_send('%s')" % safe)
 	else:
