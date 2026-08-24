@@ -44,9 +44,10 @@
 //      - If I2S enabled, write samples to I2S.
 //      - loop
 //   * ESP's amy_platform_init
+//      - if the app renders via amy_update() (Arduino, or audio without built-in
+//        I2S), register the calling task as amy_update_handle
 //      - if multicore, launch esp_render_task
 //      - if multithread, launch esp_fill_audio_buffer_task
-//      - if not I2S, Notify fill_buffer to get it started
 //   * ESP's amy_render_audio
 //      - If multithread, wait for Notification (from fill_audio_buffer)
 //      - If not I2S, Notify fill_buffer
@@ -400,8 +401,15 @@ void amy_platform_init() {
     // However, if we're not using amy_update (e.g., Tulip/AMYboard native), we don't
     // want to do this - the un-handled xTaskNotifyGives cause Tulip to crash when it
     // turns on WiFi.
+    // ARDUINO builds always render via amy_update().  Non-Arduino builds do too
+    // whenever the audio output is not the built-in I2S (nothing else consumes the
+    // rendered blocks), so there the gate is the audio config, not the platform.
+    // Registering at init requires amy_start() to be called from the task that
+    // will call amy_update() - already the (implicit) Arduino contract.
 #ifdef ARDUINO
     amy_update_handle = xTaskGetCurrentTaskHandle();
+#else
+    if (!AMY_HAS_I2S) amy_update_handle = xTaskGetCurrentTaskHandle();
 #endif
     if (AMY_HAS_I2S) {
         // Start i2s
@@ -450,7 +458,8 @@ void amy_update_tasks() {
 }
 
 int16_t *amy_render_audio() {
-    // Called by api.amy_update() to render the audio.  Not used for non-Arduino.
+    // Called by api.amy_update() to render the audio.  Not used by builds with
+    // their own audio loop (e.g. Tulip/AMYboard native).
     int16_t *buf = NULL;
     if (amy_global.config.platform.multithread) {
         // Wait for esp_fill_audio_buffer_task to indicate a buffer is ready.
