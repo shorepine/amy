@@ -13,6 +13,7 @@
 
 #ifdef ESP_PLATFORM
 #include <esp_task.h>
+#include "freertos/semphr.h"
 
 ///////////////////////////////////////////////////////////////
 // ESP32, S3, P4 (maybe others)
@@ -30,7 +31,7 @@
 //   * esp_render_task (the task that runs on the second core):
 //      - Waits for notification (from main fill_audio thread)
 //      - renders half the oscs
-//      - notifies either fill_buffer (multithread) or amy_update (single thread) when done.
+//      - gives esp_render_done_sem when done, releasing whichever task ran esp_render_on_cores.
 //      - loop
 //   * esp_fill_audio_buffer_task (launched as one parallel task):
 //      - if not using I2S, waits for notification (from amy_update task)
@@ -38,7 +39,7 @@
 //      - execute AMY command updates (deltas)
 //      - Notify esp_render_task
 //      - render the other half of oscs
-//      - Wait for notification (indicating that esp_render_task is done)
+//      - Wait for esp_render_done_sem (indicating that esp_render_task is done)
 //      - call amy_fill_buffer (to combine the rendered oscs into output samples)
 //      - Notify amy_update_handle that the new block is ready
 //      - If I2S enabled, write samples to I2S.
@@ -53,7 +54,7 @@
 //      - If not I2S, Notify fill_buffer
 //      - If not multithread
 //        - If multicore, Notify amy_render_handle to get task on second core to render
-//          - wait for Notification indicating esp_render_task is done
+//          - wait for esp_render_done_sem indicating esp_render_task is done
 //        - else render all oscs
 //        - call amy_fill_buffer
 
@@ -255,30 +256,33 @@ TaskHandle_t amy_fill_buffer_handle;
 // Task to notify when amy_update is waiting for a completed buffer
 TaskHandle_t amy_update_handle = NULL;
 
-// Who esp_render_task tells that it is done.
-TaskHandle_t amy_render_task_done_handle = NULL;
+// Signals completion from esp_render_task back to esp_render_on_cores.  A
+// dedicated semaphore, not a task notification: the joining task can be any app
+// task (e.g. the one running amy_update()), and apps commonly pace such a task
+// with task notifications of their own.  A join on the shared default-index
+// notification counter can be released early by an unrelated notify, making the
+// caller combine the worker's half-written buffer.
+static SemaphoreHandle_t esp_render_done_sem = NULL;
 
 // Render the second core
 void esp_render_task( void * pvParameters) {
     while(1) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_render_on_cores
         amy_render(0, AMY_OSCS/2, 1);
-        // Tell (someone) we're done.
-        xTaskNotifyGive(amy_render_task_done_handle);  // to esp_render_on_cores
+        // Tell the caller we're done.
+        xSemaphoreGive(esp_render_done_sem);  // to esp_render_on_cores
     }
 }
 
 void esp_render_on_cores() {
     // Call amy_render on all the oscs, using multicore if available.
     if (amy_global.config.platform.multicore) {
-        // Tell the esp_render_task to inform *us* when it's done.
-        amy_render_task_done_handle = xTaskGetCurrentTaskHandle();
         // Tell the other core to start rendering.
         xTaskNotifyGive(amy_render_handle);  // to esp_render_task
         // Render me
         amy_render(AMY_OSCS/2, AMY_OSCS, 0);
         // Wait for the other core to finish
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from esp_render_task
+        xSemaphoreTake(esp_render_done_sem, portMAX_DELAY);  // from esp_render_task
     } else {
         // We render everything on this core.
         amy_render(0, AMY_OSCS, 0);
@@ -417,7 +421,8 @@ void amy_platform_init() {
     }
     if (amy_global.config.platform.multicore) {
         // On ESP, multicore starts a second thread even if multithread is not requested.
-        // Create the second core rendering task
+        // Create the second core rendering task and its completion semaphore
+        esp_render_done_sem = xSemaphoreCreateBinary();
         xTaskCreatePinnedToCore(&esp_render_task, AMY_RENDER_TASK_NAME, AMY_RENDER_TASK_STACK_SIZE, NULL, AMY_RENDER_TASK_PRIORITY, &amy_render_handle, AMY_RENDER_TASK_COREID);
     }
     if (amy_global.config.platform.multithread) {
@@ -436,6 +441,8 @@ void amy_platform_deinit() {
     }
     if (amy_global.config.platform.multicore) {
         vTaskDelete(amy_render_handle);
+        vSemaphoreDelete(esp_render_done_sem);
+        esp_render_done_sem = NULL;
     }
     if (amy_global.config.platform.multithread) {
         vTaskDelete(amy_fill_buffer_handle);
