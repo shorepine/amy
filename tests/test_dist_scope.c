@@ -9,7 +9,9 @@
 // Build/run with `make ctest`.
 
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
+#include <math.h>
 #include "amy.h"
 
 static int failures = 0;
@@ -20,6 +22,10 @@ static int failures = 0;
 } while (0)
 
 void delay_ms(uint32_t ms) { (void)ms; }
+
+extern uint16_t *voice_to_base_osc;
+extern int instrument_get_num_voices(int instrument_number, uint16_t *amy_voices);
+extern void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event);
 
 static void restart(void) {
     amy_stop();
@@ -143,6 +149,99 @@ static void test_undistorted_bus_says_nothing(void) {
           "no drive or mix is emitted");
 }
 
+// The dumped event is the inverse of the wire that built the osc, so the
+// wire it prints, fed to a clean engine, has to render the same samples.
+#define ROUND_TRIP_BLOCKS 8
+
+static void render_blocks(int16_t *out, int n_blocks) {
+    for (int b = 0; b < n_blocks; ++b) {
+        int16_t *buf = amy_simple_fill_buffer();
+        memcpy(out + b * AMY_BLOCK_SIZE * AMY_NCHANS, buf,
+               AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(int16_t));
+    }
+}
+
+static void test_osc_state_round_trips(void) {
+    printf("a distorting osc reads back as osc-scope commands\n");
+    restart();
+
+    // Drive 3 is deliberately not a power of two: it goes through log2 on the
+    // way in and exp2 on the way out, so the read-back is only as exact as
+    // that pair.  The wire prints to 3 dp, which is what the replay parses,
+    // so the sample-level comparison is the one that has to hold exactly.
+    send("v0w3GC1GF1GH6,5GD3,,2GM0.7Z");
+    amy_event e = amy_default_event();
+    set_event_for_osc(0, 0, &e);
+    CHECK(AMY_IS_SET(e.dist_clip) && e.dist_clip == 1, "clip comes back enabled");
+    CHECK(AMY_IS_SET(e.dist_fold) && e.dist_fold == 1, "fold comes back enabled");
+    CHECK(AMY_IS_SET(e.dist_crush) && e.dist_crush == 1, "crush comes back enabled");
+    CHECK(e.dist_bits == 6 && e.dist_rate == 5, "the crusher's bits,rate come back");
+    CHECK(AMY_IS_SET(e.dist_drive_coefs[COEF_CONST])
+          && fabsf(e.dist_drive_coefs[COEF_CONST] - 3.0f) < 1e-3f,
+          "drive comes back linear (%.6f)", e.dist_drive_coefs[COEF_CONST]);
+    CHECK(e.dist_drive_coefs[COEF_VEL] == 2.0f, "the drive's velocity coef comes back as sent");
+    CHECK(e.dist_mix_coefs[COEF_CONST] == 0.7f, "mix comes back");
+
+    // Play it, then play the dump from a clean start, and compare samples.
+    static int16_t original[ROUND_TRIP_BLOCKS * AMY_BLOCK_SIZE * AMY_NCHANS];
+    static int16_t replayed[ROUND_TRIP_BLOCKS * AMY_BLOCK_SIZE * AMY_NCHANS];
+    amy_reset_sysclock();
+    send("v0n60l1Z");
+    render_blocks(original, ROUND_TRIP_BLOCKS);
+
+    e.osc = 0;  // The dump names its osc, so the G commands stay osc-scope.
+    char wire[MAX_MESSAGE_LEN];
+    sprint_event(&e, wire, sizeof(wire), /* wirecode= */ true);
+    restart();
+    amy_reset_sysclock();
+    send(wire);
+    send("v0n60l1Z");
+    render_blocks(replayed, ROUND_TRIP_BLOCKS);
+    CHECK(memcmp(original, replayed, sizeof(original)) == 0,
+          "replaying the dump renders the same samples (%s)", wire);
+}
+
+static void test_undistorted_osc_says_nothing(void) {
+    printf("an osc with no stage enabled adds nothing to its dump\n");
+    restart();
+
+    send("v0w3Z");
+    amy_event e = amy_default_event();
+    set_event_for_osc(0, 0, &e);
+    CHECK(AMY_IS_UNSET(e.dist_clip) && AMY_IS_UNSET(e.dist_fold) && AMY_IS_UNSET(e.dist_crush),
+          "no stage enables are emitted");
+    CHECK(AMY_IS_UNSET(e.dist_bits) && AMY_IS_UNSET(e.dist_rate), "no bits or rate are emitted");
+    CHECK(AMY_IS_UNSET(e.dist_drive_coefs[COEF_CONST]) && AMY_IS_UNSET(e.dist_mix_coefs[COEF_CONST]),
+          "no drive or mix is emitted");
+    e.osc = 0;
+    char wire[MAX_MESSAGE_LEN];
+    sprint_event(&e, wire, sizeof(wire), /* wirecode= */ true);
+    CHECK(strchr(wire, 'G') == NULL, "the wire form carries no G command (%s)", wire);
+}
+
+static void test_osc_dist_survives_growth(void) {
+    printf("growing a synth keeps its voices' distortion\n");
+    restart();
+
+    // A hand-configured synth: growth clones voice 0 through the osc readout.
+    send("i1iv1in1Z");
+    send("i1v0GC1GD3Z");
+    send("i1iv3Z");
+    CHECK(instrument_get_num_voices(1, NULL) == 3, "synth grew to 3 voices");
+    uint16_t voices[MAX_VOICES_PER_INSTRUMENT];
+    int num_voices = instrument_get_num_voices(1, voices);
+    bool all_clip = true, all_drive = true;
+    for (int v = 0; v < num_voices; ++v) {
+        uint16_t osc = voice_to_base_osc[voices[v]];
+        if (!(osc_dist_stages(osc) & DIST_CLIP))  all_clip = false;
+        if (synth[osc] == NULL
+            || fabsf(synth[osc]->dist_logdrive_coefs[COEF_CONST] - log2f(3.0f)) > 1e-3f)
+            all_drive = false;
+    }
+    CHECK(all_clip, "every voice has the clip stage enabled");
+    CHECK(all_drive, "every voice has drive 3");
+}
+
 int main(void) {
     amy_config_t c = amy_default_config();
     c.features.startup_bleep = 0;
@@ -155,6 +254,9 @@ int main(void) {
     test_bus_takes_only_the_constant_coef();
     test_bus_state_round_trips();
     test_undistorted_bus_says_nothing();
+    test_osc_state_round_trips();
+    test_undistorted_osc_says_nothing();
+    test_osc_dist_survives_growth();
 
     amy_stop();
     printf(failures ? "FAILURES: %d\n" : "all ok\n", failures);
