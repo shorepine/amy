@@ -27,9 +27,9 @@ void test_polyphony() {
 
 void test_sequencer() {
   amy_event e = amy_default_event();
-  e.sequence[0] = 0;
-  e.sequence[1] = 48;
-  e.sequence[2] = 1;
+  e.ticks[0] = 0;
+  e.ticks[1] = 48;
+  e.ticks[2] = 1;
   e.velocity = 1;
   e.midi_note = 60;
   e.synth = 1;
