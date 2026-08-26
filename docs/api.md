@@ -319,10 +319,10 @@ A note on list parameters:  When an argument is a list of parameters, you can in
 | `b`    | `feedback` | `feedback` | float 0-1 | Use for the ALGO synthesis type in FM or for karplus-strong, or to indicate PCM looping (0 off, >0, on) |
 | `c`    | `chained_osc` | `chained_osc` |  uint 0 to OSCS-1 | Chained oscillator.  Note/velocity events to this oscillator will propagate to chained oscillators.  VCF is run only for first osc in chain, but applies to all oscs in chain. |
 | `G`    | `filter_type` | `filter_type` | 0-6 | Filter type: 0 = none (default.) 1 = lowpass, 2 = bandpass, 3 = highpass, 4 = double-order lowpass, 5 = notch, 6 = phaser. A letter instead of a digit selects a distortion sub-command; see the `G` distortion rows below. |
-| `GC` / `GF` | `dist_type` | `dist_clip` / `dist_fold` | 0 or 1 | Per-oscillator distortion, applied before the filter. `GC1` enables soft clip, `GF1` enables wavefold; 0 turns the stage off. |
-| `GH`   | `dist_type`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 ints | Enables the bitcrusher as [bits, rate]. bits: bit depth 1-24, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
-| `GD`   | `dist_drive` | `dist_drive` | float 0-16 | Distortion pre-gain (fold depth for wavefold), shared by all types; default 1. |
-| `GM`   | `dist_mix` | `dist_mix` | float 0-1 | Distortion wet/dry, shared by all types; default 1 (full wet). |
+| `GC` / `GF` | `dist_clip` / `dist_fold` | `dist_clip` / `dist_fold` | 0 or 1 | Distortion soft clip / wavefold. `GC1` enables, 0 turns the stage off. Stages are independent and enabled stages stack in clip, fold, crush order. The event decides the scope: with an osc (`v`), the osc's own stage, applied before the filter; with no osc, the stage on the bus the event addresses. See "Distortion scope" below. |
+| `GH`   | `dist_crush`, `dist_bits`, `dist_rate` | `dist_crush` | list of 2 ints | Enables the bitcrusher as [bits, rate]. bits: bit depth 1-24, >= 24 leaves bit depth unchanged. rate: sample-hold length in samples, 1 disables. `GH0` turns the stage off. |
+| `GD`   | `dist_drive` | `dist_drive` | coefs | Distortion pre-gain (fold depth for wavefold), shared by all stages; default 1, range 1/16-16. A control-coefficient list like `freq`: the constant is linear drive, the modulation coefs are octaves of it. At bus scope only the constant is used -- a bus has no per-note modulation sources -- and the rest of the list is ignored. |
+| `GM`   | `dist_mix` | `dist_mix` | coefs | Distortion wet/dry, shared by all stages; default 1 (full wet). A control-coefficient list, combined linearly and clamped to 0-1. At bus scope only the constant is used. |
 | `I`    | `ratio` | `ratio`  | float | For ALGO types, ratio of modulator frequency to  base note frequency  |
 | `L`    | `mod_source` | `mod_source` | 0 to OSCS-1, up to two, comma-separated | Which oscillator(s) are used as modulation/LFO sources for this oscillator. Source oscillators will be silent. The first feeds the `mod0` control coefficient and the second `mod1`, so `mod_source=[3, 4]` makes osc 3 the `mod0` input and osc 4 the `mod1` input. |
 | `m`    | `portamento`| `portamento` | uint | Time constant (in ms) for pitch changes when note is changed without intervening note-off.  default 0 (immediate), 100 is good. |
@@ -481,6 +481,23 @@ Default AMY has 4 buses, 0..3.  Set `max_buses` in `amy_config_t` before `amy_st
 | `k`    | `chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth` | `chorus` | float[,float,float,float] | Chorus parameters -- level, delay, freq, depth: Level is for output mix (0 to turn off); delay is max in samples (320); freq is LFO rate in Hz (0.5); depth is proportion of max delay (0.5). |
 | `M`    | `echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef` | `echo` | float[,int,int,float,float] | Echo parameters --  level, delay_ms, max_delay_ms, feedback, filter_coef (-1 is HPF, 0 is flat, +1 is LPF). |
 | `x`    | `eq_l, eq_m, eq_h` |`eq` | float,float,float | Equalization in dB low (~800Hz) / med (~2500Hz) / high (~7500Hz) -15 to 15. 0 is off. default 0. |
+
+Distortion (`GC`/`GF`/`GH`/`GD`/`GM`) runs per bus too, first in the bus FX chain -- before EQ, chorus, echo and reverb.  It has no bus-specific commands: the `G` commands above address a bus whenever the event that carries them names no oscillator.
+
+#### Distortion scope
+
+The `G` distortion commands say what to do, not where.  Which stage they configure is read off the rest of the event:
+
+| Message | Scope |
+| ------- | ----- |
+| `amy.send(synth=0, osc=1, dist_clip=1)` (`i0v1GC1`) | Osc 1 of synth 0's voices. |
+| `amy.send(osc=1, bus=2, dist_clip=1)` (`v1y2GC1`) | Osc 1, which `bus=` routes to bus 2 -- `bus=` next to an explicit osc is routing, as it is for every other osc command. |
+| `amy.send(bus=1, dist_clip=1)` (`y1GC1`) | Bus 1. |
+| `amy.send(synth=1, dist_clip=1)` (`i1GC1`) | The bus synth 1 is on, or bus 0 if it is on none. |
+
+An event with distortion fields and no `osc`, `bus` or `synth` at all addresses bus 0, like any other bus-directed command with no `y`.
+
+At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-note modulation sources to combine, so the rest of the coef list is ignored.
 
 ### Other
 

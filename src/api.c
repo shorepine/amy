@@ -149,11 +149,15 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->resonance);
     AMY_UNSET(e->portamento_ms);
     AMY_UNSET(e->filter_type);
-    AMY_UNSET(e->dist_type);
-    AMY_UNSET(e->dist_drive);
+    AMY_UNSET(e->dist_clip);
+    AMY_UNSET(e->dist_fold);
+    AMY_UNSET(e->dist_crush);
     AMY_UNSET(e->dist_bits);
     AMY_UNSET(e->dist_rate);
-    AMY_UNSET(e->dist_mix);
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+        AMY_UNSET(e->dist_drive_coefs[i]);
+        AMY_UNSET(e->dist_mix_coefs[i]);
+    }
     AMY_UNSET(e->chained_osc);
     for (int i = 0; i < NUM_MOD_SOURCES; ++i) AMY_UNSET(e->mod_source[i]);
     AMY_UNSET(e->algorithm);

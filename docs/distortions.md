@@ -7,7 +7,9 @@ dynamics drive the shaper: a hard hit pushes further into the nonlinearity
 than a soft one, and a decaying tail cleans up on its own. On a `SILENT`
 chained-osc head the same stage shapes the voice's summed chain instead, which
 is a musically different effect - see [Per-osc versus the voice's
-sum](#per-osc-versus-the-voices-sum) below.
+sum](#per-osc-versus-the-voices-sum) below. The same chain also runs per bus,
+as a mixbus stage ahead of the bus FX - see [Per-bus
+distortion](#per-bus-distortion).
 
 All the clips on this page are rendered offline through the Python module and
 peak-normalized to -6 dBFS, so louder never reads as "better" in an A/B.
@@ -22,11 +24,28 @@ Distortion rides `G` sub-commands on the wire (a digit after `G` is
 | `GC1` / `GC0` | `dist_clip=1` / `0` | 0 or 1 | Enable / disable the soft clipper. |
 | `GF1` / `GF0` | `dist_fold=1` / `0` | 0 or 1 | Enable / disable the wavefolder. |
 | `GH<bits>,<rate>` | `dist_crush=[bits, rate]` | ints; bits 1-24, rate 1-1024 | Enable the bitcrusher: quantize to `bits` magnitude bits (24 leaves bit depth unchanged) and hold each sample for `rate` samples (1 disables the sample-and-hold). `GH0` disables. |
-| `GD<drive>` | `dist_drive=` | float 0-16 | Pre-gain into the shaper (fold depth for the wavefolder), shared by all types. Default 1. |
-| `GM<mix>` | `dist_mix=` | float 0-1 | Wet/dry mix, shared by all types. Default 1 (full wet). |
+| `GD<coefs>` | `dist_drive=` | coef list | Pre-gain into the shaper (fold depth for the wavefolder), shared by all stages. A single value sets just the constant term in linear drive (1 = unity, range 2^-4 to 2^4); further coefs modulate it in octaves - see [Modulating drive and mix](#modulating-drive-and-mix) below. Default 1. |
+| `GM<coefs>` | `dist_mix=` | coef list | Wet/dry mix, shared by all stages; combines linearly (like duty), clamped 0-1. Default 1 (full wet). |
 
-One type is active per osc; enabling one replaces another. Drive and mix keep
-their values across type changes.
+Stages are independent: each command toggles only its own stage, and enabled
+stages stack in a fixed clip -> fold -> crush order (shaping before lo-fi;
+the reverse order per voice is reachable by putting the crusher on a chain
+member and the clipper on its `SILENT` head). Drive and mix are shared
+across the chain, and each stage applies drive as its own pre-gain, so
+stacking re-amplifies per pass. One riff with the stage set changing on each
+downbeat - dry, clip, clip+fold, all three, crusher alone:
+
+
+https://github.com/user-attachments/assets/b66d66b6-22b1-4074-9295-0551db2e01a2
+
+
+```python
+amy.send(osc=0, wave=amy.TRIANGLE, dist_drive=4, dist_mix=1)
+amy.send(osc=0, dist_clip=1)           # bar 2: clip
+amy.send(osc=0, dist_fold=1)           # bar 3: clip + fold
+amy.send(osc=0, dist_crush=[6, 5])     # bar 4: all three
+amy.send(osc=0, dist_clip=0, dist_fold=0)  # bar 5: crusher alone
+```
 
 ```python
 amy.send(osc=0, wave=amy.SINE, dist_clip=1, dist_drive=3, dist_mix=1)
@@ -105,6 +124,106 @@ https://github.com/user-attachments/assets/671b1ec0-5fe6-4579-9517-06ed513a9668
 ```python
 amy.send(osc=0, wave=amy.SAW_DOWN, dist_crush=[6, 5], dist_mix=1)
 ```
+
+## Modulating drive and mix
+
+`GD` and `GM` are control-coefficient lists, the same rail as `freq` and
+`filter_freq`: the constant term stays in linear drive and the modulation
+coefs are octaves of it, so a coef of 1 doubles the drive (an octave is
+also the natural unit for the wavefolder, where it buys one more fold).
+Velocity into drive is what makes the shaper respond like part of the
+voice - soft hits play a near-pure tone, hard hits bark:
+
+
+
+https://github.com/user-attachments/assets/39d34301-3422-4e5d-b4a7-6065adf0d0c2
+
+
+
+```python
+# drive = 1 * 2^(3 * velocity): about 1.5 soft, 8 at full velocity
+amy.send(osc=0, wave=amy.SINE, dist_clip=1, dist_mix=1,
+         dist_drive={'const': 1, 'vel': 3})
+```
+
+The control: identical notes at static `dist_drive=8` bark at full velocity
+exactly the same (that is the drive the vel-coef arm reaches there), but the
+soft hits buzz just as hard relative to their level - static drive can't
+tell touch apart:
+
+
+
+
+https://github.com/user-attachments/assets/23fa611d-74c5-49d6-b8e7-68ac94d6d03a
+
+
+Any modulation source works. Drive on EG1, swelling a single held note from
+pure tone into growl with no parameter events after the note-on:
+
+
+
+
+https://github.com/user-attachments/assets/d45b9dd6-5c0d-47ad-83c6-a5e7bb10024a
+
+
+```python
+amy.send(osc=0, wave=amy.SINE, bp1='0,0,4000,1,600,0',
+         dist_clip=1, dist_mix=1, dist_drive={'const': 0.5, 'eg1': 3})
+```
+
+## Per-bus distortion
+
+The same stage chain runs per bus, first in the bus FX chain - before EQ,
+chorus, echo and reverb - so the delays and reverb take tails of the shaped
+signal. There are no separate commands for it: the `G` sub-commands above
+configure a bus whenever the message that carries them names no oscillator.
+
+| Message | What it shapes |
+| ------- | -------------- |
+| `amy.send(synth=0, osc=1, dist_clip=1)` | Osc 1 of synth 0's voices. |
+| `amy.send(osc=1, bus=2, dist_clip=1)` | Osc 1, routed to bus 2 - `bus=` alongside an explicit osc is routing, as it is for every other osc command. |
+| `amy.send(bus=1, dist_clip=1)` | Bus 1. |
+| `amy.send(synth=1, dist_clip=1)` | The bus synth 1 is on, or bus 0 if it is on none. |
+
+```python
+amy.send(bus=0, dist_clip=1, dist_drive=4, dist_mix=1)
+```
+
+A bus sum has no per-note modulation sources to combine, so at bus scope
+`dist_drive` and `dist_mix` take only their constant term; the rest of a coef
+list is ignored.
+
+A bus stage responds to the whole bus level - which is what a mixbus
+saturator is for. A quiet sustained tone and a loud pulsing bass through the
+same clip settings: per-osc leaves the quiet tone static, on the bus the
+bass drags the sum into the knee and the quiet tone ducks and buzzes
+whenever the bass sounds:
+
+https://github.com/user-attachments/assets/a88bcf1c-e19e-4d66-8dc8-59685b6ad54e
+
+<details><summary>dry twin</summary>
+
+
+https://github.com/user-attachments/assets/8778d836-46af-41a9-b6f1-1f74a71d24f2
+
+
+</details>
+
+<details><summary>per osc</summary>
+
+
+https://github.com/user-attachments/assets/3de002c5-57d0-40a9-b246-b7843094872b
+
+
+</details>
+
+One drive knob over a whole held chord blooms the intermodulation fan out of
+three pure tones in a single gesture:
+
+
+
+https://github.com/user-attachments/assets/86182961-81e9-4c7f-83e4-f4020776d349
+
 
 ## Per-osc versus the voice's sum
 

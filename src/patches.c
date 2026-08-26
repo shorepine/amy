@@ -363,34 +363,33 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_I_SEQ(mod_source, "mod_source", NUM_MOD_SOURCES, "L");
     _EPRINT_I(algorithm, "algorithm", "o");
     _EPRINT_I(filter_type, "filter_type", "G");
-    // Distortion rides 'G' sub-commands: GC/GF/GH pick the type (a zero
-    // value is the off switch, printed canonically as GC0), GD/GM carry the
-    // shared drive and mix.
-    if (AMY_IS_SET(e->dist_type)) {
-        uint8_t dist_type = e->dist_type;
-        if (wirecode && dist_type == DIST_CRUSH) {
+    // Distortion rides 'G' sub-commands; each stage prints its own toggle,
+    // so state-to-wire is one field per command.  GH carries the crusher's
+    // bits,rate; a disabled crusher prints as GH0.  Whether the printed
+    // commands mean the osc or the bus is carried by the rest of the event -
+    // the 'v' printed above, or its absence - not by the letters.
+    _EPRINT_I(dist_clip, "dist_clip", "GC");
+    _EPRINT_I(dist_fold, "dist_fold", "GF");
+    if (AMY_IS_SET(e->dist_crush)) {
+        if (!wirecode) {
+            snprintf(s, len - (size_t)(s - s_entry), " dist_crush: %d", e->dist_crush); s += strlen(s);
+        } else if (!e->dist_crush) {
+            snprintf(s, len - (size_t)(s - s_entry), "GH0"); s += strlen(s);
+        } else {
             snprintf(s, len - (size_t)(s - s_entry), "GH"); s += strlen(s);
             if (AMY_IS_SET(e->dist_bits)) { snprintf(s, len - (size_t)(s - s_entry), "%d", e->dist_bits); s += strlen(s); }
-            if (AMY_IS_SET(e->dist_rate)) {
-                snprintf(s, len - (size_t)(s - s_entry), ",%d", e->dist_rate); s += strlen(s);
-            }
-        } else if (wirecode) {
-            snprintf(s, len - (size_t)(s - s_entry), "G%c%d",
-                     (dist_type == DIST_FOLD) ? 'F' : 'C', (dist_type != DIST_OFF) ? 1 : 0);
-            s += strlen(s);
-        } else {
-            snprintf(s, len - (size_t)(s - s_entry), " dist_type: %d", dist_type); s += strlen(s);
+            if (AMY_IS_SET(e->dist_rate)) { snprintf(s, len - (size_t)(s - s_entry), ",%d", e->dist_rate); s += strlen(s); }
         }
     }
     if (!wirecode) {
-        // Wire mode prints bits/rate inside GH above; they mean nothing to
-        // the other types, so an event carrying them without DIST_CRUSH
-        // drops them from the wire form.
+        // Wire mode prints bits/rate inside GH above; they mean nothing
+        // without the crusher, so an event carrying them with dist_crush
+        // unset drops them from the wire form.
         _EPRINT_I(dist_bits, "dist_bits", "");
         _EPRINT_I(dist_rate, "dist_rate", "");
     }
-    _EPRINT_F(dist_drive, "dist_drive", "GD");
-    _EPRINT_F(dist_mix, "dist_mix", "GM");
+    _EPRINT_COEF(dist_drive_coefs, "dist_drive_coefs", "GD");
+    _EPRINT_COEF(dist_mix_coefs, "dist_mix_coefs", "GM");
     _EPRINT_I_SEQ(bp_is_set, "bp_is_set", MAX_BREAKPOINT_SETS, "??");
     // Convert these two at least to vectors of ints, save several hundred bytes
     _EPRINT_I_SEQ(algo_source, "algo_source", MAX_ALGO_OPS, "O");
@@ -460,6 +459,19 @@ bool event_addresses_bus(amy_event *e) {
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
     _RET_TRUE_IF_5_F_SET(chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth, chorus_depth);
     _RET_TRUE_IF_5_F_SET(reverb_level, reverb_liveness, reverb_damping, reverb_xover_hz, reverb_xover_hz);
+    // Distortion addresses a bus only when the event names no osc; naming one
+    // makes the same fields osc-scope (see event_addresses_oscs).
+    // Not _RET_TRUE_IF_5_F_SET: the int fields' unset sentinels cast to
+    // ordinary floats rather than NaN.
+    if (AMY_IS_UNSET(e->osc)) {
+        _RET_TRUE_IF_SET(dist_clip);
+        _RET_TRUE_IF_SET(dist_fold);
+        _RET_TRUE_IF_SET(dist_crush);
+        _RET_TRUE_IF_SET(dist_bits);
+        _RET_TRUE_IF_SET(dist_rate);
+        _RET_TRUE_IF_SET_COEF(dist_drive_coefs);
+        _RET_TRUE_IF_SET_COEF(dist_mix_coefs);
+    }
     return false;
 }
 
@@ -506,13 +518,20 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET_SEQ(mod_source, NUM_MOD_SOURCES);
     _RET_TRUE_IF_SET(algorithm);
     _RET_TRUE_IF_SET(filter_type);
-    // Not _RET_TRUE_IF_5_F_SET: type/bits/rate are ints, and their unset
-    // sentinels cast to ordinary floats rather than NaN.
-    _RET_TRUE_IF_SET(dist_type);
-    _RET_TRUE_IF_SET(dist_drive);
-    _RET_TRUE_IF_SET(dist_bits);
-    _RET_TRUE_IF_SET(dist_rate);
-    _RET_TRUE_IF_SET(dist_mix);
+    // Distortion addresses oscs only when the event names one; with no osc
+    // named it is bus-scope (see event_addresses_bus), and answering true
+    // here would fan it out over the voice's oscs as well.
+    // Not _RET_TRUE_IF_5_F_SET: the enables and bits/rate are ints, and
+    // their unset sentinels cast to ordinary floats rather than NaN.
+    if (AMY_IS_SET(e->osc)) {
+        _RET_TRUE_IF_SET(dist_clip);
+        _RET_TRUE_IF_SET(dist_fold);
+        _RET_TRUE_IF_SET(dist_crush);
+        _RET_TRUE_IF_SET(dist_bits);
+        _RET_TRUE_IF_SET(dist_rate);
+        _RET_TRUE_IF_SET_COEF(dist_drive_coefs);
+        _RET_TRUE_IF_SET_COEF(dist_mix_coefs);
+    }
     _RET_TRUE_IF_SET_SEQ(bp_is_set, MAX_BREAKPOINT_SETS);
     // Convert these two at least to vectors of ints, save several hundred bytes
     _RET_TRUE_IF_SET_SEQ(algo_source, MAX_ALGO_OPS);
@@ -537,6 +556,16 @@ bool event_addresses_oscs(amy_event *e) {
 #define _TEST_COEFS(FIELD, PARAM)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) {                          \
         if ((int)queue->param == (int)PARAM + i) event->FIELD[i] = queue->data.f; \
+    }
+// Const drive coef is linear drive, rest are octaves.
+#define _TEST_DRIVE_COEFS(FIELD, PARAM) \
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {      \
+        if ((int)queue->param == (int)PARAM + i) {   \
+            if (i == COEF_CONST)  \
+                event->FIELD[i] = drive_of_logdrive(queue->data.f);   \
+            else \
+                event->FIELD[i] = queue->data.f; \
+        }                                    \
     }
 // Const freq coef is in Hz, rest are linear.
 #define _TEST_FREQ_COEFS(FIELD, PARAM) \
@@ -584,11 +613,11 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_I(reset_osc, RESET_OSC)
       _CASE_I(note_source_channel, NOTE_SOURCE_CHANNEL)
       _CASE_I(filter_type, FILTER_TYPE)
-      _CASE_I(dist_type, DIST_TYPE)
-      _CASE_F(dist_drive, DIST_DRIVE)
+      _CASE_I(dist_clip, DIST_CLIP_EN)
+      _CASE_I(dist_fold, DIST_FOLD_EN)
+      _CASE_I(dist_crush, DIST_CRUSH_EN)
       _CASE_I(dist_bits, DIST_BITS)
       _CASE_I(dist_rate, DIST_RATE)
-      _CASE_F(dist_mix, DIST_MIX)
       _CASE_I(algorithm, ALGORITHM)
       _CASE_F(eq_l, EQ_L)
       _CASE_F(eq_m, EQ_M)
@@ -606,6 +635,16 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(reverb_liveness, REVERB_LIVENESS)
       _CASE_F(reverb_damping, REVERB_DAMPING)
       _CASE_F(reverb_xover_hz, REVERB_XOVER_HZ)
+      // Bus distortion comes back through the same event fields the per-osc
+      // stage uses; the event's own osc says which scope it will be read at
+      // on the way back in, exactly as it does for VOLUME below.
+      _CASE_I(dist_clip, BUS_DIST_CLIP_EN)
+      _CASE_I(dist_fold, BUS_DIST_FOLD_EN)
+      _CASE_I(dist_crush, BUS_DIST_CRUSH_EN)
+      _CASE_I(dist_bits, BUS_DIST_BITS)
+      _CASE_I(dist_rate, BUS_DIST_RATE)
+      case BUS_DIST_DRIVE: event->dist_drive_coefs[COEF_CONST] = queue->data.f; break;
+      case BUS_DIST_MIX: event->dist_mix_coefs[COEF_CONST] = queue->data.f; break;
       _CASE_I(eg_type[0], EG0_TYPE)
       _CASE_I(eg_type[1], EG1_TYPE)
       _CASE_F(velocity, VELOCITY)
@@ -619,6 +658,8 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _TEST_FREQ_COEFS(filter_freq_coefs, FILTER_FREQ)
       _TEST_COEFS(duty_coefs, DUTY)
       _TEST_COEFS(pan_coefs, PAN)
+      _TEST_DRIVE_COEFS(dist_drive_coefs, DIST_LOGDRIVE)
+      _TEST_COEFS(dist_mix_coefs, DIST_MIX)
       for (int i = 0; i < MAX_ALGO_OPS; ++i) {
           if ((int)queue->param == (int)ALGO_SOURCE_START + i)
               event->algo_source[i] = queue->data.i;
@@ -713,6 +754,16 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
         }                                                                 \
     }
 
+#define EVENT_FROM_OSC_ARRAY_LOGDRIVE(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)  \
+    for (int i = 0; i < NUM_ELS; ++i) {                                   \
+        if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i]) {   \
+            if (i == COEF_CONST)                                          \
+                event->EVENT_FIELD[i] = drive_of_logdrive(synth[osc]->SYNTH_FIELD[i]); \
+            else                                                          \
+                event->EVENT_FIELD[i] = synth[osc]->SYNTH_FIELD[i];       \
+        }                                                                 \
+    }
+
 void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     // Set fields in the event to configure the osc away from default.
     // We assume event has already been cleared.
@@ -760,6 +811,16 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     EVENT_FROM_OSC_ARRAY_BASEOSC(mod_source, NUM_MOD_SOURCES);
     EVENT_FROM_OSC(algorithm);
     EVENT_FROM_OSC(filter_type);
+    // Distortion: one enable per stage that is on (a stage that is off is
+    // the default, and saying so would put GC0GF0GH0 on every osc), and the
+    // drive rail back in linear units, the way it was sent.
+    if (synth[osc]->dist_stages & DIST_CLIP)   event->dist_clip = 1;
+    if (synth[osc]->dist_stages & DIST_FOLD)   event->dist_fold = 1;
+    if (synth[osc]->dist_stages & DIST_CRUSH)  event->dist_crush = 1;
+    EVENT_FROM_OSC(dist_bits);
+    EVENT_FROM_OSC(dist_rate);
+    EVENT_FROM_OSC_ARRAY_LOGDRIVE(dist_logdrive_coefs, dist_drive_coefs, NUM_COMBO_COEFS);
+    EVENT_FROM_OSC_ARRAY2(dist_mix_coefs, dist_mix_coefs, NUM_COMBO_COEFS);
     EVENT_FROM_OSC_ARRAY_BASEOSC(algo_source, MAX_ALGO_OPS);
     EVENT_FROM_OSC_ARRAY_T(breakpoint_times[0], eg0_times, synth[osc]->max_num_breakpoints[0]);
     EVENT_FROM_OSC_ARRAY2(breakpoint_values[0], eg0_values, synth[osc]->max_num_breakpoints[0]);
@@ -798,6 +859,19 @@ void set_event_for_bus_fx(amy_event *event, uint16_t bus, global_state_t *state)
         event->echo_max_delay_ms = state->bus[bus]->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
     event->echo_feedback = S2F(state->bus[bus]->echo.feedback);
     event->echo_filter_coef = S2F(state->bus[bus]->echo.filter_coef);
+    // Distortion, which shares its event fields with the per-osc stage: this
+    // event names no osc, and that is what makes the commands read back as
+    // bus-scope.  A bus with no stage enabled has nothing to restore, and
+    // saying so would put five commands on every bus line.
+    if (state->bus[bus]->dist.stages) {
+        event->dist_clip = (state->bus[bus]->dist.stages & DIST_CLIP) ? 1 : 0;
+        event->dist_fold = (state->bus[bus]->dist.stages & DIST_FOLD) ? 1 : 0;
+        event->dist_crush = (state->bus[bus]->dist.stages & DIST_CRUSH) ? 1 : 0;
+        event->dist_bits = state->bus[bus]->dist.bits;
+        event->dist_rate = state->bus[bus]->dist.rate;
+        event->dist_drive_coefs[COEF_CONST] = state->bus[bus]->dist.drive;
+        event->dist_mix_coefs[COEF_CONST] = state->bus[bus]->dist.mix;
+    }
 }
 
 
