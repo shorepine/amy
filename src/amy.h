@@ -466,7 +466,10 @@ enum params{
     REVERB_DAMPING,
     REVERB_XOVER_HZ,
     // Per-bus distortion stage; bus in delta.osc like the params above.
-    // Same per-stage enables as the per-osc stage.
+    // Same per-stage enables as the per-osc stage, and the same event fields
+    // feed both - which of the two an event reaches is its own scope, but the
+    // deltas stay distinct because their targets are.  Drive and mix are
+    // scalar here: a bus has no per-note modulation sources.
     BUS_DIST_CLIP_EN,
     BUS_DIST_FOLD_EN, BUS_DIST_CRUSH_EN,
     BUS_DIST_DRIVE, BUS_DIST_BITS,
@@ -625,9 +628,14 @@ typedef struct amy_event {
     uint16_t mod_source[NUM_MOD_SOURCES];
     uint8_t algorithm;
     uint8_t filter_type;
-    // Per-osc distortion ('G' distortion sub-commands on the wire).
-    // One enable per stage, so an event can toggle one stage without
-    // naming the others.
+    // Distortion ('G' distortion sub-commands on the wire).  One enable per
+    // stage, so an event can toggle one stage without naming the others.
+    // Scope comes from the event, not from the field: an event that names an
+    // osc shapes that osc, one that names none shapes the bus it addresses
+    // (bus=, else the synth's bus, else AMY_DEFAULT_BUS) - the rule
+    // event_addresses_bus()/event_addresses_oscs() apply.  A bus has no
+    // per-note modulation sources, so at bus scope only the CONST coef of
+    // dist_drive_coefs/dist_mix_coefs is read.
     uint8_t dist_clip;
     uint8_t dist_fold;
     uint8_t dist_crush;
@@ -678,13 +686,6 @@ typedef struct amy_event {
     float reverb_liveness;
     float reverb_damping;
     float reverb_xover_hz;
-    uint8_t bus_dist_clip;
-    uint8_t bus_dist_fold;
-    uint8_t bus_dist_crush;
-    float bus_dist_drive;
-    uint8_t bus_dist_bits;
-    uint16_t bus_dist_rate;
-    float bus_dist_mix;
 } amy_event;
 
 // Distortion stage.  Split from synthinfo so the same shaper can run at any

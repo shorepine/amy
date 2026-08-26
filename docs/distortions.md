@@ -175,21 +175,23 @@ amy.send(osc=0, wave=amy.SINE, bp1='0,0,4000,1,600,0',
 
 The same stage chain runs per bus, first in the bus FX chain - before EQ,
 chorus, echo and reverb - so the delays and reverb take tails of the shaped
-signal. It rides `J` with the same sub-command grammar as `G`, and
-bus-directed messages pick their bus with the `y` prefix, like the other
-bus FX:
+signal. There are no separate commands for it: the `G` sub-commands above
+configure a bus whenever the message that carries them names no oscillator.
 
-| Wire | Python kwarg | Values | Meaning |
-| ---- | ------------ | ------ | ------- |
-| `JC1` / `JC0` | `bus_dist_clip=1` / `0` | 0 or 1 | Enable / disable the bus soft clipper. |
-| `JF1` / `JF0` | `bus_dist_fold=1` / `0` | 0 or 1 | Enable / disable the bus wavefolder. |
-| `JH<bits>,<rate>` | `bus_dist_crush=[bits, rate]` | ints; bits 1-24, rate 1-1024 | Enable the bus bitcrusher, exactly as `GH`. `JH0` disables. |
-| `JD<drive>` | `bus_dist_drive=` | float 0-16 | Pre-gain into the enabled stages; default 1. Scalar - a bus has no per-note modulation sources, so no coef rail at this scope. |
-| `JM<mix>` | `bus_dist_mix=` | float 0-1 | Wet/dry mix; default 1 (full wet). Scalar. |
+| Message | What it shapes |
+| ------- | -------------- |
+| `amy.send(synth=0, osc=1, dist_clip=1)` | Osc 1 of synth 0's voices. |
+| `amy.send(osc=1, bus=2, dist_clip=1)` | Osc 1, routed to bus 2 - `bus=` alongside an explicit osc is routing, as it is for every other osc command. |
+| `amy.send(bus=1, dist_clip=1)` | Bus 1. |
+| `amy.send(synth=1, dist_clip=1)` | The bus synth 1 is on, or bus 0 if it is on none. |
 
 ```python
-amy.send(bus=0, bus_dist_clip=1, bus_dist_drive=4, bus_dist_mix=1)
+amy.send(bus=0, dist_clip=1, dist_drive=4, dist_mix=1)
 ```
+
+A bus sum has no per-note modulation sources to combine, so at bus scope
+`dist_drive` and `dist_mix` take only their constant term; the rest of a coef
+list is ignored.
 
 A bus stage responds to the whole bus level - which is what a mixbus
 saturator is for. A quiet sustained tone and a loud pulsing bass through the

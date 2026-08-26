@@ -83,3 +83,4 @@ tests/test_osc_free_on_release
 tests/test_timebase_reset
 tests/test_voice_osc_range
 tests/test_dist_coefs
+tests/test_dist_scope

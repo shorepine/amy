@@ -758,6 +758,21 @@ bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what
 
 static void flush_due_deltas();  // definition next to amy_execute_deltas()
 
+// Take the distortion fields out of an event once they have been turned into
+// deltas, so no later pass over the same event can spend them a second time
+// at the other scope.
+static void clear_dist_fields(amy_event *e) {
+    AMY_UNSET(e->dist_clip);
+    AMY_UNSET(e->dist_fold);
+    AMY_UNSET(e->dist_crush);
+    AMY_UNSET(e->dist_bits);
+    AMY_UNSET(e->dist_rate);
+    for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+        AMY_UNSET(e->dist_drive_coefs[i]);
+        AMY_UNSET(e->dist_mix_coefs[i]);
+    }
+}
+
 // Add a API facing event, convert into delta directly
 void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_per_voice, struct delta **queue) {
     // fprintf(stderr, "time %.3f amy_event_to_deltas: base_osc %d\n", amy_global.time, base_osc);
@@ -794,13 +809,23 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
         EVENT_TO_DELTA_F(reverb_liveness, REVERB_LIVENESS)
         EVENT_TO_DELTA_F(reverb_damping, REVERB_DAMPING)
         EVENT_TO_DELTA_F(reverb_xover_hz, REVERB_XOVER_HZ)
-        EVENT_TO_DELTA_I(bus_dist_clip, BUS_DIST_CLIP_EN)
-        EVENT_TO_DELTA_I(bus_dist_fold, BUS_DIST_FOLD_EN)
-        EVENT_TO_DELTA_I(bus_dist_crush, BUS_DIST_CRUSH_EN)
-        EVENT_TO_DELTA_F(bus_dist_drive, BUS_DIST_DRIVE)
-        EVENT_TO_DELTA_I(bus_dist_bits, BUS_DIST_BITS)
-        EVENT_TO_DELTA_I(bus_dist_rate, BUS_DIST_RATE)
-        EVENT_TO_DELTA_F(bus_dist_mix, BUS_DIST_MIX)
+        // The distortion fields serve both scopes; naming no osc is what
+        // puts them at bus scope.  Only the CONST coef of drive and mix
+        // reaches a bus - the modulation coefs need per-note sources a bus
+        // sum doesn't have.
+        if (AMY_IS_UNSET(e->osc)) {
+            EVENT_TO_DELTA_I(dist_clip, BUS_DIST_CLIP_EN)
+            EVENT_TO_DELTA_I(dist_fold, BUS_DIST_FOLD_EN)
+            EVENT_TO_DELTA_I(dist_crush, BUS_DIST_CRUSH_EN)
+            EVENT_TO_DELTA_F(dist_drive_coefs[COEF_CONST], BUS_DIST_DRIVE)
+            EVENT_TO_DELTA_I(dist_bits, BUS_DIST_BITS)
+            EVENT_TO_DELTA_I(dist_rate, BUS_DIST_RATE)
+            EVENT_TO_DELTA_F(dist_mix_coefs[COEF_CONST], BUS_DIST_MIX)
+            // Spent at bus scope.  The per-voice fan-out in
+            // patches_event_has_voices names an osc for each voice osc, and
+            // would otherwise offer the same fields again at osc scope.
+            clear_dist_fields(e);
+        }
     }
     // Hereafter, d.osc refers to an osc
     d.osc = e->osc;
@@ -901,13 +926,17 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     }
     EVENT_TO_DELTA_I(note_source_channel, NOTE_SOURCE_CHANNEL)
     EVENT_TO_DELTA_I(filter_type, FILTER_TYPE)
-    EVENT_TO_DELTA_I(dist_clip, DIST_CLIP_EN)
-    EVENT_TO_DELTA_I(dist_fold, DIST_FOLD_EN)
-    EVENT_TO_DELTA_I(dist_crush, DIST_CRUSH_EN)
-    EVENT_TO_DELTA_I(dist_bits, DIST_BITS)
-    EVENT_TO_DELTA_I(dist_rate, DIST_RATE)
-    EVENT_TO_DELTA_COEFS_COEF0_SPECIAL(dist_drive_coefs, DIST_LOGDRIVE, logdrive_of_drive)
-    EVENT_TO_DELTA_COEFS(dist_mix_coefs, DIST_MIX)
+    // Only an event that named an osc distorts one: with no osc named, d.osc
+    // above defaulted to 0, and these fields have already gone to a bus.
+    if (AMY_IS_SET(e->osc)) {
+        EVENT_TO_DELTA_I(dist_clip, DIST_CLIP_EN)
+        EVENT_TO_DELTA_I(dist_fold, DIST_FOLD_EN)
+        EVENT_TO_DELTA_I(dist_crush, DIST_CRUSH_EN)
+        EVENT_TO_DELTA_I(dist_bits, DIST_BITS)
+        EVENT_TO_DELTA_I(dist_rate, DIST_RATE)
+        EVENT_TO_DELTA_COEFS_COEF0_SPECIAL(dist_drive_coefs, DIST_LOGDRIVE, logdrive_of_drive)
+        EVENT_TO_DELTA_COEFS(dist_mix_coefs, DIST_MIX)
+    }
     EVENT_TO_DELTA_I(algorithm, ALGORITHM)
     EVENT_TO_DELTA_I(eg_type[0], EG0_TYPE)
     EVENT_TO_DELTA_I(eg_type[1], EG1_TYPE)

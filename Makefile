@@ -127,7 +127,7 @@ CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_
          tests/test_bus_config tests/test_patch_slots \
          tests/test_synth_readout tests/test_log2_lut tests/test_clone_on_grow \
          tests/test_timebase_reset tests/test_osc_free_on_release \
-         tests/test_voice_osc_range tests/test_dist_coefs
+         tests/test_voice_osc_range tests/test_dist_coefs tests/test_dist_scope
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
