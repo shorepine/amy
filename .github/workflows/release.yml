@@ -11,8 +11,8 @@ name: Release
 # manual claude/bump-* flow that produced every release to date.
 #
 # WHAT THE BUMP TOUCHES: library.properties (the Arduino version, and the source
-# this workflow reads to compute the next one), amy/__init__.py's `release`
-# string, so `import amy; amy.release` reports the tag that copy shipped in, and
+# this workflow reads to compute the next one), amy/__init__.py's `version`
+# string, so `import amy; amy.version` reports the tag that copy shipped in, and
 # pyproject.toml's `version`, so a pip install reports the same number.
 #
 # WHY THIS DOESN'T LOOP: the bump branch, PR, and merge are all done with the
@@ -132,12 +132,12 @@ jobs:
           branch="bump-$NEXT"
           git switch -c "$branch"
           sed -i -E "s/^version=.*/version=$NEXT/" library.properties
-          # Keep the Python package's amy.release string in lockstep with
-          # library.properties, so `import amy; amy.release` reports the release
+          # Keep the Python package's amy.version string in lockstep with
+          # library.properties, so `import amy; amy.version` reports the release
           # tag this copy shipped in.
-          sed -i -E "s/^release = .*/release = '$NEXT'/" amy/__init__.py
-          grep -q "^release = '$NEXT'\$" amy/__init__.py \
-            || { echo "::error::Failed to bump amy.release in amy/__init__.py" >&2; exit 1; }
+          sed -i -E "s/^version = .*/version = '$NEXT'/" amy/__init__.py
+          grep -q "^version = '$NEXT'\$" amy/__init__.py \
+            || { echo "::error::Failed to bump amy.version in amy/__init__.py" >&2; exit 1; }
           # ...and the version pip reports for the installed package.
           sed -i -E "s/^version = .*/version = \"$NEXT\"/" pyproject.toml
           grep -q "^version = \"$NEXT\"\$" pyproject.toml \
