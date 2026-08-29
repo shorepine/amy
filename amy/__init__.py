@@ -13,7 +13,7 @@ except ImportError:
 # .github/workflows/release.yml, which rewrites the line below in the same commit
 # it tags -- so amy.version always matches the release tag it shipped in. Edit
 # with the workflow, not by hand.
-version = '1.2.161'
+version = '1.2.162'
 
 # BEGIN GENERATED - scripts/gen_amy_c_api.py
 # One backend resolver per C API function: prefer the CPython c_amy
