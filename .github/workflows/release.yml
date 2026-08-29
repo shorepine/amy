@@ -7,8 +7,13 @@ name: Release
 # WHY THE BUMP GOES THROUGH A PR: main is a protected branch (a PR is required to
 # merge, and enforce_admins is on), so the "Bump version to X" change to
 # library.properties cannot be pushed straight to main — not even by an admin or
-# a PAT. This workflow therefore opens a one-line bump PR and merges it, matching
-# the manual claude/bump-* flow that produced every release to date.
+# a PAT. This workflow therefore opens a bump PR and merges it, matching the
+# manual claude/bump-* flow that produced every release to date.
+#
+# WHAT THE BUMP TOUCHES: library.properties (the Arduino version, and the source
+# this workflow reads to compute the next one), amy/__init__.py's `release`
+# string, so `import amy; amy.release` reports the tag that copy shipped in, and
+# pyproject.toml's `version`, so a pip install reports the same number.
 #
 # WHY THIS DOESN'T LOOP: the bump branch, PR, and merge are all done with the
 # built-in GITHUB_TOKEN. Pushes and merges performed with GITHUB_TOKEN do NOT
@@ -127,12 +132,22 @@ jobs:
           branch="bump-$NEXT"
           git switch -c "$branch"
           sed -i -E "s/^version=.*/version=$NEXT/" library.properties
-          # Stage the version bump alongside the rebuilt web + Godot assets so the
+          # Keep the Python package's amy.release string in lockstep with
+          # library.properties, so `import amy; amy.release` reports the release
+          # tag this copy shipped in.
+          sed -i -E "s/^release = .*/release = '$NEXT'/" amy/__init__.py
+          grep -q "^release = '$NEXT'\$" amy/__init__.py \
+            || { echo "::error::Failed to bump amy.release in amy/__init__.py" >&2; exit 1; }
+          # ...and the version pip reports for the installed package.
+          sed -i -E "s/^version = .*/version = \"$NEXT\"/" pyproject.toml
+          grep -q "^version = \"$NEXT\"\$" pyproject.toml \
+            || { echo "::error::Failed to bump version in pyproject.toml" >&2; exit 1; }
+          # Stage the version bumps alongside the rebuilt web + Godot assets so the
           # single tagged commit carries all of them. Explicit paths (not
           # `commit -a`) keep any other files `make` touched (build/, src/patches.h,
           # amy/constants.py) out of the commit. If a regenerated file is
           # byte-identical, `git add` is a harmless no-op.
-          git add library.properties \
+          git add library.properties amy/__init__.py pyproject.toml \
             docs/amy.js docs/amy.wasm \
             godot/amy.gd
           git commit -m "Bump version to $NEXT, rebuild web + Godot API"
