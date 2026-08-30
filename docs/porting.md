@@ -25,6 +25,14 @@ Keep blocking IPC away from the realtime audio callback. If a receiver thread
 accepts commands, move them through a bounded queue and let the AMY/audio owner
 drain that queue between render blocks.
 
+Do not assume that a platform audio callback requests exactly one AMY render
+block. A host adapter should retain a cursor into the current AMY block, copy
+only the number of frames requested by the platform, and call
+`amy_simple_fill_buffer()` only after that block has been consumed. Drain
+queued control messages immediately before rendering the next AMY block so a
+command is never applied halfway through one block. This needs no additional
+full-block output ring.
+
 ## Linux/Android packet transport
 
 `src/amy_unix_socket.[ch]` implements a local pathname `AF_UNIX` /
@@ -88,6 +96,14 @@ supply the MIDI lifecycle hooks. The Oboe callback calls
 `amy_simple_fill_buffer()` only when it needs another AMY block and drains the
 socket queue before that block.
 
+An Android service and its client can remain separate processes while sharing
+one application UID. Put the pathname below the actual application-private
+`Context.getFilesDir()` and have the client discover that directory at runtime;
+do not hard-code `/data/user/...` or an Android user number. If the service
+publishes the socket only after audio has started, retrying `connect()` provides
+a readiness boundary without a fixed startup sleep. Clients should also
+reconnect after their application lifecycle restarts them.
+
 One declaration-only compatibility header is force-included in the C
 translation units so `pcm.c` sees allocators already supplied by `delay.c`
 under `AMY_DAISY`:
@@ -104,12 +120,30 @@ Do not link a second allocator implementation.
 The Android audio-level regression also caught an important gain detail:
 AMY's `V` bus/master control is a `0..10` scale, and final mixdown multiplies
 it by `0.1`. Therefore `V2.0` is 20% linear gain, while `V10.0` is full master
-gain. This differs from oscillator velocity/amplitude and per-synth `iV`.
+gain. This differs from oscillator velocity/amplitude and per-synth `iV`. A
+non-silence threshold must therefore be derived from the messages and patch
+used by that application rather than treated as a universal AMY dBFS value.
+
+For an end-to-end audio regression, a successful application launch or host
+audio log is not enough. A Linux-hosted Android emulator can mention its own
+PulseAudio device even while the guest service uses Oboe/AAudio. Check the
+guest output route, capture both the samples rendered by AMY and those handed
+to the platform callback, and compare them while independently rejecting
+silence and clipping. Emulator coverage proves build, packaging, process
+isolation, wire delivery, and digital audio flow; physical-device latency,
+xruns, speakers, suspend/resume, and audio-route changes still need hardware
+tests.
 
 The reference branch includes the Gradle AAR, private `:amy` service, Oboe
 adapter, transport-only Java client, emulator tests, and captured AMY-to-Oboe
 audio comparison. Those framework-specific files remain outside the core AMY
 tree.
+
+The same external boundary is exercised by the fork's current
+[Android integration branch][android-integration] and by a released
+[PySide6/Qt application package][qt-android-package]. The Qt deployment,
+Buildozer/python-for-android workarounds, first-run extraction warm-up, and APK
+signing remain downstream packaging concerns rather than AMY requirements.
 
 ## Godot lifecycle and Android reference
 
@@ -160,7 +194,9 @@ physical audio, MIDI, latency, or dropout behavior. See the [full Windows
 design and validation notes][windows-doc] for those limits.
 
 [android-oboe]: https://github.com/linuxificator/amy/tree/upstream/android-oboe
+[android-integration]: https://github.com/linuxificator/amy/tree/integration/amy_android
 [godot-android]: https://github.com/linuxificator/amy/tree/upstream/godot-android
+[qt-android-package]: https://github.com/linuxificator/LB_Omnichord/blob/f8724328b2e679533c7f3b97cee939e009b7eba7/amysynth_version/qt_frontend/packaging/android/README.md
 [windows-service]: https://github.com/linuxificator/LB_Omnichord/blob/387776cffad7394c1fcf6add1ced5d3e69a8d382/amysynth_version/qt_frontend/packaging/windows/amy_service.c
 [windows-launcher]: https://github.com/linuxificator/LB_Omnichord/blob/387776cffad7394c1fcf6add1ced5d3e69a8d382/amysynth_version/qt_frontend/packaging/windows/run_windows.ps1
 [windows-client]: https://github.com/linuxificator/LB_Omnichord/blob/387776cffad7394c1fcf6add1ced5d3e69a8d382/amysynth_version/qt_frontend/code/amy_transport.py
