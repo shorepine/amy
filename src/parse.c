@@ -677,6 +677,11 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         amy_external_midi_sync((uint8_t)atoi(message));
         return 1;
     }
+    else if (cmd == 'Q') {
+        // zQ: immutable nested-pattern lifecycle and playback controls.
+        // The action byte and its arguments consume the rest of this message.
+        return amy_parse_pattern_control_message(message);
+    }
     else fprintf(stderr, "Unrecognized transfer-level command '%s'\n", message - 1);
     return 0;
 }
@@ -725,6 +730,83 @@ void handle_ticks_message(char *message) {
         sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
                            num_vals >= 3, stripped);
     }
+}
+
+// J mirrors H for a staging nested-pattern definition:
+//
+//   J<pattern>,<tick>[,<period>[,<tag>]]<ordinary-event>Z
+//
+// The stored event has the root sequencer's exact tick/period/tag semantics.
+// J is recognized only at the ingest boundary, just like H; pattern payloads
+// are deliberately ordinary events, so a pattern cannot nest another pattern.
+void handle_pattern_ticks_message(char *message) {
+    assert(message[0] == 'J');
+    uint32_t values[4] = {0, 0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, values, 4, 0);
+    uint16_t schedule_len = 1 + _next_alpha(message + 1);
+    char *payload = message + schedule_len;
+    if (num_vals < 2 || payload[0] == '\0') {
+        fprintf(stderr, "pattern event requires pattern,tick and a payload\n");
+        return;
+    }
+    amy_pattern_add_wire(
+        values[0], values[1], num_vals >= 3 ? values[2] : 0,
+        num_vals >= 4 ? values[3] : 0, num_vals >= 4, payload);
+}
+
+// zQ actions:
+//   Bpattern,length,lane,priority  begin/replace staging definition
+//   Cpattern                       atomically commit staging definition
+//   Tpattern,mode,quantum[,tag]    trigger one-shot/loop, quantized in ticks
+//   Stag[,quantum]                 stop tagged instance(s), quantized
+//   Rpattern                       clear current and staging definitions
+uint16_t amy_parse_pattern_control_message(char *message) {
+    uint16_t consumed = (uint16_t)strlen(message) + 1;  // include the Q
+    if (message[0] == '\0') return consumed;
+    char action = message[0];
+    uint32_t values[4] = {0, 0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, values, 4, 0);
+    switch (action) {
+        case 'B':
+            if (num_vals >= 2) {
+                amy_pattern_begin(
+                    values[0], values[1],
+                    (uint16_t)(num_vals >= 3 ? values[2] : 0),
+                    (uint8_t)(num_vals >= 4 ? values[3] : 0));
+            } else {
+                fprintf(stderr, "zQB requires pattern,length\n");
+            }
+            break;
+        case 'C':
+            if (num_vals >= 1) amy_pattern_commit(values[0]);
+            else fprintf(stderr, "zQC requires pattern\n");
+            break;
+        case 'T':
+            if (num_vals >= 1) {
+                amy_pattern_trigger(
+                    values[0],
+                    (uint8_t)(num_vals >= 2 ? values[1]
+                                           : AMY_PATTERN_ONE_SHOT),
+                    num_vals >= 3 ? values[2] : 0,
+                    num_vals >= 4 ? values[3] : AMY_PATTERN_UNTAGGED);
+            } else {
+                fprintf(stderr, "zQT requires pattern\n");
+            }
+            break;
+        case 'S':
+            if (num_vals >= 1)
+                amy_pattern_stop(values[0], num_vals >= 2 ? values[1] : 0);
+            else fprintf(stderr, "zQS requires instance tag\n");
+            break;
+        case 'R':
+            if (num_vals >= 1) amy_pattern_clear(values[0]);
+            else fprintf(stderr, "zQR requires pattern\n");
+            break;
+        default:
+            fprintf(stderr, "unrecognized zQ pattern action '%c'\n", action);
+            break;
+    }
+    return consumed;
 }
 
 // given a string return a parsed event
@@ -906,4 +988,3 @@ int amy_parse_message(char * message, amy_event *e) {
     // Return exactly how many characters we used.
     return pos;
 }
-

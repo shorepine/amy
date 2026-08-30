@@ -373,6 +373,60 @@ def send(**kwargs):
     send_raw(m)
 
 
+def pattern_begin(pattern, length_ticks, lane=0, priority=0):
+    """Begin a new staging definition for a finite-length sequencer pattern."""
+    send_raw("zQB%d,%d,%d,%dZ" %
+             (pattern, length_ticks, lane, priority))
+
+
+def pattern_event_wire(pattern, tick, wire, period=None, tag=None):
+    """Add one ordinary wire event to a staging pattern.
+
+    ``tick``, ``period`` and ``tag`` have the same meanings as the values in
+    ``send(..., ticks=...)``. The payload must be exactly one ordinary AMY
+    message; scheduling or triggering another pattern is deliberately refused.
+    """
+    if not isinstance(wire, str) or not wire.endswith('Z'):
+        raise ValueError("pattern wire payload must be one Z-terminated string")
+    values = [str(int(pattern)), str(int(tick))]
+    if period is not None or tag is not None:
+        values.append('' if period is None else str(int(period)))
+    if tag is not None:
+        values.append(str(int(tag)))
+    send_raw('J' + ','.join(values) + wire)
+
+
+def pattern_event(pattern, tick, period=None, tag=None, **kwargs):
+    """Add an event built with the normal ``amy.message`` keyword API."""
+    if 'ticks' in kwargs:
+        raise ValueError("use pattern_event's tick, period and tag arguments")
+    pattern_event_wire(pattern, tick, message(**kwargs), period, tag)
+
+
+def pattern_commit(pattern):
+    """Atomically publish a staging pattern for future playback."""
+    send_raw("zQC%dZ" % pattern)
+
+
+def pattern_trigger(pattern, mode=AMY_PATTERN_ONE_SHOT, quantize_ticks=0,
+                    instance_tag=None):
+    """Start a committed pattern in one-shot or loop mode on a tick boundary."""
+    values = [str(int(pattern)), str(int(mode)), str(int(quantize_ticks))]
+    if instance_tag is not None:
+        values.append(str(int(instance_tag)))
+    send_raw('zQT' + ','.join(values) + 'Z')
+
+
+def pattern_stop(instance_tag, quantize_ticks=0):
+    """Stop all instances with this tag on the requested tick boundary."""
+    send_raw("zQS%d,%dZ" % (instance_tag, quantize_ticks))
+
+
+def pattern_clear(pattern):
+    """Remove a pattern definition; already-running one-shots finish safely."""
+    send_raw("zQR%dZ" % pattern)
+
+
 # Plots a time domain and spectra of audio
 def show(data):
     import matplotlib.pyplot as plt

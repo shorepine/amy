@@ -47,7 +47,49 @@ static volatile bool sequencer_external_clock = false;
 // flag makes those nested calls no-ops so a tick is never processed twice.
 static volatile bool wire_firing = false;
 
-void sequencer_init(int max_sequencer_tags) {
+// Nested patterns deliberately reuse sequence_info_t: each definition is a
+// small sequencer with the same tick/period/tag semantics as the root table.
+// Definitions are immutable after commit.  An instance only adds an origin,
+// a finite/looping playback mode and lane priority; pattern events themselves
+// are always ordinary AMY events, so nesting stops at exactly two levels.
+typedef struct pattern_definition_t {
+    sequence_info_t *events;
+    int32_t first_active;
+    int32_t anon_cursor;
+    uint32_t length_ticks;
+    uint16_t lane;
+    uint8_t priority;
+    uint32_t refs;
+    bool retired;
+} pattern_definition_t;
+
+typedef struct pattern_slot_t {
+    pattern_definition_t *current;
+    pattern_definition_t *staging;
+} pattern_slot_t;
+
+typedef struct pattern_instance_t {
+    pattern_definition_t *definition;
+    uint32_t start_tick;
+    uint32_t stop_tick;
+    uint32_t instance_tag;
+    uint8_t mode;
+    bool occupied;
+} pattern_instance_t;
+
+static pattern_slot_t *pattern_slots = NULL;
+static pattern_instance_t *pattern_instances = NULL;
+static int32_t max_pattern_slots = 0;
+static int32_t max_pattern_event_tags = 0;
+static int32_t max_pattern_players = 0;
+
+static void pattern_definition_free(pattern_definition_t *definition);
+static void pattern_instances_reset(void);
+static void pattern_process_tick(uint32_t tick);
+
+void sequencer_init(int max_sequencer_tags, uint32_t max_patterns,
+                    uint32_t max_pattern_tags,
+                    uint32_t max_pattern_instances) {
     // These are statics, so a stop/start of AMY within one process needs them
     // put back to their boot state (internal clock, running).
     sequencer_running = true;
@@ -65,6 +107,50 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+
+    // malloc_caps takes a uint32_t byte count and the active-list indices use
+    // -1 as their sentinel. Refuse impossible configurations before either
+    // conversion can wrap into a small allocation followed by a large write.
+    max_pattern_slots = max_patterns <= INT32_MAX
+        && max_patterns <= UINT32_MAX / sizeof(pattern_slot_t)
+        ? (int32_t)max_patterns : 0;
+    max_pattern_event_tags = max_pattern_tags <= INT32_MAX - AMY_ANON_SEQUENCE_SLOTS
+        && max_pattern_tags + AMY_ANON_SEQUENCE_SLOTS
+               <= UINT32_MAX / sizeof(sequence_info_t)
+        ? (int32_t)max_pattern_tags : 0;
+    max_pattern_players = max_pattern_instances <= INT32_MAX
+        && max_pattern_instances <= UINT32_MAX / sizeof(pattern_instance_t)
+        ? (int32_t)max_pattern_instances : 0;
+    if (max_pattern_slots == 0 && max_patterns != 0)
+        fprintf(stderr, "max_patterns is too large, nested patterns disabled\n");
+    if (max_pattern_event_tags == 0 && max_pattern_tags != 0)
+        fprintf(stderr, "max_pattern_tags is too large, nested patterns disabled\n");
+    if (max_pattern_players == 0 && max_pattern_instances != 0)
+        fprintf(stderr, "max_pattern_instances is too large, nested patterns disabled\n");
+    if (max_pattern_slots > 0) {
+        pattern_slots = (pattern_slot_t *)malloc_caps(
+            (uint32_t)max_pattern_slots * sizeof(pattern_slot_t),
+            amy_global.config.ram_caps_synth);
+        if (pattern_slots == NULL) {
+            amy_oom("pattern slots");
+            max_pattern_slots = 0;
+        } else {
+            bzero(pattern_slots,
+                  (size_t)max_pattern_slots * sizeof(pattern_slot_t));
+        }
+    }
+    if (max_pattern_players > 0) {
+        pattern_instances = (pattern_instance_t *)malloc_caps(
+            (uint32_t)max_pattern_players * sizeof(pattern_instance_t),
+            amy_global.config.ram_caps_synth);
+        if (pattern_instances == NULL) {
+            amy_oom("pattern instances");
+            max_pattern_players = 0;
+        } else {
+            bzero(pattern_instances,
+                  (size_t)max_pattern_players * sizeof(pattern_instance_t));
+        }
+    }
     // We are read to go.
     sequencer_recompute();
 }
@@ -82,6 +168,10 @@ void sequencer_reset() {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+    // Stored definitions are analogous to stored patches and survive a
+    // sequencer reset.  Running/pending instances are transport state and do
+    // not: RESET_SEQUENCER must silence every sequencer level.
+    pattern_instances_reset();
 }
 
 void sequencer_deinit() {
@@ -91,6 +181,22 @@ void sequencer_deinit() {
         sequences = NULL;  // sequencer_check_and_fill guards on this
     }
     max_sequences = 0;
+    pattern_instances_reset();
+    if (pattern_slots != NULL) {
+        for (int32_t i = 0; i < max_pattern_slots; ++i) {
+            pattern_definition_free(pattern_slots[i].staging);
+            pattern_definition_free(pattern_slots[i].current);
+        }
+        free(pattern_slots);
+        pattern_slots = NULL;
+    }
+    if (pattern_instances != NULL) {
+        free(pattern_instances);
+        pattern_instances = NULL;
+    }
+    max_pattern_slots = 0;
+    max_pattern_event_tags = 0;
+    max_pattern_players = 0;
 }
 
 void sequencer_debug() {
@@ -156,6 +262,435 @@ static void active_unlink(int32_t tag)
         prev = &sequences[*prev].next_active;
     if (*prev == tag)
         *prev = sequences[tag].next_active;   /* one store, again */
+}
+
+static int32_t pattern_total_slots(void) {
+    return max_pattern_event_tags + AMY_ANON_SEQUENCE_SLOTS;
+}
+
+static pattern_definition_t *pattern_definition_new(
+    uint32_t length_ticks, uint16_t lane, uint8_t priority
+) {
+    if (length_ticks == 0 || max_pattern_event_tags <= 0) return NULL;
+    int32_t total_slots = pattern_total_slots();
+    if (total_slots <= 0) return NULL;
+
+    pattern_definition_t *definition =
+        (pattern_definition_t *)malloc_caps(
+            sizeof(pattern_definition_t), amy_global.config.ram_caps_events);
+    if (definition == NULL) {
+        amy_oom("pattern definition");
+        return NULL;
+    }
+    bzero(definition, sizeof(pattern_definition_t));
+    definition->events = (sequence_info_t *)malloc_caps(
+        (uint32_t)total_slots * sizeof(sequence_info_t),
+        amy_global.config.ram_caps_events);
+    if (definition->events == NULL) {
+        amy_oom("pattern events");
+        free(definition);
+        return NULL;
+    }
+    for (int32_t i = 0; i < total_slots; ++i) {
+        definition->events[i].wire = NULL;
+        definition->events[i].tick = 0;
+        definition->events[i].period = 0;
+        definition->events[i].next_active = -1;
+    }
+    definition->first_active = -1;
+    definition->anon_cursor = 0;
+    definition->length_ticks = length_ticks;
+    definition->lane = lane;
+    definition->priority = priority;
+    return definition;
+}
+
+static void pattern_definition_free(pattern_definition_t *definition) {
+    if (definition == NULL) return;
+    if (definition->events != NULL) {
+        int32_t total_slots = pattern_total_slots();
+        for (int32_t i = 0; i < total_slots; ++i) {
+            if (definition->events[i].wire != NULL)
+                free(definition->events[i].wire);
+        }
+        free(definition->events);
+    }
+    free(definition);
+}
+
+static void pattern_active_link(pattern_definition_t *definition,
+                                int32_t tag) {
+    int32_t *previous = &definition->first_active;
+    while (*previous != -1 && *previous < tag)
+        previous = &definition->events[*previous].next_active;
+    if (*previous == tag) return;
+    definition->events[tag].next_active = *previous;
+    *previous = tag;
+}
+
+static void pattern_active_unlink(pattern_definition_t *definition,
+                                  int32_t tag) {
+    int32_t *previous = &definition->first_active;
+    while (*previous != -1 && *previous != tag)
+        previous = &definition->events[*previous].next_active;
+    if (*previous == tag)
+        *previous = definition->events[tag].next_active;
+    definition->events[tag].next_active = -1;
+}
+
+static bool pattern_index_valid(uint32_t pattern) {
+    if (pattern_slots != NULL && pattern < (uint32_t)max_pattern_slots)
+        return true;
+    fprintf(stderr, "pattern %" PRIu32 " is outside configured range 0..%" PRIi32 "\n",
+            pattern, max_pattern_slots > 0 ? max_pattern_slots - 1 : -1);
+    return false;
+}
+
+static bool pattern_payload_is_leaf(const char *wire) {
+    if (wire == NULL || wire[0] == '\0') return false;
+    // H/J schedule commands are only meaningful at the root ingest boundary;
+    // zQ is the pattern control family.  Reject all three explicitly so a
+    // stored pattern cannot create a third sequencer level.
+    if (wire[0] == 'H' || wire[0] == 'J' || strstr(wire, "zQ") != NULL) {
+        fprintf(stderr, "nested pattern events cannot schedule or trigger patterns\n");
+        return false;
+    }
+    const char *end = strchr(wire, 'Z');
+    if (end == NULL || end[1] != '\0') {
+        fprintf(stderr, "nested pattern event must be one Z-terminated wire message\n");
+        return false;
+    }
+    return true;
+}
+
+uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks,
+                          uint16_t lane, uint8_t priority) {
+    if (!pattern_index_valid(pattern) || length_ticks == 0) return 0;
+    pattern_definition_t *definition = pattern_definition_new(
+        length_ticks, lane, priority);
+    if (definition == NULL) return 0;
+
+    amy_grab_lock();
+    pattern_definition_t *old_staging = pattern_slots[pattern].staging;
+    pattern_slots[pattern].staging = definition;
+    amy_release_lock();
+    pattern_definition_free(old_staging);
+    return 1;
+}
+
+uint8_t amy_pattern_add_wire(uint32_t pattern, uint32_t tick,
+                             uint32_t period, uint32_t tag, bool has_tag,
+                             const char *wire) {
+    if (!pattern_index_valid(pattern) || !pattern_payload_is_leaf(wire))
+        return 0;
+
+    size_t length = strlen(wire);
+    char *copy = (char *)malloc_caps((uint32_t)length + 1,
+                                    amy_global.config.ram_caps_events);
+    if (copy == NULL) {
+        amy_oom("pattern event wire");
+        return 0;
+    }
+    memcpy(copy, wire, length + 1);
+
+    amy_grab_lock();
+    pattern_definition_t *definition = pattern_slots[pattern].staging;
+    if (definition == NULL) {
+        amy_release_lock();
+        free(copy);
+        fprintf(stderr, "pattern %" PRIu32 " has no staging definition\n",
+                pattern);
+        return 0;
+    }
+
+    if (has_tag) {
+        if (tag >= (uint32_t)max_pattern_event_tags) {
+            amy_release_lock();
+            free(copy);
+            fprintf(stderr, "pattern tag %" PRIu32 " is outside configured range 0..%" PRIi32 "\n",
+                    tag, max_pattern_event_tags - 1);
+            return 0;
+        }
+    } else {
+        // Keep the root sequencer's exact anonymous zero/zero semantics.
+        if (tick == 0 && period == 0) {
+            amy_release_lock();
+            free(copy);
+            return 0;
+        }
+        tag = (uint32_t)(max_pattern_event_tags + definition->anon_cursor);
+        definition->anon_cursor =
+            (definition->anon_cursor + 1) % AMY_ANON_SEQUENCE_SLOTS;
+    }
+
+    sequence_info_t *event = &definition->events[tag];
+    if (event->wire != NULL) free(event->wire);
+    event->wire = NULL;
+    event->tick = 0;
+    event->period = 0;
+    pattern_active_unlink(definition, (int32_t)tag);
+    if (tick == 0 && period == 0) {
+        amy_release_lock();
+        free(copy);
+        return 0;
+    }
+    event->tick = tick;
+    event->period = period;
+    event->wire = copy;
+    pattern_active_link(definition, (int32_t)tag);
+    amy_release_lock();
+    return 1;
+}
+
+uint8_t amy_pattern_add_event(uint32_t pattern, const amy_event *event) {
+    if (event == NULL) return 0;
+    amy_event payload = *event;
+    uint32_t tick = AMY_IS_SET(payload.ticks[TICKS_TICK])
+        ? payload.ticks[TICKS_TICK] : 0;
+    uint32_t period = AMY_IS_SET(payload.ticks[TICKS_PERIOD])
+        ? payload.ticks[TICKS_PERIOD] : 0;
+    bool has_tag = AMY_IS_SET(payload.ticks[TICKS_TAG]);
+    uint32_t tag = has_tag ? payload.ticks[TICKS_TAG] : 0;
+    AMY_UNSET(payload.ticks[TICKS_TICK]);
+    AMY_UNSET(payload.ticks[TICKS_PERIOD]);
+    AMY_UNSET(payload.ticks[TICKS_TAG]);
+
+    char *wire = (char *)malloc_caps(MAX_MESSAGE_LEN,
+                                     amy_global.config.ram_caps_events);
+    if (wire == NULL) {
+        amy_oom("pattern add event");
+        return 0;
+    }
+    sprint_event(&payload, wire, MAX_MESSAGE_LEN, /* wirecode= */ true);
+    uint8_t result = amy_pattern_add_wire(
+        pattern, tick, period, tag, has_tag, wire);
+    free(wire);
+    return result;
+}
+
+uint8_t amy_pattern_commit(uint32_t pattern) {
+    if (!pattern_index_valid(pattern)) return 0;
+    amy_grab_lock();
+    pattern_definition_t *replacement = pattern_slots[pattern].staging;
+    if (replacement == NULL) {
+        amy_release_lock();
+        fprintf(stderr, "pattern %" PRIu32 " has no staging definition\n",
+                pattern);
+        return 0;
+    }
+    pattern_definition_t *old = pattern_slots[pattern].current;
+    pattern_slots[pattern].current = replacement;
+    pattern_slots[pattern].staging = NULL;
+    if (old != NULL) old->retired = true;
+    bool free_old = old != NULL && old->refs == 0;
+    amy_release_lock();
+    if (free_old) pattern_definition_free(old);
+    return 1;
+}
+
+uint8_t amy_pattern_clear(uint32_t pattern) {
+    if (!pattern_index_valid(pattern)) return 0;
+    amy_grab_lock();
+    pattern_definition_t *current = pattern_slots[pattern].current;
+    pattern_definition_t *staging = pattern_slots[pattern].staging;
+    pattern_slots[pattern].current = NULL;
+    pattern_slots[pattern].staging = NULL;
+    if (current != NULL) current->retired = true;
+    bool free_current = current != NULL && current->refs == 0;
+    amy_release_lock();
+    pattern_definition_free(staging);
+    if (free_current) pattern_definition_free(current);
+    return current != NULL || staging != NULL;
+}
+
+static bool tick_reached(uint32_t now, uint32_t target) {
+    return (int32_t)(now - target) >= 0;
+}
+
+static uint32_t pattern_activation_tick(uint32_t quantum) {
+    uint32_t now = amy_global.sequencer_tick_count;
+    if (quantum == 0) return wire_firing ? now : now + 1;
+    uint32_t remainder = now % quantum;
+    if (wire_firing && remainder == 0) return now;
+    return now + (remainder == 0 ? quantum : quantum - remainder);
+}
+
+uint8_t amy_pattern_trigger(uint32_t pattern, uint8_t mode,
+                            uint32_t quantize_ticks,
+                            uint32_t instance_tag) {
+    if (!pattern_index_valid(pattern)
+        || (mode != AMY_PATTERN_ONE_SHOT && mode != AMY_PATTERN_LOOP))
+        return 0;
+
+    amy_grab_lock();
+    pattern_definition_t *definition = pattern_slots[pattern].current;
+    if (definition == NULL) {
+        amy_release_lock();
+        fprintf(stderr, "pattern %" PRIu32 " is not committed\n", pattern);
+        return 0;
+    }
+    int32_t free_index = -1;
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        if (!pattern_instances[i].occupied) {
+            free_index = i;
+            break;
+        }
+    }
+    if (free_index < 0) {
+        amy_release_lock();
+        fprintf(stderr, "no free nested pattern instance\n");
+        return 0;
+    }
+
+    uint32_t start_tick = pattern_activation_tick(quantize_ticks);
+    if (instance_tag != AMY_PATTERN_UNTAGGED) {
+        for (int32_t i = 0; i < max_pattern_players; ++i) {
+            pattern_instance_t *existing = &pattern_instances[i];
+            if (existing->occupied && existing->instance_tag == instance_tag
+                && (existing->stop_tick == UINT32_MAX
+                    || tick_reached(existing->stop_tick, start_tick))) {
+                existing->stop_tick = start_tick;
+            }
+        }
+    }
+
+    pattern_instance_t *instance = &pattern_instances[free_index];
+    instance->definition = definition;
+    instance->start_tick = start_tick;
+    instance->stop_tick = UINT32_MAX;
+    instance->instance_tag = instance_tag;
+    instance->mode = mode;
+    instance->occupied = true;
+    definition->refs++;
+    amy_release_lock();
+    return 1;
+}
+
+uint8_t amy_pattern_stop(uint32_t instance_tag, uint32_t quantize_ticks) {
+    if (instance_tag == AMY_PATTERN_UNTAGGED) return 0;
+    uint32_t stop_tick = pattern_activation_tick(quantize_ticks);
+    uint8_t found = 0;
+    amy_grab_lock();
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (instance->occupied && instance->instance_tag == instance_tag) {
+            instance->stop_tick = stop_tick;
+            found = 1;
+        }
+    }
+    amy_release_lock();
+    return found;
+}
+
+static void pattern_instance_release(pattern_instance_t *instance) {
+    pattern_definition_t *definition = instance->definition;
+    bzero(instance, sizeof(pattern_instance_t));
+    if (definition != NULL && definition->refs > 0) definition->refs--;
+    if (definition != NULL && definition->retired && definition->refs == 0)
+        pattern_definition_free(definition);
+}
+
+static void pattern_instances_reset(void) {
+    if (pattern_instances == NULL) return;
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        if (pattern_instances[i].occupied)
+            pattern_instance_release(&pattern_instances[i]);
+    }
+}
+
+void sequencer_rebase_patterns(uint32_t old_tick) {
+    if (pattern_instances == NULL) return;
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (!instance->occupied) continue;
+        instance->start_tick -= old_tick;
+        if (instance->stop_tick != UINT32_MAX) {
+            instance->stop_tick = tick_reached(old_tick, instance->stop_tick)
+                ? 0 : instance->stop_tick - old_tick;
+        }
+    }
+}
+
+static bool pattern_instance_running(const pattern_instance_t *instance,
+                                     uint32_t tick) {
+    if (!instance->occupied || !tick_reached(tick, instance->start_tick))
+        return false;
+    if (instance->stop_tick != UINT32_MAX
+        && tick_reached(tick, instance->stop_tick))
+        return false;
+    uint32_t elapsed = tick - instance->start_tick;
+    return instance->mode == AMY_PATTERN_LOOP
+        || elapsed < instance->definition->length_ticks;
+}
+
+static bool pattern_instance_audible(const pattern_instance_t *instance,
+                                     uint32_t tick) {
+    if (!pattern_instance_running(instance, tick)) return false;
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        const pattern_instance_t *other = &pattern_instances[i];
+        if (other == instance || !pattern_instance_running(other, tick))
+            continue;
+        if (other->definition->lane == instance->definition->lane
+            && other->definition->priority > instance->definition->priority)
+            return false;
+    }
+    return true;
+}
+
+static void pattern_process_tick(uint32_t tick) {
+    if (pattern_instances == NULL) return;
+
+    // Retire stopped/finished instances before determining lane priority, so
+    // a completed fill cannot suppress the background pattern for one extra
+    // tick.  A replacement scheduled on this exact tick takes effect here.
+    amy_grab_lock();
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (!instance->occupied || !tick_reached(tick, instance->start_tick))
+            continue;
+        uint32_t elapsed = tick - instance->start_tick;
+        bool stopped = instance->stop_tick != UINT32_MAX
+            && tick_reached(tick, instance->stop_tick);
+        bool finished = instance->mode == AMY_PATTERN_ONE_SHOT
+            && elapsed >= instance->definition->length_ticks;
+        if (stopped || finished) pattern_instance_release(instance);
+    }
+    amy_release_lock();
+
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        amy_grab_lock();
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (!pattern_instance_audible(instance, tick)) {
+            amy_release_lock();
+            continue;
+        }
+        pattern_definition_t *definition = instance->definition;
+        uint32_t local_tick = tick - instance->start_tick;
+        if (instance->mode == AMY_PATTERN_LOOP)
+            local_tick %= definition->length_ticks;
+        // Keep the immutable definition alive while ordinary event playback
+        // runs without the lock. A payload can itself execute
+        // RESET_SEQUENCER, which releases the instance that owned this ref.
+        definition->refs++;
+        amy_release_lock();
+
+        int32_t tag = definition->first_active;
+        while (tag != -1) {
+            sequence_info_t *event = &definition->events[tag];
+            int32_t next = event->next_active;
+            bool hit = event->period != 0
+                ? local_tick % event->period == event->tick
+                : local_tick == event->tick;
+            if (hit && event->wire != NULL) amy_play_message(event->wire);
+            tag = next;
+        }
+
+        amy_grab_lock();
+        if (definition->refs > 0) definition->refs--;
+        bool free_definition = definition->retired && definition->refs == 0;
+        amy_release_lock();
+        if (free_definition) pattern_definition_free(definition);
+    }
 }
 
 void sequencer_recompute() {
@@ -300,6 +835,11 @@ static void sequencer_process_tick(void) {
         }
         tag = next;
     }
+    // Root items fire first.  A root event can therefore start a pattern on
+    // this exact tick; the new instance then emits its local tick-zero events
+    // below.  Pattern payloads cannot trigger another pattern, fixing nesting
+    // at two levels and keeping the processing cost bounded.
+    pattern_process_tick(amy_global.sequencer_tick_count);
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
         amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
@@ -338,7 +878,10 @@ void sequencer_midi_start() {
     // If external clock was not previously enabled, keep using internal clock
     // so the sequencer advances on its own without needing F8 ticks.
     if (sequencer_external_clock) {
+        amy_grab_lock();
+        sequencer_rebase_patterns(amy_global.sequencer_tick_count);
         amy_global.sequencer_tick_count = 0;
+        amy_release_lock();
     }
     // Reset the tick timer to now so sequencer_check_and_fill doesn't try to
     // catch up all the ticks that elapsed while stopped.

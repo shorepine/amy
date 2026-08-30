@@ -364,6 +364,13 @@ enum coefs{
 #define TICKS_PERIOD 1
 #define TICKS_TAG 2
 
+// Nested sequencer pattern playback modes.  Patterns use the same
+// tick/period/tag event model as the root sequencer; only their lifetime is
+// different.  UINT32_MAX means that an instance is deliberately untagged.
+#define AMY_PATTERN_ONE_SHOT 0
+#define AMY_PATTERN_LOOP 1
+#define AMY_PATTERN_UNTAGGED 4294967295
+
 // Reset masks
 #define RESET_SEQUENCER 4096
 #define RESET_ALL_OSCS 8192
@@ -953,6 +960,14 @@ typedef struct  {
     // device ids for miniaudio platforms
     int8_t capture_device_id;
     int8_t playback_device_id;
+
+    // Appended to preserve every pre-existing config field's offset and the
+    // meaning of positional initializers. Pattern event tables are allocated
+    // only when a definition is authored; set max_patterns to 0 to disable
+    // the feature entirely on a memory-constrained target.
+    uint32_t max_patterns;
+    uint32_t max_pattern_tags;
+    uint32_t max_pattern_instances;
 
 } amy_config_t;
 

@@ -48,6 +48,9 @@ amy_config_t amy_default_config() {
     c.max_oscs = 250;
     c.max_buses = AMY_DEFAULT_NUM_BUSES;
     c.max_sequencer_tags = 256;
+    c.max_patterns = 32;
+    c.max_pattern_tags = 64;
+    c.max_pattern_instances = 32;
     c.max_voices = 64;
     c.max_synths = 64;
     c.max_memory_patches = 32;
@@ -297,6 +300,8 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
     // command, only recognized as the very first character of the message.
     if (message[0] == 'H') {
         handle_ticks_message(message);
+    } else if (message[0] == 'J') {
+        handle_pattern_ticks_message(message);
     } else {
         // Not scheduled: parse and play every command in the message now.
         amy_play_message(message);

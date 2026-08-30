@@ -1298,7 +1298,10 @@ int8_t oscs_init() {
     algo_init();
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
-    sequencer_init(amy_global.config.max_sequencer_tags);
+    sequencer_init(amy_global.config.max_sequencer_tags,
+                   amy_global.config.max_patterns,
+                   amy_global.config.max_pattern_tags,
+                   amy_global.config.max_pattern_instances);
     if(pcm_samples)  pcm_init();
     if(AMY_HAS_CUSTOM)  custom_init();
     // synth and msynth are now pointers to arrays of pointers to dynamically-allocated synth structures.
@@ -2476,6 +2479,7 @@ int16_t * amy_fill_buffer() {
         amy_global.total_blocks = 0;
         amy_global.total_samples = 0;
         amy_global.time = 0;
+        sequencer_rebase_patterns(amy_global.sequencer_tick_count);
         amy_global.sequencer_tick_count = 0;
         sequencer_recompute();
         amy_global.reset_timebase_pending = 0;
