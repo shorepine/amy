@@ -263,6 +263,17 @@ drums, fills, instrument roles, fill selection and continuation policy outside
 AMY. AMY only stores and schedules ordinary wire events, so the same mechanism
 can represent any reusable musical phrase.
 
+I also use stored one-shots for the Omnichord's arpeggios to get better control
+over their start and stop behavior. Each sounding arpeggio note is a short
+`ONE_SHOT` containing its note-on and matching note-off. A live rate, direction
+or pitch change can replace future root triggers or definitions without
+deleting the release owned by a child which has already started; that child
+keeps its immutable definition and ends at its original gate. This avoids both
+an abrupt all-off and a host timer, while remaining ordinary reusable AMY event
+scheduling rather than an arpeggiator-specific engine feature. The downstream
+wire and overlap tests are documented in [the Omnichord sequencer
+contract](https://github.com/linuxificator/LB_Omnichord/blob/feature/drum_fills/amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md).
+
 I chose a playback mode on an otherwise identical stored definition instead
 of adding a separate fill abstraction. `LOOP` makes a phrase repeat until it
 is stopped; `ONE_SHOT` gives the same phrase a finite lifetime. This reuses the
