@@ -288,6 +288,28 @@ sound is not forcibly note-offed. This lets a one-shot fill temporarily cover
 a looping rhythm, which resumes on the first tick after the fill. Different
 lanes, or equal priorities on one lane, play together.
 
+For explicit control over an already-running pattern, give its instance a tag
+and schedule `pattern_mute(tag, duration_ticks)`. A mute suppresses only new
+events; the target's local clock and any already-ringing sounds continue. It
+therefore resumes at its original phase on the first tick after the duration.
+`zQM` is the only pattern control allowed as a stored pattern event because it
+cannot start or schedule another pattern:
+
+```python
+amy.pattern_begin(1, length_ticks=96, lane=1, priority=0)
+amy.pattern_event_wire(1, 0, "zQM100,96Z", period=96, tag=0)
+amy.pattern_event(1, 0, period=96, tag=1, synth=10, note=38, vel=1)
+amy.pattern_commit(1)
+```
+
+`pattern_schedule()` puts a pattern trigger in the root sequencer relative to
+the next requested quantization boundary. Its `offset_ticks` is relative to
+that boundary; a nonzero `period_ticks` repeats the trigger. The supplied
+`sequence_tag` is a normal root tag, so `send(ticks="0,0,tag")` removes future
+triggers without truncating a one-shot which is already playing. This is useful
+for sparse arrangements: the child definition can stay short while the root
+event repeats it over a much longer cycle.
+
 Definitions are immutable after commit. Replacing or clearing one affects new
 triggers only; an already-running instance safely finishes its version.
 `RESET_SEQUENCER` stops root events and all pattern instances, but keeps stored
@@ -297,8 +319,9 @@ of a pending quantized start. The sequencer transport (`sequencer_run` / `zY`)
 clocks both levels.
 
 Nesting is deliberately limited to two levels: a root event may trigger a
-pattern, but pattern payloads must be ordinary AMY events and cannot contain
-`H`, `J`, or `zQ`. This keeps execution and memory bounded.
+pattern, but pattern payloads cannot contain `H`, `J`, or a pattern-creating
+`zQ` control. The finite `zQM` gate is the sole leaf-control exception. This
+keeps execution and memory bounded.
 
 ## Core oscillators
 
@@ -534,5 +557,4 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
 

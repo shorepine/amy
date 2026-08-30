@@ -758,14 +758,17 @@ void handle_pattern_ticks_message(char *message) {
 //   Bpattern,length,lane,priority  begin/replace staging definition
 //   Cpattern                       atomically commit staging definition
 //   Tpattern,mode,quantum[,tag]    trigger one-shot/loop, quantized in ticks
+//   Apattern,mode,offset,period,quantum,sequence_tag[,instance_tag]
+//                                  schedule a quantized relative root trigger
 //   Stag[,quantum]                 stop tagged instance(s), quantized
+//   Mtag,duration                   mute matching running instance(s)
 //   Rpattern                       clear current and staging definitions
 uint16_t amy_parse_pattern_control_message(char *message) {
     uint16_t consumed = (uint16_t)strlen(message) + 1;  // include the Q
     if (message[0] == '\0') return consumed;
     char action = message[0];
-    uint32_t values[4] = {0, 0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, values, 4, 0);
+    uint32_t values[7] = {0, 0, 0, 0, 0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, values, 7, 0);
     switch (action) {
         case 'B':
             if (num_vals >= 2) {
@@ -793,10 +796,25 @@ uint16_t amy_parse_pattern_control_message(char *message) {
                 fprintf(stderr, "zQT requires pattern\n");
             }
             break;
+        case 'A':
+            if (num_vals >= 6) {
+                amy_pattern_schedule(
+                    values[0], (uint8_t)values[1], values[2], values[3],
+                    values[4], values[5],
+                    num_vals >= 7 ? values[6] : AMY_PATTERN_UNTAGGED);
+            } else {
+                fprintf(stderr,
+                        "zQA requires pattern,mode,offset,period,quantum,sequence_tag\n");
+            }
+            break;
         case 'S':
             if (num_vals >= 1)
                 amy_pattern_stop(values[0], num_vals >= 2 ? values[1] : 0);
             else fprintf(stderr, "zQS requires instance tag\n");
+            break;
+        case 'M':
+            if (num_vals >= 2) amy_pattern_mute(values[0], values[1]);
+            else fprintf(stderr, "zQM requires instance tag,duration\n");
             break;
         case 'R':
             if (num_vals >= 1) amy_pattern_clear(values[0]);

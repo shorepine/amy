@@ -133,7 +133,12 @@ uint8_t amy_pattern_add_wire(uint32_t pattern, uint32_t tick,
 uint8_t amy_pattern_commit(uint32_t pattern);
 uint8_t amy_pattern_trigger(uint32_t pattern, uint8_t mode,
                             uint32_t quantize_ticks, uint32_t instance_tag);
+uint8_t amy_pattern_schedule(uint32_t pattern, uint8_t mode,
+                             uint32_t offset_ticks, uint32_t period_ticks,
+                             uint32_t quantize_ticks, uint32_t sequence_tag,
+                             uint32_t instance_tag);
 uint8_t amy_pattern_stop(uint32_t instance_tag, uint32_t quantize_ticks);
+uint8_t amy_pattern_mute(uint32_t instance_tag, uint32_t duration_ticks);
 uint8_t amy_pattern_clear(uint32_t pattern);
 ```
 
@@ -142,7 +147,11 @@ For `amy_pattern_add_event`, set `event.ticks[TICKS_TICK]`,
 `amy_add_event()` sequencer path. Playback mode is
 `AMY_PATTERN_ONE_SHOT` or `AMY_PATTERN_LOOP`; pass
 `AMY_PATTERN_UNTAGGED` when an instance should coexist independently. All
-functions return nonzero on success. See [finite and looping
+functions return nonzero on success. `amy_pattern_schedule()` stores an
+ordinary root-sequencer trigger under `sequence_tag`; clear it with the normal
+root `tick=0,period=0,tag` operation. `amy_pattern_mute()` suppresses new
+onsets from matching tagged instances while their local clocks continue. See
+[finite and looping
 patterns](synth.md#finite-and-looping-patterns) for lifecycle, quantization,
 lane, reset, and nesting semantics.
 
@@ -542,7 +551,9 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 | `zQB`  | — | `pattern_begin()` | pattern,length[,lane[,priority]] | Begin or replace a staging pattern definition |
 | `zQC`  | — | `pattern_commit()` | pattern | Atomically publish a staging pattern |
 | `zQT`  | — | `pattern_trigger()` | pattern[,mode[,quantize_ticks[,instance_tag]]] | Trigger `mode=0` one-shot or `mode=1` loop at the next tick boundary; an omitted instance tag creates an independent instance |
+| `zQA`  | — | `pattern_schedule()` | pattern,mode,offset,period,quantize_ticks,sequence_tag[,instance_tag] | Store a root event which triggers the pattern at an offset from the next quantized boundary; nonzero period repeats it and the normal `H0,0,sequence_tag` operation clears it |
 | `zQS`  | — | `pattern_stop()` | instance_tag[,quantize_ticks] | Stop every matching tagged instance at the requested boundary |
+| `zQM`  | — | `pattern_mute()` | instance_tag,duration_ticks | Suppress new onsets from matching running instances for a finite duration without stopping or changing their phase; unlike other `zQ` controls, this leaf operation may be stored in a pattern |
 | `zQR`  | — | `pattern_clear()` | pattern | Remove staging/current definitions; running instances retain their committed version |
 | `N`    | `latency_ms`| `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `s`    | `pitch_bend` | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |

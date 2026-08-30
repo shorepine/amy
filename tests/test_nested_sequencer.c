@@ -239,6 +239,93 @@ static void test_lane_priority_suppresses_onsets_only(void) {
     clock_to(sequencer_ticks() + 2);
 }
 
+static void test_mute_event_targets_tag_and_preserves_phase(void) {
+    printf("a scheduled mute gates selected running tags and preserves phase\n");
+    sequencer_reset();
+    clear_marks();
+
+    CHECK(amy_pattern_begin(11, 4, 1, 0), "begin muted background");
+    CHECK(amy_pattern_add_wire(11, 0, 2, 0, true, "zPmutedZ"),
+          "store muted background pulse");
+    CHECK(amy_pattern_commit(11), "commit muted background");
+    CHECK(amy_pattern_begin(12, 4, 2, 0), "begin independent background");
+    CHECK(amy_pattern_add_wire(12, 0, 2, 0, true, "zPkeptZ"),
+          "store independent background pulse");
+    CHECK(amy_pattern_commit(12), "commit independent background");
+
+    uint32_t background_start = next_boundary(sequencer_ticks(), 4);
+    CHECK(amy_pattern_trigger(11, AMY_PATTERN_LOOP, 4, 81),
+          "start tagged background to mute");
+    CHECK(amy_pattern_trigger(12, AMY_PATTERN_LOOP, 4, 82),
+          "start tagged background to retain");
+    clock_to(background_start + 2);
+    CHECK(mark_at("muted", background_start)
+          && mark_at("kept", background_start),
+          "both backgrounds initially sound");
+
+    CHECK(amy_pattern_begin(13, 4, 3, 0), "begin explicit mute overlay");
+    CHECK(amy_pattern_add_wire(13, 0, 4, 0, true, "zQM81,4Z"),
+          "mute is accepted as a non-nesting leaf event");
+    CHECK(amy_pattern_add_wire(13, 0, 4, 1, true, "zPfillZ"),
+          "overlay also contains an ordinary event");
+    CHECK(amy_pattern_commit(13), "commit explicit mute overlay");
+    uint32_t fill_start = next_boundary(sequencer_ticks(), 4);
+    CHECK(amy_pattern_trigger(13, AMY_PATTERN_ONE_SHOT, 4,
+                              AMY_PATTERN_UNTAGGED),
+          "arm explicit mute overlay");
+    clock_to(fill_start + 4);
+    CHECK(mark_at("fill", fill_start), "overlay event fires");
+    CHECK(!mark_at("muted", fill_start)
+          && !mark_at("muted", fill_start + 2),
+          "target tag has no onsets for the exact mute duration");
+    CHECK(mark_at("kept", fill_start) && mark_at("kept", fill_start + 2),
+          "untargeted tag keeps running");
+    CHECK(mark_at("muted", fill_start + 4),
+          "target resumes at its original phase after the mute");
+
+    clear_marks();
+    CHECK(amy_pattern_mute(82, 4), "C API can mute a running tag directly");
+    uint32_t direct_start = sequencer_ticks();
+    clock_to(direct_start + 4);
+    CHECK(!mark_at("kept", direct_start + 2),
+          "direct mute applies to the next due onset");
+    CHECK(mark_at("kept", direct_start + 4),
+          "direct mute expires without stopping the loop");
+    amy_pattern_stop(81, 0);
+    amy_pattern_stop(82, 0);
+    clock_to(sequencer_ticks() + 2);
+}
+
+static void test_relative_pattern_schedule(void) {
+    printf("pattern triggers can be scheduled relative to a quantized boundary\n");
+    sequencer_reset();
+    clear_marks();
+    CHECK(amy_pattern_begin(14, 2, 0, 0), "begin scheduled one-shot");
+    CHECK(amy_pattern_add_wire(14, 0, 2, 0, true, "zPscheduledZ"),
+          "store scheduled marker");
+    CHECK(amy_pattern_commit(14), "commit scheduled one-shot");
+
+    uint32_t first = next_boundary(sequencer_ticks(), 4) + 2;
+    CHECK(amy_pattern_schedule(14, AMY_PATTERN_ONE_SHOT, 2, 8, 4, 20,
+                               AMY_PATTERN_UNTAGGED),
+          "C API installs recurring root trigger");
+    clock_to(first + 8);
+    CHECK(mark_at("scheduled", first), "first trigger uses relative offset");
+    CHECK(mark_at("scheduled", first + 8), "root trigger repeats by period");
+    amy_add_message("H0,0,20Z");
+    clock_to(first + 16);
+    CHECK(marks_named("scheduled") == 2,
+          "ordinary H tag clear removes future triggers only");
+
+    clear_marks();
+    uint32_t wire_first = next_boundary(sequencer_ticks(), 4) + 1;
+    amy_add_message("zQA14,0,1,8,4,21Z");
+    clock_to(wire_first);
+    CHECK(mark_at("scheduled", wire_first),
+          "wire scheduler matches the C scheduling API");
+    amy_add_message("H0,0,21Z");
+}
+
 static void test_third_level_is_rejected(void) {
     printf("pattern payloads cannot create a third sequencer level\n");
     CHECK(amy_pattern_begin(5, 4, 0, 0), "begin leaf-only definition");
@@ -250,6 +337,8 @@ static void test_third_level_is_rejected(void) {
           "pattern trigger payload rejected");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "v0zQT0,0,0Z"),
           "pattern trigger after an ordinary field is also rejected");
+    CHECK(amy_pattern_add_wire(5, 0, 4, 0, true, "zQM77,2Z"),
+          "mute payload is allowed because it cannot create a level");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "v0l1"),
           "unterminated pattern payload rejected");
     amy_pattern_clear(5);
@@ -407,6 +496,8 @@ int main(void) {
     test_c_event_api();
     test_committed_version_survives_replacement();
     test_lane_priority_suppresses_onsets_only();
+    test_mute_event_targets_tag_and_preserves_phase();
+    test_relative_pattern_schedule();
     test_third_level_is_rejected();
     test_root_can_trigger_local_tick_zero();
     test_pattern_event_tag_semantics();

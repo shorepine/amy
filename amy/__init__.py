@@ -417,9 +417,28 @@ def pattern_trigger(pattern, mode=AMY_PATTERN_ONE_SHOT, quantize_ticks=0,
     send_raw('zQT' + ','.join(values) + 'Z')
 
 
+def pattern_schedule(pattern, sequence_tag, mode=AMY_PATTERN_ONE_SHOT,
+                     offset_ticks=0, period_ticks=0, quantize_ticks=0,
+                     instance_tag=None):
+    """Schedule a pattern trigger relative to a quantized root boundary."""
+    values = [
+        str(int(pattern)), str(int(mode)), str(int(offset_ticks)),
+        str(int(period_ticks)), str(int(quantize_ticks)),
+        str(int(sequence_tag)),
+    ]
+    if instance_tag is not None:
+        values.append(str(int(instance_tag)))
+    send_raw('zQA' + ','.join(values) + 'Z')
+
+
 def pattern_stop(instance_tag, quantize_ticks=0):
     """Stop all instances with this tag on the requested tick boundary."""
     send_raw("zQS%d,%dZ" % (instance_tag, quantize_ticks))
+
+
+def pattern_mute(instance_tag, duration_ticks):
+    """Suppress onsets from tagged running patterns while phase advances."""
+    send_raw("zQM%d,%dZ" % (instance_tag, duration_ticks))
 
 
 def pattern_clear(pattern):

@@ -72,9 +72,12 @@ typedef struct pattern_instance_t {
     pattern_definition_t *definition;
     uint32_t start_tick;
     uint32_t stop_tick;
+    uint32_t mute_tick;
+    uint32_t mute_duration;
     uint32_t instance_tag;
     uint8_t mode;
     bool occupied;
+    bool muted;
 } pattern_instance_t;
 
 static pattern_slot_t *pattern_slots = NULL;
@@ -349,9 +352,13 @@ static bool pattern_index_valid(uint32_t pattern) {
 static bool pattern_payload_is_leaf(const char *wire) {
     if (wire == NULL || wire[0] == '\0') return false;
     // H/J schedule commands are only meaningful at the root ingest boundary;
-    // zQ is the pattern control family.  Reject all three explicitly so a
-    // stored pattern cannot create a third sequencer level.
-    if (wire[0] == 'H' || wire[0] == 'J' || strstr(wire, "zQ") != NULL) {
+    // zQ is the pattern control family.  zQM is the one leaf exception: it
+    // only gates already-running instances and cannot create another level.
+    const char *pattern_control = strstr(wire, "zQ");
+    bool is_mute = pattern_control == wire && strncmp(wire, "zQM", 3) == 0
+        && strstr(wire + 3, "zQ") == NULL;
+    if (wire[0] == 'H' || wire[0] == 'J'
+        || (pattern_control != NULL && !is_mute)) {
         fprintf(stderr, "nested pattern events cannot schedule or trigger patterns\n");
         return false;
     }
@@ -582,6 +589,55 @@ uint8_t amy_pattern_stop(uint32_t instance_tag, uint32_t quantize_ticks) {
     return found;
 }
 
+uint8_t amy_pattern_mute(uint32_t instance_tag, uint32_t duration_ticks) {
+    if (instance_tag == AMY_PATTERN_UNTAGGED) return 0;
+    uint32_t now = amy_global.sequencer_tick_count;
+    uint8_t found = 0;
+    amy_grab_lock();
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (!instance->occupied || instance->instance_tag != instance_tag)
+            continue;
+        instance->mute_tick = now;
+        instance->mute_duration = duration_ticks;
+        instance->muted = duration_ticks != 0;
+        found = 1;
+    }
+    amy_release_lock();
+    return found;
+}
+
+uint8_t amy_pattern_schedule(uint32_t pattern, uint8_t mode,
+                             uint32_t offset_ticks, uint32_t period_ticks,
+                             uint32_t quantize_ticks, uint32_t sequence_tag,
+                             uint32_t instance_tag) {
+    if (!pattern_index_valid(pattern)
+        || (mode != AMY_PATTERN_ONE_SHOT && mode != AMY_PATTERN_LOOP))
+        return 0;
+
+    char encoded[96];
+    int length;
+    if (instance_tag == AMY_PATTERN_UNTAGGED) {
+        length = snprintf(encoded, sizeof(encoded), "zQT%" PRIu32 ",%u,0Z",
+                          pattern, mode);
+    } else {
+        length = snprintf(encoded, sizeof(encoded),
+                          "zQT%" PRIu32 ",%u,0,%" PRIu32 "Z",
+                          pattern, mode, instance_tag);
+    }
+    if (length < 0 || (size_t)length >= sizeof(encoded)) return 0;
+    char *wire = strdup(encoded);
+    if (wire == NULL) {
+        amy_oom("scheduled pattern trigger");
+        return 0;
+    }
+
+    uint32_t tick = pattern_activation_tick(quantize_ticks) + offset_ticks;
+    if (period_ticks != 0) tick %= period_ticks;
+    return sequencer_add_wire(
+        tick, period_ticks, sequence_tag, true, wire);
+}
+
 static void pattern_instance_release(pattern_instance_t *instance) {
     pattern_definition_t *definition = instance->definition;
     bzero(instance, sizeof(pattern_instance_t));
@@ -608,6 +664,7 @@ void sequencer_rebase_patterns(uint32_t old_tick) {
             instance->stop_tick = tick_reached(old_tick, instance->stop_tick)
                 ? 0 : instance->stop_tick - old_tick;
         }
+        if (instance->muted) instance->mute_tick -= old_tick;
     }
 }
 
@@ -626,6 +683,9 @@ static bool pattern_instance_running(const pattern_instance_t *instance,
 static bool pattern_instance_audible(const pattern_instance_t *instance,
                                      uint32_t tick) {
     if (!pattern_instance_running(instance, tick)) return false;
+    if (instance->muted
+        && tick - instance->mute_tick < instance->mute_duration)
+        return false;
     for (int32_t i = 0; i < max_pattern_players; ++i) {
         const pattern_instance_t *other = &pattern_instances[i];
         if (other == instance || !pattern_instance_running(other, tick))
@@ -635,6 +695,20 @@ static bool pattern_instance_audible(const pattern_instance_t *instance,
             return false;
     }
     return true;
+}
+
+static bool pattern_event_hits(const pattern_instance_t *instance,
+                               const sequence_info_t *event, uint32_t tick) {
+    uint32_t local_tick = tick - instance->start_tick;
+    if (instance->mode == AMY_PATTERN_LOOP)
+        local_tick %= instance->definition->length_ticks;
+    return event->period != 0
+        ? local_tick % event->period == event->tick
+        : local_tick == event->tick;
+}
+
+static bool pattern_event_is_mute(const sequence_info_t *event) {
+    return event->wire != NULL && strncmp(event->wire, "zQM", 3) == 0;
 }
 
 static void pattern_process_tick(uint32_t tick) {
@@ -656,6 +730,37 @@ static void pattern_process_tick(uint32_t tick) {
         if (stopped || finished) pattern_instance_release(instance);
     }
     amy_release_lock();
+
+    // Mute is a schedulable leaf control.  Fire every due mute before any
+    // ordinary child event so the target cannot leak an onset on the first
+    // muted tick merely because its instance occupies an earlier pool slot.
+    for (int32_t i = 0; i < max_pattern_players; ++i) {
+        amy_grab_lock();
+        pattern_instance_t *instance = &pattern_instances[i];
+        if (!pattern_instance_audible(instance, tick)) {
+            amy_release_lock();
+            continue;
+        }
+        pattern_definition_t *definition = instance->definition;
+        definition->refs++;
+        amy_release_lock();
+
+        int32_t tag = definition->first_active;
+        while (tag != -1) {
+            sequence_info_t *event = &definition->events[tag];
+            int32_t next = event->next_active;
+            if (pattern_event_is_mute(event)
+                && pattern_event_hits(instance, event, tick))
+                amy_play_message(event->wire);
+            tag = next;
+        }
+
+        amy_grab_lock();
+        if (definition->refs > 0) definition->refs--;
+        bool free_definition = definition->retired && definition->refs == 0;
+        amy_release_lock();
+        if (free_definition) pattern_definition_free(definition);
+    }
 
     for (int32_t i = 0; i < max_pattern_players; ++i) {
         amy_grab_lock();
@@ -681,7 +786,8 @@ static void pattern_process_tick(uint32_t tick) {
             bool hit = event->period != 0
                 ? local_tick % event->period == event->tick
                 : local_tick == event->tick;
-            if (hit && event->wire != NULL) amy_play_message(event->wire);
+            if (hit && event->wire != NULL && !pattern_event_is_mute(event))
+                amy_play_message(event->wire);
             tag = next;
         }
 

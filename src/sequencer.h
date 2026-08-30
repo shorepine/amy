@@ -46,9 +46,19 @@ uint8_t amy_pattern_clear(uint32_t pattern);
 uint8_t amy_pattern_trigger(uint32_t pattern, uint8_t mode,
                             uint32_t quantize_ticks, uint32_t instance_tag);
 uint8_t amy_pattern_stop(uint32_t instance_tag, uint32_t quantize_ticks);
+// Temporarily suppress onsets from every running instance with this tag.  The
+// instance keeps advancing, and resumes at its original phase after duration.
+uint8_t amy_pattern_mute(uint32_t instance_tag, uint32_t duration_ticks);
+// Store a root-sequencer event which triggers a pattern relative to the next
+// quantized boundary.  A nonzero period repeats that trigger without making
+// the child pattern itself loop through the intervening silence.
+uint8_t amy_pattern_schedule(uint32_t pattern, uint8_t mode,
+                             uint32_t offset_ticks, uint32_t period_ticks,
+                             uint32_t quantize_ticks, uint32_t sequence_tag,
+                             uint32_t instance_tag);
 
 // Wire entry points. J<pattern>,<tick>[,<period>[,<tag>]]<event> stores one
-// event in the staging definition. zQ handles begin/commit/trigger/stop/clear.
+// event in the staging definition. zQ handles lifecycle, scheduling and mute.
 void handle_pattern_ticks_message(char *message);
 uint16_t amy_parse_pattern_control_message(char *message);
 void sequencer_midi_clock_tick();

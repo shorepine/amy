@@ -2178,6 +2178,10 @@ class TestPatternHelpers(AmyTest):
       amy.pattern_event_wire(3, 24, 'v2l0Z', tag=8)
       amy.pattern_commit(3)
       amy.pattern_trigger(3, amy.AMY_PATTERN_LOOP, 96, instance_tag=12)
+      amy.pattern_schedule(3, 9, amy.AMY_PATTERN_ONE_SHOT,
+                           offset_ticks=24, period_ticks=384,
+                           quantize_ticks=192)
+      amy.pattern_mute(12, 48)
       amy.pattern_stop(12, 96)
       amy.pattern_clear(3)
       expected = [
@@ -2186,6 +2190,8 @@ class TestPatternHelpers(AmyTest):
         'J3,24,,8v2l0Z',
         'zQC3Z',
         'zQT3,1,96,12Z',
+        'zQA3,0,24,384,192,9Z',
+        'zQM12,48Z',
         'zQS12,96Z',
         'zQR3Z',
       ]
