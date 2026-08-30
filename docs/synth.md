@@ -243,6 +243,76 @@ If you are including AMY in a program, you can set the [hook `void (*amy_externa
 
 ### Finite and looping patterns
 
+#### Motivation and scope
+
+I added stored patterns because the root sequencer is intentionally a flat
+table of events, while some musical applications need to recall a complete
+phrase from a single quantized event. Without that extra level, a host must
+either resend the whole phrase for every occurrence or reproduce AMY's musical
+clock and stream the phrase at exactly the right time. Both approaches turn a
+small musical action into a large block of sequencer traffic.
+
+The motivating downstream example is [LB Omnichord's rhythm
+engine](https://github.com/linuxificator/LB_Omnichord/blob/feature/drum_fills/amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md).
+It keeps repeating rhythm parts running while it schedules short fills from a
+preloaded catalogue; its concrete catalogue and integration checks are
+available in
+[`tests/test_drum_patterns.py`](https://github.com/linuxificator/LB_Omnichord/blob/feature/drum_fills/amysynth_version/qt_frontend/tests/test_drum_patterns.py).
+I used that application to validate the design, but I kept all knowledge of
+drums, fills, instrument roles, fill selection and continuation policy outside
+AMY. AMY only stores and schedules ordinary wire events, so the same mechanism
+can represent any reusable musical phrase.
+
+I chose a playback mode on an otherwise identical stored definition instead
+of adding a separate fill abstraction. `LOOP` makes a phrase repeat until it
+is stopped; `ONE_SHOT` gives the same phrase a finite lifetime. This reuses the
+root sequencer's existing `tick,period,tag` event model and lets a definition
+serve either purpose without duplicating events or synthesis logic. Quantized
+trigger, schedule and stop operations keep both modes on AMY's clock, while a
+finite tag mute is an explicit, generic way for an application to suppress
+selected running parts without resetting their phase. AMY assigns no musical
+lane or priority policy; the application chooses which tagged parts to mute.
+
+I deliberately allow one child level only: the root sequencer may trigger a
+stored pattern, but a stored pattern may not trigger another pattern. In the
+musical structures I expect in practice, arrangement events triggering finite
+or repeating phrases cover the useful hierarchy. A deeper hierarchy adds no
+clear musical capability here, but it would admit recursive cycles and make
+execution time, lifetime and memory harder to bound. The parser therefore
+rejects `H` and pattern-creating `zQ` controls inside pattern payloads;
+the finite `zQM` mute is the only safe leaf-control exception.
+
+I kept the portable defaults conservative: 32 stored definitions, 64 local
+event tags per definition and 32 active or pending instances. Applications can
+change these limits in `amy_config_t`, or set `max_patterns` to zero to disable
+the feature. The LB Omnichord integration uses 1,024 definition slots while
+keeping the 64/32 event and instance limits, because its current public test
+catalogue preloads 270 fills and its reserved ID space is intended to hold a
+future catalogue of more than 700. Configuring 1,024 slots does not create
+1,024 players: definition event tables are allocated only when authored, and
+only triggered patterns consume the separately bounded instance pool.
+
+Preserving existing sequencer behavior is a hard requirement. The new `zQ`
+wire operations and matching C/Python calls are opt-in; existing `H` wire
+commands and `amy_add_event()` tick scheduling retain their previous paths and
+semantics. The regression suite proves both legacy paths in
+[`tests/test_nested_sequencer.c`](../tests/test_nested_sequencer.c), alongside
+tests for one-shot/loop timing, quantization, immutable commits, reset and
+timebase behavior, rollover, nesting rejection and configured bounds. The
+legacy checks cover `H` modulo timing, repetition, tag replacement and clear,
+anonymous coexistence, and absolute C-API tick delivery. The unchanged
+Shorepine sequencer, bounds, rollover and timebase-reset tests run in the same
+native suite; the existing Python/audio suite also passes with the feature
+enabled.
+
+I kept every new wire operation in the `zQ` extended-control family. In
+particular, `zQE<pattern>,<tick>[,<period>[,<tag>]]<event>Z` uses the existing
+multi-letter `z` grammar while retaining the root sequencer's familiar
+tick/period/tag model for each stored event. I did not extend `H`: it remains
+the legacy root-scheduling envelope, including its special rule that it must
+be the first command and owns the remaining payload. This avoids both a new
+top-level command family and any ambiguity in existing `H` messages.
+
 A stored pattern is a small, local sequencer. Its events have exactly the
 same `tick,period,tag` model as the root sequencer, while each playback
 instance adds only a local starting point and a lifetime: `ONE_SHOT` runs
@@ -313,7 +383,7 @@ of a pending quantized start. The sequencer transport (`sequencer_run` / `zY`)
 clocks both levels.
 
 Nesting is deliberately limited to two levels: a root event may trigger a
-pattern, but pattern payloads cannot contain `H`, `J`, or a pattern-creating
+pattern, but pattern payloads cannot contain `H` or a pattern-creating
 `zQ` control. The finite `zQM` gate is the sole leaf-control exception. This
 keeps execution and memory bounded.
 

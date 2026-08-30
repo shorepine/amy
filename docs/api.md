@@ -543,11 +543,11 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message. |
-| `J`    | — | `pattern_event()` / `pattern_event_wire()` | pattern,tick[,period[,tag]] + event | Add one ordinary event to a staging pattern, with the root sequencer's tick/period/tag semantics. `J` must be the first character. Example: `J3,0,96,7i10n36l1Z` |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
 | `zQB`  | — | `pattern_begin()` | pattern,length | Begin or replace a staging pattern definition |
+| `zQE`  | — | `pattern_event()` / `pattern_event_wire()` | pattern,tick[,period[,tag]] + event | Add one ordinary event to a staging pattern, with the root sequencer's tick/period/tag semantics. Example: `zQE3,0,96,7i10n36l1Z` |
 | `zQC`  | — | `pattern_commit()` | pattern | Atomically publish a staging pattern |
 | `zQT`  | — | `pattern_trigger()` | pattern[,mode[,quantize_ticks[,instance_tag]]] | Trigger `mode=0` one-shot or `mode=1` loop at the next tick boundary; an omitted instance tag creates an independent instance |
 | `zQA`  | — | `pattern_schedule()` | pattern,mode,offset,period,quantize_ticks,sequence_tag[,instance_tag] | Store a root event which triggers the pattern at an offset from the next quantized boundary; nonzero period repeats it and the normal `H0,0,sequence_tag` operation clears it |

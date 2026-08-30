@@ -732,30 +732,10 @@ void handle_ticks_message(char *message) {
     }
 }
 
-// J mirrors H for a staging nested-pattern definition:
-//
-//   J<pattern>,<tick>[,<period>[,<tag>]]<ordinary-event>Z
-//
-// The stored event has the root sequencer's exact tick/period/tag semantics.
-// J is recognized only at the ingest boundary, just like H; pattern payloads
-// are deliberately ordinary events, so a pattern cannot nest another pattern.
-void handle_pattern_ticks_message(char *message) {
-    assert(message[0] == 'J');
-    uint32_t values[4] = {0, 0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, values, 4, 0);
-    uint16_t schedule_len = 1 + _next_alpha(message + 1);
-    char *payload = message + schedule_len;
-    if (num_vals < 2 || payload[0] == '\0') {
-        fprintf(stderr, "pattern event requires pattern,tick and a payload\n");
-        return;
-    }
-    amy_pattern_add_wire(
-        values[0], values[1], num_vals >= 3 ? values[2] : 0,
-        num_vals >= 4 ? values[3] : 0, num_vals >= 4, payload);
-}
-
 // zQ actions:
 //   Bpattern,length                begin/replace staging definition
+//   Epattern,tick[,period[,tag]]event
+//                                  add an ordinary event to staging
 //   Cpattern                       atomically commit staging definition
 //   Tpattern,mode,quantum[,tag]    trigger one-shot/loop, quantized in ticks
 //   Apattern,mode,offset,period,quantum,sequence_tag[,instance_tag]
@@ -777,6 +757,19 @@ uint16_t amy_parse_pattern_control_message(char *message) {
                 fprintf(stderr, "zQB requires exactly pattern,length\n");
             }
             break;
+        case 'E': {
+            uint16_t header_len = 1 + _next_alpha(message + 1);
+            char *payload = message + header_len;
+            if (num_vals >= 2 && num_vals <= 4 && payload[0] != '\0') {
+                amy_pattern_add_wire(
+                    values[0], values[1], num_vals >= 3 ? values[2] : 0,
+                    num_vals >= 4 ? values[3] : 0, num_vals >= 4, payload);
+            } else {
+                fprintf(stderr,
+                        "zQE requires pattern,tick[,period[,tag]] and an event\n");
+            }
+            break;
+        }
         case 'C':
             if (num_vals >= 1) amy_pattern_commit(values[0]);
             else fprintf(stderr, "zQC requires pattern\n");

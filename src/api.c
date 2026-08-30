@@ -300,8 +300,6 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
     // command, only recognized as the very first character of the message.
     if (message[0] == 'H') {
         handle_ticks_message(message);
-    } else if (message[0] == 'J') {
-        handle_pattern_ticks_message(message);
     } else {
         // Not scheduled: parse and play every command in the message now.
         amy_play_message(message);

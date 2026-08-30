@@ -2,7 +2,7 @@
 // quantized activation and immutable committed versions.
 //
 // The existing H sequencer is intentionally exercised in the same process:
-// the new J/zQ paths must not change its modulo, tag or wire behavior.
+// the new zQ path must not change its modulo, tag or wire behavior.
 
 #include <stdio.h>
 #include <stdint.h>
@@ -76,6 +76,37 @@ static void test_existing_h_is_unchanged(void) {
     amy_add_message("H0,0,0Z");
 }
 
+static void test_existing_h_tag_and_anonymous_behavior_is_unchanged(void) {
+    printf("existing H tag replacement, clear and anonymous behavior remain unchanged\n");
+    sequencer_reset();
+    clear_marks();
+    uint32_t first = sequencer_ticks() + 4;
+    char wire[80];
+
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,17zPold-tagZ", first);
+    amy_add_message(wire);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,17zPnew-tagZ", first);
+    amy_add_message(wire);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 "zPanon-aZ", first);
+    amy_add_message(wire);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 "zPanon-bZ", first);
+    amy_add_message(wire);
+    clock_to(first);
+    CHECK(!marks_named("old-tag") && mark_at("new-tag", first),
+          "a legacy H tag still replaces only its previous entry");
+    CHECK(mark_at("anon-a", first) && mark_at("anon-b", first),
+          "legacy anonymous H entries still coexist at one tick");
+
+    clear_marks();
+    uint32_t second = sequencer_ticks() + 4;
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,18zPcleared-tagZ", second);
+    amy_add_message(wire);
+    amy_add_message("H0,0,18Z");
+    clock_to(second);
+    CHECK(!marks_named("cleared-tag"),
+          "legacy H zero/zero/tag still clears a future entry");
+}
+
 static void test_existing_c_ticks_are_unchanged(void) {
     printf("existing C amy_event tick scheduling remains unchanged\n");
     sequencer_reset();
@@ -105,8 +136,8 @@ static void test_wire_one_shot_and_loop(void) {
     clear_marks();
 
     amy_add_message("zQB0,8Z");
-    amy_add_message("J0,0,8,0zPwire0Z");
-    amy_add_message("J0,2,8,1zPwire2Z");
+    amy_add_message("zQE0,0,8,0zPwire0Z");
+    amy_add_message("zQE0,2,8,1zPwire2Z");
     amy_add_message("zQC0Z");
 
     uint32_t one_start = next_boundary(sequencer_ticks(), 4);
@@ -290,8 +321,8 @@ static void test_third_level_is_rejected(void) {
     CHECK(amy_pattern_begin(5, 4), "begin leaf-only definition");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "H0,4v0l1Z"),
           "root H payload rejected");
-    CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "J0,0,4,0v0l1Z"),
-          "nested J payload rejected");
+    CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "zQE0,0,4,0v0l1Z"),
+          "nested zQE payload rejected");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "zQT0,0,0Z"),
           "pattern trigger payload rejected");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "v0zQT0,0,0Z"),
@@ -450,6 +481,7 @@ int main(void) {
     amy_start(config);
 
     test_existing_h_is_unchanged();
+    test_existing_h_tag_and_anonymous_behavior_is_unchanged();
     test_existing_c_ticks_are_unchanged();
     test_wire_one_shot_and_loop();
     test_c_event_api();

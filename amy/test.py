@@ -2186,8 +2186,8 @@ class TestPatternHelpers(AmyTest):
       amy.pattern_clear(3)
       expected = [
         'zQB3,96Z',
-        'J3,0,96,7n36l1i10Z',
-        'J3,24,,8v2l0Z',
+        'zQE3,0,96,7n36l1i10Z',
+        'zQE3,24,,8v2l0Z',
         'zQC3Z',
         'zQT3,1,96,12Z',
         'zQA3,0,24,384,192,9Z',

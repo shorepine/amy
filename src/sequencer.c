@@ -345,14 +345,13 @@ static bool pattern_index_valid(uint32_t pattern) {
 
 static bool pattern_payload_is_leaf(const char *wire) {
     if (wire == NULL || wire[0] == '\0') return false;
-    // H/J schedule commands are only meaningful at the root ingest boundary;
-    // zQ is the pattern control family.  zQM is the one leaf exception: it
+    // H is meaningful only at the root ingest boundary; zQ is the pattern
+    // control family. zQM is the one leaf exception: it
     // only gates already-running instances and cannot create another level.
     const char *pattern_control = strstr(wire, "zQ");
     bool is_mute = pattern_control == wire && strncmp(wire, "zQM", 3) == 0
         && strstr(wire + 3, "zQ") == NULL;
-    if (wire[0] == 'H' || wire[0] == 'J'
-        || (pattern_control != NULL && !is_mute)) {
+    if (wire[0] == 'H' || (pattern_control != NULL && !is_mute)) {
         fprintf(stderr, "nested pattern events cannot schedule or trigger patterns\n");
         return false;
     }

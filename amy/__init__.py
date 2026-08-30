@@ -392,7 +392,7 @@ def pattern_event_wire(pattern, tick, wire, period=None, tag=None):
         values.append('' if period is None else str(int(period)))
     if tag is not None:
         values.append(str(int(tag)))
-    send_raw('J' + ','.join(values) + wire)
+    send_raw('zQE' + ','.join(values) + wire)
 
 
 def pattern_event(pattern, tick, period=None, tag=None, **kwargs):
