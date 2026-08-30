@@ -12,8 +12,8 @@ extern "C" {
 
 // Private pathname AF_UNIX transport for local AMY control.
 //
-// Intended Android topology:
-//   Qt/Python process <-> amy.sock <-> native AMY/Oboe process
+// Typical service topology:
+//   application process <-> amy.sock <-> native AMY/audio process
 //
 // The socket thread never calls AMY. It only copies complete SOCK_SEQPACKET
 // packets into this fixed SPSC queue. The audio/control owner drains packets
@@ -22,8 +22,9 @@ extern "C" {
 //
 // One connected client is supported at a time. On Linux/Android, accepted
 // peers must have the same effective UID as the server process. The pathname
-// is created mode 0600 and a stale socket is removed only when it is owned by
-// the same UID; an existing non-socket path is never removed.
+// is created mode 0600. A stale socket is removed only when it is owned by the
+// same UID and refuses a connection; a live listener, an existing non-socket
+// path, and any pathname that replaces the running server's node are preserved.
 
 #define AMY_UNIX_SOCKET_QUEUE_CAPACITY 64u
 #define AMY_UNIX_SOCKET_MAX_PACKET ((size_t)MAX_MESSAGE_LEN - 1u)

@@ -38,6 +38,9 @@ struct amy_unix_socket_server {
     volatile uint32_t running;
 
     char path[sizeof(((struct sockaddr_un *)0)->sun_path)];
+    dev_t path_device;
+    ino_t path_inode;
+    bool path_bound;
 
     struct amy_unix_socket_packet queue[AMY_UNIX_SOCKET_QUEUE_CAPACITY];
     volatile uint32_t write_index;
@@ -71,6 +74,13 @@ static int set_nonblocking_cloexec(int fd) {
     return 0;
 }
 
+static void fill_socket_address(struct sockaddr_un *addr, const char *path) {
+    size_t path_len = strlen(path);
+    memset(addr, 0, sizeof(*addr));
+    addr->sun_family = AF_UNIX;
+    memcpy(addr->sun_path, path, path_len + 1u);
+}
+
 static int remove_owned_stale_socket(const char *path) {
     struct stat st;
     if (lstat(path, &st) < 0) {
@@ -79,8 +89,54 @@ static int remove_owned_stale_socket(const char *path) {
 
     if (!S_ISSOCK(st.st_mode)) return -EEXIST;
     if (st.st_uid != geteuid()) return -EPERM;
+
+    // Do not steal the pathname from a live same-UID server. A pathname socket
+    // left behind after a crash refuses a connection; a listening server
+    // accepts it. The short-lived probe may be accepted and immediately see
+    // EOF, but it cannot replace or interrupt an existing client.
+    int probe_fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    if (probe_fd < 0) return -errno;
+
+    struct sockaddr_un addr;
+    fill_socket_address(&addr, path);
+    int connect_rc = connect(probe_fd, (struct sockaddr *)&addr, sizeof(addr));
+    int connect_errno = errno;
+    close(probe_fd);
+
+    if (connect_rc == 0) return -EADDRINUSE;
+    if (connect_errno == ENOENT) return 0;
+    if (connect_errno != ECONNREFUSED) return -connect_errno;
+
     if (unlink(path) < 0) return -errno;
     return 0;
+}
+
+static int remember_bound_socket(amy_unix_socket_server_t *server) {
+    struct stat st;
+    if (lstat(server->path, &st) < 0) return -errno;
+    if (!S_ISSOCK(st.st_mode) || st.st_uid != geteuid()) return -EPERM;
+
+    server->path_device = st.st_dev;
+    server->path_inode = st.st_ino;
+    server->path_bound = true;
+    return 0;
+}
+
+static void remove_bound_socket(amy_unix_socket_server_t *server) {
+    if (!server->path_bound) return;
+
+    // Only unlink the exact filesystem node created by this server. This
+    // avoids deleting a regular file or a replacement socket if the pathname
+    // was removed and reused while the server was running.
+    struct stat st;
+    if (lstat(server->path, &st) == 0 &&
+        S_ISSOCK(st.st_mode) &&
+        st.st_uid == geteuid() &&
+        st.st_dev == server->path_device &&
+        st.st_ino == server->path_inode) {
+        unlink(server->path);
+    }
+    server->path_bound = false;
 }
 
 static bool peer_has_same_uid(int fd) {
@@ -276,14 +332,15 @@ int amy_unix_socket_start(amy_unix_socket_server_t **out_server,
     if (rc < 0) goto fail;
 
     struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    memcpy(addr.sun_path, path, path_len + 1u);
+    fill_socket_address(&addr, path);
 
     if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         rc = -errno;
         goto fail;
     }
+
+    rc = remember_bound_socket(server);
+    if (rc < 0) goto fail;
 
     // The Android app-data parent directory is already sandboxed. Mode 0600
     // additionally makes filesystem pathname access same-UID only.
@@ -312,7 +369,7 @@ int amy_unix_socket_start(amy_unix_socket_server_t **out_server,
 
 fail:
     if (server->listen_fd >= 0) close(server->listen_fd);
-    if (server->path[0] != '\0') unlink(server->path);
+    remove_bound_socket(server);
     pthread_mutex_destroy(&server->client_lock);
     free(server);
     return rc;
@@ -331,7 +388,7 @@ void amy_unix_socket_stop(amy_unix_socket_server_t *server) {
         server->listen_fd = -1;
     }
 
-    if (server->path[0] != '\0') unlink(server->path);
+    remove_bound_socket(server);
     pthread_mutex_destroy(&server->client_lock);
     free(server);
 }

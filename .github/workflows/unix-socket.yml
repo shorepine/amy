@@ -1,4 +1,4 @@
-name: Android Unix socket transport
+name: Unix socket transport
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - 'src/amy_unix_socket.h'
       - 'tests/test_amy_unix_socket.c'
       - 'tests/run_amy_unix_socket_test.sh'
-      - '.github/workflows/android-unix-socket.yml'
+      - '.github/workflows/unix-socket.yml'
 
 permissions:
   contents: read
@@ -17,5 +17,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Compile and run private Unix socket transport test
+      - name: Compile and run Unix socket transport test
         run: bash tests/run_amy_unix_socket_test.sh
