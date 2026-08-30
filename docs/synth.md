@@ -241,6 +241,65 @@ For pattern sequencers like drum machines, you will also want to use `tick` alon
 
 If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](docs/api.md) to any function. This will be called at every tick with the current tick number as an argument.
 
+### Finite and looping patterns
+
+A stored pattern is a small, local sequencer. Its events have exactly the
+same `tick,period,tag` model as the root sequencer, while each playback
+instance adds only a local starting point and a lifetime: `ONE_SHOT` runs
+local ticks `0..length-1` once and `LOOP` wraps at `length` until stopped.
+The same definition can therefore be a repeating rhythm or a one-time fill;
+only its playback mode changes.
+
+Pattern definitions are built in staging storage and published atomically:
+
+```python
+amy.pattern_begin(0, length_ticks=384, lane=0, priority=0)
+amy.pattern_event(0, tick=0,   period=384, tag=0,
+                  synth=10, note=36, vel=1)
+amy.pattern_event(0, tick=192, period=384, tag=1,
+                  synth=10, note=38, vel=1)
+amy.pattern_commit(0)
+
+# Start on the next 384-tick boundary and keep looping.
+amy.pattern_trigger(0, amy.AMY_PATTERN_LOOP, quantize_ticks=384,
+                    instance_tag=100)
+
+# The same pattern as a one-time performance.
+amy.pattern_trigger(0, amy.AMY_PATTERN_ONE_SHOT, quantize_ticks=384)
+amy.pattern_stop(100, quantize_ticks=384)
+```
+
+As in the root sequencer, a nonzero `period` makes `tick` an offset and
+`tick=0,period=0,tag=N` clears tag `N`; anonymous zero/zero is a no-op. For a
+single hit at local tick zero, use the pattern length as its period, as in the
+example. Events without a tag coexist and cannot be replaced individually.
+`pattern_event_wire()` is the raw-wire counterpart of `pattern_event()`.
+
+`quantize_ticks=Q` chooses the next global sequencer-tick multiple of `Q`.
+A normal host/API call made exactly on a boundary chooses the following
+boundary, so a late call cannot fire retroactively inside the call. A `zQT`
+trigger fired by a root `H` event on a boundary is already in the sequencer
+tick and starts there; local tick-zero events then fire on that same tick.
+Use zero for the next tick (or the current root-event tick).
+
+Patterns may share a `lane`. While a higher-priority instance owns a lane,
+new onsets from lower-priority patterns on that lane are suppressed; existing
+sound is not forcibly note-offed. This lets a one-shot fill temporarily cover
+a looping rhythm, which resumes on the first tick after the fill. Different
+lanes, or equal priorities on one lane, play together.
+
+Definitions are immutable after commit. Replacing or clearing one affects new
+triggers only; an already-running instance safely finishes its version.
+`RESET_SEQUENCER` stops root events and all pattern instances, but keeps stored
+pattern definitions, just as oscillator resets do not erase stored patches.
+`RESET_TIMEBASE` preserves an instance's local phase and the remaining delay
+of a pending quantized start. The sequencer transport (`sequencer_run` / `zY`)
+clocks both levels.
+
+Nesting is deliberately limited to two levels: a root event may trigger a
+pattern, but pattern payloads must be ordinary AMY events and cannot contain
+`H`, `J`, or `zQ`. This keeps execution and memory bounded.
+
 ## Core oscillators
 
 We support bandlimited saw, pulse/square and triangle waves, alongside sine and noise. Use the wave parameter: 0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE. Each oscillator can have a frequency (or set by midi note), amplitude and phase (set in 0-1.). You can also set `duty` for the pulse type. We also have a karplus-strong type (KS=6), plus `WAVETABLE` when compiled with `AMY_WAVETABLE` that plays back 16,384 sample long wavetable packs, such as those hosted on [waveeditonline.com](http://waveeditonline.com). 
@@ -475,7 +534,5 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
-
 
 

@@ -118,6 +118,34 @@ Notes:
 
 <!-- END GENERATED C API DOCS -->
 
+### Nested-pattern C API
+
+Native hosts can author and play the same finite/looping patterns without
+constructing wire strings:
+
+```c
+uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks,
+                          uint16_t lane, uint8_t priority);
+uint8_t amy_pattern_add_event(uint32_t pattern, const amy_event *event);
+uint8_t amy_pattern_add_wire(uint32_t pattern, uint32_t tick,
+                             uint32_t period, uint32_t tag, bool has_tag,
+                             const char *wire);
+uint8_t amy_pattern_commit(uint32_t pattern);
+uint8_t amy_pattern_trigger(uint32_t pattern, uint8_t mode,
+                            uint32_t quantize_ticks, uint32_t instance_tag);
+uint8_t amy_pattern_stop(uint32_t instance_tag, uint32_t quantize_ticks);
+uint8_t amy_pattern_clear(uint32_t pattern);
+```
+
+For `amy_pattern_add_event`, set `event.ticks[TICKS_TICK]`,
+`[TICKS_PERIOD]`, and optionally `[TICKS_TAG]` exactly as for the existing
+`amy_add_event()` sequencer path. Playback mode is
+`AMY_PATTERN_ONE_SHOT` or `AMY_PATTERN_LOOP`; pass
+`AMY_PATTERN_UNTAGGED` when an instance should coexist independently. All
+functions return nonzero on success. See [finite and looping
+patterns](synth.md#finite-and-looping-patterns) for lifecycle, quantization,
+lane, reset, and nesting semantics.
+
 ## JavaScript API
 
 AMY provides a high-level JavaScript API (`amy_send`) that mirrors the Python `amy.send()` interface. It is auto-generated from the same source of truth (`amy/__init__.py` and `amy/constants.py`) so parameter names are always identical to Python. The connector and API are bundled into `amy.js`, so you only need two includes:
@@ -204,6 +232,9 @@ amy_start(amy_config);
 | `max_oscs` | Int | 180 | How many oscillators to support |
 | `max_buses` | Int | 4 | How many FX buses to support. No compile-time ceiling — every bus-indexed table is allocated from this at `amy_start`. Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
 | `max_sequencer_tags` | Int | 256 | How many sequencer items to handle |
+| `max_patterns` | Int | 32 | Number of stored two-level pattern slots. Set to 0 to disable nested patterns |
+| `max_pattern_tags` | Int | 64 | Addressable event tags in each stored pattern. Anonymous events use a separate internal pool |
+| `max_pattern_instances` | Int | 32 | Maximum running and quantized-pending one-shot/loop pattern instances |
 | `max_voices` | Int | 64 | How many voices |
 | `max_synths` | Int | 64 | How many synths |
 | `max_memory_patches` | Int | 32 | How many in memory patches to supprot |
@@ -504,9 +535,15 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message. |
+| `J`    | — | `pattern_event()` / `pattern_event_wire()` | pattern,tick[,period[,tag]] + event | Add one ordinary event to a staging pattern, with the root sequencer's tick/period/tag semantics. `J` must be the first character. Example: `J3,0,96,7i10n36l1Z` |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
+| `zQB`  | — | `pattern_begin()` | pattern,length[,lane[,priority]] | Begin or replace a staging pattern definition |
+| `zQC`  | — | `pattern_commit()` | pattern | Atomically publish a staging pattern |
+| `zQT`  | — | `pattern_trigger()` | pattern[,mode[,quantize_ticks[,instance_tag]]] | Trigger `mode=0` one-shot or `mode=1` loop at the next tick boundary; an omitted instance tag creates an independent instance |
+| `zQS`  | — | `pattern_stop()` | instance_tag[,quantize_ticks] | Stop every matching tagged instance at the requested boundary |
+| `zQR`  | — | `pattern_clear()` | pattern | Remove staging/current definitions; running instances retain their committed version |
 | `N`    | `latency_ms`| `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
 | `s`    | `pitch_bend` | `pitch_bend` | float | Sets the global pitch bend, by default modifying all note frequencies by (fractional) octaves up or down |
 | `V`    | `volume`| `volume` | float  | Volume knob for the addressed bus (`bus`/`y`, default 0) in the final mixdown, default 1.0 |

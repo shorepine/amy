@@ -2163,6 +2163,46 @@ class TestLoadSyx(AmyTest):
     return True, self.__class__.__name__ + ' : ok (%.1f dB)' % level
 
 
+class TestPatternHelpers(AmyTest):
+  """The Python pattern API must be a transport-independent wire wrapper."""
+
+  def test(self):
+    captured = []
+    saved_override = amy.override_send
+    amy.override_send = captured.append
+    problems = []
+    try:
+      amy.pattern_begin(3, 96, lane=2, priority=1)
+      amy.pattern_event(3, 0, period=96, tag=7,
+                        synth=10, note=36, vel=1)
+      amy.pattern_event_wire(3, 24, 'v2l0Z', tag=8)
+      amy.pattern_commit(3)
+      amy.pattern_trigger(3, amy.AMY_PATTERN_LOOP, 96, instance_tag=12)
+      amy.pattern_stop(12, 96)
+      amy.pattern_clear(3)
+      expected = [
+        'zQB3,96,2,1Z',
+        'J3,0,96,7n36l1i10Z',
+        'J3,24,,8v2l0Z',
+        'zQC3Z',
+        'zQT3,1,96,12Z',
+        'zQS12,96Z',
+        'zQR3Z',
+      ]
+      if captured != expected:
+        problems.append('wire mismatch: %r != %r' % (captured, expected))
+      try:
+        amy.pattern_event(3, 0, ticks='0,4', osc=0, vel=1)
+        problems.append('nested ticks= was accepted')
+      except ValueError:
+        pass
+    finally:
+      amy.override_send = saved_override
+    if problems:
+      return False, self.__class__.__name__ + ': ' + '; '.join(problems)
+    return True, self.__class__.__name__ + ' : ok'
+
+
 class TestFuzzWireParser(AmyTest):
   """Arbitrary junk fed to amy.send_wire() must never crash the engine.
 
@@ -2341,4 +2381,3 @@ def main(argv):
 
 if __name__ == "__main__":
   main(sys.argv)
-
