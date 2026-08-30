@@ -35,8 +35,7 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
 // loop mode.  Pattern events are ordinary AMY wire events and cannot trigger
 // another pattern.  Existing instances retain the committed version they
 // started with, so replacing/clearing a definition never truncates playback.
-uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks,
-                          uint16_t lane, uint8_t priority);
+uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks);
 uint8_t amy_pattern_add_wire(uint32_t pattern, uint32_t tick,
                              uint32_t period, uint32_t tag, bool has_tag,
                              const char *wire);

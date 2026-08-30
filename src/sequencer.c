@@ -50,15 +50,13 @@ static volatile bool wire_firing = false;
 // Nested patterns deliberately reuse sequence_info_t: each definition is a
 // small sequencer with the same tick/period/tag semantics as the root table.
 // Definitions are immutable after commit.  An instance only adds an origin,
-// a finite/looping playback mode and lane priority; pattern events themselves
-// are always ordinary AMY events, so nesting stops at exactly two levels.
+// a finite/looping playback mode; pattern events themselves are always
+// ordinary AMY events, so nesting stops at exactly two levels.
 typedef struct pattern_definition_t {
     sequence_info_t *events;
     int32_t first_active;
     int32_t anon_cursor;
     uint32_t length_ticks;
-    uint16_t lane;
-    uint8_t priority;
     uint32_t refs;
     bool retired;
 } pattern_definition_t;
@@ -271,9 +269,7 @@ static int32_t pattern_total_slots(void) {
     return max_pattern_event_tags + AMY_ANON_SEQUENCE_SLOTS;
 }
 
-static pattern_definition_t *pattern_definition_new(
-    uint32_t length_ticks, uint16_t lane, uint8_t priority
-) {
+static pattern_definition_t *pattern_definition_new(uint32_t length_ticks) {
     if (length_ticks == 0 || max_pattern_event_tags <= 0) return NULL;
     int32_t total_slots = pattern_total_slots();
     if (total_slots <= 0) return NULL;
@@ -303,8 +299,6 @@ static pattern_definition_t *pattern_definition_new(
     definition->first_active = -1;
     definition->anon_cursor = 0;
     definition->length_ticks = length_ticks;
-    definition->lane = lane;
-    definition->priority = priority;
     return definition;
 }
 
@@ -370,11 +364,9 @@ static bool pattern_payload_is_leaf(const char *wire) {
     return true;
 }
 
-uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks,
-                          uint16_t lane, uint8_t priority) {
+uint8_t amy_pattern_begin(uint32_t pattern, uint32_t length_ticks) {
     if (!pattern_index_valid(pattern) || length_ticks == 0) return 0;
-    pattern_definition_t *definition = pattern_definition_new(
-        length_ticks, lane, priority);
+    pattern_definition_t *definition = pattern_definition_new(length_ticks);
     if (definition == NULL) return 0;
 
     amy_grab_lock();
@@ -686,14 +678,6 @@ static bool pattern_instance_audible(const pattern_instance_t *instance,
     if (instance->muted
         && tick - instance->mute_tick < instance->mute_duration)
         return false;
-    for (int32_t i = 0; i < max_pattern_players; ++i) {
-        const pattern_instance_t *other = &pattern_instances[i];
-        if (other == instance || !pattern_instance_running(other, tick))
-            continue;
-        if (other->definition->lane == instance->definition->lane
-            && other->definition->priority > instance->definition->priority)
-            return false;
-    }
     return true;
 }
 
@@ -714,9 +698,8 @@ static bool pattern_event_is_mute(const sequence_info_t *event) {
 static void pattern_process_tick(uint32_t tick) {
     if (pattern_instances == NULL) return;
 
-    // Retire stopped/finished instances before determining lane priority, so
-    // a completed fill cannot suppress the background pattern for one extra
-    // tick.  A replacement scheduled on this exact tick takes effect here.
+    // Retire stopped/finished instances before processing events. A
+    // replacement scheduled on this exact tick takes effect here.
     amy_grab_lock();
     for (int32_t i = 0; i < max_pattern_players; ++i) {
         pattern_instance_t *instance = &pattern_instances[i];

@@ -1,5 +1,5 @@
 // Two-level sequencer patterns: wire/C authoring, one-shot and loop playback,
-// quantized activation, immutable committed versions and lane priority.
+// quantized activation and immutable committed versions.
 //
 // The existing H sequencer is intentionally exercised in the same process:
 // the new J/zQ paths must not change its modulo, tag or wire behavior.
@@ -104,7 +104,7 @@ static void test_wire_one_shot_and_loop(void) {
     sequencer_reset();
     clear_marks();
 
-    amy_add_message("zQB0,8,2,0Z");
+    amy_add_message("zQB0,8Z");
     amy_add_message("J0,0,8,0zPwire0Z");
     amy_add_message("J0,2,8,1zPwire2Z");
     amy_add_message("zQC0Z");
@@ -150,7 +150,7 @@ static void test_c_event_api(void) {
     event.ticks[TICKS_PERIOD] = 4;
     event.ticks[TICKS_TAG] = 0;
 
-    CHECK(amy_pattern_begin(1, 4, 3, 0), "C API begins staging pattern");
+    CHECK(amy_pattern_begin(1, 4), "C API begins staging pattern");
     CHECK(amy_pattern_add_event(1, &event), "C API stores amy_event");
     CHECK(amy_pattern_commit(1), "C API commits atomically");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
@@ -170,7 +170,7 @@ static void test_committed_version_survives_replacement(void) {
     sequencer_reset();
     clear_marks();
 
-    CHECK(amy_pattern_begin(2, 8, 4, 0), "begin old definition");
+    CHECK(amy_pattern_begin(2, 8), "begin old definition");
     CHECK(amy_pattern_add_wire(2, 0, 8, 0, true, "zPold0Z"),
           "store old tick zero");
     CHECK(amy_pattern_add_wire(2, 6, 8, 1, true, "zPold6Z"),
@@ -181,7 +181,7 @@ static void test_committed_version_survives_replacement(void) {
                               AMY_PATTERN_UNTAGGED),
           "trigger old definition");
 
-    CHECK(amy_pattern_begin(2, 8, 4, 0), "begin replacement");
+    CHECK(amy_pattern_begin(2, 8), "begin replacement");
     CHECK(amy_pattern_add_wire(2, 0, 8, 0, true, "zPnew0Z"),
           "store replacement");
     CHECK(amy_pattern_commit(2), "commit replacement while old is pending");
@@ -198,57 +198,16 @@ static void test_committed_version_survives_replacement(void) {
     CHECK(mark_at("new0", new_start), "next instance uses replacement");
 }
 
-static void test_lane_priority_suppresses_onsets_only(void) {
-    printf("higher-priority pattern owns its lane for its exact duration\n");
-    sequencer_reset();
-    clear_marks();
-
-    CHECK(amy_pattern_begin(3, 4, 7, 0), "begin background");
-    CHECK(amy_pattern_add_wire(3, 0, 4, 0, true, "zPbg0Z"),
-          "background tick zero");
-    CHECK(amy_pattern_add_wire(3, 2, 4, 1, true, "zPbg2Z"),
-          "background tick two");
-    CHECK(amy_pattern_commit(3), "commit background");
-    uint32_t background_start = next_boundary(sequencer_ticks(), 4);
-    CHECK(amy_pattern_trigger(3, AMY_PATTERN_LOOP, 4, 77),
-          "start background loop");
-    clock_to(background_start + 2);
-    CHECK(mark_at("bg0", background_start)
-          && mark_at("bg2", background_start + 2),
-          "background sounds before overlay");
-
-    CHECK(amy_pattern_begin(4, 4, 7, 1), "begin lane overlay");
-    CHECK(amy_pattern_add_wire(4, 0, 4, 0, true, "zPfill0Z"),
-          "overlay tick zero");
-    CHECK(amy_pattern_add_wire(4, 2, 4, 1, true, "zPfill2Z"),
-          "overlay tick two");
-    CHECK(amy_pattern_commit(4), "commit lane overlay");
-    uint32_t fill_start = next_boundary(sequencer_ticks(), 4);
-    CHECK(amy_pattern_trigger(4, AMY_PATTERN_ONE_SHOT, 4,
-                              AMY_PATTERN_UNTAGGED),
-          "arm overlay");
-    clock_to(fill_start + 4);
-    CHECK(mark_at("fill0", fill_start)
-          && mark_at("fill2", fill_start + 2),
-          "overlay events sound");
-    CHECK(!mark_at("bg0", fill_start) && !mark_at("bg2", fill_start + 2),
-          "lower-priority lane onsets are suppressed");
-    CHECK(mark_at("bg0", fill_start + 4),
-          "background resumes on first tick after overlay duration");
-    amy_pattern_stop(77, 0);
-    clock_to(sequencer_ticks() + 2);
-}
-
 static void test_mute_event_targets_tag_and_preserves_phase(void) {
     printf("a scheduled mute gates selected running tags and preserves phase\n");
     sequencer_reset();
     clear_marks();
 
-    CHECK(amy_pattern_begin(11, 4, 1, 0), "begin muted background");
+    CHECK(amy_pattern_begin(11, 4), "begin muted background");
     CHECK(amy_pattern_add_wire(11, 0, 2, 0, true, "zPmutedZ"),
           "store muted background pulse");
     CHECK(amy_pattern_commit(11), "commit muted background");
-    CHECK(amy_pattern_begin(12, 4, 2, 0), "begin independent background");
+    CHECK(amy_pattern_begin(12, 4), "begin independent background");
     CHECK(amy_pattern_add_wire(12, 0, 2, 0, true, "zPkeptZ"),
           "store independent background pulse");
     CHECK(amy_pattern_commit(12), "commit independent background");
@@ -263,7 +222,7 @@ static void test_mute_event_targets_tag_and_preserves_phase(void) {
           && mark_at("kept", background_start),
           "both backgrounds initially sound");
 
-    CHECK(amy_pattern_begin(13, 4, 3, 0), "begin explicit mute overlay");
+    CHECK(amy_pattern_begin(13, 4), "begin explicit mute overlay");
     CHECK(amy_pattern_add_wire(13, 0, 4, 0, true, "zQM81,4Z"),
           "mute is accepted as a non-nesting leaf event");
     CHECK(amy_pattern_add_wire(13, 0, 4, 1, true, "zPfillZ"),
@@ -300,7 +259,7 @@ static void test_relative_pattern_schedule(void) {
     printf("pattern triggers can be scheduled relative to a quantized boundary\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(14, 2, 0, 0), "begin scheduled one-shot");
+    CHECK(amy_pattern_begin(14, 2), "begin scheduled one-shot");
     CHECK(amy_pattern_add_wire(14, 0, 2, 0, true, "zPscheduledZ"),
           "store scheduled marker");
     CHECK(amy_pattern_commit(14), "commit scheduled one-shot");
@@ -328,7 +287,7 @@ static void test_relative_pattern_schedule(void) {
 
 static void test_third_level_is_rejected(void) {
     printf("pattern payloads cannot create a third sequencer level\n");
-    CHECK(amy_pattern_begin(5, 4, 0, 0), "begin leaf-only definition");
+    CHECK(amy_pattern_begin(5, 4), "begin leaf-only definition");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "H0,4v0l1Z"),
           "root H payload rejected");
     CHECK(!amy_pattern_add_wire(5, 0, 4, 0, true, "J0,0,4,0v0l1Z"),
@@ -348,7 +307,7 @@ static void test_root_can_trigger_local_tick_zero(void) {
     printf("a root sequence event can trigger pattern tick zero atomically\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(6, 4, 1, 0), "begin root-triggered pattern");
+    CHECK(amy_pattern_begin(6, 4), "begin root-triggered pattern");
     CHECK(amy_pattern_add_wire(6, 0, 4, 0, true, "zProot-childZ"),
           "store local tick zero");
     CHECK(amy_pattern_commit(6), "commit root-triggered pattern");
@@ -366,7 +325,7 @@ static void test_pattern_event_tag_semantics(void) {
     printf("pattern tags and anonymous events match root sequencer semantics\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(7, 4, 0, 0), "begin tag-semantics pattern");
+    CHECK(amy_pattern_begin(7, 4), "begin tag-semantics pattern");
     CHECK(amy_pattern_add_wire(7, 0, 4, 3, true, "zPclearedZ"),
           "store tagged event");
     CHECK(!amy_pattern_add_wire(7, 0, 0, 3, true, "zPignoredZ"),
@@ -392,7 +351,7 @@ static void test_reset_stops_instances_but_keeps_definitions(void) {
     printf("RESET_SEQUENCER clears playback but preserves stored definitions\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(8, 4, 0, 0), "begin reset-survival pattern");
+    CHECK(amy_pattern_begin(8, 4), "begin reset-survival pattern");
     CHECK(amy_pattern_add_wire(8, 0, 4, 0, true, "zPsurvivorZ"),
           "store reset-survival event");
     CHECK(amy_pattern_commit(8), "commit reset-survival pattern");
@@ -420,7 +379,7 @@ static void test_timebase_reset_preserves_local_phase(void) {
     printf("RESET_TIMEBASE preserves pattern phase and pending distances\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(9, 8, 0, 0), "begin phase pattern");
+    CHECK(amy_pattern_begin(9, 8), "begin phase pattern");
     CHECK(amy_pattern_add_wire(9, 3, 8, 0, true, "zPphase-threeZ"),
           "store local phase marker");
     CHECK(amy_pattern_commit(9), "commit phase pattern");
@@ -443,7 +402,7 @@ static void test_pattern_activation_wraps_with_tick_clock(void) {
     printf("quantized pattern activation survives uint32 tick rollover\n");
     sequencer_reset();
     clear_marks();
-    CHECK(amy_pattern_begin(10, 4, 0, 0), "begin rollover pattern");
+    CHECK(amy_pattern_begin(10, 4), "begin rollover pattern");
     CHECK(amy_pattern_add_wire(10, 0, 4, 0, true, "zPwrappedZ"),
           "store rollover tick zero");
     CHECK(amy_pattern_commit(10), "commit rollover pattern");
@@ -461,8 +420,8 @@ static void test_pattern_activation_wraps_with_tick_clock(void) {
 static void test_configured_bounds_are_enforced(void) {
     printf("configured pattern, tag and instance bounds are enforced\n");
     sequencer_reset();
-    CHECK(amy_pattern_begin(31, 8, 0, 0), "last configured pattern is valid");
-    CHECK(!amy_pattern_begin(32, 8, 0, 0),
+    CHECK(amy_pattern_begin(31, 8), "last configured pattern is valid");
+    CHECK(!amy_pattern_begin(32, 8),
           "first pattern past the configured range is refused");
     CHECK(amy_pattern_add_wire(31, 0, 8, 63, true, "zPlast-tagZ"),
           "last configured event tag is valid");
@@ -495,7 +454,6 @@ int main(void) {
     test_wire_one_shot_and_loop();
     test_c_event_api();
     test_committed_version_survives_replacement();
-    test_lane_priority_suppresses_onsets_only();
     test_mute_event_targets_tag_and_preserves_phase();
     test_relative_pattern_schedule();
     test_third_level_is_rejected();

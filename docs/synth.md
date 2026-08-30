@@ -253,7 +253,7 @@ only its playback mode changes.
 Pattern definitions are built in staging storage and published atomically:
 
 ```python
-amy.pattern_begin(0, length_ticks=384, lane=0, priority=0)
+amy.pattern_begin(0, length_ticks=384)
 amy.pattern_event(0, tick=0,   period=384, tag=0,
                   synth=10, note=36, vel=1)
 amy.pattern_event(0, tick=192, period=384, tag=1,
@@ -282,12 +282,6 @@ trigger fired by a root `H` event on a boundary is already in the sequencer
 tick and starts there; local tick-zero events then fire on that same tick.
 Use zero for the next tick (or the current root-event tick).
 
-Patterns may share a `lane`. While a higher-priority instance owns a lane,
-new onsets from lower-priority patterns on that lane are suppressed; existing
-sound is not forcibly note-offed. This lets a one-shot fill temporarily cover
-a looping rhythm, which resumes on the first tick after the fill. Different
-lanes, or equal priorities on one lane, play together.
-
 For explicit control over an already-running pattern, give its instance a tag
 and schedule `pattern_mute(tag, duration_ticks)`. A mute suppresses only new
 events; the target's local clock and any already-ringing sounds continue. It
@@ -296,7 +290,7 @@ therefore resumes at its original phase on the first tick after the duration.
 cannot start or schedule another pattern:
 
 ```python
-amy.pattern_begin(1, length_ticks=96, lane=1, priority=0)
+amy.pattern_begin(1, length_ticks=96)
 amy.pattern_event_wire(1, 0, "zQM100,96Z", period=96, tag=0)
 amy.pattern_event(1, 0, period=96, tag=1, synth=10, note=38, vel=1)
 amy.pattern_commit(1)
@@ -557,4 +551,3 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-

@@ -373,10 +373,9 @@ def send(**kwargs):
     send_raw(m)
 
 
-def pattern_begin(pattern, length_ticks, lane=0, priority=0):
+def pattern_begin(pattern, length_ticks):
     """Begin a new staging definition for a finite-length sequencer pattern."""
-    send_raw("zQB%d,%d,%d,%dZ" %
-             (pattern, length_ticks, lane, priority))
+    send_raw("zQB%d,%dZ" % (pattern, length_ticks))
 
 
 def pattern_event_wire(pattern, tick, wire, period=None, tag=None):

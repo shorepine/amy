@@ -755,7 +755,7 @@ void handle_pattern_ticks_message(char *message) {
 }
 
 // zQ actions:
-//   Bpattern,length,lane,priority  begin/replace staging definition
+//   Bpattern,length                begin/replace staging definition
 //   Cpattern                       atomically commit staging definition
 //   Tpattern,mode,quantum[,tag]    trigger one-shot/loop, quantized in ticks
 //   Apattern,mode,offset,period,quantum,sequence_tag[,instance_tag]
@@ -771,13 +771,10 @@ uint16_t amy_parse_pattern_control_message(char *message) {
     int num_vals = parse_list_uint32_t(message + 1, values, 7, 0);
     switch (action) {
         case 'B':
-            if (num_vals >= 2) {
-                amy_pattern_begin(
-                    values[0], values[1],
-                    (uint16_t)(num_vals >= 3 ? values[2] : 0),
-                    (uint8_t)(num_vals >= 4 ? values[3] : 0));
+            if (num_vals == 2) {
+                amy_pattern_begin(values[0], values[1]);
             } else {
-                fprintf(stderr, "zQB requires pattern,length\n");
+                fprintf(stderr, "zQB requires exactly pattern,length\n");
             }
             break;
         case 'C':

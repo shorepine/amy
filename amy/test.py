@@ -2172,7 +2172,7 @@ class TestPatternHelpers(AmyTest):
     amy.override_send = captured.append
     problems = []
     try:
-      amy.pattern_begin(3, 96, lane=2, priority=1)
+      amy.pattern_begin(3, 96)
       amy.pattern_event(3, 0, period=96, tag=7,
                         synth=10, note=36, vel=1)
       amy.pattern_event_wire(3, 24, 'v2l0Z', tag=8)
@@ -2185,7 +2185,7 @@ class TestPatternHelpers(AmyTest):
       amy.pattern_stop(12, 96)
       amy.pattern_clear(3)
       expected = [
-        'zQB3,96,2,1Z',
+        'zQB3,96Z',
         'J3,0,96,7n36l1i10Z',
         'J3,24,,8v2l0Z',
         'zQC3Z',
