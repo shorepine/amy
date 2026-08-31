@@ -52,8 +52,12 @@ var amy: Amy
 
 func _ready():
     amy = Amy.new()
+    amy.backend_ready.connect(_on_amy_ready)
+    amy.backend_error.connect(_on_amy_error)
     add_child(amy)
-    await get_tree().process_frame  # let AMY initialize
+
+func _on_amy_ready():
+    # The selected backend can now accept messages.
 
     # Play a 440 Hz sine wave
     amy.send({"osc": 0, "wave": Amy.SINE, "freq": 440, "vel": 1.0})
@@ -69,7 +73,15 @@ func _ready():
 
     # Or use wire protocol directly
     amy.send_raw("v3w0f880l0.5")
+
+func _on_amy_error(message: String):
+    push_error(message)
 ```
+
+Connect the signals before `add_child(amy)`: the native backend can become
+ready synchronously during `_ready()`. `backend_ready` is emitted once the
+native or web backend accepts messages. `backend_error(message)` reports a
+missing native extension or a web-backend startup timeout.
 
 ### 4. Configure AMY (optional)
 
@@ -136,6 +148,16 @@ Or run locally: `python3 -m http.server` from your `dist`  folder and go to `loc
 
 - **Web:** AMY runs as its own WASM module with Web Audio API AudioWorklets. The `Amy` GDScript class detects `OS.get_name() == "Web"` and sends wire messages via `JavaScriptBridge` instead of the native extension.
 
+### Android reference implementation
+
+Android is not built or maintained in this repository. A complete external
+[Godot Android service integration](https://github.com/linuxificator/amy/tree/upstream/godot-android)
+demonstrates the same `Amy` Dictionary-to-wire API with AMY running in a
+separate Oboe service process. The lower-level
+[Android Oboe reference](https://github.com/linuxificator/amy/tree/upstream/android-oboe)
+contains the service and private Unix-socket transport. See
+[porting notes](porting.md) for the reusable boundary and verified build flags.
+
 
 ## API Reference
 
@@ -179,6 +201,11 @@ Send a raw AMY wire-protocol message (e.g. `"v0w0f440l1"`).
 ### `amy.panic()`
 
 Stop all sound immediately.
+
+### Signals
+
+- `backend_ready`: the selected backend is ready to accept AMY messages.
+- `backend_error(message)`: backend initialization failed.
 
 ### Constants
 
