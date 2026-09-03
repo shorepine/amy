@@ -83,6 +83,35 @@ static void test_legacy_ticks_are_unchanged(void) {
     clock_to(target);
     CHECK(!marks_named("old") && mark_at("new", target),
           "legacy root tags still replace by tag");
+
+    clear_marks();
+    uint32_t group_zero = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("H0,4,5,0zPgroup-zero-rootZ");
+    clock_to(group_zero);
+    CHECK(mark_at("group-zero-root", group_zero),
+          "an explicit group tag zero follows the legacy root path");
+    amy_add_message("H0,0,5Z");
+}
+
+static void test_group_local_tags_are_independent(void) {
+    printf("event tags are local to each sequencer group\n");
+    sequencer_reset();
+    clear_group(6);
+    clear_group(7);
+    clear_marks();
+    amy_add_message("H0,4,0,6zPgroup-six-tag-zeroZ");
+    amy_add_message("H0,4,0,7zPgroup-seven-tag-zeroZ");
+    amy_add_message("zQ6,3,4Z");
+    amy_add_message("zQ7,3,4Z");
+
+    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ6,1,1,4Z");
+    amy_add_message("zQ7,1,1,4Z");
+    clock_to(start);
+    CHECK(mark_at("group-six-tag-zero", start),
+          "group 6 owns its event tag zero");
+    CHECK(mark_at("group-seven-tag-zero", start),
+          "group 7 independently owns event tag zero");
 }
 
 static void test_one_n_and_infinite_repeats(void) {
@@ -293,6 +322,24 @@ static void test_resets_keep_definitions_only(void) {
     CHECK(marks_named("survivor") == 1, "definition survives RESET_TIMEBASE");
 }
 
+static void test_group_start_crosses_clock_rollover(void) {
+    printf("group phase remains correct across the 32-bit tick rollover\n");
+    sequencer_reset();
+    clear_group(5);
+    clear_marks();
+    amy_add_message("H0,4,0,5zPwrap-zeroZ");
+    amy_add_message("H1,0,1,5zPwrap-oneZ");
+    amy_add_message("zQ5,3,4Z");
+
+    amy_global.sequencer_tick_count = UINT32_MAX - 2;
+    amy_add_message("zQ5,1,1,4Z");
+    clock_to(1);
+    CHECK(mark_at("wrap-zero", 0),
+          "quantized local tick zero fired after rollover");
+    CHECK(mark_at("wrap-one", 1),
+          "local elapsed time advanced across rollover");
+}
+
 static void test_configured_bounds(void) {
     printf("configured group, local-tag and execution bounds are enforced\n");
     sequencer_reset();
@@ -332,6 +379,7 @@ int main(void) {
     amy_start(config);
 
     test_legacy_ticks_are_unchanged();
+    test_group_local_tags_are_independent();
     test_one_n_and_infinite_repeats();
     test_atomic_revision_lifetime();
     test_root_launches_local_zero_on_same_tick();
@@ -340,6 +388,7 @@ int main(void) {
     test_quantized_stop_precedes_boundary_event();
     test_group_control_cannot_recurse();
     test_resets_keep_definitions_only();
+    test_group_start_crosses_clock_rollover();
     test_configured_bounds();
 
     amy_stop();
