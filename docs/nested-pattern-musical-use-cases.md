@@ -1,18 +1,18 @@
 # Musical use cases for stored patterns
 
 Stored patterns are useful when a musical phrase should remain a coherent unit
-while a controller changes *which* phrase will play next. The feature was
-developed against two live features in
-[LB Omnichord](https://github.com/linuxificator/LB_Omnichord): drum fills and
-arpeggios. AMY contains no Omnichord-specific policy; both are expressed as
-ordinary AMY events on a local timeline.
+while a controller changes *which* phrase will play next. Two representative
+applications are an interactive rhythm engine with selectable drum fills and
+an arpeggiator whose timing or direction can change during playback. Both are
+expressed as ordinary AMY events on a local timeline; AMY contains no policy
+specific to either application.
 
 ## Dynamic drum fills
 
-The Omnichord rhythm engine combines a repeating rhythm with a selectable fill
-and a fill density. Each rhythm offers multiple fills, and the user may change
-the selection or density while playback continues. During a fill, selected
-percussion layers can be silent while other layers continue.
+Consider a rhythm engine that combines a repeating rhythm with a selectable
+fill and a fill density. Each rhythm offers multiple fills, and the player may
+change the selection or density while playback continues. During a fill,
+selected percussion layers can be silent while other layers continue.
 
 A flat sequencer can render any one final arrangement, but live editing makes
 the host responsible for considerably more state. It must expand every chosen
@@ -37,10 +37,10 @@ and which layers continue. AMY only provides coherent phrase playback. This
 reduces live control from rewriting many individual sequencer events to
 replacing or clearing one tagged root trigger.
 
-The public Omnichord catalogue currently exercises hundreds of stored fills;
-its larger configuration reserves 1,024 definition slots for growth. That does
-not imply 1,024 simultaneous players: stored definitions and active instances
-have separate limits.
+A large rhythm engine may preload hundreds of fills and configure more
+definition slots than AMY's conservative portable default. That does not imply
+the same number of simultaneous players: stored definitions and active
+instances have separate limits.
 
 ## Arpeggios with clean live changes
 
@@ -51,9 +51,9 @@ a note hanging. Sending an all-off avoids the hang but cuts a valid note short.
 A host-side timer can defer the edit, but then the host must reproduce AMY's
 musical clock and account for every overlapping note gate.
 
-The Omnichord instead represents each sounding arpeggio note as a short
-one-shot containing its note-on and matching note-off. Root events decide which
-one-shots will start in the future. When the user changes the arpeggio:
+The arpeggiator can instead represent each sounding note as a short one-shot
+containing its note-on and matching note-off. Root events decide which
+one-shots will start in the future. When the player changes the arpeggio:
 
 - future root triggers are replaced or cleared by tag;
 - an already-started one-shot keeps its immutable definition;
