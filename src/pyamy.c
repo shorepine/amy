@@ -97,6 +97,33 @@ static int parse_live_kwarg(amy_config_t *cfg, const char *key, PyObject *value)
         }
         cfg->max_sequencer_tags = (uint32_t)llv;
         return 0;
+    } else if (strcmp(key, "max_sequence_groups") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_sequence_groups must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_sequence_groups = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "max_sequence_group_tags") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_sequence_group_tags must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_sequence_group_tags = (uint32_t)llv;
+        return 0;
+    } else if (strcmp(key, "max_sequence_group_executions") == 0) {
+        llv = PyLong_AsLongLong(value);
+        if (PyErr_Occurred()) return -1;
+        if (llv < 0 || (unsigned long long)llv > UINT32_MAX) {
+            PyErr_SetString(PyExc_ValueError, "max_sequence_group_executions must be in range [0, 4294967295]");
+            return -1;
+        }
+        cfg->max_sequence_group_executions = (uint32_t)llv;
+        return 0;
     } else if (strcmp(key, "max_voices") == 0) {
         llv = PyLong_AsLongLong(value);
         if (PyErr_Occurred()) return -1;

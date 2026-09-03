@@ -659,6 +659,18 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             return total;
         }
     }
+    else if (cmd == 'Q') {
+        // zQgroup,action,value,quantize[,execution_tag]
+        uint32_t values[5] = {0, 0, 0, 0, 0};
+        int count = parse_list_uint32_t(message, values, 5, 0);
+        if (count < 2) {
+            fprintf(stderr, "sequence_control needs at least group and action\n");
+        } else {
+            sequencer_group_control(values[0], values[1], values[2], values[3],
+                                    values[4], count >= 5);
+        }
+        return 1;
+    }
     else if (cmd == 'Y') {
         // zY: sequencer transport. zY1 starts the sequencer, zY0 stops it. Lets a
         // host drive playback without MIDI clock sync (see external_midi_sync).
@@ -710,8 +722,8 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
 // is only ever honored as the first command of a message.
 void handle_ticks_message(char *message) {
     assert(message[0] == 'H');
-    uint32_t ticks[3] = {0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
+    uint32_t ticks[4] = {0, 0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, ticks, 4, 0);
     uint16_t schedule_len = 1 + _next_alpha(message + 1);
     char *payload = message + schedule_len;
     uint16_t payload_len = (uint16_t)strlen(payload);
@@ -720,10 +732,17 @@ void handle_ticks_message(char *message) {
         amy_oom("ticks_message");
     } else {
         memcpy(stripped, payload, payload_len + 1);
-        // A tag is only "given" if all 3 values were present; fewer
-        // than that (a 1- or 2-value ticks=) stores anonymously.
-        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
-                           num_vals >= 3, stripped);
+        if (num_vals >= 4 && ticks[TICKS_GROUP] != 0) {
+            // The fourth ticks value selects persistent group-local storage.
+            // Group zero deliberately follows the legacy root path below.
+            sequencer_group_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD],
+                                     ticks[TICKS_TAG], ticks[TICKS_GROUP], stripped);
+        } else {
+            // A root tag is only "given" if all 3 values were present; fewer
+            // than that (a 1- or 2-value ticks=) stores anonymously.
+            sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+                               num_vals >= 3, stripped);
+        }
     }
 }
 
@@ -906,4 +925,3 @@ int amy_parse_message(char * message, amy_event *e) {
     // Return exactly how many characters we used.
     return pos;
 }
-

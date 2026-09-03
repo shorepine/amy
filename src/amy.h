@@ -363,6 +363,7 @@ enum coefs{
 #define TICKS_TICK 0
 #define TICKS_PERIOD 1
 #define TICKS_TAG 2
+#define TICKS_GROUP 3
 
 // Reset masks
 #define RESET_SEQUENCER 4096
@@ -667,7 +668,7 @@ typedef struct amy_event {
     uint16_t num_voices;
     uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
     //
-    uint32_t ticks[3]; // tick, period, tag
+    uint32_t ticks[4]; // tick, period, tag, optional group tag
     //
     uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
@@ -887,6 +888,10 @@ typedef struct  {
     uint16_t max_buses;
     uint8_t ks_oscs;
     uint32_t max_sequencer_tags;
+    // Group tag zero is reserved for the existing root sequencer.
+    uint32_t max_sequence_groups;
+    uint32_t max_sequence_group_tags;
+    uint32_t max_sequence_group_executions;
     uint32_t max_voices;
     uint32_t max_synths;
     uint32_t max_memory_patches;

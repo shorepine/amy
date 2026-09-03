@@ -47,7 +47,164 @@ static volatile bool sequencer_external_clock = false;
 // flag makes those nested calls no-ops so a tick is never processed twice.
 static volatile bool wire_firing = false;
 
-void sequencer_init(int max_sequencer_tags) {
+// A group definition is immutable once published. Edits are accumulated in a
+// private copy and become visible together through SEQUENCE_CONTROL_PUBLISH.
+// Active executions retain the published revision they started with.
+typedef struct sequence_group_event_t {
+    char *wire;
+    uint32_t tick;
+    uint32_t period;
+} sequence_group_event_t;
+
+typedef struct sequence_group_definition_t {
+    sequence_group_event_t *events;
+    uint32_t length_ticks;
+    uint32_t refs;
+} sequence_group_definition_t;
+
+typedef struct sequence_group_slot_t {
+    sequence_group_definition_t *published;
+    sequence_group_definition_t *staging;
+} sequence_group_slot_t;
+
+typedef struct sequence_group_execution_t {
+    sequence_group_definition_t *definition;
+    uint32_t group;
+    uint32_t start_tick;
+    uint32_t repeats;
+    uint32_t execution_tag;
+    uint32_t stop_tick;
+    uint32_t gate_change_tick;
+    uint32_t gate_duration;
+    uint32_t gate_end_tick;
+    bool occupied;
+    bool has_execution_tag;
+    bool stop_pending;
+    bool gate_change_pending;
+    bool gated;
+} sequence_group_execution_t;
+
+static sequence_group_slot_t *sequence_groups = NULL;
+static sequence_group_execution_t *group_executions = NULL;
+static uint32_t max_sequence_groups = 0;
+static uint32_t max_sequence_group_tags = 0;
+static uint32_t max_sequence_group_executions = 0;
+static volatile bool group_wire_firing = false;
+
+static void group_definition_release(sequence_group_definition_t *definition) {
+    if (definition == NULL || definition->refs == 0) return;
+    definition->refs--;
+    if (definition->refs != 0) return;
+    for (uint32_t i = 0; i < max_sequence_group_tags; ++i)
+        if (definition->events[i].wire != NULL) free(definition->events[i].wire);
+    free(definition->events);
+    free(definition);
+}
+
+static sequence_group_definition_t *group_definition_new(void) {
+    sequence_group_definition_t *definition =
+        (sequence_group_definition_t *)malloc_caps(sizeof(sequence_group_definition_t),
+                                                    amy_global.config.ram_caps_synth);
+    if (definition == NULL) return NULL;
+    definition->events = (sequence_group_event_t *)malloc_caps(
+        sizeof(sequence_group_event_t) * max_sequence_group_tags,
+        amy_global.config.ram_caps_synth);
+    if (definition->events == NULL) {
+        free(definition);
+        return NULL;
+    }
+    memset(definition->events, 0,
+           sizeof(sequence_group_event_t) * max_sequence_group_tags);
+    definition->length_ticks = 0;
+    definition->refs = 1;
+    return definition;
+}
+
+static char *group_wire_copy(const char *wire) {
+    size_t len = strlen(wire);
+    char *copy = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
+    if (copy != NULL) memcpy(copy, wire, len + 1);
+    return copy;
+}
+
+static sequence_group_definition_t *group_definition_clone(
+        const sequence_group_definition_t *source) {
+    sequence_group_definition_t *copy = group_definition_new();
+    if (copy == NULL) return NULL;
+    if (source == NULL) return copy;
+    copy->length_ticks = source->length_ticks;
+    for (uint32_t i = 0; i < max_sequence_group_tags; ++i) {
+        const sequence_group_event_t *from = &source->events[i];
+        if (from->wire == NULL) continue;
+        copy->events[i].wire = group_wire_copy(from->wire);
+        if (copy->events[i].wire == NULL) {
+            group_definition_release(copy);
+            return NULL;
+        }
+        copy->events[i].tick = from->tick;
+        copy->events[i].period = from->period;
+    }
+    return copy;
+}
+
+static void group_execution_release(sequence_group_execution_t *execution) {
+    if (!execution->occupied) return;
+    sequence_group_definition_t *definition = execution->definition;
+    memset(execution, 0, sizeof(*execution));
+    group_definition_release(definition);
+}
+
+static void group_executions_reset(void) {
+    if (group_executions == NULL) return;
+    for (uint32_t i = 0; i < max_sequence_group_executions; ++i)
+        group_execution_release(&group_executions[i]);
+}
+
+static void sequence_groups_deinit(void) {
+    group_executions_reset();
+    if (sequence_groups != NULL) {
+        for (uint32_t i = 0; i < max_sequence_groups; ++i) {
+            group_definition_release(sequence_groups[i].published);
+            group_definition_release(sequence_groups[i].staging);
+        }
+        free(sequence_groups);
+        sequence_groups = NULL;
+    }
+    if (group_executions != NULL) {
+        free(group_executions);
+        group_executions = NULL;
+    }
+    max_sequence_groups = 0;
+    max_sequence_group_tags = 0;
+    max_sequence_group_executions = 0;
+}
+
+static void sequence_groups_init(uint32_t groups, uint32_t tags,
+                                 uint32_t executions) {
+    max_sequence_groups = groups;
+    max_sequence_group_tags = tags;
+    max_sequence_group_executions = executions;
+    group_wire_firing = false;
+    if (groups == 0 || tags == 0 || executions == 0) return;
+    sequence_groups = (sequence_group_slot_t *)malloc_caps(
+        sizeof(sequence_group_slot_t) * groups, amy_global.config.ram_caps_synth);
+    if (sequence_groups != NULL)
+        memset(sequence_groups, 0, sizeof(sequence_group_slot_t) * groups);
+    group_executions = (sequence_group_execution_t *)malloc_caps(
+        sizeof(sequence_group_execution_t) * executions,
+        amy_global.config.ram_caps_synth);
+    if (group_executions != NULL)
+        memset(group_executions, 0,
+               sizeof(sequence_group_execution_t) * executions);
+    if (sequence_groups == NULL || group_executions == NULL) {
+        amy_oom("sequencer groups");
+        sequence_groups_deinit();
+        return;
+    }
+}
+
+void sequencer_init(int max_sequencer_tags, uint32_t groups,
+                    uint32_t group_tags, uint32_t group_execution_count) {
     // These are statics, so a stop/start of AMY within one process needs them
     // put back to their boot state (internal clock, running).
     sequencer_running = true;
@@ -65,6 +222,7 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+    sequence_groups_init(groups, group_tags, group_execution_count);
     // We are read to go.
     sequencer_recompute();
 }
@@ -82,6 +240,9 @@ void sequencer_reset() {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+    // Definitions are preloadable state and deliberately survive a transport
+    // reset; only their active or quantized executions are discarded.
+    group_executions_reset();
 }
 
 void sequencer_deinit() {
@@ -91,6 +252,13 @@ void sequencer_deinit() {
         sequences = NULL;  // sequencer_check_and_fill guards on this
     }
     max_sequences = 0;
+    sequence_groups_deinit();
+}
+
+void sequencer_group_reset_timebase() {
+    // Absolute activation/control ticks cannot be meaningfully rebased across
+    // a timebase reset. Persistent definitions remain available for relaunch.
+    group_executions_reset();
 }
 
 void sequencer_debug() {
@@ -240,6 +408,289 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     return 1;
 }
 
+static sequence_group_slot_t *group_slot(uint32_t group) {
+    if (sequence_groups == NULL || group == 0 || group > max_sequence_groups)
+        return NULL;
+    return &sequence_groups[group - 1];
+}
+
+uint8_t sequencer_group_add_wire(uint32_t tick, uint32_t period,
+                                 uint32_t tag, uint32_t group, char *wire) {
+    sequence_group_slot_t *slot = group_slot(group);
+    if (slot == NULL || tag >= max_sequence_group_tags) {
+        fprintf(stderr, "sequencer group/event tag out of range: group %" PRIu32
+                ", tag %" PRIu32 "\n", group, tag);
+        free(wire);
+        return 0;
+    }
+    if (wire[0] == 'H') {
+        fprintf(stderr, "a grouped ticks event cannot contain another ticks event\n");
+        free(wire);
+        return 0;
+    }
+
+    amy_grab_lock();
+    if (slot->staging == NULL) {
+        slot->staging = group_definition_clone(slot->published);
+        if (slot->staging == NULL) {
+            amy_release_lock();
+            amy_oom("sequencer group edit");
+            free(wire);
+            return 0;
+        }
+    }
+    sequence_group_event_t *event = &slot->staging->events[tag];
+    if (event->wire != NULL) free(event->wire);
+    event->wire = NULL;
+    event->tick = 0;
+    event->period = 0;
+    if (tick != 0 || period != 0) {
+        event->wire = wire;
+        event->tick = tick;
+        event->period = period;
+        wire = NULL;
+    }
+    amy_release_lock();
+    if (wire != NULL) free(wire);
+    return 1;
+}
+
+static uint32_t group_control_tick(uint32_t quantize) {
+    // A control fired by the root sequencer participates in this tick. A
+    // control arriving between ticks begins no earlier than the next tick.
+    uint32_t tick = wire_firing ? amy_global.sequencer_tick_count
+                                : amy_global.sequencer_tick_count + 1;
+    if (quantize != 0) {
+        uint32_t remainder = tick % quantize;
+        if (remainder != 0) tick += quantize - remainder;
+    }
+    return tick;
+}
+
+static bool group_execution_matches(const sequence_group_execution_t *execution,
+                                    uint32_t group, uint32_t execution_tag,
+                                    bool has_execution_tag) {
+    if (!execution->occupied || execution->group != group) return false;
+    return !has_execution_tag
+        || (execution->has_execution_tag
+            && execution->execution_tag == execution_tag);
+}
+
+static uint8_t group_publish(sequence_group_slot_t *slot, uint32_t length) {
+    if (length == 0) {
+        fprintf(stderr, "a sequencer group must have a nonzero length\n");
+        return 0;
+    }
+    if (slot->staging == NULL) {
+        slot->staging = group_definition_clone(slot->published);
+        if (slot->staging == NULL) {
+            amy_oom("sequencer group publish");
+            return 0;
+        }
+    }
+    for (uint32_t i = 0; i < max_sequence_group_tags; ++i) {
+        sequence_group_event_t *event = &slot->staging->events[i];
+        if (event->wire == NULL) continue;
+        if (event->tick >= length
+            || (event->period != 0 && event->tick >= event->period)) {
+            fprintf(stderr, "sequencer group event %" PRIu32
+                    " has tick %" PRIu32 " outside its period/group length\n",
+                    i, event->tick);
+            return 0;
+        }
+    }
+    slot->staging->length_ticks = length;
+    sequence_group_definition_t *previous = slot->published;
+    slot->published = slot->staging;
+    slot->staging = NULL;
+    group_definition_release(previous);
+    return 1;
+}
+
+uint8_t sequencer_group_control(uint32_t group, uint32_t action,
+                                uint32_t value, uint32_t quantize,
+                                uint32_t execution_tag,
+                                bool has_execution_tag) {
+    sequence_group_slot_t *slot = group_slot(group);
+    if (slot == NULL) {
+        fprintf(stderr, "sequencer group %" PRIu32 " is out of range\n", group);
+        return 0;
+    }
+    if (group_wire_firing
+        && (action == SEQUENCE_CONTROL_START
+            || action == SEQUENCE_CONTROL_PUBLISH
+            || action == SEQUENCE_CONTROL_CLEAR)) {
+        fprintf(stderr, "a sequencer group cannot launch or edit a group\n");
+        return 0;
+    }
+
+    uint8_t result = 0;
+    amy_grab_lock();
+    if (action == SEQUENCE_CONTROL_PUBLISH) {
+        result = group_publish(slot, value);
+    } else if (action == SEQUENCE_CONTROL_CLEAR) {
+        group_definition_release(slot->published);
+        group_definition_release(slot->staging);
+        slot->published = NULL;
+        slot->staging = NULL;
+        result = 1;
+    } else if (action == SEQUENCE_CONTROL_START) {
+        if (slot->published == NULL || slot->published->length_ticks == 0) {
+            fprintf(stderr, "sequencer group %" PRIu32 " has no published definition\n",
+                    group);
+        } else {
+            uint32_t start_tick = group_control_tick(quantize);
+            sequence_group_execution_t *available = NULL;
+            for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
+                sequence_group_execution_t *execution = &group_executions[i];
+                if (!execution->occupied && available == NULL) available = execution;
+            }
+            if (available == NULL) {
+                fprintf(stderr, "sequencer group execution pool is full\n");
+            } else {
+                if (has_execution_tag) {
+                    for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
+                        sequence_group_execution_t *execution = &group_executions[i];
+                        if (group_execution_matches(execution, group, execution_tag, true)) {
+                            execution->stop_tick = start_tick;
+                            execution->stop_pending = true;
+                        }
+                    }
+                }
+                memset(available, 0, sizeof(*available));
+                available->definition = slot->published;
+                available->definition->refs++;
+                available->group = group;
+                available->start_tick = start_tick;
+                available->repeats = value;
+                available->execution_tag = execution_tag;
+                available->has_execution_tag = has_execution_tag;
+                available->occupied = true;
+                result = 1;
+            }
+        }
+    } else if (action == SEQUENCE_CONTROL_STOP
+               || action == SEQUENCE_CONTROL_GATE) {
+        uint32_t control_tick = group_control_tick(quantize);
+        for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
+            sequence_group_execution_t *execution = &group_executions[i];
+            if (!group_execution_matches(execution, group, execution_tag,
+                                         has_execution_tag))
+                continue;
+            if (action == SEQUENCE_CONTROL_STOP) {
+                execution->stop_tick = control_tick;
+                execution->stop_pending = true;
+            } else {
+                execution->gate_change_tick = control_tick;
+                execution->gate_duration = value;
+                execution->gate_change_pending = true;
+            }
+            result = 1;
+        }
+    } else {
+        fprintf(stderr, "unknown sequencer group action %" PRIu32 "\n", action);
+    }
+    amy_release_lock();
+    return result;
+}
+
+static bool group_event_hits(const sequence_group_event_t *event,
+                             uint32_t local_tick) {
+    if (event->wire == NULL) return false;
+    return event->period != 0 ? local_tick % event->period == event->tick
+                              : local_tick == event->tick;
+}
+
+static bool group_event_is_control(const sequence_group_event_t *event) {
+    return event->wire != NULL && strncmp(event->wire, "zQ", 2) == 0;
+}
+
+static void group_play_wire(const char *wire) {
+    bool previous = group_wire_firing;
+    group_wire_firing = true;
+    amy_play_message((char *)wire);
+    group_wire_firing = previous;
+}
+
+static void group_process_control_events(uint32_t tick) {
+    for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
+        amy_grab_lock();
+        sequence_group_execution_t *execution = &group_executions[i];
+        if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
+            amy_release_lock();
+            continue;
+        }
+        uint32_t elapsed = tick - execution->start_tick;
+        sequence_group_definition_t *definition = execution->definition;
+        if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
+            || (execution->repeats != 0
+                && elapsed / definition->length_ticks >= execution->repeats)) {
+            group_execution_release(execution);
+            amy_release_lock();
+            continue;
+        }
+        definition->refs++;
+        uint32_t local_tick = elapsed % definition->length_ticks;
+        amy_release_lock();
+
+        for (uint32_t tag = 0; tag < max_sequence_group_tags; ++tag) {
+            sequence_group_event_t *event = &definition->events[tag];
+            if (group_event_is_control(event) && group_event_hits(event, local_tick))
+                group_play_wire(event->wire);
+        }
+
+        amy_grab_lock();
+        group_definition_release(definition);
+        amy_release_lock();
+    }
+}
+
+static void group_process_events(uint32_t tick) {
+    for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
+        amy_grab_lock();
+        sequence_group_execution_t *execution = &group_executions[i];
+        if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
+            amy_release_lock();
+            continue;
+        }
+        uint32_t elapsed = tick - execution->start_tick;
+        sequence_group_definition_t *definition = execution->definition;
+        if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
+            || (execution->repeats != 0
+                && elapsed / definition->length_ticks >= execution->repeats)) {
+            group_execution_release(execution);
+            amy_release_lock();
+            continue;
+        }
+        if (execution->gate_change_pending
+            && AMY_TIME_GEQ(tick, execution->gate_change_tick)) {
+            execution->gate_change_pending = false;
+            execution->gated = execution->gate_duration != 0;
+            execution->gate_end_tick = execution->gate_change_tick
+                                     + execution->gate_duration;
+        }
+        if (execution->gated && AMY_TIME_GEQ(tick, execution->gate_end_tick))
+            execution->gated = false;
+        bool gated = execution->gated;
+        definition->refs++;
+        uint32_t local_tick = elapsed % definition->length_ticks;
+        amy_release_lock();
+
+        if (!gated) {
+            for (uint32_t tag = 0; tag < max_sequence_group_tags; ++tag) {
+                sequence_group_event_t *event = &definition->events[tag];
+                if (!group_event_is_control(event)
+                    && group_event_hits(event, local_tick))
+                    group_play_wire(event->wire);
+            }
+        }
+
+        amy_grab_lock();
+        group_definition_release(definition);
+        amy_release_lock();
+    }
+}
+
 static void sequencer_process_tick(void) {
     amy_global.sequencer_tick_count++;
     midi_clock_out_tick();  // no-op unless in AMY_MIDI_SYNC_SEND mode
@@ -300,6 +751,10 @@ static void sequencer_process_tick(void) {
         }
         tag = next;
     }
+    // Controls embedded in a group are leaf operations (stop/gate only) and
+    // take effect before any ordinary group event on the same tick.
+    group_process_control_events(amy_global.sequencer_tick_count);
+    group_process_events(amy_global.sequencer_tick_count);
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
         amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
