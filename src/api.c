@@ -49,8 +49,8 @@ amy_config_t amy_default_config() {
     c.max_buses = AMY_DEFAULT_NUM_BUSES;
     c.max_sequencer_tags = 256;
     c.max_sequence_groups = 32;
-    c.max_sequence_group_tags = 32;
-    c.max_sequence_group_executions = 16;
+    c.max_sequence_group_tags = 64;
+    c.max_sequence_group_executions = 32;
     c.max_voices = 64;
     c.max_synths = 64;
     c.max_memory_patches = 32;

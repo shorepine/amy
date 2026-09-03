@@ -241,6 +241,18 @@ For pattern sequencers like drum machines, you will also want to use `tick` alon
 
 If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](docs/api.md) to any function. This will be called at every tick with the current tick number as an argument.
 
+### Reusable sequencer groups
+
+A fourth `ticks` value stores an event in a reusable group instead of the root
+sequencer: `tick,period,event_tag,group_tag`. Group tag zero is reserved for
+the root sequencer, so existing one-, two- and three-value `ticks` messages
+retain their original behavior. Groups are controlled through the single
+`sequence_control` parameter; they can run once, a fixed number of times, or
+continuously, and start/stop can be quantized to AMY's tick clock.
+
+See [Sequencer groups](sequencer-groups.md) for the wire format, lifecycle,
+examples and implementation guarantees.
+
 ## Core oscillators
 
 We support bandlimited saw, pulse/square and triangle waves, alongside sine and noise. Use the wave parameter: 0=SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE, NOISE. Each oscillator can have a frequency (or set by midi note), amplitude and phase (set in 0-1.). You can also set `duty` for the pulse type. We also have a karplus-strong type (KS=6), plus `WAVETABLE` when compiled with `AMY_WAVETABLE` that plays back 16,384 sample long wavetable packs, such as those hosted on [waveeditonline.com](http://waveeditonline.com). 
@@ -475,7 +487,6 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
 
 
 

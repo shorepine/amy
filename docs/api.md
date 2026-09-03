@@ -204,6 +204,9 @@ amy_start(amy_config);
 | `max_oscs` | Int | 180 | How many oscillators to support |
 | `max_buses` | Int | 4 | How many FX buses to support. No compile-time ceiling — every bus-indexed table is allocated from this at `amy_start`. Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
 | `max_sequencer_tags` | Int | 256 | How many sequencer items to handle |
+| `max_sequence_groups` | Int | 32 | Number of persistent sequencer groups; group tags are 1 through this value |
+| `max_sequence_group_tags` | Int | 64 | Addressable local event tags in each allocated group definition |
+| `max_sequence_group_executions` | Int | 32 | Maximum active or quantized-pending group executions |
 | `max_voices` | Int | 64 | How many voices |
 | `max_synths` | Int | 64 | How many synths |
 | `max_memory_patches` | Int | 32 | How many in memory patches to supprot |
@@ -503,8 +506,9 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
-| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message. |
+| `H`    | `ticks[4]` | `ticks` | int[,int[,tag[,group]]] | Tick, period and tag for root sequencing. A nonzero fourth value instead addresses a persistent [sequencer group](sequencer-groups.md), with the third value as its local event tag. `tag` omitted at root: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message. |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
+| `zQ`   | — | `sequence_control` | group,action,value,quantize[,execution_tag] | Publish, start, stop, gate or clear a [sequencer group](sequencer-groups.md). |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
 | `N`    | `latency_ms`| `latency_ms` | uint | Sets latency in ms. default 0 (see LATENCY) |
