@@ -170,6 +170,154 @@ static void test_root_launches_local_zero_on_same_tick(void) {
     CHECK(mark_at("child", start), "root launch and group local zero coincide");
 }
 
+static void test_c_event_uses_fourth_ticks_field(void) {
+    printf("the C event API defines grouped events through ticks[3]\n");
+    sequencer_reset();
+    clear_group(6);
+    amy_event event = amy_default_event();
+    event.osc = 0;
+    event.wave = TRIANGLE;
+    event.ticks[TICKS_TICK] = 0;
+    event.ticks[TICKS_PERIOD] = 4;
+    event.ticks[TICKS_TAG] = 0;
+    event.ticks[TICKS_GROUP] = 6;
+    amy_add_event(&event);
+    CHECK(sequencer_group_control(6, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "C-authored grouped event publishes");
+    CHECK(sequencer_group_control(6, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "C-authored group starts");
+    clock_to(sequencer_ticks() + 2);
+    amy_execute_deltas();
+    CHECK(synth[0] != NULL && synth[0]->wave == TRIANGLE,
+          "C-authored grouped event reaches normal playback");
+}
+
+static void test_quantized_gate_preserves_phase(void) {
+    printf("finite event gating preserves local phase\n");
+    sequencer_reset();
+    clear_group(4);
+    clear_group(5);
+    clear_marks();
+    amy_add_message("H0,2,0,4zPbackgroundZ");
+    amy_add_message("zQ4,3,4Z");
+    amy_add_message("H0,4,0,5zQ4,2,4,0,81Z");
+    amy_add_message("H0,4,1,5zPforegroundZ");
+    amy_add_message("zQ5,3,4Z");
+
+    uint32_t background = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ4,1,0,4,81Z");
+    clock_to(background + 2);
+    CHECK(mark_at("background", background)
+          && mark_at("background", background + 2),
+          "background loop initially emits on phase");
+
+    uint32_t foreground = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ5,1,1,4Z");
+    clock_to(foreground + 4);
+    CHECK(mark_at("foreground", foreground), "foreground group starts normally");
+    CHECK(!mark_at("background", foreground)
+          && !mark_at("background", foreground + 2),
+          "gate suppresses events for its exact duration");
+    CHECK(mark_at("background", foreground + 4),
+          "background resumes on its unchanged phase");
+    amy_add_message("zQ4,0,0,0,81Z");
+    clock_to(foreground + 6);
+}
+
+static void test_quantized_stop_precedes_boundary_event(void) {
+    printf("quantized stop takes effect before an event at its boundary\n");
+    sequencer_reset();
+    clear_group(6);
+    clear_marks();
+    amy_add_message("H0,4,0,6zPstoppedZ");
+    amy_add_message("zQ6,3,4Z");
+    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ6,1,0,4,91Z");
+    clock_to(start);
+    CHECK(mark_at("stopped", start), "loop starts on its boundary");
+
+    uint32_t stop = next_boundary(sequencer_ticks(), 8);
+    amy_add_message("zQ6,0,0,8,91Z");
+    clock_to(stop);
+    CHECK(!mark_at("stopped", stop), "stop suppresses the boundary event");
+}
+
+static void test_group_control_cannot_recurse(void) {
+    printf("a group cannot launch a third sequencer level\n");
+    sequencer_reset();
+    clear_group(7);
+    clear_group(8);
+    clear_marks();
+    amy_add_message("H0,4,0,8zPgrandchildZ");
+    amy_add_message("zQ8,3,4Z");
+    amy_add_message("H0,4,0,7zQ8,1,1,0Z");
+    amy_add_message("zQ7,3,4Z");
+
+    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ7,1,1,4Z");
+    clock_to(start + 4);
+    CHECK(!marks_named("grandchild"), "nested group launch is rejected");
+}
+
+static void test_resets_keep_definitions_only(void) {
+    printf("sequencer and timebase resets stop executions but keep definitions\n");
+    sequencer_reset();
+    clear_group(8);
+    clear_marks();
+    amy_add_message("H0,4,0,8zPsurvivorZ");
+    amy_add_message("zQ8,3,4Z");
+    uint32_t first = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ8,1,0,4Z");
+    clock_to(first);
+    CHECK(mark_at("survivor", first), "definition runs before reset");
+
+    clear_marks();
+    sequencer_reset();
+    clock_to(first + 4);
+    CHECK(!marks_named("survivor"), "RESET_SEQUENCER stops active executions");
+    uint32_t second = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("zQ8,1,1,4Z");
+    clock_to(second);
+    CHECK(mark_at("survivor", second), "definition survives RESET_SEQUENCER");
+
+    clear_marks();
+    amy_add_message("zQ8,1,0,0Z");
+    clock_to(sequencer_ticks() + 2);
+    sequencer_group_reset_timebase();
+    clear_marks();
+    uint32_t after_reset = sequencer_ticks() + 4;
+    clock_to(after_reset);
+    CHECK(!marks_named("survivor"), "RESET_TIMEBASE stops active executions");
+    amy_add_message("zQ8,1,1,0Z");
+    clock_to(sequencer_ticks() + 2);
+    CHECK(marks_named("survivor") == 1, "definition survives RESET_TIMEBASE");
+}
+
+static void test_configured_bounds(void) {
+    printf("configured group, local-tag and execution bounds are enforced\n");
+    sequencer_reset();
+    clear_group(8);
+    char *valid = strdup("zPlastZ");
+    char *bad_group = strdup("zPbad-groupZ");
+    char *bad_tag = strdup("zPbad-tagZ");
+    CHECK(sequencer_group_add_wire(0, 4, 7, 8, valid),
+          "last configured group and local tag are valid");
+    CHECK(!sequencer_group_add_wire(0, 4, 0, 9, bad_group),
+          "first group past the configured range is rejected");
+    CHECK(!sequencer_group_add_wire(0, 4, 8, 8, bad_tag),
+          "first local tag past the configured range is rejected");
+    CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "last group publishes");
+    for (uint32_t i = 0; i < 8; ++i)
+        CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 64,
+                                      i, true),
+              "execution slot %" PRIu32 " is available", i);
+    CHECK(!sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 64,
+                                   8, true),
+          "one execution beyond the configured pool is rejected");
+    sequencer_reset();
+}
+
 // examples.c calls this; the platform normally provides it.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -187,6 +335,12 @@ int main(void) {
     test_one_n_and_infinite_repeats();
     test_atomic_revision_lifetime();
     test_root_launches_local_zero_on_same_tick();
+    test_c_event_uses_fourth_ticks_field();
+    test_quantized_gate_preserves_phase();
+    test_quantized_stop_precedes_boundary_event();
+    test_group_control_cannot_recurse();
+    test_resets_keep_definitions_only();
+    test_configured_bounds();
 
     amy_stop();
     if (failures) {
