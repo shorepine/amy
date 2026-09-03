@@ -281,6 +281,17 @@ static void test_mute_event_targets_tag_and_preserves_phase(void) {
           "direct mute applies to the next due onset");
     CHECK(mark_at("kept", direct_start + 4),
           "direct mute expires without stopping the loop");
+
+    clear_marks();
+    amy_add_message("zQM82,2147483647Z");
+    uint32_t held_start = sequencer_ticks();
+    clock_to(held_start + 2);
+    CHECK(!mark_at("kept", held_start + 2),
+          "wire mute can hold a controller-addressed layer silent");
+    amy_add_message("zQM82,0Z");
+    clock_to(held_start + 4);
+    CHECK(mark_at("kept", held_start + 4),
+          "zero-duration wire mute releases the layer on its original phase");
     amy_pattern_stop(81, 0);
     amy_pattern_stop(82, 0);
     clock_to(sequencer_ticks() + 2);

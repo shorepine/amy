@@ -243,6 +243,12 @@ If you are including AMY in a program, you can set the [hook `void (*amy_externa
 
 ### Finite and looping patterns
 
+The feature is described from three complementary viewpoints:
+
+- [Stored-pattern abstractions and implementation](nested-pattern-abstractions.md)
+- [Musical use cases](nested-pattern-musical-use-cases.md)
+- [Step-by-step arpeggio and live-mute how-to](nested-pattern-howto.md)
+
 #### Motivation and scope
 
 I added stored patterns because the root sequencer is intentionally a flat
