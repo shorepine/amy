@@ -11,6 +11,12 @@ preload these phrases and later send one small, quantized control message. It
 does not need to reproduce AMY's clock or resend every event at performance
 time.
 
+Related guides:
+
+- [Abstractions and implementation](sequencer-groups-abstractions.md)
+- [Musical use cases](sequencer-groups-musical-use-cases.md)
+- [Step-by-step wire and Python how-to](sequencer-groups-howto.md)
+
 ## Defining and publishing a group
 
 The normal `ticks` tuple accepts an optional fourth value:
