@@ -133,6 +133,8 @@ them.
 Storage and work are bounded by `max_sequence_groups`,
 `max_sequence_group_tags` and `max_sequence_group_executions` in
 `amy_config_t`. Group event arrays and wire payloads are allocated only for
-definitions that are authored. The tick path scans only the fixed active
-execution pool; inactive stored groups are not visited, and starting an
-execution does not allocate memory.
+definitions that are authored. Setting any of the three capacities to zero
+disables sequencer groups. The tick path scans only the fixed execution pool,
+not all stored groups, so a larger definition catalogue does not make inactive
+definitions part of per-tick work. Starting an execution does not allocate
+memory.

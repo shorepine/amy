@@ -143,8 +143,11 @@ but preserve published group definitions. Full AMY shutdown releases the
 definitions.
 
 The native group regression test exercises legacy root behavior and group
-behavior in the same process. It covers root compatibility, local tag
-namespaces, one/N/infinite repetition, quantization, atomic publication,
-immutable active revisions, same-tick root launches, finite phase-preserving
-gates, group-to-group lifecycle rejection, resets, 32-bit clock rollover, and
-configured bounds.
+behavior in the same process. It covers the unchanged three-value C and wire
+formats, root/group namespace isolation, one/N/infinite repetition,
+quantization, tagged replacement, selective stop and gate, early ungate,
+atomic publication, repair after rejected publication, immutable active
+revisions, same-tick root launches, non-recursive lifecycle controls, allowed
+leaf controls, resets, 32-bit clock rollover, disabled configuration, and
+configured storage and execution bounds. The existing AMY C and audio suites
+remain the broader backward-compatibility tests.

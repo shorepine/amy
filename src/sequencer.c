@@ -520,6 +520,13 @@ static bool group_execution_matches(const sequence_group_execution_t *execution,
             && execution->execution_tag == execution_tag);
 }
 
+static const char *group_action_name(uint32_t action) {
+    if (action == SEQUENCE_CONTROL_START) return "start";
+    if (action == SEQUENCE_CONTROL_PUBLISH) return "publish";
+    if (action == SEQUENCE_CONTROL_CLEAR) return "clear";
+    return "unknown";
+}
+
 static uint8_t group_publish(sequence_group_slot_t *slot, uint32_t group,
                              uint32_t length) {
     if (length == 0) {
@@ -580,9 +587,9 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
             || action == SEQUENCE_CONTROL_PUBLISH
             || action == SEQUENCE_CONTROL_CLEAR)) {
         fprintf(stderr, "sequencer group %" PRIu32
-                " cannot perform lifecycle action %" PRIu32
+                " cannot perform lifecycle action %s (%" PRIu32 ")"
                 ": grouped events may only stop or gate executions\n",
-                group, action);
+                group, group_action_name(action), action);
         return 0;
     }
 
@@ -598,8 +605,8 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
         result = 1;
     } else if (action == SEQUENCE_CONTROL_START) {
         if (slot->published == NULL || slot->published->length_ticks == 0) {
-            fprintf(stderr, "sequencer group %" PRIu32 " has no published definition\n",
-                    group);
+            fprintf(stderr, "cannot start sequencer group %" PRIu32
+                    ": no definition has been published\n", group);
         } else {
             uint32_t start_tick = group_control_tick(quantize);
             sequence_group_execution_t *available = NULL;
@@ -653,7 +660,8 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
         }
     } else {
         fprintf(stderr, "cannot control sequencer group %" PRIu32
-                ": action %" PRIu32 " is unknown; valid actions are [0, 4]\n",
+                ": action %" PRIu32 " is unknown; valid actions are "
+                "stop=0, start=1, gate=2, publish=3, clear=4\n",
                 group, action);
     }
     amy_release_lock();
