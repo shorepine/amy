@@ -755,7 +755,13 @@ static uint32_t sequence_control_tick(uint32_t alignment_period,
                   : current_tick;
     if (alignment_period != 0) {
         uint32_t remainder = tick % alignment_period;
-        if (remainder != 0) tick += alignment_period - remainder;
+        if (remainder != 0) {
+            uint32_t delta = alignment_period - remainder;
+            // The visible uint32 clock restarts at zero on rollover, and zero
+            // is an alignment boundary for every period. Do not carry a
+            // pre-rollover modulo phase into the wrapped clock.
+            tick = delta > UINT32_MAX - tick ? 0 : tick + delta;
+        }
     }
     return tick;
 }
@@ -1019,7 +1025,10 @@ static void sequencer_process_tick(void) {
                         active_unlink(tag);
                     } else {
                         size_t len = strlen(sequences[tag].wire);
-                        wire = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
+                        wire = len >= UINT32_MAX ? NULL
+                            : (char *)malloc_caps(
+                                (uint32_t)(len + 1),
+                                amy_global.config.ram_caps_events);
                         if (wire != NULL) memcpy(wire, sequences[tag].wire, len + 1);
                         else amy_oom("sequencer fire");
                     }

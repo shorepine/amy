@@ -546,9 +546,10 @@ static void test_start_crosses_clock_rollover(void) {
     amy_add_message("H0,0,2zPwrap-zeroZ");
     amy_add_message("H2,0,2zPwrap-twoZ");
     amy_global.sequencer_tick_count = UINT32_MAX - 2;
-    amy_add_message("HC2,1,4Z");
+    amy_add_message("HC2,1,48Z");
     clock_to(2);
-    CHECK(mark_at("wrap-zero", 0), "aligned local zero fires after rollover");
+    CHECK(mark_at("wrap-zero", 0),
+          "non-power-of-two alignment treats wrapped tick zero as a boundary");
     CHECK(mark_at("wrap-two", 2), "elapsed local time crosses rollover");
 }
 
