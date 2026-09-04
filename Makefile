@@ -126,6 +126,7 @@ amy-message: $(OBJECTS) src/amy-message.o
 CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds \
 	         tests/test_sequencer_sequences \
 	         tests/test_sequencer_oom \
+	         tests/test_sequencer_concurrency \
          tests/test_bus_config tests/test_patch_slots \
          tests/test_synth_readout tests/test_log2_lut tests/test_clone_on_grow \
          tests/test_timebase_reset tests/test_osc_free_on_release \
@@ -133,22 +134,27 @@ CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
-$(addsuffix .o,$(filter-out tests/test_sequencer_oom,$(CTESTS))): %.o: %.c $(HEADERS) src/patches.h
+SEQUENCE_SPECIAL_TESTS = tests/test_sequencer_oom tests/test_sequencer_concurrency
+
+$(addsuffix .o,$(filter-out $(SEQUENCE_SPECIAL_TESTS),$(CTESTS))): %.o: %.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -Isrc -c $< -o $@
 
-$(filter-out tests/test_sequencer_oom,$(CTESTS)): %: %.o $(OBJECTS)
+$(filter-out $(SEQUENCE_SPECIAL_TESTS),$(CTESTS)): %: %.o $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $< -Wall $(LIBS) -o $@
 
 # Build only the sequencer and its OOM test with the test-only allocation hook;
 # every other test and every production target uses the ordinary object.
-tests/sequencer_oom_impl.o: src/sequencer.c $(HEADERS) src/patches.h
+tests/sequencer_testing_impl.o: src/sequencer.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -c $< -o $@
 
 tests/test_sequencer_oom.o: tests/test_sequencer_oom.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -Isrc -c $< -o $@
 
-tests/test_sequencer_oom: tests/test_sequencer_oom.o tests/sequencer_oom_impl.o $(filter-out src/sequencer.o,$(OBJECTS))
-	$(CC) $(CFLAGS) $(filter-out src/sequencer.o,$(OBJECTS)) tests/sequencer_oom_impl.o $< -Wall $(LIBS) -o $@
+tests/test_sequencer_concurrency.o: tests/test_sequencer_concurrency.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -Isrc -c $< -o $@
+
+$(SEQUENCE_SPECIAL_TESTS): %: %.o tests/sequencer_testing_impl.o $(filter-out src/sequencer.o,$(OBJECTS))
+	$(CC) $(CFLAGS) $(filter-out src/sequencer.o,$(OBJECTS)) tests/sequencer_testing_impl.o $< -Wall $(LIBS) -o $@
 
 ctest: $(CTESTS)
 	@for t in $(CTESTS); do echo "== $$t"; ./$$t || exit 1; done

@@ -95,9 +95,14 @@ static stored_sequence_definition_t *retired_sequence_definitions = NULL;
 
 #ifdef AMY_SEQUENCE_TESTING
 static int32_t stored_sequence_allocations_before_failure = -1;
+static void (*stored_sequence_after_pin_hook)(void) = NULL;
 
 void sequencer_test_fail_allocation_after(int32_t successful_allocations) {
     stored_sequence_allocations_before_failure = successful_allocations;
+}
+
+void sequencer_test_set_after_pin_hook(void (*hook)(void)) {
+    stored_sequence_after_pin_hook = hook;
 }
 #endif
 
@@ -588,6 +593,9 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
     }
 
     stored_sequence_reclaim_retired();
+#ifdef AMY_SEQUENCE_TESTING
+    bool test_pin_hook_called = false;
+#endif
     for (;;) {
         amy_grab_lock();
         stored_sequence_definition_t *source = slot->definition;
@@ -617,6 +625,15 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         // up the render thread.
         if (source != NULL) source->refs++;
         amy_release_lock();
+
+#ifdef AMY_SEQUENCE_TESTING
+        // Tests use this one-shot rendezvous to make two writers clone the
+        // same pinned generation. It is absent from production builds.
+        if (!test_pin_hook_called && stored_sequence_after_pin_hook != NULL) {
+            test_pin_hook_called = true;
+            stored_sequence_after_pin_hook();
+        }
+#endif
 
         stored_sequence_definition_t *candidate = source == NULL
             ? stored_sequence_definition_new()
