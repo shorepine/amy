@@ -72,14 +72,22 @@ extern const uint32_t pcm_wavetable_len;
 
 
 
-// Set block size and SR. We try for 256/44100, but some platforms don't let us:
+// Set block size and SR. We try for 256/44100, but some platforms don't let us.
+// The block is a POWER OF TWO -- the per-block amplitude and pan ramps are
+// SHIFTR(delta, BLOCK_SIZE_BITS), not a divide -- so a host chooses it in
+// BITS, at compile time: -DBLOCK_SIZE_BITS=7 is a 128-sample block, 6 is 64.
+// Left alone it is 8 (256 samples), or 7 (128) on Daisy, exactly as before.
+#ifndef BLOCK_SIZE_BITS
 #ifdef AMY_DAISY
-#define AMY_BLOCK_SIZE 128
-#define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE
+#define BLOCK_SIZE_BITS 7
 #else
-#define AMY_BLOCK_SIZE 256
-#define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
+#define BLOCK_SIZE_BITS 8
 #endif
+#endif
+#if BLOCK_SIZE_BITS < 5 || BLOCK_SIZE_BITS > 10
+#error "BLOCK_SIZE_BITS must be 5..10 (a block of 32..1024 samples)"
+#endif
+#define AMY_BLOCK_SIZE (1 << BLOCK_SIZE_BITS)
 
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000
