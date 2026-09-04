@@ -75,10 +75,12 @@ typedef struct stored_sequence_execution_t {
     uint32_t gate_change_tick;
     uint32_t gate_duration;
     uint32_t gate_end_tick;
+    uint32_t controls_processed_tick;
     bool occupied;
     bool stop_pending;
     bool gate_change_pending;
     bool gated;
+    bool controls_processed;
 } stored_sequence_execution_t;
 
 static stored_sequence_definition_t **stored_sequences = NULL;
@@ -859,53 +861,86 @@ static void stored_sequence_play_wire(const char *wire, uint32_t current_tick) {
         (char *)wire, SEQUENCER_ORIGIN_STORED, current_tick);
 }
 
-static void stored_sequence_process_pass(uint32_t tick, bool controls) {
-    for (uint32_t i = 0; i < max_stored_sequence_executions; ++i) {
-        amy_grab_lock();
-        stored_sequence_execution_t *execution = &sequence_executions[i];
-        if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
-            amy_release_lock();
-            continue;
-        }
-        uint32_t elapsed = tick - execution->start_tick;
-        stored_sequence_definition_t *definition = execution->definition;
-        if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
-            || (!definition->has_periodic_event
-                && elapsed > definition->last_one_shot_tick)) {
-            stored_sequence_execution_release_deferred(execution);
-            amy_release_lock();
-            continue;
-        }
-        if (!controls) {
-            if (execution->gate_change_pending
-                && AMY_TIME_GEQ(tick, execution->gate_change_tick)) {
-                execution->gate_change_pending = false;
-                execution->gated = execution->gate_duration != 0;
-                execution->gate_end_tick = execution->gate_change_tick
-                                         + execution->gate_duration;
-            }
-            if (execution->gated && AMY_TIME_GEQ(tick, execution->gate_end_tick))
-                execution->gated = false;
-        }
-        bool suppress = !controls && execution->gated;
-        definition->refs++;
+static bool stored_sequence_process_slot(uint32_t slot, uint32_t tick,
+                                         bool controls) {
+    amy_grab_lock();
+    stored_sequence_execution_t *execution = &sequence_executions[slot];
+    if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
         amy_release_lock();
-
-        if (!suppress) {
-            for (uint32_t event_index = 0;
-                 event_index < definition->event_count; ++event_index) {
-                stored_sequence_event_t *event =
-                    &definition->events[event_index];
-                if (stored_sequence_event_is_control(event) == controls
-                    && stored_sequence_event_hits(event, elapsed))
-                    stored_sequence_play_wire(event->wire, tick);
-            }
-        }
-
-        amy_grab_lock();
-        stored_sequence_definition_retire_locked(definition);
-        amy_release_lock();
+        return false;
     }
+    uint32_t elapsed = tick - execution->start_tick;
+    stored_sequence_definition_t *definition = execution->definition;
+    if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
+        || (!definition->has_periodic_event
+            && elapsed > definition->last_one_shot_tick)) {
+        stored_sequence_execution_release_deferred(execution);
+        amy_release_lock();
+        return false;
+    }
+    if (controls) {
+        if (execution->controls_processed
+            && execution->controls_processed_tick == tick) {
+            amy_release_lock();
+            return false;
+        }
+        // Mark before dispatch: a control graph may stop/reuse this slot, and a
+        // newly created execution in that slot must remain distinguishable.
+        execution->controls_processed = true;
+        execution->controls_processed_tick = tick;
+    } else {
+        if (execution->gate_change_pending
+            && AMY_TIME_GEQ(tick, execution->gate_change_tick)) {
+            execution->gate_change_pending = false;
+            execution->gated = execution->gate_duration != 0;
+            execution->gate_end_tick = execution->gate_change_tick
+                                     + execution->gate_duration;
+        }
+        if (execution->gated && AMY_TIME_GEQ(tick, execution->gate_end_tick))
+            execution->gated = false;
+    }
+    bool suppress = !controls && execution->gated;
+    definition->refs++;
+    amy_release_lock();
+
+    if (!suppress) {
+        for (uint32_t event_index = 0;
+             event_index < definition->event_count; ++event_index) {
+            stored_sequence_event_t *event = &definition->events[event_index];
+            if (stored_sequence_event_is_control(event) == controls
+                && stored_sequence_event_hits(event, elapsed))
+                stored_sequence_play_wire(event->wire, tick);
+        }
+    }
+
+    amy_grab_lock();
+    stored_sequence_definition_retire_locked(definition);
+    amy_release_lock();
+    return true;
+}
+
+static void stored_sequence_process_controls(uint32_t tick) {
+    // A control can start an execution in a lower-numbered slot already passed
+    // by this scan. Repeat until no due execution remains unvisited. At most one
+    // control visit per configured slot is allowed per tick; this both covers
+    // every simultaneously active execution and bounds stop/reuse cycles.
+    uint32_t visits_left = max_stored_sequence_executions;
+    bool progressed;
+    do {
+        progressed = false;
+        for (uint32_t i = 0;
+             i < max_stored_sequence_executions && visits_left != 0; ++i) {
+            if (stored_sequence_process_slot(i, tick, true)) {
+                visits_left--;
+                progressed = true;
+            }
+        }
+    } while (progressed && visits_left != 0);
+}
+
+static void stored_sequence_process_events(uint32_t tick) {
+    for (uint32_t i = 0; i < max_stored_sequence_executions; ++i)
+        stored_sequence_process_slot(i, tick, false);
 }
 
 static void sequencer_process_tick(void) {
@@ -973,10 +1008,10 @@ static void sequencer_process_tick(void) {
         }
         tag = next;
     }
-    // Nested controls take effect before ordinary stored-sequence events on
+    // Composed controls take effect before ordinary stored-sequence events on
     // the same tick. This lets a parent stop a child without one extra onset.
-    stored_sequence_process_pass(tick, true);
-    stored_sequence_process_pass(tick, false);
+    stored_sequence_process_controls(tick);
+    stored_sequence_process_events(tick);
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
         amy_global.config.amy_external_sequencer_hook(tick);

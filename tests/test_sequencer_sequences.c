@@ -353,6 +353,27 @@ static void test_cyclic_controls_are_bounded_and_recoverable(void) {
           "stopping both cycle tags makes the pool reusable");
 }
 
+static void test_same_tick_control_is_slot_order_independent(void) {
+    printf("same-tick controls are independent of execution slot order\n");
+    sequencer_reset();
+    clear_marks();
+
+    // The filler occupies slot 0 for tick 1 only. The parent occupies slot 1
+    // from tick 2. At tick 2 slot 0 is retired before slot 1 starts child 3,
+    // which therefore reuses the already-visited lower slot. Child 3 must still
+    // run its local-zero control and start leaf 4 on that same tick.
+    amy_add_message("H0,0,1zPfillerZ");
+    amy_add_message("H0,0,2HC3,1,1Z");
+    amy_add_message("H0,0,3HC4,1,1Z");
+    amy_add_message("H0,0,4zPslot-leafZ");
+    amy_add_message("HC1,1,1Z");
+    amy_add_message("HC2,1,2Z");
+    clock_to(sequencer_ticks() + 4);
+
+    CHECK(marks_named("slot-leaf") == 1,
+          "a child in a recycled lower slot receives its tick-zero control");
+}
+
 static void test_per_tag_and_global_reset_semantics(void) {
     printf("per-tag replacement and global reset have distinct scopes\n");
     sequencer_reset();
@@ -553,6 +574,7 @@ int main(void) {
     test_finite_gate_preserves_phase();
     test_quantized_stop_targets_current_executions();
     test_cyclic_controls_are_bounded_and_recoverable();
+    test_same_tick_control_is_slot_order_independent();
     test_per_tag_and_global_reset_semantics();
     test_timebase_reset_keeps_definitions();
     test_start_crosses_clock_rollover();
