@@ -64,7 +64,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api
+.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api js-api-test
 
 default: $(TARGET)
 all: default
@@ -82,6 +82,10 @@ check-c-api:
 	$(PYTHON) scripts/gen_amy_js_api.py --check
 	$(PYTHON) scripts/gen_patches_js.py --check
 	$(PYTHON) scripts/gen_pcm_presets_js.py --check
+	node tests/test_js_api.js
+
+js-api-test:
+	node tests/test_js_api.js
 
 SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c src/parse.c \
 	src/filters.c src/oscillators.c src/pcm.c src/interp_partials.c src/custom.c \

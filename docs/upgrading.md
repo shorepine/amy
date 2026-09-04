@@ -10,6 +10,13 @@ accumulates all those events into a stopped reusable sequence. Previously, a
 later event replaced the earlier event at that tag. This intentional change
 makes a tag behave like a synth identity: repeated messages build it up.
 
+Tagged events therefore no longer begin repeating merely because they were
+defined. Callers which used a unique tag as the replace/remove identity of one
+automatically active event must either use tagless direct scheduling or adapt
+their wrapper to reset, define, and explicitly start that tag. Updating such a
+wrapper should stop the old execution, reset the future definition, append the
+replacement events, and start it at the required alignment boundary.
+
 Code which only needs direct one-off or periodic scheduling should omit the
 tag and keep using one- or two-value `ticks`:
 
@@ -103,4 +110,3 @@ void loop() {
     e.patch_number = 1024;
     patches_store_patch(&e, "v0w7f0");  // Or whatever the wire string defining your patch is.
 ```
-
