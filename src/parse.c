@@ -728,7 +728,9 @@ static int sequence_control_uint_tail(const char *cursor, uint32_t *values,
 // It claims the rest of the message as its payload -- stored as a raw
 // wire string and only parsed when it comes due -- so a schedule command
 // is only ever honored as the first command of a message.
-void handle_ticks_message(char *message) {
+void handle_ticks_message_with_origin(char *message,
+                                      sequencer_origin_t origin,
+                                      uint32_t current_tick) {
     assert(message[0] == 'H');
     if (message[1] == 'A') {
         fprintf(stderr,
@@ -791,8 +793,9 @@ void handle_ticks_message(char *message) {
                     "gate=2 with a duration; tag, duration, and "
                     "alignment must be non-negative integers\n");
         } else {
-            sequencer_sequence_control((uint32_t)parsed_tag, action, value,
-                                       alignment);
+            sequencer_sequence_control_with_origin(
+                (uint32_t)parsed_tag, action, value, alignment, origin,
+                current_tick);
         }
         return;
     }
@@ -805,7 +808,7 @@ void handle_ticks_message(char *message) {
         if ((terminator != '\0' && terminator != 'Z') || count != 1)
             fprintf(stderr, "invalid sequence reset: expected HRtag\n");
         else
-            sequencer_sequence_reset(values[0]);
+            sequencer_sequence_reset_with_origin(values[0], origin);
         return;
     }
 
@@ -821,9 +824,14 @@ void handle_ticks_message(char *message) {
         memcpy(stripped, payload, payload_len + 1);
         // A root tag is only "given" if all 3 values were present; fewer
         // than that (a 1- or 2-value ticks=) stores anonymously.
-        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
-                           num_vals >= 3, stripped);
+        sequencer_add_wire_with_origin(
+            ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+            num_vals >= 3, stripped, origin);
     }
+}
+
+void handle_ticks_message(char *message) {
+    handle_ticks_message_with_origin(message, SEQUENCER_ORIGIN_EXTERNAL, 0);
 }
 
 // given a string return a parsed event

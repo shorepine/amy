@@ -1169,6 +1169,10 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Internal render-side ingress, used by CV triggers. It deliberately avoids
+// variable-time sequence reclamation and gives sequence controls the current
+// render tick rather than pretending they came from an external caller.
+void amy_add_message_from_render(char *message);
 // Parse and play a stored wire message now (a fired sequencer entry).
 void amy_play_message(char *message);
 // Like amy_add_message but the data is treated as coming from an external

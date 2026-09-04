@@ -316,6 +316,16 @@ void amy_add_message(char *message) {
     amy_add_message_with_sysex_flag(message, /* sysex */ false);
 }
 
+void amy_add_message_from_render(char *message) {
+    if (message[0] == 'H') {
+        handle_ticks_message_with_origin(
+            message, SEQUENCER_ORIGIN_RENDER,
+            amy_global.sequencer_tick_count);
+    } else {
+        amy_play_message(message);
+    }
+}
+
 // Like amy_add_message but marks the message as coming from an external
 // sysex source so the transfer routing in amy_message_is_transfer_chunk()
 // applies.

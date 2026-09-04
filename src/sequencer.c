@@ -24,7 +24,7 @@ typedef struct sequence_info_t {
 } sequence_info_t;
 
 struct sequence_info_t *sequences = NULL;  // Anonymous direct-schedule slots.
-int32_t max_sequences = 0;  // Number of user-addressable tags.
+uint32_t max_sequences = 0;  // Number of user-addressable tags.
 // Head of the ascending list of occupied anonymous slots; -1 when nothing is
 // scheduled. This replaces `highest_tag`,
 // which was a HIGH-WATER MARK: it only ever grew, so one event at a high tag
@@ -86,7 +86,6 @@ static stored_sequence_execution_t *sequence_executions = NULL;
 static uint32_t max_stored_sequence_events = 0;
 static uint32_t max_stored_sequence_executions = 0;
 static size_t stored_sequence_event_bytes = 0;
-static volatile bool stored_sequence_wire_firing = false;
 static stored_sequence_definition_t *retired_sequence_definitions = NULL;
 
 #ifdef AMY_SEQUENCE_TESTING
@@ -168,9 +167,18 @@ void sequencer_reclaim_retired(void) {
     stored_sequence_definition_destroy_list(retired);
 }
 
-static void stored_sequence_reclaim_retired(void) {
-    if (wire_firing || stored_sequence_wire_firing) return;
-    sequencer_reclaim_retired();
+static bool sequence_origin_may_reclaim(sequencer_origin_t origin) {
+    return origin == SEQUENCER_ORIGIN_EXTERNAL;
+}
+
+static stored_sequence_definition_t *
+stored_sequence_definition_release_locked(
+        stored_sequence_definition_t *definition,
+        sequencer_origin_t origin) {
+    if (sequence_origin_may_reclaim(origin))
+        return stored_sequence_definition_unref_locked(definition);
+    stored_sequence_definition_retire_locked(definition);
+    return NULL;
 }
 
 static stored_sequence_definition_t *stored_sequence_definition_new(void) {
@@ -239,7 +247,7 @@ static void stored_sequence_executions_reset(void) {
 
 static void stored_sequences_clear_definitions(void) {
     if (stored_sequences == NULL) return;
-    for (int32_t i = 0; i < max_sequences; ++i) {
+    for (uint32_t i = 0; i < max_sequences; ++i) {
         stored_sequence_definition_retire_locked(
             stored_sequences[i]);
         stored_sequences[i] = NULL;
@@ -268,12 +276,11 @@ static void stored_sequences_deinit(void) {
 static void stored_sequences_init(uint32_t events, uint32_t executions) {
     max_stored_sequence_events = events;
     max_stored_sequence_executions = executions;
-    stored_sequence_wire_firing = false;
     if (max_sequences == 0 || events == 0 || executions == 0) return;
 
     size_t slot_bytes = 0;
     size_t execution_bytes = 0;
-    if (!checked_array_size((uint32_t)max_sequences,
+    if (!checked_array_size(max_sequences,
                             sizeof(*stored_sequences), &slot_bytes)
         || !checked_array_size(events, sizeof(stored_sequence_event_t),
                                &stored_sequence_event_bytes)
@@ -282,7 +289,7 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
                                &execution_bytes)) {
         fprintf(stderr,
                 "stored sequence configuration exceeds addressable memory: "
-                "tags=%" PRIi32 ", events=%" PRIu32
+                "tags=%" PRIu32 ", events=%" PRIu32
                 ", executions=%" PRIu32 "\n",
                 max_sequences, events, executions);
         stored_sequences_deinit();
@@ -303,7 +310,7 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
     }
 }
 
-void sequencer_init(int max_sequencer_tags, uint32_t sequence_events,
+void sequencer_init(uint32_t max_sequencer_tags, uint32_t sequence_events,
                     uint32_t sequence_execution_count) {
     // These are statics, so a stop/start of AMY within one process needs them
     // put back to their boot state (internal clock, running).
@@ -362,7 +369,7 @@ void sequencer_sequence_reset_timebase() {
 void sequencer_debug() {
     int32_t n_active = 0;
     for (int32_t t = first_active; t != -1; t = sequences[t].next_active) ++n_active;
-    fprintf(stderr, "sequencer: max_sequences %" PRIi32" active %" PRIi32 "\n", max_sequences, n_active);
+    fprintf(stderr, "sequencer: max_sequences %" PRIu32" active %" PRIi32 "\n", max_sequences, n_active);
     for (int32_t tag = first_active; tag != -1; tag = sequences[tag].next_active) {
         if (sequences[tag].wire) {
             fprintf(stderr, "anonymous sequence slot %" PRIi32 " tick %" PRIu32
@@ -446,14 +453,16 @@ void sequencer_recompute() {
 //
 // A one-off whose tick is already due or overdue is not stored at all -- it
 // plays immediately, before returning.  See the comment at that branch.
-uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool has_tag, char *wire) {
+uint8_t sequencer_add_wire_with_origin(uint32_t tick, uint32_t period,
+                                      uint32_t tag, bool has_tag, char *wire,
+                                      sequencer_origin_t origin) {
     if (sequences == NULL) {  // sequencer_init hasn't run
         free(wire);
         return 0;
     }
     if (has_tag) {
-        if (tag >= (uint32_t)max_sequences) {
-            fprintf(stderr, "sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIi32"\n",
+        if (tag >= max_sequences) {
+            fprintf(stderr, "sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIu32"\n",
                     tag, tick, period, max_sequences);
             free(wire);
             return 0;
@@ -467,9 +476,10 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
         if (tick == 0 && period == 0
             && (wire == NULL || wire[0] == '\0' || wire[0] == 'Z')) {
             free(wire);
-            return sequencer_sequence_reset(tag);
+            return sequencer_sequence_reset_with_origin(tag, origin);
         }
-        return sequencer_sequence_add_wire(tag, tick, period, wire);
+        return sequencer_sequence_add_wire_with_origin(
+            tag, tick, period, wire, origin);
     } else {
         // Anonymous: tick==0 && period==0 has nothing to cancel (no tag was
         // given), so just drop it rather than allocating a slot for a no-op.
@@ -520,8 +530,14 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     return 1;
 }
 
+uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag,
+                           bool has_tag, char *wire) {
+    return sequencer_add_wire_with_origin(
+        tick, period, tag, has_tag, wire, SEQUENCER_ORIGIN_EXTERNAL);
+}
+
 static stored_sequence_definition_t **stored_sequence_slot(uint32_t tag) {
-    if (stored_sequences == NULL || tag >= (uint32_t)max_sequences) return NULL;
+    if (stored_sequences == NULL || tag >= max_sequences) return NULL;
     return &stored_sequences[tag];
 }
 
@@ -554,8 +570,9 @@ static void stored_sequence_candidate_discard(
     stored_sequence_definition_destroy(candidate);
 }
 
-uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
-                                    uint32_t period, char *wire) {
+uint8_t sequencer_sequence_add_wire_with_origin(
+        uint32_t tag, uint32_t tick, uint32_t period, char *wire,
+        sequencer_origin_t origin) {
     stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
@@ -564,7 +581,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         else
             fprintf(stderr, "cannot append event: sequence tag %" PRIu32
                     " is outside the configured range [0, %" PRIi32 "]\n",
-                    tag, max_sequences - 1);
+                    tag, (int32_t)(max_sequences - 1));
         free(wire);
         return 0;
     }
@@ -588,7 +605,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         return 0;
     }
 
-    stored_sequence_reclaim_retired();
+    if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
 #ifdef AMY_SEQUENCE_TESTING
     bool test_pin_hook_called = false;
 #endif
@@ -612,7 +629,8 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
             stored_sequence_definition_append_owned(source, tick, period,
                                                      wire);
             amy_release_lock();
-            stored_sequence_reclaim_retired();
+            if (sequence_origin_may_reclaim(origin))
+                sequencer_reclaim_retired();
             return 1;
         }
 
@@ -638,7 +656,8 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
             stored_sequence_definition_t *dead = NULL;
             if (source != NULL) {
                 amy_grab_lock();
-                dead = stored_sequence_definition_unref_locked(source);
+                dead = stored_sequence_definition_release_locked(source,
+                                                                  origin);
                 amy_release_lock();
             }
             stored_sequence_definition_destroy(dead);
@@ -654,14 +673,17 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
             stored_sequence_definition_t *dead = NULL;
             if (source != NULL) {
                 // Drop the old slot ownership and our temporary writer pin.
-                dead = stored_sequence_definition_unref_locked(source);
+                dead = stored_sequence_definition_release_locked(source,
+                                                                  origin);
                 stored_sequence_definition_t *after_pin =
-                    stored_sequence_definition_unref_locked(source);
+                    stored_sequence_definition_release_locked(source,
+                                                               origin);
                 if (after_pin != NULL) dead = after_pin;
             }
             amy_release_lock();
             stored_sequence_definition_destroy(dead);
-            stored_sequence_reclaim_retired();
+            if (sequence_origin_may_reclaim(origin))
+                sequencer_reclaim_retired();
             return 1;
         }
 
@@ -669,14 +691,21 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         // source pin, discard the private candidate outside the lock, and retry
         // against the new cumulative definition.
         stored_sequence_definition_t *dead = source == NULL ? NULL
-            : stored_sequence_definition_unref_locked(source);
+            : stored_sequence_definition_release_locked(source, origin);
         amy_release_lock();
         stored_sequence_candidate_discard(candidate, wire);
         stored_sequence_definition_destroy(dead);
     }
 }
 
-uint8_t sequencer_sequence_reset(uint32_t tag) {
+uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
+                                    uint32_t period, char *wire) {
+    return sequencer_sequence_add_wire_with_origin(
+        tag, tick, period, wire, SEQUENCER_ORIGIN_EXTERNAL);
+}
+
+uint8_t sequencer_sequence_reset_with_origin(uint32_t tag,
+                                             sequencer_origin_t origin) {
     stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
@@ -685,34 +714,41 @@ uint8_t sequencer_sequence_reset(uint32_t tag) {
         else
             fprintf(stderr, "cannot reset sequence: tag %" PRIu32
                     " is outside the configured range [0, %" PRIi32 "]\n",
-                    tag, max_sequences - 1);
+                    tag, (int32_t)(max_sequences - 1));
         return 0;
     }
-    if (stored_sequence_wire_firing) {
+    if (origin == SEQUENCER_ORIGIN_STORED) {
         fprintf(stderr, "sequence %" PRIu32
                 " cannot reset definitions from a stored sequence event\n",
                 tag);
         return 0;
     }
 
-    stored_sequence_reclaim_retired();
+    if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
     amy_grab_lock();
     stored_sequence_definition_t *definition = *slot;
     *slot = NULL;
     stored_sequence_definition_t *dead = NULL;
-    if (wire_firing) stored_sequence_definition_retire_locked(definition);
-    else dead = stored_sequence_definition_unref_locked(definition);
+    dead = stored_sequence_definition_release_locked(definition, origin);
     amy_release_lock();
     stored_sequence_definition_destroy(dead);
-    stored_sequence_reclaim_retired();
+    if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
     return 1;
 }
 
-static uint32_t sequence_control_tick(uint32_t alignment_period) {
+uint8_t sequencer_sequence_reset(uint32_t tag) {
+    return sequencer_sequence_reset_with_origin(
+        tag, SEQUENCER_ORIGIN_EXTERNAL);
+}
+
+static uint32_t sequence_control_tick(uint32_t alignment_period,
+                                      sequencer_origin_t origin,
+                                      uint32_t current_tick) {
     // A control fired by the root sequencer participates in this tick. A
     // control arriving between ticks begins no earlier than the next tick.
-    uint32_t tick = wire_firing ? amy_global.sequencer_tick_count
-                                : amy_global.sequencer_tick_count + 1;
+    uint32_t tick = origin == SEQUENCER_ORIGIN_EXTERNAL
+                  ? amy_global.sequencer_tick_count + 1
+                  : current_tick;
     if (alignment_period != 0) {
         uint32_t remainder = tick % alignment_period;
         if (remainder != 0) tick += alignment_period - remainder;
@@ -720,9 +756,10 @@ static uint32_t sequence_control_tick(uint32_t alignment_period) {
     return tick;
 }
 
-uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
-                                   uint32_t value,
-                                   uint32_t alignment_period) {
+uint8_t sequencer_sequence_control_with_origin(
+        uint32_t tag, uint32_t action, uint32_t value,
+        uint32_t alignment_period, sequencer_origin_t origin,
+        uint32_t current_tick) {
     stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
@@ -731,11 +768,11 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
         else
             fprintf(stderr, "cannot control sequence %" PRIu32
                     ": valid tags are [0, %" PRIi32 "]\n",
-                    tag, max_sequences - 1);
+                    tag, (int32_t)(max_sequences - 1));
         return 0;
     }
 
-    stored_sequence_reclaim_retired();
+    if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
     uint8_t result = 0;
     amy_grab_lock();
     if (action == SEQUENCE_CONTROL_START) {
@@ -743,7 +780,8 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
             fprintf(stderr, "cannot start sequence %" PRIu32
                     ": its definition is empty\n", tag);
         } else {
-            uint32_t start_tick = sequence_control_tick(alignment_period);
+            uint32_t start_tick = sequence_control_tick(
+                alignment_period, origin, current_tick);
             stored_sequence_execution_t *available = NULL;
             for (uint32_t i = 0; i < max_stored_sequence_executions; ++i) {
                 stored_sequence_execution_t *execution = &sequence_executions[i];
@@ -765,7 +803,8 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
         }
     } else if (action == SEQUENCE_CONTROL_STOP
                || action == SEQUENCE_CONTROL_GATE) {
-        uint32_t control_tick = sequence_control_tick(alignment_period);
+        uint32_t control_tick = sequence_control_tick(
+            alignment_period, origin, current_tick);
         for (uint32_t i = 0; i < max_stored_sequence_executions; ++i) {
             stored_sequence_execution_t *execution = &sequence_executions[i];
             if (!execution->occupied || execution->tag != tag)
@@ -786,8 +825,15 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                 "stop=0, start=1, gate=2\n", tag, action);
     }
     amy_release_lock();
-    stored_sequence_reclaim_retired();
+    if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
     return result;
+}
+
+uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
+                                   uint32_t value,
+                                   uint32_t alignment_period) {
+    return sequencer_sequence_control_with_origin(
+        tag, action, value, alignment_period, SEQUENCER_ORIGIN_EXTERNAL, 0);
 }
 
 static bool stored_sequence_event_hits(const stored_sequence_event_t *event,
@@ -801,16 +847,16 @@ static bool stored_sequence_event_is_control(
     return strncmp(event->wire, "HC", 2) == 0;
 }
 
-static void sequence_play_wire_now(char *wire) {
-    if (wire[0] == 'H') handle_ticks_message(wire);
+static void sequence_play_wire_now(char *wire, sequencer_origin_t origin,
+                                   uint32_t current_tick) {
+    if (wire[0] == 'H')
+        handle_ticks_message_with_origin(wire, origin, current_tick);
     else amy_play_message(wire);
 }
 
-static void stored_sequence_play_wire(const char *wire) {
-    bool previous = stored_sequence_wire_firing;
-    stored_sequence_wire_firing = true;
-    sequence_play_wire_now((char *)wire);
-    stored_sequence_wire_firing = previous;
+static void stored_sequence_play_wire(const char *wire, uint32_t current_tick) {
+    sequence_play_wire_now(
+        (char *)wire, SEQUENCER_ORIGIN_STORED, current_tick);
 }
 
 static void stored_sequence_process_pass(uint32_t tick, bool controls) {
@@ -852,7 +898,7 @@ static void stored_sequence_process_pass(uint32_t tick, bool controls) {
                     &definition->events[event_index];
                 if (stored_sequence_event_is_control(event) == controls
                     && stored_sequence_event_hits(event, elapsed))
-                    stored_sequence_play_wire(event->wire);
+                    stored_sequence_play_wire(event->wire, tick);
             }
         }
 
@@ -863,7 +909,11 @@ static void stored_sequence_process_pass(uint32_t tick, bool controls) {
 }
 
 static void sequencer_process_tick(void) {
-    amy_global.sequencer_tick_count++;
+    // External sequence controls take their next-tick snapshot under this same
+    // lock, so current-tick versus next-tick activation has one ordering point.
+    amy_grab_lock();
+    uint32_t tick = ++amy_global.sequencer_tick_count;
+    amy_release_lock();
     midi_clock_out_tick();  // no-op unless in AMY_MIDI_SYNC_SEND mode
     // Guard nested check-and-fire calls (via a fired message's own parse)
     // while still processing this tick's fires; restore on the way out.
@@ -879,7 +929,7 @@ static void sequencer_process_tick(void) {
             bool hit = false;
             bool delete = false;
             if(sequences[tag].period != 0) { // period set
-                uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
+                uint32_t offset = tick % sequences[tag].period;
                 if (offset == sequences[tag].tick) hit = true;
             } else {
                 // Test for absolute tick (no period set).  <= rather than ==:
@@ -890,7 +940,7 @@ static void sequencer_process_tick(void) {
                 // playing.  <= lets it fire on the next tick instead, matching
                 // the play-it-late rule sequencer_add_wire() uses for a
                 // one-off that is already due when it arrives.
-                if (sequences[tag].tick <= amy_global.sequencer_tick_count) { hit = true; delete = true; }
+                if (sequences[tag].tick <= tick) { hit = true; delete = true; }
             }
             if(hit) {
                 // Take the message out (one-shot) or a copy of it (repeating)
@@ -915,7 +965,8 @@ static void sequencer_process_tick(void) {
                 amy_release_lock();
                 if (wire != NULL) {
                     // Parse and play now; the deltas play back within this block.
-                    sequence_play_wire_now(wire);
+                    sequence_play_wire_now(
+                        wire, SEQUENCER_ORIGIN_RENDER, tick);
                     free(wire);
                 }
             }
@@ -924,11 +975,11 @@ static void sequencer_process_tick(void) {
     }
     // Nested controls take effect before ordinary stored-sequence events on
     // the same tick. This lets a parent stop a child without one extra onset.
-    stored_sequence_process_pass(amy_global.sequencer_tick_count, true);
-    stored_sequence_process_pass(amy_global.sequencer_tick_count, false);
+    stored_sequence_process_pass(tick, true);
+    stored_sequence_process_pass(tick, false);
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
-        amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
+        amy_global.config.amy_external_sequencer_hook(tick);
     }
 }
 
@@ -964,7 +1015,9 @@ void sequencer_midi_start() {
     // If external clock was not previously enabled, keep using internal clock
     // so the sequencer advances on its own without needing F8 ticks.
     if (sequencer_external_clock) {
+        amy_grab_lock();
         amy_global.sequencer_tick_count = 0;
+        amy_release_lock();
     }
     // Reset the tick timer to now so sequencer_check_and_fill doesn't try to
     // catch up all the ticks that elapsed while stopped.
