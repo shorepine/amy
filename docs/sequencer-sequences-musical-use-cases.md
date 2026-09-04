@@ -1,100 +1,62 @@
-# Musical use cases for sequencer groups
+# Musical use cases for reusable sequences
 
-Sequencer groups are useful when a musical phrase must remain a coherent unit
-while a controller changes what will play next. Two representative applications
-are an interactive rhythm engine with selectable drum fills and an arpeggiator
-whose timing, direction, or notes can change during playback. Both are expressed
-as ordinary AMY events on a local timeline; AMY contains no policy specific to
-either application.
+Reusable sequences reduce controller complexity when a musical phrase contains
+several events but should be launched as one unit. The examples below describe
+generic rhythm-engine behavior; AMY assigns no musical meaning to a tag.
 
-## Dynamic drum fills
+## Preloaded fills
 
-Consider a rhythm engine that combines repeating percussion layers with a
-selectable fill and a fill density. It may offer hundreds of short fills, let a
-player change the active selection while transport continues, and temporarily
-silence some background layers during a fill while allowing others to continue.
+A rhythm engine can preload each fill once as a finite tagged sequence. Its
+root schedule then stores only sequence starts. Selecting or deselecting a fill
+changes future root launches, not the complete fill body.
 
-A flat root sequence can represent one final arrangement. Live editing is more
-complicated: the host must expand every chosen fill into root events, identify
-which future events are safe to replace, coordinate the background boundaries,
-avoid truncating a fill already in progress, and resend a large schedule whenever
-selection or density changes. Combining fills, densities, and independently
-controlled background layers multiplies that state even though every individual
-phrase is small.
+An already-started fill holds its immutable definition and finishes even if its
+future launches are removed. The controller does not calculate an end time,
+stream the phrase repeatedly, or maintain an active-fill state machine.
 
-Sequencer groups preserve the useful phrase boundary:
+## Arpeggios and note lifetime
 
-1. The controller preloads each fill once as a finite group.
-2. A small tagged root event starts the selected group at a musical boundary.
-3. Independently controllable background roles run as tagged repeating group
-   executions.
-4. A fill can contain finite gate events for background executions that should
-   not dispatch events during that fill.
-5. Replacing or clearing the root event changes future fills only. A fill that
-   already started retains its immutable revision and finishes normally.
+A short child sequence can contain one note-on and its matching note-off. A
+parent sequence starts these children in an arpeggio pattern. Stopping or
+replacing the parent prevents future child starts; children which already
+started keep their scheduled release.
 
-The controller still owns every musical choice: fill selection, density,
-instrument roles, and which roles continue. AMY only provides reusable phrase
-storage, coherent execution, and generic event gating. Live control therefore
-changes a small reference instead of rewriting the expanded leaf-event schedule.
+This makes live rate, direction, voicing, or chord changes predictable without
+requiring the controller to mirror AMY's clock or remember which note-offs are
+still pending. Starting the same finite child again may overlap with an older
+execution; each execution retains its own event snapshot.
 
-Stored definitions and active executions have independent limits. A rhythm
-engine can configure enough group slots for a large fill catalogue without
-creating hundreds of live players or scanning every stored fill on each tick.
+An explicit stop of the child tag has the different, generic meaning of
+terminating every active execution of that child. A caller can therefore choose
+between stopping future launches at a parent and deliberately truncating the
+leaf itself.
 
-## Arpeggios with clean live changes
+## Temporarily reducing a rhythm
 
-An arpeggio can also be expanded into the root sequencer. The difficult part is
-changing rate, direction, pitch, or voicing while notes are already in flight.
-Deleting old root entries can remove a future note-off and leave a note hanging.
-Sending an immediate all-off prevents the hang but shortens a valid note. A
-host-side timer can defer the edit, but then the host must mirror AMY's musical
-clock and track the lifetimes of overlapping phrases.
+A repeating percussion layer can be represented by a periodic sequence. A
+finite gate suppresses its ordinary events for a chosen number of ticks while
+its local phase keeps advancing. Once the gate expires, it resumes at the point
+it would otherwise have reached; already-ringing audio is unaffected.
 
-Instead, one group revision stores the complete arpeggio phrase, including every
-note-on and its matching note-off. Tagged root events determine when that phrase
-starts. When a player changes the arpeggio:
+The controller decides which musical layer a tag represents and which layers
+to gate. AMY implements only generic event dispatch, duration, and phase.
 
-- the controller stages and atomically publishes the complete replacement;
-- future starts capture the new published revision;
-- an execution already sounding retains its previous immutable revision;
-- every release in that execution therefore occurs at its original gate;
-- quantized root starts preserve the musical boundary;
-- untagged executions may overlap when a new phrase starts before an older one
-  has finished.
+## Fixed repeat counts
 
-The result avoids both abrupt releases and delayed hanging notes. AMY does not
-know that the event collection is an arpeggio; the same lifetime guarantee
-applies to any finite musical gesture.
+Component periods define looping. When a phrase should repeat exactly `N`
+times, a finite controller sequence can start the periodic phrase at tick zero
+and stop it at `N * period`. Control processing precedes ordinary events, so the
+event on the stop boundary is not dispatched.
 
-## Independently controlled repeating layers
+This composes existing concepts instead of adding a separate repeat-mode or
+published-length state.
 
-A drum voice, ostinato, control phrase, or other repeating part can run as an
-independently tagged group execution. A controller can stop it at a quantized
-boundary or gate future event dispatch without stopping the sequencer, changing
-the phase, or affecting unrelated layers.
+## Live definition changes
 
-For example, a foot controller can gate the event stream that triggers one
-percussion instrument. Pedal-down suppresses future hits for that tagged
-execution, while a sample already sounding ends naturally. Pedal-up releases the
-gate and the next hit occurs on the layer's original phase. Reading the pedal and
-choosing the execution tag remain responsibilities of the controller application.
+A controller can remove future launches, reset and append the replacement
+definition, then install new launches. Executions which started before the
+change keep the old snapshot. Future starts use the new contents.
 
-## The common abstraction
-
-All three applications share the same structure:
-
-```text
-root timeline:       decide when a stored phrase starts
-group definition:    store a coherent local event sequence
-group execution:     play one immutable revision with a bounded lifetime
-execution control:   start, stop, or temporarily gate that playback
-```
-
-A flat sequence can ultimately represent the same notes. The group boundary is
-valuable because it makes live changes atomic, compact, and independent of host
-timing. It moves phrase completion and release ownership into AMY without moving
-application-specific musical policy into the synthesizer.
-
-See the [step-by-step arpeggio and percussion-gate example](sequencer-groups-howto.md)
-for the corresponding wire commands and Python calls.
+The controller still owns musical policy and transaction ordering, but it does
+not own active execution revisions, note lifetime, phrase completion, or the
+sequencer clock.

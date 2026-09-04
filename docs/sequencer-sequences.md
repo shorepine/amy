@@ -1,140 +1,112 @@
-# Sequencer groups
+# Reusable sequencer sequences
 
-Sequencer groups are reusable collections of ordinary AMY sequencer events.
-They add one bounded level below the existing root sequencer: a root event may
-start a group, but a group cannot start another group.
+AMY's existing sequencer tags can also identify reusable sequences. A reusable
+sequence is a collection of ordinary AMY events with local `tick` and `period`
+values. It can be started from Python, from the wire protocol, or from another
+sequenced event.
 
-This is useful when a musical controller needs to trigger a complete phrase
-as one operation. Examples include a drum fill, a short arpeggio with its own
-note-on and note-off, or a repeating percussion layer. The controller can
-preload these phrases and later send one small, quantized control message. It
-does not need to reproduce AMY's clock or resend every event at performance
-time.
+The ordinary three-value `ticks=(tick, period, tag)` API remains unchanged. A
+legacy tagged write replaces the event at that tag. Multi-event accumulation is
+always explicit.
 
-Related guides:
+## Defining a sequence
 
-- [Abstractions and implementation](sequencer-groups-abstractions.md)
-- [Musical use cases](sequencer-groups-musical-use-cases.md)
-- [Step-by-step wire and Python how-to](sequencer-groups-howto.md)
-
-## Defining and publishing a group
-
-The normal `ticks` tuple accepts an optional fourth value:
-
-```text
-tick,period,event_tag,group_tag
-```
-
-`group_tag` values start at 1. An absent or zero group tag uses the existing
-root sequencer without changing any of its semantics.
-
-This wire sequence stages a four-beat phrase in group 1 and then publishes it
-atomically with a length of 192 ticks:
-
-```text
-H0,192,0,1i2n60l1Z
-H24,192,1,1i2n60l0Z
-H48,192,2,1i2n64l1Z
-H72,192,3,1i2n64l0Z
-zQ1,3,192Z
-```
-
-The equivalent Python calls are:
+The Python convenience API replaces all future contents at a tag:
 
 ```python
-amy.send(ticks="0,192,0,1", synth=2, note=60, vel=1)
-amy.send(ticks="24,192,1,1", synth=2, note=60, vel=0)
-amy.send(ticks="48,192,2,1", synth=2, note=64, vel=1)
-amy.send(ticks="72,192,3,1", synth=2, note=64, vel=0)
-amy.send(sequence_control=[1, amy.SEQUENCE_CONTROL_PUBLISH, 192])
+amy.define_sequence(40, [
+    dict(ticks=(0,), synth=2, note=60, vel=1),
+    dict(ticks=(12,), synth=2, note=60, vel=0),
+])
 ```
 
-Grouped `ticks` commands update a private staging revision. Publishing is one
-action in the generic control family rather than a separate begin/add/commit
-API. It makes all staged local-tag replacements visible together, so a launch
-can never observe a half-updated phrase. As at the root, `tick=0,period=0`
-clears the specified event tag. Use a nonzero period for an event at local tick
-zero.
+Each event uses the normal AMY keyword arguments. Its `ticks` value is local to
+the start of the sequence and contains `tick` plus an optional `period`.
 
-The published length is explicit and bounded; AMY does not derive it using an
-LCM of event periods. Within each phrase, a nonzero event period repeats by
-local modulo and a zero period fires once at its local tick.
+`define_sequence()` validates every event before sending anything. It then
+performs a per-tag reset followed by explicit cumulative writes. If a sequence
+may be launched while it is being rewritten, first remove or stop those future
+launches. An execution which already started is safe: it retains the immutable
+definition it started with, including later note-offs.
 
-## Controlling executions
-
-The control layout is fixed:
-
-```text
-group,action,value,quantize[,execution_tag]
-```
-
-| Action | Number | Meaning of `value` |
-|---|---:|---|
-| stop | 0 | reserved; use 0 |
-| start | 1 | repeat count: 1 once, N exactly N times, 0 indefinitely |
-| gate | 2 | suppress group-event firings for this many ticks; 0 releases a gate |
-| publish | 3 | explicit group length in ticks |
-| clear | 4 | reserved; use 0 |
-
-`quantize=0` means the next sequencer tick for a direct command. Otherwise the
-control takes effect at the next multiple of that many ticks. When a root
-sequencer event issues the control on the boundary itself, it takes effect on
-that same tick, including the group's local tick-zero events.
-
-For example, start group 1 indefinitely at the next 192-tick boundary, assign
-execution tag 100, and later stop that execution at a boundary:
-
-```text
-zQ1,1,0,192,100Z
-zQ1,0,0,192,100Z
-```
+Low-level callers can use `sequence_reset` and `sequence_event` directly:
 
 ```python
-amy.send(sequence_control=[1, amy.SEQUENCE_CONTROL_START, 0, 192, 100])
-amy.send(sequence_control=[1, amy.SEQUENCE_CONTROL_STOP, 0, 192, 100])
+amy.send(sequence_reset=40)
+amy.send(sequence_event=(40, 0, 0), synth=2, note=60, vel=1)
+amy.send(sequence_event=(40, 12, 0), synth=2, note=60, vel=0)
 ```
 
-Omit `execution_tag` to address every active execution of the group for stop
-or gate operations. Supplying a tag to start makes a later start with the same
-group and execution tag replace it on the requested boundary. Untagged starts
-may overlap, which is useful for one-shot note phrases whose releases must be
-allowed to finish independently.
+The sequence tag and legacy root tag are one identity space. Writing a legacy
+tagged `ticks` event replaces the future reusable definition at that tag;
+explicitly appending a reusable event removes the future legacy root event at
+that tag. Applications should assign distinct tags to stored phrases and root
+launch events.
 
-A finite gate advances the execution's local clock but suppresses its event
-firings. Audio already sounding is not stopped, and the first event after the
-gate occurs at its original phase. A gate can itself be placed in another
-group as a leaf control; start, publish and clear are rejected while a group
-payload is firing. A group therefore never launches or edits another group.
+## Starting and stopping
 
-## Scheduling a launch at the root
-
-Because `sequence_control` is an ordinary wire command, it can be the payload
-of a normal root `ticks` event. This starts group 1 once at absolute tick 960:
-
-```text
-H960,0,40zQ1,1,1,0Z
+```python
+amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_START, 1))
+amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_STOP, 48))
 ```
 
-A repeating root entry can launch the same group sparsely without copying its
-events. Clear that future launch with the unchanged root operation
-`H0,0,40Z`; an execution already started from it keeps running.
+The optional final value is `alignment_period`. `0` or `1` acts at the next
+available sequencer tick for a direct command. A larger value selects the next
+tick divisible by that period. When a root sequencer event fires a start on a
+tick, the child sequence's local tick zero participates in that same tick.
 
-## Lifetime and memory guarantees
+A start creates a bounded execution. More than one execution of a finite
+sequence may overlap; no caller-generated execution ID is required. Stop
+targets every active execution of the tag. Stopping a parent prevents its
+future child starts but does not stop child sequences which already started.
+This lets a note-on/note-off child own its complete lifetime.
 
-An active execution retains the immutable published revision it started with.
-Editing, publishing or clearing the group affects future starts only. This is
-important for phrases containing releases: an old note-off cannot disappear
-because a new definition was loaded while it was sounding.
+## Finite and repeating lifetime
 
-`RESET_SEQUENCER` and `RESET_TIMEBASE` discard active and quantized-pending
-executions but preserve published group definitions. Full AMY shutdown frees
-them.
+No explicit sequence length or publish action is needed:
 
-Storage and work are bounded by `max_sequence_groups`,
-`max_sequence_group_tags` and `max_sequence_group_executions` in
-`amy_config_t`. Group event arrays and wire payloads are allocated only for
-definitions that are authored. Setting any of the three capacities to zero
-disables sequencer groups. The tick path scans only the fixed execution pool,
-not all stored groups, so a larger definition catalogue does not make inactive
-definitions part of per-tick work. Starting an execution does not allocate
-memory.
+- a definition containing only `period=0` events is finite and retires after
+  its last event;
+- an event with nonzero `period` repeats on its local period, and keeps that
+  execution alive until it is stopped;
+- a controlling finite sequence can start a periodic child at local tick zero
+  and stop it after a chosen number of periods.
+
+## Temporary event gating
+
+```python
+amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_GATE, 24, 1))
+```
+
+This suppresses ordinary event dispatch from active executions of tag `40` for
+24 ticks. Their local phase continues and dispatch resumes on the original
+phase. Audio which is already ringing is not cut off. Nested sequence controls
+remain active while ordinary payload events are gated, so controller sequences
+can still complete their lifecycle.
+
+Gate duration `0` removes a gate at the selected alignment boundary.
+
+## Reset behavior
+
+- `amy.send(sequence_reset=tag)` removes the future legacy/root event and the
+  future reusable definition for that tag. Active immutable executions finish.
+- `RESET_TIMEBASE` discards active/pending executions because their absolute
+  activation ticks cannot be rebased, but retains stored definitions.
+- `RESET_SEQUENCER` retains its global meaning: it clears root events, reusable
+  definitions, and active/pending executions.
+
+## Capacity and realtime behavior
+
+`max_sequencer_tags` bounds the shared tag space. `max_sequence_events` bounds
+the number of events in one reusable definition, and
+`max_sequence_executions` independently bounds active or alignment-pending
+executions. Definitions are allocated only for tags which use them, and
+inactive definitions are not scanned on each tick.
+
+Starts fail clearly when the execution pool is full. Cyclic sequence launches
+cannot allocate beyond that fixed pool and can be recovered with targeted stop
+commands or `RESET_SEQUENCER`.
+
+See the [implementation model](sequencer-sequences-abstractions.md),
+[musical use cases](sequencer-sequences-musical-use-cases.md), and
+[step-by-step examples](sequencer-sequences-howto.md).

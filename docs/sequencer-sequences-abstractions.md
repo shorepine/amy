@@ -1,153 +1,87 @@
-# Sequencer-group abstractions and implementation
+# Reusable sequence abstractions and implementation
 
-AMY's root sequencer stores ordinary events on one global musical timeline.
-Sequencer groups add one reusable, bounded phrase level below that timeline: a
-root event can start a finite or repeating group of ordinary AMY events. They
-do not add a drum machine, arpeggiator, song model, or scheduler hierarchy.
+## Public model
 
-For concrete applications, see the [musical use cases](sequencer-groups-musical-use-cases.md).
-For exact messages, see the [step-by-step how-to](sequencer-groups-howto.md).
-The concise argument reference is in [Sequencer groups](sequencer-groups.md).
+The public model has two ways to use the existing sequencer tag identity:
 
-## The model
+1. `ticks=(tick, period, tag)` keeps the established single-event behavior;
+2. `define_sequence(tag, events)` explicitly gives that tag multiple local
+   events which can be started and stopped as a reusable sequence.
 
-The model separates stored content, scheduled starts, and active playback:
+There is no second public group ID, no local event-tag namespace, no fourth
+`ticks` field, no explicit length, and no publish/revision command.
 
-| Object | Purpose | Lifetime |
-| --- | --- | --- |
-| Root sequencer event | Decides when a group starts | Existing `H` tick/period/tag semantics |
-| Group tag | Selects one reusable definition slot | From 1 through the configured group capacity |
-| Staging revision | Receives local event edits privately | Until published or cleared |
-| Published revision | Supplies immutable content to future starts | Until replaced or cleared |
-| Execution | Plays one captured revision | Until its repeat count completes or it is stopped |
-| Execution tag | Optionally addresses live or pending executions | Supplied by the start operation |
-| Local event tag | Replaces or clears one event in one group's staging revision | Scoped to that group only |
+`sequence_control` supplies the three generic runtime operations:
 
-Root tags, group tags, execution tags, and local event tags are separate
-identities. For example, replacing a tagged root event changes which phrase
-will start in the future. It does not edit the phrase definition or shorten an
-execution that has already started.
+- start, optionally aligned to an AMY sequencer period;
+- stop every active execution of the tag at an optional alignment boundary;
+- gate ordinary events for a finite duration without resetting local phase.
 
-## Authoring and publication
+Sequences may start or stop other sequences. A finite controller sequence can
+therefore express a fixed repeat count, and a parent can stop launching new
+note-pair children while children already in progress deliver their note-offs.
 
-The existing `ticks` tuple accepts an optional fourth value:
+## Why executions still exist internally
 
-```text
-tick,period,event_tag,group_tag
-```
+A stored definition and an active execution have different lifetimes even
+though that distinction is not a second public API. An execution needs a local
+start tick and must retain the event data it began with. Without that internal
+separation, changing a future phrase could remove a note-off or alter a fill
+which is already sounding.
 
-With a nonzero `group_tag`, the `H` message edits that group's private staging
-revision instead of the root sequencer. The first edit after publication clones
-the current published revision, so a host can replace only the local tags that
-changed. A local tag is cleared with `tick=0,period=0`, exactly like a tagged
-root event.
+AMY therefore uses a small bounded execution pool and reference-counted,
+copy-on-write definitions. Appending to a definition which an execution still
+uses first clones it. The active execution keeps the old snapshot; later starts
+see the updated contents. No revision number is exposed to callers.
 
-Because that pair means clear, an event at local tick zero must use a nonzero
-period. Using the group length as its period is usually the clearest choice; a
-finite execution still fires it only once per repetition.
+Multiple finite executions of one tag may overlap. This is important for
+ordinary musical phrases whose gate time is longer than the interval between
+starts. The execution pool, rather than a caller-managed ID scheme, is the
+bound.
 
-Publication uses action 3 of the `sequence_control` family:
+## Lifetime inference
 
-```text
-zQ<group>,3,<length>Z
-```
+The component events define lifetime:
 
-The length is explicit. AMY validates every staged event against it, then
-publishes the complete revision atomically. Playback therefore never observes
-a partly rewritten phrase. AMY does not infer a potentially expensive least
-common multiple from event periods.
+- if every event has `period=0`, the execution retires after its greatest local
+  tick has been processed;
+- if any event has a nonzero period, the execution remains active and evaluates
+  that event against elapsed local time until stopped.
 
-## Execution lifetime
+This avoids an independent length that could disagree with the ordinary
+sequencer periods. A fixed number of repeats is composition: a finite parent
+starts a periodic child and stops it at the required local tick.
 
-A start captures the currently published revision. Its repeat value is:
+## Tick processing
 
-- `1` for one performance;
-- `N` for exactly N performances;
-- `0` for indefinite repetition.
+Only active root entries and active sequence executions are visited per tick.
+Stored but inactive definitions have no per-tick cost.
 
-Editing, publishing, or clearing the group afterward affects future starts
-only. Every active execution retains a reference to the revision it captured
-and can deliver the note-offs or other closing events already stored in that
-revision. This is the key guarantee for glitch-free live phrase changes.
+Sequence controls are processed before ordinary events for a tick. Consequently
+a stop scheduled at a period boundary prevents the event on that boundary, and
+a parent launch can make a child's local tick-zero event run on the launch tick.
 
-Starts and stops can be quantized to the next multiple of a sequencer tick
-interval. A zero quantization value means the next sequencer tick for a direct
-command. When a root event starts a group, local tick zero is processed on that
-same root tick.
+Temporary gating suppresses ordinary payload dispatch but advances elapsed
+local time normally. Control events are not gated; otherwise a controller could
+mute its own future stop or recovery operation.
 
-An optional execution tag gives live playback a stable control identity. A new
-start with the same group and execution tag replaces the matching execution at
-the requested boundary. Untagged starts may overlap. Stop and gate operations
-can address one execution tag or, when the tag is omitted, all executions of a
-group.
+## Bounds and recovery
 
-## Finite event gates
+All storage is configured at startup:
 
-Gate action 2 suppresses event dispatch for a duration while the execution's
-local clock continues advancing. It does not stop already-sounding audio. When
-the gate ends, the next event occurs at its original phase rather than at a
-restarted phase. A zero duration releases a current gate.
+- `max_sequencer_tags`: shared public identities;
+- `max_sequence_events`: maximum events in one stored definition;
+- `max_sequence_executions`: active and pending executions.
 
-A group may contain a gate control as a leaf event. This lets one finite phrase
-temporarily suppress events from another tagged repeating layer. AMY assigns no
-musical meaning to either layer; the controller owns that policy.
+Definitions allocate event storage only when first used. The render path does
+not perform unbounded allocation. A recursive or cyclic control graph can fill
+the execution pool, but cannot grow past it; further starts fail and the caller
+can stop a tag or reset the sequencer.
 
-## Bounded scheduling
+## Compatibility boundary
 
-The root sequencer may start a group. A group may contain ordinary AMY events
-and finite gate controls, but it cannot start, publish, or clear a group. This
-provides the two useful musical levels—global arrangement and reusable
-phrase—without cycles or variable scheduling depth.
-
-The configured limits independently bound:
-
-- persistent group slots;
-- local event tags in each allocated definition;
-- active or quantized-pending executions.
-
-The portable defaults are 32 groups, 64 local tags per group, and 32 active or
-pending executions. Definition storage is allocated only when a group is
-authored. The audio-time tick path scans only the fixed execution pool, not all
-stored groups, so an application can choose a larger definition catalogue
-without making every inactive definition part of per-tick work.
-
-## Implementation outline
-
-The implementation in [`src/sequencer.c`](../src/sequencer.c) deliberately
-reuses the normal event path:
-
-- grouped `H` messages store the same wire payloads AMY already parses;
-- staged and published definitions use fixed-capacity local-tag tables;
-- published revisions are reference-counted and remain alive while captured by
-  an execution;
-- an independently bounded execution pool owns start phase, repeat count,
-  execution identity, pending stop, and gate state;
-- root events are processed before group events, which makes a root launch and
-  its local tick-zero payload sample-clock coherent;
-- group-to-group lifecycle operations are rejected while a grouped payload is
-  firing.
-
-The public configuration fields and constants are declared in
-[`src/amy.h`](../src/amy.h). The group engine entry points are in
-[`src/sequencer.h`](../src/sequencer.h), and Python uses the existing
-`amy.send(ticks=...)` and `amy.send(sequence_control=...)` interface.
-
-## Compatibility contract
-
-An absent or zero fourth `ticks` value follows the existing root-sequencer path.
-Existing three-field `H` messages, anonymous root events, tag replacement and
-clear behavior, modulo periods, and `amy_add_event()` scheduling are unchanged.
-
-`RESET_SEQUENCER` and `RESET_TIMEBASE` discard active and pending executions
-but preserve published group definitions. Full AMY shutdown releases the
-definitions.
-
-The native group regression test exercises legacy root behavior and group
-behavior in the same process. It covers the unchanged three-value C and wire
-formats, root/group namespace isolation, one/N/infinite repetition,
-quantization, tagged replacement, selective stop and gate, early ungate,
-atomic publication, repair after rejected publication, immutable active
-revisions, same-tick root launches, non-recursive lifecycle controls, allowed
-leaf controls, resets, 32-bit clock rollover, disabled configuration, and
-configured storage and execution bounds. The existing AMY C and audio suites
-remain the broader backward-compatibility tests.
+The legacy parser, C event layout, anonymous-event pool, modulo timing,
+same-tag replacement, MIDI/external-clock behavior, and root active-list order
+are unchanged. Reusable accumulation only occurs through the explicit sequence
+API. Tests cover both the old path and the interaction between legacy and
+reusable forms.
