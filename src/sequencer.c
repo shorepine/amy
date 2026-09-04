@@ -1,6 +1,8 @@
 #include "sequencer.h"
 #include "amy.h"
 
+#include <assert.h>
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -59,6 +61,10 @@ typedef struct stored_sequence_definition_t {
     uint32_t last_one_shot_tick;
     bool has_periodic_event;
     uint32_t refs;
+    // Zero-reference definitions are linked here by the render path. A
+    // non-rendering sequence API call detaches the complete list under the
+    // queue lock and performs the variable-time frees after releasing it.
+    struct stored_sequence_definition_t *next_retired;
 } stored_sequence_definition_t;
 
 typedef struct stored_sequence_slot_t {
@@ -85,6 +91,7 @@ static uint32_t max_stored_sequence_events = 0;
 static uint32_t max_stored_sequence_executions = 0;
 static size_t stored_sequence_event_bytes = 0;
 static volatile bool stored_sequence_wire_firing = false;
+static stored_sequence_definition_t *retired_sequence_definitions = NULL;
 
 static bool checked_array_size(uint32_t count, size_t element_size,
                                size_t *bytes) {
@@ -93,15 +100,55 @@ static bool checked_array_size(uint32_t count, size_t element_size,
     return true;
 }
 
-static void stored_sequence_definition_release(
+static void stored_sequence_definition_destroy(
         stored_sequence_definition_t *definition) {
-    if (definition == NULL || definition->refs == 0) return;
-    definition->refs--;
-    if (definition->refs != 0) return;
+    if (definition == NULL) return;
     for (uint32_t i = 0; i < definition->event_count; ++i)
         if (definition->events[i].wire != NULL) free(definition->events[i].wire);
     free(definition->events);
     free(definition);
+}
+
+// References are changed only while amy_queue_lock is held. Return the object
+// which reached zero so the caller can either retire it (render path) or free
+// it after dropping the lock (control path).
+static stored_sequence_definition_t *stored_sequence_definition_unref_locked(
+        stored_sequence_definition_t *definition) {
+    if (definition == NULL) return NULL;
+    assert(definition->refs != 0);
+    definition->refs--;
+    return definition->refs == 0 ? definition : NULL;
+}
+
+static void stored_sequence_definition_retire_locked(
+        stored_sequence_definition_t *definition) {
+    stored_sequence_definition_t *retired =
+        stored_sequence_definition_unref_locked(definition);
+    if (retired == NULL) return;
+    retired->next_retired = retired_sequence_definitions;
+    retired_sequence_definitions = retired;
+}
+
+static void stored_sequence_definition_destroy_list(
+        stored_sequence_definition_t *definition) {
+    while (definition != NULL) {
+        stored_sequence_definition_t *next = definition->next_retired;
+        stored_sequence_definition_destroy(definition);
+        definition = next;
+    }
+}
+
+// This may be called from sequence API entry points which can also be fired by
+// the render thread through a stored HC payload. Reclaim only when this is an
+// external/control-side call. Keeping retired objects until the next such call
+// is bounded by the tag and execution pools and never delays audio rendering.
+static void stored_sequence_reclaim_retired(void) {
+    if (wire_firing || stored_sequence_wire_firing) return;
+    amy_grab_lock();
+    stored_sequence_definition_t *retired = retired_sequence_definitions;
+    retired_sequence_definitions = NULL;
+    amy_release_lock();
+    stored_sequence_definition_destroy_list(retired);
 }
 
 static stored_sequence_definition_t *stored_sequence_definition_new(void) {
@@ -121,6 +168,7 @@ static stored_sequence_definition_t *stored_sequence_definition_new(void) {
     definition->last_one_shot_tick = 0;
     definition->has_periodic_event = false;
     definition->refs = 1;
+    definition->next_retired = NULL;
     return definition;
 }
 
@@ -143,7 +191,7 @@ static stored_sequence_definition_t *stored_sequence_definition_clone(
         const stored_sequence_event_t *from = &source->events[i];
         copy->events[i].wire = stored_sequence_wire_copy(from->wire);
         if (copy->events[i].wire == NULL) {
-            stored_sequence_definition_release(copy);
+            stored_sequence_definition_destroy(copy);
             return NULL;
         }
         copy->events[i].tick = from->tick;
@@ -152,24 +200,25 @@ static stored_sequence_definition_t *stored_sequence_definition_clone(
     return copy;
 }
 
-static void stored_sequence_execution_release(
+static void stored_sequence_execution_release_deferred(
         stored_sequence_execution_t *execution) {
     if (!execution->occupied) return;
     stored_sequence_definition_t *definition = execution->definition;
     memset(execution, 0, sizeof(*execution));
-    stored_sequence_definition_release(definition);
+    stored_sequence_definition_retire_locked(definition);
 }
 
 static void stored_sequence_executions_reset(void) {
     if (sequence_executions == NULL) return;
     for (uint32_t i = 0; i < max_stored_sequence_executions; ++i)
-        stored_sequence_execution_release(&sequence_executions[i]);
+        stored_sequence_execution_release_deferred(&sequence_executions[i]);
 }
 
 static void stored_sequences_clear_definitions(void) {
     if (stored_sequences == NULL) return;
     for (int32_t i = 0; i < max_sequences; ++i) {
-        stored_sequence_definition_release(stored_sequences[i].definition);
+        stored_sequence_definition_retire_locked(
+            stored_sequences[i].definition);
         stored_sequences[i].definition = NULL;
     }
 }
@@ -188,6 +237,9 @@ static void stored_sequences_deinit(void) {
     max_stored_sequence_events = 0;
     max_stored_sequence_executions = 0;
     stored_sequence_event_bytes = 0;
+    stored_sequence_definition_t *retired = retired_sequence_definitions;
+    retired_sequence_definitions = NULL;
+    stored_sequence_definition_destroy_list(retired);
 }
 
 static void stored_sequences_init(uint32_t events, uint32_t executions) {
@@ -450,6 +502,35 @@ static stored_sequence_slot_t *stored_sequence_slot(uint32_t tag) {
     return &stored_sequences[tag];
 }
 
+static void stored_sequence_definition_append_owned(
+        stored_sequence_definition_t *definition, uint32_t tick,
+        uint32_t period, char *wire) {
+    stored_sequence_event_t *event =
+        &definition->events[definition->event_count++];
+    event->wire = wire;
+    event->tick = tick;
+    event->period = period;
+    if (period != 0) definition->has_periodic_event = true;
+    else if (tick > definition->last_one_shot_tick)
+        definition->last_one_shot_tick = tick;
+}
+
+// A candidate owns the incoming wire in its final event. If publication loses
+// a race, detach that event before destroying the private candidate so the
+// same caller-owned wire can be retried against the newly published version.
+static void stored_sequence_candidate_discard(
+        stored_sequence_definition_t *candidate, char *wire) {
+    if (candidate != NULL && candidate->event_count != 0) {
+        stored_sequence_event_t *event =
+            &candidate->events[candidate->event_count - 1];
+        if (event->wire == wire) {
+            event->wire = NULL;
+            candidate->event_count--;
+        }
+    }
+    stored_sequence_definition_destroy(candidate);
+}
+
 uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
                                     uint32_t period, char *wire) {
     stored_sequence_slot_t *slot = stored_sequence_slot(tag);
@@ -484,41 +565,80 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         return 0;
     }
 
-    amy_grab_lock();
-    stored_sequence_definition_t *definition = slot->definition;
-    if (definition == NULL) {
-        definition = stored_sequence_definition_new();
-    } else if (definition->refs > 1) {
-        definition = stored_sequence_definition_clone(definition);
-    }
-    if (definition == NULL) {
+    stored_sequence_reclaim_retired();
+    for (;;) {
+        amy_grab_lock();
+        stored_sequence_definition_t *source = slot->definition;
+        if (source != NULL
+            && source->event_count >= max_stored_sequence_events) {
+            fprintf(stderr, "cannot append event to sequence %" PRIu32
+                    ": configured limit of %" PRIu32 " events is full\n",
+                    tag, max_stored_sequence_events);
+            amy_release_lock();
+            free(wire);
+            return 0;
+        }
+
+        // No execution or other writer can observe a refs==1 definition, so
+        // appending the already-allocated incoming wire is a bounded mutation.
+        // This keeps bulk preload O(n) instead of cloning on every event.
+        if (source != NULL && source->refs == 1) {
+            stored_sequence_definition_append_owned(source, tick, period,
+                                                     wire);
+            amy_release_lock();
+            stored_sequence_reclaim_retired();
+            return 1;
+        }
+
+        // Pin a shared source before leaving the lock. From this point it is
+        // immutable, so allocation and all copying can happen without holding
+        // up the render thread.
+        if (source != NULL) source->refs++;
         amy_release_lock();
-        amy_oom("stored sequence edit");
-        free(wire);
-        return 0;
-    }
-    if (definition != slot->definition) {
-        stored_sequence_definition_release(slot->definition);
-        slot->definition = definition;
-    }
-    if (definition->event_count >= max_stored_sequence_events) {
-        fprintf(stderr, "cannot append event to sequence %" PRIu32
-                ": configured limit of %" PRIu32 " events is full\n",
-                tag, max_stored_sequence_events);
+
+        stored_sequence_definition_t *candidate = source == NULL
+            ? stored_sequence_definition_new()
+            : stored_sequence_definition_clone(source);
+        if (candidate == NULL) {
+            stored_sequence_definition_t *dead = NULL;
+            if (source != NULL) {
+                amy_grab_lock();
+                dead = stored_sequence_definition_unref_locked(source);
+                amy_release_lock();
+            }
+            stored_sequence_definition_destroy(dead);
+            amy_oom("stored sequence edit");
+            free(wire);
+            return 0;
+        }
+        stored_sequence_definition_append_owned(candidate, tick, period, wire);
+
+        amy_grab_lock();
+        if (slot->definition == source) {
+            slot->definition = candidate;
+            stored_sequence_definition_t *dead = NULL;
+            if (source != NULL) {
+                // Drop the old slot ownership and our temporary writer pin.
+                dead = stored_sequence_definition_unref_locked(source);
+                stored_sequence_definition_t *after_pin =
+                    stored_sequence_definition_unref_locked(source);
+                if (after_pin != NULL) dead = after_pin;
+            }
+            amy_release_lock();
+            stored_sequence_definition_destroy(dead);
+            stored_sequence_reclaim_retired();
+            return 1;
+        }
+
+        // Another writer published first. Keep the caller's wire, release our
+        // source pin, discard the private candidate outside the lock, and retry
+        // against the new cumulative definition.
+        stored_sequence_definition_t *dead = source == NULL ? NULL
+            : stored_sequence_definition_unref_locked(source);
         amy_release_lock();
-        free(wire);
-        return 0;
+        stored_sequence_candidate_discard(candidate, wire);
+        stored_sequence_definition_destroy(dead);
     }
-    stored_sequence_event_t *event =
-        &definition->events[definition->event_count++];
-    event->wire = wire;
-    event->tick = tick;
-    event->period = period;
-    if (period != 0) definition->has_periodic_event = true;
-    else if (tick > definition->last_one_shot_tick)
-        definition->last_one_shot_tick = tick;
-    amy_release_lock();
-    return 1;
 }
 
 uint8_t sequencer_sequence_reset(uint32_t tag) {
@@ -540,10 +660,15 @@ uint8_t sequencer_sequence_reset(uint32_t tag) {
         return 0;
     }
 
+    stored_sequence_reclaim_retired();
     amy_grab_lock();
-    stored_sequence_definition_release(slot->definition);
+    stored_sequence_definition_t *definition = slot->definition;
     slot->definition = NULL;
+    stored_sequence_definition_t *dead =
+        stored_sequence_definition_unref_locked(definition);
     amy_release_lock();
+    stored_sequence_definition_destroy(dead);
+    stored_sequence_reclaim_retired();
     return 1;
 }
 
@@ -574,6 +699,7 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
         return 0;
     }
 
+    stored_sequence_reclaim_retired();
     uint8_t result = 0;
     amy_grab_lock();
     if (action == SEQUENCE_CONTROL_START) {
@@ -624,6 +750,7 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                 "stop=0, start=1, gate=2\n", tag, action);
     }
     amy_release_lock();
+    stored_sequence_reclaim_retired();
     return result;
 }
 
@@ -658,7 +785,7 @@ static void stored_sequence_process_pass(uint32_t tick, bool controls) {
         if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
             || (!definition->has_periodic_event
                 && elapsed > definition->last_one_shot_tick)) {
-            stored_sequence_execution_release(execution);
+            stored_sequence_execution_release_deferred(execution);
             amy_release_lock();
             continue;
         }
@@ -689,7 +816,7 @@ static void stored_sequence_process_pass(uint32_t tick, bool controls) {
         }
 
         amy_grab_lock();
-        stored_sequence_definition_release(definition);
+        stored_sequence_definition_retire_locked(definition);
         amy_release_lock();
     }
 }

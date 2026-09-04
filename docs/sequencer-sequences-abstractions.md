@@ -30,6 +30,21 @@ definitions. Editing a definition used by an execution clones it. The active
 execution keeps its old snapshot; later starts see the new contents. No
 revision number or execution ID is exposed.
 
+The copy is constructed while the old definition is pinned, but outside the
+queue lock also used by rendering. Publication is a short checked pointer swap.
+When the last execution releases an obsolete definition, the render path links
+it onto an intrusive retirement list; a later non-rendering control call
+detaches that list and performs the variable-time string and heap frees. The
+audio path therefore neither copies nor frees a definition.
+
+This is reference-counted deferred reclamation, not a tracing garbage
+collector. A fixed two-buffer ping-pong is insufficient because overlapping or
+repeating executions can retain more than two generations at once. Allocating
+versions only when an active definition is edited keeps the normal preload path
+linear and bounds retained generations through the configured execution pool.
+This matters in particular on embedded targets, where allocator and external-
+memory/cache latency must not extend a render-thread critical section.
+
 Finite executions of one tag may overlap. This supports phrases whose note
 gate exceeds their trigger interval without transferring note state to the
 caller.
