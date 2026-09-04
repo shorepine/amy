@@ -22,6 +22,8 @@ def main():
         == "H0,0,7n60l1i1Z"
     assert amy.message(sequence_control=(7, amy.SEQUENCE_CONTROL_START, 48)) \
         == "HC7,1,48Z"
+    assert amy.message(sequence_control=("%v", "%v", "%v", "%v")) \
+        == "HC%v,%v,%v,%vZ"
     assert amy.message(ticks=(0, 48, 3),
                        sequence_control=(7, amy.SEQUENCE_CONTROL_START, 1)) \
         == "H0,48,3HC7,1,1Z"
@@ -63,6 +65,17 @@ def main():
     expect_error("action", lambda: amy.message(sequence_control=(2, -0.1)))
     expect_error("integer", lambda: amy.message(sequence_control=(2, 0.625)))
     expect_error("integer", lambda: amy.message(sequence_control=(2, True)))
+    expect_error("tag", lambda: amy.message(sequence_control=(1.5, 1)))
+    expect_error("alignment", lambda: amy.message(sequence_control=(2, 1, 1.5)))
+    expect_error("uint32", lambda: amy.message(
+        sequence_control=(2, 2, 1 << 32)))
+    expect_error("tag", lambda: amy.message(sequence_reset=1.5))
+    expect_error("tag", lambda: amy.message(sequence=True, action="start"))
+    expect_error("tag", lambda: amy.message(sequence=1.5, action="start"))
+    expect_error("duration", lambda: amy.message(
+        sequence=2, action="gate", duration=1.5))
+    expect_error("alignment", lambda: amy.message(
+        sequence=2, action="start", alignment_period=1.5))
     expect_error("needs action", lambda: amy.message(sequence=2))
     expect_error("can only be combined", lambda: amy.message(
         sequence=2, action="start", synth=1))
@@ -78,6 +91,10 @@ def main():
     expect_error("needs a ticks", lambda: amy.define_sequence(2, [{"synth": 1}]))
     expect_error("needs an AMY payload", lambda: amy.define_sequence(
         2, [{"ticks": (0,)}]))
+    expect_error("tick", lambda: amy.define_sequence(
+        2, [{"ticks": (1.5,), "osc": 1}]))
+    expect_error("period", lambda: amy.define_sequence(
+        2, [{"ticks": (1, 1 << 32), "osc": 1}]))
 
 
 if __name__ == "__main__":

@@ -705,20 +705,29 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     return pos;
 }
 
+static bool sequence_uint32(const char *cursor, const char **end,
+                            uint32_t *value) {
+    while (*cursor == ' ') ++cursor;
+    if (!isdigit((unsigned char)*cursor)) return false;
+    errno = 0;
+    char *parsed_end = NULL;
+    unsigned long long parsed = strtoull(cursor, &parsed_end, 10);
+    if (errno == ERANGE || parsed > UINT32_MAX) return false;
+    while (*parsed_end == ' ') ++parsed_end;
+    *value = (uint32_t)parsed;
+    *end = parsed_end;
+    return true;
+}
+
 static int sequence_control_uint_tail(const char *cursor, uint32_t *values,
                                       int capacity) {
     int count = 0;
     while (*cursor == ',') {
         ++cursor;
-        while (*cursor == ' ') ++cursor;
-        if (!isdigit((unsigned char)*cursor) || count == capacity) return -1;
-        errno = 0;
-        char *end = NULL;
-        unsigned long long parsed = strtoull(cursor, &end, 10);
-        if (errno == ERANGE || parsed > UINT32_MAX) return -1;
-        while (*end == ' ') ++end;
-        values[count++] = (uint32_t)parsed;
-        cursor = end;
+        if (count == capacity
+            || !sequence_uint32(cursor, &cursor, &values[count]))
+            return -1;
+        count++;
     }
     if (*cursor != '\0' && (*cursor != 'Z' || cursor[1] != '\0')) return -1;
     return count;
@@ -732,36 +741,23 @@ void handle_ticks_message_with_origin(char *message,
                                       sequencer_origin_t origin,
                                       uint32_t current_tick) {
     assert(message[0] == 'H');
-    if (message[1] == 'A') {
-        fprintf(stderr,
-                "invalid ticks command: HA is not needed; append with "
-                "Htick,period,tag<payload>\n");
-        return;
-    }
     if (message[1] == 'C') {
         // HCtag,action[,alignment_period], for stop=0 or start=1.
         // HCtag,gate,duration[,alignment_period]
-        const char *tag_start = message + 2;
-        while (*tag_start == ' ') ++tag_start;
-        errno = 0;
-        char *tag_end = NULL;
-        unsigned long long parsed_tag = strtoull(tag_start, &tag_end, 10);
-        while (*tag_end == ' ') ++tag_end;
-        const char *action_start = *tag_end == ',' ? tag_end + 1 : tag_end;
-        while (*action_start == ' ') ++action_start;
-        errno = 0;
-        char *action_end = NULL;
-        unsigned long long parsed_action = strtoull(action_start, &action_end,
-                                                    10);
-        bool action_valid = isdigit((unsigned char)*action_start)
-                         && action_end != action_start && errno != ERANGE
-                         && parsed_action <= UINT32_MAX;
-        const char *tail = action_end;
-        while (*tail == ' ') ++tail;
+        const char *tag_end = NULL;
+        uint32_t tag = 0;
+        bool tag_valid = sequence_uint32(message + 2, &tag_end, &tag);
+        const char *action_start = tag_valid && *tag_end == ','
+                                 ? tag_end + 1 : "";
+        const char *action_end = NULL;
+        uint32_t action = 0;
+        bool action_valid = sequence_uint32(
+            action_start, &action_end, &action);
+        const char *tail = action_valid ? action_end : "";
         uint32_t rest[2] = {0, 0};
-        int rest_count = sequence_control_uint_tail(tail, rest, 2);
-        if (!isdigit((unsigned char)*tag_start) || tag_end == tag_start
-            || parsed_tag > UINT32_MAX || *tag_end != ','
+        int rest_count = action_valid
+                       ? sequence_control_uint_tail(tail, rest, 2) : -1;
+        if (!tag_valid || *tag_end != ','
             || !action_valid || rest_count < 0) {
             fprintf(stderr,
                     "invalid sequence_control: expected "
@@ -770,7 +766,6 @@ void handle_ticks_message_with_origin(char *message,
             return;
         }
 
-        uint32_t action = (uint32_t)parsed_action;
         uint32_t value = 0;
         uint32_t alignment = 0;
         bool shape_valid = false;
@@ -794,21 +789,29 @@ void handle_ticks_message_with_origin(char *message,
                     "alignment must be non-negative integers\n");
         } else {
             sequencer_sequence_control_with_origin(
-                (uint32_t)parsed_tag, action, value, alignment, origin,
-                current_tick);
+                tag, action, value, alignment, origin, current_tick);
         }
         return;
     }
     if (message[1] == 'R') {
         // HRtag: clear the future stored events for this tag. Already-active
         // immutable sequence executions are intentionally unaffected.
-        uint32_t values[2] = {0, 0};
-        int count = parse_list_uint32_t(message + 2, values, 2, 0);
-        char terminator = message[2 + _next_alpha(message + 2)];
-        if ((terminator != '\0' && terminator != 'Z') || count != 1)
+        const char *end = NULL;
+        uint32_t tag = 0;
+        if (!sequence_uint32(message + 2, &end, &tag)
+            || (*end != '\0' && (*end != 'Z' || end[1] != '\0')))
             fprintf(stderr, "invalid sequence reset: expected HRtag\n");
         else
-            sequencer_sequence_reset_with_origin(values[0], origin);
+            sequencer_sequence_reset_with_origin(tag, origin);
+        return;
+    }
+
+    const char *tick_start = message + 1;
+    while (*tick_start == ' ') ++tick_start;
+    if (!isdigit((unsigned char)*tick_start)) {
+        fprintf(stderr,
+                "invalid ticks command: expected Htick[,period[,tag]]payload, "
+                "HCtag,action, or HRtag\n");
         return;
     }
 

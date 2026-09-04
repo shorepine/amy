@@ -458,8 +458,12 @@ static void test_wire_control_shape_is_strict(void) {
           "a missing gate duration and trailing payload are rejected");
 
     amy_add_message("HR3,4Z");
+    amy_add_message("HR4294967296Z");
+    amy_add_message("HR3.0Z");
+    amy_add_message("HR-1Z");
+    amy_add_message("HA3Z");
     CHECK(sequencer_sequence_control(3, SEQUENCE_CONTROL_START, 0, 0),
-          "a reset with an extra field leaves the definition intact");
+          "malformed and overflowing resets leave the definition intact");
     uint32_t start = sequencer_ticks() + 1;
     clock_to(start);
     CHECK(mark_at("defined", start), "the intact definition still starts");

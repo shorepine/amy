@@ -249,17 +249,45 @@ def _list_values(value):
     return [value]
 
 
+_SEQUENCE_UINT32_MAX = (1 << 32) - 1
+
+
+def _sequence_uint32(value, name, allow_template=False):
+    """Return one exact sequence integer without lossy numeric coercion."""
+    if allow_template and isinstance(value, str) and value.startswith('%'):
+        return value
+    if isinstance(value, bool):
+        raise ValueError('%s must be a non-negative integer.' % name)
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        result = int(value.strip())
+    else:
+        raise ValueError('%s must be a non-negative integer.' % name)
+    if result < 0:
+        raise ValueError('%s must be non-negative.' % name)
+    if result > _SEQUENCE_UINT32_MAX:
+        raise ValueError('%s must be in uint32 range.' % name)
+    return result
+
+
 def _sequence_control_values(value):
     """Validate the low-level ``HC`` payload without blocking templates."""
     values = _list_values(value)
     if len(values) < 2:
         raise ValueError('sequence_control needs at least tag and action.')
+    values[0] = _sequence_uint32(
+        values[0], 'sequence_control tag', allow_template=True)
     raw_action = values[1]
     if isinstance(raw_action, str) and raw_action.startswith('%'):
         # Command templates substitute the token before AMY parses HC. The
         # resulting wire value must still be the integer 0, 1, or 2.
-        if len(values) not in (2, 3):
-            raise ValueError('A templated sequence_control needs tag, action, and optional alignment_period.')
+        if not 2 <= len(values) <= 4:
+            raise ValueError('A templated sequence_control needs tag, action, and up to duration and alignment_period.')
+        for index in range(2, len(values)):
+            values[index] = _sequence_uint32(
+                values[index], 'templated sequence_control field',
+                allow_template=True)
         return values
     if isinstance(raw_action, int) and not isinstance(raw_action, bool):
         action = raw_action
@@ -275,6 +303,13 @@ def _sequence_control_values(value):
             raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
     else:
         raise ValueError('sequence_control action must be stop=0, start=1, or gate=2.')
+    values[1] = action
+    field_names = ('sequence_control duration', 'sequence_control alignment_period') \
+        if action == SEQUENCE_CONTROL_GATE else ('sequence_control alignment_period',)
+    for index, name in enumerate(field_names, start=2):
+        if index < len(values):
+            values[index] = _sequence_uint32(
+                values[index], name, allow_template=True)
     return values
 
 
@@ -294,12 +329,9 @@ def _normalize_sequence_action(kwargs):
         raise ValueError('sequence can only be combined with action, duration, alignment_period, and ticks.')
     if 'action' not in kwargs:
         raise ValueError("sequence needs action='start', 'stop', or 'gate'.")
-    tag = int(kwargs['sequence'])
-    if tag < 0:
-        raise ValueError('Sequence tag must be non-negative.')
-    alignment = int(kwargs.get('alignment_period', 0))
-    if alignment < 0:
-        raise ValueError('Sequence alignment_period must be non-negative.')
+    tag = _sequence_uint32(kwargs['sequence'], 'Sequence tag')
+    alignment = _sequence_uint32(
+        kwargs.get('alignment_period', 0), 'Sequence alignment_period')
     action_name = kwargs['action']
     actions = {
         'stop': SEQUENCE_CONTROL_STOP,
@@ -312,9 +344,8 @@ def _normalize_sequence_action(kwargs):
     if action == SEQUENCE_CONTROL_GATE:
         if 'duration' not in kwargs:
             raise ValueError("Sequence action='gate' needs a duration in ticks.")
-        duration = int(kwargs['duration'])
-        if duration < 0:
-            raise ValueError('Sequence gate duration must be non-negative.')
+        duration = _sequence_uint32(
+            kwargs['duration'], 'Sequence gate duration')
         control = (tag, action, duration, alignment)
     else:
         if 'duration' in kwargs:
@@ -393,10 +424,14 @@ def message(**kwargs):
         raise ValueError('Use only one of sequence_reset or ticks in a message.')
     if 'sequence_reset' in kwargs and len(kwargs) != 1:
         raise ValueError('sequence_reset must be sent as a standalone message.')
+    if 'sequence_reset' in kwargs:
+        kwargs['sequence_reset'] = _sequence_uint32(
+            kwargs['sequence_reset'], 'sequence_reset tag')
     if 'sequence_control' in kwargs:
         if set(kwargs) - {'sequence_control', 'ticks'}:
             raise ValueError('sequence_control can only be combined with ticks.')
-        _sequence_control_values(kwargs['sequence_control'])
+        kwargs['sequence_control'] = _sequence_control_values(
+            kwargs['sequence_control'])
 
     # Validity check all the passed args.
     prioritized_keys = []
@@ -485,10 +520,9 @@ def _sequence_ticks(value):
         values = [value]
     if not 1 <= len(values) <= 2:
         raise ValueError('A stored sequence event needs ticks=(tick,) or ticks=(tick, period).')
-    tick = int(values[0])
-    period = int(values[1]) if len(values) == 2 else 0
-    if tick < 0 or period < 0:
-        raise ValueError('Stored sequence tick and period must be non-negative.')
+    tick = _sequence_uint32(values[0], 'Stored sequence tick')
+    period = _sequence_uint32(values[1], 'Stored sequence period') \
+        if len(values) == 2 else 0
     if period and tick >= period:
         raise ValueError('A stored sequence tick must be below its nonzero period.')
     return tick, period
@@ -503,9 +537,7 @@ def define_sequence(tag, events):
     per-tag reset followed by explicit cumulative event appends. Executions
     which already started keep their previous immutable definition.
     """
-    sequence_tag = int(tag)
-    if sequence_tag < 0:
-        raise ValueError('Sequence tag must be non-negative.')
+    sequence_tag = _sequence_uint32(tag, 'Sequence tag')
     event_messages = []
     for event in events:
         values = dict(event)
