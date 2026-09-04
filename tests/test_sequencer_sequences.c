@@ -529,19 +529,26 @@ static void test_gate_and_stop_cross_clock_rollover(void) {
 }
 
 static void test_disabled_configuration(void) {
-    printf("zero reusable-sequence capacities disable the feature safely\n");
-    const uint32_t capacities[][2] = {{0, 8}, {8, 0}};
+    printf("invalid reusable-sequence capacities disable the feature safely\n");
+    const uint32_t capacities[][3] = {
+        {256, 0, 8},
+        {256, 8, 0},
+        {256, UINT32_MAX, 1},
+        {256, 1, UINT32_MAX},
+        {UINT32_MAX, 1, 1},
+    };
     for (size_t i = 0; i < sizeof(capacities) / sizeof(capacities[0]); ++i) {
         amy_config_t config = amy_default_config();
         config.features.startup_bleep = 0;
         config.audio = AMY_AUDIO_IS_NONE;
-        config.max_sequence_events = capacities[i][0];
-        config.max_sequence_executions = capacities[i][1];
+        config.max_sequencer_tags = capacities[i][0];
+        config.max_sequence_events = capacities[i][1];
+        config.max_sequence_executions = capacities[i][2];
         amy_start(config);
         CHECK(!sequencer_sequence_add_wire(1, 0, 0, strdup("zPdisabledZ")),
-              "append is disabled for zero capacity set %zu", i + 1);
+              "append is disabled for invalid capacity set %zu", i + 1);
         CHECK(!sequencer_sequence_control(1, SEQUENCE_CONTROL_START, 0, 0),
-              "control is disabled for zero capacity set %zu", i + 1);
+              "control is disabled for invalid capacity set %zu", i + 1);
         amy_stop();
     }
 }

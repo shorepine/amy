@@ -103,18 +103,21 @@ void sequencer_test_set_after_pin_hook(void (*hook)(void)) {
 }
 #endif
 
-static void *stored_sequence_allocate(uint32_t size, uint32_t caps) {
+static void *stored_sequence_allocate(size_t size, uint32_t caps) {
 #ifdef AMY_SEQUENCE_TESTING
     if (stored_sequence_allocations_before_failure == 0) return NULL;
     if (stored_sequence_allocations_before_failure > 0)
         stored_sequence_allocations_before_failure--;
 #endif
-    return malloc_caps(size, caps);
+    if (size > UINT32_MAX) return NULL;
+    return malloc_caps((uint32_t)size, caps);
 }
 
 static bool checked_array_size(uint32_t count, size_t element_size,
                                size_t *bytes) {
-    if (count > SIZE_MAX / element_size) return false;
+    if (element_size == 0 || element_size > UINT32_MAX
+        || count > UINT32_MAX / element_size)
+        return false;
     *bytes = (size_t)count * element_size;
     return true;
 }
@@ -157,10 +160,8 @@ static void stored_sequence_definition_destroy_list(
     }
 }
 
-// The public wire boundary calls this unconditionally after parsing. Sequence
-// entry points also use it opportunistically, except while a render-fired wire
-// is active. Keeping the actual destruction here makes that distinction
-// explicit instead of trying to infer the caller from concurrent global state.
+// External API boundaries call this after parsing. Render-side dispatch only
+// retires definitions; it never enters this variable-time destruction path.
 void sequencer_reclaim_retired(void) {
     amy_grab_lock();
     stored_sequence_definition_t *retired = retired_sequence_definitions;
@@ -297,11 +298,11 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
         stored_sequences_deinit();
         return;
     }
-    stored_sequences = (stored_sequence_definition_t **)malloc_caps(
+    stored_sequences = (stored_sequence_definition_t **)stored_sequence_allocate(
         slot_bytes, amy_global.config.ram_caps_synth);
     if (stored_sequences != NULL)
         memset(stored_sequences, 0, slot_bytes);
-    sequence_executions = (stored_sequence_execution_t *)malloc_caps(
+    sequence_executions = (stored_sequence_execution_t *)stored_sequence_allocate(
         execution_bytes, amy_global.config.ram_caps_synth);
     if (sequence_executions != NULL)
         memset(sequence_executions, 0, execution_bytes);
@@ -498,7 +499,7 @@ uint8_t sequencer_add_wire_with_origin(uint32_t tick, uint32_t period,
     sequences[tag].wire = NULL;
     sequences[tag].tick = 0;
     sequences[tag].period = 0;
-    active_unlink(tag);   // out of the list while it has nothing in it
+    active_unlink((int32_t)tag);  // Anonymous slots are bounded to 0..255.
     if (tick == 0 && period == 0) {  // Non-schedulable event: just clear the tag.
         amy_release_lock();
         free(wire);
@@ -527,7 +528,7 @@ uint8_t sequencer_add_wire_with_origin(uint32_t tick, uint32_t period,
     sequences[tag].tick = tick;
     sequences[tag].period = period;
     sequences[tag].wire = wire;
-    active_link(tag);   // ...and back in, now that it has a message again
+    active_link((int32_t)tag);  // ...and back in, now that it has a message again
     amy_release_lock();
     return 1;
 }
@@ -582,8 +583,8 @@ uint8_t sequencer_sequence_add_wire_with_origin(
                     ": stored sequences are disabled\n", tag);
         else
             fprintf(stderr, "cannot append event: sequence tag %" PRIu32
-                    " is outside the configured range [0, %" PRIi32 "]\n",
-                    tag, (int32_t)(max_sequences - 1));
+                    " is outside the configured range [0, %" PRIu32 "]\n",
+                    tag, max_sequences - 1);
         free(wire);
         return 0;
     }
@@ -715,8 +716,8 @@ uint8_t sequencer_sequence_reset_with_origin(uint32_t tag,
                     ": stored sequences are disabled\n", tag);
         else
             fprintf(stderr, "cannot reset sequence: tag %" PRIu32
-                    " is outside the configured range [0, %" PRIi32 "]\n",
-                    tag, (int32_t)(max_sequences - 1));
+                    " is outside the configured range [0, %" PRIu32 "]\n",
+                    tag, max_sequences - 1);
         return 0;
     }
     if (origin == SEQUENCER_ORIGIN_STORED) {
@@ -769,8 +770,8 @@ uint8_t sequencer_sequence_control_with_origin(
                     ": stored sequences are disabled\n", tag);
         else
             fprintf(stderr, "cannot control sequence %" PRIu32
-                    ": valid tags are [0, %" PRIi32 "]\n",
-                    tag, (int32_t)(max_sequences - 1));
+                    ": valid tags are [0, %" PRIu32 "]\n",
+                    tag, max_sequences - 1);
         return 0;
     }
 
