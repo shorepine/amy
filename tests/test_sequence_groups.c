@@ -129,6 +129,7 @@ static void test_group_local_tags_are_independent(void) {
     clear_marks();
     amy_add_message("H0,4,0,6zPgroup-six-tag-zeroZ");
     amy_add_message("H0,4,0,7zPgroup-seven-tag-zeroZ");
+    amy_add_message("H0,4,0zProot-tag-zeroZ");
     amy_add_message("zQ6,3,4Z");
     amy_add_message("zQ7,3,4Z");
 
@@ -140,6 +141,9 @@ static void test_group_local_tags_are_independent(void) {
           "group 6 owns its event tag zero");
     CHECK(mark_at("group-seven-tag-zero", start),
           "group 7 independently owns event tag zero");
+    CHECK(mark_at("root-tag-zero", start),
+          "root tag zero remains independent of every group-local tag zero");
+    amy_add_message("H0,0,0Z");
 }
 
 static void test_one_n_and_infinite_repeats(void) {
@@ -375,6 +379,20 @@ static void test_tagged_gate_and_stop_are_selective(void) {
           "a tagged gate does not cross group boundaries");
 
     clear_marks();
+    CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_GATE, 100, 0, 101, true),
+          "a longer tagged gate is accepted");
+    uint32_t long_gate_tick = sequencer_ticks() + 1;
+    clock_to(long_gate_tick);
+    CHECK(marks_named_at("shared", long_gate_tick) == 1,
+          "a positive gate duration suppresses the selected execution");
+    uint32_t ungate_tick = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_GATE, 0, 0, 101, true),
+          "gate duration zero requests an early ungate");
+    clock_to(ungate_tick);
+    CHECK(marks_named_at("shared", ungate_tick) == 2,
+          "gate duration zero resumes the selected execution on its phase");
+
+    clear_marks();
     uint32_t tagged_stop_tick = sequencer_ticks() + 1;
     CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_STOP, 0, 0, 102, true),
           "a matching tagged stop is accepted");
@@ -433,6 +451,27 @@ static void test_group_lifecycle_control_is_not_recursive(void) {
     sequencer_midi_clock_tick();
     CHECK(mark_at("staged-revision", new_revision_start),
           "the rejected nested publish did not discard staged edits");
+}
+
+static void test_group_stop_control_is_a_supported_leaf(void) {
+    printf("a group payload may stop an existing group execution\n");
+    sequencer_reset();
+    clear_group(7);
+    clear_group(8);
+    clear_marks();
+    amy_add_message("H0,1,0,8zPmust-be-stoppedZ");
+    amy_add_message("zQ8,3,4Z");
+    amy_add_message("H0,4,0,7zQ8,0,0,0,55Z");
+    amy_add_message("zQ7,3,4Z");
+
+    uint32_t boundary = next_boundary(sequencer_ticks(), 4);
+    CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_START, 0, 4, 55, true),
+          "the target execution is queued");
+    CHECK(sequencer_group_control(7, SEQUENCE_CONTROL_START, 1, 4, 0, false),
+          "the stopping group is queued on the same boundary");
+    clock_to(boundary);
+    CHECK(!mark_at("must-be-stopped", boundary),
+          "the leaf stop takes effect before ordinary events on that tick");
 }
 
 static void test_invalid_edits_are_repairable(void) {
@@ -583,6 +622,14 @@ static void test_configured_bounds(void) {
     CHECK(!sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 64,
                                    8, true),
           "one execution beyond the configured pool is rejected");
+    clear_marks();
+    uint32_t start = next_boundary(sequencer_ticks(), 64);
+    clock_to(start);
+    CHECK(marks_named_at("last", start) == 8,
+          "a rejected ninth start does not disturb the eight queued executions");
+    clock_to(start + 4);
+    CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "completed one-shots return their execution slots to the pool");
     sequencer_reset();
 }
 
@@ -628,6 +675,7 @@ int main(void) {
     test_quantized_stop_precedes_boundary_event();
     test_tagged_gate_and_stop_are_selective();
     test_group_lifecycle_control_is_not_recursive();
+    test_group_stop_control_is_a_supported_leaf();
     test_invalid_edits_are_repairable();
     test_clear_preserves_active_revision();
     test_resets_keep_definitions_only();
