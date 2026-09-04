@@ -415,6 +415,28 @@ static void test_tagged_gate_and_stop_are_selective(void) {
     sequencer_midi_clock_tick();
 }
 
+static void test_tagged_control_does_not_select_untagged_execution(void) {
+    printf("tagged controls do not select untagged executions\n");
+    sequencer_reset();
+    clear_group(2);
+    clear_marks();
+    amy_add_message("H0,1,0,2zPuntaggedZ");
+    amy_add_message("zQ2,3,1Z");
+    CHECK(sequencer_group_control(2, SEQUENCE_CONTROL_START, 0, 0, 0, false),
+          "an untagged execution starts");
+    sequencer_midi_clock_tick();
+
+    clear_marks();
+    CHECK(!sequencer_group_control(2, SEQUENCE_CONTROL_STOP, 0, 0, 77, true),
+          "a tagged stop reports no match for an untagged execution");
+    sequencer_midi_clock_tick();
+    CHECK(marks_named("untagged") == 2,
+          "the unmatched tagged stop leaves the untagged execution running");
+    CHECK(sequencer_group_control(2, SEQUENCE_CONTROL_STOP, 0, 0, 0, false),
+          "an untagged stop still selects the execution");
+    sequencer_midi_clock_tick();
+}
+
 static void test_group_lifecycle_control_is_not_recursive(void) {
     printf("a group payload cannot start, publish or clear a group\n");
     sequencer_reset();
@@ -502,6 +524,17 @@ static void test_invalid_edits_are_repairable(void) {
           "the invalid local tag can be cleared");
     CHECK(sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
           "publication succeeds after clearing the invalid tag");
+
+    CHECK(sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "publishing without new edits clones the published definition");
+    clear_marks();
+    uint32_t cloned_start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(5, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "the cloned definition can be started");
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("repaired", cloned_start + 1),
+          "the cloned definition retains its event wire");
+    sequencer_reset();
 
     CHECK(!sequencer_group_control(5, 99, 0, 0, 0, false),
           "an unknown lifecycle action is rejected");
@@ -635,18 +668,27 @@ static void test_configured_bounds(void) {
 
 static void test_disabled_configuration(void) {
     printf("zero capacities disable sequencer groups safely\n");
-    amy_config_t config = amy_default_config();
-    config.features.startup_bleep = 0;
-    config.audio = AMY_AUDIO_IS_NONE;
-    config.max_sequence_groups = 0;
-    config.max_sequence_group_tags = 0;
-    config.max_sequence_group_executions = 0;
-    amy_start(config);
-    CHECK(!sequencer_group_add_wire(0, 1, 0, 1, strdup("zPdisabledZ")),
-          "group storage rejects events while disabled");
-    CHECK(!sequencer_group_control(1, SEQUENCE_CONTROL_START, 1, 0, 0, false),
-          "group control rejects operations while disabled");
-    amy_stop();
+    const uint32_t capacities[][3] = {
+        {0, 8, 8},
+        {8, 0, 8},
+        {8, 8, 0},
+    };
+    for (size_t i = 0; i < sizeof(capacities) / sizeof(capacities[0]); ++i) {
+        amy_config_t config = amy_default_config();
+        config.features.startup_bleep = 0;
+        config.audio = AMY_AUDIO_IS_NONE;
+        config.max_sequence_groups = capacities[i][0];
+        config.max_sequence_group_tags = capacities[i][1];
+        config.max_sequence_group_executions = capacities[i][2];
+        amy_start(config);
+        CHECK(!sequencer_group_add_wire(0, 1, 0, 1, strdup("zPdisabledZ")),
+              "group storage is disabled when capacity set %zu contains zero",
+              i + 1);
+        CHECK(!sequencer_group_control(1, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+              "group control is disabled when capacity set %zu contains zero",
+              i + 1);
+        amy_stop();
+    }
 }
 
 // examples.c calls this; the platform normally provides it.
@@ -674,6 +716,7 @@ int main(void) {
     test_quantized_gate_preserves_phase();
     test_quantized_stop_precedes_boundary_event();
     test_tagged_gate_and_stop_are_selective();
+    test_tagged_control_does_not_select_untagged_execution();
     test_group_lifecycle_control_is_not_recursive();
     test_group_stop_control_is_a_supported_leaf();
     test_invalid_edits_are_repairable();
