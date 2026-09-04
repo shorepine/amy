@@ -20,17 +20,13 @@ amy.define_sequence(21, [
 
 ```python
 amy.define_sequence(30, [
-    dict(ticks=(0, 48),
-         sequence_control=(20, amy.SEQUENCE_CONTROL_START, 1)),
-    dict(ticks=(24, 48),
-         sequence_control=(21, amy.SEQUENCE_CONTROL_START, 1)),
+    dict(ticks=(0, 48), sequence=20, vel=1, alignment_period=1),
+    dict(ticks=(24, 48), sequence=21, vel=1, alignment_period=1),
 ])
 
 amy.define_sequence(31, [
-    dict(ticks=(0, 24),
-         sequence_control=(20, amy.SEQUENCE_CONTROL_START, 1)),
-    dict(ticks=(12, 24),
-         sequence_control=(21, amy.SEQUENCE_CONTROL_START, 1)),
+    dict(ticks=(0, 24), sequence=20, vel=1, alignment_period=1),
+    dict(ticks=(12, 24), sequence=21, vel=1, alignment_period=1),
 ])
 ```
 
@@ -39,11 +35,11 @@ The parents contain periodic events and run until stopped.
 ## 3. Start and switch
 
 ```python
-amy.send(sequence_control=(30, amy.SEQUENCE_CONTROL_START, 48))
+amy.send(sequence=30, vel=1, alignment_period=48)
 
 # Later, switch both parents at the same boundary.
-amy.send(sequence_control=(30, amy.SEQUENCE_CONTROL_STOP, 48))
-amy.send(sequence_control=(31, amy.SEQUENCE_CONTROL_START, 48))
+amy.send(sequence=30, vel=0, alignment_period=48)
+amy.send(sequence=31, vel=1, alignment_period=48)
 ```
 
 The old parent starts no more children at that boundary. A note-pair child

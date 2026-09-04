@@ -8,7 +8,9 @@ reset explicitly and controlled with one start/stop operation. There is no
 second group namespace, separate append command, fourth `ticks` field,
 explicit length, or publish/revision operation.
 
-`sequence_control` provides:
+At the Python API, `amy.send(sequence=tag, vel=...)` makes start and stop look
+like note-on and note-off. Internally its compact `sequence_control` operation
+provides:
 
 - start, optionally aligned to an AMY sequencer period;
 - stop all active executions of a tag at an optional boundary;

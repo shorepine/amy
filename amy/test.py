@@ -2034,7 +2034,7 @@ class TestSequencer(AmyTest):
     self.default_synths = True
 
   def run(self):
-    amy_send_at(time=100, ticks='20,24,0', synth=1, note=64, vel=1)
+    amy_send_at(time=100, ticks='20,24', synth=1, note=64, vel=1)
 
 
 class TestSequencedSynthDrums(AmyTest):
@@ -2046,7 +2046,7 @@ class TestSequencedSynthDrums(AmyTest):
 
   def run(self):
     # The sequencer working on the SYNTH_FLAGS_NOTES_VIA_MIDI synth 10 (38 = Acoustic Snare).
-    amy_send_at(time=100, ticks='20,24,0', synth=10, note=38, vel=1)
+    amy_send_at(time=100, ticks='20,24', synth=10, note=38, vel=1)
 
 
 class TestSequencerOsc(AmyTest):
@@ -2058,10 +2058,10 @@ class TestSequencerOsc(AmyTest):
   def run(self):
     amy_send_at(time=0, osc=0, wave=amy.SINE, freq=1000)
     # Absolute-tick events: note on at tick 20 (~231 ms), off at tick 40 (~463 ms).
-    amy.send(osc=0, vel=1, ticks="20,0,1")
-    amy.send(osc=0, vel=0, ticks="40,0,2")
+    amy.send(osc=0, vel=1, ticks="20")
+    amy.send(osc=0, vel=0, ticks="40")
     # Periodic event: a lower note every 60 ticks, lands once at ~694 ms.
-    amy.send(osc=1, wave=amy.SINE, freq=500, vel=1, ticks="0,60,3")
+    amy.send(osc=1, wave=amy.SINE, freq=500, vel=1, ticks="0,60")
     amy_send_at(time=900, osc=1, vel=0)
 
 
@@ -2341,4 +2341,3 @@ def main(argv):
 
 if __name__ == "__main__":
   main(sys.argv)
-

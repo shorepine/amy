@@ -37,11 +37,15 @@ With an event payload, `ticks=(0, 0, 40)` is a valid local tick-zero event.
 ## Starting and stopping
 
 ```python
-amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_START, 1))
-amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_STOP, 48))
+amy.send(sequence=40, vel=1, alignment_period=1)
+amy.send(sequence=40, vel=0, alignment_period=48)
 ```
 
-The optional final value is `alignment_period`. `0` or `1` acts at the next
+This deliberately resembles note-on/note-off: positive `vel` starts the
+sequence and zero stops it. The wire representation remains the lower-level
+`sequence_control` operation, so existing command templates can substitute
+their value into `HCtag,%v,alignment`. The optional `alignment_period` is the
+alignment quantum. `0` or `1` acts at the next
 available sequencer tick for a direct command. A larger value selects the next
 global tick divisible by that period. When a sequenced parent starts a child,
 the child's local tick zero participates in the same tick.
