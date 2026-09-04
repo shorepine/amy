@@ -34,8 +34,12 @@ amy.define_sequence(7, [
     dict(ticks=(0,), synth=1, note=60, vel=1),
     dict(ticks=(12,), synth=1, note=60, vel=0),
 ])
-amy.send(sequence=7, vel=1, alignment_period=1)
+amy.send(sequence=7, run=True, alignment_period=1)
 ```
+
+Sequence execution is a boolean state, not a note velocity. Use `run=True` or
+`run=False` in the Python convenience API. The corresponding low-level and
+wire values are the integers `1` and `0`; fractional values are rejected.
 
 The C configuration adds `max_sequence_events` and
 `max_sequence_executions`. They are appended to `amy_config_t`; initialize the

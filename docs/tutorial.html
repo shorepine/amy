@@ -162,23 +162,23 @@ amy.send(osc=0, vel=1, note=40)
         <div class="editor mb-4">
 amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, ticks=",24,1") # play a PCM drum every eighth note.
 amy.send(osc=1, vel=1, wave=amy.PCM, preset=3, ticks=",48,2") # play a different PCM drum every quarter note.
-amy.send(sequence=1, vel=1, alignment_period=1)
-amy.send(sequence=2, vel=1, alignment_period=1)
+amy.send(sequence=1, run=True, alignment_period=1)
+amy.send(sequence=2, run=True, alignment_period=1)
         </div>
         <P>Events with the same tag cumulate into a reusable sequence. Stop and reset a tag before replacing its contents:</P>
         <div class="editor mb-4">
-amy.send(sequence=1, vel=0, alignment_period=1)
+amy.send(sequence=1, run=False, alignment_period=1)
 amy.send(sequence_reset=1)
 amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, note=70, ticks=",48,1")
-amy.send(sequence=1, vel=1, alignment_period=1)
+amy.send(sequence=1, run=True, alignment_period=1)
         </div>
         <P>For patterns you want to also address their "slots", which is the offset within the pattern, like this</P>
         <div class="editor mb-4">
-amy.send(sequence=1, vel=0, alignment_period=1)
+amy.send(sequence=1, run=False, alignment_period=1)
 amy.send(sequence_reset=1)
 amy.send(osc=0, vel=1, wave=amy.PCM, preset=0, ticks="0,384,1") # first slot of a 16 1/8th note drum machine
 amy.send(osc=1, vel=1, wave=amy.PCM, preset=3, ticks="216,384,1") # ninth slot in the same tagged sequence
-amy.send(sequence=1, vel=1, alignment_period=384)
+amy.send(sequence=1, run=True, alignment_period=384)
         </div>
       </div>
 

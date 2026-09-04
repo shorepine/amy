@@ -37,15 +37,15 @@ With an event payload, `ticks=(0, 0, 40)` is a valid local tick-zero event.
 ## Starting and stopping
 
 ```python
-amy.send(sequence=40, vel=1, alignment_period=1)
-amy.send(sequence=40, vel=0, alignment_period=48)
+amy.send(sequence=40, run=True, alignment_period=1)
+amy.send(sequence=40, run=False, alignment_period=48)
 ```
 
-This deliberately resembles note-on/note-off: `vel` in the range `(0, 1]`
-starts the sequence and zero stops it. The wire representation remains the
-lower-level `sequence_control` operation, where that same field has velocity
-semantics. Existing command templates can therefore substitute their value
-directly into `HCtag,%v,alignment`. The optional `alignment_period` is the
+`run` is a boolean: true starts the sequence and false stops it. It is separate
+from `vel`, which keeps its usual meaning of note velocity. At the lower-level
+`sequence_control` API and on the wire, run is represented by the integer `1`
+or `0`: `HCtag,run,alignment`. Fractional values are invalid rather than being
+interpreted as a sequence state. The optional `alignment_period` is the
 alignment quantum. `0` or `1` acts at the next
 available sequencer tick for a direct command. A larger value selects the next
 global tick divisible by that period. When a sequenced parent starts a child,

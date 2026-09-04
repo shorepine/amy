@@ -257,7 +257,7 @@ def example_sequencer_drums():
     # Update high cowbell
     amy.send(osc=4, note=70)
 
-    # Store all parts as one reusable pattern, then start it like a note.
+    # Store all parts as one reusable pattern, then start it explicitly.
     amy.define_sequence(0, [
         dict(ticks=(0, 24), osc=2, vel=2.0),   # hi-hat every eighth note
         dict(ticks=(0, 96), osc=0, vel=1.0),   # bass drum every quarter

@@ -507,7 +507,7 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
 | `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | `tag` omitted: schedule directly on the global clock. `tag` supplied: append to that reusable sequence using local ticks; repeating a tag cumulates. **If used in a wire string message**, the `H` **must** be the first character of the message. |
 | `HR`   | — | `sequence_reset` | tag | Clear the future definition at one tag; already-started immutable executions may finish. |
-| `HC`   | — | `sequence_control` | tag,start-or-stop[,alignment] or tag,gate,duration[,alignment] | Start, stop, align, or temporarily gate a reusable tagged sequence. |
+| `HC`   | — | `sequence_control` | tag,run[,alignment] or tag,gate,duration[,alignment] | Start (`run=1`), stop (`run=0`), align, or temporarily gate (`gate=2`) a reusable tagged sequence. Run is strictly `0` or `1`, not a velocity or fractional value. Python callers can use `amy.send(sequence=tag, run=True/False, alignment_period=...)`. |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |
