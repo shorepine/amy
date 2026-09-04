@@ -41,10 +41,11 @@ amy.send(sequence=40, vel=1, alignment_period=1)
 amy.send(sequence=40, vel=0, alignment_period=48)
 ```
 
-This deliberately resembles note-on/note-off: positive `vel` starts the
-sequence and zero stops it. The wire representation remains the lower-level
-`sequence_control` operation, so existing command templates can substitute
-their value into `HCtag,%v,alignment`. The optional `alignment_period` is the
+This deliberately resembles note-on/note-off: `vel` in the range `(0, 1]`
+starts the sequence and zero stops it. The wire representation remains the
+lower-level `sequence_control` operation, where that same field has velocity
+semantics. Existing command templates can therefore substitute their value
+directly into `HCtag,%v,alignment`. The optional `alignment_period` is the
 alignment quantum. `0` or `1` acts at the next
 available sequencer tick for a direct command. A larger value selects the next
 global tick divisible by that period. When a sequenced parent starts a child,

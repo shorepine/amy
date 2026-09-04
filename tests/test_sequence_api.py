@@ -22,10 +22,12 @@ def main():
         == "H0,0,7n60l1i1Z"
     assert amy.message(sequence_control=(7, amy.SEQUENCE_CONTROL_START, 48)) \
         == "HC7,1,48Z"
+    assert amy.message(sequence_control=(7, 0.625, 48)) == "HC7,0.625,48Z"
     assert amy.message(ticks=(0, 48, 3),
                        sequence_control=(7, amy.SEQUENCE_CONTROL_START, 1)) \
         == "H0,48,3HC7,1,1Z"
     assert amy.message(sequence=7, vel=1) == "HC7,1,0Z"
+    assert amy.message(sequence=7, vel=0.625) == "HC7,1,0Z"
     assert amy.message(sequence=7, vel=0, alignment_period=48) \
         == "HC7,0,48Z"
     assert amy.message(ticks=(0, 48, 3), sequence=7, vel=1,
@@ -60,6 +62,7 @@ def main():
     expect_error("start/stop", lambda: amy.message(sequence_control=(2, 1, 3, 4)))
     expect_error("duration", lambda: amy.message(sequence_control=(2, 2)))
     expect_error("action", lambda: amy.message(sequence_control=(2, 99)))
+    expect_error("action", lambda: amy.message(sequence_control=(2, -0.1)))
     expect_error("needs vel", lambda: amy.message(sequence=2))
     expect_error("can only be combined", lambda: amy.message(
         sequence=2, vel=1, synth=1))

@@ -255,7 +255,7 @@ def _sequence_control_values(value):
     if len(values) < 2:
         raise ValueError('sequence_control needs at least tag and action.')
     try:
-        action = int(values[1])
+        action = float(values[1])
     except (TypeError, ValueError):
         # Command templates substitute tokens such as %v before AMY parses HC.
         if not (isinstance(values[1], str) and values[1].startswith('%')):
@@ -263,14 +263,14 @@ def _sequence_control_values(value):
         if len(values) not in (2, 3):
             raise ValueError('A templated sequence_control needs tag, action, and optional alignment_period.')
         return values
-    if action in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
+    if 0 <= action <= 1:
         if len(values) not in (2, 3):
-            raise ValueError('A start/stop sequence_control needs tag, action, and optional alignment_period.')
+            raise ValueError('A start/stop sequence_control needs tag, velocity, and optional alignment_period.')
     elif action == SEQUENCE_CONTROL_GATE:
         if len(values) not in (3, 4):
             raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
     else:
-        raise ValueError('sequence_control action must be stop=0, start=1, or gate=2.')
+        raise ValueError('sequence_control velocity/action must be stop=0, start=(0,1], or gate=2.')
     return values
 
 

@@ -5,6 +5,7 @@
 #include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
 #include <assert.h>
+#include <errno.h>
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
 #endif
@@ -704,6 +705,25 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     return pos;
 }
 
+static int sequence_control_uint_tail(const char *cursor, uint32_t *values,
+                                      int capacity) {
+    int count = 0;
+    while (*cursor == ',') {
+        ++cursor;
+        while (*cursor == ' ') ++cursor;
+        if (!isdigit((unsigned char)*cursor) || count == capacity) return -1;
+        errno = 0;
+        char *end = NULL;
+        unsigned long long parsed = strtoull(cursor, &end, 10);
+        if (errno == ERANGE || parsed > UINT32_MAX) return -1;
+        while (*end == ' ') ++end;
+        values[count++] = (uint32_t)parsed;
+        cursor = end;
+    }
+    if (*cursor != '\0' && (*cursor != 'Z' || cursor[1] != '\0')) return -1;
+    return count;
+}
+
 // Called from amy_add_message when the first char is 'H', indicating a ticks message.
 // It claims the rest of the message as its payload -- stored as a raw
 // wire string and only parsed when it comes due -- so a schedule command
@@ -717,40 +737,60 @@ void handle_ticks_message(char *message) {
         return;
     }
     if (message[1] == 'C') {
-        // HCtag,start_or_stop[,alignment_period]
+        // HCtag,velocity[,alignment_period]
         // HCtag,gate,duration[,alignment_period]
-        uint32_t values[5] = {0, 0, 0, 0, 0};
-        int count = parse_list_uint32_t(message + 2, values, 5, 0);
-        char terminator = message[2 + _next_alpha(message + 2)];
-        if (terminator != '\0' && terminator != 'Z') {
-            fprintf(stderr,
-                    "invalid sequence_control: HC must not contain an "
-                    "ordinary AMY payload\n");
-        } else if (count < 2) {
+        const char *tag_start = message + 2;
+        while (*tag_start == ' ') ++tag_start;
+        errno = 0;
+        char *tag_end = NULL;
+        unsigned long long parsed_tag = strtoull(tag_start, &tag_end, 10);
+        while (*tag_end == ' ') ++tag_end;
+        const char *velocity_start = tag_end + 1;
+        errno = 0;
+        char *velocity_end = NULL;
+        float velocity = strtof(velocity_start, &velocity_end);
+        bool velocity_valid = velocity_end != velocity_start
+                           && errno != ERANGE && isfinite(velocity);
+        const char *tail = velocity_end;
+        while (*tail == ' ') ++tail;
+        uint32_t rest[2] = {0, 0};
+        int rest_count = sequence_control_uint_tail(tail, rest, 2);
+        if (!isdigit((unsigned char)*tag_start) || tag_end == tag_start
+            || parsed_tag > UINT32_MAX || *tag_end != ','
+            || !velocity_valid || rest_count < 0) {
             fprintf(stderr,
                     "invalid sequence_control: expected "
-                    "HCtag,start_or_stop[,alignment_period] or "
+                    "HCtag,velocity[,alignment_period] or "
                     "HCtag,gate,duration[,alignment_period]\n");
-        } else if ((values[1] == SEQUENCE_CONTROL_START
-                    || values[1] == SEQUENCE_CONTROL_STOP)
-                   && count != 2 && count != 3) {
-            fprintf(stderr,
-                    "invalid sequence_control start/stop: expected "
-                    "HCtag,start_or_stop[,alignment_period]\n");
-        } else if (values[1] == SEQUENCE_CONTROL_GATE
-                   && count != 3 && count != 4) {
-            fprintf(stderr,
-                    "invalid sequence_control gate: expected "
-                    "HCtag,gate,duration[,alignment_period]\n");
-        } else if (count > 4) {
-            fprintf(stderr,
-                    "invalid sequence_control: expected at most four values\n");
+            return;
+        }
+
+        uint32_t action = 0;
+        uint32_t value = 0;
+        uint32_t alignment = 0;
+        bool shape_valid = false;
+        if (velocity >= 0 && velocity <= 1) {
+            action = velocity > 0 ? SEQUENCE_CONTROL_START
+                                  : SEQUENCE_CONTROL_STOP;
+            shape_valid = rest_count <= 1;
+            if (rest_count == 1) alignment = rest[0];
+        } else if (velocity == SEQUENCE_CONTROL_GATE) {
+            action = SEQUENCE_CONTROL_GATE;
+            shape_valid = rest_count >= 1 && rest_count <= 2;
+            value = rest[0];
+            if (rest_count == 2) alignment = rest[1];
         } else {
-            uint32_t value = values[1] == SEQUENCE_CONTROL_GATE
-                           ? values[2] : 0;
-            uint32_t alignment = values[1] == SEQUENCE_CONTROL_GATE
-                               ? values[3] : values[2];
-            sequencer_sequence_control(values[0], values[1], value, alignment);
+            shape_valid = false;
+        }
+
+        if (!shape_valid) {
+            fprintf(stderr,
+                    "invalid sequence_control: velocity must be in [0,1], "
+                    "or use gate=2 with a duration; tag, duration, and "
+                    "alignment must be non-negative integers\n");
+        } else {
+            sequencer_sequence_control((uint32_t)parsed_tag, action, value,
+                                       alignment);
         }
         return;
     }
