@@ -93,6 +93,23 @@ static size_t stored_sequence_event_bytes = 0;
 static volatile bool stored_sequence_wire_firing = false;
 static stored_sequence_definition_t *retired_sequence_definitions = NULL;
 
+#ifdef AMY_SEQUENCE_TESTING
+static int32_t stored_sequence_allocations_before_failure = -1;
+
+void sequencer_test_fail_allocation_after(int32_t successful_allocations) {
+    stored_sequence_allocations_before_failure = successful_allocations;
+}
+#endif
+
+static void *stored_sequence_allocate(uint32_t size, uint32_t caps) {
+#ifdef AMY_SEQUENCE_TESTING
+    if (stored_sequence_allocations_before_failure == 0) return NULL;
+    if (stored_sequence_allocations_before_failure > 0)
+        stored_sequence_allocations_before_failure--;
+#endif
+    return malloc_caps(size, caps);
+}
+
 static bool checked_array_size(uint32_t count, size_t element_size,
                                size_t *bytes) {
     if (count > SIZE_MAX / element_size) return false;
@@ -157,11 +174,11 @@ static void stored_sequence_reclaim_retired(void) {
 
 static stored_sequence_definition_t *stored_sequence_definition_new(void) {
     stored_sequence_definition_t *definition =
-        (stored_sequence_definition_t *)malloc_caps(
+        (stored_sequence_definition_t *)stored_sequence_allocate(
             sizeof(stored_sequence_definition_t),
             amy_global.config.ram_caps_synth);
     if (definition == NULL) return NULL;
-    definition->events = (stored_sequence_event_t *)malloc_caps(
+    definition->events = (stored_sequence_event_t *)stored_sequence_allocate(
         stored_sequence_event_bytes, amy_global.config.ram_caps_synth);
     if (definition->events == NULL) {
         free(definition);
@@ -178,7 +195,8 @@ static stored_sequence_definition_t *stored_sequence_definition_new(void) {
 
 static char *stored_sequence_wire_copy(const char *wire) {
     size_t len = strlen(wire);
-    char *copy = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
+    char *copy = (char *)stored_sequence_allocate(
+        len + 1, amy_global.config.ram_caps_events);
     if (copy != NULL) memcpy(copy, wire, len + 1);
     return copy;
 }
@@ -611,7 +629,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
                 amy_release_lock();
             }
             stored_sequence_definition_destroy(dead);
-            amy_oom("stored sequence edit");
+            amy_oom("stored sequence edit: out of memory\n");
             free(wire);
             return 0;
         }

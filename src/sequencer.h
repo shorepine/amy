@@ -40,6 +40,9 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                                    uint32_t value,
                                    uint32_t alignment_period);
 void sequencer_sequence_reset_timebase();
+#ifdef AMY_SEQUENCE_TESTING
+void sequencer_test_fail_allocation_after(int32_t successful_allocations);
+#endif
 void sequencer_midi_clock_tick();
 void sequencer_midi_start();
 void sequencer_midi_stop();
