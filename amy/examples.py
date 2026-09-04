@@ -264,7 +264,7 @@ def example_sequencer_drums():
         dict(ticks=(24, 96), osc=1, vel=1.0),  # counterphase snare
         dict(ticks=(0, 192), osc=3, vel=1.0),  # cowbell every other cycle
     ])
-    amy.send(sequence=0, run=True, alignment_period=1)
+    amy.send(sequence=0, action='start', alignment_period=1)
 
 def example_fm():
     amy.reset()

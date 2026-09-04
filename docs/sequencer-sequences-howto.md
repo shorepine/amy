@@ -20,13 +20,13 @@ amy.define_sequence(21, [
 
 ```python
 amy.define_sequence(30, [
-    dict(ticks=(0, 48), sequence=20, run=True, alignment_period=1),
-    dict(ticks=(24, 48), sequence=21, run=True, alignment_period=1),
+    dict(ticks=(0, 48), sequence=20, action='start', alignment_period=1),
+    dict(ticks=(24, 48), sequence=21, action='start', alignment_period=1),
 ])
 
 amy.define_sequence(31, [
-    dict(ticks=(0, 24), sequence=20, run=True, alignment_period=1),
-    dict(ticks=(12, 24), sequence=21, run=True, alignment_period=1),
+    dict(ticks=(0, 24), sequence=20, action='start', alignment_period=1),
+    dict(ticks=(12, 24), sequence=21, action='start', alignment_period=1),
 ])
 ```
 
@@ -35,11 +35,11 @@ The parents contain periodic events and run until stopped.
 ## 3. Start and switch
 
 ```python
-amy.send(sequence=30, run=True, alignment_period=48)
+amy.send(sequence=30, action='start', alignment_period=48)
 
 # Later, switch both parents at the same boundary.
-amy.send(sequence=30, run=False, alignment_period=48)
-amy.send(sequence=31, run=True, alignment_period=48)
+amy.send(sequence=30, action='stop', alignment_period=48)
+amy.send(sequence=31, action='start', alignment_period=48)
 ```
 
 The old parent starts no more children at that boundary. A note-pair child
@@ -78,14 +78,14 @@ can suppress its events for one quarter note at 48 PPQ without stopping its
 clock:
 
 ```python
-amy.send(sequence_control=(50, amy.SEQUENCE_CONTROL_GATE, 48, 1))
+amy.send(sequence=50, action='gate', duration=48, alignment_period=1)
 ```
 
 After 48 ticks the gate expires and events resume on their original phase.
 Duration zero removes a current gate explicitly:
 
 ```python
-amy.send(sequence_control=(50, amy.SEQUENCE_CONTROL_GATE, 0, 1))
+amy.send(sequence=50, action='gate', duration=0, alignment_period=1)
 ```
 
 The equivalent wire messages are `HC50,2,48,1Z` and `HC50,2,0,1Z`. Their

@@ -8,9 +8,10 @@ reset explicitly and controlled with one start/stop operation. There is no
 second group namespace, separate append command, fourth `ticks` field,
 explicit length, or publish/revision operation.
 
-At the Python API, `amy.send(sequence=tag, run=True)` starts and
-`run=False` stops. This boolean deliberately does not reuse note velocity.
-Internally its compact `sequence_control` operation provides:
+At the Python API, `amy.send(sequence=tag, action='start')`, `action='stop'`,
+and `action='gate'` expose the full operation rather than presenting part of it
+as a boolean. These named actions do not reuse note velocity. Internally the
+compact `sequence_control` operation provides:
 
 - start, optionally aligned to an AMY sequencer period;
 - stop all active executions of a tag at an optional boundary;

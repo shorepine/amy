@@ -37,16 +37,18 @@ With an event payload, `ticks=(0, 0, 40)` is a valid local tick-zero event.
 ## Starting and stopping
 
 ```python
-amy.send(sequence=40, run=True, alignment_period=1)
-amy.send(sequence=40, run=False, alignment_period=48)
+amy.send(sequence=40, action='start', alignment_period=1)
+amy.send(sequence=40, action='stop', alignment_period=48)
+amy.send(sequence=40, action='gate', duration=24, alignment_period=1)
 ```
 
-`run` is a boolean: true starts the sequence and false stops it. It is separate
-from `vel`, which keeps its usual meaning of note velocity. At the lower-level
-`sequence_control` API and on the wire, run is represented by the integer `1`
-or `0`: `HCtag,run,alignment`. Fractional values are invalid rather than being
-interpreted as a sequence state. The optional `alignment_period` is the
-alignment quantum. `0` or `1` acts at the next
+The named actions expose the complete control model: `start` creates an
+execution, `stop` terminates the selected executions, and `gate` temporarily
+suppresses their ordinary events for the required `duration`. `vel` keeps its
+usual meaning of note velocity. At the lower-level `sequence_control` API and
+on the wire, actions use integers: stop `0`, start `1`, and gate `2`.
+Fractional values are invalid. The optional `alignment_period` is the alignment
+quantum. `0` or `1` acts at the next
 available sequencer tick for a direct command. A larger value selects the next
 global tick divisible by that period. When a sequenced parent starts a child,
 the child's local tick zero participates in the same tick.
@@ -72,7 +74,7 @@ No explicit sequence length or publish action is needed:
 ## Temporary event gating
 
 ```python
-amy.send(sequence_control=(40, amy.SEQUENCE_CONTROL_GATE, 24, 1))
+amy.send(sequence=40, action='gate', duration=24, alignment_period=1)
 ```
 
 This suppresses ordinary event dispatch from active executions of tag `40` for
