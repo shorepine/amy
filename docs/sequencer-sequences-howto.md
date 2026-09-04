@@ -137,6 +137,11 @@ After 48 ticks, ordinary event dispatch resumes on the original phase. Audio
 which was already ringing is not cut off. A zero-duration gate removes the
 current gate at the selected boundary:
 
+Gate skips every ordinary event in the interval rather than postponing it. In
+particular, a note-off or parameter reset inside the interval will not run
+later. Keep state-restoring events outside the gate or package a complete
+note-on/note-off gesture in its own finite sequence.
+
 ```python
 amy.send(
     sequence=50,

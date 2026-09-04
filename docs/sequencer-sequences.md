@@ -83,6 +83,12 @@ Audio already ringing is not cut off. Sequence-control payloads remain active,
 so a controller sequence can still complete its lifecycle. Duration zero
 removes a gate at the selected boundary.
 
+Gated ordinary events are skipped and are not replayed. That rule also applies
+to note-offs and parameter-restoration events. Keep required cleanup outside
+the interval or in a separately started finite gesture. Duration and alignment
+must not exceed 2,147,483,647 ticks so their boundaries remain unambiguous
+across the wrapping 32-bit tick clock.
+
 ## Reset behavior
 
 - `amy.send(sequence_reset=tag)` removes the future definition. Active

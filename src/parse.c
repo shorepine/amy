@@ -733,6 +733,21 @@ static int sequence_control_uint_tail(const char *cursor, uint32_t *values,
     return count;
 }
 
+static int sequence_ticks_prefix(const char *cursor, uint32_t values[3],
+                                 const char **payload) {
+    int count = 0;
+    while (count < 3) {
+        if (!sequence_uint32(cursor, &cursor, &values[count])) return -1;
+        count++;
+        if (*cursor != ',') break;
+        if (count == 3) return -1;
+        cursor++;
+    }
+    if (*cursor != '\0' && !isalpha((unsigned char)*cursor)) return -1;
+    *payload = cursor;
+    return count;
+}
+
 // Called from amy_add_message when the first char is 'H', indicating a ticks message.
 // It claims the rest of the message as its payload -- stored as a raw
 // wire string and only parsed when it comes due -- so a schedule command
@@ -806,21 +821,19 @@ void handle_ticks_message_with_origin(char *message,
         return;
     }
 
-    const char *tick_start = message + 1;
-    while (*tick_start == ' ') ++tick_start;
-    if (!isdigit((unsigned char)*tick_start)) {
+    uint32_t ticks[3] = {0, 0, 0};
+    const char *payload = NULL;
+    int num_vals = sequence_ticks_prefix(message + 1, ticks, &payload);
+    if (num_vals < 1) {
         fprintf(stderr,
                 "invalid ticks command: expected Htick[,period[,tag]]payload, "
                 "HCtag,action, or HRtag\n");
         return;
     }
-
-    uint32_t ticks[3] = {0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
-    uint16_t schedule_len = 1 + _next_alpha(message + 1);
-    char *payload = message + schedule_len;
-    uint16_t payload_len = (uint16_t)strlen(payload);
-    char *stripped = (char *)malloc_caps(payload_len + 1, amy_global.config.ram_caps_events);
+    size_t payload_len = strlen(payload);
+    char *stripped = payload_len >= UINT32_MAX ? NULL
+        : (char *)malloc_caps((uint32_t)(payload_len + 1),
+                              amy_global.config.ram_caps_events);
     if (stripped == NULL) {
         amy_oom("ticks_message");
     } else {

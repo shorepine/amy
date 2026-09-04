@@ -250,6 +250,7 @@ def _list_values(value):
 
 
 _SEQUENCE_UINT32_MAX = (1 << 32) - 1
+_SEQUENCE_MAX_INTERVAL = (1 << 31) - 1
 
 
 def _sequence_uint32(value, name, allow_template=False):
@@ -271,6 +272,30 @@ def _sequence_uint32(value, name, allow_template=False):
     return result
 
 
+def _sequence_interval(value, name, allow_template=False):
+    result = _sequence_uint32(value, name, allow_template=allow_template)
+    if isinstance(result, str):
+        return result
+    if result > _SEQUENCE_MAX_INTERVAL:
+        raise ValueError('%s must not exceed 2147483647 ticks.' % name)
+    return result
+
+
+def _message_ticks(value):
+    values = _list_values(value)
+    if not 1 <= len(values) <= 3:
+        raise ValueError('ticks needs tick, optional period, and optional tag.')
+    names = ('ticks tick', 'ticks period', 'ticks tag')
+    normalized = [
+        _sequence_uint32(item, names[index])
+        for index, item in enumerate(values)
+    ]
+    if (len(normalized) >= 2 and normalized[1]
+            and normalized[0] >= normalized[1]):
+        raise ValueError('ticks tick must be below its nonzero period.')
+    return normalized
+
+
 def _sequence_control_values(value):
     """Validate the low-level ``HC`` payload without blocking templates."""
     values = _list_values(value)
@@ -285,7 +310,7 @@ def _sequence_control_values(value):
         if not 2 <= len(values) <= 4:
             raise ValueError('A templated sequence_control needs tag, action, and up to duration and alignment_period.')
         for index in range(2, len(values)):
-            values[index] = _sequence_uint32(
+            values[index] = _sequence_interval(
                 values[index], 'templated sequence_control field',
                 allow_template=True)
         return values
@@ -308,7 +333,7 @@ def _sequence_control_values(value):
         if action == SEQUENCE_CONTROL_GATE else ('sequence_control alignment_period',)
     for index, name in enumerate(field_names, start=2):
         if index < len(values):
-            values[index] = _sequence_uint32(
+            values[index] = _sequence_interval(
                 values[index], name, allow_template=True)
     return values
 
@@ -330,7 +355,7 @@ def _normalize_sequence_action(kwargs):
     if 'action' not in kwargs:
         raise ValueError("sequence needs action='start', 'stop', or 'gate'.")
     tag = _sequence_uint32(kwargs['sequence'], 'Sequence tag')
-    alignment = _sequence_uint32(
+    alignment = _sequence_interval(
         kwargs.get('alignment_period', 0), 'Sequence alignment_period')
     action_name = kwargs['action']
     actions = {
@@ -344,7 +369,7 @@ def _normalize_sequence_action(kwargs):
     if action == SEQUENCE_CONTROL_GATE:
         if 'duration' not in kwargs:
             raise ValueError("Sequence action='gate' needs a duration in ticks.")
-        duration = _sequence_uint32(
+        duration = _sequence_interval(
             kwargs['duration'], 'Sequence gate duration')
         control = (tag, action, duration, alignment)
     else:
@@ -400,6 +425,8 @@ def message(**kwargs):
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
     kwargs = _normalize_sequence_action(kwargs)
+    if kwargs.get('ticks') is not None:
+        kwargs['ticks'] = _message_ticks(kwargs['ticks'])
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:

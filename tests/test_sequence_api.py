@@ -55,6 +55,9 @@ def main():
     ]
 
     expect_error("standalone", lambda: amy.message(sequence_reset=2, synth=1))
+    expect_error("tick", lambda: amy.message(ticks=(1.5,), osc=1))
+    expect_error("period", lambda: amy.message(ticks=(4, 4), osc=1))
+    expect_error("tag", lambda: amy.message(ticks=(0, 4, True), osc=1))
     expect_error("only be combined", lambda: amy.message(
         sequence_control=(2, 1), synth=1))
     expect_error("only be combined", lambda: amy.message(
@@ -69,6 +72,8 @@ def main():
     expect_error("alignment", lambda: amy.message(sequence_control=(2, 1, 1.5)))
     expect_error("uint32", lambda: amy.message(
         sequence_control=(2, 2, 1 << 32)))
+    expect_error("2147483647", lambda: amy.message(
+        sequence_control=(2, 2, 1 << 31)))
     expect_error("tag", lambda: amy.message(sequence_reset=1.5))
     expect_error("tag", lambda: amy.message(sequence=True, action="start"))
     expect_error("tag", lambda: amy.message(sequence=1.5, action="start"))
@@ -76,6 +81,8 @@ def main():
         sequence=2, action="gate", duration=1.5))
     expect_error("alignment", lambda: amy.message(
         sequence=2, action="start", alignment_period=1.5))
+    expect_error("2147483647", lambda: amy.message(
+        sequence=2, action="start", alignment_period=1 << 31))
     expect_error("needs action", lambda: amy.message(sequence=2))
     expect_error("can only be combined", lambda: amy.message(
         sequence=2, action="start", synth=1))

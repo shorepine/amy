@@ -309,6 +309,23 @@ static void test_finite_gate_preserves_phase(void) {
           "event resumes on the original phase after gate expiry");
 }
 
+static void test_gate_drops_state_restoration_without_replay(void) {
+    printf("gate suppression is event-agnostic and does not replay events\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,0,5zPstate-onZ");
+    amy_add_message("H2,0,5zPstate-offZ");
+    amy_add_message("HC5,1,1Z");
+    uint32_t start = sequencer_ticks() + 1;
+    clock_to(start);
+    CHECK(mark_at("state-on", start), "event before gate is dispatched");
+    CHECK(sequencer_sequence_control(5, SEQUENCE_CONTROL_GATE, 3, 1),
+          "gate covers the later state-restoring event");
+    clock_to(start + 6);
+    CHECK(!marks_named("state-off"),
+          "suppressed state restoration is neither dispatched nor replayed");
+}
+
 static void test_quantized_stop_targets_current_executions(void) {
     printf("quantized controls capture the current execution set\n");
     sequencer_reset();
@@ -438,6 +455,12 @@ static void test_bounds_and_validation(void) {
           "one execution beyond configured capacity is rejected");
     CHECK(!sequencer_sequence_control(3, 99, 0, 0),
           "unknown control action is rejected");
+    CHECK(!sequencer_sequence_control(
+              3, SEQUENCE_CONTROL_START, 0, (uint32_t)INT32_MAX + 1U),
+          "alignment beyond the wrap-safe interval is rejected");
+    CHECK(!sequencer_sequence_control(
+              3, SEQUENCE_CONTROL_GATE, (uint32_t)INT32_MAX + 1U, 0),
+          "gate duration beyond the wrap-safe interval is rejected");
 }
 
 static void test_wire_control_shape_is_strict(void) {
@@ -462,11 +485,20 @@ static void test_wire_control_shape_is_strict(void) {
     amy_add_message("HR3.0Z");
     amy_add_message("HR-1Z");
     amy_add_message("HA3Z");
+    amy_add_message("H4294967296,0,3zPoverflow-tickZ");
+    amy_add_message("H0,4294967296,3zPoverflow-periodZ");
+    amy_add_message("H0,0,4294967296zPoverflow-tagZ");
+    amy_add_message("H0.5,0,3zPfractional-tickZ");
     CHECK(sequencer_sequence_control(3, SEQUENCE_CONTROL_START, 0, 0),
           "malformed and overflowing resets leave the definition intact");
     uint32_t start = sequencer_ticks() + 1;
     clock_to(start);
-    CHECK(mark_at("defined", start), "the intact definition still starts");
+    CHECK(mark_at("defined", start)
+          && !marks_named("overflow-tick")
+          && !marks_named("overflow-period")
+          && !marks_named("overflow-tag")
+          && !marks_named("fractional-tick"),
+          "the intact definition starts without malformed additions");
 
     sequencer_reset();
     clear_marks();
@@ -583,6 +615,7 @@ int main(void) {
     test_parent_stop_leaves_started_child_to_finish();
     test_controller_sequence_bounds_repetition();
     test_finite_gate_preserves_phase();
+    test_gate_drops_state_restoration_without_replay();
     test_quantized_stop_targets_current_executions();
     test_cyclic_controls_are_bounded_and_recoverable();
     test_same_tick_control_is_slot_order_independent();

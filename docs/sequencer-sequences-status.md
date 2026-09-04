@@ -30,7 +30,10 @@ The wire protocol uses:
 | gate | `HCtag,2,duration,alignmentZ` | Temporarily suppress ordinary events |
 
 The numeric action is deliberately a three-value action rather than a boolean
-or a note velocity. Fractional action values are rejected.
+or a note velocity. Fractional values are rejected for every sequence tag,
+tick, period, duration and alignment field. Tags, ticks and periods use uint32;
+duration and alignment are capped at 2,147,483,647 ticks for wrap-safe pending
+boundaries.
 
 ## Compatibility summary
 

@@ -46,6 +46,12 @@ controller sequence cannot gate away its own recovery. The caller decides
 which tags represent musical layers; AMY implements only generic action,
 duration, and phase behavior.
 
+Ordinary events inside the interval are skipped, not delayed. For material
+with a required note-off or parameter restoration, the author must place that
+cleanup outside the gate or express the complete gesture as a separate finite
+sequence. This keeps gate semantics independent of any particular instrument
+or application.
+
 ## A fixed number of repeats
 
 An event with a nonzero period repeats until its execution is stopped. To play

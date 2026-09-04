@@ -33,6 +33,18 @@ Sequence-control events continue to run while gated, allowing a finite
 controller sequence to restore or change another sequence without being
 blocked by its own gate.
 
+Suppression is deliberately event-agnostic: an ordinary event which falls in
+the gated interval is skipped and is not replayed later. This includes
+note-offs and parameter-restoration events. A definition which requires such
+an event for cleanup should keep it outside the gated interval or put the
+complete gesture in a separately started finite sequence.
+
+Gate duration and control alignment are limited to 2,147,483,647 ticks. This
+keeps every pending boundary within the unambiguous half-range of AMY's
+wrapping 32-bit tick comparisons. Once an execution has reached its start it
+is latched as started, so an indefinitely running periodic sequence continues
+across subsequent clock wraparounds.
+
 ### Composition
 
 A stored payload may be an ordinary AMY event or a control for another

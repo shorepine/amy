@@ -77,6 +77,7 @@ typedef struct stored_sequence_execution_t {
     uint32_t gate_end_tick;
     uint32_t controls_processed_tick;
     bool occupied;
+    bool started;
     bool stop_pending;
     bool gate_change_pending;
     bool gated;
@@ -463,6 +464,12 @@ uint8_t sequencer_add_wire_with_origin(uint32_t tick, uint32_t period,
         free(wire);
         return 0;
     }
+    if (period != 0 && tick >= period) {
+        fprintf(stderr, "cannot schedule event: tick %" PRIu32
+                " must be below period %" PRIu32 "\n", tick, period);
+        free(wire);
+        return 0;
+    }
     if (has_tag) {
         if (tag >= max_sequences) {
             fprintf(stderr, "sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIu32"\n",
@@ -774,6 +781,18 @@ uint8_t sequencer_sequence_control_with_origin(
                     tag, max_sequences - 1);
         return 0;
     }
+    if (alignment_period > INT32_MAX) {
+        fprintf(stderr, "cannot control sequence %" PRIu32
+                ": alignment %" PRIu32 " exceeds the maximum %" PRIi32
+                " ticks\n", tag, alignment_period, INT32_MAX);
+        return 0;
+    }
+    if (action == SEQUENCE_CONTROL_GATE && value > INT32_MAX) {
+        fprintf(stderr, "cannot gate sequence %" PRIu32
+                ": duration %" PRIu32 " exceeds the maximum %" PRIi32
+                " ticks\n", tag, value, INT32_MAX);
+        return 0;
+    }
 
     if (sequence_origin_may_reclaim(origin)) sequencer_reclaim_retired();
     uint8_t result = 0;
@@ -866,9 +885,16 @@ static bool stored_sequence_process_slot(uint32_t slot, uint32_t tick,
                                          bool controls) {
     amy_grab_lock();
     stored_sequence_execution_t *execution = &sequence_executions[slot];
-    if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
+    if (!execution->occupied) {
         amy_release_lock();
         return false;
+    }
+    if (!execution->started) {
+        if (!AMY_TIME_GEQ(tick, execution->start_tick)) {
+            amy_release_lock();
+            return false;
+        }
+        execution->started = true;
     }
     uint32_t elapsed = tick - execution->start_tick;
     stored_sequence_definition_t *definition = execution->definition;
@@ -914,8 +940,14 @@ static bool stored_sequence_process_slot(uint32_t slot, uint32_t tick,
         }
     }
 
+    bool finite_complete = !controls && !definition->has_periodic_event
+                        && elapsed == definition->last_one_shot_tick;
     amy_grab_lock();
     stored_sequence_definition_retire_locked(definition);
+    if (finite_complete && execution->occupied
+        && execution->definition == definition
+        && execution->start_tick == tick - elapsed)
+        stored_sequence_execution_release_deferred(execution);
     amy_release_lock();
     return true;
 }
