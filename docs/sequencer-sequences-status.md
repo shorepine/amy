@@ -41,8 +41,10 @@ boundaries.
 | --- | --- | --- |
 | Untagged `ticks=(tick,)` | Compatible | None |
 | Untagged `ticks=(tick, period)` | Compatible | None |
+| Empty zero fields such as `ticks=",period,tag"` | Compatible | None |
 | Repeated tagged writes used to replace one event | Changed | Reset and rebuild the definition, or omit the tag for direct scheduling |
 | A tagged event expected to become active immediately | Changed | Start its sequence explicitly |
+| C `amy_event.ticks` with `TICKS_TAG` set | Changed like any tagged event | Build the definition, then issue an explicit start |
 | Empty `H0,0,tagZ` used as cancellation | Compatible reset spelling | It still resets the future definition; stop an active execution separately |
 | C code using `amy_config_t` | Source compatible after rebuild | Initialize with `amy_default_config()` and override named fields |
 | Generated JavaScript or Godot bindings | Regeneration required | Rebuild the bindings with this AMY source |

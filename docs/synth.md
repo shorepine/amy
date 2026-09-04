@@ -221,7 +221,10 @@ AMY starts a musical sequencer that works on `ticks` from startup. You can reset
 
 Ticks run at 48 PPQ at the set tempo. The tempo defaults to 108 BPM. This means there are 108 quarter notes a minute, and `48 * 108 = 5184` ticks a minute, 86 ticks a second. The tempo can be changed with `amy.send(tempo=120)`.
 
-You can schedule an event with `amy.send(..., ticks="tick,period,tag")`. All three values are optional past `tick`:
+You can schedule an event with `amy.send(..., ticks="tick,period,tag")`.
+`period` and `tag` are optional. As in other AMY list fields, an empty numeric
+field means zero, so `ticks=",24,7"` is the compact spelling for a tick-zero
+event with period 24 and tag 7:
 ```python
 amy.send(osc=0, wave=amy.SAW_UP, eg0="0,1,500,0,500,0")  # Pluck tone
 amy.send(osc=0, note=50, vel=1, ticks=amy.sequencer_ticks() + 96)   # one-off: fires once, ~1s from now
