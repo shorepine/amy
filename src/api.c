@@ -2,6 +2,7 @@
 // C callable entry points to amy
 
 #include "amy.h"
+#include "sequencer.h"
 
 amy_config_t amy_default_config() {
     amy_config_t c;
@@ -293,6 +294,7 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
         // Transfer status can't change mid-message, so the whole string is
         // one chunk of transfer payload.
         parse_transfer_message(message, (uint16_t)strlen(message));
+        sequencer_reclaim_retired();
         return;
     }
     // Fast pre-check of this message for a leading 'H' (ticks) scheduling
@@ -303,6 +305,10 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
         // Not scheduled: parse and play every command in the message now.
         amy_play_message(message);
     }
+    // Public wire ingestion is a control-side boundary. Sequence playback uses
+    // amy_play_message()/handle_ticks_message() directly, so it can never enter
+    // this reclamation path from the render thread.
+    sequencer_reclaim_retired();
 }
 
 // given a wire message string play / schedule the event directly (WIRE API)

@@ -13,6 +13,9 @@ void sequencer_debug();
 
 void sequencer_recompute();
 void sequencer_check_and_fill();  // called once per block from amy_execute_deltas()
+// Destroy zero-reference immutable sequence definitions retired by the render
+// path. The caller must be a control/non-render thread.
+void sequencer_reclaim_retired();
 #ifdef __EMSCRIPTEN__
 void sequencer_check_and_call_js_hook();  // called from the browser main loop
 #endif

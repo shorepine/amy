@@ -35,7 +35,10 @@ queue lock also used by rendering. Publication is a short checked pointer swap.
 When the last execution releases an obsolete definition, the render path links
 it onto an intrusive retirement list; a later non-rendering control call
 detaches that list and performs the variable-time string and heap frees. The
-audio path therefore neither copies nor frees a definition.
+audio path therefore neither copies nor frees a definition. Internally fired
+wire payloads bypass the public wire-ingest boundary, while that public boundary
+drains the retirement list after parsing. This makes reclamation a structural
+control-path property rather than a best-effort test of concurrent render state.
 
 This is reference-counted deferred reclamation, not a tracing garbage
 collector. A fixed two-buffer ping-pong is insufficient because overlapping or

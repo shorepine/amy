@@ -138,17 +138,21 @@ static void stored_sequence_definition_destroy_list(
     }
 }
 
-// This may be called from sequence API entry points which can also be fired by
-// the render thread through a stored HC payload. Reclaim only when this is an
-// external/control-side call. Keeping retired objects until the next such call
-// is bounded by the tag and execution pools and never delays audio rendering.
-static void stored_sequence_reclaim_retired(void) {
-    if (wire_firing || stored_sequence_wire_firing) return;
+// The public wire boundary calls this unconditionally after parsing. Sequence
+// entry points also use it opportunistically, except while a render-fired wire
+// is active. Keeping the actual destruction here makes that distinction
+// explicit instead of trying to infer the caller from concurrent global state.
+void sequencer_reclaim_retired(void) {
     amy_grab_lock();
     stored_sequence_definition_t *retired = retired_sequence_definitions;
     retired_sequence_definitions = NULL;
     amy_release_lock();
     stored_sequence_definition_destroy_list(retired);
+}
+
+static void stored_sequence_reclaim_retired(void) {
+    if (wire_firing || stored_sequence_wire_firing) return;
+    sequencer_reclaim_retired();
 }
 
 static stored_sequence_definition_t *stored_sequence_definition_new(void) {
@@ -765,10 +769,15 @@ static bool stored_sequence_event_is_control(
     return strncmp(event->wire, "HC", 2) == 0;
 }
 
+static void sequence_play_wire_now(char *wire) {
+    if (wire[0] == 'H') handle_ticks_message(wire);
+    else amy_play_message(wire);
+}
+
 static void stored_sequence_play_wire(const char *wire) {
     bool previous = stored_sequence_wire_firing;
     stored_sequence_wire_firing = true;
-    amy_add_message((char *)wire);
+    sequence_play_wire_now((char *)wire);
     stored_sequence_wire_firing = previous;
 }
 
@@ -874,7 +883,7 @@ static void sequencer_process_tick(void) {
                 amy_release_lock();
                 if (wire != NULL) {
                     // Parse and play now; the deltas play back within this block.
-                    amy_add_message(wire);
+                    sequence_play_wire_now(wire);
                     free(wire);
                 }
             }
