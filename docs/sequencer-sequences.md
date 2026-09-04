@@ -52,8 +52,11 @@ the child's local tick zero participates in the same tick.
 
 A start creates a bounded execution. Finite executions of one tag may overlap,
 so callers do not need execution IDs or note-lifetime bookkeeping. Stop targets
-all active executions of that tag. Stopping a parent prevents future child
-starts, while children already started retain their own event pairs.
+all executions of that tag which are active when the command is sent. If the
+stop is aligned to a future boundary, a separate execution started after that
+command does not inherit its pending stop. This avoids hidden per-tag control
+state. Stopping a parent prevents future child starts, while children already
+started retain their own event pairs.
 
 ## Finite and repeating lifetime
 

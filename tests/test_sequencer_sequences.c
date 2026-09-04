@@ -309,6 +309,50 @@ static void test_finite_gate_preserves_phase(void) {
           "event resumes on the original phase after gate expiry");
 }
 
+static void test_quantized_stop_targets_current_executions(void) {
+    printf("quantized controls capture the current execution set\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,4,6zPpulseZ");
+    amy_add_message("HC6,1,1Z");
+    uint32_t first_start = sequencer_ticks() + 1;
+    clock_to(first_start);
+    CHECK(mark_at("pulse", first_start), "first execution begins");
+
+    CHECK(sequencer_sequence_control(6, SEQUENCE_CONTROL_STOP, 0, 8),
+          "first execution accepts a future aligned stop");
+    uint32_t stop_boundary = next_boundary(sequencer_ticks(), 8);
+    amy_add_message("HC6,1,1Z");
+    uint32_t second_start = sequencer_ticks() + 1;
+    clock_to(stop_boundary + 4);
+    CHECK(!mark_at("pulse", stop_boundary),
+          "the captured execution stops before its boundary event");
+    CHECK(mark_at("pulse", second_start)
+          && mark_at("pulse", second_start + 4),
+          "a later start does not inherit an earlier pending stop");
+}
+
+static void test_cyclic_controls_are_bounded_and_recoverable(void) {
+    printf("cyclic sequence controls remain bounded and recoverable\n");
+    sequencer_reset();
+    amy_add_message("H0,1,1HC2,1,0Z");
+    amy_add_message("H0,1,2HC1,1,0Z");
+    amy_add_message("H0,0,3zPrecoveryZ");
+    CHECK(sequencer_sequence_control(1, SEQUENCE_CONTROL_START, 0, 0),
+          "cycle root starts");
+    clock_to(sequencer_ticks() + 1);
+    CHECK(!sequencer_sequence_control(3, SEQUENCE_CONTROL_START, 0, 0),
+          "the cycle fills but cannot exceed the execution pool");
+
+    CHECK(sequencer_sequence_control(1, SEQUENCE_CONTROL_STOP, 0, 0),
+          "all active A executions accept stop");
+    CHECK(sequencer_sequence_control(2, SEQUENCE_CONTROL_STOP, 0, 0),
+          "all active B executions accept stop");
+    clock_to(sequencer_ticks() + 1);
+    CHECK(sequencer_sequence_control(3, SEQUENCE_CONTROL_START, 0, 0),
+          "stopping both cycle tags makes the pool reusable");
+}
+
 static void test_per_tag_and_global_reset_semantics(void) {
     printf("per-tag replacement and global reset have distinct scopes\n");
     sequencer_reset();
@@ -413,6 +457,32 @@ static void test_start_crosses_clock_rollover(void) {
     CHECK(mark_at("wrap-two", 2), "elapsed local time crosses rollover");
 }
 
+static void test_gate_and_stop_cross_clock_rollover(void) {
+    printf("pending gate and stop controls cross uint32 clock rollover\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,2,2zPwrap-pulseZ");
+    amy_global.sequencer_tick_count = UINT32_MAX - 4;
+    amy_add_message("HC2,1,2Z");
+    uint32_t start = UINT32_MAX - 3;
+    clock_to(start);
+    CHECK(mark_at("wrap-pulse", start), "loop starts before rollover");
+
+    CHECK(sequencer_sequence_control(2, SEQUENCE_CONTROL_GATE, 4, 1),
+          "gate spanning rollover is accepted");
+    clock_to(2);
+    CHECK(!mark_at("wrap-pulse", UINT32_MAX - 1)
+          && !mark_at("wrap-pulse", 0),
+          "events remain gated on both sides of rollover");
+    CHECK(mark_at("wrap-pulse", 2), "gate expires at its wrapped end tick");
+
+    CHECK(sequencer_sequence_control(2, SEQUENCE_CONTROL_STOP, 0, 4),
+          "stop aligns to a post-rollover boundary");
+    clock_to(4);
+    CHECK(mark_at("wrap-pulse", 2) && !mark_at("wrap-pulse", 4),
+          "stop suppresses the event on its aligned boundary");
+}
+
 static void test_disabled_configuration(void) {
     printf("zero reusable-sequence capacities disable the feature safely\n");
     const uint32_t capacities[][2] = {{0, 8}, {8, 0}};
@@ -457,9 +527,12 @@ int main(void) {
     test_parent_stop_leaves_started_child_to_finish();
     test_controller_sequence_bounds_repetition();
     test_finite_gate_preserves_phase();
+    test_quantized_stop_targets_current_executions();
+    test_cyclic_controls_are_bounded_and_recoverable();
     test_per_tag_and_global_reset_semantics();
     test_timebase_reset_keeps_definitions();
     test_start_crosses_clock_rollover();
+    test_gate_and_stop_cross_clock_rollover();
     test_bounds_and_validation();
     test_wire_control_shape_is_strict();
 

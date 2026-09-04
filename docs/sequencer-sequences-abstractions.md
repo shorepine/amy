@@ -75,6 +75,11 @@ executions. A cyclic control graph may fill the execution pool, but cannot grow
 beyond it; later starts fail clearly and the caller can stop a tag or reset the
 sequencer.
 
+Aligned stop and gate commands capture the executions active when the command
+is sent. An execution started later does not inherit previously pending control
+state merely because its tag matches. This keeps control ownership on explicit
+executions rather than creating a hidden per-tag automation timeline.
+
 The ordinary three-field C event layout remains unchanged. Untagged one-off
 and periodic scheduling, MIDI/external-clock behavior, and global reset retain
 their existing behavior. The intentional API change is that a supplied tag now
