@@ -1,4 +1,4 @@
-# Reusable sequencer sequences
+# Reusable sequences
 
 A sequencer tag identifies a reusable sequence of ordinary AMY events. Sending
 more than one event with the same tag accumulates those events, in the same way
@@ -48,10 +48,10 @@ suppresses their ordinary events for the required `duration`. `vel` keeps its
 usual meaning of note velocity. At the lower-level `sequence_control` API and
 on the wire, actions use integers: stop `0`, start `1`, and gate `2`.
 Fractional values are invalid. The optional `alignment_period` is the alignment
-quantum. `0` or `1` acts at the next
-available sequencer tick for a direct command. A larger value selects the next
-global tick divisible by that period. When a sequenced parent starts a child,
-the child's local tick zero participates in the same tick.
+quantum. `0` or `1` acts at the next available sequencer tick for a direct
+command. A larger value selects the next global tick divisible by that period.
+When a sequenced parent starts a child, the child's local tick zero participates
+in the same tick.
 
 A start creates a bounded execution. Finite executions of one tag may overlap,
 so callers do not need execution IDs or note-lifetime bookkeeping. Stop targets
@@ -63,7 +63,7 @@ started retain their own event pairs.
 
 ## Finite and repeating lifetime
 
-No explicit sequence length or publish action is needed:
+Lifetime follows directly from the periods of the stored events:
 
 - a definition containing only `period=0` events is finite and retires after
   its last event;
@@ -79,7 +79,7 @@ amy.send(sequence=40, action='gate', duration=24, alignment_period=1)
 
 This suppresses ordinary event dispatch from active executions of tag `40` for
 24 ticks. Local phase continues, and dispatch resumes on the original phase.
-Audio already ringing is not cut off. Nested sequence controls remain active,
+Audio already ringing is not cut off. Sequence-control payloads remain active,
 so a controller sequence can still complete its lifecycle. Duration zero
 removes a gate at the selected boundary.
 
@@ -100,4 +100,7 @@ inactive definitions are not scanned on each tick.
 
 See the [implementation model](sequencer-sequences-abstractions.md),
 [musical use cases](sequencer-sequences-musical-use-cases.md), and
-[step-by-step examples](sequencer-sequences-howto.md).
+[step-by-step examples](sequencer-sequences-howto.md). The
+[status and compatibility guide](sequencer-sequences-status.md) records the
+intentional tagged-scheduling change, migration path, test coverage, and
+target-dependent validation boundary.

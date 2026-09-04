@@ -5,6 +5,10 @@ Here we will post breaking APIs between releases of AMY and tips on porting.
 
 ## Reusable sequencer sequences (unreleased)
 
+For the complete compatibility matrix, migration lifecycle, validation status,
+and target-dependent checks, see
+[Reusable sequence status and compatibility](sequencer-sequences-status.md).
+
 Supplying the same tag in more than one three-value `ticks=` message now
 accumulates all those events into a stopped reusable sequence. Previously, a
 later event replaced the earlier event at that tag. This intentional change

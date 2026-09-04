@@ -1,62 +1,75 @@
 # Musical use cases for reusable sequences
 
-Reusable sequences reduce controller complexity when a musical phrase contains
-several events but should be launched as one unit. The examples below describe
-generic rhythm-engine behavior; AMY assigns no musical meaning to a tag.
+Reusable sequences let a caller define a collection of ordinary AMY events
+once and launch that collection as one musical unit. AMY gives no musical
+meaning to a sequence tag: a sequence may contain notes, parameter changes, or
+controls for other sequences.
 
-## Preloaded fills
+## Preloaded fills and phrases
 
-A rhythm engine can preload each fill once as a finite tagged sequence. Its
-root schedule then stores only sequence starts. Selecting or deselecting a fill
-changes future root launches, not the complete fill body.
+A rhythm engine can preload each fill or phrase as a finite sequence. Its live
+schedule then needs only a sequence start instead of another copy of every
+event in the phrase. This keeps controller traffic and controller code small
+even when the phrase catalogue is large.
 
-An already-started fill holds its immutable definition and finishes even if its
-future launches are removed. The controller does not calculate an end time,
-stream the phrase repeatedly, or maintain an active-fill state machine.
+An execution retains the definition with which it started. Rebuilding the
+stored definition affects later starts but does not alter a phrase already in
+progress. The caller therefore does not need to stream the phrase repeatedly,
+calculate when it ends, or track which definition version is sounding.
 
-## Arpeggios and note lifetime
+## Arpeggios with complete note ownership
 
-A short child sequence can contain one note-on and its matching note-off. A
-parent sequence starts these children in an arpeggio pattern. Stopping or
-replacing the parent prevents future child starts; children which already
-started keep their scheduled release.
+A short finite sequence can hold a note-on together with its matching
+note-off. A periodic parent sequence can start these note-pair sequences in an
+arpeggio pattern.
 
-This makes live rate, direction, voicing, or chord changes predictable without
-requiring the controller to mirror AMY's clock or remember which note-offs are
-still pending. Starting the same finite child again may overlap with an older
-execution; each execution retains its own event snapshot.
+Stopping or replacing the parent prevents later child starts. Children which
+already started remain independent and deliver their original note-offs. A
+live change of rate, direction, voicing, or harmony can therefore be expressed
+without mirroring AMY's clock or maintaining pending-note state in the caller.
 
-An explicit stop of the child tag has the different, generic meaning of
-terminating every active execution of that child. A caller can therefore choose
-between stopping future launches at a parent and deliberately truncating the
-leaf itself.
+Starting the same child again while an older execution is active is valid.
+This permits note gates to overlap their trigger interval. If a caller instead
+wants to truncate every active instance of the child, it can explicitly stop
+the child's tag.
 
-## Temporarily reducing a rhythm
+## Temporarily thinning a rhythm
 
-A repeating percussion layer can be represented by a periodic sequence. A
-finite gate suppresses its ordinary events for a chosen number of ticks while
-its local phase keeps advancing. Once the gate expires, it resumes at the point
-it would otherwise have reached; already-ringing audio is unaffected.
+A repeating percussion layer can be stored as a periodic sequence. The `gate`
+action suppresses its ordinary event dispatch for a chosen number of ticks
+while local phase continues. When the gate expires, the layer resumes where it
+would otherwise have been.
 
-The controller decides which musical layer a tag represents and which layers
-to gate. AMY implements only generic event dispatch, duration, and phase.
+This action does not silence audio which is already ringing. It controls
+future event dispatch and continues to process sequence-control events, so a
+controller sequence cannot gate away its own recovery. The caller decides
+which tags represent musical layers; AMY implements only generic action,
+duration, and phase behavior.
 
-## Fixed repeat counts
+## A fixed number of repeats
 
-Component periods define looping. When a phrase should repeat exactly `N`
-times, a finite controller sequence can start the periodic phrase at tick zero
-and stop it at `N * period`. Control processing precedes ordinary events, so the
-event on the stop boundary is not dispatched.
+An event with a nonzero period repeats until its execution is stopped. To play
+it exactly `N` times, a finite controller sequence can start the periodic
+sequence at local tick zero and stop it at `N * period`.
 
-This composes existing concepts instead of adding a separate repeat-mode or
-published-length state.
+Sequence controls are processed before ordinary events on the same tick, so
+the event at the stop boundary is not dispatched. This composes finite and
+periodic sequences without adding a separate repeat-counter state.
+
+## Parameter automation and compound gestures
+
+Stored events are not limited to notes. A finite sequence can apply filter,
+amplitude, pan, effects, patch, or other AMY changes at local ticks. This can
+represent a reusable automation curve or a compound control gesture. AMY does
+not invent inverse events when such an execution is stopped; the definition
+must contain any restoration required by the caller's musical intent.
 
 ## Live definition changes
 
-A controller can remove future launches, reset and append the replacement
-definition, then install new launches. Executions which started before the
-change keep the old snapshot. Future starts use the new contents.
+A controller can stop future launches, reset a tag, append a replacement
+definition, and start it at a selected alignment. Executions which began before
+the change keep their immutable snapshots; later starts use the replacement.
 
-The controller still owns musical policy and transaction ordering, but it does
-not own active execution revisions, note lifetime, phrase completion, or the
-sequencer clock.
+The controller continues to own musical policy and the ordering of the edit.
+It does not need to own definition versions, phrase completion, sequence phase,
+or note-release bookkeeping.

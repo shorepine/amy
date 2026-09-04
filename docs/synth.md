@@ -252,11 +252,13 @@ operation. `sequence_control` starts, stops, aligns, or temporarily gates an
 active tagged sequence. Component periods define looping; a definition
 containing only period-zero events finishes after its last event.
 
-See [Reusable sequencer sequences](sequencer-sequences.md) for the concise API
+See [Reusable sequences](sequencer-sequences.md) for the concise API
 and lifecycle reference. The accompanying guides explain the
 [abstractions and implementation](sequencer-sequences-abstractions.md),
 [musical use cases](sequencer-sequences-musical-use-cases.md), and a
-[step-by-step Python example](sequencer-sequences-howto.md).
+[step-by-step Python example](sequencer-sequences-howto.md). See
+[status and compatibility](sequencer-sequences-status.md) when migrating
+existing tagged scheduling or configuring a target build.
 
 ## Core oscillators
 
