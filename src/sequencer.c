@@ -308,7 +308,7 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
     if (sequence_executions != NULL)
         memset(sequence_executions, 0, execution_bytes);
     if (stored_sequences == NULL || sequence_executions == NULL) {
-        amy_oom("stored sequences");
+        amy_oom("stored sequences: out of memory\n");
         stored_sequences_deinit();
         return;
     }

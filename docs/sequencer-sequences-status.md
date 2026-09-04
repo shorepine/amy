@@ -104,9 +104,17 @@ Limits are explicit. `max_sequencer_tags` bounds identities,
 `max_sequence_events` bounds one definition, and
 `max_sequence_executions` bounds active or alignment-pending executions.
 Exhaustion, invalid tags, malformed actions, publication allocation failure,
-and cyclic start graphs fail without publishing a partial definition. Callers
-which deliberately choose small limits should treat a rejected operation as a
-normal bounded-resource failure.
+and cyclic start graphs reject the affected operation without corrupting the
+previously published generation. Callers which deliberately choose small
+limits should treat a rejected operation as a normal bounded-resource failure.
+
+A multi-message upload is not a wire-level transaction. `define_sequence()`
+validates every Python event before sending its reset, but a target-side
+capacity or transport failure during the subsequent messages can leave the
+successfully accepted prefix as the new definition. A protocol which needs
+acknowledged all-or-nothing remote upload must add that acknowledgement above
+AMY's one-way wire command stream; after a detected failure, reset the tag
+before retrying.
 
 Resetting a definition does not stop an execution which already holds a
 snapshot. `RESET_TIMEBASE` removes active and pending executions while
@@ -126,8 +134,8 @@ The host test suite covers:
 - current-execution capture for aligned stop and gate;
 - arbitrary payloads, sequence composition, bounded cycles, and exhausted
   execution pools;
-- allocation failure at candidate-construction stages and recovery without a
-  partial publication;
+- allocation failure during pool initialization, new-definition creation and
+  candidate cloning, with recovery and no partial single-event publication;
 - two competing writers, including checked publication and retry;
 - Python validation and exact wire serialization;
 - executable JavaScript serialization and generated binding freshness.
