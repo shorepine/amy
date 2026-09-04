@@ -711,27 +711,9 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
 void handle_ticks_message(char *message) {
     assert(message[0] == 'H');
     if (message[1] == 'A') {
-        // HAsequence_tag,tick,period<payload>: explicitly append one ordinary
-        // event to a reusable sequence. The sequence tag is the same public
-        // identity space used by legacy root ticks events.
-        uint32_t values[3] = {0, 0, 0};
-        int count = parse_list_uint32_t(message + 2, values, 3, 0);
-        uint16_t header_len = 2 + _next_alpha(message + 2);
-        if (count != 3) {
-            fprintf(stderr,
-                    "invalid sequence event: expected "
-                    "HAsequence_tag,tick,period<payload>\n");
-            return;
-        }
-        char *payload = message + header_len;
-        size_t payload_len = strlen(payload);
-        char *copy = (char *)malloc_caps(payload_len + 1,
-                                         amy_global.config.ram_caps_events);
-        if (copy == NULL) amy_oom("sequence_event");
-        else {
-            memcpy(copy, payload, payload_len + 1);
-            sequencer_sequence_add_wire(values[0], values[1], values[2], copy);
-        }
+        fprintf(stderr,
+                "invalid ticks command: HA is not needed; append with "
+                "Htick,period,tag<payload>\n");
         return;
     }
     if (message[1] == 'C') {
@@ -757,7 +739,7 @@ void handle_ticks_message(char *message) {
         return;
     }
     if (message[1] == 'R') {
-        // HRtag: clear future root/stored events for this tag. Already-active
+        // HRtag: clear the future stored events for this tag. Already-active
         // immutable sequence executions are intentionally unaffected.
         uint32_t values[1] = {0};
         int count = parse_list_uint32_t(message + 2, values, 1, 0);

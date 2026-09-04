@@ -56,28 +56,26 @@ static int marks_named(const char *name) {
     return count;
 }
 
-static void test_legacy_ticks_are_unchanged(void) {
-    printf("legacy root ticks remain unchanged\n");
+static void test_untagged_ticks_and_cumulative_tags(void) {
+    printf("untagged root ticks and cumulative tagged sequences\n");
     sequencer_reset();
     clear_marks();
     uint32_t first = next_boundary(sequencer_ticks(), 4);
 
-    amy_add_message("H0,4,0zProotZ");
+    amy_add_message("H0,4zProotZ");
     clock_to(first + 4);
     CHECK(mark_at("root", first), "periodic root event fires at global modulo");
     CHECK(mark_at("root", first + 4), "periodic root event keeps looping");
-    amy_add_message("H0,0,0Z");
+    sequencer_reset();
 
     clear_marks();
-    uint32_t target = sequencer_ticks() + 4;
-    char wire[96];
-    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,9zPoldZ", target);
-    amy_add_message(wire);
-    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,9zPnewZ", target);
-    amy_add_message(wire);
-    clock_to(target);
-    CHECK(!marks_named("old") && mark_at("new", target),
-          "legacy tagged writes still replace rather than accumulate");
+    amy_add_message("H0,0,9zPfirstZ");
+    amy_add_message("H2,0,9zPsecondZ");
+    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("HC9,1,4Z");
+    clock_to(start + 2);
+    CHECK(mark_at("first", start) && mark_at("second", start + 2),
+          "repeating a tag cumulates ordinary events into one sequence");
 }
 
 static void test_legacy_c_event_wire_is_unchanged(void) {
@@ -98,8 +96,8 @@ static void test_explicit_append_and_one_shot_lifetime(void) {
     printf("explicit sequence events accumulate and finite events retire\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA10,0,0zPzeroZ");
-    amy_add_message("HA10,2,0zPtwoZ");
+    amy_add_message("H0,0,10zPzeroZ");
+    amy_add_message("H2,0,10zPtwoZ");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC10,1,4Z");
     clock_to(start + 4);
@@ -109,39 +107,34 @@ static void test_explicit_append_and_one_shot_lifetime(void) {
           "period-zero sequence events fire once and execution retires");
 }
 
-static void test_root_and_stored_forms_share_one_tag_identity(void) {
-    printf("legacy and reusable forms share one public tag identity\n");
+static void test_empty_tick_zero_is_reset_but_payload_is_an_event(void) {
+    printf("empty tick-zero reset remains distinct from a tick-zero event\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("H0,4,10zProot-replacedZ");
-    amy_add_message("HA10,0,0zPstoredZ");
+    amy_add_message("H0,0,10zPstoredZ");
+    amy_add_message("H0,0,10Z");
+    CHECK(!sequencer_sequence_control(10, SEQUENCE_CONTROL_START, 0, 0),
+          "an empty H0,0,tag resets that tag");
+    amy_add_message("H0,0,10zPstoredZ");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC10,1,4Z");
-    clock_to(start + 4);
-    CHECK(mark_at("stored", start) && !marks_named("root-replaced"),
-          "explicit append replaces the root object at the same tag");
-
-    amy_add_message("H0,4,10zProotZ");
-    CHECK(!sequencer_sequence_control(10, SEQUENCE_CONTROL_START, 0, 0),
-          "legacy replacement removes the future stored definition");
-    clear_marks();
-    uint32_t root = next_boundary(sequencer_ticks(), 4);
-    clock_to(root);
-    CHECK(mark_at("root", root), "the replacement legacy event remains active");
+    clock_to(start);
+    CHECK(mark_at("stored", start),
+          "H0,0,tag with a payload is a local tick-zero event");
 }
 
 static void test_active_definition_is_immutable(void) {
     printf("active executions retain the definition they started with\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA11,0,0zPold-headZ");
-    amy_add_message("HA11,4,0zPold-tailZ");
+    amy_add_message("H0,0,11zPold-headZ");
+    amy_add_message("H4,0,11zPold-tailZ");
     uint32_t old_start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC11,1,4Z");
     clock_to(old_start + 2);
 
     amy_add_message("HR11Z");
-    amy_add_message("HA11,0,0zPnew-headZ");
+    amy_add_message("H0,0,11zPnew-headZ");
     clock_to(old_start + 4);
     CHECK(mark_at("old-tail", old_start + 4),
           "resetting future contents does not remove an old note release");
@@ -159,10 +152,10 @@ static void test_root_launches_local_zero_on_same_tick(void) {
     printf("root events can launch stored sequences\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA12,0,0zPchild-zeroZ");
+    amy_add_message("H0,0,12zPchild-zeroZ");
     uint32_t start = sequencer_ticks() + 4;
     char wire[96];
-    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,1HC12,1,0Z", start);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0HC12,1,0Z", start);
     amy_add_message(wire);
     clock_to(start);
     CHECK(mark_at("child-zero", start),
@@ -173,13 +166,13 @@ static void test_overlapping_executions_need_no_host_identity(void) {
     printf("one sequence tag supports bounded overlapping executions\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA13,0,0zPonZ");
-    amy_add_message("HA13,4,0zPoffZ");
+    amy_add_message("H0,0,13zPonZ");
+    amy_add_message("H4,0,13zPoffZ");
     uint32_t first = next_boundary(sequencer_ticks(), 4);
     char wire[96];
-    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,2HC13,1,0Z", first);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0HC13,1,0Z", first);
     amy_add_message(wire);
-    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0,3HC13,1,0Z", first + 2);
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0HC13,1,0Z", first + 2);
     amy_add_message(wire);
     clock_to(first + 6);
     CHECK(mark_at("on", first) && mark_at("on", first + 2),
@@ -192,9 +185,9 @@ static void test_parent_stop_leaves_started_child_to_finish(void) {
     printf("stopping a parent prevents future children without truncating one\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA15,0,0zPnote-onZ");
-    amy_add_message("HA15,4,0zPnote-offZ");
-    amy_add_message("HA14,0,4HC15,1,0Z");
+    amy_add_message("H0,0,15zPnote-onZ");
+    amy_add_message("H4,0,15zPnote-offZ");
+    amy_add_message("H0,4,14HC15,1,0Z");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC14,1,4Z");
     clock_to(start + 2);
@@ -211,9 +204,9 @@ static void test_controller_sequence_bounds_repetition(void) {
     printf("a finite controller sequence can bound a periodic child\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA8,0,4zPpulseZ");
-    amy_add_message("HA7,0,0HC8,1,0Z");
-    amy_add_message("HA7,12,0HC8,0,0Z");
+    amy_add_message("H0,4,8zPpulseZ");
+    amy_add_message("H0,0,7HC8,1,0Z");
+    amy_add_message("H12,0,7HC8,0,0Z");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC7,1,4Z");
     clock_to(start + 14);
@@ -228,7 +221,7 @@ static void test_finite_gate_preserves_phase(void) {
     printf("finite event gating preserves the target phase\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA6,0,4zPbeatZ");
+    amy_add_message("H0,4,6zPbeatZ");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC6,1,4Z");
     clock_to(start);
@@ -245,7 +238,7 @@ static void test_per_tag_and_global_reset_semantics(void) {
     printf("per-tag replacement and global reset have distinct scopes\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA5,0,0zPsurvivorZ");
+    amy_add_message("H0,0,5zPsurvivorZ");
     amy_add_message("HC5,1,0Z");
     uint32_t start = sequencer_ticks() + 1;
     amy_add_message("HR5Z");
@@ -255,7 +248,7 @@ static void test_per_tag_and_global_reset_semantics(void) {
     CHECK(!sequencer_sequence_control(5, SEQUENCE_CONTROL_START, 0, 0),
           "per-tag reset removed the future definition");
 
-    amy_add_message("HA5,0,4zPclearedZ");
+    amy_add_message("H0,4,5zPclearedZ");
     amy_add_message("HC5,1,0Z");
     sequencer_reset();
     CHECK(!sequencer_sequence_control(5, SEQUENCE_CONTROL_START, 0, 0),
@@ -266,7 +259,7 @@ static void test_timebase_reset_keeps_definitions(void) {
     printf("timebase reset drops runtime but keeps definitions\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA4,0,0zPafter-rebaseZ");
+    amy_add_message("H0,0,4zPafter-rebaseZ");
     amy_add_message("HC4,1,0Z");
     sequencer_sequence_reset_timebase();
     clock_to(sequencer_ticks() + 2);
@@ -287,7 +280,7 @@ static void test_bounds_and_validation(void) {
           "tick equal to period is rejected");
     CHECK(!sequencer_sequence_add_wire(3, 0, 0, strdup("")),
           "empty payload is rejected");
-    CHECK(!sequencer_sequence_add_wire(3, 0, 0, strdup("HA1,0,0zPbadZ")),
+    CHECK(!sequencer_sequence_add_wire(3, 0, 0, strdup("H0,0,1zPbadZ")),
           "stored sequences cannot edit definitions recursively");
 
     for (uint32_t i = 0; i < 8; ++i) {
@@ -311,8 +304,8 @@ static void test_start_crosses_clock_rollover(void) {
     printf("relative sequence phase crosses uint32 clock rollover\n");
     sequencer_reset();
     clear_marks();
-    amy_add_message("HA2,0,0zPwrap-zeroZ");
-    amy_add_message("HA2,2,0zPwrap-twoZ");
+    amy_add_message("H0,0,2zPwrap-zeroZ");
+    amy_add_message("H2,0,2zPwrap-twoZ");
     amy_global.sequencer_tick_count = UINT32_MAX - 2;
     amy_add_message("HC2,1,4Z");
     clock_to(2);
@@ -351,10 +344,10 @@ int main(void) {
     config.max_sequence_executions = 8;
     amy_start(config);
 
-    test_legacy_ticks_are_unchanged();
+    test_untagged_ticks_and_cumulative_tags();
     test_legacy_c_event_wire_is_unchanged();
     test_explicit_append_and_one_shot_lifetime();
-    test_root_and_stored_forms_share_one_tag_identity();
+    test_empty_tick_zero_is_reset_but_payload_is_an_event();
     test_active_definition_is_immutable();
     test_root_launches_local_zero_on_same_tick();
     test_overlapping_executions_need_no_host_identity();

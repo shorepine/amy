@@ -17,19 +17,19 @@ void sequencer_check_and_fill();  // called once per block from amy_execute_delt
 void sequencer_check_and_call_js_hook();  // called from the browser main loop
 #endif
 // Store a wire message (with its leading 'H' already stripped) in the
-// sequencer.  If has_tag is true, it's stored under tag (replacing/clearing
-// any existing entry there, addressable later by that same tag); clears the
-// tag if tick and period are both 0. If has_tag is false, it's stored
-// anonymously (round-robin in a small reserved pool) and can't be addressed
-// or cancelled by any tag. Takes ownership of wire.
+// sequencer. If has_tag is true, append it to the reusable sequence identified
+// by tag. An empty tick=period=0 command clears that sequence; the same timing
+// with a payload appends a local tick-zero event. If has_tag is false, store it
+// anonymously (round-robin in a small reserved pool) for immediate sequencer
+// playback. Takes ownership of wire.
 uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool has_tag, char *wire);
 // Append one ordinary ticks event to the reusable sequence identified by tag.
-// Takes ownership of wire. Unlike the legacy root ticks syntax, tick=period=0
-// is a valid one-shot event here.
+// Takes ownership of wire. A tick=period=0 event is a valid one-shot when its
+// wire payload is nonempty.
 uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
                                     uint32_t period, char *wire);
-// Clear the future root event and reusable definition at tag. Executions which
-// already started retain their immutable definition and may finish.
+// Clear the future definition at tag. Executions which already started retain
+// their immutable definition and may finish.
 uint8_t sequencer_sequence_reset(uint32_t tag);
 // sequence_control is [tag, start_or_stop, alignment_period] or
 // [tag, gate, duration, alignment_period].

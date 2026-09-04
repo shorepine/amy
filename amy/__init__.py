@@ -242,9 +242,8 @@ def str_of_int(arg):
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     # Sequence/ticks headers must come first: 'H' is only recognized as the
-    # first wire character. sequence_control follows a ticks/sequence_event
+    # first wire character. sequence_control follows a ticks
     # header when it is used as that scheduled event's payload.
-    ('sequence_event', 'HAL'),
     ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
     ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('sample_offset', 'poI'), ('fit', 'pFF'), ('fit_search', 'pSI'), ('pan', 'QC'), ('client', 'gI'),
@@ -301,14 +300,14 @@ def message(**kwargs):
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
 
-    outer_sequence_keys = {'sequence_event', 'ticks', 'sequence_reset'} & kwargs.keys()
+    outer_sequence_keys = {'ticks', 'sequence_reset'} & kwargs.keys()
     if len(outer_sequence_keys) > 1:
-        raise ValueError('Use only one of sequence_event, sequence_reset, or ticks in a message.')
+        raise ValueError('Use only one of sequence_reset or ticks in a message.')
     if 'sequence_reset' in kwargs and len(kwargs) != 1:
         raise ValueError('sequence_reset must be sent as a standalone message.')
     if ('sequence_control' in kwargs and len(kwargs) != 1
-            and not ({'sequence_event', 'ticks'} & kwargs.keys())):
-        raise ValueError('sequence_control can only be combined with ticks or sequence_event.')
+            and 'ticks' not in kwargs):
+        raise ValueError('sequence_control can only be combined with ticks.')
 
     # Validity check all the passed args.
     prioritized_keys = []
@@ -423,13 +422,12 @@ def define_sequence(tag, events):
         values = dict(event)
         if 'ticks' not in values:
             raise ValueError('Every stored sequence event needs a ticks value.')
-        if {'sequence_event', 'sequence_reset'} & values.keys():
+        if 'sequence_reset' in values:
             raise ValueError('Stored sequence events cannot contain sequence authoring commands.')
         tick, period = _sequence_ticks(values.pop('ticks'))
         if not values:
             raise ValueError('Every stored sequence event needs an AMY payload.')
-        event_messages.append(message(
-            sequence_event=(sequence_tag, tick, period), **values))
+        event_messages.append(message(ticks=(tick, period, sequence_tag), **values))
 
     send_raw(message(sequence_reset=sequence_tag))
     for event_message in event_messages:

@@ -18,8 +18,8 @@ def expect_error(fragment, fn):
 
 
 def main():
-    assert amy.message(sequence_event=(7, 0, 0), synth=1, note=60, vel=1) \
-        == "HA7,0,0n60l1i1Z"
+    assert amy.message(ticks=(0, 0, 7), synth=1, note=60, vel=1) \
+        == "H0,0,7n60l1i1Z"
     assert amy.message(sequence_control=(7, amy.SEQUENCE_CONTROL_START, 48)) \
         == "HC7,1,48Z"
     assert amy.message(ticks=(0, 48, 3),
@@ -41,12 +41,10 @@ def main():
         amy.override_send = old_override
     assert sent == [
         "HR7Z",
-        "HA7,0,0n60l1i1Z",
-        "HA7,3,8n60l0i1Z",
+        "H0,0,7n60l1i1Z",
+        "H3,8,7n60l0i1Z",
     ]
 
-    expect_error("only one", lambda: amy.message(
-        ticks=(0, 4, 1), sequence_event=(2, 0, 0), synth=1))
     expect_error("standalone", lambda: amy.message(sequence_reset=2, synth=1))
     expect_error("only be combined", lambda: amy.message(
         sequence_control=(2, 1), synth=1))

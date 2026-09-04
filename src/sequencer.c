@@ -21,10 +21,10 @@ typedef struct sequence_info_t {
     int32_t next_active;
 } sequence_info_t;
 
-struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
+struct sequence_info_t *sequences = NULL;  // Anonymous direct-schedule slots.
 int32_t max_sequences = 0;  // Number of user-addressable tags.
-// Head of the ascending list of occupied slots (user tags and anonymous
-// entries alike); -1 when nothing is scheduled.  This replaces `highest_tag`,
+// Head of the ascending list of occupied anonymous slots; -1 when nothing is
+// scheduled. This replaces `highest_tag`,
 // which was a HIGH-WATER MARK: it only ever grew, so one event at a high tag
 // made every tick scan that far for the rest of the session, long after that
 // sequence was cleared.  The anonymous pool made that the common case, not a
@@ -33,11 +33,8 @@ int32_t max_sequences = 0;  // Number of user-addressable tags.
 // end of the table permanently.  The cost is proportional to what is
 // scheduled now.
 int32_t first_active = -1;
-// Anonymous (no-tag) entries live past the user-addressable tag range, at
-// indices [max_sequences .. max_sequences+AMY_ANON_SEQUENCE_SLOTS), so a
-// user-supplied tag (bounds-checked against max_sequences) can never reach
-// or clobber one. Allocated round-robin; a new anonymous entry silently
-// evicts the oldest one once the pool wraps around.
+// Anonymous (no-tag) entries have their own fixed pool. Allocated round-robin;
+// a new anonymous entry silently evicts the oldest once the pool wraps.
 #define AMY_ANON_SEQUENCE_SLOTS 256
 static int32_t anon_cursor = 0;
 static volatile bool sequencer_running = true;
@@ -240,10 +237,9 @@ void sequencer_init(int max_sequencer_tags, uint32_t sequence_events,
     wire_firing = false;
     anon_cursor = 0;
     max_sequences = max_sequencer_tags;
-    int32_t total_slots = max_sequences + AMY_ANON_SEQUENCE_SLOTS;
-    sequences = (struct sequence_info_t *)malloc_caps(total_slots * sizeof(struct sequence_info_t),
+    sequences = (struct sequence_info_t *)malloc_caps(AMY_ANON_SEQUENCE_SLOTS * sizeof(struct sequence_info_t),
                                                       amy_global.config.ram_caps_synth);
-    for (int32_t i = 0; i < total_slots; ++i) {
+    for (int32_t i = 0; i < AMY_ANON_SEQUENCE_SLOTS; ++i) {
         sequences[i].wire = NULL;
         sequences[i].tick = 0;
         sequences[i].period = 0;
@@ -258,7 +254,7 @@ void sequencer_init(int max_sequencer_tags, uint32_t sequence_events,
 void sequencer_reset() {
     // Remove all events (tagged and anonymous).  No lock here: this is called
     // from play_delta() (RESET_SEQUENCER), which already runs under the amy lock.
-    for (int32_t i = 0; i < max_sequences + AMY_ANON_SEQUENCE_SLOTS; ++i) {
+    for (int32_t i = 0; i < AMY_ANON_SEQUENCE_SLOTS; ++i) {
         if (sequences[i].wire) {
             free(sequences[i].wire);
             sequences[i].wire = NULL;
@@ -294,8 +290,10 @@ void sequencer_debug() {
     fprintf(stderr, "sequencer: max_sequences %" PRIi32" active %" PRIi32 "\n", max_sequences, n_active);
     for (int32_t tag = first_active; tag != -1; tag = sequences[tag].next_active) {
         if (sequences[tag].wire) {
-            fprintf(stderr, "sequence tag %" PRIi32"%s tick %" PRIu32 " period %"PRIu32 " wire \"%s\"\n",
-                    tag, tag >= max_sequences ? " (anon)" : "", sequences[tag].tick, sequences[tag].period, sequences[tag].wire);
+            fprintf(stderr, "anonymous sequence slot %" PRIi32 " tick %" PRIu32
+                    " period %" PRIu32 " wire \"%s\"\n",
+                    tag, sequences[tag].tick, sequences[tag].period,
+                    sequences[tag].wire);
         }
     }
 }
@@ -366,10 +364,10 @@ void sequencer_recompute() {
 // Store a wire message in the sequencer.  Takes ownership of wire (malloc'd).
 //
 // has_tag false means tag wasn't supplied by the caller (a 1- or 2-value
-// ticks= form): the entry is allocated round-robin from the anonymous pool
-// instead of the given tag value, so it's stored but not addressable or
-// individually cancelable. has_tag true is the normal tag-indexed form: tick
-// and period both zero clears that tag's entry (the only way to cancel one).
+// ticks= form): the entry is allocated round-robin from the anonymous pool, so
+// it is stored but not addressable or individually cancelable. has_tag true
+// appends to the reusable definition at that tag; an empty tick-zero message
+// resets the definition.
 //
 // A one-off whose tick is already due or overdue is not stored at all -- it
 // plays immediately, before returning.  See the comment at that branch.
@@ -385,6 +383,18 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
             free(wire);
             return 0;
         }
+        // Tagged ticks are the events of the reusable sequence identified by
+        // that tag. Repeating a tag therefore accumulates events, matching
+        // the way repeated synth= messages build one synth. The historical
+        // empty H0,0,tag form remains a convenient spelling for per-tag reset;
+        // with a payload, tick zero is an ordinary (and essential) local
+        // one-shot event.
+        if (tick == 0 && period == 0
+            && (wire == NULL || wire[0] == '\0' || wire[0] == 'Z')) {
+            free(wire);
+            return sequencer_sequence_reset(tag);
+        }
+        return sequencer_sequence_add_wire(tag, tick, period, wire);
     } else {
         // Anonymous: tick==0 && period==0 has nothing to cancel (no tag was
         // given), so just drop it rather than allocating a slot for a no-op.
@@ -392,18 +402,11 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
             free(wire);
             return 0;
         }
-        tag = (uint32_t)(max_sequences + anon_cursor);
+        tag = (uint32_t)anon_cursor;
         anon_cursor = (anon_cursor + 1) % AMY_ANON_SEQUENCE_SLOTS;
     }
     amy_grab_lock();
-    // A public tag identifies one future sequencer object. A legacy tagged
-    // write therefore replaces any reusable definition at the same tag; an
-    // execution which already retained that definition can still finish.
-    if (has_tag && stored_sequences != NULL) {
-        stored_sequence_definition_release(stored_sequences[tag].definition);
-        stored_sequences[tag].definition = NULL;
-    }
-    // Release any existing message for this tag, even if we're just going to rewrite it.
+    // Reuse the selected anonymous slot, evicting its previous message.
     if (sequences[tag].wire) free(sequences[tag].wire);
     sequences[tag].wire = NULL;
     sequences[tag].tick = 0;
@@ -482,14 +485,6 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
     }
 
     amy_grab_lock();
-    // Explicit cumulative sequence authoring and legacy root scheduling share
-    // one tag identity. Appending a stored event removes any future root event
-    // at that tag, while unrelated tags are untouched.
-    if (sequences[tag].wire != NULL) free(sequences[tag].wire);
-    sequences[tag].wire = NULL;
-    sequences[tag].tick = 0;
-    sequences[tag].period = 0;
-    active_unlink((int32_t)tag);
     stored_sequence_definition_t *definition = slot->definition;
     if (definition == NULL) {
         definition = stored_sequence_definition_new();
@@ -546,11 +541,6 @@ uint8_t sequencer_sequence_reset(uint32_t tag) {
     }
 
     amy_grab_lock();
-    if (sequences[tag].wire != NULL) free(sequences[tag].wire);
-    sequences[tag].wire = NULL;
-    sequences[tag].tick = 0;
-    sequences[tag].period = 0;
-    active_unlink((int32_t)tag);
     stored_sequence_definition_release(slot->definition);
     slot->definition = NULL;
     amy_release_lock();
