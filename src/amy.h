@@ -891,8 +891,6 @@ typedef struct  {
     uint16_t max_buses;
     uint8_t ks_oscs;
     uint32_t max_sequencer_tags;
-    uint32_t max_sequence_events;
-    uint32_t max_sequence_executions;
     uint32_t max_voices;
     uint32_t max_synths;
     uint32_t max_memory_patches;
@@ -959,6 +957,11 @@ typedef struct  {
     // device ids for miniaudio platforms
     int8_t capture_device_id;
     int8_t playback_device_id;
+
+    // Append new configuration fields here so existing members retain their
+    // offsets for callers compiled against an earlier amy_config_t layout.
+    uint32_t max_sequence_events;
+    uint32_t max_sequence_executions;
 
 } amy_config_t;
 
