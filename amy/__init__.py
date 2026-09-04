@@ -254,53 +254,57 @@ def _sequence_control_values(value):
     values = _list_values(value)
     if len(values) < 2:
         raise ValueError('sequence_control needs at least tag and action.')
-    try:
-        action = float(values[1])
-    except (TypeError, ValueError):
-        # Command templates substitute tokens such as %v before AMY parses HC.
-        if not (isinstance(values[1], str) and values[1].startswith('%')):
-            raise ValueError('sequence_control action must be stop=0, start=1, gate=2, or a template token.')
+    raw_action = values[1]
+    if isinstance(raw_action, str) and raw_action.startswith('%'):
+        # Command templates substitute the token before AMY parses HC. The
+        # resulting wire value must still be the integer 0, 1, or 2.
         if len(values) not in (2, 3):
             raise ValueError('A templated sequence_control needs tag, action, and optional alignment_period.')
         return values
-    if 0 <= action <= 1:
+    if isinstance(raw_action, int) and not isinstance(raw_action, bool):
+        action = raw_action
+    elif isinstance(raw_action, str) and raw_action.isdigit():
+        action = int(raw_action)
+    else:
+        raise ValueError('sequence_control action must be an integer: stop=0, start=1, or gate=2.')
+    if action in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
         if len(values) not in (2, 3):
-            raise ValueError('A start/stop sequence_control needs tag, velocity, and optional alignment_period.')
+            raise ValueError('A start/stop sequence_control needs tag, run, and optional alignment_period.')
     elif action == SEQUENCE_CONTROL_GATE:
         if len(values) not in (3, 4):
             raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
     else:
-        raise ValueError('sequence_control velocity/action must be stop=0, start=(0,1], or gate=2.')
+        raise ValueError('sequence_control action must be stop=0, start=1, or gate=2.')
     return values
 
 
-def _normalize_sequence_note(kwargs):
-    """Translate note-like sequence control into the existing HC primitive."""
+def _normalize_sequence_run(kwargs):
+    """Translate boolean sequence control into the existing HC primitive."""
     if 'sequence' not in kwargs:
-        if 'alignment_period' in kwargs:
-            raise ValueError('alignment_period is only valid with sequence.')
+        for key in ('run', 'alignment_period'):
+            if key in kwargs:
+                raise ValueError('%s is only valid with sequence.' % key)
         return kwargs
     if 'sequence_control' in kwargs or 'sequence_reset' in kwargs:
         raise ValueError('sequence cannot be combined with sequence_control or sequence_reset.')
-    extra = set(kwargs) - {'sequence', 'vel', 'alignment_period', 'ticks'}
+    extra = set(kwargs) - {'sequence', 'run', 'alignment_period', 'ticks'}
     if extra:
-        raise ValueError('sequence can only be combined with vel, alignment_period, and ticks.')
-    if 'vel' not in kwargs:
-        raise ValueError('sequence needs vel: use a value above zero to start and zero to stop.')
+        raise ValueError('sequence can only be combined with run, alignment_period, and ticks.')
+    if 'run' not in kwargs:
+        raise ValueError('sequence needs run=True to start or run=False to stop.')
     tag = int(kwargs['sequence'])
     if tag < 0:
         raise ValueError('Sequence tag must be non-negative.')
     alignment = int(kwargs.get('alignment_period', 0))
     if alignment < 0:
         raise ValueError('Sequence alignment_period must be non-negative.')
-    velocity = kwargs['vel']
-    if isinstance(velocity, str) and velocity.startswith('%'):
-        action = velocity
+    run = kwargs['run']
+    if isinstance(run, bool):
+        action = SEQUENCE_CONTROL_START if run else SEQUENCE_CONTROL_STOP
+    elif isinstance(run, int) and run in (0, 1):
+        action = run
     else:
-        velocity = float(velocity)
-        if velocity < 0:
-            raise ValueError('Sequence vel must be non-negative.')
-        action = SEQUENCE_CONTROL_START if velocity > 0 else SEQUENCE_CONTROL_STOP
+        raise ValueError('Sequence run must be True/False or numeric 1/0.')
     normalized = {}
     if 'ticks' in kwargs:
         normalized['ticks'] = kwargs['ticks']
@@ -349,7 +353,7 @@ def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
-    kwargs = _normalize_sequence_note(kwargs)
+    kwargs = _normalize_sequence_run(kwargs)
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:

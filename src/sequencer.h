@@ -34,7 +34,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
 // Clear the future definition at tag. Executions which already started retain
 // their immutable definition and may finish.
 uint8_t sequencer_sequence_reset(uint32_t tag);
-// sequence_control is [tag, velocity, alignment_period] or
+// sequence_control is [tag, run, alignment_period] (run is 0 or 1) or
 // [tag, gate, duration, alignment_period].
 uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                                    uint32_t value,

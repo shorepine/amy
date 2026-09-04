@@ -6,8 +6,8 @@ const path = require("node:path");
 require(path.join(__dirname, "..", "src", "amy_api.generated.js"));
 
 assert.equal(
-  amy_message({sequence_control: [7, 0.625, 48]}),
-  "HC7,0.625,48Z"
+  amy_message({sequence_control: [7, 1, 48]}),
+  "HC7,1,48Z"
 );
 assert.equal(
   amy_message({ticks: [0, 48, 3], sequence_control: [7, 1, 1]}),

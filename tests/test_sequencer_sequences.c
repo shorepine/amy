@@ -445,27 +445,27 @@ static void test_wire_control_shape_is_strict(void) {
 
     sequencer_reset();
     clear_marks();
-    amy_add_message("H0,1,4zPvelocity-startZ");
-    amy_add_message("HC4,0.625,1Z");
+    amy_add_message("H0,1,4zPrun-startZ");
+    amy_add_message("HC4,1,1Z");
     start = sequencer_ticks() + 1;
     clock_to(start);
-    CHECK(mark_at("velocity-start", start),
-          "a positive fractional template velocity starts a sequence");
+    CHECK(mark_at("run-start", start), "run=1 starts a sequence");
     amy_add_message("HC4,0,1Z");
     clock_to(sequencer_ticks() + 1);
-    CHECK(!mark_at("velocity-start", sequencer_ticks()),
-          "zero template velocity stops a sequence");
+    CHECK(!mark_at("run-start", sequencer_ticks()),
+          "run=0 stops a sequence");
 
     sequencer_reset();
     clear_marks();
     amy_add_message("H0,1,5zPmalformed-startZ");
-    amy_add_message("HC5,-0.1,1Z");
+    amy_add_message("HC5,-1,1Z");
+    amy_add_message("HC5,0.5,1Z");
     amy_add_message("HC5,0.5,1.5Z");
     amy_add_message("HC5,1,Z");
     amy_add_message("HC4294967296,1Z");
     clock_to(sequencer_ticks() + 2);
     CHECK(!marks_named("malformed-start"),
-          "invalid velocity, integer, empty, and overflowing fields are rejected");
+          "invalid action, fractional, empty, and overflowing fields are rejected");
 }
 
 static void test_start_crosses_clock_rollover(void) {

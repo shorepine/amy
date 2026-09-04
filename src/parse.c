@@ -737,7 +737,7 @@ void handle_ticks_message(char *message) {
         return;
     }
     if (message[1] == 'C') {
-        // HCtag,velocity[,alignment_period]
+        // HCtag,run[,alignment_period], where run is exactly 0 or 1.
         // HCtag,gate,duration[,alignment_period]
         const char *tag_start = message + 2;
         while (*tag_start == ' ') ++tag_start;
@@ -745,37 +745,38 @@ void handle_ticks_message(char *message) {
         char *tag_end = NULL;
         unsigned long long parsed_tag = strtoull(tag_start, &tag_end, 10);
         while (*tag_end == ' ') ++tag_end;
-        const char *velocity_start = tag_end + 1;
+        const char *action_start = *tag_end == ',' ? tag_end + 1 : tag_end;
+        while (*action_start == ' ') ++action_start;
         errno = 0;
-        char *velocity_end = NULL;
-        float velocity = strtof(velocity_start, &velocity_end);
-        bool velocity_valid = velocity_end != velocity_start
-                           && errno != ERANGE && isfinite(velocity);
-        const char *tail = velocity_end;
+        char *action_end = NULL;
+        unsigned long long parsed_action = strtoull(action_start, &action_end,
+                                                    10);
+        bool action_valid = isdigit((unsigned char)*action_start)
+                         && action_end != action_start && errno != ERANGE
+                         && parsed_action <= UINT32_MAX;
+        const char *tail = action_end;
         while (*tail == ' ') ++tail;
         uint32_t rest[2] = {0, 0};
         int rest_count = sequence_control_uint_tail(tail, rest, 2);
         if (!isdigit((unsigned char)*tag_start) || tag_end == tag_start
             || parsed_tag > UINT32_MAX || *tag_end != ','
-            || !velocity_valid || rest_count < 0) {
+            || !action_valid || rest_count < 0) {
             fprintf(stderr,
                     "invalid sequence_control: expected "
-                    "HCtag,velocity[,alignment_period] or "
+                    "HCtag,run[,alignment_period] (run is 0 or 1) or "
                     "HCtag,gate,duration[,alignment_period]\n");
             return;
         }
 
-        uint32_t action = 0;
+        uint32_t action = (uint32_t)parsed_action;
         uint32_t value = 0;
         uint32_t alignment = 0;
         bool shape_valid = false;
-        if (velocity >= 0 && velocity <= 1) {
-            action = velocity > 0 ? SEQUENCE_CONTROL_START
-                                  : SEQUENCE_CONTROL_STOP;
+        if (action == SEQUENCE_CONTROL_STOP
+            || action == SEQUENCE_CONTROL_START) {
             shape_valid = rest_count <= 1;
             if (rest_count == 1) alignment = rest[0];
-        } else if (velocity == SEQUENCE_CONTROL_GATE) {
-            action = SEQUENCE_CONTROL_GATE;
+        } else if (action == SEQUENCE_CONTROL_GATE) {
             shape_valid = rest_count >= 1 && rest_count <= 2;
             value = rest[0];
             if (rest_count == 2) alignment = rest[1];
@@ -785,8 +786,8 @@ void handle_ticks_message(char *message) {
 
         if (!shape_valid) {
             fprintf(stderr,
-                    "invalid sequence_control: velocity must be in [0,1], "
-                    "or use gate=2 with a duration; tag, duration, and "
+                    "invalid sequence_control: run must be 0 or 1, or use "
+                    "gate=2 with a duration; tag, duration, and "
                     "alignment must be non-negative integers\n");
         } else {
             sequencer_sequence_control((uint32_t)parsed_tag, action, value,
