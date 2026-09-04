@@ -240,6 +240,74 @@ def str_of_int(arg):
     return str(int(arg))
 
 
+def _list_values(value):
+    """Return a wire-list argument as individual values for validation."""
+    if isinstance(value, str):
+        return value.split(',')
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+def _sequence_control_values(value):
+    """Validate the low-level ``HC`` payload without blocking templates."""
+    values = _list_values(value)
+    if len(values) < 2:
+        raise ValueError('sequence_control needs at least tag and action.')
+    try:
+        action = int(values[1])
+    except (TypeError, ValueError):
+        # Command templates substitute tokens such as %v before AMY parses HC.
+        if not (isinstance(values[1], str) and values[1].startswith('%')):
+            raise ValueError('sequence_control action must be stop=0, start=1, gate=2, or a template token.')
+        if len(values) not in (2, 3):
+            raise ValueError('A templated sequence_control needs tag, action, and optional alignment_period.')
+        return values
+    if action in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
+        if len(values) not in (2, 3):
+            raise ValueError('A start/stop sequence_control needs tag, action, and optional alignment_period.')
+    elif action == SEQUENCE_CONTROL_GATE:
+        if len(values) not in (3, 4):
+            raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
+    else:
+        raise ValueError('sequence_control action must be stop=0, start=1, or gate=2.')
+    return values
+
+
+def _normalize_sequence_note(kwargs):
+    """Translate note-like sequence control into the existing HC primitive."""
+    if 'sequence' not in kwargs:
+        if 'alignment_period' in kwargs:
+            raise ValueError('alignment_period is only valid with sequence.')
+        return kwargs
+    if 'sequence_control' in kwargs or 'sequence_reset' in kwargs:
+        raise ValueError('sequence cannot be combined with sequence_control or sequence_reset.')
+    extra = set(kwargs) - {'sequence', 'vel', 'alignment_period', 'ticks'}
+    if extra:
+        raise ValueError('sequence can only be combined with vel, alignment_period, and ticks.')
+    if 'vel' not in kwargs:
+        raise ValueError('sequence needs vel: use a value above zero to start and zero to stop.')
+    tag = int(kwargs['sequence'])
+    if tag < 0:
+        raise ValueError('Sequence tag must be non-negative.')
+    alignment = int(kwargs.get('alignment_period', 0))
+    if alignment < 0:
+        raise ValueError('Sequence alignment_period must be non-negative.')
+    velocity = kwargs['vel']
+    if isinstance(velocity, str) and velocity.startswith('%'):
+        action = velocity
+    else:
+        velocity = float(velocity)
+        if velocity < 0:
+            raise ValueError('Sequence vel must be non-negative.')
+        action = SEQUENCE_CONTROL_START if velocity > 0 else SEQUENCE_CONTROL_STOP
+    normalized = {}
+    if 'ticks' in kwargs:
+        normalized['ticks'] = kwargs['ticks']
+    normalized['sequence_control'] = (tag, action, alignment)
+    return normalized
+
+
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     # Sequence/ticks headers must come first: 'H' is only recognized as the
     # first wire character. sequence_control follows a ticks
@@ -281,6 +349,7 @@ def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
+    kwargs = _normalize_sequence_note(kwargs)
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
@@ -305,9 +374,10 @@ def message(**kwargs):
         raise ValueError('Use only one of sequence_reset or ticks in a message.')
     if 'sequence_reset' in kwargs and len(kwargs) != 1:
         raise ValueError('sequence_reset must be sent as a standalone message.')
-    if ('sequence_control' in kwargs and len(kwargs) != 1
-            and 'ticks' not in kwargs):
-        raise ValueError('sequence_control can only be combined with ticks.')
+    if 'sequence_control' in kwargs:
+        if set(kwargs) - {'sequence_control', 'ticks'}:
+            raise ValueError('sequence_control can only be combined with ticks.')
+        _sequence_control_values(kwargs['sequence_control'])
 
     # Validity check all the passed args.
     prioritized_keys = []

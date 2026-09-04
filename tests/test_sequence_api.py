@@ -25,6 +25,13 @@ def main():
     assert amy.message(ticks=(0, 48, 3),
                        sequence_control=(7, amy.SEQUENCE_CONTROL_START, 1)) \
         == "H0,48,3HC7,1,1Z"
+    assert amy.message(sequence=7, vel=1) == "HC7,1,0Z"
+    assert amy.message(sequence=7, vel=0, alignment_period=48) \
+        == "HC7,0,48Z"
+    assert amy.message(ticks=(0, 48, 3), sequence=7, vel=1,
+                       alignment_period=1) == "H0,48,3HC7,1,1Z"
+    assert amy.message(sequence=7, vel="%v", alignment_period=1) \
+        == "HC7,%v,1Z"
     assert amy.message(sequence_reset=7) == "HR7Z"
     assert amy.message(ticks=(1, 4, 2), synth=1, note=60, vel=1) \
         == "H1,4,2n60l1i1Z"
@@ -48,6 +55,16 @@ def main():
     expect_error("standalone", lambda: amy.message(sequence_reset=2, synth=1))
     expect_error("only be combined", lambda: amy.message(
         sequence_control=(2, 1), synth=1))
+    expect_error("only be combined", lambda: amy.message(
+        ticks=(0,), sequence_control=(2, 1), synth=1))
+    expect_error("start/stop", lambda: amy.message(sequence_control=(2, 1, 3, 4)))
+    expect_error("duration", lambda: amy.message(sequence_control=(2, 2)))
+    expect_error("action", lambda: amy.message(sequence_control=(2, 99)))
+    expect_error("needs vel", lambda: amy.message(sequence=2))
+    expect_error("can only be combined", lambda: amy.message(
+        sequence=2, vel=1, synth=1))
+    expect_error("only valid", lambda: amy.message(alignment_period=4, synth=1))
+    expect_error("non-negative", lambda: amy.message(sequence=2, vel=-1))
     expect_error("needs a ticks", lambda: amy.define_sequence(2, [{"synth": 1}]))
     expect_error("needs an AMY payload", lambda: amy.define_sequence(
         2, [{"ticks": (0,)}]))

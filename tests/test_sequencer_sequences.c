@@ -375,6 +375,31 @@ static void test_bounds_and_validation(void) {
           "unknown control action is rejected");
 }
 
+static void test_wire_control_shape_is_strict(void) {
+    printf("sequence control and reset wire shapes are strict\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,0,3zPdefinedZ");
+
+    amy_add_message("HC3,1,0,99Z");
+    clock_to(sequencer_ticks() + 2);
+    CHECK(!marks_named("defined"),
+          "a start with an extra field is rejected");
+
+    amy_add_message("HC3,2Z");
+    amy_add_message("HC3,1,0zPignoredZ");
+    clock_to(sequencer_ticks() + 2);
+    CHECK(!marks_named("defined") && !marks_named("ignored"),
+          "a missing gate duration and trailing payload are rejected");
+
+    amy_add_message("HR3,4Z");
+    CHECK(sequencer_sequence_control(3, SEQUENCE_CONTROL_START, 0, 0),
+          "a reset with an extra field leaves the definition intact");
+    uint32_t start = sequencer_ticks() + 1;
+    clock_to(start);
+    CHECK(mark_at("defined", start), "the intact definition still starts");
+}
+
 static void test_start_crosses_clock_rollover(void) {
     printf("relative sequence phase crosses uint32 clock rollover\n");
     sequencer_reset();
@@ -436,6 +461,7 @@ int main(void) {
     test_timebase_reset_keeps_definitions();
     test_start_crosses_clock_rollover();
     test_bounds_and_validation();
+    test_wire_control_shape_is_strict();
 
     amy_stop();
     test_disabled_configuration();

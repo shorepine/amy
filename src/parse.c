@@ -719,16 +719,32 @@ void handle_ticks_message(char *message) {
     if (message[1] == 'C') {
         // HCtag,start_or_stop[,alignment_period]
         // HCtag,gate,duration[,alignment_period]
-        uint32_t values[4] = {0, 0, 0, 0};
-        int count = parse_list_uint32_t(message + 2, values, 4, 0);
-        if (count < 2) {
+        uint32_t values[5] = {0, 0, 0, 0, 0};
+        int count = parse_list_uint32_t(message + 2, values, 5, 0);
+        char terminator = message[2 + _next_alpha(message + 2)];
+        if (terminator != '\0' && terminator != 'Z') {
+            fprintf(stderr,
+                    "invalid sequence_control: HC must not contain an "
+                    "ordinary AMY payload\n");
+        } else if (count < 2) {
             fprintf(stderr,
                     "invalid sequence_control: expected "
                     "HCtag,start_or_stop[,alignment_period] or "
                     "HCtag,gate,duration[,alignment_period]\n");
-        } else if (values[1] == SEQUENCE_CONTROL_GATE && count < 3) {
+        } else if ((values[1] == SEQUENCE_CONTROL_START
+                    || values[1] == SEQUENCE_CONTROL_STOP)
+                   && count != 2 && count != 3) {
             fprintf(stderr,
-                    "invalid sequence_control gate: duration is required\n");
+                    "invalid sequence_control start/stop: expected "
+                    "HCtag,start_or_stop[,alignment_period]\n");
+        } else if (values[1] == SEQUENCE_CONTROL_GATE
+                   && count != 3 && count != 4) {
+            fprintf(stderr,
+                    "invalid sequence_control gate: expected "
+                    "HCtag,gate,duration[,alignment_period]\n");
+        } else if (count > 4) {
+            fprintf(stderr,
+                    "invalid sequence_control: expected at most four values\n");
         } else {
             uint32_t value = values[1] == SEQUENCE_CONTROL_GATE
                            ? values[2] : 0;
@@ -741,9 +757,10 @@ void handle_ticks_message(char *message) {
     if (message[1] == 'R') {
         // HRtag: clear the future stored events for this tag. Already-active
         // immutable sequence executions are intentionally unaffected.
-        uint32_t values[1] = {0};
-        int count = parse_list_uint32_t(message + 2, values, 1, 0);
-        if (count != 1)
+        uint32_t values[2] = {0, 0};
+        int count = parse_list_uint32_t(message + 2, values, 2, 0);
+        char terminator = message[2 + _next_alpha(message + 2)];
+        if ((terminator != '\0' && terminator != 'Z') || count != 1)
             fprintf(stderr, "invalid sequence reset: expected HRtag\n");
         else
             sequencer_sequence_reset(values[0]);
