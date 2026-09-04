@@ -92,8 +92,8 @@ static void test_legacy_c_event_wire_is_unchanged(void) {
           "C ticks serialization remains three values: %s", wire);
 }
 
-static void test_explicit_append_and_one_shot_lifetime(void) {
-    printf("explicit sequence events accumulate and finite events retire\n");
+static void test_repeated_tag_and_one_shot_lifetime(void) {
+    printf("repeated tagged events accumulate and finite events retire\n");
     sequencer_reset();
     clear_marks();
     amy_add_message("H0,0,10zPzeroZ");
@@ -346,7 +346,7 @@ int main(void) {
 
     test_untagged_ticks_and_cumulative_tags();
     test_legacy_c_event_wire_is_unchanged();
-    test_explicit_append_and_one_shot_lifetime();
+    test_repeated_tag_and_one_shot_lifetime();
     test_empty_tick_zero_is_reset_but_payload_is_an_event();
     test_active_definition_is_immutable();
     test_root_launches_local_zero_on_same_tick();
