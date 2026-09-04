@@ -678,7 +678,7 @@ static void group_play_wire(const char *wire) {
     group_wire_firing = previous;
 }
 
-static void group_process_control_events(uint32_t tick) {
+static void group_process_pass(uint32_t tick, bool controls) {
     for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
         amy_grab_lock();
         sequence_group_execution_t *execution = &group_executions[i];
@@ -695,57 +695,26 @@ static void group_process_control_events(uint32_t tick) {
             amy_release_lock();
             continue;
         }
+        if (!controls) {
+            if (execution->gate_change_pending
+                && AMY_TIME_GEQ(tick, execution->gate_change_tick)) {
+                execution->gate_change_pending = false;
+                execution->gated = execution->gate_duration != 0;
+                execution->gate_end_tick = execution->gate_change_tick
+                                         + execution->gate_duration;
+            }
+            if (execution->gated && AMY_TIME_GEQ(tick, execution->gate_end_tick))
+                execution->gated = false;
+        }
+        bool suppress = !controls && execution->gated;
         definition->refs++;
         uint32_t local_tick = elapsed % definition->length_ticks;
         amy_release_lock();
 
-        for (uint32_t tag = 0; tag < max_sequence_group_tags; ++tag) {
-            sequence_group_event_t *event = &definition->events[tag];
-            if (group_event_is_control(event) && group_event_hits(event, local_tick))
-                group_play_wire(event->wire);
-        }
-
-        amy_grab_lock();
-        group_definition_release(definition);
-        amy_release_lock();
-    }
-}
-
-static void group_process_events(uint32_t tick) {
-    for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
-        amy_grab_lock();
-        sequence_group_execution_t *execution = &group_executions[i];
-        if (!execution->occupied || !AMY_TIME_GEQ(tick, execution->start_tick)) {
-            amy_release_lock();
-            continue;
-        }
-        uint32_t elapsed = tick - execution->start_tick;
-        sequence_group_definition_t *definition = execution->definition;
-        if ((execution->stop_pending && AMY_TIME_GEQ(tick, execution->stop_tick))
-            || (execution->repeats != 0
-                && elapsed / definition->length_ticks >= execution->repeats)) {
-            group_execution_release(execution);
-            amy_release_lock();
-            continue;
-        }
-        if (execution->gate_change_pending
-            && AMY_TIME_GEQ(tick, execution->gate_change_tick)) {
-            execution->gate_change_pending = false;
-            execution->gated = execution->gate_duration != 0;
-            execution->gate_end_tick = execution->gate_change_tick
-                                     + execution->gate_duration;
-        }
-        if (execution->gated && AMY_TIME_GEQ(tick, execution->gate_end_tick))
-            execution->gated = false;
-        bool gated = execution->gated;
-        definition->refs++;
-        uint32_t local_tick = elapsed % definition->length_ticks;
-        amy_release_lock();
-
-        if (!gated) {
+        if (!suppress) {
             for (uint32_t tag = 0; tag < max_sequence_group_tags; ++tag) {
                 sequence_group_event_t *event = &definition->events[tag];
-                if (!group_event_is_control(event)
+                if (group_event_is_control(event) == controls
                     && group_event_hits(event, local_tick))
                     group_play_wire(event->wire);
             }
@@ -819,8 +788,8 @@ static void sequencer_process_tick(void) {
     }
     // Controls embedded in a group are leaf operations (stop/gate only) and
     // take effect before any ordinary group event on the same tick.
-    group_process_control_events(amy_global.sequencer_tick_count);
-    group_process_events(amy_global.sequencer_tick_count);
+    group_process_pass(amy_global.sequencer_tick_count, true);
+    group_process_pass(amy_global.sequencer_tick_count, false);
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
         amy_global.config.amy_external_sequencer_hook(amy_global.sequencer_tick_count);
