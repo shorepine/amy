@@ -438,7 +438,7 @@ static void test_bounds_and_validation(void) {
     CHECK(!sequencer_sequence_add_wire(3, 0, 0, strdup("")),
           "empty payload is rejected");
     CHECK(!sequencer_sequence_add_wire(3, 0, 0, strdup("H0,0,1zPbadZ")),
-          "stored sequences cannot edit definitions recursively");
+          "stored sequences cannot contain sequence authoring commands");
 
     for (uint32_t i = 0; i < 8; ++i) {
         char *payload = strdup("zPfullZ");

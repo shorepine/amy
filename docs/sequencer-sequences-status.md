@@ -134,7 +134,7 @@ The host test suite covers:
 
 The reusable-sequence C tests run as part of `make ctest`. Python API coverage
 is in `tests/test_sequence_api.py`, and generated API checks are included in
-`make check-c-api`.
+`make check-c-api` and `make js-api-test`.
 
 ## Target-dependent validation still required
 

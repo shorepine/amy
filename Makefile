@@ -82,7 +82,6 @@ check-c-api:
 	$(PYTHON) scripts/gen_amy_js_api.py --check
 	$(PYTHON) scripts/gen_patches_js.py --check
 	$(PYTHON) scripts/gen_pcm_presets_js.py --check
-	node tests/test_js_api.js
 
 js-api-test:
 	node tests/test_js_api.js

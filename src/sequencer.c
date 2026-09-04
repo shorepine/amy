@@ -603,7 +603,7 @@ uint8_t sequencer_sequence_add_wire_with_origin(
     }
     if (wire[0] == 'H' && wire[1] != 'C') {
         fprintf(stderr, "cannot append event to sequence %" PRIu32
-                ": only H sequence-control payloads may be nested\n", tag);
+                ": only HC sequence-control payloads may be composed\n", tag);
         free(wire);
         return 0;
     }
