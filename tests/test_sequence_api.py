@@ -25,12 +25,12 @@ def main():
     assert amy.message(ticks=(0, 48, 3),
                        sequence_control=(7, amy.SEQUENCE_CONTROL_START, 1)) \
         == "H0,48,3HC7,1,1Z"
-    assert amy.message(sequence=7, run=True) == "HC7,1,0Z"
-    assert amy.message(sequence=7, run=1) == "HC7,1,0Z"
-    assert amy.message(sequence=7, run=False, alignment_period=48) \
+    assert amy.message(sequence=7, action="start") == "HC7,1,0Z"
+    assert amy.message(sequence=7, action="stop", alignment_period=48) \
         == "HC7,0,48Z"
-    assert amy.message(sequence=7, run=0) == "HC7,0,0Z"
-    assert amy.message(ticks=(0, 48, 3), sequence=7, run=True,
+    assert amy.message(sequence=7, action="gate", duration=24,
+                       alignment_period=1) == "HC7,2,24,1Z"
+    assert amy.message(ticks=(0, 48, 3), sequence=7, action="start",
                        alignment_period=1) == "H0,48,3HC7,1,1Z"
     assert amy.message(sequence_reset=7) == "HR7Z"
     assert amy.message(ticks=(1, 4, 2), synth=1, note=60, vel=1) \
@@ -63,15 +63,18 @@ def main():
     expect_error("action", lambda: amy.message(sequence_control=(2, -0.1)))
     expect_error("integer", lambda: amy.message(sequence_control=(2, 0.625)))
     expect_error("integer", lambda: amy.message(sequence_control=(2, True)))
-    expect_error("needs run", lambda: amy.message(sequence=2))
+    expect_error("needs action", lambda: amy.message(sequence=2))
     expect_error("can only be combined", lambda: amy.message(
-        sequence=2, run=True, synth=1))
+        sequence=2, action="start", synth=1))
     expect_error("only valid", lambda: amy.message(alignment_period=4, synth=1))
-    expect_error("only valid", lambda: amy.message(run=True, synth=1))
-    expect_error("True/False", lambda: amy.message(sequence=2, run=0.625))
-    expect_error("True/False", lambda: amy.message(sequence=2, run=1.0))
-    expect_error("True/False", lambda: amy.message(sequence=2, run=2))
-    expect_error("True/False", lambda: amy.message(sequence=2, run="%v"))
+    expect_error("only valid", lambda: amy.message(action="start", synth=1))
+    expect_error("start", lambda: amy.message(sequence=2, action=True))
+    expect_error("start", lambda: amy.message(sequence=2, action=1))
+    expect_error("duration", lambda: amy.message(sequence=2, action="gate"))
+    expect_error("only valid", lambda: amy.message(
+        sequence=2, action="start", duration=1))
+    expect_error("non-negative", lambda: amy.message(
+        sequence=2, action="gate", duration=-1))
     expect_error("needs a ticks", lambda: amy.define_sequence(2, [{"synth": 1}]))
     expect_error("needs an AMY payload", lambda: amy.define_sequence(
         2, [{"ticks": (0,)}]))

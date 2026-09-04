@@ -445,15 +445,15 @@ static void test_wire_control_shape_is_strict(void) {
 
     sequencer_reset();
     clear_marks();
-    amy_add_message("H0,1,4zPrun-startZ");
+    amy_add_message("H0,1,4zPaction-startZ");
     amy_add_message("HC4,1,1Z");
     start = sequencer_ticks() + 1;
     clock_to(start);
-    CHECK(mark_at("run-start", start), "run=1 starts a sequence");
+    CHECK(mark_at("action-start", start), "action start=1 starts a sequence");
     amy_add_message("HC4,0,1Z");
     clock_to(sequencer_ticks() + 1);
-    CHECK(!mark_at("run-start", sequencer_ticks()),
-          "run=0 stops a sequence");
+    CHECK(!mark_at("action-start", sequencer_ticks()),
+          "action stop=0 stops a sequence");
 
     sequencer_reset();
     clear_marks();

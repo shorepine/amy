@@ -737,7 +737,7 @@ void handle_ticks_message(char *message) {
         return;
     }
     if (message[1] == 'C') {
-        // HCtag,run[,alignment_period], where run is exactly 0 or 1.
+        // HCtag,action[,alignment_period], for stop=0 or start=1.
         // HCtag,gate,duration[,alignment_period]
         const char *tag_start = message + 2;
         while (*tag_start == ' ') ++tag_start;
@@ -763,7 +763,7 @@ void handle_ticks_message(char *message) {
             || !action_valid || rest_count < 0) {
             fprintf(stderr,
                     "invalid sequence_control: expected "
-                    "HCtag,run[,alignment_period] (run is 0 or 1) or "
+                    "HCtag,action[,alignment_period] (stop=0, start=1) or "
                     "HCtag,gate,duration[,alignment_period]\n");
             return;
         }
@@ -786,7 +786,8 @@ void handle_ticks_message(char *message) {
 
         if (!shape_valid) {
             fprintf(stderr,
-                    "invalid sequence_control: run must be 0 or 1, or use "
+                    "invalid sequence_control: action must be stop=0, "
+                    "start=1, or use "
                     "gate=2 with a duration; tag, duration, and "
                     "alignment must be non-negative integers\n");
         } else {

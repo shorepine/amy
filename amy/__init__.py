@@ -269,7 +269,7 @@ def _sequence_control_values(value):
         raise ValueError('sequence_control action must be an integer: stop=0, start=1, or gate=2.')
     if action in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
         if len(values) not in (2, 3):
-            raise ValueError('A start/stop sequence_control needs tag, run, and optional alignment_period.')
+            raise ValueError('A start/stop sequence_control needs tag, action, and optional alignment_period.')
     elif action == SEQUENCE_CONTROL_GATE:
         if len(values) not in (3, 4):
             raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
@@ -278,37 +278,52 @@ def _sequence_control_values(value):
     return values
 
 
-def _normalize_sequence_run(kwargs):
-    """Translate boolean sequence control into the existing HC primitive."""
+def _normalize_sequence_action(kwargs):
+    """Translate a named sequence action into the existing HC primitive."""
     if 'sequence' not in kwargs:
-        for key in ('run', 'alignment_period'):
+        for key in ('action', 'duration', 'alignment_period'):
             if key in kwargs:
                 raise ValueError('%s is only valid with sequence.' % key)
         return kwargs
     if 'sequence_control' in kwargs or 'sequence_reset' in kwargs:
         raise ValueError('sequence cannot be combined with sequence_control or sequence_reset.')
-    extra = set(kwargs) - {'sequence', 'run', 'alignment_period', 'ticks'}
+    extra = set(kwargs) - {
+        'sequence', 'action', 'duration', 'alignment_period', 'ticks'
+    }
     if extra:
-        raise ValueError('sequence can only be combined with run, alignment_period, and ticks.')
-    if 'run' not in kwargs:
-        raise ValueError('sequence needs run=True to start or run=False to stop.')
+        raise ValueError('sequence can only be combined with action, duration, alignment_period, and ticks.')
+    if 'action' not in kwargs:
+        raise ValueError("sequence needs action='start', 'stop', or 'gate'.")
     tag = int(kwargs['sequence'])
     if tag < 0:
         raise ValueError('Sequence tag must be non-negative.')
     alignment = int(kwargs.get('alignment_period', 0))
     if alignment < 0:
         raise ValueError('Sequence alignment_period must be non-negative.')
-    run = kwargs['run']
-    if isinstance(run, bool):
-        action = SEQUENCE_CONTROL_START if run else SEQUENCE_CONTROL_STOP
-    elif isinstance(run, int) and run in (0, 1):
-        action = run
+    action_name = kwargs['action']
+    actions = {
+        'stop': SEQUENCE_CONTROL_STOP,
+        'start': SEQUENCE_CONTROL_START,
+        'gate': SEQUENCE_CONTROL_GATE,
+    }
+    if not isinstance(action_name, str) or action_name not in actions:
+        raise ValueError("Sequence action must be 'start', 'stop', or 'gate'.")
+    action = actions[action_name]
+    if action == SEQUENCE_CONTROL_GATE:
+        if 'duration' not in kwargs:
+            raise ValueError("Sequence action='gate' needs a duration in ticks.")
+        duration = int(kwargs['duration'])
+        if duration < 0:
+            raise ValueError('Sequence gate duration must be non-negative.')
+        control = (tag, action, duration, alignment)
     else:
-        raise ValueError('Sequence run must be True/False or numeric 1/0.')
+        if 'duration' in kwargs:
+            raise ValueError('Sequence duration is only valid with action=\'gate\'.')
+        control = (tag, action, alignment)
     normalized = {}
     if 'ticks' in kwargs:
         normalized['ticks'] = kwargs['ticks']
-    normalized['sequence_control'] = (tag, action, alignment)
+    normalized['sequence_control'] = control
     return normalized
 
 
@@ -353,7 +368,7 @@ def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
-    kwargs = _normalize_sequence_run(kwargs)
+    kwargs = _normalize_sequence_action(kwargs)
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
