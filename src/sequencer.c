@@ -67,10 +67,6 @@ typedef struct stored_sequence_definition_t {
     struct stored_sequence_definition_t *next_retired;
 } stored_sequence_definition_t;
 
-typedef struct stored_sequence_slot_t {
-    stored_sequence_definition_t *definition;
-} stored_sequence_slot_t;
-
 typedef struct stored_sequence_execution_t {
     stored_sequence_definition_t *definition;
     uint32_t tag;
@@ -85,7 +81,7 @@ typedef struct stored_sequence_execution_t {
     bool gated;
 } stored_sequence_execution_t;
 
-static stored_sequence_slot_t *stored_sequences = NULL;
+static stored_sequence_definition_t **stored_sequences = NULL;
 static stored_sequence_execution_t *sequence_executions = NULL;
 static uint32_t max_stored_sequence_events = 0;
 static uint32_t max_stored_sequence_executions = 0;
@@ -245,8 +241,8 @@ static void stored_sequences_clear_definitions(void) {
     if (stored_sequences == NULL) return;
     for (int32_t i = 0; i < max_sequences; ++i) {
         stored_sequence_definition_retire_locked(
-            stored_sequences[i].definition);
-        stored_sequences[i].definition = NULL;
+            stored_sequences[i]);
+        stored_sequences[i] = NULL;
     }
 }
 
@@ -278,7 +274,7 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
     size_t slot_bytes = 0;
     size_t execution_bytes = 0;
     if (!checked_array_size((uint32_t)max_sequences,
-                            sizeof(stored_sequence_slot_t), &slot_bytes)
+                            sizeof(*stored_sequences), &slot_bytes)
         || !checked_array_size(events, sizeof(stored_sequence_event_t),
                                &stored_sequence_event_bytes)
         || !checked_array_size(executions,
@@ -292,7 +288,7 @@ static void stored_sequences_init(uint32_t events, uint32_t executions) {
         stored_sequences_deinit();
         return;
     }
-    stored_sequences = (stored_sequence_slot_t *)malloc_caps(
+    stored_sequences = (stored_sequence_definition_t **)malloc_caps(
         slot_bytes, amy_global.config.ram_caps_synth);
     if (stored_sequences != NULL)
         memset(stored_sequences, 0, slot_bytes);
@@ -524,7 +520,7 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     return 1;
 }
 
-static stored_sequence_slot_t *stored_sequence_slot(uint32_t tag) {
+static stored_sequence_definition_t **stored_sequence_slot(uint32_t tag) {
     if (stored_sequences == NULL || tag >= (uint32_t)max_sequences) return NULL;
     return &stored_sequences[tag];
 }
@@ -560,7 +556,7 @@ static void stored_sequence_candidate_discard(
 
 uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
                                     uint32_t period, char *wire) {
-    stored_sequence_slot_t *slot = stored_sequence_slot(tag);
+    stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
             fprintf(stderr, "cannot append event to sequence %" PRIu32
@@ -598,7 +594,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
 #endif
     for (;;) {
         amy_grab_lock();
-        stored_sequence_definition_t *source = slot->definition;
+        stored_sequence_definition_t *source = *slot;
         if (source != NULL
             && source->event_count >= max_stored_sequence_events) {
             fprintf(stderr, "cannot append event to sequence %" PRIu32
@@ -653,8 +649,8 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
         stored_sequence_definition_append_owned(candidate, tick, period, wire);
 
         amy_grab_lock();
-        if (slot->definition == source) {
-            slot->definition = candidate;
+        if (*slot == source) {
+            *slot = candidate;
             stored_sequence_definition_t *dead = NULL;
             if (source != NULL) {
                 // Drop the old slot ownership and our temporary writer pin.
@@ -681,7 +677,7 @@ uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
 }
 
 uint8_t sequencer_sequence_reset(uint32_t tag) {
-    stored_sequence_slot_t *slot = stored_sequence_slot(tag);
+    stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
             fprintf(stderr, "cannot reset sequence %" PRIu32
@@ -701,8 +697,8 @@ uint8_t sequencer_sequence_reset(uint32_t tag) {
 
     stored_sequence_reclaim_retired();
     amy_grab_lock();
-    stored_sequence_definition_t *definition = slot->definition;
-    slot->definition = NULL;
+    stored_sequence_definition_t *definition = *slot;
+    *slot = NULL;
     stored_sequence_definition_t *dead = NULL;
     if (wire_firing) stored_sequence_definition_retire_locked(definition);
     else dead = stored_sequence_definition_unref_locked(definition);
@@ -727,7 +723,7 @@ static uint32_t sequence_control_tick(uint32_t alignment_period) {
 uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                                    uint32_t value,
                                    uint32_t alignment_period) {
-    stored_sequence_slot_t *slot = stored_sequence_slot(tag);
+    stored_sequence_definition_t **slot = stored_sequence_slot(tag);
     if (slot == NULL) {
         if (stored_sequences == NULL)
             fprintf(stderr, "cannot control sequence %" PRIu32
@@ -743,7 +739,7 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
     uint8_t result = 0;
     amy_grab_lock();
     if (action == SEQUENCE_CONTROL_START) {
-        if (slot->definition == NULL || slot->definition->event_count == 0) {
+        if (*slot == NULL || (*slot)->event_count == 0) {
             fprintf(stderr, "cannot start sequence %" PRIu32
                     ": its definition is empty\n", tag);
         } else {
@@ -759,7 +755,7 @@ uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
                         tag, max_stored_sequence_executions);
             } else {
                 memset(available, 0, sizeof(*available));
-                available->definition = slot->definition;
+                available->definition = *slot;
                 available->definition->refs++;
                 available->tag = tag;
                 available->start_tick = start_tick;
