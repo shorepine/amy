@@ -55,6 +55,13 @@ static int marks_named(const char *name) {
     return count;
 }
 
+static int marks_named_at(const char *name, uint32_t tick) {
+    int count = 0;
+    for (int i = 0; i < mark_count; ++i)
+        if (!strcmp(marks[i].name, name) && marks[i].tick == tick) count++;
+    return count;
+}
+
 static void clear_group(uint32_t group) {
     char wire[32];
     snprintf(wire, sizeof(wire), "zQ%" PRIu32 ",4Z", group);
@@ -91,6 +98,27 @@ static void test_legacy_ticks_are_unchanged(void) {
     CHECK(mark_at("group-zero-root", group_zero),
           "an explicit group tag zero follows the legacy root path");
     amy_add_message("H0,0,5Z");
+}
+
+static void test_legacy_c_event_wire_is_unchanged(void) {
+    printf("legacy C events keep their three-value ticks wire format\n");
+    amy_event event = amy_default_event();
+    event.osc = 2;
+    event.wave = TRIANGLE;
+    event.ticks[TICKS_TICK] = 3;
+    event.ticks[TICKS_PERIOD] = 8;
+    event.ticks[TICKS_TAG] = 7;
+
+    char wire[MAX_MESSAGE_LEN];
+    sprint_event(&event, wire, sizeof(wire), true);
+    CHECK(strncmp(wire, "H3,8,7", 6) == 0
+          && strncmp(wire, "H3,8,7,", 7) != 0,
+          "an unset group field adds no fourth ticks value: %s", wire);
+
+    event.ticks[TICKS_GROUP] = 2;
+    sprint_event(&event, wire, sizeof(wire), true);
+    CHECK(strncmp(wire, "H3,8,7,2", 8) == 0,
+          "a grouped C event adds exactly one ticks value: %s", wire);
 }
 
 static void test_group_local_tags_are_independent(void) {
@@ -199,6 +227,49 @@ static void test_root_launches_local_zero_on_same_tick(void) {
     CHECK(mark_at("child", start), "root launch and group local zero coincide");
 }
 
+static void test_direct_start_begins_on_next_tick(void) {
+    printf("an unquantized direct start begins on the next tick\n");
+    sequencer_reset();
+    clear_group(1);
+    clear_marks();
+    amy_add_message("H0,4,0,1zPnext-tickZ");
+    amy_add_message("zQ1,3,4Z");
+
+    uint32_t start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(1, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "unquantized direct start is accepted");
+    CHECK(!marks_named("next-tick"), "start does not fire synchronously");
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("next-tick", start), "local tick zero fires on the next tick");
+}
+
+static void test_tagged_start_replaces_at_activation(void) {
+    printf("a tagged start replaces its predecessor at the activation boundary\n");
+    sequencer_reset();
+    clear_group(2);
+    clear_marks();
+    amy_add_message("H0,2,0,2zPold-executionZ");
+    amy_add_message("zQ2,3,2Z");
+    uint32_t predecessor_start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(2, SEQUENCE_CONTROL_START, 0, 0, 41, true),
+          "the predecessor starts");
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("old-execution", predecessor_start),
+          "the predecessor is running before replacement");
+
+    amy_add_message("H0,2,0,2zPnew-executionZ");
+    amy_add_message("zQ2,3,2Z");
+    clear_marks();
+    uint32_t replacement = next_boundary(sequencer_ticks(), 4);
+    CHECK(sequencer_group_control(2, SEQUENCE_CONTROL_START, 1, 4, 41, true),
+          "the tagged replacement is accepted");
+    clock_to(replacement);
+    CHECK(!mark_at("old-execution", replacement),
+          "the predecessor does not fire at the replacement boundary");
+    CHECK(marks_named_at("new-execution", replacement) == 1,
+          "exactly one replacement fires at the boundary");
+}
+
 static void test_c_event_uses_fourth_ticks_field(void) {
     printf("the C event API defines grouped events through ticks[3]\n");
     sequencer_reset();
@@ -271,21 +342,157 @@ static void test_quantized_stop_precedes_boundary_event(void) {
     CHECK(!mark_at("stopped", stop), "stop suppresses the boundary event");
 }
 
-static void test_group_to_group_control_is_rejected(void) {
-    printf("a group payload cannot launch another group\n");
+static void test_tagged_gate_and_stop_are_selective(void) {
+    printf("execution tags make gate and stop selective\n");
+    sequencer_reset();
+    clear_group(3);
+    clear_group(4);
+    clear_marks();
+    amy_add_message("H0,1,0,3zPsharedZ");
+    amy_add_message("zQ3,3,8Z");
+    amy_add_message("H0,1,0,4zPother-groupZ");
+    amy_add_message("zQ4,3,8Z");
+    amy_add_message("zQ3,1,0,0,101Z");
+    amy_add_message("zQ3,1,0,0,102Z");
+    amy_add_message("zQ4,1,0,0,101Z");
+    sequencer_midi_clock_tick();
+    CHECK(marks_named_at("shared", sequencer_ticks()) == 2,
+          "two tagged executions of one group can overlap");
+    CHECK(marks_named_at("other-group", sequencer_ticks()) == 1,
+          "the same execution tag is independent in another group");
+
+    clear_marks();
+    CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_GATE, 2, 0, 101, true),
+          "a matching tagged gate is accepted");
+    uint32_t gate_tick = sequencer_ticks() + 1;
+    clock_to(gate_tick + 2);
+    CHECK(marks_named_at("shared", gate_tick) == 1
+          && marks_named_at("shared", gate_tick + 1) == 1,
+          "only the selected execution is gated");
+    CHECK(marks_named_at("shared", gate_tick + 2) == 2,
+          "the selected execution resumes after the exact duration");
+    CHECK(marks_named_at("other-group", gate_tick) == 1,
+          "a tagged gate does not cross group boundaries");
+
+    clear_marks();
+    uint32_t tagged_stop_tick = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_STOP, 0, 0, 102, true),
+          "a matching tagged stop is accepted");
+    clock_to(tagged_stop_tick);
+    CHECK(marks_named_at("shared", tagged_stop_tick) == 1,
+          "only the selected execution stops");
+    CHECK(!sequencer_group_control(3, SEQUENCE_CONTROL_STOP, 0, 0, 999, true),
+          "a nonmatching execution tag reports no affected execution");
+    uint32_t all_stop_tick = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(3, SEQUENCE_CONTROL_STOP, 0, 0, 0, false),
+          "an untagged stop selects every remaining execution in the group");
+    clock_to(all_stop_tick);
+    int remaining = marks_named_at("shared", all_stop_tick);
+    CHECK(remaining == 0,
+          "the untagged stop removed the remaining execution (got %d events)",
+          remaining);
+    CHECK(mark_at("other-group", all_stop_tick),
+          "the untagged stop remains scoped to its group");
+    amy_add_message("zQ4,0Z");
+    sequencer_midi_clock_tick();
+}
+
+static void test_group_lifecycle_control_is_not_recursive(void) {
+    printf("a group payload cannot start, publish or clear a group\n");
     sequencer_reset();
     clear_group(7);
     clear_group(8);
     clear_marks();
-    amy_add_message("H0,4,0,8zPforbiddenZ");
+    amy_add_message("H0,4,0,8zPpublished-revisionZ");
     amy_add_message("zQ8,3,4Z");
+    amy_add_message("H0,4,0,8zPstaged-revisionZ");
     amy_add_message("H0,4,0,7zQ8,1,1,0Z");
+    amy_add_message("H0,4,1,7zQ8,3,4Z");
+    amy_add_message("H0,4,2,7zQ8,4Z");
     amy_add_message("zQ7,3,4Z");
 
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("zQ7,1,1,4Z");
-    clock_to(start + 4);
-    CHECK(!marks_named("forbidden"), "group-to-group launch is rejected");
+    clock_to(start);
+    CHECK(!marks_named("published-revision") && !marks_named("staged-revision"),
+          "group-to-group start is rejected");
+
+    uint32_t old_revision_start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "the target group can still be started directly");
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("published-revision", old_revision_start),
+          "nested clear was rejected and the published revision remains");
+    CHECK(!mark_at("staged-revision", old_revision_start),
+          "nested publish was rejected and staged edits remain private");
+
+    amy_add_message("zQ8,3,4Z");
+    uint32_t new_revision_start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(8, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "the newly published target group starts");
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("staged-revision", new_revision_start),
+          "the rejected nested publish did not discard staged edits");
+}
+
+static void test_invalid_edits_are_repairable(void) {
+    printf("invalid definitions fail without losing staged edits\n");
+    sequencer_reset();
+    clear_group(5);
+    CHECK(!sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 0, 0, 0, false),
+          "zero-length publication is rejected");
+    CHECK(!sequencer_group_add_wire(0, 1, 0, 5, NULL),
+          "a NULL wire is rejected safely");
+    CHECK(!sequencer_group_add_wire(0, 1, 0, 5, strdup("H0zPnestedZ")),
+          "a second ticks command is rejected");
+
+    CHECK(sequencer_group_add_wire(3, 2, 0, 5, strdup("zPbad-periodZ")),
+          "an invalid-period edit can be staged");
+    CHECK(!sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "publication rejects tick >= period");
+    CHECK(sequencer_group_add_wire(1, 2, 0, 5, strdup("zPrepairedZ")),
+          "the invalid staged event can be replaced");
+    CHECK(sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "the repaired definition publishes");
+
+    CHECK(sequencer_group_add_wire(4, 0, 1, 5, strdup("zPtoo-lateZ")),
+          "an out-of-length event can be staged");
+    CHECK(!sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "publication rejects tick >= group length");
+    CHECK(sequencer_group_add_wire(0, 0, 1, 5, strdup("")),
+          "the invalid local tag can be cleared");
+    CHECK(sequencer_group_control(5, SEQUENCE_CONTROL_PUBLISH, 4, 0, 0, false),
+          "publication succeeds after clearing the invalid tag");
+
+    CHECK(!sequencer_group_control(5, 99, 0, 0, 0, false),
+          "an unknown lifecycle action is rejected");
+    CHECK(!sequencer_group_control(0, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "reserved group zero is rejected by group control");
+    CHECK(!sequencer_group_control(9, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "a group beyond the configured range is rejected");
+    clear_group(6);
+    CHECK(!sequencer_group_control(6, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "start without a published definition is rejected");
+    CHECK(!sequencer_group_control(6, SEQUENCE_CONTROL_GATE, 1, 0, 0, false),
+          "gate with no active execution reports no affected execution");
+}
+
+static void test_clear_preserves_active_revision(void) {
+    printf("clearing storage does not invalidate an active revision\n");
+    sequencer_reset();
+    clear_group(6);
+    clear_marks();
+    amy_add_message("H0,4,0,6zPactive-after-clearZ");
+    amy_add_message("zQ6,3,4Z");
+    uint32_t start = sequencer_ticks() + 1;
+    CHECK(sequencer_group_control(6, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "the execution starts before storage is cleared");
+    clear_group(6);
+    sequencer_midi_clock_tick();
+    CHECK(mark_at("active-after-clear", start),
+          "an active execution retains its published revision");
+    CHECK(!sequencer_group_control(6, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "clear prevents future starts until another publication");
 }
 
 static void test_resets_keep_definitions_only(void) {
@@ -308,6 +515,20 @@ static void test_resets_keep_definitions_only(void) {
     amy_add_message("zQ8,1,1,4Z");
     clock_to(second);
     CHECK(mark_at("survivor", second), "definition survives RESET_SEQUENCER");
+
+    clear_marks();
+    amy_add_message("zQ8,1,0,0Z");
+    sequencer_midi_clock_tick();
+    amy_add_message("S4096Z");
+    amy_execute_deltas();
+    clear_marks();
+    clock_to(sequencer_ticks() + 4);
+    CHECK(!marks_named("survivor"),
+          "the public RESET_SEQUENCER wire stops group executions");
+    amy_add_message("zQ8,1,1,0Z");
+    sequencer_midi_clock_tick();
+    CHECK(marks_named("survivor") == 1,
+          "the public RESET_SEQUENCER wire preserves definitions");
 
     clear_marks();
     amy_add_message("zQ8,1,0,0Z");
@@ -365,6 +586,22 @@ static void test_configured_bounds(void) {
     sequencer_reset();
 }
 
+static void test_disabled_configuration(void) {
+    printf("zero capacities disable sequencer groups safely\n");
+    amy_config_t config = amy_default_config();
+    config.features.startup_bleep = 0;
+    config.audio = AMY_AUDIO_IS_NONE;
+    config.max_sequence_groups = 0;
+    config.max_sequence_group_tags = 0;
+    config.max_sequence_group_executions = 0;
+    amy_start(config);
+    CHECK(!sequencer_group_add_wire(0, 1, 0, 1, strdup("zPdisabledZ")),
+          "group storage rejects events while disabled");
+    CHECK(!sequencer_group_control(1, SEQUENCE_CONTROL_START, 1, 0, 0, false),
+          "group control rejects operations while disabled");
+    amy_stop();
+}
+
 // examples.c calls this; the platform normally provides it.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -379,19 +616,26 @@ int main(void) {
     amy_start(config);
 
     test_legacy_ticks_are_unchanged();
+    test_legacy_c_event_wire_is_unchanged();
     test_group_local_tags_are_independent();
     test_one_n_and_infinite_repeats();
     test_atomic_revision_lifetime();
     test_root_launches_local_zero_on_same_tick();
+    test_direct_start_begins_on_next_tick();
+    test_tagged_start_replaces_at_activation();
     test_c_event_uses_fourth_ticks_field();
     test_quantized_gate_preserves_phase();
     test_quantized_stop_precedes_boundary_event();
-    test_group_to_group_control_is_rejected();
+    test_tagged_gate_and_stop_are_selective();
+    test_group_lifecycle_control_is_not_recursive();
+    test_invalid_edits_are_repairable();
+    test_clear_preserves_active_revision();
     test_resets_keep_definitions_only();
     test_group_start_crosses_clock_rollover();
     test_configured_bounds();
 
     amy_stop();
+    test_disabled_configuration();
     if (failures) {
         printf("\n%d check(s) FAILED\n", failures);
         return 1;
