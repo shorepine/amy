@@ -5,8 +5,8 @@
 #include "amy.h"
 #define MIDI_SEQUENCER_PPQ 24  // MIDI clocks per quarter note
 uint32_t sequencer_ticks();
-void sequencer_init(int max_num_sequences, uint32_t max_groups,
-                    uint32_t max_group_tags, uint32_t max_group_executions);
+void sequencer_init(int max_num_sequences, uint32_t max_sequence_events,
+                    uint32_t max_sequence_executions);
 void sequencer_deinit();
 void sequencer_reset();
 void sequencer_debug();
@@ -23,18 +23,20 @@ void sequencer_check_and_call_js_hook();  // called from the browser main loop
 // anonymously (round-robin in a small reserved pool) and can't be addressed
 // or cancelled by any tag. Takes ownership of wire.
 uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool has_tag, char *wire);
-// Store one ordinary ticks event in a group's unpublished revision. Takes
-// ownership of wire. Group zero is reserved for sequencer_add_wire().
-uint8_t sequencer_group_add_wire(uint32_t tick, uint32_t period,
-                                 uint32_t tag, uint32_t group, char *wire);
-
-// sequence_control actions. The wire/API representation is always
-// [group, action, value, quantize, optional execution_tag].
-uint8_t sequencer_group_control(uint32_t group, uint32_t action,
-                                uint32_t value, uint32_t quantize,
-                                uint32_t execution_tag,
-                                bool has_execution_tag);
-void sequencer_group_reset_timebase();
+// Append one ordinary ticks event to the reusable sequence identified by tag.
+// Takes ownership of wire. Unlike the legacy root ticks syntax, tick=period=0
+// is a valid one-shot event here.
+uint8_t sequencer_sequence_add_wire(uint32_t tag, uint32_t tick,
+                                    uint32_t period, char *wire);
+// Clear the future root event and reusable definition at tag. Executions which
+// already started retain their immutable definition and may finish.
+uint8_t sequencer_sequence_reset(uint32_t tag);
+// sequence_control is [tag, start_or_stop, alignment_period] or
+// [tag, gate, duration, alignment_period].
+uint8_t sequencer_sequence_control(uint32_t tag, uint32_t action,
+                                   uint32_t value,
+                                   uint32_t alignment_period);
+void sequencer_sequence_reset_timebase();
 void sequencer_midi_clock_tick();
 void sequencer_midi_start();
 void sequencer_midi_stop();

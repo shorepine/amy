@@ -241,7 +241,10 @@ def str_of_int(arg):
 
 
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    # 'ticks' must come first: 'H' is recognized only as first char in wire message.
+    # Sequence/ticks headers must come first: 'H' is only recognized as the
+    # first wire character. sequence_control follows a ticks/sequence_event
+    # header when it is used as that scheduled event's payload.
+    ('sequence_event', 'HAL'),
     ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
     ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('sample_offset', 'poI'), ('fit', 'pFF'), ('fit_search', 'pSI'), ('pan', 'QC'), ('client', 'gI'),
@@ -253,8 +256,9 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('dist_clip', 'GCI'), ('dist_fold', 'GFI'), ('dist_crush', 'GHL'), ('dist_drive', 'GDC'), ('dist_mix', 'GMC'),
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
+    ('sequence_reset', 'HRI'),
+    ('sequence_control', 'HCL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
-    ('sequence_control', 'zQL'),
     ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
     ('synth_level', 'iVF'),
@@ -296,6 +300,15 @@ def message(**kwargs):
                 raise ValueError('You cannot use \'num_partials\' and \'preset\' in the same message.')
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
+
+    outer_sequence_keys = {'sequence_event', 'ticks', 'sequence_reset'} & kwargs.keys()
+    if len(outer_sequence_keys) > 1:
+        raise ValueError('Use only one of sequence_event, sequence_reset, or ticks in a message.')
+    if 'sequence_reset' in kwargs and len(kwargs) != 1:
+        raise ValueError('sequence_reset must be sent as a standalone message.')
+    if ('sequence_control' in kwargs and len(kwargs) != 1
+            and not ({'sequence_event', 'ticks'} & kwargs.keys())):
+        raise ValueError('sequence_control can only be combined with ticks or sequence_event.')
 
     # Validity check all the passed args.
     prioritized_keys = []
@@ -372,6 +385,55 @@ def send(**kwargs):
     m = message(**kwargs)
 
     send_raw(m)
+
+
+def _sequence_ticks(value):
+    """Normalize a stored-sequence event's local (tick, period) tuple."""
+    if isinstance(value, str):
+        values = value.split(',')
+    elif isinstance(value, (list, tuple)):
+        values = list(value)
+    else:
+        values = [value]
+    if not 1 <= len(values) <= 2:
+        raise ValueError('A stored sequence event needs ticks=(tick,) or ticks=(tick, period).')
+    tick = int(values[0])
+    period = int(values[1]) if len(values) == 2 else 0
+    if tick < 0 or period < 0:
+        raise ValueError('Stored sequence tick and period must be non-negative.')
+    if period and tick >= period:
+        raise ValueError('A stored sequence tick must be below its nonzero period.')
+    return tick, period
+
+
+def define_sequence(tag, events):
+    """Replace one reusable tagged sequence with ordinary AMY events.
+
+    Each event is a mapping accepted by :func:`message` and must contain a
+    local ``ticks`` value with one or two fields. All event messages are
+    validated before the reset is sent, then the definition is written as a
+    per-tag reset followed by explicit cumulative event appends. Executions
+    which already started keep their previous immutable definition.
+    """
+    sequence_tag = int(tag)
+    if sequence_tag < 0:
+        raise ValueError('Sequence tag must be non-negative.')
+    event_messages = []
+    for event in events:
+        values = dict(event)
+        if 'ticks' not in values:
+            raise ValueError('Every stored sequence event needs a ticks value.')
+        if {'sequence_event', 'sequence_reset'} & values.keys():
+            raise ValueError('Stored sequence events cannot contain sequence authoring commands.')
+        tick, period = _sequence_ticks(values.pop('ticks'))
+        if not values:
+            raise ValueError('Every stored sequence event needs an AMY payload.')
+        event_messages.append(message(
+            sequence_event=(sequence_tag, tick, period), **values))
+
+    send_raw(message(sequence_reset=sequence_tag))
+    for event_message in event_messages:
+        send_raw(event_message)
 
 
 # Plots a time domain and spectra of audio

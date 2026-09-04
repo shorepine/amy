@@ -330,12 +330,12 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
         snprintf(s, len - (size_t)(s - s_entry), "amy_event(time=%" PRIu32 ", osc=%u, addr_osc=%d adr_syn=%d adr_bus=%d): ", e->time, (unsigned)e->osc,
                  event_addresses_oscs(e), event_addresses_synth(e), event_addresses_bus(e));
         s += strlen(s);
-        _EPRINT_U_SEQ(ticks, "ticks", 4, "H"); // tick, period, tag, optional group
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
     } else {
         // e->time has no wire representation anymore (there's no 't' command);
         // it's only ever meaningful as this event's own near-term playback time.
         // ticks ("H") must always be the first entry in wire code if used.
-        _EPRINT_U_SEQ(ticks, "ticks", 4, "H"); // tick, period, tag, optional group
+        _EPRINT_U_SEQ(ticks, "ticks", 3, "H"); // tick, period, tag
         _EPRINT_I(osc, "osc", "v");
     }
     _EPRINT_I(wave, "wave", "w");
@@ -540,7 +540,7 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(eg_type[0]);
     _RET_TRUE_IF_SET(eg_type[1]);
     // We don't know
-    _RET_TRUE_IF_SET_SEQ(ticks, 4); // tick, period, tag, optional group
+    _RET_TRUE_IF_SET_SEQ(ticks, 3); // tick, period, tag
     //
     //_RET_TRUE_IF_SET(status, "status");
     _RET_TRUE_IF_SET(reset_osc);

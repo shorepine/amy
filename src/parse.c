@@ -659,20 +659,6 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
             return total;
         }
     }
-    else if (cmd == 'Q') {
-        // zQgroup,action,value,quantize[,execution_tag]
-        uint32_t values[5] = {0, 0, 0, 0, 0};
-        int count = parse_list_uint32_t(message, values, 5, 0);
-        if (count < 2) {
-            fprintf(stderr,
-                    "invalid sequence_control: expected "
-                    "zQgroup,action[,value,quantize,execution_tag]\n");
-        } else {
-            sequencer_group_control(values[0], values[1], values[2], values[3],
-                                    values[4], count >= 5);
-        }
-        return 1;
-    }
     else if (cmd == 'Y') {
         // zY: sequencer transport. zY1 starts the sequencer, zY0 stops it. Lets a
         // host drive playback without MIDI clock sync (see external_midi_sync).
@@ -724,8 +710,66 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
 // is only ever honored as the first command of a message.
 void handle_ticks_message(char *message) {
     assert(message[0] == 'H');
-    uint32_t ticks[4] = {0, 0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, ticks, 4, 0);
+    if (message[1] == 'A') {
+        // HAsequence_tag,tick,period<payload>: explicitly append one ordinary
+        // event to a reusable sequence. The sequence tag is the same public
+        // identity space used by legacy root ticks events.
+        uint32_t values[3] = {0, 0, 0};
+        int count = parse_list_uint32_t(message + 2, values, 3, 0);
+        uint16_t header_len = 2 + _next_alpha(message + 2);
+        if (count != 3) {
+            fprintf(stderr,
+                    "invalid sequence event: expected "
+                    "HAsequence_tag,tick,period<payload>\n");
+            return;
+        }
+        char *payload = message + header_len;
+        size_t payload_len = strlen(payload);
+        char *copy = (char *)malloc_caps(payload_len + 1,
+                                         amy_global.config.ram_caps_events);
+        if (copy == NULL) amy_oom("sequence_event");
+        else {
+            memcpy(copy, payload, payload_len + 1);
+            sequencer_sequence_add_wire(values[0], values[1], values[2], copy);
+        }
+        return;
+    }
+    if (message[1] == 'C') {
+        // HCtag,start_or_stop[,alignment_period]
+        // HCtag,gate,duration[,alignment_period]
+        uint32_t values[4] = {0, 0, 0, 0};
+        int count = parse_list_uint32_t(message + 2, values, 4, 0);
+        if (count < 2) {
+            fprintf(stderr,
+                    "invalid sequence_control: expected "
+                    "HCtag,start_or_stop[,alignment_period] or "
+                    "HCtag,gate,duration[,alignment_period]\n");
+        } else if (values[1] == SEQUENCE_CONTROL_GATE && count < 3) {
+            fprintf(stderr,
+                    "invalid sequence_control gate: duration is required\n");
+        } else {
+            uint32_t value = values[1] == SEQUENCE_CONTROL_GATE
+                           ? values[2] : 0;
+            uint32_t alignment = values[1] == SEQUENCE_CONTROL_GATE
+                               ? values[3] : values[2];
+            sequencer_sequence_control(values[0], values[1], value, alignment);
+        }
+        return;
+    }
+    if (message[1] == 'R') {
+        // HRtag: clear future root/stored events for this tag. Already-active
+        // immutable sequence executions are intentionally unaffected.
+        uint32_t values[1] = {0};
+        int count = parse_list_uint32_t(message + 2, values, 1, 0);
+        if (count != 1)
+            fprintf(stderr, "invalid sequence reset: expected HRtag\n");
+        else
+            sequencer_sequence_reset(values[0]);
+        return;
+    }
+
+    uint32_t ticks[3] = {0, 0, 0};
+    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
     uint16_t schedule_len = 1 + _next_alpha(message + 1);
     char *payload = message + schedule_len;
     uint16_t payload_len = (uint16_t)strlen(payload);
@@ -734,17 +778,10 @@ void handle_ticks_message(char *message) {
         amy_oom("ticks_message");
     } else {
         memcpy(stripped, payload, payload_len + 1);
-        if (num_vals >= 4 && ticks[TICKS_GROUP] != 0) {
-            // The fourth ticks value selects persistent group-local storage.
-            // Group zero deliberately follows the legacy root path below.
-            sequencer_group_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD],
-                                     ticks[TICKS_TAG], ticks[TICKS_GROUP], stripped);
-        } else {
-            // A root tag is only "given" if all 3 values were present; fewer
-            // than that (a 1- or 2-value ticks=) stores anonymously.
-            sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
-                               num_vals >= 3, stripped);
-        }
+        // A root tag is only "given" if all 3 values were present; fewer
+        // than that (a 1- or 2-value ticks=) stores anonymously.
+        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+                           num_vals >= 3, stripped);
     }
 }
 

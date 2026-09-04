@@ -48,9 +48,8 @@ amy_config_t amy_default_config() {
     c.max_oscs = 250;
     c.max_buses = AMY_DEFAULT_NUM_BUSES;
     c.max_sequencer_tags = 256;
-    c.max_sequence_groups = 32;
-    c.max_sequence_group_tags = 64;
-    c.max_sequence_group_executions = 32;
+    c.max_sequence_events = 64;
+    c.max_sequence_executions = 32;
     c.max_voices = 64;
     c.max_synths = 64;
     c.max_memory_patches = 32;
@@ -190,7 +189,6 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->ticks[TICKS_TICK]);
     AMY_UNSET(e->ticks[TICKS_PERIOD]);
     AMY_UNSET(e->ticks[TICKS_TAG]);
-    AMY_UNSET(e->ticks[TICKS_GROUP]);
     AMY_UNSET(e->eq_l);
     AMY_UNSET(e->eq_m);
     AMY_UNSET(e->eq_h);
@@ -324,7 +322,7 @@ void amy_send_wire_from_sysex(char *message) {
 void amy_add_event(amy_event *e) {
     peek_stack("add_event");
     // was amy_process_event
-    if(AMY_IS_SET(e->ticks[TICKS_TICK]) || AMY_IS_SET(e->ticks[TICKS_PERIOD]) || AMY_IS_SET(e->ticks[TICKS_TAG]) || AMY_IS_SET(e->ticks[TICKS_GROUP])) {
+    if(AMY_IS_SET(e->ticks[TICKS_TICK]) || AMY_IS_SET(e->ticks[TICKS_PERIOD]) || AMY_IS_SET(e->ticks[TICKS_TAG])) {
         // C-API ticks event: serialize it to a wire message and hand it to
         // the sequencer, so scheduled events have a single storage format.
         char *buf = (char *)malloc_caps(MAX_MESSAGE_LEN, amy_global.config.ram_caps_events);
