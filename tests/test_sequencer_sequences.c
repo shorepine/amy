@@ -564,6 +564,41 @@ static void test_gate_and_stop_cross_clock_rollover(void) {
           "stop suppresses the event on its aligned boundary");
 }
 
+static void test_execution_lifetime_beyond_half_clock_range(void) {
+    printf("started executions remain valid across the uint32 clock\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,1,2zPlong-periodicZ");
+    amy_add_message("HC2,1,1Z");
+    uint32_t start = sequencer_ticks() + 1;
+    clock_to(start);
+    clear_marks();
+
+    amy_global.sequencer_tick_count = start + (uint32_t)INT32_MAX;
+    sequencer_midi_clock_tick();
+    CHECK(marks_named("long-periodic") == 2,
+          "a latched periodic execution keeps running past half-range");
+
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H4294967295,0,3zPuint32-tailZ");
+    amy_add_message("HC3,1,1Z");
+    start = sequencer_ticks() + 1;
+    clock_to(start);
+    clear_marks();
+
+    amy_global.sequencer_tick_count = start - 2;
+    sequencer_midi_clock_tick();
+    CHECK(marks_named("uint32-tail") == 1,
+          "a finite event at UINT32_MAX fires exactly once");
+    int starts = 0;
+    for (int i = 0; i < 8; ++i)
+        starts += sequencer_sequence_control(
+            3, SEQUENCE_CONTROL_START, 0, 1);
+    CHECK(starts == 8,
+          "the UINT32_MAX finite execution retires on its final event");
+}
+
 static void test_disabled_configuration(void) {
     printf("invalid reusable-sequence capacities disable the feature safely\n");
     const uint32_t capacities[][3] = {
@@ -623,6 +658,7 @@ int main(void) {
     test_timebase_reset_keeps_definitions();
     test_start_crosses_clock_rollover();
     test_gate_and_stop_cross_clock_rollover();
+    test_execution_lifetime_beyond_half_clock_range();
     test_bounds_and_validation();
     test_wire_control_shape_is_strict();
 
