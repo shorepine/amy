@@ -664,7 +664,9 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         uint32_t values[5] = {0, 0, 0, 0, 0};
         int count = parse_list_uint32_t(message, values, 5, 0);
         if (count < 2) {
-            fprintf(stderr, "sequence_control needs at least group and action\n");
+            fprintf(stderr,
+                    "invalid sequence_control: expected "
+                    "zQgroup,action[,value,quantize,execution_tag]\n");
         } else {
             sequencer_group_control(values[0], values[1], values[2], values[3],
                                     values[4], count >= 5);

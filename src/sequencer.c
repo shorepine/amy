@@ -89,7 +89,15 @@ static sequence_group_execution_t *group_executions = NULL;
 static uint32_t max_sequence_groups = 0;
 static uint32_t max_sequence_group_tags = 0;
 static uint32_t max_sequence_group_executions = 0;
+static size_t sequence_group_event_bytes = 0;
 static volatile bool group_wire_firing = false;
+
+static bool checked_array_size(uint32_t count, size_t element_size,
+                               size_t *bytes) {
+    if (count > SIZE_MAX / element_size) return false;
+    *bytes = (size_t)count * element_size;
+    return true;
+}
 
 static void group_definition_release(sequence_group_definition_t *definition) {
     if (definition == NULL || definition->refs == 0) return;
@@ -107,14 +115,12 @@ static sequence_group_definition_t *group_definition_new(void) {
                                                     amy_global.config.ram_caps_synth);
     if (definition == NULL) return NULL;
     definition->events = (sequence_group_event_t *)malloc_caps(
-        sizeof(sequence_group_event_t) * max_sequence_group_tags,
-        amy_global.config.ram_caps_synth);
+        sequence_group_event_bytes, amy_global.config.ram_caps_synth);
     if (definition->events == NULL) {
         free(definition);
         return NULL;
     }
-    memset(definition->events, 0,
-           sizeof(sequence_group_event_t) * max_sequence_group_tags);
+    memset(definition->events, 0, sequence_group_event_bytes);
     definition->length_ticks = 0;
     definition->refs = 1;
     return definition;
@@ -177,6 +183,7 @@ static void sequence_groups_deinit(void) {
     max_sequence_groups = 0;
     max_sequence_group_tags = 0;
     max_sequence_group_executions = 0;
+    sequence_group_event_bytes = 0;
 }
 
 static void sequence_groups_init(uint32_t groups, uint32_t tags,
@@ -186,16 +193,31 @@ static void sequence_groups_init(uint32_t groups, uint32_t tags,
     max_sequence_group_executions = executions;
     group_wire_firing = false;
     if (groups == 0 || tags == 0 || executions == 0) return;
+
+    size_t group_bytes = 0;
+    size_t execution_bytes = 0;
+    if (!checked_array_size(groups, sizeof(sequence_group_slot_t), &group_bytes)
+        || !checked_array_size(tags, sizeof(sequence_group_event_t),
+                               &sequence_group_event_bytes)
+        || !checked_array_size(executions,
+                               sizeof(sequence_group_execution_t),
+                               &execution_bytes)) {
+        fprintf(stderr,
+                "sequencer group configuration exceeds addressable memory: "
+                "groups=%" PRIu32 ", event_tags=%" PRIu32
+                ", executions=%" PRIu32 "\n",
+                groups, tags, executions);
+        sequence_groups_deinit();
+        return;
+    }
     sequence_groups = (sequence_group_slot_t *)malloc_caps(
-        sizeof(sequence_group_slot_t) * groups, amy_global.config.ram_caps_synth);
+        group_bytes, amy_global.config.ram_caps_synth);
     if (sequence_groups != NULL)
-        memset(sequence_groups, 0, sizeof(sequence_group_slot_t) * groups);
+        memset(sequence_groups, 0, group_bytes);
     group_executions = (sequence_group_execution_t *)malloc_caps(
-        sizeof(sequence_group_execution_t) * executions,
-        amy_global.config.ram_caps_synth);
+        execution_bytes, amy_global.config.ram_caps_synth);
     if (group_executions != NULL)
-        memset(group_executions, 0,
-               sizeof(sequence_group_execution_t) * executions);
+        memset(group_executions, 0, execution_bytes);
     if (sequence_groups == NULL || group_executions == NULL) {
         amy_oom("sequencer groups");
         sequence_groups_deinit();
@@ -417,14 +439,36 @@ static sequence_group_slot_t *group_slot(uint32_t group) {
 uint8_t sequencer_group_add_wire(uint32_t tick, uint32_t period,
                                  uint32_t tag, uint32_t group, char *wire) {
     sequence_group_slot_t *slot = group_slot(group);
-    if (slot == NULL || tag >= max_sequence_group_tags) {
-        fprintf(stderr, "sequencer group/event tag out of range: group %" PRIu32
-                ", tag %" PRIu32 "\n", group, tag);
+    if (slot == NULL) {
+        if (sequence_groups == NULL)
+            fprintf(stderr, "cannot add event to sequencer group %" PRIu32
+                    ": sequencer groups are disabled\n", group);
+        else
+            fprintf(stderr, "cannot add event: sequencer group %" PRIu32
+                    " is outside the configured range [1, %" PRIu32 "]\n",
+                    group, max_sequence_groups);
         free(wire);
         return 0;
     }
+    if (tag >= max_sequence_group_tags) {
+        fprintf(stderr, "cannot add event tag %" PRIu32
+                " to sequencer group %" PRIu32
+                ": valid event tags are [0, %" PRIu32 "]\n",
+                tag, group, max_sequence_group_tags - 1);
+        free(wire);
+        return 0;
+    }
+    if (wire == NULL) {
+        fprintf(stderr, "cannot add event tag %" PRIu32
+                " to sequencer group %" PRIu32 ": wire is NULL\n",
+                tag, group);
+        return 0;
+    }
     if (wire[0] == 'H') {
-        fprintf(stderr, "a grouped ticks event cannot contain another ticks event\n");
+        fprintf(stderr, "cannot add event tag %" PRIu32
+                " to sequencer group %" PRIu32
+                ": a grouped event cannot contain another ticks command\n",
+                tag, group);
         free(wire);
         return 0;
     }
@@ -476,9 +520,11 @@ static bool group_execution_matches(const sequence_group_execution_t *execution,
             && execution->execution_tag == execution_tag);
 }
 
-static uint8_t group_publish(sequence_group_slot_t *slot, uint32_t length) {
+static uint8_t group_publish(sequence_group_slot_t *slot, uint32_t group,
+                             uint32_t length) {
     if (length == 0) {
-        fprintf(stderr, "a sequencer group must have a nonzero length\n");
+        fprintf(stderr, "cannot publish sequencer group %" PRIu32
+                ": length must be greater than zero\n", group);
         return 0;
     }
     if (slot->staging == NULL) {
@@ -491,11 +537,18 @@ static uint8_t group_publish(sequence_group_slot_t *slot, uint32_t length) {
     for (uint32_t i = 0; i < max_sequence_group_tags; ++i) {
         sequence_group_event_t *event = &slot->staging->events[i];
         if (event->wire == NULL) continue;
-        if (event->tick >= length
-            || (event->period != 0 && event->tick >= event->period)) {
-            fprintf(stderr, "sequencer group event %" PRIu32
-                    " has tick %" PRIu32 " outside its period/group length\n",
-                    i, event->tick);
+        if (event->tick >= length) {
+            fprintf(stderr, "cannot publish sequencer group %" PRIu32
+                    ": event tag %" PRIu32 " has tick %" PRIu32
+                    ", which must be below group length %" PRIu32 "\n",
+                    group, i, event->tick, length);
+            return 0;
+        }
+        if (event->period != 0 && event->tick >= event->period) {
+            fprintf(stderr, "cannot publish sequencer group %" PRIu32
+                    ": event tag %" PRIu32 " has tick %" PRIu32
+                    ", which must be below its period %" PRIu32 "\n",
+                    group, i, event->tick, event->period);
             return 0;
         }
     }
@@ -513,21 +566,30 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
                                 bool has_execution_tag) {
     sequence_group_slot_t *slot = group_slot(group);
     if (slot == NULL) {
-        fprintf(stderr, "sequencer group %" PRIu32 " is out of range\n", group);
+        if (sequence_groups == NULL)
+            fprintf(stderr, "cannot control sequencer group %" PRIu32
+                    ": sequencer groups are disabled\n", group);
+        else
+            fprintf(stderr, "cannot control sequencer group %" PRIu32
+                    ": valid groups are [1, %" PRIu32 "]\n",
+                    group, max_sequence_groups);
         return 0;
     }
     if (group_wire_firing
         && (action == SEQUENCE_CONTROL_START
             || action == SEQUENCE_CONTROL_PUBLISH
             || action == SEQUENCE_CONTROL_CLEAR)) {
-        fprintf(stderr, "a sequencer group cannot launch or edit a group\n");
+        fprintf(stderr, "sequencer group %" PRIu32
+                " cannot perform lifecycle action %" PRIu32
+                ": grouped events may only stop or gate executions\n",
+                group, action);
         return 0;
     }
 
     uint8_t result = 0;
     amy_grab_lock();
     if (action == SEQUENCE_CONTROL_PUBLISH) {
-        result = group_publish(slot, value);
+        result = group_publish(slot, group, value);
     } else if (action == SEQUENCE_CONTROL_CLEAR) {
         group_definition_release(slot->published);
         group_definition_release(slot->staging);
@@ -546,7 +608,9 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
                 if (!execution->occupied && available == NULL) available = execution;
             }
             if (available == NULL) {
-                fprintf(stderr, "sequencer group execution pool is full\n");
+                fprintf(stderr, "cannot start sequencer group %" PRIu32
+                        ": all %" PRIu32 " execution slots are occupied\n",
+                        group, max_sequence_group_executions);
             } else {
                 if (has_execution_tag) {
                     for (uint32_t i = 0; i < max_sequence_group_executions; ++i) {
@@ -588,7 +652,9 @@ uint8_t sequencer_group_control(uint32_t group, uint32_t action,
             result = 1;
         }
     } else {
-        fprintf(stderr, "unknown sequencer group action %" PRIu32 "\n", action);
+        fprintf(stderr, "cannot control sequencer group %" PRIu32
+                ": action %" PRIu32 " is unknown; valid actions are [0, 4]\n",
+                group, action);
     }
     amy_release_lock();
     return result;
