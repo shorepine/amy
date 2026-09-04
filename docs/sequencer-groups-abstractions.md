@@ -3,7 +3,7 @@
 AMY's root sequencer stores ordinary events on one global musical timeline.
 Sequencer groups add one reusable, bounded phrase level below that timeline: a
 root event can start a finite or repeating group of ordinary AMY events. They
-do not add a drum machine, arpeggiator, song model, or recursive scheduler.
+do not add a drum machine, arpeggiator, song model, or scheduler hierarchy.
 
 For concrete applications, see the [musical use cases](sequencer-groups-musical-use-cases.md).
 For exact messages, see the [step-by-step how-to](sequencer-groups-howto.md).
@@ -97,7 +97,7 @@ musical meaning to either layer; the controller owns that policy.
 The root sequencer may start a group. A group may contain ordinary AMY events
 and finite gate controls, but it cannot start, publish, or clear a group. This
 provides the two useful musical levels—global arrangement and reusable
-phrase—without cycles or unbounded recursive work.
+phrase—without cycles or variable scheduling depth.
 
 The configured limits independently bound:
 
@@ -124,7 +124,7 @@ reuses the normal event path:
   execution identity, pending stop, and gate state;
 - root events are processed before group events, which makes a root launch and
   its local tick-zero payload sample-clock coherent;
-- recursive group lifecycle operations are rejected while a grouped payload is
+- group-to-group lifecycle operations are rejected while a grouped payload is
   firing.
 
 The public configuration fields and constants are declared in
@@ -146,5 +146,5 @@ The native group regression test exercises legacy root behavior and group
 behavior in the same process. It covers root compatibility, local tag
 namespaces, one/N/infinite repetition, quantization, atomic publication,
 immutable active revisions, same-tick root launches, finite phase-preserving
-gates, recursion rejection, resets, 32-bit clock rollover, and configured
-bounds.
+gates, group-to-group lifecycle rejection, resets, 32-bit clock rollover, and
+configured bounds.

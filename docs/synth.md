@@ -239,7 +239,7 @@ For pattern sequencers like drum machines, you will also want to use `tick` alon
 
 `tag` is optional. If you give one, you can cancel that event later by sending `ticks="0,0,tag"` with the same `tag`. If you omitted `tag` when setting up the sequence (a 1- or 2-value `ticks=`), the event is still scheduled and still fires, but it isn't addressable by any tag -- there's no way to cancel or replace it individually (only by something like `amy.reset()`, discarding all sequenced events), so only omit `tag` for events you don't need to manage later.
 
-If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](docs/api.md) to any function. This will be called at every tick with the current tick number as an argument.
+If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](api.md) to any function. This will be called at every tick with the current tick number as an argument.
 
 ### Reusable sequencer groups
 
@@ -250,8 +250,11 @@ retain their original behavior. Groups are controlled through the single
 `sequence_control` parameter; they can run once, a fixed number of times, or
 continuously, and start/stop can be quantized to AMY's tick clock.
 
-See [Sequencer groups](sequencer-groups.md) for the wire format, lifecycle,
-examples and implementation guarantees.
+See [Sequencer groups](sequencer-groups.md) for the concise wire format and
+lifecycle reference. The accompanying guides explain the
+[abstractions and implementation](sequencer-groups-abstractions.md),
+[musical use cases](sequencer-groups-musical-use-cases.md), and a
+[step-by-step wire and Python example](sequencer-groups-howto.md).
 
 ## Core oscillators
 
@@ -487,6 +490,5 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
 
 

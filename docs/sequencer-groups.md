@@ -104,7 +104,7 @@ A finite gate advances the execution's local clock but suppresses its event
 firings. Audio already sounding is not stopped, and the first event after the
 gate occurs at its original phase. A gate can itself be placed in another
 group as a leaf control; start, publish and clear are rejected while a group
-payload is firing, preventing recursive nesting.
+payload is firing. A group therefore never launches or edits another group.
 
 ## Scheduling a launch at the root
 

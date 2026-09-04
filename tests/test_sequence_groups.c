@@ -271,13 +271,13 @@ static void test_quantized_stop_precedes_boundary_event(void) {
     CHECK(!mark_at("stopped", stop), "stop suppresses the boundary event");
 }
 
-static void test_group_control_cannot_recurse(void) {
-    printf("a group cannot launch a third sequencer level\n");
+static void test_group_to_group_control_is_rejected(void) {
+    printf("a group payload cannot launch another group\n");
     sequencer_reset();
     clear_group(7);
     clear_group(8);
     clear_marks();
-    amy_add_message("H0,4,0,8zPgrandchildZ");
+    amy_add_message("H0,4,0,8zPforbiddenZ");
     amy_add_message("zQ8,3,4Z");
     amy_add_message("H0,4,0,7zQ8,1,1,0Z");
     amy_add_message("zQ7,3,4Z");
@@ -285,7 +285,7 @@ static void test_group_control_cannot_recurse(void) {
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("zQ7,1,1,4Z");
     clock_to(start + 4);
-    CHECK(!marks_named("grandchild"), "nested group launch is rejected");
+    CHECK(!marks_named("forbidden"), "group-to-group launch is rejected");
 }
 
 static void test_resets_keep_definitions_only(void) {
@@ -386,7 +386,7 @@ int main(void) {
     test_c_event_uses_fourth_ticks_field();
     test_quantized_gate_preserves_phase();
     test_quantized_stop_precedes_boundary_event();
-    test_group_control_cannot_recurse();
+    test_group_to_group_control_is_rejected();
     test_resets_keep_definitions_only();
     test_group_start_crosses_clock_rollover();
     test_configured_bounds();
