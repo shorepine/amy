@@ -22,6 +22,7 @@ static int writers_at_pin = 0;
 static int release_writers = 0;
 static int a_hits = 0;
 static int b_hits = 0;
+static int control_failures = 0;
 
 static void after_source_pin(void) {
     pthread_mutex_lock(&rendezvous_lock);
@@ -92,6 +93,49 @@ static void test_losing_writer_retries_cumulatively(void) {
           "the losing compare/retry path loses and duplicates no event");
 }
 
+static void *advance_render_ticks(void *opaque) {
+    uint32_t count = *(uint32_t *)opaque;
+    for (uint32_t i = 0; i < count; ++i) sequencer_midi_clock_tick();
+    return NULL;
+}
+
+static void *change_sequence_gate(void *opaque) {
+    uint32_t count = *(uint32_t *)opaque;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (!sequencer_sequence_control(
+                2, SEQUENCE_CONTROL_GATE, i & 1U, 1))
+            control_failures++;
+    }
+    return NULL;
+}
+
+static void test_render_and_control_threads_share_no_sequence_context(void) {
+    printf("render ticks and external controls keep separate context\n");
+    sequencer_reset();
+    CHECK(sequencer_sequence_add_wire(2, 0, 1, strdup("zPthread-pulseZ")),
+          "periodic definition exists");
+    CHECK(sequencer_sequence_control(2, SEQUENCE_CONTROL_START, 0, 0),
+          "periodic execution starts");
+
+    uint32_t iterations = 2000;
+    pthread_t render_thread;
+    pthread_t control_thread;
+    control_failures = 0;
+    CHECK(pthread_create(&render_thread, NULL, advance_render_ticks,
+                         &iterations) == 0,
+          "render thread starts");
+    CHECK(pthread_create(&control_thread, NULL, change_sequence_gate,
+                         &iterations) == 0,
+          "control thread starts");
+    pthread_join(render_thread, NULL);
+    pthread_join(control_thread, NULL);
+
+    CHECK(control_failures == 0,
+          "all concurrent controls target the active execution");
+    CHECK(sequencer_sequence_reset(2),
+          "external reset is not confused with stored-event dispatch");
+}
+
 // examples.c calls this; the platform normally provides it.
 void delay_ms(uint32_t ms) { (void)ms; }
 
@@ -106,6 +150,7 @@ int main(void) {
     amy_start(config);
 
     test_losing_writer_retries_cumulatively();
+    test_render_and_control_threads_share_no_sequence_context();
 
     amy_stop();
     if (failures) {
