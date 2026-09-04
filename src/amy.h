@@ -73,29 +73,21 @@ extern const uint32_t pcm_wavetable_len;
 
 
 // Set block size and SR. We try for 256/44100, but some platforms don't let us.
-// A host may pick the block at COMPILE time (-DAMY_BLOCK_SIZE=128, any power of
-// two from 32 to 1024); BLOCK_SIZE_BITS then follows it. Left alone, it is
-// 256 (128 on Daisy), exactly as before.
-#ifndef AMY_BLOCK_SIZE
-#ifdef AMY_DAISY
-#define AMY_BLOCK_SIZE 128
-#define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE
-#else
-#define AMY_BLOCK_SIZE 256
-#define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE
-#endif
-#endif
+// The block is a POWER OF TWO -- the per-block amplitude and pan ramps are
+// SHIFTR(delta, BLOCK_SIZE_BITS), not a divide -- so a host chooses it in
+// BITS, at compile time: -DBLOCK_SIZE_BITS=7 is a 128-sample block, 6 is 64.
+// Left alone it is 8 (256 samples), or 7 (128) on Daisy, exactly as before.
 #ifndef BLOCK_SIZE_BITS
-#if (AMY_BLOCK_SIZE & (AMY_BLOCK_SIZE - 1)) || AMY_BLOCK_SIZE < 32 || AMY_BLOCK_SIZE > 1024
-#error "AMY_BLOCK_SIZE must be a power of two from 32 to 1024"
+#ifdef AMY_DAISY
+#define BLOCK_SIZE_BITS 7
+#else
+#define BLOCK_SIZE_BITS 8
 #endif
-// An expression rather than one literal per size, so `make amy/constants.py`
-// (which greps every numeric #define out of this file) keeps reporting the
-// default above rather than whichever literal came last.
-#define BLOCK_SIZE_BITS (AMY_BLOCK_SIZE == 32 ? 5 : AMY_BLOCK_SIZE == 64 ? 6 : \
-                         AMY_BLOCK_SIZE == 128 ? 7 : AMY_BLOCK_SIZE == 256 ? 8 : \
-                         AMY_BLOCK_SIZE == 512 ? 9 : 10) // log2 of AMY_BLOCK_SIZE
 #endif
+#if BLOCK_SIZE_BITS < 5 || BLOCK_SIZE_BITS > 10
+#error "BLOCK_SIZE_BITS must be 5..10 (a block of 32..1024 samples)"
+#endif
+#define AMY_BLOCK_SIZE (1 << BLOCK_SIZE_BITS)
 
 #ifdef AMY_DAISY
 #define AMY_SAMPLE_RATE 48000

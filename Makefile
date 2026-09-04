@@ -96,8 +96,14 @@ HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 
 PYTHONS = $(wildcard *.py)
 
+# The grep below takes every NUMERIC #define out of amy.h. AMY_BLOCK_SIZE is
+# the one derived define -- (1 << BLOCK_SIZE_BITS), since the block has to be
+# a power of two and the bits are the knob -- so it is spelt out afterwards
+# from the BLOCK_SIZE_BITS that landed, or amy.render() and the generated JS
+# API would lose it.
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 	cat src/amy.h  | sed -e 's@^//.*@@' | tr '\t' ' ' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([-0-9][0-9]*\.[0-9]*\)f.*/\1/' | awk '{print $$2 "=" $$3}' > amy/constants.py
+	echo "AMY_BLOCK_SIZE=$$((1 << $$(sed -n 's/^BLOCK_SIZE_BITS=//p' amy/constants.py | tail -1)))" >> amy/constants.py
 	${PYTHON} -m amy.headers
 
 %.o: %.c $(HEADERS) src/patches.h

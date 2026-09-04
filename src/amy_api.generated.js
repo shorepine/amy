@@ -270,7 +270,6 @@ function amy_send(params, log) {
 // Constants from amy/constants.py (mirrors amy.SINE, amy.FILTER_LPF, etc.)
 var AMY = {
   MAX_FILENAME_LEN: 127,
-  AMY_BLOCK_SIZE: 256,
   BLOCK_SIZE_BITS: 8,
   AMY_SAMPLE_RATE: 44100,
   PCM_AMY_SAMPLE_RATE: 22050,
@@ -419,7 +418,8 @@ var AMY = {
   AMYBOARD_MIDI_IN: 21,
   AMY_AUDIO_DEVICE_OUT: 0,
   AMY_AUDIO_DEVICE_IN: 1,
-  AMY_NUM_MIDI_CHANNELS: 16
+  AMY_NUM_MIDI_CHANNELS: 16,
+  AMY_BLOCK_SIZE: 256
 };
 
 if (typeof globalThis !== "undefined") {
