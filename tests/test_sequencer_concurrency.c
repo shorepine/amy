@@ -23,6 +23,7 @@ static int release_writers = 0;
 static int a_hits = 0;
 static int b_hits = 0;
 static int control_failures = 0;
+static int edit_failures = 0;
 
 static void after_source_pin(void) {
     pthread_mutex_lock(&rendezvous_lock);
@@ -99,12 +100,19 @@ static void *advance_render_ticks(void *opaque) {
     return NULL;
 }
 
-static void *change_sequence_gate(void *opaque) {
+static void *change_sequence_gate_and_definition(void *opaque) {
     uint32_t count = *(uint32_t *)opaque;
     for (uint32_t i = 0; i < count; ++i) {
         if (!sequencer_sequence_control(
                 2, SEQUENCE_CONTROL_GATE, i & 1U, 1))
             control_failures++;
+        // Resetting the future definition must not disturb the immutable
+        // snapshot currently read by the render thread. Rebuild it each time
+        // so publication and reclamation race with real tick processing.
+        if (!sequencer_sequence_reset(2)
+            || !sequencer_sequence_add_wire(
+                2, 0, 1, strdup("zPthread-pulseZ")))
+            edit_failures++;
     }
     return NULL;
 }
@@ -121,10 +129,12 @@ static void test_render_and_control_threads_share_no_sequence_context(void) {
     pthread_t render_thread;
     pthread_t control_thread;
     control_failures = 0;
+    edit_failures = 0;
     CHECK(pthread_create(&render_thread, NULL, advance_render_ticks,
                          &iterations) == 0,
           "render thread starts");
-    CHECK(pthread_create(&control_thread, NULL, change_sequence_gate,
+    CHECK(pthread_create(&control_thread, NULL,
+                         change_sequence_gate_and_definition,
                          &iterations) == 0,
           "control thread starts");
     pthread_join(render_thread, NULL);
@@ -132,6 +142,8 @@ static void test_render_and_control_threads_share_no_sequence_context(void) {
 
     CHECK(control_failures == 0,
           "all concurrent controls target the active execution");
+    CHECK(edit_failures == 0,
+          "concurrent future-definition replacement remains available");
     CHECK(sequencer_sequence_reset(2),
           "external reset is not confused with stored-event dispatch");
 }
