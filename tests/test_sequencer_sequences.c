@@ -224,6 +224,19 @@ static void test_root_launches_local_zero_on_same_tick(void) {
           "a root launch includes the child's local tick zero");
 }
 
+static void test_root_can_reset_a_future_definition(void) {
+    printf("root events can reset future stored definitions\n");
+    sequencer_reset();
+    amy_add_message("H0,0,12zPfutureZ");
+    uint32_t reset_tick = sequencer_ticks() + 2;
+    char wire[96];
+    snprintf(wire, sizeof(wire), "H%" PRIu32 ",0HR12Z", reset_tick);
+    amy_add_message(wire);
+    clock_to(reset_tick);
+    CHECK(!sequencer_sequence_control(12, SEQUENCE_CONTROL_START, 0, 0),
+          "a render-fired reset removes the future definition");
+}
+
 static void test_overlapping_executions_need_no_host_identity(void) {
     printf("one sequence tag supports bounded overlapping executions\n");
     sequencer_reset();
@@ -414,6 +427,7 @@ int main(void) {
     test_append_while_active_uses_copy_on_write();
     test_three_definition_generations_overlap();
     test_root_launches_local_zero_on_same_tick();
+    test_root_can_reset_a_future_definition();
     test_overlapping_executions_need_no_host_identity();
     test_parent_stop_leaves_started_child_to_finish();
     test_controller_sequence_bounds_repetition();

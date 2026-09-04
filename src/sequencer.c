@@ -668,8 +668,9 @@ uint8_t sequencer_sequence_reset(uint32_t tag) {
     amy_grab_lock();
     stored_sequence_definition_t *definition = slot->definition;
     slot->definition = NULL;
-    stored_sequence_definition_t *dead =
-        stored_sequence_definition_unref_locked(definition);
+    stored_sequence_definition_t *dead = NULL;
+    if (wire_firing) stored_sequence_definition_retire_locked(definition);
+    else dead = stored_sequence_definition_unref_locked(definition);
     amy_release_lock();
     stored_sequence_definition_destroy(dead);
     stored_sequence_reclaim_retired();
