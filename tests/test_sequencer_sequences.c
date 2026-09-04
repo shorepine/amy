@@ -62,16 +62,30 @@ static void test_untagged_ticks_and_cumulative_tags(void) {
     clear_marks();
     uint32_t first = next_boundary(sequencer_ticks(), 4);
 
-    amy_add_message("H0,4zProotZ");
+    amy_add_message("H,4zProotZ");
     clock_to(first + 4);
-    CHECK(mark_at("root", first), "periodic root event fires at global modulo");
+    CHECK(mark_at("root", first),
+          "an omitted tick remains a tick-zero legacy list field");
     CHECK(mark_at("root", first + 4), "periodic root event keeps looping");
+    sequencer_reset();
+
+    CHECK(sequencer_add_wire(4, 4, 0, false, strdup("zPlegacy-periodZ")),
+          "untagged tick equal to period retains legacy acceptance");
+    sequencer_reset();
+
+    clear_marks();
+    amy_add_message("H,4,8zPomitted-local-zeroZ");
+    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    amy_add_message("HC8,1,4Z");
+    clock_to(start);
+    CHECK(mark_at("omitted-local-zero", start),
+          "H,period,tag remains a reusable tick-zero event");
     sequencer_reset();
 
     clear_marks();
     amy_add_message("H0,0,9zPfirstZ");
     amy_add_message("H2,0,9zPsecondZ");
-    uint32_t start = next_boundary(sequencer_ticks(), 4);
+    start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC9,1,4Z");
     clock_to(start + 2);
     CHECK(mark_at("first", start) && mark_at("second", start + 2),
@@ -112,9 +126,9 @@ static void test_empty_tick_zero_is_reset_but_payload_is_an_event(void) {
     sequencer_reset();
     clear_marks();
     amy_add_message("H0,0,10zPstoredZ");
-    amy_add_message("H0,0,10Z");
+    amy_add_message("H,,10Z");
     CHECK(!sequencer_sequence_control(10, SEQUENCE_CONTROL_START, 0, 0),
-          "an empty H0,0,tag resets that tag");
+          "the legacy empty H,,tag spelling resets that tag");
     amy_add_message("H0,0,10zPstoredZ");
     uint32_t start = next_boundary(sequencer_ticks(), 4);
     amy_add_message("HC10,1,4Z");

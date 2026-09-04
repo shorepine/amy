@@ -286,12 +286,23 @@ def _message_ticks(value):
     if not 1 <= len(values) <= 3:
         raise ValueError('ticks needs tick, optional period, and optional tag.')
     names = ('ticks tick', 'ticks period', 'ticks tag')
-    normalized = [
-        _sequence_uint32(item, names[index])
-        for index, item in enumerate(values)
-    ]
-    if (len(normalized) >= 2 and normalized[1]
-            and normalized[0] >= normalized[1]):
+    normalized = []
+    numeric = []
+    for index, item in enumerate(values):
+        # Empty list fields have always meant zero on the AMY wire. Preserve
+        # that spelling as well as the meaning; the tutorial and existing
+        # callers use ticks=",period,tag" for a tick-zero event.
+        if item is None or (isinstance(item, str) and not item.strip()):
+            normalized.append(item)
+            numeric.append(0)
+        else:
+            parsed = _sequence_uint32(item, names[index])
+            normalized.append(parsed)
+            numeric.append(parsed)
+    # tick < period is a reusable-sequence invariant. Legacy untagged two-
+    # field scheduling retains its historical wire behavior.
+    if (len(numeric) == 3 and numeric[1]
+            and numeric[0] >= numeric[1]):
         raise ValueError('ticks tick must be below its nonzero period.')
     return normalized
 

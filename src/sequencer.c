@@ -464,12 +464,6 @@ uint8_t sequencer_add_wire_with_origin(uint32_t tick, uint32_t period,
         free(wire);
         return 0;
     }
-    if (period != 0 && tick >= period) {
-        fprintf(stderr, "cannot schedule event: tick %" PRIu32
-                " must be below period %" PRIu32 "\n", tick, period);
-        free(wire);
-        return 0;
-    }
     if (has_tag) {
         if (tag >= max_sequences) {
             fprintf(stderr, "sequencer tag %" PRIu32" (with tick %" PRIu32", period %" PRIu32") is greater than or eq max_sequences %" PRIu32"\n",

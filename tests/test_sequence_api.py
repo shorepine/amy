@@ -37,6 +37,9 @@ def main():
     assert amy.message(sequence_reset=7) == "HR7Z"
     assert amy.message(ticks=(1, 4, 2), synth=1, note=60, vel=1) \
         == "H1,4,2n60l1i1Z"
+    assert amy.message(ticks=",24,2", osc=1) == "H,24,2v1Z"
+    assert amy.message(ticks=(None, 24, 2), osc=1) == "H,24,2v1Z"
+    assert amy.message(ticks=(4, 4), osc=1) == "H4,4v1Z"
 
     sent = []
     old_override = amy.override_send
@@ -56,7 +59,7 @@ def main():
 
     expect_error("standalone", lambda: amy.message(sequence_reset=2, synth=1))
     expect_error("tick", lambda: amy.message(ticks=(1.5,), osc=1))
-    expect_error("period", lambda: amy.message(ticks=(4, 4), osc=1))
+    expect_error("period", lambda: amy.message(ticks=(4, 4, 2), osc=1))
     expect_error("tag", lambda: amy.message(ticks=(0, 4, True), osc=1))
     expect_error("only be combined", lambda: amy.message(
         sequence_control=(2, 1), synth=1))

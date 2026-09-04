@@ -737,11 +737,27 @@ static int sequence_ticks_prefix(const char *cursor, uint32_t values[3],
                                  const char **payload) {
     int count = 0;
     while (count < 3) {
-        if (!sequence_uint32(cursor, &cursor, &values[count])) return -1;
+        const char *field = cursor;
+        while (*field == ' ') ++field;
+        if (*field == ',') {
+            // The generic AMY list syntax uses an empty field for zero. Keep
+            // accepting H,period,tag and H,,tag legacy spellings.
+            values[count] = 0;
+            cursor = field;
+        } else if (!sequence_uint32(cursor, &cursor, &values[count])) {
+            return -1;
+        }
         count++;
         if (*cursor != ',') break;
         if (count == 3) return -1;
         cursor++;
+        const char *next = cursor;
+        while (*next == ' ') ++next;
+        // A trailing comma did not add another value in the legacy parser.
+        if (*next == '\0' || isalpha((unsigned char)*next)) {
+            cursor = next;
+            break;
+        }
     }
     if (*cursor != '\0' && !isalpha((unsigned char)*cursor)) return -1;
     *payload = cursor;
