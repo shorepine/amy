@@ -2,86 +2,61 @@
 
 ## Public model
 
-The public model has two ways to use the existing sequencer tag identity:
+The existing sequencer tag is the sequence identity. Every ordinary
+`ticks=(tick, period, tag)` message appends an event to that tag. The tag is
+reset explicitly and controlled with one start/stop operation. There is no
+second group namespace, separate append command, fourth `ticks` field,
+explicit length, or publish/revision operation.
 
-1. `ticks=(tick, period, tag)` keeps the established single-event behavior;
-2. `define_sequence(tag, events)` explicitly gives that tag multiple local
-   events which can be started and stopped as a reusable sequence.
-
-There is no second public group ID, no local event-tag namespace, no fourth
-`ticks` field, no explicit length, and no publish/revision command.
-
-`sequence_control` supplies the three generic runtime operations:
+`sequence_control` provides:
 
 - start, optionally aligned to an AMY sequencer period;
-- stop every active execution of the tag at an optional alignment boundary;
+- stop all active executions of a tag at an optional boundary;
 - gate ordinary events for a finite duration without resetting local phase.
 
-Sequences may start or stop other sequences. A finite controller sequence can
-therefore express a fixed repeat count, and a parent can stop launching new
-note-pair children while children already in progress deliver their note-offs.
+Sequences may start or stop other sequences. A finite controller can therefore
+express a fixed repeat count, and a parent can stop launching new note-pair
+children while children already in progress deliver their note-offs.
 
-## Why executions still exist internally
+## Why executions exist internally
 
-A stored definition and an active execution have different lifetimes even
-though that distinction is not a second public API. An execution needs a local
-start tick and must retain the event data it began with. Without that internal
-separation, changing a future phrase could remove a note-off or alter a fill
-which is already sounding.
+A stored definition and an active execution have different lifetimes without
+being different public abstractions. An execution needs a local start tick and
+must retain the event data it began with. Otherwise editing a future phrase
+could remove a note-off or alter a fill already sounding.
 
-AMY therefore uses a small bounded execution pool and reference-counted,
-copy-on-write definitions. Appending to a definition which an execution still
-uses first clones it. The active execution keeps the old snapshot; later starts
-see the updated contents. No revision number is exposed to callers.
+AMY therefore uses a bounded execution pool and reference-counted copy-on-write
+definitions. Editing a definition used by an execution clones it. The active
+execution keeps its old snapshot; later starts see the new contents. No
+revision number or execution ID is exposed.
 
-Multiple finite executions of one tag may overlap. This is important for
-ordinary musical phrases whose gate time is longer than the interval between
-starts. The execution pool, rather than a caller-managed ID scheme, is the
-bound.
+Finite executions of one tag may overlap. This supports phrases whose note
+gate exceeds their trigger interval without transferring note state to the
+caller.
 
-## Lifetime inference
+## Lifetime inference and tick processing
 
-The component events define lifetime:
+If every event has `period=0`, the execution retires after its greatest local
+tick. If any event has a nonzero period, it remains active until stopped.
 
-- if every event has `period=0`, the execution retires after its greatest local
-  tick has been processed;
-- if any event has a nonzero period, the execution remains active and evaluates
-  that event against elapsed local time until stopped.
+Only untagged scheduled entries and active sequence executions are visited per
+tick. Stored inactive definitions have no per-tick cost. Sequence controls are
+processed before ordinary events, so a boundary stop prevents an event on that
+boundary and a child start can include local tick zero on the same tick.
 
-This avoids an independent length that could disagree with the ordinary
-sequencer periods. A fixed number of repeats is composition: a finite parent
-starts a periodic child and stops it at the required local tick.
-
-## Tick processing
-
-Only active root entries and active sequence executions are visited per tick.
-Stored but inactive definitions have no per-tick cost.
-
-Sequence controls are processed before ordinary events for a tick. Consequently
-a stop scheduled at a period boundary prevents the event on that boundary, and
-a parent launch can make a child's local tick-zero event run on the launch tick.
-
-Temporary gating suppresses ordinary payload dispatch but advances elapsed
-local time normally. Control events are not gated; otherwise a controller could
-mute its own future stop or recovery operation.
+Gating suppresses ordinary payload dispatch while elapsed local time advances.
+Control events are not gated, preventing a controller from muting its own
+recovery operation.
 
 ## Bounds and recovery
 
-All storage is configured at startup:
+Startup configuration bounds tags, events per definition, and simultaneous
+executions. A cyclic control graph may fill the execution pool, but cannot grow
+beyond it; later starts fail clearly and the caller can stop a tag or reset the
+sequencer.
 
-- `max_sequencer_tags`: shared public identities;
-- `max_sequence_events`: maximum events in one stored definition;
-- `max_sequence_executions`: active and pending executions.
-
-Definitions allocate event storage only when first used. The render path does
-not perform unbounded allocation. A recursive or cyclic control graph can fill
-the execution pool, but cannot grow past it; further starts fail and the caller
-can stop a tag or reset the sequencer.
-
-## Compatibility boundary
-
-The legacy parser, C event layout, anonymous-event pool, modulo timing,
-same-tag replacement, MIDI/external-clock behavior, and root active-list order
-are unchanged. Reusable accumulation only occurs through the explicit sequence
-API. Tests cover both the old path and the interaction between legacy and
-reusable forms.
+The ordinary three-field C event layout remains unchanged. Untagged one-off
+and periodic scheduling, MIDI/external-clock behavior, and global reset retain
+their existing behavior. The intentional API change is that a supplied tag now
+creates a stopped reusable sequence and repeated writes cumulate instead of
+replacing one scheduled event.

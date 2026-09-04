@@ -203,7 +203,7 @@ amy_start(amy_config);
 | `write_samples_fn` | fn ptr | `NULL` | If provided, `amy_update` will call this with each new block of samples | 
 | `max_oscs` | Int | 180 | How many oscillators to support |
 | `max_buses` | Int | 4 | How many FX buses to support. No compile-time ceiling — every bus-indexed table is allocated from this at `amy_start`. Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
-| `max_sequencer_tags` | Int | 256 | Size of the tag space shared by legacy root events and reusable sequences |
+| `max_sequencer_tags` | Int | 256 | Number of reusable sequencer tag identities |
 | `max_sequence_events` | Int | 64 | Maximum ordinary events in one reusable tagged sequence |
 | `max_sequence_executions` | Int | 32 | Maximum active or alignment-pending reusable-sequence executions |
 | `max_voices` | Int | 64 | How many voices |
@@ -505,9 +505,8 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
-| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Existing tick, period and tag scheduling. `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. A legacy tagged write keeps its replace-by-tag behavior. **If used in a wire string message**, the `H` **must** be the first character of the message. |
-| `HA`   | — | `sequence_event` | tag,tick,period | Explicitly append an ordinary event to a [reusable tagged sequence](sequencer-sequences.md). Prefer `amy.define_sequence()` in Python. |
-| `HR`   | — | `sequence_reset` | tag | Clear the future root event and reusable definition at one tag; already-started immutable executions may finish. |
+| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | `tag` omitted: schedule directly on the global clock. `tag` supplied: append to that reusable sequence using local ticks; repeating a tag cumulates. **If used in a wire string message**, the `H` **must** be the first character of the message. |
+| `HR`   | — | `sequence_reset` | tag | Clear the future definition at one tag; already-started immutable executions may finish. |
 | `HC`   | — | `sequence_control` | tag,start-or-stop[,alignment] or tag,gate,duration[,alignment] | Start, stop, align, or temporarily gate a reusable tagged sequence. |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |

@@ -225,8 +225,6 @@ You can schedule an event with `amy.send(..., ticks="tick,period,tag")`. All thr
 ```python
 amy.send(osc=0, wave=amy.SAW_UP, eg0="0,1,500,0,500,0")  # Pluck tone
 amy.send(osc=0, note=50, vel=1, ticks=amy.sequencer_ticks() + 96)   # one-off: fires once, ~1s from now
-amy.send(osc=0, note=38, vel=1, ticks="0,24,7")    # repeating, cancelable via tag 7
-amy.send(osc=0, ticks="0,0,7")                     # cancel tag 7
 amy.send(osc=0, note=72, vel=1, ticks="0,24")      # repeating, not individually cancelable
 amy.reset()   # Stop everything
 ```
@@ -237,18 +235,22 @@ You can schedule repeating events (like a step sequencer or drum machine) with `
 
 For pattern sequencers like drum machines, you will also want to use `tick` alongside `period`. If both are given and `period` is nonzero, `tick` is assumed to be an offset on the `period`. For example, for a 16-step drum machine pattern running on eighth notes (PPQ/2), you would use a `period` of `16 * 24 = 384`. The first slot of the drum machine would have a `tick` of 0, the 2nd would have a `tick` offset of 24, and so on.
 
-`tag` is optional. If you give one, you can cancel that event later by sending `ticks="0,0,tag"` with the same `tag`. If you omitted `tag` when setting up the sequence (a 1- or 2-value `ticks=`), the event is still scheduled and still fires, but it isn't addressable by any tag -- there's no way to cancel or replace it individually (only by something like `amy.reset()`, discarding all sequenced events), so only omit `tag` for events you don't need to manage later.
+`tag` is optional. Without one, an event is scheduled directly on the global
+sequencer clock and cannot be addressed individually. With a tag, the event is
+added to a reusable sequence and its tick becomes local to each start of that
+sequence. Repeating a tag accumulates events; reset the tag explicitly before
+replacing its contents.
 
 If you are including AMY in a program, you can set the [hook `void (*amy_external_sequencer_hook)(uint32_t)`](api.md) to any function. This will be called at every tick with the current tick number as an argument.
 
 ### Reusable tagged sequences
 
-An existing sequencer tag can explicitly hold several ordinary events with
-local tick values. `amy.define_sequence(tag, events)` replaces that reusable
-definition, while legacy three-value `ticks=(tick, period, tag)` retains its
-single-event replace behavior. `sequence_control` starts, stops, aligns, or
-temporarily gates an active tagged sequence. Component periods define looping;
-a definition containing only period-zero events finishes after its last event.
+A sequencer tag holds one or more ordinary events with local tick values.
+Repeated three-value `ticks=(tick, period, tag)` messages cumulate behind the
+same tag. `amy.define_sequence(tag, events)` is the convenient replace-as-a-list
+operation. `sequence_control` starts, stops, aligns, or temporarily gates an
+active tagged sequence. Component periods define looping; a definition
+containing only period-zero events finishes after its last event.
 
 See [Reusable sequencer sequences](sequencer-sequences.md) for the concise API
 and lifecycle reference. The accompanying guides explain the
@@ -490,4 +492,3 @@ amy.start_sample(preset=1024, source=amy.SAMPLE_FROM_OUTPUT, max_frames=11025, m
 amy.send(osc=0, wave=amy.PCM_LEFT, preset=1024, pan=0, note=72, vel=1) # play back AUDIO_IN sample an octave higher
 amy.send(osc=1, wave=amy.PCM_RIGHT, preset=1024, pan=1, note=72, vel=1) 
 ```
-
