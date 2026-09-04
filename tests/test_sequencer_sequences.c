@@ -148,6 +148,68 @@ static void test_active_definition_is_immutable(void) {
           "a later start uses only the replacement definition");
 }
 
+static void test_append_while_active_uses_copy_on_write(void) {
+    printf("appending while active publishes a future definition\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,0,11zPbaseZ");
+    amy_add_message("H6,0,11zPold-tailZ");
+    amy_add_message("HC11,1,0Z");
+    uint32_t old_start = sequencer_ticks() + 1;
+    clock_to(old_start + 1);
+
+    amy_add_message("H2,0,11zPappendedZ");
+    clock_to(old_start + 6);
+    CHECK(mark_at("base", old_start) && mark_at("old-tail", old_start + 6),
+          "the active execution retains its original events");
+    CHECK(!mark_at("appended", old_start + 2),
+          "an append cannot enter an already-running snapshot");
+
+    clear_marks();
+    amy_add_message("HC11,1,0Z");
+    uint32_t new_start = sequencer_ticks() + 1;
+    clock_to(new_start + 6);
+    CHECK(mark_at("base", new_start)
+          && mark_at("appended", new_start + 2)
+          && mark_at("old-tail", new_start + 6),
+          "a later execution sees the cumulative appended definition");
+}
+
+static void test_three_definition_generations_overlap(void) {
+    printf("three immutable definition generations can overlap\n");
+    sequencer_reset();
+    clear_marks();
+    amy_add_message("H0,0,12zPbaseZ");
+    amy_add_message("H12,0,12zPtailZ");
+
+    amy_add_message("HC12,1,0Z");
+    uint32_t first_start = sequencer_ticks() + 1;
+    clock_to(first_start);
+
+    amy_add_message("H2,0,12zPsecondZ");
+    amy_add_message("HC12,1,0Z");
+    uint32_t second_start = sequencer_ticks() + 1;
+    clock_to(second_start);
+
+    amy_add_message("H4,0,12zPthirdZ");
+    amy_add_message("HC12,1,0Z");
+    uint32_t third_start = sequencer_ticks() + 1;
+    clock_to(third_start + 12);
+
+    CHECK(mark_at("base", first_start)
+          && !mark_at("second", first_start + 2)
+          && !mark_at("third", first_start + 4),
+          "the first execution keeps generation one");
+    CHECK(mark_at("base", second_start)
+          && mark_at("second", second_start + 2)
+          && !mark_at("third", second_start + 4),
+          "the second execution keeps generation two");
+    CHECK(mark_at("base", third_start)
+          && mark_at("second", third_start + 2)
+          && mark_at("third", third_start + 4),
+          "the third execution sees generation three");
+}
+
 static void test_root_launches_local_zero_on_same_tick(void) {
     printf("root events can launch stored sequences\n");
     sequencer_reset();
@@ -349,6 +411,8 @@ int main(void) {
     test_repeated_tag_and_one_shot_lifetime();
     test_empty_tick_zero_is_reset_but_payload_is_an_event();
     test_active_definition_is_immutable();
+    test_append_while_active_uses_copy_on_write();
+    test_three_definition_generations_overlap();
     test_root_launches_local_zero_on_same_tick();
     test_overlapping_executions_need_no_host_identity();
     test_parent_stop_leaves_started_child_to_finish();
