@@ -35,6 +35,10 @@ git clone --branch godot-4.4-stable https://github.com/godotengine/godot-cpp.git
 
 The script builds the native GDExtension library and copies everything into `your_project/addons/amy/`.
 
+See the [Windows `M_PI` portability note](windows-m-pi-portability.md) for the
+MSVC build failure introduced by the PCM time-stretch Hann window, why older
+Windows builds were unaffected, and how the guarded fallback was validated.
+
 If you want to point to a `godot-cpp` checkout in a different location:
 
 ```bash

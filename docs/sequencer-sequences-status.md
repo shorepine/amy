@@ -165,3 +165,8 @@ the sequence behavior itself is implemented in the common C core.
 
 See [Abstractions and implementation](sequencer-sequences-abstractions.md) for
 the snapshot publication and deferred-reclamation design.
+
+The independently discovered MSVC build failure and its portable correction
+are documented in [Windows portability of the PCM Hann-window
+constant](windows-m-pi-portability.md). That correction does not change any
+reusable-sequence behavior.
