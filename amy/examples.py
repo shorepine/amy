@@ -257,18 +257,14 @@ def example_sequencer_drums():
     # Update high cowbell
     amy.send(osc=4, note=70)
 
-    # Add patterns
-    # Hi hat every 1/8th note
-    amy.send(ticks=[0, 24, 0], osc=2, vel=2.0)
-
-    # Bass drum every quarter note
-    amy.send(ticks=[0, 96, 1], osc=0, vel=1.0)
-
-    # Snare every quarter note, counterphase to BD
-    amy.send(ticks=[24, 96, 2], osc=1, vel=1.0)
-
-    # Cow once every other cycle
-    amy.send(ticks=[0, 192, 3], osc=3, vel=1.0)
+    # Store all parts as one reusable pattern, then start it explicitly.
+    amy.define_sequence(0, [
+        dict(ticks=(0, 24), osc=2, vel=2.0),   # hi-hat every eighth note
+        dict(ticks=(0, 96), osc=0, vel=1.0),   # bass drum every quarter
+        dict(ticks=(24, 96), osc=1, vel=1.0),  # counterphase snare
+        dict(ticks=(0, 192), osc=3, vel=1.0),  # cowbell every other cycle
+    ])
+    amy.send(sequence=0, action='start', alignment_period=1)
 
 def example_fm():
     amy.reset()

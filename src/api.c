@@ -2,6 +2,7 @@
 // C callable entry points to amy
 
 #include "amy.h"
+#include "sequencer.h"
 
 amy_config_t amy_default_config() {
     amy_config_t c;
@@ -48,9 +49,8 @@ amy_config_t amy_default_config() {
     c.max_oscs = 250;
     c.max_buses = AMY_DEFAULT_NUM_BUSES;
     c.max_sequencer_tags = 256;
-    c.max_sequence_groups = 32;
-    c.max_sequence_group_tags = 64;
-    c.max_sequence_group_executions = 32;
+    c.max_sequence_events = 64;
+    c.max_sequence_executions = 32;
     c.max_voices = 64;
     c.max_synths = 64;
     c.max_memory_patches = 32;
@@ -190,7 +190,6 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->ticks[TICKS_TICK]);
     AMY_UNSET(e->ticks[TICKS_PERIOD]);
     AMY_UNSET(e->ticks[TICKS_TAG]);
-    AMY_UNSET(e->ticks[TICKS_GROUP]);
     AMY_UNSET(e->eq_l);
     AMY_UNSET(e->eq_m);
     AMY_UNSET(e->eq_h);
@@ -295,6 +294,7 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
         // Transfer status can't change mid-message, so the whole string is
         // one chunk of transfer payload.
         parse_transfer_message(message, (uint16_t)strlen(message));
+        sequencer_reclaim_retired();
         return;
     }
     // Fast pre-check of this message for a leading 'H' (ticks) scheduling
@@ -305,11 +305,25 @@ void amy_add_message_with_sysex_flag(char *message, bool sysex) {
         // Not scheduled: parse and play every command in the message now.
         amy_play_message(message);
     }
+    // Public wire ingestion is a control-side boundary. Sequence playback uses
+    // amy_play_message()/handle_ticks_message() directly, so it can never enter
+    // this reclamation path from the render thread.
+    sequencer_reclaim_retired();
 }
 
 // given a wire message string play / schedule the event directly (WIRE API)
 void amy_add_message(char *message) {
     amy_add_message_with_sysex_flag(message, /* sysex */ false);
+}
+
+void amy_add_message_from_render(char *message) {
+    if (message[0] == 'H') {
+        handle_ticks_message_with_origin(
+            message, SEQUENCER_ORIGIN_RENDER,
+            amy_global.sequencer_tick_count);
+    } else {
+        amy_play_message(message);
+    }
 }
 
 // Like amy_add_message but marks the message as coming from an external
@@ -324,7 +338,7 @@ void amy_send_wire_from_sysex(char *message) {
 void amy_add_event(amy_event *e) {
     peek_stack("add_event");
     // was amy_process_event
-    if(AMY_IS_SET(e->ticks[TICKS_TICK]) || AMY_IS_SET(e->ticks[TICKS_PERIOD]) || AMY_IS_SET(e->ticks[TICKS_TAG]) || AMY_IS_SET(e->ticks[TICKS_GROUP])) {
+    if(AMY_IS_SET(e->ticks[TICKS_TICK]) || AMY_IS_SET(e->ticks[TICKS_PERIOD]) || AMY_IS_SET(e->ticks[TICKS_TAG])) {
         // C-API ticks event: serialize it to a wire message and hand it to
         // the sequencer, so scheduled events have a single storage format.
         char *buf = (char *)malloc_caps(MAX_MESSAGE_LEN, amy_global.config.ram_caps_events);

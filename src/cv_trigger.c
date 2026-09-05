@@ -116,7 +116,7 @@ void cv_trigger_generate_events(float *cv_inputs) {
                    char message[AMY_WIRE_COMMAND_LEN];
                    substitute_midi_special_values(message, cv_trig->message_template, 0, 0, note);
                    //fprintf(stderr, "update_external_cv_in: message %s\n", message);
-                   amy_add_message(message);
+                   amy_add_message_from_render(message);
                 }
             }
         } else if ((polarity * cv_val) < (polarity * cv_trig->thresh_reset)) {

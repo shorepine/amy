@@ -1,13 +1,12 @@
 // Regression test for the sequencer tag bounds check.
 //
-// User-addressable tags index `sequences[0 .. max_sequences-1]`, and the
-// anonymous pool lives immediately after, at
-// [max_sequences .. max_sequences+AMY_ANON_SEQUENCE_SLOTS). An earlier
+// User-addressable tags once indexed `sequences[0 .. max_sequences-1]`, with
+// the anonymous pool immediately after it. An earlier
 // version of the sequencer guarded with `tag > max_sequences` (and read
 // the tag into an int32_t), which let tag == max_sequences write one
 // entry past the user range — in those days one element past the whole
-// allocation, a heap overflow; today it would silently clobber an
-// anonymous entry instead. sequencer_add_wire() now checks
+// allocation, a heap overflow. Tagged definitions and anonymous direct events
+// now use separate storage, and sequencer_add_wire() still checks
 // `tag >= (uint32_t)max_sequences` unsigned, which also disposes of the
 // negative-reindex case: a tag past INT32_MAX stays a huge unsigned
 // value and fails the same compare, so it can never index backwards.
@@ -76,16 +75,14 @@ static int audible(int osc) {
     return synth[osc] != NULL && synth[osc]->status == SYNTH_AUDIBLE;
 }
 
-// Whether a tag was accepted is observable two ways: the sequence fires
-// (osc goes audible), and something is in the active list at all.
-extern int32_t first_active;
-
 static int accepted(uint32_t tag) {
     sequencer_reset();
     seq_note_on_at_tag(tag, 0);
+    int scheduled = sequencer_sequence_control(
+        tag, SEQUENCE_CONTROL_START, 0, 0);
     advance_secs(0.5);
     int fired = audible(0);
-    int scheduled = (first_active != -1);
+    sequencer_sequence_control(tag, SEQUENCE_CONTROL_STOP, 0, 0);
     seq_clear(tag);
     all_off();
     sequencer_reset();
@@ -110,9 +107,7 @@ static void test_tag_bounds(void) {
     CHECK(!accepted(0x80000000u), "a tag past INT32_MAX is rejected");
 }
 
-// An out-of-range user tag must not clobber the anonymous pool that sits
-// right past the user range. Occupy anonymous slot 0 (the entry a
-// too-lenient check would land tag==max on), then try to overwrite it.
+// An out-of-range user tag must not affect the separate anonymous pool.
 static void test_no_anon_clobber(void) {
     printf("an out-of-range tag can't clobber an anonymous entry\n");
     sequencer_reset();

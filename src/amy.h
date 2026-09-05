@@ -363,13 +363,10 @@ enum coefs{
 #define TICKS_TICK 0
 #define TICKS_PERIOD 1
 #define TICKS_TAG 2
-#define TICKS_GROUP 3
 
 #define SEQUENCE_CONTROL_STOP 0
 #define SEQUENCE_CONTROL_START 1
 #define SEQUENCE_CONTROL_GATE 2
-#define SEQUENCE_CONTROL_PUBLISH 3
-#define SEQUENCE_CONTROL_CLEAR 4
 
 // Reset masks
 #define RESET_SEQUENCER 4096
@@ -674,7 +671,7 @@ typedef struct amy_event {
     uint16_t num_voices;
     uint8_t oscs_per_voice;  // Used when initializing a synth without a patch.
     //
-    uint32_t ticks[4]; // tick, period, tag, optional group tag
+    uint32_t ticks[3]; // tick, period, tag
     //
     uint8_t note_source_channel;  // .. to mark the channel of events that come from MIDI so we don't send them back out again.
     uint32_t reset_osc;
@@ -894,10 +891,6 @@ typedef struct  {
     uint16_t max_buses;
     uint8_t ks_oscs;
     uint32_t max_sequencer_tags;
-    // Group tag zero is reserved for the existing root sequencer.
-    uint32_t max_sequence_groups;
-    uint32_t max_sequence_group_tags;
-    uint32_t max_sequence_group_executions;
     uint32_t max_voices;
     uint32_t max_synths;
     uint32_t max_memory_patches;
@@ -964,6 +957,11 @@ typedef struct  {
     // device ids for miniaudio platforms
     int8_t capture_device_id;
     int8_t playback_device_id;
+
+    // Append new configuration fields here so existing members retain their
+    // offsets for callers compiled against an earlier amy_config_t layout.
+    uint32_t max_sequence_events;
+    uint32_t max_sequence_executions;
 
 } amy_config_t;
 
@@ -1171,6 +1169,10 @@ uint32_t ms_to_samples(uint32_t ms) ;
 
 // API
 void amy_add_message(char *message);
+// Internal render-side ingress, used by CV triggers. It deliberately avoids
+// variable-time sequence reclamation and gives sequence controls the current
+// render tick rather than pretending they came from an external caller.
+void amy_add_message_from_render(char *message);
 // Parse and play a stored wire message now (a fired sequencer entry).
 void amy_play_message(char *message);
 // Like amy_add_message but the data is treated as coming from an external
