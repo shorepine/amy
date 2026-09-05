@@ -64,7 +64,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api
+.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api js-api-test
 
 default: $(TARGET)
 all: default
@@ -82,6 +82,9 @@ check-c-api:
 	$(PYTHON) scripts/gen_amy_js_api.py --check
 	$(PYTHON) scripts/gen_patches_js.py --check
 	$(PYTHON) scripts/gen_pcm_presets_js.py --check
+
+js-api-test:
+	node tests/test_js_api.js
 
 SOURCES += src/algorithms.c src/amy.c src/envelope.c src/examples.c src/parse.c \
 	src/filters.c src/oscillators.c src/pcm.c src/interp_partials.c src/custom.c \
@@ -124,6 +127,9 @@ amy-message: $(OBJECTS) src/amy-message.o
 # Plain C tests for things the audio-rendering suite can't reach -- e.g. clock
 # rollovers 50 days out, which you can only hit by fast-forwarding the counters.
 CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_bounds \
+	         tests/test_sequencer_sequences \
+	         tests/test_sequencer_oom \
+	         tests/test_sequencer_concurrency \
          tests/test_bus_config tests/test_patch_slots \
          tests/test_synth_readout tests/test_log2_lut tests/test_clone_on_grow \
          tests/test_timebase_reset tests/test_osc_free_on_release \
@@ -131,11 +137,27 @@ CTESTS = tests/test_clock_wrap tests/test_sequencer_active tests/test_sequencer_
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
-$(addsuffix .o,$(CTESTS)): %.o: %.c $(HEADERS) src/patches.h
+SEQUENCE_SPECIAL_TESTS = tests/test_sequencer_oom tests/test_sequencer_concurrency
+
+$(addsuffix .o,$(filter-out $(SEQUENCE_SPECIAL_TESTS),$(CTESTS))): %.o: %.c $(HEADERS) src/patches.h
 	$(CC) $(CFLAGS) -Isrc -c $< -o $@
 
-$(CTESTS): %: %.o $(OBJECTS)
+$(filter-out $(SEQUENCE_SPECIAL_TESTS),$(CTESTS)): %: %.o $(OBJECTS)
 	$(CC) $(CFLAGS) $(OBJECTS) $< -Wall $(LIBS) -o $@
+
+# Build only the sequencer and its OOM test with the test-only allocation hook;
+# every other test and every production target uses the ordinary object.
+tests/sequencer_testing_impl.o: src/sequencer.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -c $< -o $@
+
+tests/test_sequencer_oom.o: tests/test_sequencer_oom.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -Isrc -c $< -o $@
+
+tests/test_sequencer_concurrency.o: tests/test_sequencer_concurrency.c $(HEADERS) src/patches.h
+	$(CC) $(CFLAGS) -DAMY_SEQUENCE_TESTING -Isrc -c $< -o $@
+
+$(SEQUENCE_SPECIAL_TESTS): %: %.o tests/sequencer_testing_impl.o $(filter-out src/sequencer.o,$(OBJECTS))
+	$(CC) $(CFLAGS) $(filter-out src/sequencer.o,$(OBJECTS)) tests/sequencer_testing_impl.o $< -Wall $(LIBS) -o $@
 
 ctest: $(CTESTS)
 	@for t in $(CTESTS); do echo "== $$t"; ./$$t || exit 1; done
@@ -144,6 +166,7 @@ amy-module: amy-example
 	${EXTRA_PIP_ENV} ${PYTHON} -m pip install -r requirements.txt; touch src/amy.c; ${EXTRA_PIP_ENV} ${PYTHON} -m pip install . --force-reinstall --no-deps; cd ..
 
 test: amy-module
+	${PYTHON} tests/test_sequence_api.py
 	${PYTHON} -m amy.test
 
 qtest: amy-module

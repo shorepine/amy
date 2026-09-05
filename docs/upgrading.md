@@ -3,6 +3,57 @@
 Here we will post breaking APIs between releases of AMY and tips on porting.
 
 
+## Reusable sequencer sequences (unreleased)
+
+For the complete compatibility matrix, migration lifecycle, validation status,
+and target-dependent checks, see
+[Reusable sequence status and compatibility](sequencer-sequences-status.md).
+
+Supplying the same tag in more than one three-value `ticks=` message now
+accumulates all those events into a stopped reusable sequence. Previously, a
+later event replaced the earlier event at that tag. This intentional change
+makes a tag behave like a synth identity: repeated messages build it up.
+
+Tagged events therefore no longer begin repeating merely because they were
+defined. Callers which used a unique tag as the replace/remove identity of one
+automatically active event must either use tagless direct scheduling or adapt
+their wrapper to reset, define, and explicitly start that tag. Updating such a
+wrapper should stop the old execution, reset the future definition, append the
+replacement events, and start it at the required alignment boundary.
+
+Code which only needs direct one-off or periodic scheduling should omit the
+tag and keep using one- or two-value `ticks`:
+
+```python
+amy.send(ticks=(20,), synth=1, note=60, vel=1)
+amy.send(ticks=(24,), synth=1, note=60, vel=0)
+```
+
+To replace a tagged definition, reset it explicitly before appending its new
+events. The Python helper validates the complete replacement before sending
+anything:
+
+```python
+amy.define_sequence(7, [
+    dict(ticks=(0,), synth=1, note=60, vel=1),
+    dict(ticks=(12,), synth=1, note=60, vel=0),
+])
+amy.send(sequence=7, action='start', alignment_period=1)
+```
+
+Sequence control is an explicit action, not a note velocity. Use
+`action='start'`, `action='stop'`, or `action='gate'` in the Python convenience
+API; gate additionally requires `duration`. The corresponding low-level and
+wire action values are the integers `1`, `0`, and `2`; fractional values are
+rejected.
+
+The C configuration adds `max_sequence_events` and
+`max_sequence_executions`. They are appended to `amy_config_t`; initialize the
+structure with `amy_default_config()` and then override named fields, as in all
+current AMY examples. Recompile applications together with the updated AMY
+headers and library whenever the public configuration structure changes.
+
+
 ## 1.0.X -> 1.1.X
 
 This is a big change that moves a lot of stuff you used to have to do yourself into AMY itself -- voice and synth handling, note stealing, MIDI, I2S, sequencer.
@@ -69,5 +120,3 @@ void loop() {
     e.patch_number = 1024;
     patches_store_patch(&e, "v0w7f0");  // Or whatever the wire string defining your patch is.
 ```
-
-

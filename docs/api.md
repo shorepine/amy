@@ -203,7 +203,9 @@ amy_start(amy_config);
 | `write_samples_fn` | fn ptr | `NULL` | If provided, `amy_update` will call this with each new block of samples | 
 | `max_oscs` | Int | 180 | How many oscillators to support |
 | `max_buses` | Int | 4 | How many FX buses to support. No compile-time ceiling — every bus-indexed table is allocated from this at `amy_start`. Each bus costs a few KB of mix buffers even when idle, plus whatever its effects allocate once switched on |
-| `max_sequencer_tags` | Int | 256 | How many sequencer items to handle |
+| `max_sequencer_tags` | Int | 256 | Number of reusable sequencer tag identities |
+| `max_sequence_events` | Int | 64 | Maximum ordinary events in one reusable tagged sequence |
+| `max_sequence_executions` | Int | 32 | Maximum active or alignment-pending reusable-sequence executions |
 | `max_voices` | Int | 64 | How many voices |
 | `max_synths` | Int | 64 | How many synths |
 | `max_memory_patches` | Int | 32 | How many in memory patches to supprot |
@@ -503,7 +505,9 @@ At bus scope only the constant term of `GD`/`GM` is used; a bus sum has no per-n
 
 | Wire code   | C `amy_event` | Python / JS   | Type-range  | Notes                                 |
 | ------ | -------- | ---------- | ----------  | ------------------------------------- |
-| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | Tick, period, tag for sequencing (see "AMY's sequencer" in synth.md). `tag` omitted: stored but not individually cancelable. `period` also omitted: a one-off event at that tick. **If used in a wire string message**, the `H` **must** be the first character of the message. |
+| `H`    | `ticks[3]` | `ticks` | int[,int[,tag]] | `tag` omitted: schedule directly on the global clock. `tag` supplied: append to that reusable sequence using local ticks; repeating a tag cumulates. **If used in a wire string message**, the `H` **must** be the first character of the message. |
+| `HR`   | — | `sequence_reset` | tag | Clear the future definition at one tag; already-started immutable executions may finish. |
+| `HC`   | — | `sequence_control` | tag,action[,alignment] or tag,gate,duration[,alignment] | Stop (`action=0`), start (`action=1`), align, or temporarily gate (`action=2`) a reusable tagged sequence. Actions are integers, not velocity or fractional values. Python callers use the named `action='stop'`, `'start'`, or `'gate'`; gate also requires `duration`. |
 | `j`    | `tempo` | `tempo`  | float | The tempo (BPM, quarter notes) of the sequencer. Defaults to 108.0. |
 | `zY`   | **TODO** | `sequencer_run` | 0/1 | Sequencer transport: `zY1` starts the sequencer, `zY0` stops it.  Lets a host drive playback without MIDI clock sync (see `external_midi_sync`). |
 | `zC`   | **TODO** | `external_midi_sync` | 0/1/2 | MIDI clock sync: 1 = the sequencer follows incoming MIDI realtime clock/start/stop (0xF8/0xFA/0xFC); 2 = AMY is the clock master, sending those messages (0xF8 at 24 PPQ from the internal tempo, 0xFA/0xFC on transport start/stop); 0 (default) = internal clock, neither follows nor sends. |

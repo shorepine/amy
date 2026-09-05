@@ -1,21 +1,8 @@
-// The sequencer's per-tick cost should track what is SCHEDULED, not what
-// tag number happened to be used.
-//
-// sequencer_process_tick() used to sweep 0..highest_tag, and highest_tag
-// was a high-water mark that only ever grew — cleared sequences never
-// brought it down. So one event parked at a high tag made every tick
-// scan that far for the rest of the session, and raising
-// max_sequencer_tags made the worst case proportionally worse. The
-// anonymous pool made this the common case, not a corner: anonymous
-// ticks= entries are allocated round-robin at indices past
-// max_sequences, so a burst of one-shots pinned the mark at the very
-// end of the table permanently. The occupied slots are threaded through
-// the table as an ascending list now.
-//
-// The headline check here is an INVARIANT rather than a benchmark: one
-// sequence at tag 0 and one sequence at tag max-1 must cost the same,
-// because both are one sequence. Under the old sweep the second cost
-// ~max times the first.
+// The sequencer's per-tick cost should track active work, not the numeric value
+// of a public tag. Tagged definitions are stored separately from the small
+// anonymous direct-scheduling pool, and active executions occupy a bounded
+// pool. Consequently one sequence at tag 0 and one at tag max-1 have the same
+// scan cost.
 //
 // Build/run with `make ctest`.
 
@@ -53,10 +40,12 @@ static void seq_note_on(int32_t tag, int osc) {
     e.ticks[TICKS_PERIOD] = 16;
     e.ticks[TICKS_TAG] = (uint32_t)tag;
     amy_add_event(&e);
+    sequencer_sequence_control((uint32_t)tag, SEQUENCE_CONTROL_START, 0, 0);
 }
 
-// Clearing is a send to the same tag with neither tick nor period.
+// Stop active playback, then clear the future definition.
 static void seq_clear(int32_t tag) {
+    sequencer_sequence_control((uint32_t)tag, SEQUENCE_CONTROL_STOP, 0, 0);
     amy_event e = amy_default_event();
     e.ticks[TICKS_TICK] = 0;
     e.ticks[TICKS_PERIOD] = 0;
@@ -105,10 +94,8 @@ static void test_out_of_order_and_clear(void) {
     all_off();
 }
 
-// Anonymous entries (1- or 2-value ticks=, no tag) live past the user tag
-// range. They should fire once, disappear, and — with the active list —
-// leave no lasting per-tick cost behind. Under the old sweep, one
-// anonymous entry pinned the scan at the far end of the table forever.
+// Anonymous entries (1- or 2-value ticks=, no tag) use a separate pool. They
+// should fire once, disappear, and leave no lasting per-tick cost behind.
 static void test_anonymous_one_shots(void) {
     printf("anonymous one-shots fire once and leave the list empty\n");
     sequencer_reset();

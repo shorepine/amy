@@ -5,6 +5,7 @@
 #include "transfer.h"  // for amy_dump_state_to_sysex, amy_dump_file_to_sysex
 #include <ctype.h>  // for isalpha().
 #include <assert.h>
+#include <errno.h>
 #if defined(TULIP) || defined(AMYBOARD)
 #include "py/runtime.h"
 #endif
@@ -704,27 +705,165 @@ size_t yield_event_from_message(char *message, amy_event *e, size_t pos) {
     return pos;
 }
 
+static bool sequence_uint32(const char *cursor, const char **end,
+                            uint32_t *value) {
+    while (*cursor == ' ') ++cursor;
+    if (!isdigit((unsigned char)*cursor)) return false;
+    errno = 0;
+    char *parsed_end = NULL;
+    unsigned long long parsed = strtoull(cursor, &parsed_end, 10);
+    if (errno == ERANGE || parsed > UINT32_MAX) return false;
+    while (*parsed_end == ' ') ++parsed_end;
+    *value = (uint32_t)parsed;
+    *end = parsed_end;
+    return true;
+}
+
+static int sequence_control_uint_tail(const char *cursor, uint32_t *values,
+                                      int capacity) {
+    int count = 0;
+    while (*cursor == ',') {
+        ++cursor;
+        if (count == capacity
+            || !sequence_uint32(cursor, &cursor, &values[count]))
+            return -1;
+        count++;
+    }
+    if (*cursor != '\0' && (*cursor != 'Z' || cursor[1] != '\0')) return -1;
+    return count;
+}
+
+static int sequence_ticks_prefix(const char *cursor, uint32_t values[3],
+                                 const char **payload) {
+    int count = 0;
+    while (count < 3) {
+        const char *field = cursor;
+        while (*field == ' ') ++field;
+        if (*field == ',') {
+            // The generic AMY list syntax uses an empty field for zero. Keep
+            // accepting H,period,tag and H,,tag legacy spellings.
+            values[count] = 0;
+            cursor = field;
+        } else if (!sequence_uint32(cursor, &cursor, &values[count])) {
+            return -1;
+        }
+        count++;
+        if (*cursor != ',') break;
+        if (count == 3) return -1;
+        cursor++;
+        const char *next = cursor;
+        while (*next == ' ') ++next;
+        // A trailing comma did not add another value in the legacy parser.
+        if (*next == '\0' || isalpha((unsigned char)*next)) {
+            cursor = next;
+            break;
+        }
+    }
+    if (*cursor != '\0' && !isalpha((unsigned char)*cursor)) return -1;
+    *payload = cursor;
+    return count;
+}
+
 // Called from amy_add_message when the first char is 'H', indicating a ticks message.
 // It claims the rest of the message as its payload -- stored as a raw
 // wire string and only parsed when it comes due -- so a schedule command
 // is only ever honored as the first command of a message.
-void handle_ticks_message(char *message) {
+void handle_ticks_message_with_origin(char *message,
+                                      sequencer_origin_t origin,
+                                      uint32_t current_tick) {
     assert(message[0] == 'H');
+    if (message[1] == 'C') {
+        // HCtag,action[,alignment_period], for stop=0 or start=1.
+        // HCtag,gate,duration[,alignment_period]
+        const char *tag_end = NULL;
+        uint32_t tag = 0;
+        bool tag_valid = sequence_uint32(message + 2, &tag_end, &tag);
+        const char *action_start = tag_valid && *tag_end == ','
+                                 ? tag_end + 1 : "";
+        const char *action_end = NULL;
+        uint32_t action = 0;
+        bool action_valid = sequence_uint32(
+            action_start, &action_end, &action);
+        const char *tail = action_valid ? action_end : "";
+        uint32_t rest[2] = {0, 0};
+        int rest_count = action_valid
+                       ? sequence_control_uint_tail(tail, rest, 2) : -1;
+        if (!tag_valid || *tag_end != ','
+            || !action_valid || rest_count < 0) {
+            fprintf(stderr,
+                    "invalid sequence_control: expected "
+                    "HCtag,action[,alignment_period] (stop=0, start=1) or "
+                    "HCtag,gate,duration[,alignment_period]\n");
+            return;
+        }
+
+        uint32_t value = 0;
+        uint32_t alignment = 0;
+        bool shape_valid = false;
+        if (action == SEQUENCE_CONTROL_STOP
+            || action == SEQUENCE_CONTROL_START) {
+            shape_valid = rest_count <= 1;
+            if (rest_count == 1) alignment = rest[0];
+        } else if (action == SEQUENCE_CONTROL_GATE) {
+            shape_valid = rest_count >= 1 && rest_count <= 2;
+            value = rest[0];
+            if (rest_count == 2) alignment = rest[1];
+        } else {
+            shape_valid = false;
+        }
+
+        if (!shape_valid) {
+            fprintf(stderr,
+                    "invalid sequence_control: action must be stop=0, "
+                    "start=1, or use "
+                    "gate=2 with a duration; tag, duration, and "
+                    "alignment must be non-negative integers\n");
+        } else {
+            sequencer_sequence_control_with_origin(
+                tag, action, value, alignment, origin, current_tick);
+        }
+        return;
+    }
+    if (message[1] == 'R') {
+        // HRtag: clear the future stored events for this tag. Already-active
+        // immutable sequence executions are intentionally unaffected.
+        const char *end = NULL;
+        uint32_t tag = 0;
+        if (!sequence_uint32(message + 2, &end, &tag)
+            || (*end != '\0' && (*end != 'Z' || end[1] != '\0')))
+            fprintf(stderr, "invalid sequence reset: expected HRtag\n");
+        else
+            sequencer_sequence_reset_with_origin(tag, origin);
+        return;
+    }
+
     uint32_t ticks[3] = {0, 0, 0};
-    int num_vals = parse_list_uint32_t(message + 1, ticks, 3, 0);
-    uint16_t schedule_len = 1 + _next_alpha(message + 1);
-    char *payload = message + schedule_len;
-    uint16_t payload_len = (uint16_t)strlen(payload);
-    char *stripped = (char *)malloc_caps(payload_len + 1, amy_global.config.ram_caps_events);
+    const char *payload = NULL;
+    int num_vals = sequence_ticks_prefix(message + 1, ticks, &payload);
+    if (num_vals < 1) {
+        fprintf(stderr,
+                "invalid ticks command: expected Htick[,period[,tag]]payload, "
+                "HCtag,action, or HRtag\n");
+        return;
+    }
+    size_t payload_len = strlen(payload);
+    char *stripped = payload_len >= UINT32_MAX ? NULL
+        : (char *)malloc_caps((uint32_t)(payload_len + 1),
+                              amy_global.config.ram_caps_events);
     if (stripped == NULL) {
         amy_oom("ticks_message");
     } else {
         memcpy(stripped, payload, payload_len + 1);
-        // A tag is only "given" if all 3 values were present; fewer
+        // A root tag is only "given" if all 3 values were present; fewer
         // than that (a 1- or 2-value ticks=) stores anonymously.
-        sequencer_add_wire(ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
-                           num_vals >= 3, stripped);
+        sequencer_add_wire_with_origin(
+            ticks[TICKS_TICK], ticks[TICKS_PERIOD], ticks[TICKS_TAG],
+            num_vals >= 3, stripped, origin);
     }
+}
+
+void handle_ticks_message(char *message) {
+    handle_ticks_message_with_origin(message, SEQUENCER_ORIGIN_EXTERNAL, 0);
 }
 
 // given a string return a parsed event
@@ -906,4 +1045,3 @@ int amy_parse_message(char * message, amy_event *e) {
     // Return exactly how many characters we used.
     return pos;
 }
-

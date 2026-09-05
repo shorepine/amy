@@ -240,8 +240,164 @@ def str_of_int(arg):
     return str(int(arg))
 
 
+def _list_values(value):
+    """Return a wire-list argument as individual values for validation."""
+    if isinstance(value, str):
+        return value.split(',')
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value]
+
+
+_SEQUENCE_UINT32_MAX = (1 << 32) - 1
+_SEQUENCE_MAX_INTERVAL = (1 << 31) - 1
+
+
+def _sequence_uint32(value, name, allow_template=False):
+    """Return one exact sequence integer without lossy numeric coercion."""
+    if allow_template and isinstance(value, str) and value.startswith('%'):
+        return value
+    if isinstance(value, bool):
+        raise ValueError('%s must be a non-negative integer.' % name)
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        result = int(value.strip())
+    else:
+        raise ValueError('%s must be a non-negative integer.' % name)
+    if result < 0:
+        raise ValueError('%s must be non-negative.' % name)
+    if result > _SEQUENCE_UINT32_MAX:
+        raise ValueError('%s must be in uint32 range.' % name)
+    return result
+
+
+def _sequence_interval(value, name, allow_template=False):
+    result = _sequence_uint32(value, name, allow_template=allow_template)
+    if isinstance(result, str):
+        return result
+    if result > _SEQUENCE_MAX_INTERVAL:
+        raise ValueError('%s must not exceed 2147483647 ticks.' % name)
+    return result
+
+
+def _message_ticks(value):
+    values = _list_values(value)
+    if not 1 <= len(values) <= 3:
+        raise ValueError('ticks needs tick, optional period, and optional tag.')
+    names = ('ticks tick', 'ticks period', 'ticks tag')
+    normalized = []
+    numeric = []
+    for index, item in enumerate(values):
+        # Empty list fields have always meant zero on the AMY wire. Preserve
+        # that spelling as well as the meaning; the tutorial and existing
+        # callers use ticks=",period,tag" for a tick-zero event.
+        if item is None or (isinstance(item, str) and not item.strip()):
+            normalized.append(item)
+            numeric.append(0)
+        else:
+            parsed = _sequence_uint32(item, names[index])
+            normalized.append(parsed)
+            numeric.append(parsed)
+    # tick < period is a reusable-sequence invariant. Legacy untagged two-
+    # field scheduling retains its historical wire behavior.
+    if (len(numeric) == 3 and numeric[1]
+            and numeric[0] >= numeric[1]):
+        raise ValueError('ticks tick must be below its nonzero period.')
+    return normalized
+
+
+def _sequence_control_values(value):
+    """Validate the low-level ``HC`` payload without blocking templates."""
+    values = _list_values(value)
+    if len(values) < 2:
+        raise ValueError('sequence_control needs at least tag and action.')
+    values[0] = _sequence_uint32(
+        values[0], 'sequence_control tag', allow_template=True)
+    raw_action = values[1]
+    if isinstance(raw_action, str) and raw_action.startswith('%'):
+        # Command templates substitute the token before AMY parses HC. The
+        # resulting wire value must still be the integer 0, 1, or 2.
+        if not 2 <= len(values) <= 4:
+            raise ValueError('A templated sequence_control needs tag, action, and up to duration and alignment_period.')
+        for index in range(2, len(values)):
+            values[index] = _sequence_interval(
+                values[index], 'templated sequence_control field',
+                allow_template=True)
+        return values
+    if isinstance(raw_action, int) and not isinstance(raw_action, bool):
+        action = raw_action
+    elif isinstance(raw_action, str) and raw_action.isdigit():
+        action = int(raw_action)
+    else:
+        raise ValueError('sequence_control action must be an integer: stop=0, start=1, or gate=2.')
+    if action in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
+        if len(values) not in (2, 3):
+            raise ValueError('A start/stop sequence_control needs tag, action, and optional alignment_period.')
+    elif action == SEQUENCE_CONTROL_GATE:
+        if len(values) not in (3, 4):
+            raise ValueError('A gate sequence_control needs tag, gate, duration, and optional alignment_period.')
+    else:
+        raise ValueError('sequence_control action must be stop=0, start=1, or gate=2.')
+    values[1] = action
+    field_names = ('sequence_control duration', 'sequence_control alignment_period') \
+        if action == SEQUENCE_CONTROL_GATE else ('sequence_control alignment_period',)
+    for index, name in enumerate(field_names, start=2):
+        if index < len(values):
+            values[index] = _sequence_interval(
+                values[index], name, allow_template=True)
+    return values
+
+
+def _normalize_sequence_action(kwargs):
+    """Translate a named sequence action into the existing HC primitive."""
+    if 'sequence' not in kwargs:
+        for key in ('action', 'duration', 'alignment_period'):
+            if key in kwargs:
+                raise ValueError('%s is only valid with sequence.' % key)
+        return kwargs
+    if 'sequence_control' in kwargs or 'sequence_reset' in kwargs:
+        raise ValueError('sequence cannot be combined with sequence_control or sequence_reset.')
+    extra = set(kwargs) - {
+        'sequence', 'action', 'duration', 'alignment_period', 'ticks'
+    }
+    if extra:
+        raise ValueError('sequence can only be combined with action, duration, alignment_period, and ticks.')
+    if 'action' not in kwargs:
+        raise ValueError("sequence needs action='start', 'stop', or 'gate'.")
+    tag = _sequence_uint32(kwargs['sequence'], 'Sequence tag')
+    alignment = _sequence_interval(
+        kwargs.get('alignment_period', 0), 'Sequence alignment_period')
+    action_name = kwargs['action']
+    actions = {
+        'stop': SEQUENCE_CONTROL_STOP,
+        'start': SEQUENCE_CONTROL_START,
+        'gate': SEQUENCE_CONTROL_GATE,
+    }
+    if not isinstance(action_name, str) or action_name not in actions:
+        raise ValueError("Sequence action must be 'start', 'stop', or 'gate'.")
+    action = actions[action_name]
+    if action == SEQUENCE_CONTROL_GATE:
+        if 'duration' not in kwargs:
+            raise ValueError("Sequence action='gate' needs a duration in ticks.")
+        duration = _sequence_interval(
+            kwargs['duration'], 'Sequence gate duration')
+        control = (tag, action, duration, alignment)
+    else:
+        if 'duration' in kwargs:
+            raise ValueError('Sequence duration is only valid with action=\'gate\'.')
+        control = (tag, action, alignment)
+    normalized = {}
+    if 'ticks' in kwargs:
+        normalized['ticks'] = kwargs['ticks']
+    normalized['sequence_control'] = control
+    return normalized
+
+
 _KW_MAP_LIST = [   # Order matters because patch_string must come last.
-    # 'ticks' must come first: 'H' is recognized only as first char in wire message.
+    # Sequence/ticks headers must come first: 'H' is only recognized as the
+    # first wire character. sequence_control follows a ticks
+    # header when it is used as that scheduled event's payload.
     ('ticks', 'HL'),
     ('osc', 'vI'), ('wave', 'wI'), ('note', 'nF'), ('vel', 'lF'), ('amp', 'aC'), ('freq', 'fC'), ('duty', 'dC'),
     ('feedback', 'bF'), ('reset', 'SI'), ('phase', 'PF'), ('sample_offset', 'poI'), ('fit', 'pFF'), ('fit_search', 'pSI'), ('pan', 'QC'), ('client', 'gI'),
@@ -253,6 +409,8 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('dist_clip', 'GCI'), ('dist_fold', 'GFI'), ('dist_crush', 'GHL'), ('dist_drive', 'GDC'), ('dist_mix', 'GMC'),
     ('algo_source', 'OL'), ('load_sample', 'zL'), ('transfer_file', 'zTL'), ('disk_sample', 'zFL'),
     ('algorithm', 'oI'), ('chorus', 'kL'), ('reverb', 'hL'), ('echo', 'ML'), ('patch', 'KI'),
+    ('sequence_reset', 'HRI'),
+    ('sequence_control', 'HCL'),
     ('external_channel', 'WI'), ('portamento', 'mI'), ('tempo', 'jF'), ('sequencer_run', 'zYI'),
     ('external_midi_sync', 'zCI'),
     ('synth', 'iI'), ('pedal', 'ipI'), ('synth_flags', 'ifI'), ('num_voices', 'ivI'), ('oscs_per_voice', 'inI'),
@@ -277,6 +435,9 @@ def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
+    kwargs = _normalize_sequence_action(kwargs)
+    if kwargs.get('ticks') is not None:
+        kwargs['ticks'] = _message_ticks(kwargs['ticks'])
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:
@@ -295,6 +456,20 @@ def message(**kwargs):
                 raise ValueError('You cannot use \'num_partials\' and \'preset\' in the same message.')
             if 'wave' not in kwargs or kwargs['wave'] != BYO_PARTIALS:
                 raise ValueError('\'num_partials\' must be used with \'wave\'=BYO_PARTIALS.')
+
+    outer_sequence_keys = {'ticks', 'sequence_reset'} & kwargs.keys()
+    if len(outer_sequence_keys) > 1:
+        raise ValueError('Use only one of sequence_reset or ticks in a message.')
+    if 'sequence_reset' in kwargs and len(kwargs) != 1:
+        raise ValueError('sequence_reset must be sent as a standalone message.')
+    if 'sequence_reset' in kwargs:
+        kwargs['sequence_reset'] = _sequence_uint32(
+            kwargs['sequence_reset'], 'sequence_reset tag')
+    if 'sequence_control' in kwargs:
+        if set(kwargs) - {'sequence_control', 'ticks'}:
+            raise ValueError('sequence_control can only be combined with ticks.')
+        kwargs['sequence_control'] = _sequence_control_values(
+            kwargs['sequence_control'])
 
     # Validity check all the passed args.
     prioritized_keys = []
@@ -371,6 +546,51 @@ def send(**kwargs):
     m = message(**kwargs)
 
     send_raw(m)
+
+
+def _sequence_ticks(value):
+    """Normalize a stored-sequence event's local (tick, period) tuple."""
+    if isinstance(value, str):
+        values = value.split(',')
+    elif isinstance(value, (list, tuple)):
+        values = list(value)
+    else:
+        values = [value]
+    if not 1 <= len(values) <= 2:
+        raise ValueError('A stored sequence event needs ticks=(tick,) or ticks=(tick, period).')
+    tick = _sequence_uint32(values[0], 'Stored sequence tick')
+    period = _sequence_uint32(values[1], 'Stored sequence period') \
+        if len(values) == 2 else 0
+    if period and tick >= period:
+        raise ValueError('A stored sequence tick must be below its nonzero period.')
+    return tick, period
+
+
+def define_sequence(tag, events):
+    """Replace one reusable tagged sequence with ordinary AMY events.
+
+    Each event is a mapping accepted by :func:`message` and must contain a
+    local ``ticks`` value with one or two fields. All event messages are
+    validated before the reset is sent, then the definition is written as a
+    per-tag reset followed by explicit cumulative event appends. Executions
+    which already started keep their previous immutable definition.
+    """
+    sequence_tag = _sequence_uint32(tag, 'Sequence tag')
+    event_messages = []
+    for event in events:
+        values = dict(event)
+        if 'ticks' not in values:
+            raise ValueError('Every stored sequence event needs a ticks value.')
+        if 'sequence_reset' in values:
+            raise ValueError('Stored sequence events cannot contain sequence authoring commands.')
+        tick, period = _sequence_ticks(values.pop('ticks'))
+        if not values:
+            raise ValueError('Every stored sequence event needs an AMY payload.')
+        event_messages.append(message(ticks=(tick, period, sequence_tag), **values))
+
+    send_raw(message(sequence_reset=sequence_tag))
+    for event_message in event_messages:
+        send_raw(event_message)
 
 
 # Plots a time domain and spectra of audio

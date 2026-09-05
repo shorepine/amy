@@ -35,9 +35,11 @@ AMY was built by [DAn Ellis](https://research.google/people/DanEllis/) and [Bria
  * [**Interactive AMY tutorial**](https://shorepine.github.io/amy/tutorial.html)
  * [**AMY API**](docs/api.md)
  * [**AMY Synthesizer Details**](docs/synth.md)
+ * [**AMY Reusable Sequences**](docs/sequencer-sequences.md)
  * [**Distortion in AMY**](docs/distortions.md)
  * [**AMY's MIDI specification**](docs/midi.md)
  * [**AMY in Arduino Getting Started**](docs/arduino.md)
+ * [**Windows `M_PI` portability note**](docs/windows-m-pi-portability.md)
  * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
 AMY supports
@@ -171,11 +173,13 @@ It's good to understand what wire messages are but you don't need to construct t
  * [**Interactive AMY tutorial**](https://shorepine.github.io/amy/tutorial.html)
  * [**AMY API**](docs/api.md)
  * [**AMY Synthesizer Details**](docs/synth.md)
+ * [**AMY Reusable Sequences**](docs/sequencer-sequences.md)
  * [**Distortion in AMY**](docs/distortions.md)
  * [**AMY's MIDI specification**](docs/midi.md)
  * [**AMY in Arduino Getting Started**](docs/arduino.md)
  * [**AMY in Godot**](docs/godot.md)
  * [**AMY on Windows**](windows/README.md)
+ * [**Windows `M_PI` portability note**](docs/windows-m-pi-portability.md)
  * [**Other AMY web demos**](https://shorepine.github.io/amy/)
 
  [![shore pine sound systems discord](https://raw.githubusercontent.com/shorepine/tulipcc/main/docs/pics/shorepine100.png) **Chat about AMY on our Discord!**](https://discord.gg/TzBFkUb8pG)

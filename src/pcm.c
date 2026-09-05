@@ -3,6 +3,10 @@
 #include "amy.h"
 #include "transfer.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
 #endif
