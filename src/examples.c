@@ -368,6 +368,19 @@ void example_sequencer_drums(uint32_t start) {
     e.midi_note = 70;
     amy_add_event(&e);
 
+    // ticks= ACCUMULATES on a tag: a second send to the same tag adds another
+    // event rather than replacing the first.  So clear the four tags this
+    // pattern uses before building it -- otherwise running this example twice
+    // (or after the other drum example, which uses the same tags) stacks two
+    // patterns on top of each other.  tick and period both 0 is the reset.
+    for (uint32_t clear_tag = 0; clear_tag < 4; ++clear_tag) {
+        e = amy_default_event();
+        e.ticks[TICKS_TICK] = 0;
+        e.ticks[TICKS_PERIOD] = 0;
+        e.ticks[TICKS_TAG] = clear_tag;
+        amy_add_event(&e);
+    }
+
     // Add patterns.
     // Hi hat every 8 ticks.
     e = amy_default_event();
@@ -406,6 +419,19 @@ void example_sequencer_drums(uint32_t start) {
 void example_sequencer_drums_synth(uint32_t start) {
     // Play a drum pattern using the low-level sequencer structure driving default system drums synth (10)
     amy_event e;
+
+    // ticks= ACCUMULATES on a tag: a second send to the same tag adds another
+    // event rather than replacing the first.  So clear the four tags this
+    // pattern uses before building it -- otherwise running this example twice
+    // (or after the other drum example, which uses the same tags) stacks two
+    // patterns on top of each other.  tick and period both 0 is the reset.
+    for (uint32_t clear_tag = 0; clear_tag < 4; ++clear_tag) {
+        e = amy_default_event();
+        e.ticks[TICKS_TICK] = 0;
+        e.ticks[TICKS_PERIOD] = 0;
+        e.ticks[TICKS_TAG] = clear_tag;
+        amy_add_event(&e);
+    }
 
     // Add patterns.
     // Hi hat every 8 ticks.
