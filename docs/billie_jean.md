@@ -293,7 +293,7 @@ timed_note chord_notes[] = {
 };
 ```
 
-We have a new function that takes an entire table of `timed_notes` along with a starting sequencer tick and a channel (synth), and schedules them all, including note-offs if the table includes nonzero note durations.  The scheduling itself is the `ticks` field of the `amy_event` structure: setting `e.ticks[0]` to an absolute sequencer tick makes AMY hold the event and play it when its clock reaches that tick.  (The `ticks` field can also describe repeating patterns - `e.ticks[1]` is a repeat period and `e.ticks[2]` a tag you can use to replace or cancel an entry - but here we only need the one-shot absolute-tick form.)  The sequencer counts 48 ticks per quarter note, and each “tick” of our pattern tables is an eighth note, so we convert between the two with `amy_ticks_per_tick = 24`.
+We have a new function that takes an entire table of `timed_notes` along with a starting sequencer tick and a channel (synth), and schedules them all, including note-offs if the table includes nonzero note durations.  The scheduling itself is the `ticks` field of the `amy_event` structure: setting `e.ticks[0]` to an absolute sequencer tick makes AMY hold the event and play it when its clock reaches that tick.  (The `ticks` field can also describe repeating patterns with `e.ticks[1]`, while `e.ticks[2]` adds the event to a reusable tagged sequence; here we only need the untagged one-shot absolute-tick form.)  The sequencer counts 48 ticks per quarter note, and each “tick” of our pattern tables is an eighth note, so we convert between the two with `amy_ticks_per_tick = 24`.
 
 ```C
 float amy_ticks_per_tick = 24.0f;

@@ -81,9 +81,9 @@ Because an `AMY_MIDI` osc emits MIDI in response to ordinary note events, you ca
 amy.send(osc=0, wave=amy.AMY_MIDI)                    # set up the MIDI sender once
 
 # Send a MIDI note on channel 1 every quarter note (48 ticks), held for an eighth note.
-amy.send(osc=0, note=60, vel=1, ticks="0,48,1")    # note on  at tick 0  of each 48-tick period
-amy.send(osc=0, note=60, vel=0, ticks="24,48,2")   # note off at tick 24 of each 48-tick period
+amy.send(osc=0, note=60, vel=1, ticks="0,48,1")    # both events accumulate behind tag 1
+amy.send(osc=0, note=60, vel=0, ticks="24,48,1")
+amy.send(sequence=1, action='start', alignment_period=48)
 ```
 
-AMY keeps sending those MIDI messages out the port at the configured tempo until you remove them (by their `tag`) or reset the sequencer. See [the sequencer docs](synth.md) for `tick` / `period` / `tag` details.
-
+AMY keeps sending those MIDI messages out the port at the configured tempo until you stop tag 1 or reset the sequencer. See [the sequencer docs](synth.md) for `tick` / `period` / `tag` details.

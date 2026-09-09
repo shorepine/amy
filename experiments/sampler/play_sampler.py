@@ -187,7 +187,7 @@ def demo_hits(args):
         # Quantized to sequencer ticks live (PPQ/4 ticks per 16th).
         amy.send(tempo=args.bpm)
         for i, k in enumerate(order):
-            amy.send(ticks=[int(i * PPQ / 4), 0, i + 1], osc=(i % 24) + 1,
+            amy.send(ticks=[int(i * PPQ / 4)], osc=(i % 24) + 1,
                      wave=amy.PCM, preset=presets[k], vel=1)
         time.sleep(len(order) * step + 2)
         return
@@ -233,7 +233,7 @@ def demo_loops(args):
         amy.send(**kw)
         # ...and let the sequencer re-trigger every `fit` ticks after that.
         if args.loops > 1:
-            amy.send(ticks=[0, fit, i + 1], **kw)
+            amy.send(ticks=[0, fit], **kw)
     # "N loops" = N cycles of the longest break.
     total_ticks = max(l[4] for l in loops) * args.loops
     total = int(total_ticks * tick_samples(args.bpm))

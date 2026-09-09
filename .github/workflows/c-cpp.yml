@@ -111,7 +111,7 @@ jobs:
         python-version: '3.13'
 
     - name: Check generated C API bindings are in sync
-      run: make check-c-api
+      run: make check-c-api js-api-test
 
   godot-build:
     # Build the Godot GDExtension for Linux. amy_midi.c is excluded from the

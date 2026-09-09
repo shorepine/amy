@@ -73,7 +73,6 @@ def main():
     # Line tick 0 up with the first note-on (loading above consumed time).
     amy.send(reset=amy.RESET_TIMEBASE)
     t = 0  # ticks
-    tag = 1
     print(f"\n  when  bars  native  break")
     for i, e in enumerate(picks):
         fit = e['bars'] * BAR_TICKS
@@ -85,8 +84,7 @@ def main():
                 # past by the first render); play the opener directly.
                 amy.send(**kw)
             else:
-                amy.send(ticks=[t, 0, tag], **kw)
-                tag += 1
+                amy.send(ticks=[t], **kw)
             t += fit
     us_per_tick = int(60000000.0 / (args.bpm * PPQ))  # matches sequencer.c
     total = int(t * us_per_tick / 1e6 * SR)

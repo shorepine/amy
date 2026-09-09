@@ -6,6 +6,9 @@ tests/tst
 tests/test_clock_wrap
 tests/test_sequencer_active
 tests/test_sequencer_bounds
+tests/test_sequencer_sequences
+tests/test_sequencer_oom
+tests/test_sequencer_concurrency
 tests/test_bus_config
 tests/test_patch_slots
 tests/test_synth_readout
