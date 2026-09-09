@@ -11,18 +11,35 @@ uint32_t sequencer_ticks() { return amy_global.sequencer_tick_count; }
 // leading 'H' command stripped) plus the scheduling metadata needed to play
 // it back.  The string is only parsed when the entry comes due.
 typedef struct sequence_info_t {
-    char *wire;    // Stored wire message; NULL means the tag is unused.
-    //uint32_t tag;  // tag is implicit, it's its index in the table
+    char *wire;    // Stored wire message; NULL means the slot is free.
     uint32_t tick; // 0 means not used
     uint32_t period; // 0 means not used
+    // The tag this entry answers to.  This used to be IMPLICIT -- the slot's
+    // own index -- because a tag held exactly one event and a second send to
+    // the same tag overwrote the first.  Events on a tag CUMULATE now, so one
+    // tag can own any number of slots and the index no longer identifies it.
+    // Anonymous entries carry their own slot index here: that keeps them
+    // sorting after every user tag (they live past max_sequences) and, since
+    // sequencer_add_wire() bounds-checks user tags below max_sequences, no
+    // user tag can ever name one.
+    uint32_t tag;
     // Next OCCUPIED slot, or -1 for the end.  Only meaningful while this
     // entry has a wire -- `wire != NULL` is what "in the list" means, so
     // there is one source of truth and not two to keep in step.
     int32_t next_active;
 } sequence_info_t;
 
-struct sequence_info_t *sequences = NULL;  // An array indexed by tag.
-int32_t max_sequences = 0;  // Number of user-addressable tags.
+// A fixed pool of event slots.  Slots [0, max_sequences) hold TAGGED events
+// and slots past that hold anonymous ones; within the tagged region a slot's
+// index means nothing but "this one is free or it isn't", because any number
+// of slots can carry the same tag.
+struct sequence_info_t *sequences = NULL;
+// Size of the tagged region, and the exclusive upper bound on a user tag.
+// It is still the "number of tags" knob (amy_config.max_sequencer_tags), but
+// now it bounds the number of tagged EVENTS as well: cumulating means N tags
+// no longer implies N events.  Both are capped by the same number, so the
+// footprint is exactly what it was.
+int32_t max_sequences = 0;
 // Head of the ascending list of occupied slots (user tags and anonymous
 // entries alike); -1 when nothing is scheduled.  This replaces `highest_tag`,
 // which was a HIGH-WATER MARK: it only ever grew, so one event at a high tag
@@ -62,6 +79,7 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].wire = NULL;
         sequences[i].tick = 0;
         sequences[i].period = 0;
+        sequences[i].tag = 0;
         sequences[i].next_active = -1;
     }
     first_active = -1;
@@ -78,6 +96,7 @@ void sequencer_reset() {
             sequences[i].wire = NULL;
             sequences[i].tick = 0;
             sequences[i].period = 0;
+            sequences[i].tag = 0;
         }
         sequences[i].next_active = -1;
     }
@@ -97,65 +116,123 @@ void sequencer_debug() {
     int32_t n_active = 0;
     for (int32_t t = first_active; t != -1; t = sequences[t].next_active) ++n_active;
     fprintf(stderr, "sequencer: max_sequences %" PRIi32" active %" PRIi32 "\n", max_sequences, n_active);
-    for (int32_t tag = first_active; tag != -1; tag = sequences[tag].next_active) {
-        if (sequences[tag].wire) {
-            fprintf(stderr, "sequence tag %" PRIi32"%s tick %" PRIu32 " period %"PRIu32 " wire \"%s\"\n",
-                    tag, tag >= max_sequences ? " (anon)" : "", sequences[tag].tick, sequences[tag].period, sequences[tag].wire);
+    for (int32_t slot = first_active; slot != -1; slot = sequences[slot].next_active) {
+        if (sequences[slot].wire) {
+            fprintf(stderr, "sequence slot %" PRIi32 " tag %" PRIu32 "%s tick %" PRIu32 " period %"PRIu32 " wire \"%s\"\n",
+                    slot, sequences[slot].tag, slot >= max_sequences ? " (anon)" : "",
+                    sequences[slot].tick, sequences[slot].period, sequences[slot].wire);
         }
     }
 }
 
-/* The occupied slots, threaded through the table as an ASCENDING list.
+/* The occupied slots, threaded through the table as a list ASCENDING BY TAG.
  *
  * Why threaded rather than a list of its own: the table has to stay
- * indexable, because add and clear both reach a tag directly and want O(1)
- * to do it.  This gets the tick scan down to the number of sequences
- * actually scheduled without giving that up, and without allocating
- * anything the render thread could walk into while it is being freed.
+ * indexable, because allocating and freeing a slot both reach it directly
+ * and want O(1) to do it.  This gets the tick scan down to the number of
+ * sequences actually scheduled without giving that up, and without
+ * allocating anything the render thread could walk into while it is being
+ * freed.
  *
- * WHY ASCENDING, and it is not tidiness: two sequences that hit on the same
- * tick play in the order they are visited, so the order decides which one
- * wins if they touch the same parameter.  That order was slot order when
- * this was an indexed sweep, and keeping the list sorted keeps it slot
- * order.  An insertion-ordered list would make a pattern sound different
- * after an edit.
+ * WHY SORTED BY TAG, and it is not tidiness: two sequences that hit on the
+ * same tick play in the order they are visited, so the order decides which
+ * one wins if they touch the same parameter.  That order has always been
+ * tag order, and it stays tag order here.  It used to fall out for free --
+ * a tag WAS its slot index, so an ascending list of indices was an
+ * ascending list of tags.  Now that several slots can share a tag, the sort
+ * key has to be the tag itself, and a new entry is spliced in AFTER every
+ * entry with the same tag, so events cumulated onto one tag fire in the
+ * order they were added.
  *
  * THREAD SAFETY.  Link mutations happen only under the amy lock --
- * sequencer_add_wire() takes it, the tick loop's delete path takes it, and
- * sequencer_reset() is called with it already held -- so writers are
- * serialized.  The tick WALK, though, runs without the lock, which is safe
- * because the links are INDICES INTO A FIXED ARRAY, not pointers:
+ * sequencer_add_wire() takes it, sequencer_clear_tag() takes it, the tick
+ * loop's delete path takes it, and sequencer_reset() is called with it
+ * already held -- so writers are serialized.  The tick WALK, though, runs
+ * without the lock, which is safe because the links are INDICES INTO A
+ * FIXED ARRAY, not pointers:
  *
  *   - publishing a splice is one aligned 32-bit store, so a walker sees
  *     either the old link or the new one, never half of one;
- *   - every stored link is greater than the slot holding it, so walking
- *     strictly increases the index.  A stale link can make a walker skip a
- *     sequence or revisit one for a single tick; it cannot form a cycle,
- *     cannot hang, and cannot leave the array.
+ *   - every link is an in-bounds slot index, so a walker can never leave
+ *     the array however stale the link it read.
  *
- * So the worst a race costs is one tick's events being wrong, which is the
- * same class of hazard the indexed sweep already had.  A list of malloc'd
- * nodes would be a different class entirely -- a torn next pointer walks
- * the render thread into freed memory.
+ * What is NOT free any more is termination.  While the list was sorted by
+ * index, every stored link was greater than the slot holding it, so a walk
+ * strictly increased and could not cycle.  Sorting by tag breaks that: a
+ * tag's slots come from wherever the pool had room, so links run in both
+ * directions and a torn read could in principle close a loop.  So the walk
+ * counts its steps and gives up after one full table's worth (see
+ * sequencer_process_tick).  A stale link can still make a walker skip a
+ * sequence or revisit one for a single tick -- that is the same hazard the
+ * indexed sweep always had, and it costs one tick of wrong events -- but it
+ * can no longer hang the render thread.
+ *
+ * A list of malloc'd nodes would be a different class of problem entirely --
+ * a torn next pointer walks the render thread into freed memory.
  */
-static void active_link(int32_t tag)
+static void active_link(int32_t slot)
 {
+    /* Only ever called on a slot that is out of the list: `wire != NULL` is
+     * what "in the list" means, and every path here has just taken a free
+     * (wire == NULL) slot or unlinked the one it is reusing. */
+    uint32_t tag = sequences[slot].tag;
     int32_t *prev = &first_active;
-    while (*prev != -1 && *prev < tag)
+    /* <= not <: skip past entries that share this tag, so cumulated events
+     * on one tag stay in the order they were added. */
+    while (*prev != -1 && sequences[*prev].tag <= tag)
         prev = &sequences[*prev].next_active;
-    if (*prev == tag)
-        return;                       /* already in */
-    sequences[tag].next_active = *prev;   /* point at the tail we found... */
-    *prev = tag;                          /* ...then publish, in one store */
+    sequences[slot].next_active = *prev;   /* point at the tail we found... */
+    *prev = slot;                          /* ...then publish, in one store */
 }
 
-static void active_unlink(int32_t tag)
+static void active_unlink(int32_t slot)
 {
     int32_t *prev = &first_active;
-    while (*prev != -1 && *prev != tag)
+    while (*prev != -1 && *prev != slot)
         prev = &sequences[*prev].next_active;
-    if (*prev == tag)
-        *prev = sequences[tag].next_active;   /* one store, again */
+    if (*prev == slot)
+        *prev = sequences[slot].next_active;   /* one store, again */
+}
+
+// Empty a slot and take it out of the walk.  Caller holds the amy lock.
+static void slot_release(int32_t slot)
+{
+    if (sequences[slot].wire) free(sequences[slot].wire);
+    sequences[slot].wire = NULL;
+    sequences[slot].tick = 0;
+    sequences[slot].period = 0;
+    active_unlink(slot);
+}
+
+// Lowest free slot in the tagged region, or -1 if the pool is full.  Lowest
+// rather than round-robin so a "clear the tag, re-add the pattern" cycle --
+// the normal way a sequencer edits itself -- lands on the same slots every
+// time and stays reproducible.  Linear, but adds happen at user rate, not
+// per tick.  Caller holds the amy lock.
+static int32_t alloc_tagged_slot(void)
+{
+    for (int32_t slot = 0; slot < max_sequences; ++slot)
+        if (sequences[slot].wire == NULL) return slot;
+    return -1;
+}
+
+// Drop EVERY event stored under `tag` -- the only way to take back a whole
+// tag now that adding to one accumulates instead of replacing.  Callers on
+// the wire and through amy_add_event() reach this as ticks="0,0,<tag>";
+// this is also the direct entry point for a C host.
+void sequencer_clear_tag(uint32_t tag)
+{
+    if (sequences == NULL) return;  // sequencer_init hasn't run
+    if (tag >= (uint32_t)max_sequences) {
+        fprintf(stderr, "sequencer clear tag %" PRIu32 " is greater than or eq max_sequences %" PRIi32 "\n",
+                tag, max_sequences);
+        return;
+    }
+    amy_grab_lock();
+    for (int32_t slot = 0; slot < max_sequences; ++slot)
+        if (sequences[slot].wire != NULL && sequences[slot].tag == tag)
+            slot_release(slot);
+    amy_release_lock();
 }
 
 void sequencer_recompute() {
@@ -173,8 +250,17 @@ void sequencer_recompute() {
 // has_tag false means tag wasn't supplied by the caller (a 1- or 2-value
 // ticks= form): the entry is allocated round-robin from the anonymous pool
 // instead of the given tag value, so it's stored but not addressable or
-// individually cancelable. has_tag true is the normal tag-indexed form: tick
-// and period both zero clears that tag's entry (the only way to cancel one).
+// individually cancelable.
+//
+// has_tag true is the tag-indexed form, and events on a tag ACCUMULATE: each
+// send adds another scheduled event under that tag, with its own tick and
+// period, rather than replacing whatever was there.  So a whole pattern can
+// live on one tag.  Taking one back is the tick==0 && period==0 send --
+// ticks="0,0,<tag>" -- which now clears every event on the tag rather than
+// the single entry it used to hold.  That is the same spelling callers have
+// always used to cancel, and it still means the same thing: this tag now
+// holds nothing.  There is no way to drop ONE event from a tag; rebuild the
+// tag instead.
 //
 // A one-off whose tick is already due or overdue is not stored at all -- it
 // plays immediately, before returning.  See the comment at that branch.
@@ -190,6 +276,11 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
             free(wire);
             return 0;
         }
+        if (tick == 0 && period == 0) {  // Non-schedulable event: clear the tag.
+            sequencer_clear_tag(tag);
+            free(wire);
+            return 0;
+        }
     } else {
         // Anonymous: tick==0 && period==0 has nothing to cancel (no tag was
         // given), so just drop it rather than allocating a slot for a no-op.
@@ -197,20 +288,6 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
             free(wire);
             return 0;
         }
-        tag = (uint32_t)(max_sequences + anon_cursor);
-        anon_cursor = (anon_cursor + 1) % AMY_ANON_SEQUENCE_SLOTS;
-    }
-    amy_grab_lock();
-    // Release any existing message for this tag, even if we're just going to rewrite it.
-    if (sequences[tag].wire) free(sequences[tag].wire);
-    sequences[tag].wire = NULL;
-    sequences[tag].tick = 0;
-    sequences[tag].period = 0;
-    active_unlink(tag);   // out of the list while it has nothing in it
-    if (tick == 0 && period == 0) {  // Non-schedulable event: just clear the tag.
-        amy_release_lock();
-        free(wire);
-        return 0;
     }
     if (period == 0 && tick <= amy_global.sequencer_tick_count) {
         // A one-off that is already due or overdue.  Play it NOW rather than
@@ -224,18 +301,41 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
         // past-due event.  NB tick==0 is the cancel form, handled above, so it
         // never reaches here.
         //
-        // Play outside the lock and free after, exactly as the tick loop does:
-        // amy_queue_lock is a plain non-recursive mutex and amy_play_message()
-        // re-enters the parser, which can land back in this function.
-        amy_release_lock();
+        // Play outside the lock, exactly as the tick loop does: amy_queue_lock
+        // is a plain non-recursive mutex and amy_play_message() re-enters the
+        // parser, which can land back in this function.  It leaves anything
+        // else on this tag alone -- an overdue one-off is one event, not a
+        // statement about the tag.
         amy_play_message(wire);
         free(wire);
         return 1;
     }
-    sequences[tag].tick = tick;
-    sequences[tag].period = period;
-    sequences[tag].wire = wire;
-    active_link(tag);   // ...and back in, now that it has a message again
+    amy_grab_lock();
+    int32_t slot;
+    if (has_tag) {
+        slot = alloc_tagged_slot();
+        if (slot < 0) {
+            // The pool is full.  It used to be impossible to run out -- one
+            // tag, one slot -- but cumulating means a runaway caller can now
+            // fill it, so say so rather than silently dropping events.
+            amy_release_lock();
+            fprintf(stderr, "sequencer full (%" PRIi32 " events), dropping tag %" PRIu32 "\n",
+                    max_sequences, tag);
+            free(wire);
+            return 0;
+        }
+    } else {
+        slot = max_sequences + anon_cursor;
+        anon_cursor = (anon_cursor + 1) % AMY_ANON_SEQUENCE_SLOTS;
+        // Round-robin: once the pool wraps, a new entry evicts the oldest.
+        slot_release(slot);
+        tag = (uint32_t)slot;   // sorts after every user tag; see the struct
+    }
+    sequences[slot].tick = tick;
+    sequences[slot].period = period;
+    sequences[slot].tag = tag;
+    sequences[slot].wire = wire;
+    active_link(slot);   // now that it has a message, put it in the walk
     amy_release_lock();
     return 1;
 }
@@ -249,44 +349,51 @@ static void sequencer_process_tick(void) {
     wire_firing = true;
     // Walk only the slots that have something scheduled.  This used to sweep
     // 0..highest_tag, a mark that never came down.
-    int32_t tag = first_active;
-    while (tag != -1) {
+    //
+    // `steps` bounds the walk at one full table.  A well-formed list can't be
+    // longer than that, so it never bites in normal operation; it is there
+    // because the list is no longer sorted by slot index (it is sorted by
+    // tag), so a torn read during a concurrent splice could in principle
+    // close a cycle.  See the thread-safety note above active_link().
+    int32_t steps = max_sequences + AMY_ANON_SEQUENCE_SLOTS;
+    int32_t slot = first_active;
+    while (slot != -1 && steps-- > 0) {
         // Read the link BEFORE anything below can unlink this entry.
-        int32_t next = sequences[tag].next_active;
-        if (sequences[tag].wire != NULL) {
+        int32_t next = sequences[slot].next_active;
+        if (sequences[slot].wire != NULL) {
             bool hit = false;
             bool delete = false;
-            if(sequences[tag].period != 0) { // period set
-                uint32_t offset = amy_global.sequencer_tick_count % sequences[tag].period;
-                if (offset == sequences[tag].tick) hit = true;
+            if(sequences[slot].period != 0) { // period set
+                uint32_t offset = amy_global.sequencer_tick_count % sequences[slot].period;
+                if (offset == sequences[slot].tick) hit = true;
             } else {
                 // Test for absolute tick (no period set).  <= rather than ==:
                 // the walk above runs without the lock, and a stale link can
                 // make it skip an entry for a single tick (see the thread
                 // safety note).  Under ==, a slot skipped on exactly its tick
-                // would sit there forever, holding an anon slot and never
-                // playing.  <= lets it fire on the next tick instead, matching
-                // the play-it-late rule sequencer_add_wire() uses for a
-                // one-off that is already due when it arrives.
-                if (sequences[tag].tick <= amy_global.sequencer_tick_count) { hit = true; delete = true; }
+                // would sit there forever, holding a slot and never playing.
+                // <= lets it fire on the next tick instead, matching the
+                // play-it-late rule sequencer_add_wire() uses for a one-off
+                // that is already due when it arrives.
+                if (sequences[slot].tick <= amy_global.sequencer_tick_count) { hit = true; delete = true; }
             }
             if(hit) {
                 // Take the message out (one-shot) or a copy of it (repeating)
-                // under the lock, so an ingest thread rewriting the tag can't
+                // under the lock, so an ingest thread rewriting the slot can't
                 // free the string while we parse it.
                 char *wire = NULL;
                 amy_grab_lock();
-                if (sequences[tag].wire != NULL) {
+                if (sequences[slot].wire != NULL) {
                     if (delete) {
-                        wire = sequences[tag].wire;
-                        sequences[tag].wire = NULL;
-                        sequences[tag].tick = 0;
-                        sequences[tag].period = 0;
-                        active_unlink(tag);
+                        wire = sequences[slot].wire;
+                        sequences[slot].wire = NULL;   // slot_release, but we
+                        sequences[slot].tick = 0;      // keep the string to
+                        sequences[slot].period = 0;    // play it below
+                        active_unlink(slot);
                     } else {
-                        size_t len = strlen(sequences[tag].wire);
+                        size_t len = strlen(sequences[slot].wire);
                         wire = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
-                        if (wire != NULL) memcpy(wire, sequences[tag].wire, len + 1);
+                        if (wire != NULL) memcpy(wire, sequences[slot].wire, len + 1);
                         else amy_oom("sequencer fire");
                     }
                 }
@@ -298,7 +405,7 @@ static void sequencer_process_tick(void) {
                 }
             }
         }
-        tag = next;
+        slot = next;
     }
     wire_firing = was_firing;
     if(amy_global.config.amy_external_sequencer_hook != NULL) {
