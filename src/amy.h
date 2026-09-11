@@ -206,11 +206,11 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #endif
 
 
-// 0.5 Hz modulation at 50% depth of 320 samples (i.e., 80..240 samples = 2..6 ms), mix at 0 (inaudible).
+// 0.5 Hz modulation at 50% depth of 512 samples (i.e., 128..384 samples = 3..9 ms), mix at 0 (inaudible).
 #define CHORUS_DEFAULT_LFO_FREQ 0.5
 #define CHORUS_DEFAULT_MOD_DEPTH 0.5
 #define CHORUS_DEFAULT_LEVEL 0
-#define CHORUS_DEFAULT_MAX_DELAY 320
+#define CHORUS_DEFAULT_MAX_DELAY 512
 // Per-bus choruses get modulators from a special osc one beyond the normal range.
 #define CHORUS_MOD_SOURCE AMY_OSCS
 
