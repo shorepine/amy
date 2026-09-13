@@ -6,8 +6,16 @@ const NUM_STEPS = 16;
 const NUM_PATTERNS = 16;
 const OSC_BASE = 200;          // stay clear of oscs used by AMY's default web synths
 const LOOKAHEAD_MS = 150;      // schedule this far into the future
-const TICK_MS = 30;
+const TICK_MS = 30;            // how often the JS scheduler wakes up
 const ACCENT_GAIN = 1.5;
+// AMY's only way to schedule anything ahead of time is a tick number on its
+// 48-PPQ sequencer clock, so our step grid has to be expressed in those ticks.
+// We run AMY's tempo at four times the musical BPM, which makes one 16th-note
+// step a whole 48-tick beat. At 1x a step would be 12 ticks and the shuffle
+// slider -- half a step of swing at most -- would have six usable positions.
+const SEQ_PPQ = 48;            // AMY_SEQUENCER_PPQ
+const TEMPO_MULT = 4;
+const TICKS_PER_STEP = SEQ_PPQ;
 const PCM_PHASE_DENOM = 1 << 23;  // AMY PCM phase is frame_index / 2^PCM_INDEX_BITS
 
 // Baked-in example setups: share-format strings (see decodeShare). Regenerate
@@ -216,6 +224,7 @@ function loadSongState(payload) {
   rebuildUI();
   if (audioOn) {
     amy_send({ volume: state.masterVol });
+    applyTempo();
     applyAllChannelFilters();
     applyFx();
   }
@@ -235,10 +244,18 @@ function setLoadStatus(text) {
   document.getElementById("startlabel").textContent = text;
 }
 
-function triggerChannel(ch, time, stepVel, stepPitch, accent) {
+// `tick` is an absolute AMY sequencer tick to play at, or undefined to play now.
+function triggerChannel(ch, tick, stepVel, stepPitch, accent) {
   const c = state.channels[ch];
   const m = manifest[c.sample];
   const vel = c.vol * (stepVel ?? 1) * (accent ? ACCENT_GAIN : 1.0);
+  // Start playback partway into the sample. `phase` sets the PCM start point
+  // for the note-on, and AMY orders phase ahead of velocity within a single
+  // message, so this rides along with the trigger rather than chasing it.
+  // preset_frames is the 22050 Hz frame count of the baked preset (the
+  // manifest's `frames` is the original native-rate count). We send it every
+  // time, not only when offset > 0: the value sticks to the oscillator, so a
+  // channel whose offset knob went back to zero has to say so.
   const ev = {
     osc: OSC_BASE + ch,
     wave: AMY.PCM,
@@ -248,20 +265,10 @@ function triggerChannel(ch, time, stepVel, stepPitch, accent) {
     note: m.root + c.pitch + (stepPitch ?? 0),
     pan: c.pan,
     vel: vel,
+    phase: Math.floor(c.offset * m.preset_frames) / PCM_PHASE_DENOM,
   };
-  if (time !== undefined) ev.time = time;
+  if (tick !== undefined) ev.ticks = tick;
   amy_send(ev);
-  if (c.offset > 0) {
-    // Start playback partway into the sample. pcm_note_on resets phase to 0, so
-    // this must land as a separate delta *after* the note-on; AMY's queue keeps
-    // insertion order for equal timestamps, so a second message at the same
-    // time does exactly that. preset_frames is the 22050 Hz frame count of the
-    // baked preset (the manifest's `frames` is the original native-rate count).
-    const startFrame = Math.floor(c.offset * m.preset_frames);
-    const ph = { osc: OSC_BASE + ch, phase: startFrame / PCM_PHASE_DENOM };
-    if (time !== undefined) ph.time = time;
-    amy_send(ph);
-  }
 }
 
 // ---------------------------------------------------------------- filter & fx
@@ -284,6 +291,14 @@ function applyAllChannelFilters() {
   for (let ch = 0; ch < NUM_CH; ch++) applyChannelFilter(ch);
 }
 
+// AMY schedules in sequencer ticks, so its tempo has to track ours or the step
+// grid drifts away from the BPM the user dialed in. See TEMPO_MULT above for
+// why this isn't simply state.bpm.
+function applyTempo() {
+  if (!audioOn) return;
+  amy_send({ tempo: state.bpm * TEMPO_MULT });
+}
+
 function applyFx() {
   if (!audioOn) return;
   const x = state.fx;
@@ -296,13 +311,18 @@ function applyFx() {
 // ---------------------------------------------------------------- sequencer
 
 let schedStep = 0;
-let schedTime = 0;      // amy_sysclock ms
+let schedTick = 0;      // AMY sequencer tick the next step lands on
 let schedSongPos = 0;
-let endAt = null;       // sysclock ms to stop at (loop off), or null
+let endAt = null;       // tick to stop at (loop off), or null
 let timer = null;
-const playheadQueue = [];  // {time, step, pat, songPos}
+const playheadQueue = [];  // {tick, step, pat, songPos}
 
 function stepDurMs() { return 60000 / state.bpm / 4; }
+// How far ahead of the playhead we hand work to AMY, in ticks.
+function lookaheadTicks() { return Math.ceil(LOOKAHEAD_MS * TICKS_PER_STEP / stepDurMs()); }
+// Swing: delay every other step by up to half a step. Whole ticks, so the
+// groove is the same every bar instead of drifting on a rounding boundary.
+function shuffleTicks() { return Math.round(state.shuffle / 100 * TICKS_PER_STEP / 2); }
 function anySolo() { return state.channels.some(c => c.solo); }
 function songActive() { return state.mode === "song" && state.song.length > 0; }
 function schedPatternIdx() {
@@ -312,7 +332,7 @@ function schedPatternIdx() {
   return state.song[schedSongPos];
 }
 
-function scheduleStep(patIdx, step, t) {
+function scheduleStep(patIdx, step, tick) {
   const pat = state.patterns[patIdx];
   const solo = anySolo();
   for (let ch = 0; ch < NUM_CH; ch++) {
@@ -320,14 +340,14 @@ function scheduleStep(patIdx, step, t) {
     if (!v) continue;
     const c = state.channels[ch];
     if (solo ? !c.solo : c.mute) continue;
-    triggerChannel(ch, t, pat.vel[ch][step], pat.pitch[ch][step], v === 2);
+    triggerChannel(ch, tick, pat.vel[ch][step], pat.pitch[ch][step], v === 2);
   }
-  playheadQueue.push({ time: t, step, pat: patIdx, songPos: schedSongPos });
+  playheadQueue.push({ tick, step, pat: patIdx, songPos: schedSongPos });
 }
 
 function schedulerTick() {
-  const now = amy_sysclock();
-  while (endAt === null && schedTime < now + LOOKAHEAD_MS) {
+  const now = amy_ticks();
+  while (endAt === null && schedTick < now + lookaheadTicks()) {
     const patIdx = schedPatternIdx();
     const pat = state.patterns[patIdx];
     if (schedStep >= pat.length) {
@@ -336,19 +356,19 @@ function schedulerTick() {
         schedSongPos++;
         if (schedSongPos >= state.song.length) {
           if (state.loop) schedSongPos = 0;
-          else { endAt = schedTime; break; }
+          else { endAt = schedTick; break; }
         }
-      } else if (!state.loop) { endAt = schedTime; break; }
+      } else if (!state.loop) { endAt = schedTick; break; }
       continue;
     }
-    let t = schedTime;
-    if (schedStep % 2 === 1) t += (state.shuffle / 100) * stepDurMs() * 0.5;
+    let t = schedTick;
+    if (schedStep % 2 === 1) t += shuffleTicks();
     scheduleStep(patIdx, schedStep, t);
-    schedTime += stepDurMs();
+    schedTick += TICKS_PER_STEP;
     schedStep++;
   }
   // playhead UI
-  while (playheadQueue.length && playheadQueue[0].time <= now) {
+  while (playheadQueue.length && playheadQueue[0].tick <= now) {
     const ph = playheadQueue.shift();
     if (songActive() && ph.pat !== state.pattern) {
       state.pattern = ph.pat;
@@ -372,7 +392,8 @@ function startPlayback() {
     state.pattern = state.song[0];
     drawPatternButtons(); drawSteps();
   }
-  schedTime = amy_sysclock() + 100;
+  applyTempo();
+  schedTick = amy_ticks() + Math.ceil(100 * TICKS_PER_STEP / stepDurMs());
   timer = setInterval(schedulerTick, TICK_MS);
   document.getElementById("play").classList.add("active");
 }
@@ -381,6 +402,10 @@ function stopPlayback() {
   state.playing = false;
   clearInterval(timer);
   timer = null;
+  // Drop the lookahead's worth of hits AMY is still holding, so Stop is silent
+  // immediately instead of playing out the last 150 ms. We're the only user of
+  // AMY's sequencer here, so clearing the whole thing is safe.
+  if (audioOn) amy_send({ reset: AMY.RESET_SEQUENCER });
   playheadQueue.length = 0;
   endAt = null;
   drawPlayhead(-1);
@@ -991,6 +1016,7 @@ async function boot() {
     await amy_js_start();
     audioOn = true;
     amy_send({ volume: state.masterVol });
+    applyTempo();
     applyAllChannelFilters();
     applyFx();
     setLoadStatus(`${manifest.length} sounds on board`);
@@ -1004,6 +1030,7 @@ async function boot() {
   document.getElementById("stop").addEventListener("click", stopPlayback);
   document.getElementById("bpm").addEventListener("input", e => {
     state.bpm = Math.max(40, Math.min(240, +e.target.value || 120));
+    applyTempo();
     refreshEchoSync();
   });
   document.getElementById("shuffle").addEventListener("input", e => {
