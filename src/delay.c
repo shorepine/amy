@@ -97,8 +97,8 @@ static SAMPLE FRACTIONAL_SAMPLE(PHASOR phase, const SAMPLE *delay, int index_mas
 
 void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, SAMPLE mod_scale, delay_line_t *delay_line, SAMPLE mix_level, SAMPLE feedback_level) {
     // Read and write the next n_samples from/to the delay line.
-    // mod_in is a per-sample modulation of the maximum delay, where 1 gives 
-    // the max delay, -1 gives no delay, and 0 gives max_delay/2.
+    // mod_in is a per-sample modulation of the read tap around fixed_delay:
+    // 0 gives fixed_delay, 1 gives 2 * fixed_delay, -1 gives no delay.
     // mod_scale is a constant scale factor applied to each value in mod_in, 
     // used e.g. to flip the sign of the delay.
     // Also supports input feedback from a non-modulated feedback delay output.
@@ -110,14 +110,16 @@ void delay_line_in_out(SAMPLE *in, SAMPLE *out, int n_samples, SAMPLE* mod_in, S
     int index_feedback = (index_in - delay_line->fixed_delay) & index_mask;
 
     SAMPLE *delay = delay_line->samples;
-    SAMPLE half_mod_scale = SHIFTR(mod_scale, 1);
+    // Tap center and modulation span as fractions of the line length.
+    SAMPLE center = AMY_I2S(delay_line->fixed_delay, index_bits);
+    SAMPLE span = MUL8_SS(center, mod_scale);
     while(n_samples-- > 0) {
         SAMPLE next_in = *in++ + MUL8_SS(feedback_level,
                                          delay[index_feedback++]);
         index_feedback &= index_mask;
 
         PHASOR phase_out = I2P(index_in, index_bits)
-            - S2P(F2S(0.5) + MUL8_SS(half_mod_scale, *mod_in++));
+            - S2P(center + MUL8_SS(span, *mod_in++));
         //if(index_out >= delay_len) index_out -= delay_len;
         //if(index_out < 0) index_out += delay_len;
         SAMPLE sample = FRACTIONAL_SAMPLE(phase_out, delay, index_mask, index_bits);
