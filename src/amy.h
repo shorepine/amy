@@ -1476,13 +1476,24 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #ifdef ESP_PLATFORM
 
 // On Arduino, something doesn't allow ESP_TASK_PRIO_MAX in tasks
+// A host may set these before including amy.h: one with a USB audio
+// device has a packet pump that must run every millisecond and so has
+// to sit ABOVE the render tasks, which is impossible while they own
+// the ceiling.
+#ifndef AMY_RENDER_TASK_PRIORITY
 #ifdef ARDUINO
 #define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 5)
-#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 5)
 #else
 // (ESP_TASK_PRIO_MAX - 1) is the highest available priority under FreeRTOS (at least in esp-idf 6.0).
 #define AMY_RENDER_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 1)
+#endif
+#endif
+#ifndef AMY_FILL_BUFFER_TASK_PRIORITY
+#ifdef ARDUINO
+#define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 5)
+#else
 #define AMY_FILL_BUFFER_TASK_PRIORITY (ESP_TASK_PRIO_MAX - 1)
+#endif
 #endif
 #define AMY_RENDER_TASK_COREID (0)
 #define AMY_FILL_BUFFER_TASK_COREID (1)
