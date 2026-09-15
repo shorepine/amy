@@ -213,10 +213,11 @@ int8_t dsps_biquad_gen_notch_f32(SAMPLE *coeffs, float f, float qFactor)
 #endif
 
 // One sample through n first-order allpass stages sharing coefficient a;
-// s[0..n-1] are the per-stage memories.  One-multiply transposed form of
-// H(z) = (a + z^-1)/(1 + a z^-1): the same a feeds both multiplies, so each
-// stage is exactly allpass for any representable |a| < 1 - coefficient
-// quantization moves the phase curve but never the gain.
+// w[0..n-1] are the per-stage memories.  Transposed direct form II of
+// H(z) = (a + z^-1)/(1 + a z^-1) with one state word per stage, so six stages
+// plus the feedback sample fit filter_delay.  The same a feeds both
+// multiplies, so each stage is exactly allpass for any representable |a| < 1 -
+// coefficient quantization moves the phase curve but never the gain.
 static inline SAMPLE allpass1_chain(SAMPLE x0, SAMPLE a, SAMPLE *w, int n) {
     for (int k = 0; k < n; ++k) {
         SAMPLE y0 = FILT_MUL_SS(a, x0) + w[k];
