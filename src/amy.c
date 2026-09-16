@@ -1655,7 +1655,13 @@ void play_delta(struct delta *d) {
     DELTA_TO_SYNTH_F(FEEDBACK, feedback)
     DELTA_TO_SYNTH_F(RATIO, logratio)
     DELTA_TO_SYNTH_F(RESONANCE, resonance)
-    DELTA_TO_SYNTH_I(FILTER_TYPE, filter_type)
+    if (d->param == FILTER_TYPE) {
+        // The kernels store different things in filter_delay (raw vs b0-scaled input
+        // history, the phaser's allpass chain), so another type's state rings the
+        // new filter.  Restart from rest on a type change.
+        if (synth[d->osc]->filter_type != d->data.i) reset_filter(d->osc);
+        synth[d->osc]->filter_type = d->data.i;
+    }
     if (d->param == DIST_CLIP_EN) {
         if (d->data.i) synth[d->osc]->dist_stages |= DIST_CLIP;
         else           synth[d->osc]->dist_stages &= ~DIST_CLIP;
