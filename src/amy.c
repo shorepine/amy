@@ -2614,7 +2614,8 @@ int16_t * amy_fill_buffer() {
 
             // TODO -- the esp stuff here could sit outside of AMY
             // For some reason, have to drop a bit to stop hard wrapping on esp?
-#if defined(ESP_PLATFORM) || defined(__IMXRT1062__)
+            // Not applied on ESP32-P4: see https://github.com/shorepine/amy/issues/1169
+#if (defined(ESP_PLATFORM) && !defined(CONFIG_IDF_TARGET_ESP32P4)) || defined(__IMXRT1062__)
             uintval >>= 1;
 #endif
             if (positive) {
