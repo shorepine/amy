@@ -312,6 +312,68 @@ void _pulse_note_on(uint16_t osc) {
     }
 }
 
+#ifdef AMY_USE_FIXEDPOINT
+// render_lut_cub with the table size a compile-time constant, so the shifts
+// and mask are immediates and the loop fits the Xtensa register window as a
+// hardware loop.  Same arithmetic, bit-identical output: table values stay at
+// their 16-bit scale because MUL0_SS(L2S(x), f) == (x * (f >> 7)) >> 8.
+// noinline - the bodies inlined into one switch lose the hardware loop again.
+#define RENDER_LUT_CUB_SIZED(NAME, BITS) \
+static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR NAME(SAMPLE* buf, PHASOR phase, PHASOR step, \
+                                 SAMPLE incoming_amp, SAMPLE ending_amp, \
+                                 const LUTSAMPLE* table, SAMPLE* pmax_value) { \
+    SAMPLE max_value = 0; \
+    SAMPLE current_amp = incoming_amp; \
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS); \
+    int lut_mask = (1 << (BITS)) - 1; \
+    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) { \
+        int base_index = INT_OF_P(phase, BITS); \
+        SAMPLE frac = S_FRAC_OF_P(phase, BITS); \
+        /* INTERP_CUBIC on the raw 16-bit taps: each MUL0_SS(L2S(x), f) is written */ \
+        /* as SHIFTR(x * SHIFTR(f, 7), 8), the same value with the L2S shift folded. */ \
+        int32_t a = table[(base_index - 1) & lut_mask]; \
+        int32_t b = table[base_index]; \
+        int32_t c = table[(base_index + 1) & lut_mask]; \
+        int32_t d = table[(base_index + 2) & lut_mask]; \
+        int32_t cminusb = c - b; \
+        SAMPLE frac7 = SHIFTR(frac, 7); \
+        SAMPLE fr_d_ma_m3cmb = SHIFTR((d - a - cminusb - SHIFTL(cminusb, 1)) * frac7, 8); \
+        SAMPLE next_bit = SHIFTR((SHIFTR(fr_d_ma_m3cmb, 8) + d + SHIFTL(a - b, 1) - b) * SHIFTR(MUL0_SS(F2S(1.0f) - frac, F2S(0.16666666666667f)), 7), 8); \
+        SAMPLE sample = L2S(b) + SHIFTR((cminusb + SHIFTR(-next_bit, 8)) * frac7, 8); \
+        SAMPLE value = buf[i] + MULA_SS(sample, current_amp); \
+        buf[i] = value; \
+        if (value < 0) value = -value; \
+        if (value > max_value) max_value = value; \
+        current_amp += incremental_amp; \
+        phase = P_WRAPPED_SUM(phase, step); \
+    } \
+    *pmax_value = max_value; \
+    return phase; \
+}
+RENDER_LUT_CUB_SIZED(render_lut_cub_11, 11)
+RENDER_LUT_CUB_SIZED(render_lut_cub_10, 10)
+RENDER_LUT_CUB_SIZED(render_lut_cub_9, 9)
+RENDER_LUT_CUB_SIZED(render_lut_cub_8, 8)
+RENDER_LUT_CUB_SIZED(render_lut_cub_7, 7)
+RENDER_LUT_CUB_SIZED(render_lut_cub_6, 6)
+
+static AMY_IRAM_ATTR PHASOR render_lut_cub_sized(SAMPLE* buf, PHASOR phase, PHASOR step,
+        SAMPLE incoming_amp, SAMPLE ending_amp, const LUT* lut, SAMPLE* pmax_value) {
+    if (lut == NULL) return phase;
+    switch (lut->log_2_table_size) {
+    case 11: return render_lut_cub_11(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    case 10: return render_lut_cub_10(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    case 9:  return render_lut_cub_9(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    case 8:  return render_lut_cub_8(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    case 7:  return render_lut_cub_7(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    case 6:  return render_lut_cub_6(buf, phase, step, incoming_amp, ending_amp, lut->table, pmax_value);
+    default: return render_lut_cub(buf, phase, step, incoming_amp, ending_amp, lut, pmax_value);
+    }
+}
+#else
+#define render_lut_cub_sized render_lut_cub
+#endif
+
 AMY_IRAM_ATTR SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square, int8_t direction, SAMPLE dc_offset) {
     AMY_PROFILE_START(RENDER_LPF_LUT)
     // Common function for pulse and saw.
@@ -321,7 +383,7 @@ AMY_IRAM_ATTR SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square,
     SAMPLE last_amp = direction * F2S(msynth[osc]->last_amp);
     PHASOR pwm_phase = synth[osc]->phase;
     SAMPLE max_value;
-    synth[osc]->phase = render_lut_cub(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
+    synth[osc]->phase = render_lut_cub_sized(buf, synth[osc]->phase, step, last_amp, amp, synth[osc]->lut, &max_value);
     if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
         float duty = msynth[osc]->duty;
         if (duty < 0.01f) duty = 0.01f;
@@ -329,7 +391,7 @@ AMY_IRAM_ATTR SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square,
         pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(msynth[osc]->last_duty));
         // Second pulse is given some blockwise-constant FM to maintain phase continuity across blocks.
         PHASOR delta_phase_per_sample = F2P((duty - msynth[osc]->last_duty) / AMY_BLOCK_SIZE);
-        render_lut_cub(buf, pwm_phase, step + delta_phase_per_sample, -last_amp, -amp, synth[osc]->lut, &max_value);
+        render_lut_cub_sized(buf, pwm_phase, step + delta_phase_per_sample, -last_amp, -amp, synth[osc]->lut, &max_value);
         msynth[osc]->last_duty = duty;
     }
     // Remember last_amp.
