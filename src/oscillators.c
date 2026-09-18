@@ -168,6 +168,35 @@ AMY_IRAM_ATTR PHASOR render_lut_fb(SAMPLE* buf,
     return phase;
 }
 
+// render_lut with the mod input, for the 256-entry sine table the FM
+// operators always read: shifts and mask are immediates, so the loop fits
+// the Xtensa register window as a hardware loop.  Same expressions as
+// RENDER_LUT_GUTS(MOD_PART_MOD, NOTHING, INTERP_LINEAR) with lut_bits = 8.
+static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR render_lut_fm_256(SAMPLE* buf,
+                     PHASOR phase,
+                     PHASOR step,
+                     SAMPLE incoming_amp, SAMPLE ending_amp,
+                     const LUTSAMPLE* table,
+                     SAMPLE* mod,
+                     SAMPLE* pmax_value) {
+    SAMPLE sample = 0;
+    SAMPLE max_value = 0;
+    SAMPLE current_amp = incoming_amp;
+    SAMPLE incremental_amp = SHIFTR(ending_amp - incoming_amp, BLOCK_SIZE_BITS);
+    for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
+        PHASOR total_phase = phase;
+        total_phase += S2P(mod[i]);
+        int16_t base_index = INT_OF_P(total_phase, 8);
+        SAMPLE frac = S_FRAC_OF_P(total_phase, 8);
+        SAMPLE b = L2S(table[base_index]);
+        SAMPLE c = L2S(table[(base_index + 1) & 255]);
+        sample = b + MUL0_SS(c - b, frac);
+        RENDER_LUT_LOOP_END
+    }
+    *pmax_value = max_value;
+    return phase;
+}
+
 AMY_IRAM_ATTR PHASOR render_lut_fm(SAMPLE* buf,
                      PHASOR phase,
                      PHASOR step,
@@ -176,6 +205,11 @@ AMY_IRAM_ATTR PHASOR render_lut_fm(SAMPLE* buf,
                      SAMPLE* mod,
                      SAMPLE* pmax_value) {
     AMY_PROFILE_START(RENDER_LUT_FM)
+    if (lut != NULL && lut->log_2_table_size == 8) {
+        phase = render_lut_fm_256(buf, phase, step, incoming_amp, ending_amp, lut->table, mod, pmax_value);
+        AMY_PROFILE_STOP(RENDER_LUT_FM)
+        return phase;
+    }
     RENDER_LUT_PREAMBLE
     for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
         PHASOR total_phase = phase;
