@@ -140,6 +140,12 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 // How many external CV inputs to contemplate.
 #define AMY_MAX_CV_IN 2
 
+// How many external CONTROL OUTPUTS a host can offer (note_output.c).
+// AMY has no opinion about what one physically is -- a DAC channel, a
+// GPIO driven to 0 or 5 V -- which is what makes using a CV output as a
+// gate free rather than a feature. Hosts with more outputs raise this.
+#define AMY_MAX_CV_OUT 4
+
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
 
@@ -332,7 +338,7 @@ enum coefs{
 #define AUDIO_IN1 13
 #define AUDIO_EXT0 14
 #define AUDIO_EXT1 15
-#define AMY_MIDI 16
+// 16 reserved, was AMY_MIDI -- see below
 #define PCM_LEFT 17
 #define PCM_RIGHT 18
 #define PCM_MIX 7 // same as PCM
@@ -340,6 +346,16 @@ enum coefs{
 #define SILENT 20  // A control osc for applying filte and env without contributing waveform
 #define CUSTOM 21
 #define WAVE_OFF 22
+// 16 (AMY_MIDI) was an osc that sent a note-on out the MIDI port. It is
+// superseded by synth note outputs (note_output.c), which can hold a
+// channel and cost no oscillator. THE NUMBER STAYS RESERVED AND UNUSED
+// rather than being recycled: a reused wave number is a silent wrong
+// sound in every stored patch and wire string that still names it.
+
+// note_output values -- where a synth's NOTE EVENTS go (note_output.c).
+#define NOTE_OUTPUT_OFF 0
+#define NOTE_OUTPUT_CV_GATE 1
+#define NOTE_OUTPUT_MIDI_OUT 2
 // wave mode values, depend on wave type
 #define MODE_NONE 0
 #define PCM_PLAY_STOP 0
@@ -911,6 +927,13 @@ typedef struct  {
     // can grow dynamically as buses are touched).
     void (*amy_external_bus_postprocess_hook)(uint16_t bus, SAMPLE *buf, uint16_t len);
     float (*amy_external_coef_hook)(uint16_t channel);
+    // A synth with note_output = NOTE_OUTPUT_CV_GATE is putting `volts` on
+    // host control output `channel` (0 .. AMY_MAX_CV_OUT-1). Called from
+    // the render thread as the note event is applied, so it lands at block
+    // resolution rather than at whatever rate the host polls; keep it to a
+    // register write or a mailbox post. MIDI note output needs no hook --
+    // midi_out() already reaches every port a host has wired.
+    void (*amy_external_cv_output_hook)(uint8_t channel, float volts);
     void (*amy_external_block_done_hook)(void);
     void (*amy_external_midi_input_hook)(uint8_t *bytes, uint16_t len, uint8_t is_sysex);
     // Called with every run of bytes AMY sends out over MIDI, before (and
@@ -1302,6 +1325,15 @@ extern void cv_trigger_new(uint8_t trigger_cv, float thresh_high, float thresh_l
 extern void cv_trigger_init(void);
 extern void cv_trigger_deinit(void);
 extern void cv_trigger_clear_mappings(int gate_cv);
+
+// note_output.c -- cv_trigger's mirror: a synth's note events out to
+// CV/gate or MIDI instead of to its oscillators.
+extern uint8_t note_output_mode_for(uint8_t synth);
+extern bool note_output_handle_event(amy_event *e);
+extern void note_output_config(uint8_t synth, int mode, float *args, int num_args);
+extern void note_output_all_off(uint8_t synth);
+extern void note_output_reset(void);
+extern int note_output_emit_command(uint8_t synth, char *buf, size_t len);
 // Read the external CV and run triggers.
 extern void update_external_cv_in(void);
 

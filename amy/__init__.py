@@ -262,13 +262,42 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
     ('bus', 'yI'), ('mode', 'wwI'),
     ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), ('cv_trigger', 'igL'),
+    ('note_output', 'iGN'),
     ('patch_string', 'uS'),  # patch_string MUST be last because we can't identify when it ends except by end-of-message.
 ]
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
 _KW_MAP = dict(_KW_MAP_LIST)
 
+# note_output='CV_GATE,0,2' -- one parameter carrying the mode and its
+# channels together, so a synth can never be half-configured (MIDI_OUT
+# holding CV channel numbers, say) the way two commands would allow.
+NOTE_OUTPUT_MODES = {'OFF': 0, 'CV_GATE': 1, 'MIDI_OUT': 2}
+
+
+def parse_note_output(arg):
+    """'CV_GATE,0,2' -> '1,0,2'.
+
+    THE NAME LIVES HERE AND THE NUMBER GOES ON THE WIRE, which is not a
+    style choice: AMY's parser delimits a command's argument with the
+    next alphabetic character, so a payload containing letters would run
+    into whatever command follows it. Every other friendly spelling in
+    AMY is in this layer for its own reasons; this one has a hard one.
+    """
+    if not isinstance(arg, str):
+        return parse_list_or_comma_string(arg)
+    fields = [f.strip() for f in arg.split(',')]
+    mode = fields[0].upper()
+    if mode in NOTE_OUTPUT_MODES:
+        fields[0] = str(NOTE_OUTPUT_MODES[mode])
+    elif not fields[0].lstrip('-').isdigit():
+        raise ValueError("note_output: unknown mode %r, want one of %s"
+                         % (fields[0], ', '.join(sorted(NOTE_OUTPUT_MODES))))
+    return ','.join(fields)
+
+
 _ARG_HANDLERS = {
     'I': str_of_int, 'F': trunc, 'S': str, 'L': parse_list_or_comma_string, 'C': parse_ctrl_coefs,
+    'N': parse_note_output,
 }
 
 # Construct an AMY message

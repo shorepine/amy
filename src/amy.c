@@ -1161,6 +1161,7 @@ void amy_reset_oscs() {
     midi_active_channels_reset();
     cv_trigger_deinit();
     cv_trigger_init();
+    note_output_reset();
     cv_from_osc_deinit();
     cv_from_osc_init();
 }
@@ -1442,6 +1443,7 @@ void show_debug(uint8_t type) {
 
 void oscs_deinit() {
     cv_from_osc_deinit();
+    note_output_reset();
     cv_trigger_deinit();
     midi_mappings_deinit();
     for (int bus = 0; bus < amy_global.config.max_buses; ++bus) {
@@ -1501,7 +1503,6 @@ void osc_note_on(uint16_t osc, float initial_freq) {
     case AUDIO_IN1: audio_in_note_on(osc, 1); break;
     case AUDIO_EXT0: external_audio_in_note_on(osc, 0); break;
     case AUDIO_EXT1: external_audio_in_note_on(osc, 1); break;
-    case AMY_MIDI: amy_send_midi_note_on(osc); break;
     case BYO_PARTIALS: if(AMY_HAS_PARTIALS) partials_note_on(osc); break;
     case INTERP_PARTIALS: if(AMY_HAS_PARTIALS) interp_partials_note_on(osc); break;
     #ifdef AMY_WAVETABLE
@@ -1987,7 +1988,6 @@ void play_delta(struct delta *d) {
                     switch(synth[osc]->wave) {
                     case KS: ks_note_off(osc); break;
                     case ALGO: algo_note_off(osc); break;
-                    case AMY_MIDI: amy_send_midi_note_off(osc); break;
                     case CUSTOM: custom_note_off(osc); break;
                     case BYO_PARTIALS:
                     case INTERP_PARTIALS:
@@ -2226,7 +2226,6 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
                 if(synth[osc]->wave == AUDIO_IN1) max_val = render_audio_in(buf, osc, 1);
                 if(synth[osc]->wave == AUDIO_EXT0) max_val = render_external_audio_in(buf, osc, 0);
                 if(synth[osc]->wave == AUDIO_EXT1) max_val = render_external_audio_in(buf, osc, 1);
-                if(synth[osc]->wave == AMY_MIDI) max_val = 1;
                 if(synth[osc]->wave == KS) {
                     if(amy_global.config.ks_oscs) {
                         max_val = render_ks(buf, osc);

@@ -486,6 +486,7 @@ amy_sources = [
     "api.c",
     "custom.c",
     "cv_trigger.c",
+    "note_output.c",
     "delay.c",
     "envelope.c",
     "examples.c",
