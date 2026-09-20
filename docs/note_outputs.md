@@ -133,10 +133,24 @@ i2iG2,6              MIDI_OUT on channel 6
 i1iG0                off
 ```
 
-**The wire payload is numeric and the friendly names live in Python.**
-That is not a style choice: AMY's parser delimits a command's argument
-with the next alphabetic character, so a payload containing letters
-would run into whatever command follows it.
+**The wire payload is numeric and the friendly names are a Python
+convenience.** Two reasons, neither of them style: AMY's parser
+delimits a command's argument with the next alphabetic character, so a
+payload containing letters runs into whatever command follows it; and
+in the generated JS and GDScript bindings this rides as an ordinary
+comma string, because a new arg-type code would be a new thing for
+every consumer of those tables to implement. **So from those bindings
+you pass the number** —
+
+```
+note_output = "1,0,2"     # CV_GATE, pitch out 0, gate out 2
+note_output = "2,6"       # MIDI_OUT on channel 6
+note_output = "0"         # off
+```
+
+— and a name that reaches AMY unmapped is **refused out loud** rather
+than read as 0, which is `OFF`, which would be silence with nothing
+said anywhere.
 
 ## What this replaced
 

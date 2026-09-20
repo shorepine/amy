@@ -431,6 +431,20 @@ int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_
 // -- note_output='CV_GATE,0,2' -- lives in the Python layer, which is
 // where every other friendly spelling in AMY lives.
 int note_output_from_message(char *message, int synth) {
+    // A MODE THAT IS NOT A NUMBER IS REFUSED OUT LOUD. The friendly
+    // spelling is a Python convenience; the generated JS and GDScript
+    // tables carry this as an ordinary comma string, so a caller there
+    // who types the name sends it through unmapped -- and atoff() would
+    // read "CV_GATE" as 0, which is OFF. That is silence, with nothing
+    // said anywhere, which is the worst answer this command could give.
+    const char *first = message;
+    while (*first == ' ') ++first;
+    if (*first < '0' || *first > '9') {
+        fprintf(stderr, "note_output: mode must be a number (%d=OFF, %d=CV_GATE, "
+                "%d=MIDI_OUT), got \"%s\"\n", NOTE_OUTPUT_OFF,
+                NOTE_OUTPUT_CV_GATE, NOTE_OUTPUT_MIDI_OUT, message);
+        return 0;
+    }
     float vals[8];
     int num_vals = parse_list_float(message, vals, 8, AMY_UNSET_FLOAT);
     if (num_vals < 1 || AMY_IS_UNSET(vals[0])) {

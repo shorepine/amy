@@ -232,6 +232,18 @@ static void test_state_round_trip(void) {
     CHECK(found, "the iG command is in the synth's dumped state");
 }
 
+static void test_bad_mode_is_refused(void) {
+    printf("a non-numeric mode is refused, not read as OFF\n");
+    restart();
+    // The friendly name is a Python convenience; a binding that passes it
+    // through unmapped must not have it read as 0 (= OFF), which would be
+    // silence with no complaint. (This prints a complaint; that is the point.)
+    wire("i1iGCV_GATE,0,1");
+    clear_log();
+    wire("i1n60l1");
+    CHECK(cv_writes == 0, "nothing was configured, so nothing was written");
+}
+
 int main(void) {
     test_cv_gate_voltages();
     test_loopback_identity();
@@ -240,6 +252,7 @@ int main(void) {
     test_costs_no_oscs();
     test_off_restores();
     test_state_round_trip();
+    test_bad_mode_is_refused();
     printf("%s: %d failure%s\n", failures ? "FAILED" : "PASSED",
            failures, failures == 1 ? "" : "s");
     return failures ? 1 : 0;
