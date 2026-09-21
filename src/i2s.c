@@ -59,16 +59,114 @@
 //        - call amy_fill_buffer
 
 #include "driver/i2s_std.h"
-#ifdef AMYBOARD_ARDUINO
-#include "driver/i2c_master.h"
+#include "amy_i2c.h"
+#if defined(AMY_CODEC_ES8311)
+  #if defined(AMYBOARD) || defined(AMYBOARD_ARDUINO)
+    // AMYboard has its own codecs and its own setup_i2s below, which never looks
+    // at an ES8311.  Silently compiling the driver in and never calling it just
+    // leaves the user with a silent board and no clue, so say so at build time.
+    #warning "AMY_CODEC_ES8311 has no effect on AMYboard builds -- AMYboard drives its own codecs"
+  #else
+    #define AMY_USE_ES8311 1
+    #include "es8311.h"
+  #endif
 #endif
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
+
+///////////////////////////////////////////////////////////////
+// Shared codec-control I2C (see amy_i2c.h)
+
+#define AMY_I2C_TIMEOUT_MS 100
+
+esp_err_t amy_i2c_open_device(amy_i2c_dev_t *d, int i2c_port, int8_t sda, int8_t scl,
+                              uint8_t addr, uint32_t scl_speed_hz) {
+    d->bus = NULL;
+    d->dev = NULL;
+    i2c_master_bus_config_t bus_conf = {
+        .i2c_port = i2c_port,
+        .sda_io_num = sda,
+        .scl_io_num = scl,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    esp_err_t ret = i2c_new_master_bus(&bus_conf, &d->bus);
+    if (ret != ESP_OK) {
+        d->bus = NULL;
+        return ret;
+    }
+    i2c_device_config_t dev_conf = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = addr,
+        .scl_speed_hz = scl_speed_hz,
+    };
+    ret = i2c_master_bus_add_device(d->bus, &dev_conf, &d->dev);
+    if (ret != ESP_OK) {
+        d->dev = NULL;
+        i2c_del_master_bus(d->bus);
+        d->bus = NULL;
+    }
+    return ret;
+}
+
+void amy_i2c_close_device(amy_i2c_dev_t *d) {
+    esp_err_t ret;
+    if (d->dev != NULL) {
+        ret = i2c_master_bus_rm_device(d->dev);
+        if (ret != ESP_OK) fprintf(stderr, "i2c: device cleanup failed: %s\n", esp_err_to_name(ret));
+        d->dev = NULL;
+    }
+    if (d->bus != NULL) {
+        ret = i2c_del_master_bus(d->bus);
+        if (ret != ESP_OK) fprintf(stderr, "i2c: bus cleanup failed: %s\n", esp_err_to_name(ret));
+        d->bus = NULL;
+    }
+}
+
+esp_err_t amy_i2c_write_reg(const amy_i2c_dev_t *d, uint8_t reg, uint8_t val) {
+    if (d == NULL || d->dev == NULL) return ESP_ERR_INVALID_STATE;
+    uint8_t buf[2] = { reg, val };
+    return i2c_master_transmit(d->dev, buf, 2, AMY_I2C_TIMEOUT_MS);
+}
+
+esp_err_t amy_i2c_read_reg(const amy_i2c_dev_t *d, uint8_t reg, uint8_t *val) {
+    if (d == NULL || d->dev == NULL) return ESP_ERR_INVALID_STATE;
+    *val = 0;
+    return i2c_master_transmit_receive(d->dev, &reg, 1, val, 1, AMY_I2C_TIMEOUT_MS);
+}
 
 
 #if !defined(AMYBOARD) && !defined(AMYBOARD_ARDUINO)
 // default ESP setup i2s
 amy_err_t esp32_setup_i2s(void) {
+    // MCLK = i2s_mclk_mult * Fs.  Codecs that take an MCLK (e.g. the ES8311
+    // below) have to be programmed for the same number, so derive both from this
+    // one place.  The ESP I2S peripheral only accepts a few multiples; anything
+    // else would fail inside i2s_channel_init_std_mode() and leave us silent.
+    uint32_t mclk_mult = amy_global.config.i2s_mclk_mult;
+    switch (mclk_mult) {
+        case 128: case 256: case 384: case 512: break;
+        default:
+            fprintf(stderr, "i2s: unsupported i2s_mclk_mult %u (want 128/256/384/512), using 256\n",
+                    (unsigned)mclk_mult);
+            mclk_mult = 256;
+            break;
+    }
+#ifdef AMY_USE_ES8311
+    // The ESP can generate multiples the ES8311's clock-coefficient table has no
+    // row for; accepting one here would just make codec bring-up fail later.
+    if (!amy_es8311_supports_mclk((uint32_t)AMY_SAMPLE_RATE * mclk_mult, AMY_SAMPLE_RATE)) {
+        fprintf(stderr, "i2s: ES8311 does not support %ux MCLK at %uHz, using 256\n",
+                (unsigned)mclk_mult, (unsigned)AMY_SAMPLE_RATE);
+        mclk_mult = 256;
+    }
+#endif
+    // Keep the config describing the hardware: anything reading i2s_mclk_mult
+    // after amy_start() (to program another MCLK consumer, say) must see the
+    // multiple I2S actually generates, not the value we overrode.
+    amy_global.config.i2s_mclk_mult = mclk_mult;
+
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
     if(AMY_HAS_AUDIO_IN) {
         i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
@@ -113,6 +211,10 @@ amy_err_t esp32_setup_i2s(void) {
         },
     };
 #endif
+    // I2S_STD_CLK_DEFAULT_CONFIG hardcodes 256; honour amy_config.i2s_mclk_mult
+    // (as pico_support.cpp does) so the config field means something on ESP too.
+    std_cfg.clk_cfg.mclk_multiple = (i2s_mclk_multiple_t)mclk_mult;
+
     /* Initialize the channel */
     i2s_channel_init_std_mode(tx_handle, &std_cfg);
     if(AMY_HAS_AUDIO_IN) i2s_channel_init_std_mode(rx_handle, &std_cfg);
@@ -120,6 +222,25 @@ amy_err_t esp32_setup_i2s(void) {
     /* Before writing data, start the TX channel first */
     i2s_channel_enable(tx_handle);
     if(AMY_HAS_AUDIO_IN) i2s_channel_enable(rx_handle);
+
+#ifdef AMY_USE_ES8311
+    // Configure an ES8311 codec (e.g. the Freenove FNK0104 ESP32-S3 boards) over
+    // I2C now that MCLK/BCLK/WS are running.  Pins/address/amp-enable default to
+    // the FNK0104 and can be overridden with -D build defines (see es8311.h).
+    // amy_start() ignores this function's result, so a codec that didn't come up
+    // would otherwise be a silent board with nothing said anywhere: complain
+    // here, leave the verdict in amy_es8311_status() for the sketch to report,
+    // and hand the error back for callers that do check it.
+    amy_err_t codec_err = amy_es8311_init(
+        AMY_ES8311_I2C_PORT, AMY_ES8311_I2C_SDA, AMY_ES8311_I2C_SCL,
+        AMY_ES8311_I2C_ADDR, AMY_ES8311_PA_GPIO, AMY_ES8311_PA_ACTIVE_LOW,
+        AMY_SAMPLE_RATE, (uint32_t)AMY_SAMPLE_RATE * mclk_mult, AMY_ES8311_VOLUME);
+    if (codec_err != AMY_OK) {
+        fprintf(stderr, "AMY: ES8311 codec init failed -- audio output will be silent\n");
+        return codec_err;
+    }
+#endif // AMY_USE_ES8311
+
     return AMY_OK;
 }
 
@@ -195,41 +316,22 @@ amy_err_t esp32_setup_i2s(void) {
             { 0x6F, 0x40 },  // MPIO_A = CLKST / MPIO_B = AUXIN2 / MPIO_C = AUXIN1
         };
 
-        i2c_master_bus_config_t bus_conf = {
-            .i2c_port = I2C_NUM_0,
-            .sda_io_num = PCM9211_I2C_SDA,
-            .scl_io_num = PCM9211_I2C_SCL,
-            .clk_source = I2C_CLK_SRC_DEFAULT,
-            .glitch_ignore_cnt = 7,
-            .flags.enable_internal_pullup = true,
-        };
-        i2c_master_bus_handle_t bus_handle = NULL;
-        i2c_master_dev_handle_t dev_handle = NULL;
-        esp_err_t ret = i2c_new_master_bus(&bus_conf, &bus_handle);
-        if (ret == ESP_OK) {
-            i2c_device_config_t dev_conf = {
-                .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-                .device_address = PCM9211_I2C_ADDR,
-                .scl_speed_hz = PCM9211_I2C_FREQ,
-            };
-            ret = i2c_master_bus_add_device(bus_handle, &dev_conf, &dev_handle);
-        }
+        amy_i2c_dev_t pcm9211;
+        esp_err_t ret = amy_i2c_open_device(&pcm9211, I2C_NUM_0, PCM9211_I2C_SDA, PCM9211_I2C_SCL,
+                                           PCM9211_I2C_ADDR, PCM9211_I2C_FREQ);
         if (ret != ESP_OK) {
             fprintf(stderr, "PCM9211: I2C init failed: %s\n", esp_err_to_name(ret));
         } else {
             for (int i = 0; i < sizeof(pcm9211_regs) / sizeof(pcm9211_regs[0]); i++) {
-                uint8_t buf[2] = { pcm9211_regs[i][0], pcm9211_regs[i][1] };
-                ret = i2c_master_transmit(dev_handle, buf, 2, 100);
+                ret = amy_i2c_write_reg(&pcm9211, pcm9211_regs[i][0], pcm9211_regs[i][1]);
                 if (ret != ESP_OK) {
                     fprintf(stderr, "PCM9211: reg 0x%02x write 0x%02x failed: %s\n",
-                        buf[0], buf[1], esp_err_to_name(ret));
+                        pcm9211_regs[i][0], pcm9211_regs[i][1], esp_err_to_name(ret));
                 }
             }
+            // Tear down the I2C driver so Arduino Wire can use bus 0 later
+            amy_i2c_close_device(&pcm9211);
         }
-
-        // Tear down the I2C driver so Arduino Wire can use bus 0 later
-        if (dev_handle) i2c_master_bus_rm_device(dev_handle);
-        if (bus_handle) i2c_del_master_bus(bus_handle);
     }
 #endif // AMYBOARD_ARDUINO
 
@@ -239,6 +341,11 @@ amy_err_t esp32_setup_i2s(void) {
 #endif
 
 amy_err_t esp32_teardown_i2s(void) {
+#ifdef AMY_USE_ES8311
+    // Mute the codec and drop its power amplifier before the clocks stop below:
+    // taking MCLK/BCLK/WS away from a live amp pops (or DC-thumps) the speaker.
+    amy_es8311_deinit();
+#endif
     i2s_channel_disable(tx_handle);
     if(AMY_HAS_AUDIO_IN) i2s_channel_disable(rx_handle);
     i2s_del_channel(tx_handle);
