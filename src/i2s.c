@@ -542,13 +542,12 @@ volatile bool core1_running = true;
 uint32_t * my_core1_separate_stack_address = NULL;
 
 extern void on_pico_uart_rx();
+extern void pico_process_midi();
 
 void amy_update_tasks() {
     amy_execute_deltas();
     if(amy_global.config.midi & AMY_MIDI_IS_UART) on_pico_uart_rx();
-#ifdef TUD_USB_GADGET
-    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) on_pico_uart_rx();
-#endif
+    if(amy_global.config.midi & AMY_MIDI_IS_USB_GADGET) pico_process_midi();
 }
 
 #define USE_SECOND_CORE
