@@ -120,6 +120,17 @@ static void note_output_on(note_output_t *n, uint8_t note, float velocity) {
     // carries one note. A note-on while another is held moves the pitch
     // and LEAVES THE GATE HIGH, which is how a mono synth gives you a
     // slide for free; the gate falls only when the last held note goes.
+    // A REPEATED NOTE-ON RETRIGGERS, it does not stack. Two note-ons for
+    // one note would otherwise need two note-offs to let the gate fall,
+    // so a doubled note-on -- which a re-sent sequencer slot or a
+    // stuttering controller produces easily -- would strand the gate
+    // high. Real synths retrigger; so does this.
+    for (uint8_t i = 0; i < n->num_held; ++i) {
+        if (n->held[i] != note) continue;
+        for (uint8_t j = i + 1; j < n->num_held; ++j) n->held[j - 1] = n->held[j];
+        n->num_held--;
+        break;
+    }
     bool was_held = (n->num_held > 0);
     if (n->num_held == NOTE_OUTPUT_HELD) {
         // Drop the oldest rather than refusing the newest: a lost
@@ -177,6 +188,19 @@ bool note_output_handle_event(amy_event *e) {
     if (AMY_IS_UNSET(e->synth)) return false;
     note_output_t *n = note_output_find(e->synth);
     if (n == NULL || n->mode == NOTE_OUTPUT_OFF) return false;
+    // ALL NOTES OFF -- a velocity of 0 with no note, patches.c's own
+    // convention -- MUST reach a note output, and this is the fix for the
+    // worst failure this feature has. A note-on whose note-off never
+    // arrives (a sequencer wiped mid-note, a pattern rewritten under a
+    // sounding step) leaves the note on the held stack for ever: the gate
+    // stays high, every later note-on sees a held note and so raises no
+    // edge at all, and on a modular that is a stuck note that nothing in
+    // the API could clear. Panic has to reach here or it is not panic.
+    if (AMY_IS_UNSET(e->midi_note) && AMY_IS_SET(e->velocity)
+        && e->velocity == 0) {
+        note_output_all_off(e->synth);
+        return false;   // ...and the synth's own voices still get it
+    }
     // ONLY NOTE EVENTS ARE CLAIMED. Anything else addressed to this synth
     // -- a level, a bus, a patch that redefines it as an ordinary synth --
     // carries on down the normal path, because swallowing it here would
@@ -240,6 +264,21 @@ void note_output_config(uint8_t synth, int mode, float *args, int num_args) {
         if (num_args > 1) n->forward_midi_in = (args[1] != 0);
         n->pitch_scale = 12.0f; n->pitch_offset = 24.0f; n->gate_volts = 5.0f;
         n->pitch_cv = 0; n->gate_cv = 1; AMY_UNSET(n->vel_cv);
+    }
+}
+
+/* Every note output's gate down, whoever owns it.
+ *
+ * all_notes_off()'s half of the panic. A host reaching for
+ * RESET_ALL_NOTES means "stop everything", and a gate is the one thing
+ * here that can stay stuck without being audible on this machine at
+ * all -- the noise it makes is in somebody's rack. */
+void note_output_all_gates_off(void) {
+    note_output_t *n = note_output_root;
+    while (n) {
+        n->num_held = 0;
+        if (n->mode == NOTE_OUTPUT_CV_GATE) cv_output(n->gate_cv, 0);
+        n = n->next;
     }
 }
 

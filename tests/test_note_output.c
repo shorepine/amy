@@ -273,6 +273,34 @@ static void test_bad_mode_is_refused(void) {
     CHECK(cv_writes == 0, "nothing was configured, so nothing was written");
 }
 
+static void test_lost_note_off_is_recoverable(void) {
+    printf("a lost note-off does not strand the gate for ever\n");
+    restart();
+    wire("i1iG1,0,1");
+    wire("i1n60l1");
+    CHECK(fabsf(last_on(1) - 5.0f) < 1e-4, "gate is up");
+    // ...and the note-off never comes: a sequencer wiped mid-note, or a
+    // pattern rewritten under a sounding step. Found on hardware, where
+    // it left a modular holding a note that NOTHING in the API could
+    // clear -- every later note-on saw a held note and raised no edge.
+    wire("l0i1");                       // all notes off: velocity 0, no note
+    CHECK(fabsf(last_on(1)) < 1e-4, "all-notes-off puts it down");
+    clear_log();
+    wire("i1n64l1");
+    CHECK(fabsf(last_on(1) - 5.0f) < 1e-4, "and the next note still gates");
+    CHECK(fabsf(last_on(0) - 3.3333f) < 1e-3, "...at its own pitch (%.4f V)", last_on(0));
+}
+
+static void test_repeated_note_on_retriggers(void) {
+    printf("a doubled note-on does not need two note-offs\n");
+    restart();
+    wire("i1iG1,0,1");
+    wire("i1n60l1");
+    wire("i1n60l1");                    // the same note again, unreleased
+    wire("i1n60l0");                    // ONE note-off
+    CHECK(fabsf(last_on(1)) < 1e-4, "one note-off is enough to drop the gate");
+}
+
 int main(void) {
     test_cv_gate_voltages();
     test_loopback_identity();
@@ -283,6 +311,8 @@ int main(void) {
     test_state_round_trip();
     test_bad_mode_is_refused();
     test_echo_not_diversion();
+    test_lost_note_off_is_recoverable();
+    test_repeated_note_on_retriggers();
     printf("%s: %d failure%s\n", failures ? "FAILED" : "PASSED",
            failures, failures == 1 ? "" : "s");
     return failures ? 1 : 0;

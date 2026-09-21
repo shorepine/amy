@@ -145,6 +145,10 @@ void update_num_oscs_for_patch_number(int patch_number) {
 }
 
 void all_notes_off() {
+    // The note outputs first: a gate left high is a stuck note on
+    // whatever is patched to it, and this is the call every host reaches
+    // for when something is stuck.
+    note_output_all_gates_off();
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         if (AMY_IS_SET(osc_to_voice[i])) {
             if(synth[i]->status == SYNTH_AUDIBLE) {

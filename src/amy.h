@@ -1332,6 +1332,7 @@ extern uint8_t note_output_mode_for(uint8_t synth);
 extern bool note_output_handle_event(amy_event *e);
 extern void note_output_config(uint8_t synth, int mode, float *args, int num_args);
 extern void note_output_all_off(uint8_t synth);
+extern void note_output_all_gates_off(void);
 extern void note_output_reset(void);
 extern int note_output_emit_command(uint8_t synth, char *buf, size_t len);
 // Read the external CV and run triggers.
