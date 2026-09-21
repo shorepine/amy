@@ -148,38 +148,74 @@ void pico_i2s_read_write_buffer(int16_t *in_samples, const int16_t *out_samples,
 
 // ---- USB gadget ----
 
-//#include <Arduino.h>
-//#include <MIDI.h>
-#ifdef USE_TUSB
+// USB MIDI gadget needs arduino-pico's Tools > USB Stack > "Adafruit TinyUSB",
+// which defines USE_TINYUSB. With the default "Pico SDK" stack, the Pico is a
+// CDC serial port only and AMY_MIDI_IS_USB_GADGET does nothing.
+#ifdef USE_TINYUSB
 #include <Adafruit_TinyUSB.h>
+static Adafruit_USBD_MIDI usb_midi;
 #endif
+
 extern "C" {
-    void check_tusb_midi();
-	
+    void convert_midi_bytes_to_messages(uint8_t * data, size_t len, uint8_t usb);
+
     void pico_setup_midi() {
-#ifdef USE_TUSB
+#ifdef USE_TINYUSB
+        // arduino-pico normally starts TinyUSB before setup(); begin() here
+        // only in case it didn't.
         if (!TinyUSBDevice.isInitialized()) {
             TinyUSBDevice.begin(0);
         }
-        //usb_midi.setStringDescriptor("AMY Synthesizer");
-
+        usb_midi.setStringDescriptor("AMY Synthesizer");
+        usb_midi.begin();
+        // Interfaces added after enumeration only appear once the host
+        // re-enumerates us (e.g. if the sketch already waited on Serial).
+        if (TinyUSBDevice.mounted()) {
+            TinyUSBDevice.detach();
+            delay(10);
+            TinyUSBDevice.attach();
+        }
 #endif
     }
 
     void pico_teardown_midi() {
-#ifdef USE_TUSB
-        // There's no TinUSBDevice.end(), so just leave it initialized.
-#endif
+        // There's no TinyUSBDevice.end(), so just leave it initialized.
     }
 
     void pico_process_midi() {
-
-#ifdef USE_TUSB
+#ifdef USE_TINYUSB
 #ifdef TINYUSB_NEED_POLLING_TASK
         // Manual call tud_task since it isn't called by Core's background
         TinyUSBDevice.task();
 #endif
-        check_tusb_midi();
+        while (tud_midi_available()) {
+            uint8_t packet[4];
+            tud_midi_packet_read(packet);
+            convert_midi_bytes_to_messages(packet + 1, 3, 1);
+        }
+#endif
+    }
+
+    void pico_midi_out(uint8_t *bytes, uint16_t len) {
+#ifdef USE_TINYUSB
+        // Only when a host has enumerated us; tud_midi_stream_write returns 0
+        // forever otherwise (see midi_out() in amy_midi.c).
+        if (!tud_ready()) return;
+        uint32_t sent = 0;
+        int stall_ticks = 0;
+        while (sent < len) {
+            uint32_t n = tud_midi_stream_write(0, bytes + sent, len - sent);
+            if (n == 0) {
+#ifdef TINYUSB_NEED_POLLING_TASK
+                TinyUSBDevice.task();
+#endif
+                delay(1);
+                if (++stall_ticks > 1000) break;
+            } else {
+                stall_ticks = 0;
+            }
+            sent += n;
+        }
 #endif
     }
 }

@@ -92,8 +92,9 @@ void setup() {
   amy_config.i2s_dout = 10;
   amy_config.i2s_din = 11;
   
-  // If you want MIDI over UART (5-pin or 3-pin serial MIDI)
-  amy_config.midi = AMY_MIDI_IS_UART;
+  // MIDI over UART (5-pin or 3-pin serial MIDI) and as a USB MIDI device.
+  // On Pi Pico (RP2040, RP2350), USB MIDI needs Tools > USB Stack > "Adafruit TinyUSB".
+  amy_config.midi = AMY_MIDI_IS_UART | AMY_MIDI_IS_USB_GADGET;
   // Pins for UART MIDI
   // Note: On the Teensy, these are ignored and midi_out = 35, midi_in = 34.
   amy_config.midi_out = 4;
