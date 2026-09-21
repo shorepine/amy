@@ -190,9 +190,38 @@ static void test_midi_out(void) {
     CHECK(midi_writes == 2, "two note-ons go out, not one (got %d)", midi_writes);
 }
 
-static void test_costs_no_oscs(void) {
-    printf("a note-output synth costs no oscillators\n");
+static int render_peak(int blocks) {
+    int peak = 0;
+    for (int b = 0; b < blocks; ++b) {
+        int16_t *buf = amy_simple_fill_buffer();
+        for (int i = 0; i < AMY_BLOCK_SIZE * AMY_NCHANS; ++i) {
+            int v = buf[i] < 0 ? -buf[i] : buf[i];
+            if (v > peak) peak = v;
+        }
+    }
+    return peak;
+}
+
+static void test_echo_not_diversion(void) {
+    printf("a voiced synth plays AND echoes\n");
     restart();
+    wire("K0i1iv1");             // synth 1, one voice, Juno patch 0
+    wire("i1iG1,0,1");
+    clear_log();
+    amy_play_message((char[]){"n60l1i1"});
+    int peak = render_peak(64);
+    CHECK(peak > 0, "the synth's own voices still sound (peak %d)", peak);
+    CHECK(fabsf(last_on(0) - 3.0f) < 1e-4, "...and the note also reached CV (%.4f V)", last_on(0));
+    CHECK(fabsf(last_on(1) - 5.0f) < 1e-4, "...and the gate (%.4f V)", last_on(1));
+    CHECK(oscs_in_use() > 0, "it is using oscillators, because it was given voices");
+}
+
+static void test_costs_no_oscs(void) {
+    printf("a synth with no voices costs no oscillators\n");
+    restart();
+    // Silent inside AMY is not a mode -- it is simply a synth nobody
+    // gave voices to, which is what makes a pure CV/gate interface cost
+    // nothing and needs no flag to ask for.
     int before = oscs_in_use();
     wire("i1iG1,0,1");
     wire("i1n60l1");
@@ -253,6 +282,7 @@ int main(void) {
     test_off_restores();
     test_state_round_trip();
     test_bad_mode_is_refused();
+    test_echo_not_diversion();
     printf("%s: %d failure%s\n", failures ? "FAILED" : "PASSED",
            failures, failures == 1 ? "" : "s");
     return failures ? 1 : 0;

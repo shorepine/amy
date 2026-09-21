@@ -8,14 +8,36 @@ note-on with velocity.
 **A synth can have a note output**, and that is the whole feature:
 
 ```python
-amy.send(synth=1, note_output='CV_GATE,0,2')
+amy.send(synth=1, note_output='%d,0,2' % amy.NOTE_OUTPUT_CV_GATE)
 amy.send(synth=1, note=60, vel=1)     # 3.0 V on control out 0, gate out 2 high
 amy.send(synth=1, note=60, vel=0)     # gate low, pitch held at 3.0 V
 
-amy.send(synth=2, note_output='MIDI_OUT,6')
+amy.send(synth=2, note_output='%d,6' % amy.NOTE_OUTPUT_MIDI_OUT)
 amy.send(synth=2, note=60, vel=0.8)   # 0x95 0x3C 0x66 out the MIDI port
 
-amy.send(synth=1, note_output='OFF')
+amy.send(synth=1, note_output='%d' % amy.NOTE_OUTPUT_OFF)
+```
+
+## It is an ECHO, not a diversion
+
+**The synth's own voices play exactly as they always did**, and the note
+*also* goes out. Layering an internal sound with an external one is the
+common case, and a synth you have just patched falling silent because
+you named an output would be a nasty surprise.
+
+**A synth that should be silent inside AMY is simply one you never gave
+voices to.** That costs no oscillators, and it needs no flag: both of
+the surprising arrangements — a configured synth going quiet, and two
+sounds answering one note when you wanted one — are things you have to
+ask for rather than things that happen to you.
+
+```python
+# plays a Juno AND drives the rack
+amy.send(synth=1, num_voices=1, patch=0)
+amy.send(synth=1, note_output='%d,0,2' % amy.NOTE_OUTPUT_CV_GATE)
+
+# a pure CV/gate interface: no voices, no oscillators, no sound in AMY
+amy.send(synth=2, note_output='%d,1,3' % amy.NOTE_OUTPUT_CV_GATE)
 ```
 
 Everything else about those synths is unchanged. They are sequenced with
@@ -31,14 +53,18 @@ channel numbers, and there should be no way to express that.
 
 | mode | value | |
 |---|---|---|
-| `OFF` | `'OFF'` | the default; the synth is an ordinary synth |
-| `CV_GATE` | `'CV_GATE,<pitch>,<gate>[,<vel>[,<scale>[,<offset>[,<gate_volts>]]]]'` | |
-| `MIDI_OUT` | `'MIDI_OUT,<channel 1..16>[,<forward_midi_in>]'` | |
+| `NOTE_OUTPUT_OFF` | `'0'` | the default; the synth is an ordinary synth |
+| `NOTE_OUTPUT_CV_GATE` | `'1,<pitch>,<gate>[,<vel>[,<scale>[,<offset>[,<gate_volts>]]]]'` | |
+| `NOTE_OUTPUT_MIDI_OUT` | `'2,<channel 1..16>[,<forward_midi_in>]'` | |
+
+The mode is the constant, interpolated, the way every other explicit
+constant is given to `amy.send`:
 
 ```python
-amy.send(synth=1, note_output='CV_GATE,0,2')        # pitch out 0, gate out 2
-amy.send(synth=1, note_output='CV_GATE,0,2,3')      # ...velocity as volts on out 3
-amy.send(synth=1, note_output='CV_GATE,0,2,,12,24,5')   # ...spelling out the defaults
+CV = amy.NOTE_OUTPUT_CV_GATE
+amy.send(synth=1, note_output='%d,0,2' % CV)          # pitch out 0, gate out 2
+amy.send(synth=1, note_output='%d,0,2,3' % CV)        # ...velocity as volts on out 3
+amy.send(synth=1, note_output='%d,0,2,,12,24,5' % CV) # ...spelling out the defaults
 ```
 
 Defaults: 12 semitones per volt, MIDI note 24 (C1) at 0 V, gate high at
@@ -133,24 +159,12 @@ i2iG2,6              MIDI_OUT on channel 6
 i1iG0                off
 ```
 
-**The wire payload is numeric and the friendly names are a Python
-convenience.** Two reasons, neither of them style: AMY's parser
-delimits a command's argument with the next alphabetic character, so a
-payload containing letters runs into whatever command follows it; and
-in the generated JS and GDScript bindings this rides as an ordinary
-comma string, because a new arg-type code would be a new thing for
-every consumer of those tables to implement. **So from those bindings
-you pass the number** —
-
-```
-note_output = "1,0,2"     # CV_GATE, pitch out 0, gate out 2
-note_output = "2,6"       # MIDI_OUT on channel 6
-note_output = "0"         # off
-```
-
-— and a name that reaches AMY unmapped is **refused out loud** rather
-than read as 0, which is `OFF`, which would be silence with nothing
-said anywhere.
+**The payload is numeric in every binding.** AMY's parser delimits a
+command's argument with the next alphabetic character, so a payload
+containing letters runs into whatever command follows it — a mode name
+could never have gone on the wire. A name that reaches AMY anyway is
+**refused out loud** rather than read by `atoff()` as 0, which is
+`OFF`, which would be silence with nothing said anywhere.
 
 ## What this replaced
 
@@ -166,11 +180,12 @@ note-on out the MIDI port, and its three problems were one problem:
   answers it once per voice per osc and nothing stops the answers
   disagreeing.
 
-A synth with a note output **consumes no voices and no oscillators**: the
-event is intercepted in `patches_event_has_voices`, at the same branch
-that already picks out `SYNTH_FLAGS_NOTES_VIA_MIDI`, before any voice is
-allocated. So there is nothing to enforce — `num_voices` and
-`oscs_per_voice` are never consulted.
+Note that **`SYNTH_FLAGS_NOTES_VIA_MIDI` is not the precedent for this**,
+though an earlier draft of this document claimed it was. That flag
+exists so mappings set up for notes arriving over MIDI also apply to
+notes generated inside AMY, and those reinterpreted notes usually still
+reach the synth's own oscillators. It is about what a note *means*, not
+about where it goes.
 
 **Wave number 16 stays reserved and unused.** A recycled wave number
 would be a silent wrong sound in every stored patch and wire string that

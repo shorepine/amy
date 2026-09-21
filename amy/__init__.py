@@ -268,38 +268,6 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
 _KW_PRIORITY = {k: i for i, (k, _) in enumerate(_KW_MAP_LIST)}   # Maps each key to its index within _KW_MAP_LIST.
 _KW_MAP = dict(_KW_MAP_LIST)
 
-# note_output='CV_GATE,0,2' -- one parameter carrying the mode and its
-# channels together, so a synth can never be half-configured (MIDI_OUT
-# holding CV channel numbers, say) the way two commands would allow.
-NOTE_OUTPUT_MODES = {'OFF': 0, 'CV_GATE': 1, 'MIDI_OUT': 2}
-
-
-def parse_note_output(arg):
-    """'CV_GATE,0,2' -> '1,0,2'.
-
-    THE NAME IS A PYTHON CONVENIENCE AND THE NUMBER IS THE VALUE, which
-    is not a style choice at either end. On the wire, AMY's parser
-    delimits a command's argument with the next alphabetic character, so
-    letters in a payload run into whatever command follows. And in the
-    generated JS and GDScript bindings this rides as an ordinary comma
-    string, because a new arg-type code would be a new thing for every
-    consumer of those tables to implement -- so callers there pass the
-    number, and a name that reaches AMY unmapped is REFUSED by the C
-    parser rather than read as 0 (which is OFF, and would be silence
-    with no complaint anywhere).
-    """
-    if not isinstance(arg, str):
-        return arg
-    fields = [f.strip() for f in arg.split(',')]
-    mode = fields[0].upper()
-    if mode in NOTE_OUTPUT_MODES:
-        fields[0] = str(NOTE_OUTPUT_MODES[mode])
-    elif not fields[0].lstrip('-').isdigit():
-        raise ValueError("note_output: unknown mode %r, want one of %s"
-                         % (fields[0], ', '.join(sorted(NOTE_OUTPUT_MODES))))
-    return ','.join(fields)
-
-
 _ARG_HANDLERS = {
     'I': str_of_int, 'F': trunc, 'S': str, 'L': parse_list_or_comma_string, 'C': parse_ctrl_coefs,
 }
@@ -310,10 +278,6 @@ def message(**kwargs):
     # Each keyword maps to two or three chars, first one or two are the wire protocol prefix, last is an arg type code
     # I=int, F=float, S=str, L=list, C=ctrl_coefs
     global show_warnings, _KW_MAP, _KW_PRIORITY, _ARG_HANDLERS
-    if 'note_output' in kwargs:
-        # The one kwarg whose friendly spelling cannot ride the type
-        # system -- see parse_note_output for both halves of why.
-        kwargs = dict(kwargs, note_output=parse_note_output(kwargs['note_output']))
     if show_warnings:
         # Check for possible user confusions.
         if 'voices' in kwargs and 'preset' in kwargs and 'osc' not in kwargs:

@@ -18,11 +18,19 @@
 // spent an osc to make no sound. "Where do this synth's notes go" is a
 // question about a synth, so it lives on the synth.
 //
-// A synth with a note output CONSUMES NO VOICES AND NO OSCILLATORS: the
-// event is intercepted in patches_event_has_voices, at the same branch
-// that already picks out SYNTH_FLAGS_NOTES_VIA_MIDI, before any voice
-// is allocated. So there is nothing to enforce -- num_voices and
-// oscs_per_voice are simply never consulted.
+// IT IS AN ECHO. The synth's own voices play as they always did and the
+// note ALSO goes out; a synth that should be silent inside AMY is simply
+// one with no voices, which costs no oscillators and needs no flag for
+// it. Both of the surprising arrangements -- a configured synth going
+// quiet because you named an output, and two synths answering one note
+// when you wanted one -- are then things you have to ask for.
+//
+// (SYNTH_FLAGS_NOTES_VIA_MIDI is NOT the precedent for this, though an
+// earlier draft of these comments claimed it was. That flag exists so
+// that mappings set up for notes arriving over MIDI also apply to notes
+// generated inside AMY, and the reinterpreted notes usually still reach
+// the synth's own oscillators. It is about what a note MEANS, not about
+// where it goes.)
 
 #include "amy.h"
 
