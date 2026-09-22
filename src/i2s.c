@@ -65,11 +65,35 @@
 i2s_chan_handle_t tx_handle;
 i2s_chan_handle_t rx_handle;
 
+// THE DMA RING IS SIZED IN BLOCKS. IDF's I2S_CHANNEL_DEFAULT_CONFIG is 6
+// descriptors of 240 frames: 33 ms of output latency at 44.1 kHz whatever
+// AMY_BLOCK_SIZE is, so a build that chose BLOCK_SIZE_BITS=6 for a 1.45 ms
+// block still sat behind 33 ms of DMA. #1118 measured 34 ms on an
+// ESP32-P4, "mainly the DMA buffer", and had to hand-edit this file to
+// get under it. Each descriptor now holds exactly one block -- a write
+// fills one descriptor, a read drains one -- and the ring holds
+// AMY_I2S_DMA_BLOCKS of them, so the latency follows the block: 6 x 256 at
+// the default block is the same ~35 ms as before, and 6 x 64 is 8.7 ms.
+// The depth is also the slack against a late render (a busy second core,
+// PSRAM contention), so a host that wants more of it raises the count:
+// -DAMY_I2S_DMA_BLOCKS=12. IDF needs at least 2. IDF also caps one
+// descriptor near 4 KB and rounds dma_frame_num down past it (a 512-sample
+// 32-bit stereo block is 4096 bytes), in which case a write straddles two
+// descriptors, which it always could.
+#ifndef AMY_I2S_DMA_BLOCKS
+#define AMY_I2S_DMA_BLOCKS 6
+#endif
+#if AMY_I2S_DMA_BLOCKS < 2
+#error "AMY_I2S_DMA_BLOCKS must be at least 2 (the IDF I2S driver's minimum)"
+#endif
+
 
 #if !defined(AMYBOARD) && !defined(AMYBOARD_ARDUINO)
 // default ESP setup i2s
 amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
+    chan_cfg.dma_desc_num = AMY_I2S_DMA_BLOCKS;
+    chan_cfg.dma_frame_num = AMY_BLOCK_SIZE;
     if(AMY_HAS_AUDIO_IN) {
         i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
     } else {
@@ -127,6 +151,8 @@ amy_err_t esp32_setup_i2s(void) {
 // AMYBOARD or AMYBOARD_ARDUINO i2s setup, which uses two audio codecs, for audio in and SPDIF
 amy_err_t esp32_setup_i2s(void) {
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_SLAVE);  // ************* I2S_ROLE_SLAVE - needs external I2S clock input.
+    chan_cfg.dma_desc_num = AMY_I2S_DMA_BLOCKS;
+    chan_cfg.dma_frame_num = AMY_BLOCK_SIZE;
     i2s_new_channel(&chan_cfg, &tx_handle, &rx_handle);
 
 #define I2S_32BIT
