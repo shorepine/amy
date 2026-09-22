@@ -115,7 +115,6 @@ static void debug_print_midi_hex(const uint8_t *data, uint32_t len, uint8_t syse
 }
 #endif
 
-// Send a MIDI note on OUT
 void amy_received_control_change(uint8_t channel, uint8_t control, uint8_t value) {
     if (control == 0) {
         // Bank select coarse.

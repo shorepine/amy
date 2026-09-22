@@ -18,18 +18,14 @@ amy.send(synth=2, note=60, vel=0.8)   # 0x95 0x3C 0x66 out the MIDI port
 amy.send(synth=1, note_output='%d' % amy.NOTE_OUTPUT_OFF)
 ```
 
-## It is an ECHO, not a diversion
+## The synth still plays
 
-**The synth's own voices play exactly as they always did**, and the note
-*also* goes out. Layering an internal sound with an external one is the
-common case, and a synth you have just patched falling silent because
-you named an output would be a nasty surprise.
+**A note output is in ADDITION to the synth's own voices**, which sound
+exactly as they always did. Layering an internal sound with an external
+one is the common case.
 
 **A synth that should be silent inside AMY is simply one you never gave
-voices to.** That costs no oscillators, and it needs no flag: both of
-the surprising arrangements — a configured synth going quiet, and two
-sounds answering one note when you wanted one — are things you have to
-ask for rather than things that happen to you.
+voices to**, which costs no oscillators and needs no flag.
 
 ```python
 # plays a Juno AND drives the rack
@@ -166,26 +162,15 @@ could never have gone on the wire. A name that reaches AMY anyway is
 **refused out loud** rather than read by `atoff()` as 0, which is
 `OFF`, which would be silence with nothing said anywhere.
 
-## What this replaced
+## Upgrading from `wave=AMY_MIDI`
 
-`wave=AMY_MIDI` (wave type 16). An oscillator with that wave sent a
-note-on out the MIDI port, and its three problems were one problem:
+Wave type 16 is gone. An oscillator with that wave sent a note-on out
+MIDI channel 1 — the status byte was hardcoded — and cost an oscillator
+to make no sound. `note_output` replaces it with a channel you choose
+and no oscillator spent.
 
-- **The channel was hardcoded** — `bytes[0] = 0x90`, channel 1, always.
-  There was nowhere for a channel to live, because the thing carrying
-  the setting was an *oscillator*, and an oscillator has no channel.
-- **It cost an oscillator to make no sound.**
-- **It was the wrong granularity.** "Where do this synth's notes go" is a
-  question about a synth; answered per-osc, a polyphonic instrument
-  answers it once per voice per osc and nothing stops the answers
-  disagreeing.
-
-Note that **`SYNTH_FLAGS_NOTES_VIA_MIDI` is not the precedent for this**,
-though an earlier draft of this document claimed it was. That flag
-exists so mappings set up for notes arriving over MIDI also apply to
-notes generated inside AMY, and those reinterpreted notes usually still
-reach the synth's own oscillators. It is about what a note *means*, not
-about where it goes.
+**Wave number 16 stays reserved and unused**, so a stored patch that
+still names it is silent rather than something else.
 
 **Wave number 16 stays reserved and unused.** A recycled wave number
 would be a silent wrong sound in every stored patch and wire string that

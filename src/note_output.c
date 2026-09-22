@@ -18,19 +18,10 @@
 // spent an osc to make no sound. "Where do this synth's notes go" is a
 // question about a synth, so it lives on the synth.
 //
-// IT IS AN ECHO. The synth's own voices play as they always did and the
-// note ALSO goes out; a synth that should be silent inside AMY is simply
-// one with no voices, which costs no oscillators and needs no flag for
-// it. Both of the surprising arrangements -- a configured synth going
-// quiet because you named an output, and two synths answering one note
-// when you wanted one -- are then things you have to ask for.
-//
-// (SYNTH_FLAGS_NOTES_VIA_MIDI is NOT the precedent for this, though an
-// earlier draft of these comments claimed it was. That flag exists so
-// that mappings set up for notes arriving over MIDI also apply to notes
-// generated inside AMY, and the reinterpreted notes usually still reach
-// the synth's own oscillators. It is about what a note MEANS, not about
-// where it goes.)
+// The note goes out IN ADDITION to reaching the synth's own voices,
+// which play as they always did. A synth that should be silent inside
+// AMY is simply one with no voices: that costs no oscillators and needs
+// no flag to ask for.
 
 #include "amy.h"
 
@@ -40,8 +31,6 @@
 #define NOTE_OUTPUT_HELD 8
 
 typedef struct note_output {
-    struct note_output *next;
-    uint8_t synth;
     uint8_t mode;            // NOTE_OUTPUT_*
     // CV_GATE
     uint8_t pitch_cv;        // control output carrying 1V/oct
@@ -58,15 +47,20 @@ typedef struct note_output {
     uint8_t num_held;
 } note_output_t;
 
-static note_output_t *note_output_root = NULL;
+/* Indexed by synth number, because the lookup is on the path of EVERY
+ * event that names a synth -- a list walk there would be a cost the
+ * whole machine pays so that a couple of synths can have note outputs.
+ *
+ * Allocated on the first note output anyone asks for, and freed with
+ * the last: a machine that never uses the feature spends nothing, and
+ * one that does spends a pointer per synth (256 bytes at the default 64)
+ * plus the entries themselves. */
+static note_output_t **note_outputs = NULL;
+static uint32_t note_outputs_len = 0;
 
 static note_output_t *note_output_find(uint8_t synth) {
-    note_output_t *n = note_output_root;
-    while (n) {
-        if (n->synth == synth) return n;
-        n = n->next;
-    }
-    return NULL;
+    if (note_outputs == NULL || synth >= note_outputs_len) return NULL;
+    return note_outputs[synth];
 }
 
 uint8_t note_output_mode_for(uint8_t synth) {
@@ -233,11 +227,26 @@ void note_output_config(uint8_t synth, int mode, float *args, int num_args) {
         return;
     }
     if (n == NULL) {
+        if (note_outputs == NULL) {
+            note_outputs_len = amy_global.config.max_synths;
+            note_outputs = (note_output_t **)malloc_caps(
+                note_outputs_len * sizeof(note_output_t *),
+                amy_global.config.ram_caps_synth);
+            if (note_outputs == NULL) {
+                note_outputs_len = 0;
+                amy_oom("note_output: out of memory for the synth table\n");
+                return;
+            }
+            memset(note_outputs, 0, note_outputs_len * sizeof(note_output_t *));
+        }
+        if (synth >= note_outputs_len) {
+            fprintf(stderr, "note_output: synth %d out of range 0..%d\n",
+                    synth, (int)note_outputs_len - 1);
+            return;
+        }
         n = (note_output_t *)malloc_caps(sizeof(note_output_t), amy_global.config.ram_caps_synth);
         if (n == NULL) { amy_oom("note_output: out of memory\n"); return; }
-        n->next = note_output_root;
-        note_output_root = n;
-        n->synth = synth;
+        note_outputs[synth] = n;
     } else {
         // Changing an output takes the old one down first, or a gate
         // left high on the previous channel is high for ever.
@@ -274,23 +283,24 @@ void note_output_config(uint8_t synth, int mode, float *args, int num_args) {
  * here that can stay stuck without being audible on this machine at
  * all -- the noise it makes is in somebody's rack. */
 void note_output_all_gates_off(void) {
-    note_output_t *n = note_output_root;
-    while (n) {
+    for (uint32_t i = 0; i < note_outputs_len; ++i) {
+        note_output_t *n = note_outputs[i];
+        if (n == NULL) continue;
         n->num_held = 0;
         if (n->mode == NOTE_OUTPUT_CV_GATE) cv_output(n->gate_cv, 0);
-        n = n->next;
     }
 }
 
 void note_output_reset(void) {
-    note_output_t *n = note_output_root;
-    while (n) {
-        note_output_t *next = n->next;
+    for (uint32_t i = 0; i < note_outputs_len; ++i) {
+        note_output_t *n = note_outputs[i];
+        if (n == NULL) continue;
         if (n->mode == NOTE_OUTPUT_CV_GATE) cv_output(n->gate_cv, 0);
         free(n);
-        n = next;
     }
-    note_output_root = NULL;
+    free(note_outputs);
+    note_outputs = NULL;
+    note_outputs_len = 0;
 }
 
 // The wire command that reconstructs this synth's note output, for

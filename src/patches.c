@@ -1261,18 +1261,13 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     if (!event_addresses_oscs(e) && AMY_IS_UNSET(e->pedal))
         return;  // Early exit.
 
-    // A NOTE OUTPUT IS AN ECHO, NOT A DIVERSION. The synth's own voices
-    // play exactly as they always did and the note ALSO goes out to CV or
-    // MIDI, because layering an internal sound with an external one is
-    // the common case -- and a synth you have just patched falling silent
-    // because you named an output would be a nasty surprise.
-    //
-    // A synth that should be silent inside AMY is simply one you never
-    // gave voices to. That costs no oscillators, needs no third state to
-    // configure or get wrong, and is the ONLY case with nothing further
-    // to do with the event -- which is why it returns here, and why the
-    // existence check passes a NULL tag: "synth N not defined", three
-    // times per note, would be noise about a deliberate arrangement.
+    // A note output is IN ADDITION to the synth's own voices, which play
+    // as they always did; a synth that should be silent inside AMY is
+    // simply one with no voices. That voiceless case is the only one
+    // with nothing further to do with the event, which is why it returns
+    // here -- and why the existence check passes a NULL tag, since
+    // "synth N not defined" three times per note would be noise about a
+    // deliberate arrangement.
     if (note_output_handle_event(e) && !instrument_number_exists(e->synth, NULL))
         return;
 
