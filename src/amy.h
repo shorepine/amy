@@ -149,7 +149,9 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 // AMY has no opinion about what one physically is -- a DAC channel, a
 // GPIO driven to 0 or 5 V -- which is what makes using a CV output as a
 // gate free rather than a feature. Hosts with more outputs raise this.
+#ifndef AMY_MAX_CV_OUT
 #define AMY_MAX_CV_OUT 4
+#endif
 
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
