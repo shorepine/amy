@@ -391,7 +391,7 @@ RENDER_LUT_CUB_SIZED(render_lut_cub_8, 8)
 RENDER_LUT_CUB_SIZED(render_lut_cub_7, 7)
 RENDER_LUT_CUB_SIZED(render_lut_cub_6, 6)
 
-static AMY_IRAM_ATTR PHASOR render_lut_cub_sized(SAMPLE* buf, PHASOR phase, PHASOR step,
+static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR render_lut_cub_sized(SAMPLE* buf, PHASOR phase, PHASOR step,
         SAMPLE incoming_amp, SAMPLE ending_amp, const LUT* lut, SAMPLE* pmax_value) {
     if (lut == NULL) return phase;
     switch (lut->log_2_table_size) {
