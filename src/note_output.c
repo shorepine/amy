@@ -105,7 +105,12 @@ static void midi_note_output(note_output_t *n, uint8_t note, uint8_t velocity) {
 // ---------------------------------------------------------------- notes
 
 static void cv_pitch_for(note_output_t *n, uint8_t note) {
-    // The exact inverse of cv_trigger's note = volts * scale + offset.
+    // volts = (note - offset) / scale, in SEMITONES. NOTE THAT cv_trigger
+    // is not spelled the same way: its scale and offset are in
+    // log-frequency units (octaves, 0 at ZERO_MIDI_NOTE), since it feeds
+    // them through midi_note_for_logfreq -- a host that wants a loopback
+    // to round-trip converts (scale / 12, (offset - ZERO_MIDI_NOTE) / 12)
+    // on the trigger side.
     float volts = (n->pitch_scale != 0)
         ? ((float)note - n->pitch_offset) / n->pitch_scale : 0;
     cv_output(n->pitch_cv, volts);
@@ -206,10 +211,14 @@ bool note_output_handle_event(amy_event *e) {
     // carries on down the normal path, because swallowing it here would
     // make a note-output synth a synth you cannot change.
     if (AMY_IS_UNSET(e->midi_note)) return false;
-    // A note that arrived over MIDI is not sent back out by default:
-    // without this a thru-patched port is a feedback loop. The wave-type
-    // implementation guarded on the same thing.
-    if (AMY_IS_SET(e->note_source_channel) && !n->forward_midi_in) return true;
+    // A note that arrived over MIDI is not sent back out over MIDI by
+    // default: without this a thru-patched port is a feedback loop. The
+    // wave-type implementation guarded on the same thing. A CV/gate
+    // output has no such loop to fall into, so a MIDI keyboard drives
+    // the rack through it exactly as a sequenced note does -- the first
+    // cut guarded both modes and a MIDI note never moved a jack.
+    if (AMY_IS_SET(e->note_source_channel) && n->mode == NOTE_OUTPUT_MIDI_OUT
+        && !n->forward_midi_in) return true;
     float velocity = AMY_IS_SET(e->velocity) ? e->velocity : 1.0f;
     uint8_t note = (uint8_t)(0x7F & (int)roundf(e->midi_note));
     if (velocity > 0) note_output_on(n, note, velocity);
@@ -250,7 +259,10 @@ void note_output_config(uint8_t synth, int mode, float *args, int num_args) {
         AMY_UNSET(n->vel_cv);
         n->pitch_cv = (num_args > 0) ? (uint8_t)args[0] : 0;
         n->gate_cv  = (num_args > 1) ? (uint8_t)args[1] : 1;
-        if (num_args > 2) n->vel_cv = (uint8_t)args[2];
+        // an EMPTY field ("1,0,2,,12,24") arrives unset and must stay
+        // so: cast to a uint8 it read as channel 0, and every note-on
+        // then wrote its velocity over the pitch output
+        if (num_args > 2 && AMY_IS_SET(args[2])) n->vel_cv = (uint8_t)args[2];
         n->pitch_scale  = (num_args > 3) ? args[3] : 12.0f;
         n->pitch_offset = (num_args > 4) ? args[4] : 24.0f;
         n->gate_volts   = (num_args > 5) ? args[5] : 5.0f;
