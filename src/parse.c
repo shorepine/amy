@@ -417,6 +417,44 @@ int parse_cv_trigger_payload(char *message, int32_t *p_gate_cv, float *p_thresh_
     return m - message;
 }
 
+// Parser for 'iG': where a synth's NOTE EVENTS go. See note_output.c.
+//
+//   iG<mode>[,<arg>...]
+//     CV_GATE  1,<pitch_cv>,<gate_cv>[,<vel_cv>[,<scale>[,<offset>[,<gate_v>]]]]
+//     MIDI_OUT 2,<channel 1..16>[,<forward_midi_in>]
+//     OFF      0
+//
+// THE PAYLOAD IS NUMERIC AND THAT IS NOT A STYLE CHOICE. The outer
+// parser delimits a command's argument with _next_alpha(), so a payload
+// containing letters would run into the next command unless this
+// function counted every character of it by hand. The friendly spelling
+// -- note_output='CV_GATE,0,2' -- lives in the Python layer, which is
+// where every other friendly spelling in AMY lives.
+int note_output_from_message(char *message, int synth) {
+    // A MODE THAT IS NOT A NUMBER IS REFUSED OUT LOUD. The friendly
+    // spelling is a Python convenience; the generated JS and GDScript
+    // tables carry this as an ordinary comma string, so a caller there
+    // who types the name sends it through unmapped -- and atoff() would
+    // read "CV_GATE" as 0, which is OFF. That is silence, with nothing
+    // said anywhere, which is the worst answer this command could give.
+    const char *first = message;
+    while (*first == ' ') ++first;
+    if (*first < '0' || *first > '9') {
+        fprintf(stderr, "note_output: mode must be a number (%d=OFF, %d=CV_GATE, "
+                "%d=MIDI_OUT), got \"%s\"\n", NOTE_OUTPUT_OFF,
+                NOTE_OUTPUT_CV_GATE, NOTE_OUTPUT_MIDI_OUT, message);
+        return 0;
+    }
+    float vals[8];
+    int num_vals = parse_list_float(message, vals, 8, AMY_UNSET_FLOAT);
+    if (num_vals < 1 || AMY_IS_UNSET(vals[0])) {
+        fprintf(stderr, "note_output: no mode in \"%s\"\n", message);
+        return 0;
+    }
+    note_output_config((uint8_t)synth, (int)vals[0], vals + 1, num_vals - 1);
+    return 0;
+}
+
 int cv_trigger_from_message(char *message, int instr_num, int skip_chars) {
     // i<synth>ig<gate_cv>,<thresh_high>,<thresh_low>,<pitch_cv>,<pitch_scale>,<pitch_offset>,<wire_template>
     int32_t gate_cv, pitch_cv;
@@ -463,6 +501,10 @@ int amy_parse_synth_layer_message(char *message, amy_event *e) {
     if (cmd == 'd')  e->synth_delay_ms = atoi(message);
     else if (cmd == 'f')  e->synth_flags = atoi(message);
     else if (cmd == 'g')  skip_chars = cv_trigger_from_message(message, e->synth, skip_chars);
+    else if (cmd == 'G') {  // note output: cv_trigger's mirror, hence the case pairing
+        if (AMY_IS_UNSET(e->synth)) fprintf(stderr, "note_output: iG needs a synth, as i<n>iG...\n");
+        else note_output_from_message(message, e->synth);
+    }
     else if (cmd == 'm')  e->grab_midi_notes = atoi(message);
     else if (cmd == 'M')  e->note_source_channel = atoi(message);  // To mark MIDI-in notes.
     else if (cmd == 'n')  e->oscs_per_voice = atoi(message);

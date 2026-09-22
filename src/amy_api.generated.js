@@ -75,6 +75,7 @@ var AMY_KW_MAP = {
   midi_cc: {wire: "ic", type: "L"},
   midi_note_cmd: {wire: "io", type: "L"},
   cv_trigger: {wire: "ig", type: "L"},
+  note_output: {wire: "iG", type: "L"},
   patch_string: {wire: "u", type: "S"}
 };
 
@@ -150,7 +151,8 @@ var AMY_KW_PRIORITY = {
   midi_cc: 68,
   midi_note_cmd: 69,
   cv_trigger: 70,
-  patch_string: 71
+  note_output: 71,
+  patch_string: 72
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];
@@ -303,6 +305,7 @@ var AMY = {
   AMY_DEFAULT_NUM_BUSES: 4,
   AMY_DEFAULT_BUS: 0,
   AMY_MAX_CV_IN: 2,
+  AMY_MAX_CV_OUT: 4,
   AMY_MAX_CORES: 2,
   AMY_MAX_CHANNELS: 2,
   AMY_NCHANS: 2,
@@ -376,7 +379,6 @@ var AMY = {
   AUDIO_IN1: 13,
   AUDIO_EXT0: 14,
   AUDIO_EXT1: 15,
-  AMY_MIDI: 16,
   PCM_LEFT: 17,
   PCM_RIGHT: 18,
   PCM_MIX: 7,
@@ -384,6 +386,9 @@ var AMY = {
   SILENT: 20,
   CUSTOM: 21,
   WAVE_OFF: 22,
+  NOTE_OUTPUT_OFF: 0,
+  NOTE_OUTPUT_CV_GATE: 1,
+  NOTE_OUTPUT_MIDI_OUT: 2,
   MODE_NONE: 0,
   PCM_PLAY_STOP: 0,
   PCM_PLAY: 1,

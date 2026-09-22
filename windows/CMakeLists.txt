@@ -22,7 +22,9 @@ set(AMY_SOURCES
     ${AMY_SRC_DIR}/transfer.c
     ${AMY_SRC_DIR}/sequencer.c
     ${AMY_SRC_DIR}/libminiaudio-audio.c
+    ${AMY_SRC_DIR}/cv_trigger.c
     ${AMY_SRC_DIR}/instrument.c
+    ${AMY_SRC_DIR}/note_output.c
     ${AMY_SRC_DIR}/amy_midi.c
     ${AMY_SRC_DIR}/api.c
     ${AMY_SRC_DIR}/midi_mappings.c

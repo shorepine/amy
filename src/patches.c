@@ -145,6 +145,10 @@ void update_num_oscs_for_patch_number(int patch_number) {
 }
 
 void all_notes_off() {
+    // The note outputs first: a gate left high is a stuck note on
+    // whatever is patched to it, and this is the call every host reaches
+    // for when something is stuck.
+    note_output_all_gates_off();
     for(uint16_t i=0;i<AMY_OSCS;i++) {
         if (AMY_IS_SET(osc_to_voice[i])) {
             if(synth[i]->status == SYNTH_AUDIBLE) {
@@ -934,19 +938,28 @@ void *yield_synth_events(uint8_t instr_num, struct amy_event *event, bool includ
 }
 
 #define STATE_START_OF_MIDI_TPLT_CMDS 1024
+// One step between the event commands and the MIDI templates, for the
+// synth's note output (iG). A note output that did not survive a state
+// round trip would be a synth that came back silently pointed at
+// oscillators, which is a worse bug than never having saved it.
+#define STATE_NOTE_OUTPUT 1023
 
 void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_fx, void *state) {
     // Generator to return multiple wirecode strings to reconfigure a synth.
     int state_val = (intptr_t)state;
     //fprintf(stderr, "yield_synth_commands: synth %d state %d\n", instr_num, state_val);
     s[0] = '\0';  // By default, return an empty string.
+    if (state_val == STATE_NOTE_OUTPUT) {
+        note_output_emit_command(instr_num, s, len);
+        return (void *)(intptr_t)STATE_START_OF_MIDI_TPLT_CMDS;
+    }
     if (state_val < STATE_START_OF_MIDI_TPLT_CMDS) {
         amy_event event = amy_default_event();
         state_val = (intptr_t)yield_synth_events(instr_num, &event, include_fx, (void *)(intptr_t)state_val);
         sprint_event(&event, s, len, /* wirecode= */ true);
         if (state_val == 0) {
-            // Push the state machine on to the MIDI codes
-            state_val = STATE_START_OF_MIDI_TPLT_CMDS;
+            // Push the state machine on to the note output, then the MIDI codes
+            state_val = STATE_NOTE_OUTPUT;
         }
     } else {
         // MIDI CC part
@@ -1247,6 +1260,16 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     // A pure pedal event doesn't strictly address oscs, but it can result in note-off events.
     if (!event_addresses_oscs(e) && AMY_IS_UNSET(e->pedal))
         return;  // Early exit.
+
+    // A note output is IN ADDITION to the synth's own voices, which play
+    // as they always did; a synth that should be silent inside AMY is
+    // simply one with no voices. That voiceless case is the only one
+    // with nothing further to do with the event, which is why it returns
+    // here -- and why the existence check passes a NULL tag, since
+    // "synth N not defined" three times per note would be noise about a
+    // deliberate arrangement.
+    if (note_output_handle_event(e) && !instrument_number_exists(e->synth, NULL))
+        return;
 
     uint8_t synth = e->synth;
     int synth_flags = 0;
