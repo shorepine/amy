@@ -137,8 +137,13 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #define AMY_DEFAULT_NUM_BUSES 4
 #define AMY_DEFAULT_BUS 0
 
-// How many external CV inputs to contemplate.
+// How many external CV inputs to contemplate. A host may raise it at
+// build time (-DAMY_MAX_CV_IN=3) to offer amy_external_coef_hook a
+// channel that is not an ADC at all -- a gate GPIO read as 0 or 5 V, so
+// a cv_trigger can fire off a gate jack with no analog input spent on it.
+#ifndef AMY_MAX_CV_IN
 #define AMY_MAX_CV_IN 2
+#endif
 
 // How many external CONTROL OUTPUTS a host can offer (note_output.c).
 // AMY has no opinion about what one physically is -- a DAC channel, a
