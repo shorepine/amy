@@ -138,15 +138,14 @@ float cv_inputs[AMY_MAX_CV_IN];
 void update_external_cv_in(void) {
     // Update the CV inputs.
     if (amy_global.config.amy_external_coef_hook != NULL) {
-        cv_inputs[0] = amy_global.config.amy_external_coef_hook(0);
-        cv_inputs[1] = amy_global.config.amy_external_coef_hook(1);
+        for (int i = 0; i < AMY_MAX_CV_IN; ++i)
+            cv_inputs[i] = amy_global.config.amy_external_coef_hook(i);
     } else {
+        for (int i = 0; i < AMY_MAX_CV_IN; ++i)
+            cv_inputs[i] = 0;
         #ifdef __EMSCRIPTEN__
         cv_inputs[0] = amy_web_cv_1;
-        cv_inputs[1] = amy_web_cv_2;
-        #else
-        cv_inputs[0] = 0;
-        cv_inputs[1] = 0;
+        if (AMY_MAX_CV_IN > 1) cv_inputs[1] = amy_web_cv_2;
         #endif
     }
     // Run triggers

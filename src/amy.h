@@ -147,14 +147,23 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 #define AMY_DEFAULT_NUM_BUSES 4
 #define AMY_DEFAULT_BUS 0
 
-// How many external CV inputs to contemplate.
+// How many external CV inputs to contemplate: the channels
+// update_external_cv_in asks amy_external_coef_hook for, 0..N-1, and
+// the range a cv_trigger may name. A host may raise it at build time
+// (-DAMY_MAX_CV_IN=3). What a channel physically is -- an ADC, a GPIO,
+// anything the hook answers for -- is the host's business; AMY only
+// knows the count.
+#ifndef AMY_MAX_CV_IN
 #define AMY_MAX_CV_IN 2
+#endif
 
 // How many external CONTROL OUTPUTS a host can offer (note_output.c).
 // AMY has no opinion about what one physically is -- a DAC channel, a
 // GPIO driven to 0 or 5 V -- which is what makes using a CV output as a
 // gate free rather than a feature. Hosts with more outputs raise this.
+#ifndef AMY_MAX_CV_OUT
 #define AMY_MAX_CV_OUT 4
+#endif
 
 // Always use fixed point. You can remove this if you want float
 #define AMY_USE_FIXEDPOINT
