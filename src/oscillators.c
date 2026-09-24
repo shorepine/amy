@@ -172,7 +172,7 @@ AMY_IRAM_ATTR PHASOR render_lut_fb(SAMPLE* buf,
 // operators always read: shifts and mask are immediates, so the loop fits
 // the Xtensa register window as a hardware loop.  Same expressions as
 // RENDER_LUT_GUTS(MOD_PART_MOD, NOTHING, INTERP_LINEAR) with lut_bits = 8.
-static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR render_lut_fm_256(SAMPLE* buf,
+static AMY_NOINLINE AMY_IRAM_ATTR PHASOR render_lut_fm_256(SAMPLE* buf,
                      PHASOR phase,
                      PHASOR step,
                      SAMPLE incoming_amp, SAMPLE ending_amp,
@@ -353,7 +353,7 @@ void _pulse_note_on(uint16_t osc) {
 // their 16-bit scale because MUL0_SS(L2S(x), f) == (x * (f >> 7)) >> 8.
 // noinline - the bodies inlined into one switch lose the hardware loop again.
 #define RENDER_LUT_CUB_SIZED(NAME, BITS) \
-static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR NAME(SAMPLE* buf, PHASOR phase, PHASOR step, \
+static AMY_NOINLINE AMY_IRAM_ATTR PHASOR NAME(SAMPLE* buf, PHASOR phase, PHASOR step, \
                                  SAMPLE incoming_amp, SAMPLE ending_amp, \
                                  const LUTSAMPLE* table, SAMPLE* pmax_value) { \
     SAMPLE max_value = 0; \
@@ -391,7 +391,7 @@ RENDER_LUT_CUB_SIZED(render_lut_cub_8, 8)
 RENDER_LUT_CUB_SIZED(render_lut_cub_7, 7)
 RENDER_LUT_CUB_SIZED(render_lut_cub_6, 6)
 
-static __attribute__((noinline)) AMY_IRAM_ATTR PHASOR render_lut_cub_sized(SAMPLE* buf, PHASOR phase, PHASOR step,
+static AMY_NOINLINE AMY_IRAM_ATTR PHASOR render_lut_cub_sized(SAMPLE* buf, PHASOR phase, PHASOR step,
         SAMPLE incoming_amp, SAMPLE ending_amp, const LUT* lut, SAMPLE* pmax_value) {
     if (lut == NULL) return phase;
     switch (lut->log_2_table_size) {

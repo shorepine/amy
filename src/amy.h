@@ -19,10 +19,12 @@
 #define bcopy(src,dest,len) memmove((dest), (src), (len))
 #define srand48(x) srand((unsigned int)(x))
 #define drand48() ((double)rand() / RAND_MAX)
+#ifdef _MSC_VER // clang provides its builtins even on Windows
 static inline int __builtin_clz(unsigned int x) {
     unsigned long index;
     return _BitScanReverse(&index, x) ? (31 - (int)index) : 32;
 }
+#endif
 #else
 #include <unistd.h>
 #include <strings.h>  // POSIX-only (strcasecmp, bzero, ...); absent on MSVC, which uses the bzero/bcopy shims above
@@ -37,6 +39,14 @@ extern CRITICAL_SECTION amy_queue_lock;
 #include <pthread.h>
 extern pthread_mutex_t amy_queue_lock;
 #endif
+#endif
+
+#if defined(_MSC_VER)
+#define AMY_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define AMY_NOINLINE __attribute__((noinline))
+#else
+#define AMY_NOINLINE
 #endif
 
 #ifdef ESP_PLATFORM
