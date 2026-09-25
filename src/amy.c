@@ -735,10 +735,9 @@ bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what
 
 // For a field naming another osc within the voice (chained_osc, mod_source,
 // and reset_osc when it carries an osc number): range-check it, then offset it
-// by base_osc to reach the real osc. Resets don't allocate what they are about
-// to clear -- reset_osc() is a no-op on an unallocated osc, which is already
-// at its defaults.
-#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue); } }
+// by base_osc to reach the real osc. Nothing is allocated here: play_delta
+// ensures the referenced osc when it executes the delta.
+#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; add_delta_to_queue(&d, queue); } }
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -836,8 +835,9 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     if (!osc_ref_within_voice((int)d.osc, oscs_per_voice, "addressed"))  goto end;
     // First, adapt the osc in this event with base_osc offsets for voices
     d.osc += base_osc;
-    // The osc's synthinfo is allocated below, once the destination queue is
-    // known - see there.
+    // Ingest never allocates the osc's synthinfo: this runs on whichever
+    // thread sent the event, unlocked, while FREE_OSC frees oscs on the
+    // render thread under the lock. play_delta allocates on execution.
 
     // Voices / patches gets set up here 
     // you must set both synth & load_patch together to load a patch 
@@ -864,15 +864,6 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
             fprintf(stderr, "event ignored\n");
             goto end;
         }
-    }
-
-    // Ensure the addressed osc's synthinfo only when these deltas are headed
-    // for live execution. Describing an osc - into a stored patch's delta
-    // list or a voice snapshot, both built base-osc-relative - must not
-    // allocate low osc numbers nothing is playing; play_delta ensures at
-    // execution for everything that actually plays.
-    if (queue == &amy_global.delta_queue) {
-        ensure_osc_allocd(d.osc, NULL);
     }
 
     // Everything else only added to queue if set
