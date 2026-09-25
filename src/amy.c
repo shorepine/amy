@@ -733,12 +733,27 @@ bool osc_ref_within_voice(int rel_osc, uint16_t oscs_per_voice, const char *what
     return false;
 }
 
+// Allocate an osc from the INGEST path, under the queue lock. Ingest runs on
+// whichever thread sent the event, while FREE_OSC frees on the render thread
+// inside flush_due_deltas(), which holds the lock. A patch load queues frees
+// for the old voice's oscs and then allocates the same osc numbers for the new
+// voice, so unlocked, the render thread can free an osc this thread is halfway
+// through initialising: a store through NULL in reset_osc(), or writes into
+// freed memory. Seen on a dual-core ESP32-P4 reloading a synth's patch. Never
+// reached with the lock held: this path takes it in add_delta_to_queue() too.
+static bool ensure_osc_allocd_ingest(int osc) {
+    amy_grab_lock();
+    bool ok = ensure_osc_allocd(osc, NULL);
+    amy_release_lock();
+    return ok;
+}
+
 // For a field naming another osc within the voice (chained_osc, mod_source,
 // and reset_osc when it carries an osc number): range-check it, then offset it
 // by base_osc to reach the real osc. Resets don't allocate what they are about
 // to clear -- reset_osc() is a no-op on an unallocated osc, which is already
 // at its defaults.
-#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd(d.data.i, NULL); add_delta_to_queue(&d, queue); } }
+#define EVENT_TO_DELTA_OSC_REF(FIELD, FLAG, WHAT)    if(AMY_IS_SET(e->FIELD)) { if (osc_ref_within_voice((int)e->FIELD, oscs_per_voice, WHAT)) { d.param=FLAG; d.data.i = e->FIELD + base_osc; if (FLAG != RESET_OSC && queue == &amy_global.delta_queue && d.data.i < (uint32_t)AMY_OSCS + amy_global.config.max_buses) ensure_osc_allocd_ingest(d.data.i); add_delta_to_queue(&d, queue); } }
 #define EVENT_TO_DELTA_LOG(FIELD, FLAG)             if(AMY_IS_SET(e->FIELD)) { d.param=FLAG; d.data.f = log2f(e->FIELD); add_delta_to_queue(&d, queue);}
 #define EVENT_TO_DELTA_COEFS(FIELD, FLAG)  \
     for (int i = 0; i < NUM_COMBO_COEFS; ++i) \
@@ -872,7 +887,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     // allocate low osc numbers nothing is playing; play_delta ensures at
     // execution for everything that actually plays.
     if (queue == &amy_global.delta_queue) {
-        ensure_osc_allocd(d.osc, NULL);
+        ensure_osc_allocd_ingest(d.osc);
     }
 
     // Everything else only added to queue if set
