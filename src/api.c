@@ -5,6 +5,13 @@
 
 amy_config_t amy_default_config() {
     amy_config_t c;
+    // Zero the lot first, so a field added to amy_config_t and missed
+    // below reads as 0/NULL rather than as whatever was on the caller's
+    // stack. A hook left as garbage is a jump to a random address the
+    // first time AMY calls it (amy_external_cv_output_hook was exactly
+    // that: never initialised here, so a note output crashed any host
+    // that did not set it).
+    memset(&c, 0, sizeof(c));
     c.features.reverb = 1;
     c.features.echo = 1;
     c.features.chorus = 1;
@@ -22,6 +29,7 @@ amy_config_t amy_default_config() {
     c.amy_external_render_hook = NULL;
     c.amy_external_bus_postprocess_hook = NULL;
     c.amy_external_coef_hook = NULL;
+    c.amy_external_cv_output_hook = NULL;
     c.amy_external_block_done_hook = NULL;
     c.amy_external_midi_input_hook = NULL;
     c.amy_external_midi_output_hook = NULL;
