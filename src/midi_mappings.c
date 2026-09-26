@@ -41,9 +41,177 @@ struct midi_mapping {
     float min_val;
     float max_val;
     float offset_val;
-    // What we actually do.
+    // What we actually do: either a wire command template, or (when the
+    // payload after O began with a digit) a list of AMY parameters to set
+    // directly -- see midi_parse_param_targets().  message_template keeps
+    // the payload text in both cases, which is what the state dump emits.
     char *message_template;
+    uint8_t num_targets;
+    struct midi_param_target targets[MIDI_MAP_MAX_TARGETS];
 };
+
+// ---------------------------------------------------------------------------
+// AMY parameters by id (enum params), for mappings that name a parameter
+// directly instead of carrying a wire command (issue #1175).
+//
+// A direct mapping does not build deltas itself: it sets the matching
+// amy_event field and sends the event down the ordinary path, so the value
+// is in the same units as the corresponding amy.send() keyword (Hz for
+// freq and filter_freq, linear drive for dist_drive, ...), the synth's
+// voices and bus are resolved exactly as for any other synth event, and
+// every conversion (logfreq, log2 ratio, logdrive) happens in one place.
+//
+// Only params with a plain one-value event field are here.  Note-shaped
+// params (MIDI_NOTE, VELOCITY), osc references (CHAINED_OSC, MOD_SOURCE_*,
+// ALGO_SOURCE_*), breakpoints, resets and global config (LATENCY, BUS) are
+// deliberately absent: a CC sweeping any of those is a bug, not a patch.
+
+enum { PF_F, PF_U8, PF_U16, PF_I16 };
+#define PF_OSC 0   // an osc-scope field: the event names the target osc
+#define PF_BUS 1   // bus-scope or global (tempo, pitch bend): no osc named
+
+typedef struct {
+    uint16_t param;     // first param id
+    uint8_t count;      // 1, or NUM_COMBO_COEFS for a coef vector
+    uint8_t type;       // PF_*
+    uint8_t scope;      // PF_OSC / PF_BUS
+    uint16_t offset;    // offsetof the (first) field in amy_event
+} param_field_t;
+
+#define PFIELD(P, N, T, S, FIELD) { P, N, T, S, (uint16_t)offsetof(amy_event, FIELD) }
+static const param_field_t param_fields[] = {
+    PFIELD(WAVE,             1,               PF_U16, PF_OSC, wave),
+    PFIELD(PRESET,           1,               PF_I16, PF_OSC, preset),
+    PFIELD(AMP,              NUM_COMBO_COEFS, PF_F,   PF_OSC, amp_coefs),
+    PFIELD(DUTY,             NUM_COMBO_COEFS, PF_F,   PF_OSC, duty_coefs),
+    PFIELD(FEEDBACK,         1,               PF_F,   PF_OSC, feedback),
+    PFIELD(FREQ,             NUM_COMBO_COEFS, PF_F,   PF_OSC, freq_coefs),
+    PFIELD(PHASE,            1,               PF_F,   PF_OSC, trigger_phase),
+    PFIELD(PITCH_BEND,       1,               PF_F,   PF_BUS, pitch_bend),
+    PFIELD(PAN,              NUM_COMBO_COEFS, PF_F,   PF_OSC, pan_coefs),
+    PFIELD(FILTER_FREQ,      NUM_COMBO_COEFS, PF_F,   PF_OSC, filter_freq_coefs),
+    PFIELD(RATIO,            1,               PF_F,   PF_OSC, ratio),
+    PFIELD(RESONANCE,        1,               PF_F,   PF_OSC, resonance),
+    PFIELD(PORTAMENTO,       1,               PF_U16, PF_OSC, portamento_ms),
+    PFIELD(FILTER_TYPE,      1,               PF_U8,  PF_OSC, filter_type),
+    PFIELD(ALGORITHM,        1,               PF_U8,  PF_OSC, algorithm),
+    PFIELD(DIST_CLIP_EN,     1,               PF_U8,  PF_OSC, dist_clip),
+    PFIELD(DIST_FOLD_EN,     1,               PF_U8,  PF_OSC, dist_fold),
+    PFIELD(DIST_CRUSH_EN,    1,               PF_U8,  PF_OSC, dist_crush),
+    PFIELD(DIST_BITS,        1,               PF_U8,  PF_OSC, dist_bits),
+    PFIELD(DIST_RATE,        1,               PF_U16, PF_OSC, dist_rate),
+    PFIELD(DIST_LOGDRIVE,    NUM_COMBO_COEFS, PF_F,   PF_OSC, dist_drive_coefs),
+    PFIELD(DIST_MIX,         NUM_COMBO_COEFS, PF_F,   PF_OSC, dist_mix_coefs),
+    PFIELD(EG0_TYPE,         1,               PF_U8,  PF_OSC, eg_type[0]),
+    PFIELD(EG1_TYPE,         1,               PF_U8,  PF_OSC, eg_type[1]),
+    PFIELD(TEMPO,            1,               PF_F,   PF_BUS, tempo),
+    PFIELD(VOLUME,           1,               PF_F,   PF_BUS, volume),
+    PFIELD(EQ_L,             1,               PF_F,   PF_BUS, eq_l),
+    PFIELD(EQ_M,             1,               PF_F,   PF_BUS, eq_m),
+    PFIELD(EQ_H,             1,               PF_F,   PF_BUS, eq_h),
+    PFIELD(ECHO_LEVEL,       1,               PF_F,   PF_BUS, echo_level),
+    PFIELD(ECHO_DELAY_MS,    1,               PF_F,   PF_BUS, echo_delay_ms),
+    PFIELD(ECHO_MAX_DELAY_MS,1,               PF_F,   PF_BUS, echo_max_delay_ms),
+    PFIELD(ECHO_FEEDBACK,    1,               PF_F,   PF_BUS, echo_feedback),
+    PFIELD(ECHO_FILTER_COEF, 1,               PF_F,   PF_BUS, echo_filter_coef),
+    PFIELD(CHORUS_LEVEL,     1,               PF_F,   PF_BUS, chorus_level),
+    PFIELD(CHORUS_MAX_DELAY, 1,               PF_F,   PF_BUS, chorus_max_delay),
+    PFIELD(CHORUS_LFO_FREQ,  1,               PF_F,   PF_BUS, chorus_lfo_freq),
+    PFIELD(CHORUS_DEPTH,     1,               PF_F,   PF_BUS, chorus_depth),
+    PFIELD(REVERB_LEVEL,     1,               PF_F,   PF_BUS, reverb_level),
+    PFIELD(REVERB_LIVENESS,  1,               PF_F,   PF_BUS, reverb_liveness),
+    PFIELD(REVERB_DAMPING,   1,               PF_F,   PF_BUS, reverb_damping),
+    PFIELD(REVERB_XOVER_HZ,  1,               PF_F,   PF_BUS, reverb_xover_hz),
+    // The bus distortion stage shares its event fields with the osc stage;
+    // which one an event reaches is decided by whether it names an osc.
+    PFIELD(BUS_DIST_CLIP_EN, 1,               PF_U8,  PF_BUS, dist_clip),
+    PFIELD(BUS_DIST_FOLD_EN, 1,               PF_U8,  PF_BUS, dist_fold),
+    PFIELD(BUS_DIST_CRUSH_EN,1,               PF_U8,  PF_BUS, dist_crush),
+    PFIELD(BUS_DIST_BITS,    1,               PF_U8,  PF_BUS, dist_bits),
+    PFIELD(BUS_DIST_RATE,    1,               PF_U16, PF_BUS, dist_rate),
+    PFIELD(BUS_DIST_DRIVE,   1,               PF_F,   PF_BUS, dist_drive_coefs[COEF_CONST]),
+    PFIELD(BUS_DIST_MIX,     1,               PF_F,   PF_BUS, dist_mix_coefs[COEF_CONST]),
+};
+#undef PFIELD
+
+static const param_field_t *param_field_for(int param, int *p_index) {
+    for (size_t i = 0; i < sizeof(param_fields) / sizeof(param_fields[0]); ++i) {
+        const param_field_t *f = &param_fields[i];
+        if (param >= f->param && param < f->param + f->count) {
+            if (p_index) *p_index = param - f->param;
+            return f;
+        }
+    }
+    return NULL;
+}
+
+bool amy_param_is_settable(int param) {
+    return param_field_for(param, NULL) != NULL;
+}
+
+// Set the event field for param to value.  Integer fields are rounded, so a
+// CC scaled onto 0..6 steps through filter types cleanly.  An osc-scope
+// param also names the osc (voice-relative when the event names a synth);
+// a bus-scope one leaves osc alone, since naming an osc would make the
+// shared distortion fields osc-scope.
+bool amy_event_set_param(amy_event *e, int param, uint16_t osc, float value) {
+    int index = 0;
+    const param_field_t *f = param_field_for(param, &index);
+    if (f == NULL)  return false;
+    char *base = (char *)e + f->offset;
+    switch (f->type) {
+        case PF_F:   ((float *)base)[index] = value; break;
+        case PF_U8:  ((uint8_t *)base)[index] = (uint8_t)MAX(0, MIN(255, (int)lrintf(value))); break;
+        case PF_U16: ((uint16_t *)base)[index] = (uint16_t)MAX(0, MIN(65535, (int)lrintf(value))); break;
+        case PF_I16: ((int16_t *)base)[index] = (int16_t)MAX(-32768, MIN(32767, (int)lrintf(value))); break;
+    }
+    if (f->scope == PF_OSC)  e->osc = osc;
+    return true;
+}
+
+// Parse a direct-parameter payload: P, or P,OSC, or P,OSC,P,OSC,...  The
+// single-P form means osc 0 of each voice (the base osc).  Returns the
+// number of targets, or 0 if the payload is malformed or names a param
+// that can't be driven this way.
+static int midi_parse_param_targets(const char *s, size_t len, struct midi_param_target *targets) {
+    int vals[2 * MIDI_MAP_MAX_TARGETS];
+    int n = 0;
+    size_t i = 0;
+    while (i < len) {
+        if (n == 2 * MIDI_MAP_MAX_TARGETS) {
+            fprintf(stderr, "midi mapping: at most %d P,OSC pairs\n", MIDI_MAP_MAX_TARGETS);
+            return 0;
+        }
+        if (s[i] < '0' || s[i] > '9') goto bad;
+        int v = 0;
+        while (i < len && s[i] >= '0' && s[i] <= '9')  v = 10 * v + (s[i++] - '0');
+        vals[n++] = v;
+        if (i < len) {
+            if (s[i] != ',') goto bad;
+            if (++i == len) goto bad;  // trailing comma
+        }
+    }
+    if (n > 1 && (n & 1)) {
+        fprintf(stderr, "midi mapping: with more than one param, each needs its osc (P,OSC,P,OSC...)\n");
+        return 0;
+    }
+    int num_targets = (n + 1) / 2;
+    for (int t = 0; t < num_targets; ++t) {
+        int param = vals[2 * t];
+        int osc = (n > 1) ? vals[2 * t + 1] : 0;
+        if (!amy_param_is_settable(param)) {
+            fprintf(stderr, "midi mapping: param %d can't be set from a MIDI mapping\n", param);
+            return 0;
+        }
+        if (osc > 0xFFFF) goto bad;
+        targets[t].param = (uint16_t)param;
+        targets[t].osc = (uint16_t)osc;
+    }
+    return num_targets;
+ bad:
+    fprintf(stderr, "midi mapping: bad param list '%.*s'\n", (int)len, s);
+    return 0;
+}
 
 bool mappings_inited = false;
 
@@ -89,6 +257,10 @@ struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_l
     else
         p_root = &midi_note_mapping_root_by_chan[channel];
     struct midi_mapping *result = (struct midi_mapping *)malloc_caps(sizeof(struct midi_mapping) + message_len + 1, amy_global.config.ram_caps_synth);
+    if (result == NULL) {
+        amy_oom("midi_mapping_init: out of memory\n");
+        return NULL;
+    }
     result->message_template = ((char *)result) + sizeof(struct midi_mapping);
     result->channel = channel;
     result->type = type;
@@ -97,6 +269,7 @@ struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_l
     result->min_val = min_val;
     result->max_val = max_val;
     result->offset_val = offset_val;
+    result->num_targets = 0;
     strncpy(result->message_template, message_template, message_len);
     result->message_template[message_len] = '\0';
     // Insert into the linked list at the head.
@@ -245,11 +418,25 @@ int midi_store_mapping(int channel, int type, int code, int is_log, float min_va
     while (message_len > 0 && message[message_len - 1] == 'Z') {
         --message_len;
     }
+    // A payload that starts with a digit is a direct parameter list
+    // (P[,OSC][,P,OSC...]), not a wire command -- no wire command can start
+    // with a digit, so the two forms never collide.  Parse it BEFORE the old
+    // mapping is dropped, so a typo doesn't silently delete a working CC.
+    struct midi_param_target targets[MIDI_MAP_MAX_TARGETS];
+    int num_targets = 0;
+    if (message_len && message[0] >= '0' && message[0] <= '9') {
+        num_targets = midi_parse_param_targets(message, message_len, targets);
+        if (num_targets <= 0)  return 0;
+    }
     struct midi_mapping **p_mapping = midi_mapping_find(channel, type, code);
     if (p_mapping) midi_mapping_free(p_mapping);
     // store with an empty string removes mapping
     if (message_len) {
-        /* struct midi_mapping *mapping = */ midi_mapping_init(channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
+        struct midi_mapping *mapping = midi_mapping_init(channel, type, code, is_log, min_val, max_val, offset_val, message, message_len);
+        if (mapping != NULL && num_targets > 0) {
+            memcpy(mapping->targets, targets, num_targets * sizeof(targets[0]));
+            mapping->num_targets = (uint8_t)num_targets;
+        }
         //midi_mapping_debug();
     }
     // We just deleted a mapping on this channel, was it the last one?
@@ -345,6 +532,13 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
 struct midi_cmd_yield_state {
     size_t pos;
     char *message;
+    // Direct-parameter mappings yield one event per target instead of
+    // parsing a message.  The targets are copied here, so a mapping changed
+    // between yields can't pull them out from under us.
+    uint8_t target;
+    uint8_t num_targets;
+    float value;
+    struct midi_param_target targets[MIDI_MAP_MAX_TARGETS];
 };
 
 void *yield_midi_message_handler_events(uint8_t status, uint16_t channel, uint8_t * data, uint16_t len, uint32_t time, amy_event *event, void *state) {
@@ -379,16 +573,42 @@ void *yield_midi_message_handler_events(uint8_t status, uint16_t channel, uint8_
                     status = 0x90;
                     value = 0;
                 }
-                substitute_midi_special_values(message, mapping->message_template, channel, code, value);
+                yield_state->value = value;
+                yield_state->target = 0;
+                yield_state->num_targets = mapping->num_targets;
+                if (mapping->num_targets > 0)
+                    memcpy(yield_state->targets, mapping->targets, mapping->num_targets * sizeof(mapping->targets[0]));
+                else
+                    substitute_midi_special_values(message, mapping->message_template, channel, code, value);
                 // Mark the event as already passed through mapping for this
                 // channel, so we don't send it back out again.
                 event->note_source_channel = channel;
                 // If we're given a time, set it in the event.
                 if (AMY_IS_SET(time)) event->time = time;
             }  // If state is non-null, assume we're working through the later yields.
-            // Layer each parsed event on top of the caller's base event, if any.
-            yield_state->pos = yield_event_from_message(yield_state->message, event, yield_state->pos);
-            if (yield_state->pos == 0) {
+            bool done;
+            if (yield_state->num_targets > 0) {
+                // Direct parameter: one event per target, addressed to this
+                // synth, so the value reaches every voice (at the target's
+                // voice-relative osc) by the ordinary synth path.  Like the
+                // message path, the call after the last event yields
+                // nothing and ends the iteration.
+                done = (yield_state->target >= yield_state->num_targets);
+                if (!done) {
+                    struct midi_param_target *t = &yield_state->targets[yield_state->target++];
+                    // Each yield starts from a fresh copy of the caller's
+                    // base event, so each needs the MIDI marking and time.
+                    event->note_source_channel = channel;
+                    if (AMY_IS_SET(time)) event->time = time;
+                    event->synth = (uint8_t)channel;
+                    amy_event_set_param(event, t->param, t->osc, yield_state->value);
+                }
+            } else {
+                // Layer each parsed event on top of the caller's base event, if any.
+                yield_state->pos = yield_event_from_message(yield_state->message, event, yield_state->pos);
+                done = (yield_state->pos == 0);
+            }
+            if (done) {
                 // End of iteration
                 free(yield_state);
                 yield_state = NULL;

@@ -96,6 +96,10 @@ HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))
 
 PYTHONS = $(wildcard *.py)
 
+# The host compiler, for build-time helper programs that must RUN here (the
+# enum params dump below) -- not $(CC), which may be a cross compiler.
+HOSTCC ?= cc
+
 # The grep below takes every NUMERIC #define out of amy.h. AMY_BLOCK_SIZE is
 # the one derived define -- (1 << BLOCK_SIZE_BITS), since the block has to be
 # a power of two and the bits are the knob -- so it is spelt out afterwards
@@ -104,6 +108,7 @@ PYTHONS = $(wildcard *.py)
 src/patches.h: $(PYTHONS) $(HEADERS_BUILD)
 	cat src/amy.h  | sed -e 's@^//.*@@' | tr '\t' ' ' | egrep 'define +[^ ]+ +[.0-9-]+' | sed -e 's/\([-0-9][0-9]*\.[0-9]*\)f.*/\1/' | awk '{print $$2 "=" $$3}' > amy/constants.py
 	echo "AMY_BLOCK_SIZE=$$((1 << $$(sed -n 's/^BLOCK_SIZE_BITS=//p' amy/constants.py | tail -1)))" >> amy/constants.py
+	${PYTHON} scripts/gen_param_constants.py $(HOSTCC) >> amy/constants.py
 	${PYTHON} -m amy.headers
 
 %.o: %.c $(HEADERS) src/patches.h
@@ -135,7 +140,7 @@ CTESTS = tests/test_filter_type_switch tests/test_clock_wrap tests/test_sequence
          tests/test_synth_readout tests/test_log2_lut tests/test_clone_on_grow \
          tests/test_timebase_reset tests/test_osc_free_on_release \
          tests/test_voice_osc_range tests/test_dist_coefs tests/test_dist_scope \
-         tests/test_note_output
+         tests/test_note_output tests/test_midi_cc_param
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).
