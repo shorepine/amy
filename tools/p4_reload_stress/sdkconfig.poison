@@ -1,0 +1,5 @@
+# Overlay: catch use-after-free that doesn't fault on its own. Freed blocks
+# are filled with 0xfefefefe and checked on the next allocation.
+#   idf.py -B build-poison -DSDKCONFIG=build-poison/sdkconfig \
+#          -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.poison" build
+CONFIG_HEAP_POISONING_COMPREHENSIVE=y

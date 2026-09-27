@@ -1,0 +1,5 @@
+build*/
+sdkconfig
+sdkconfig.old
+*.log
+__pycache__/

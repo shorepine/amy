@@ -1,0 +1,15 @@
+# ESP32-P4-Function-EV-Board
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_SPIRAM=y
+
+# As tulipcc's ESP32 builds of AMY set them.
+CONFIG_FREERTOS_HZ=1000
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# On a panic: print the registers and backtrace, then reboot and start the
+# next run.
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+# Full backtraces on RISC-V panics (otherwise only MEPC/RA), for capture.py.
+CONFIG_ESP_SYSTEM_USE_EH_FRAME=y
