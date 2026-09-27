@@ -1,5 +1,5 @@
 // reload_stress: hardware repro for the patch-reload crash (#1185, #1190)
-// on the ESP32-P4-Function-EV-Board.
+// on the ESP32-P4X-Function-EV-Board.
 //
 // Mirrors the #1185 report: AMY renders in its own tasks (I2S out, multicore,
 // multithread), and a task on the other core reloads a synth's patch by
@@ -45,13 +45,13 @@
 // application core did in #1185.
 #define STRESS_CORE 0
 
-// ESP32-P4-Function-EV-Board: the ES8311 codec's I2S pins (esp-bsp
-// esp32_p4_function_ev_board). The codec isn't initialised, so there's no
-// sound, but the I2S DMA runs and paces the render tasks as in a real app.
-#define I2S_MCLK 13
-#define I2S_BCLK 12
-#define I2S_LRC 10
-#define I2S_DOUT 9
+// I2S output as wired on the ESP32-P4X-Function-EV-Board this is run on:
+// output only, so no MCLK or DIN (they stay at amy_default_config's -1).
+// Nothing needs to be connected, but the I2S DMA must run: it paces the
+// render tasks as in a real app.
+#define I2S_BCLK 21
+#define I2S_LRC 22
+#define I2S_DOUT 23
 
 // Patches with different oscs-per-voice, so the new voice lands on osc
 // numbers the old one is freeing: Juno 1, DX7 130, Juno 20.
@@ -83,7 +83,6 @@ static void stress_task(void *arg) {
 void app_main(void) {
     amy_config_t c = amy_default_config();
     c.audio = AMY_AUDIO_IS_I2S;
-    c.i2s_mclk = I2S_MCLK;
     c.i2s_bclk = I2S_BCLK;
     c.i2s_lrc = I2S_LRC;
     c.i2s_dout = I2S_DOUT;

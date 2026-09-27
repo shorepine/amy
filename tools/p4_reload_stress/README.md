@@ -1,6 +1,6 @@
 # P4 patch-reload stress test
 
-An ESP-IDF app for the **ESP32-P4-Function-EV-Board** that reproduces the
+An ESP-IDF app for the **ESP32-P4X-Function-EV-Board** that reproduces the
 patch-reload crash behind #1185, to compare `main` against the candidate
 fixes (#1185, #1190) on the hardware where it was seen.
 
@@ -23,10 +23,10 @@ runs without touching it.
 | `0` (default) | 30 | 500 ms | The #1185 protocol: about 1 fault in 6 reloads on `main`, 30 clean with the fix |
 | `1` | 1000 | none | Back to back, for the rarer render-side race |
 
-I2S runs on the board codec's pins (MCLK 13, BCLK 12, LRCK 10, DOUT 9). The
-codec is never initialised, so there's no sound, but the I2S DMA runs and
-paces the render tasks. I2S has to be on: without it AMY renders on the
-caller's thread and the race can't happen.
+I2S output is on BCLK 21, LRCLK 22, DOUT 23, as wired on the bench board;
+it's output only, so MCLK and DIN are unused. Nothing has to be
+connected, but I2S has to be on: its DMA paces the render tasks, and without
+it AMY renders on the caller's thread and the race can't happen.
 
 ## Two races
 
