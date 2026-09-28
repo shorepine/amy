@@ -1312,6 +1312,20 @@ extern void reset_osc(uint16_t i );
 // How many channels we consider for tracking active MIDI channels.
 #define AMY_NUM_MIDI_CHANNELS 16
 
+// A mapping can name AMY parameters directly instead of carrying a wire
+// command: ic<C>,<L>,<N>,<X>,<O>,<P>[,<OSC>][,<P>,<OSC>...] (issue #1175).
+// OSC is voice-relative; a lone P means osc 0 of each voice.
+#define MIDI_MAP_MAX_TARGETS 4
+struct midi_param_target {
+    uint16_t param;  // enum params
+    uint16_t osc;    // voice-relative
+};
+// Can this param be set by a direct mapping?  (see param_fields in midi_mappings.c)
+extern bool amy_param_is_settable(int param);
+// Set the amy_event field for `param` to `value`, in amy.send() units; an
+// osc-scope param also sets e->osc.  False if the param isn't settable.
+extern bool amy_event_set_param(amy_event *e, int param, uint16_t osc, float value);
+
 extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len);
 extern int midi_clear_mapping(int channel, int type, int code);
 extern bool midi_fetch_mapping_command(int channel, int type, int code, char *s, size_t len);

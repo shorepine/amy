@@ -87,3 +87,4 @@ tests/test_voice_osc_range
 tests/test_dist_coefs
 tests/test_dist_scope
 tests/test_note_output
+tests/test_midi_cc_param
