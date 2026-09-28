@@ -71,9 +71,11 @@ static void test_reference_outside_the_voice_is_refused(void) {
     send("i1iv1in1Z");
     int base = base_of(1);
     send("i1v0L1c1Z");
-    CHECK(AMY_IS_UNSET(synth[base]->mod_source[0]),
+    // Every field was refused, so no delta reached the osc and it may never
+    // have been allocated -- an unallocated osc is at its defaults.
+    CHECK((synth[base] == NULL || AMY_IS_UNSET(synth[base]->mod_source[0])),
           "mod_source=1 on a 1-osc voice left mod_source unset");
-    CHECK(AMY_IS_UNSET(synth[base]->chained_osc),
+    CHECK((synth[base] == NULL || AMY_IS_UNSET(synth[base]->chained_osc)),
           "chained_osc=1 on a 1-osc voice left chained_osc unset");
 }
 
@@ -93,7 +95,7 @@ static void test_refused_reference_does_not_touch_the_neighbour(void) {
           synth[base + 1] == NULL ? "still unallocated"
                                   : (synth[base + 1]->wave == neighbour_wave ? "wave unchanged"
                                                                              : "OVERWRITTEN"));
-    CHECK(AMY_IS_UNSET(synth[base]->chained_osc), "and nothing got chained to it");
+    CHECK((synth[base] == NULL || AMY_IS_UNSET(synth[base]->chained_osc)), "and nothing got chained to it");
 }
 
 static void test_algo_source_is_checked_per_operator(void) {
