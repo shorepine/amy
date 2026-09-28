@@ -966,9 +966,14 @@ void *yield_synth_commands(uint8_t instr_num, char *s, size_t len, bool include_
         bool found = false;
         int type = MIDI_MAP_TYPE_CC;
         int starting_code = state_val - STATE_START_OF_MIDI_TPLT_CMDS;
-        for (int next_code = starting_code; next_code < 256; ++next_code) {
+        // codes 0..127 are CC inputs (ic), 128..255 note commands (io),
+        // 256..383 CC outputs (iC).
+        for (int next_code = starting_code; next_code < 384; ++next_code) {
             int next_midi_code = next_code;
-            if (next_midi_code >= 128) {
+            if (next_midi_code >= 256) {
+                next_midi_code -= 256;
+                type = MIDI_MAP_TYPE_CC_OUT;
+            } else if (next_midi_code >= 128) {
                 next_midi_code -= 128;
                 type = MIDI_MAP_TYPE_NOTE;
             }

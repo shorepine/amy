@@ -785,6 +785,12 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     d.time = e->time;
     if(AMY_IS_UNSET(e->time)) { d.time = 0; } 
 
+    // Echo watched parameter changes out as MIDI CCs (midi_cc_output).  Here,
+    // before anything below spends the event: bus-scope distortion fields are
+    // cleared once issued, and bus-only events never reach
+    // patches_event_has_voices at all.
+    if (AMY_IS_SET(e->synth))  midi_cc_output_handle_event(e, queue);
+
     // If this is a bus-directed event, use d->osc to store the bus number instead.
     if (event_addresses_bus(e)) {
         // Store the target bus in d.osc.  Either bus is specified, or synth is specified and has a bus, or default.
