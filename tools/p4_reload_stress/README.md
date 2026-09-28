@@ -105,6 +105,32 @@ idf.py -B build-$t-poison -DAMY_DIR=... -DSTRESS_MODE=1 \
     -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.poison" build
 ```
 
+## Known gap: this harness did not reproduce #1185
+
+Tested 2026-09-27 on an ESP32-P4X-Function-EV-Board (IDF 5.5.3): `main`,
+pr1185 and pr1190 all ran completely clean here — 300 reloads each in mode 0
+(10 runs x 30) and ~15,000 reloads each in mode 1 (15 runs x 1000), zero
+`ingest` or `render` panics on any of the three, including `main`. Do not
+read that as the bug being absent — it means this harness's raw
+`amy_add_message()` patch-load + note-hold protocol doesn't recreate the
+crash's actual trigger.
+
+The real trigger, confirmed on the same board: tulip2's `synth.Group` /
+`Synth` / `DrumSynth` + sequencer-tag allocation and teardown, driven the
+way a person actually hits it — `run("parallax")` then `.quit()` (^Q),
+repeated. On tulip2 with amy pinned to `main` (2ca613a) this panic'ed in
+`reset_osc` (amy.c:1139, the ingest race) on cycle 14 of 20. The same loop
+ran 40/40 clean cycles on both pr1185 (c40cdd8) and pr1190 (352b8bc /
+de3cab3), which is the actual evidence that both fixes work — not the
+mode-0/mode-1 runs above.
+
+If you're picking this test back up: treat this app's numbers as
+uninformative until its `amy_add_message()` sequence is rebuilt to
+allocate/free through a synth group's actual lifecycle (osc/voice churn
+across polyphony + a sequencer tag) instead of one synth's bare patch
+reloads. Until then, use tulip2 + a real app's run/quit cycle as the
+ground truth for this bug.
+
 ## Suggested order
 
 1. **`main`, mode 0, about 10 runs.** This should reproduce roughly one fault
