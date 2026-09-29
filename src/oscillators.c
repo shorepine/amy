@@ -822,7 +822,10 @@ void partial_note_off(uint16_t osc) {
 
 SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     SAMPLE half = MUL0_SS(F2S(0.5f), F2S(synth[osc]->feedback));
-    SAMPLE amp = F2S(msynth[osc]->amp);
+    // Ramp the gain across the block from last_amp to amp, as the other
+    // oscillators do.
+    SAMPLE current_amp = F2S(msynth[osc]->last_amp);
+    SAMPLE incremental_amp = SHIFTR(F2S(msynth[osc]->amp) - current_amp, BLOCK_SIZE_BITS);
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     SAMPLE max_value = 0;
     SAMPLE *ring = synth[osc]->ks_ring;
@@ -857,7 +860,8 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
                 p[0] = m + w;
                 w = v + m;
                 p++;
-                SAMPLE value = SMULR7(sample, amp);
+                SAMPLE value = SMULR7(sample, current_amp);
+                current_amp += incremental_amp;
                 *o++ += value;
                 if (value < 0) value = -value;
                 if (value > max_value) max_value = value;
@@ -869,7 +873,8 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
                 *p = m + w;
                 w = v + m;
                 p = ring;
-                SAMPLE value = SMULR7(sample, amp);
+                SAMPLE value = SMULR7(sample, current_amp);
+                current_amp += incremental_amp;
                 *o++ += value;
                 if (value < 0) value = -value;
                 if (value > max_value) max_value = value;
@@ -878,7 +883,8 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
         synth[osc]->phase = (PHASOR)(p - ring);
         synth[osc]->ks_tune_state = w;
     }
-    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, S2F(amp), S2F(max_value));
+    msynth[osc]->last_amp = msynth[osc]->amp;
+    //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, msynth[osc]->amp, S2F(max_value));
     return max_value;
 }
 
