@@ -2214,6 +2214,14 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
     // Only render if osc has not already been rendered this time step e.g. by chained_osc.
     if (synth[osc]->render_clock != amy_global.total_samples) {
         synth[osc]->render_clock = amy_global.total_samples;
+        if(AMY_IS_SET(synth[osc]->chained_osc)) {
+            // Chained oscillators are rendered into the same buffer, starting with the last one in the chain; tail-recurse.
+            uint16_t chained_osc = synth[osc]->chained_osc;
+            if (synth[chained_osc] != NULL && synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
+                SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
+                if (new_max_val > max_val)  max_val = new_max_val;
+            }
+        }
         if (synth[osc]->amp_coefs[COEF_CONST] != 0) {
                     // fill buf with next block_size of samples for specified osc.
             hold_and_modify(osc); // apply bp / mod
@@ -2248,47 +2256,20 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if(AMY_HAS_CUSTOM) {
             if(synth[osc]->wave == CUSTOM) max_val = render_custom(buf, osc);
         }
-        if (synth[osc]->wave != SILENT) {
-            // apply distortion to osc if set, pre-filter; returns its own max
-            // (folding can amplify a quiet release tail).
-            if (synth[osc]->dist_stages) {
-                max_val = dist_process(buf, osc);
-            }
-            // apply filter to osc if set
-            if (synth[osc]->filter_type != FILTER_NONE) {
-                max_val = filter_process(buf, osc, max_val);
-                // Maybe clear filter state here if we've finshed this osc.
-                if (synth[osc]->status != SYNTH_AUDIBLE) {
-                    reset_filter(osc);  // (f)
-                }
-            }
+        // A SILENT osc supplies no waveform, and applies its envelope to summed waveform of the chain below it.
+        if(synth[osc]->wave == SILENT) max_val = render_envelope(buf, osc);
+        // Distortion and Filter *always* apply to the entire chain below.
+        // apply distortion to osc if set, pre-filter; returns its own max
+        // (folding can amplify a quiet release tail).
+        if (synth[osc]->dist_stages) {
+            max_val = dist_process(buf, osc);
         }
-        if(AMY_IS_SET(synth[osc]->chained_osc)) {
-            // Stack oscillators - render next osc into same buffer.
-            uint16_t chained_osc = synth[osc]->chained_osc;
-            if (synth[chained_osc] != NULL && synth[chained_osc]->status == SYNTH_AUDIBLE) {  // We have to recheck this since we're bypassing the skip in amy_render.
-                SAMPLE new_max_val = render_osc_wave(chained_osc, core, buf);
-                if (new_max_val > max_val)  max_val = new_max_val;
-            }
-        }
-        // Unlike other oscs, SILENT osc is processed *after* collecting chained_oscs
-        if (synth[osc]->wave == SILENT) {
-            max_val = render_envelope(buf, osc);
-            // Distortion on a SILENT head shapes the whole voice: buf now holds
-            // the summed chain, and chained_osc is base-osc-relative, so this
-            // runs once per voice on that voice's mix alone.  After the
-            // envelope, so note dynamics drive the shaper as they do per-osc;
-            // before the filter, keeping the per-osc dist -> filter order.
-            if (synth[osc]->dist_stages) {
-                max_val = dist_process(buf, osc);
-            }
-            // apply filter to osc if set
-            if (synth[osc]->filter_type != FILTER_NONE) {
-                max_val = filter_process(buf, osc, max_val);
-                // Maybe clear filter state here if we've finshed this osc.
-                if (synth[osc]->status != SYNTH_AUDIBLE) {
-                    reset_filter(osc);  // (f)
-                }
+        // apply filter to osc if set
+        if (synth[osc]->filter_type != FILTER_NONE) {
+            max_val = filter_process(buf, osc, max_val);
+            // Maybe clear filter state here if we've finshed this osc.
+            if (synth[osc]->status != SYNTH_AUDIBLE) {
+                reset_filter(osc);  // (f)
             }
         }
         // note: Code transplanted here from hold_and_modify() to distinguish actual zero output
