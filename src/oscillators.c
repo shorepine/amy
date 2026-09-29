@@ -853,6 +853,10 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
 void ks_note_on(uint16_t osc, float freq) {
     uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
     if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
+    // render_ks reads phase as the ring index, and a note-on keeps the phase
+    // the osc had: after another wave it is that wave's phasor, far past the
+    // ring.
+    synth[osc]->phase = 0;
     // init KS buffer with noise up to max
     SAMPLE sum = 0;
     for(uint16_t i = 0; i < buflen; i++) {
