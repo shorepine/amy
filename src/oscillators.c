@@ -879,10 +879,6 @@ void ks_note_on(uint16_t osc, float freq) {
     //fprintf(stderr, "ks_note_on: osc %d buflen %d poly_index %d\n", osc, buflen, ks_polyphony_index);
 }
 
-void ks_note_off(uint16_t osc) {
-    msynth[osc]->amp = 0;
-}
-
 
 void ks_init(void) {
     // 6ms buffer

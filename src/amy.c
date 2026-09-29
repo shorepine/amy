@@ -1991,7 +1991,6 @@ void play_delta(struct delta *d) {
                       || synth[osc]->wave == PARTIAL)) {
                     //synth[osc]->velocity = 0;
                     switch(synth[osc]->wave) {
-                    case KS: ks_note_off(osc); break;
                     case ALGO: algo_note_off(osc); break;
                     case CUSTOM: custom_note_off(osc); break;
                     case BYO_PARTIALS:
@@ -2017,7 +2016,7 @@ void play_delta(struct delta *d) {
                     default:
                         // ** no_amp_001
                         // osc note off, start release
-                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
+                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT ALGO, PARTIAL, PCM, or CUSTOM.
                         // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                         // those waves on note-off.
                         AMY_UNSET(synth[osc]->note_on_clock);
