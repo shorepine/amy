@@ -1143,6 +1143,10 @@ int8_t global_init(amy_config_t c);
 void global_deinit();
 void amy_grab_lock();
 void amy_release_lock();
+// Held by the render thread across each block, and by an ingest thread across
+// a patch load; recursive for its owner. Take it before the queue lock.
+void amy_grab_render_lock();
+void amy_release_render_lock();
 void amy_deltas_reset();
 void add_delta_to_queue(struct delta *d, struct delta **queue);
 void amy_add_event_internal(amy_event *e, uint16_t base_osc);
