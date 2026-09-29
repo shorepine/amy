@@ -888,6 +888,50 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     return max_value;
 }
 
+// Pluck position from duty's constant coefficient, read at note-on:
+// b = |duty - 0.5| is the pluck point as a fraction of the string, and the
+// reset default 0.5 keeps the plain noise burst.  The burst becomes the noise
+// combed to notch the harmonics a pluck at b leaves out, mixed with a pulse
+// b of the period wide (an ideal pluck's force on the bridge).
+#define KS_PICK_MIX  0.6f   // pulse share of the burst once eased in
+#define KS_PICK_RAMP 0.1f   // pick position below which pulse and comb ease in
+
+// One in-place pass: remove the mean, comb (circular, so the notches land on
+// harmonics), rescale and add the pulse.  Walking each cycle of i -> i - M
+// reads x[i - M] before it is overwritten; only the cycle's start is saved.
+// Scales come from the fill's expected RMS, so the per-sample work is fixed
+// point.
+static void ks_pluck(SAMPLE *ring, uint16_t buflen, uint16_t M, float b, SAMPLE mean) {
+    float r = (b < KS_PICK_RAMP) ? b / KS_PICK_RAMP : 1.0f;
+    float s = KS_PICK_MIX * r;              // pulse share
+    float g = r;                            // comb depth
+    float p = (float)M / (float)buflen;     // pulse duty as rendered
+    // The uniform +/-0.5 fill has RMS 1/sqrt(12); the comb scales it by
+    // sqrt(1 + g^2); a unit pulse of duty p has RMS sqrt(p (1 - p)).  d keeps
+    // the mix at the fill's RMS.
+    float d = sqrtf((1.0f - s) * (1.0f - s) + s * s);
+    float kn = (1.0f - s) / (sqrtf(1.0f + g * g) * d);
+    float kp = s * 0.28867513f / (sqrtf(p * (1.0f - p)) * d);
+    SAMPLE kn_s = F2S(kn), g_s = F2S(g);
+    SAMPLE hi = F2S(kp * (1.0f - p)), lo = F2S(-kp * p);
+    // (x[i] - mean) - g (x[i - M] - mean), with the mean term folded.
+    SAMPLE dc = SMULR7(F2S(1.0f - g), mean);
+    uint16_t cycles = buflen, t = M;
+    while(t) { uint16_t u = cycles % t; cycles = t; t = u; }   // gcd
+    for(uint16_t c = 0; c < cycles; c++) {
+        SAMPLE first = ring[c];
+        uint16_t j = c;
+        for(;;) {
+            uint16_t k = (j >= M) ? j - M : j + buflen - M;
+            SAMPLE prev = (k == c) ? first : ring[k];
+            SAMPLE v = ring[j] - SMULR7(g_s, prev) - dc;
+            ring[j] = SMULR7(kn_s, v) + ((j < M) ? hi : lo);
+            if(k == c) break;
+            j = k;
+        }
+    }
+}
+
 void ks_note_on(uint16_t osc, float freq) {
     uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
     if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
@@ -921,8 +965,15 @@ void ks_note_on(uint16_t osc, float freq) {
     }
     // Remove dc, to avoid ending up with a dc-offset residual.
     SAMPLE mean = sum / buflen;
-    for(uint16_t i = 0; i < buflen; i++) {
-        ring[i] -= mean;
+    float b = fabsf(synth[osc]->duty_coefs[COEF_CONST] - 0.5f);
+    if(b > 0.5f) b = 0.5f;
+    uint16_t M = (uint16_t)(b * (float)buflen + 0.5f);
+    if(M > 0 && M < buflen) {
+        ks_pluck(ring, buflen, M, b, mean);
+    } else {
+        for(uint16_t i = 0; i < buflen; i++) {
+            ring[i] -= mean;
+        }
     }
     //fprintf(stderr, "ks_note_on: osc %d buflen %d\n", osc, buflen);
 }
