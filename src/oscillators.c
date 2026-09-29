@@ -829,25 +829,54 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     // Outside this range the ring would need more than MAX_KS_BUFFER_LEN
     // samples, or less than one.
     if(freq >= KS_LOWEST_FREQ && freq < AMY_SAMPLE_RATE && ring != NULL) {
-        uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
+        float period = AMY_SAMPLE_RATE / freq;
+        uint16_t buflen = (uint16_t)period;
         if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
-        for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
-            uint16_t index = (uint16_t)synth[osc]->phase;
-            SAMPLE sample = ring[index];
-            ring[index] =
-                SMULR7(
-                    (ring[index] + ring[(index + 1) % buflen]),
-                    half);
-            synth[osc]->phase = (PHASOR)((index + 1) % buflen);
-            SAMPLE value = SMULR7(sample, amp);
-            buf[i] += value;
-            if (i == 0) {
-                max_value = value;
-            } else {
+        // The ring plus the two-tap average is buflen - 0.5 samples of delay.
+        // A first-order allpass (Jaffe and Smith's tuning filter) adds the
+        // missing d = period + 0.5 - buflen, in [0.5, 1.5), as its delay at
+        // low frequencies.
+        float d = period + 0.5f - (float)buflen;
+        SAMPLE a = F2S((1.0f - d) / (1.0f + d));
+        SAMPLE w = synth[osc]->ks_tune_state;
+        // The block is split where the ring wraps, so the inner loop needs no
+        // wrap test; the sample at the wrap takes ring[0] as its neighbour.
+        // A position left past a shrunk ring by a pitch step makes stop < o,
+        // so that sample goes straight to the wrap.
+        SAMPLE *p = ring + (uint16_t)synth[osc]->phase;
+        SAMPLE *last = ring + buflen - 1;
+        SAMPLE *o = buf, *bend = buf + AMY_BLOCK_SIZE;
+        while (o < bend) {
+            SAMPLE *stop = o + (last - p);
+            if (stop > bend) stop = bend;
+            while (o < stop) {
+                SAMPLE sample = p[0];
+                SAMPLE v = SMULR7((sample + p[1]), half);
+                // One-multiply allpass, (a + z^-1) / (1 + a z^-1).
+                SAMPLE m = SMULR7(a, v - w);
+                p[0] = m + w;
+                w = v + m;
+                p++;
+                SAMPLE value = SMULR7(sample, amp);
+                *o++ += value;
+                if (value < 0) value = -value;
                 if (value > max_value) max_value = value;
-                else if (-value > max_value) max_value = -value;
+            }
+            if (o < bend) {
+                SAMPLE sample = *p;
+                SAMPLE v = SMULR7((sample + ring[0]), half);
+                SAMPLE m = SMULR7(a, v - w);
+                *p = m + w;
+                w = v + m;
+                p = ring;
+                SAMPLE value = SMULR7(sample, amp);
+                *o++ += value;
+                if (value < 0) value = -value;
+                if (value > max_value) max_value = value;
             }
         }
+        synth[osc]->phase = (PHASOR)(p - ring);
+        synth[osc]->ks_tune_state = w;
     }
     //fprintf(stderr, "render_ks time %u osc %d freq %.1f amp %.3f maxval %.3f\n", amy_global.total_blocks*AMY_BLOCK_SIZE, osc, freq, S2F(amp), S2F(max_value));
     return max_value;
@@ -876,6 +905,7 @@ void ks_note_on(uint16_t osc, float freq) {
         memset(ring, 0, sizeof(SAMPLE)*MAX_KS_BUFFER_LEN);
         synth[osc]->ks_ring = ring;
     }
+    synth[osc]->ks_tune_state = 0;
     // init KS buffer with noise up to max
     SAMPLE sum = 0;
     for(uint16_t i = 0; i < buflen; i++) {

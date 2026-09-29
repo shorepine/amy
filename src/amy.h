@@ -831,6 +831,7 @@ struct synthinfo {
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
     SAMPLE last_two[2];    // For ALGO feedback ops
+    SAMPLE ks_tune_state;  // KS tuning allpass state, cleared at note-on.
     // For filters.  Need 2x because LPF24 uses two instances of filter.
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
