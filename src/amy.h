@@ -1511,7 +1511,6 @@ extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc, float freq);
 extern void algo_note_off(uint16_t osc);
 extern void ks_note_on(uint16_t osc, float freq);
-extern void ks_note_off(uint16_t osc);
 extern void sine_mod_trigger(uint16_t osc);
 extern void saw_down_mod_trigger(uint16_t osc);
 extern void saw_up_mod_trigger(uint16_t osc);

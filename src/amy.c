@@ -1038,6 +1038,14 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
     }
 }
 
+// True while osc's EG0 is still the key gate reset_osc_params installs.
+static bool eg0_is_default_gate(uint16_t osc) {
+    struct synthinfo *psynth = synth[osc];
+    return psynth->breakpoint_times[0][0] == 0 && psynth->breakpoint_values[0][0] == 1.0f
+        && psynth->breakpoint_times[0][1] == 0 && psynth->breakpoint_values[0][1] == 0
+        && (psynth->max_num_breakpoints[0] <= 2 || AMY_IS_UNSET(psynth->breakpoint_times[0][2]));
+}
+
 void reset_osc_params(struct synthinfo *psynth) {
     // osc params are the things set through the amy_event API
     // Event-derived config
@@ -1991,7 +1999,6 @@ void play_delta(struct delta *d) {
                       || synth[osc]->wave == PARTIAL)) {
                     //synth[osc]->velocity = 0;
                     switch(synth[osc]->wave) {
-                    case KS: ks_note_off(osc); break;
                     case ALGO: algo_note_off(osc); break;
                     case CUSTOM: custom_note_off(osc); break;
                     case BYO_PARTIALS:
@@ -2014,10 +2021,16 @@ void play_delta(struct delta *d) {
                             }
                         }
                         break;
+                    case KS:
+                        // On the default key gate the release would cut the
+                        // string at note-off, so it rings out instead; a KS
+                        // osc given an amp envelope releases like any other.
+                        if (eg0_is_default_gate(osc)) break;
+                        // fall through
                     default:
                         // ** no_amp_001
                         // osc note off, start release
-                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
+                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT ALGO, PARTIAL, PCM, CUSTOM, or KS on the default key gate.
                         // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                         // those waves on note-off.
                         AMY_UNSET(synth[osc]->note_on_clock);
