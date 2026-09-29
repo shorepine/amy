@@ -386,8 +386,6 @@ Please see our [piano voice documentation](https://shorepine.github.io/amy/piano
 
 Most sounds use several oscs per note, and AMY has three different ways for one note-on to control a group of them: **chains** (`chained_osc`, often headed by a `SILENT` osc), **partials** (`BYO_PARTIALS` and `INTERP_PARTIALS`) and **FM** (`ALGO`). They look alike from the outside -- you send `note` and `vel` to one osc and several oscs sound -- but they differ in what the addressed osc passes on to the others, and when. A chain copies the note-on to each member once, and from then on each member runs by itself. A partials or `ALGO` parent keeps steering its group on every block for as long as the note lasts.
 
-(This is separate from voices and synths. A note-on sent to a synth without an `osc` goes to every osc in the voice -- see Note 2 under [Synths](#synths) -- and each osc then follows the rules below.)
-
 | | Chain (`chained_osc`) | Partials (`BYO_PARTIALS`, `INTERP_PARTIALS`) | FM (`ALGO`) |
 |---|---|---|---|
 | Group members | Oscs linked one to the next by `chained_osc`, any osc numbers | The oscs right after the parent: `num_partials` of them for `BYO_PARTIALS`, as many as the preset needs for `INTERP_PARTIALS` | The oscs listed in `algo_source`, up to 6 |
@@ -395,7 +393,6 @@ Most sounds use several oscs per note, and AMY has three different ways for one 
 | After note-on | Nothing. Each member computes its own pitch and amp from its own ControlCoefficients | Every block, each partial's `note` input is set to the parent's current pitch and its `vel` input to the parent's current amplitude | Every block, an operator with `ratio` runs at the `ALGO` osc's current frequency times `ratio` |
 | Where velocity acts | On every member (through each one's `amp` `vel` coefficient), and on a `SILENT` head as well | On the parent's amplitude, which scales every partial. `INTERP_PARTIALS` also picks the partials' spectrum from it | Only on the `ALGO` osc's amplitude, which scales the carriers' output |
 | Pitch changes during the note (bend, EGs, LFOs) | Each member follows only its own controls | Partials follow the parent | Operators with `ratio` follow the `ALGO` osc. Operators without `ratio` stay at a fixed `freq` |
-| Note-on sent straight to a member | Its `note` is ignored, but its `vel` starts that osc and the rest of the chain after it, without the head | Ignored | Ignored |
 | Filter, distortion, pan | An osc's filter and distortion process itself plus the rest of the chain below it, so the head's process the whole chain. A `SILENT` head also applies its amplitude envelope to the whole chain. The whole chain uses the head's `pan` and `bus` | The parent's filter and distortion process the summed partials | The `ALGO` osc's filter and distortion process the FM output |
 | Note-off | Passed down the chain | Releases the partials' envelopes | Releases the operators' envelopes |
 
@@ -416,7 +413,7 @@ amy.send(osc=0, note=48, vel=1)   # Always send notes to the head
 ```
 
 Two practical rules follow from this:
-* Send notes to the head. A note-on addressed to a member ignores its `note` value (members take the note from the head), and its velocity starts that member and the ones after it but bypasses the head's envelope and filter.
+* Send notes to the head. Sending note-ons directly to other members of the chain is not supported.
 * Give the head a lower osc number than its members. AMY renders oscs in ascending order, so a member numbered below its head gets rendered on its own before the head can collect it, and misses the head's envelope and filter.
 
 ### Partials: the parent steers its partials every block
