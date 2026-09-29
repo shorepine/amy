@@ -1366,7 +1366,9 @@ extern void cv_trigger_clear_mappings(int gate_cv);
 // note_output.c -- cv_trigger's mirror: a synth's note events out to
 // CV/gate or MIDI instead of to its oscillators.
 extern uint8_t note_output_mode_for(uint8_t synth);
-extern bool note_output_handle_event(amy_event *e);
+// live: the event is being played (headed for amy_global.delta_queue), not
+// stored into a patch. Only a live event sends anything.
+extern bool note_output_handle_event(amy_event *e, bool live);
 // If synth has a MIDI note output, its channel (1..16) and forward_midi_in.
 extern bool note_output_midi_channel(uint8_t synth, uint8_t *channel, bool *forward_midi_in);
 extern void note_output_config(uint8_t synth, int mode, float *args, int num_args);

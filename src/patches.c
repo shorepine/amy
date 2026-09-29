@@ -1273,7 +1273,7 @@ void patches_event_has_voices(amy_event *e, struct delta **queue) {
     // here -- and why the existence check passes a NULL tag, since
     // "synth N not defined" three times per note would be noise about a
     // deliberate arrangement.
-    if (note_output_handle_event(e) && !instrument_number_exists(e->synth, NULL))
+    if (note_output_handle_event(e, queue == &amy_global.delta_queue) && !instrument_number_exists(e->synth, NULL))
         return;
 
     uint8_t synth = e->synth;

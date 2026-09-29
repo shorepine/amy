@@ -301,6 +301,40 @@ static void test_repeated_note_on_retriggers(void) {
     CHECK(fabsf(last_on(1)) < 1e-4, "one note-off is enough to drop the gate");
 }
 
+// Storing a patch parses its string into the patch's delta list, and a
+// segment like "i1n60l1" names a synth and a note. That is a note being
+// SAVED, not played: it used to go out of the port (or raise the gate) the
+// moment the patch was stored. Pinned for both modes, and for a stored
+// panic, which must not drop a gate that a real note is holding up.
+static void test_storing_a_patch_sends_nothing(void) {
+    printf("storing a patch that contains a note sends nothing\n");
+    restart();
+    wire("i1iG2,1");
+    clear_log();
+    wire("K1024ui1n60l1");
+    CHECK(midi_writes == 0, "MIDI: nothing sent while storing (%d)", midi_writes);
+    wire("i1n62l1");
+    CHECK(midi_writes == 1 && midi_log[0][0] == 0x90 && midi_log[0][1] == 62,
+          "MIDI: a played note still goes out (%d sent)", midi_writes);
+
+    restart();
+    wire("i1iG1,0,1");
+    clear_log();
+    wire("K1025ui1n60l1");
+    CHECK(cv_writes == 0, "CV: no voltage written while storing (%d writes)", cv_writes);
+    // Had the stored note been pushed onto the held stack, this note-on
+    // would be legato over it and raise no gate edge at all.
+    wire("i1n48l1");
+    CHECK(fabsf(last_on(1) - 5.0f) < 1e-4 && fabsf(last_on(0) - 2.0f) < 1e-4,
+          "CV: the next played note raises the gate at its own pitch (gate %.2f, pitch %.3f)",
+          last_on(1), last_on(0));
+    clear_log();
+    wire("K1026ui1l0");   // a stored ALL NOTES OFF
+    CHECK(writes_on(1) == 0, "CV: a stored panic leaves the held gate alone (%d gate writes)", writes_on(1));
+    wire("i1l0");         // the real one
+    CHECK(fabsf(last_on(1)) < 1e-4, "CV: a played panic still drops it (%.2f)", last_on(1));
+}
+
 int main(void) {
     test_cv_gate_voltages();
     test_loopback_identity();
@@ -313,6 +347,7 @@ int main(void) {
     test_echo_not_diversion();
     test_lost_note_off_is_recoverable();
     test_repeated_note_on_retriggers();
+    test_storing_a_patch_sends_nothing();
     printf("%s: %d failure%s\n", failures ? "FAILED" : "PASSED",
            failures, failures == 1 ? "" : "s");
     return failures ? 1 : 0;

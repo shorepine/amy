@@ -194,7 +194,15 @@ void note_output_all_off(uint8_t synth) {
 
 // Called from patches_event_has_voices. Returns true if this event was a
 // note for a note-output synth and has been dealt with.
-bool note_output_handle_event(amy_event *e) {
+//
+// `live` is false when the event is being STORED -- parsed into a patch's
+// delta list by patches_store_patch -- rather than played. A note in a
+// patch string is not a note being played, and before this a stored
+// "i1n60l1" sent a real note-on out of the port (or raised a gate) at the
+// moment the patch was saved. Such a note is still claimed, so a voiceless
+// note-output synth skips the voice path exactly as when it plays, but
+// nothing is sent and no held-note state changes.
+bool note_output_handle_event(amy_event *e, bool live) {
     if (AMY_IS_UNSET(e->synth)) return false;
     note_output_t *n = note_output_find(e->synth);
     if (n == NULL || n->mode == NOTE_OUTPUT_OFF) return false;
@@ -208,7 +216,7 @@ bool note_output_handle_event(amy_event *e) {
     // the API could clear. Panic has to reach here or it is not panic.
     if (AMY_IS_UNSET(e->midi_note) && AMY_IS_SET(e->velocity)
         && e->velocity == 0) {
-        note_output_all_off(e->synth);
+        if (live) note_output_all_off(e->synth);
         return false;   // ...and the synth's own voices still get it
     }
     // ONLY NOTE EVENTS ARE CLAIMED. Anything else addressed to this synth
@@ -216,6 +224,7 @@ bool note_output_handle_event(amy_event *e) {
     // carries on down the normal path, because swallowing it here would
     // make a note-output synth a synth you cannot change.
     if (AMY_IS_UNSET(e->midi_note)) return false;
+    if (!live) return true;
     // A note that arrived over MIDI is not sent back out over MIDI by
     // default: without this a thru-patched port is a feedback loop. The
     // wave-type implementation guarded on the same thing. A CV/gate
