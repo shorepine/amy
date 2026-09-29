@@ -1305,6 +1305,7 @@ extern void reset_osc(uint16_t i );
 #define MIDI_MAP_TYPE_ANY (-1)
 #define MIDI_MAP_TYPE_CC (0)
 #define MIDI_MAP_TYPE_NOTE (1)
+#define MIDI_MAP_TYPE_CC_OUT (2)  // midi_cc_output (iC): param changes out as CCs
 
 // Value for code (or note) that matches anything
 #define MIDI_MAP_CODE_ANY (-1)
@@ -1325,6 +1326,9 @@ extern bool amy_param_is_settable(int param);
 // Set the amy_event field for `param` to `value`, in amy.send() units; an
 // osc-scope param also sets e->osc.  False if the param isn't settable.
 extern bool amy_event_set_param(amy_event *e, int param, uint16_t osc, float value);
+// midi_cc_output: send any watched parameter change in this synth event out
+// as a MIDI CC.  Only events headed for `queue == &amy_global.delta_queue` count.
+extern void midi_cc_output_handle_event(amy_event *e, struct delta **queue);
 
 extern int midi_store_mapping(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message, size_t message_len);
 extern int midi_clear_mapping(int channel, int type, int code);
@@ -1365,6 +1369,8 @@ extern uint8_t note_output_mode_for(uint8_t synth);
 // live: the event is being played (headed for amy_global.delta_queue), not
 // stored into a patch. Only a live event sends anything.
 extern bool note_output_handle_event(amy_event *e, bool live);
+// If synth has a MIDI note output, its channel (1..16) and forward_midi_in.
+extern bool note_output_midi_channel(uint8_t synth, uint8_t *channel, bool *forward_midi_in);
 extern void note_output_config(uint8_t synth, int mode, float *args, int num_args);
 extern void note_output_all_off(uint8_t synth);
 extern void note_output_all_gates_off(void);

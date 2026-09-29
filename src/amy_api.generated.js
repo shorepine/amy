@@ -76,6 +76,7 @@ var AMY_KW_MAP = {
   midi_note_cmd: {wire: "io", type: "L"},
   cv_trigger: {wire: "ig", type: "L"},
   note_output: {wire: "iG", type: "L"},
+  midi_cc_output: {wire: "iC", type: "L"},
   patch_string: {wire: "u", type: "S"}
 };
 
@@ -152,7 +153,8 @@ var AMY_KW_PRIORITY = {
   midi_note_cmd: 69,
   cv_trigger: 70,
   note_output: 71,
-  patch_string: 72
+  midi_cc_output: 72,
+  patch_string: 73
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];

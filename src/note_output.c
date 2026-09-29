@@ -96,6 +96,17 @@ static void midi_note_output(note_output_t *n, uint8_t note, uint8_t velocity) {
     midi_out(bytes, 3);
 }
 
+// midi_cc_output sends a synth's parameter changes on the same channel as
+// its notes, and follows the same forwarding rule, so a synth's MIDI output
+// is configured in one place.
+bool note_output_midi_channel(uint8_t synth, uint8_t *channel, bool *forward_midi_in) {
+    note_output_t *n = note_output_find(synth);
+    if (n == NULL || n->mode != NOTE_OUTPUT_MIDI_OUT) return false;
+    *channel = n->midi_channel;
+    *forward_midi_in = n->forward_midi_in != 0;
+    return true;
+}
+
 // ---------------------------------------------------------------- notes
 
 static void cv_pitch_for(note_output_t *n, uint8_t note) {
