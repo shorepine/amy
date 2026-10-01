@@ -95,13 +95,13 @@ void amy_profiles_print() {}
 // Two locks, always taken in this order when both are needed:
 //
 //   render lock  held by the render thread for a whole block (flush, render,
-//                mix), and by an ingest thread across a patch load (its flush
-//                plus patches_load_patch's bookkeeping). So a load's frees and
-//                resets can't run while a render is reading oscs, and a queued
-//                reset can't wipe the synth tables halfway through a load.
-//                Recursive for its owner: a patch string can load a patch
-//                (drum kits open with `if3iv1in38Z`), and a render-thread hook
-//                or sequenced message can send one mid-block.
+//                mix), and by an ingest thread for the flush it runs before a
+//                patch load. So a load's frees and resets can't run while a
+//                render is reading oscs. Only the flush, not the load: a load
+//                takes tens of ms on an ESP32-S3, far longer than a block.
+//                Recursive for its owner: a render-thread hook or sequenced
+//                message can load a patch mid-block, and the render thread's
+//                own amy_execute_deltas() takes it inside the block's hold.
 //   queue lock   guards the delta queue itself (add_delta_to_queue, the
 //                flush), held briefly. Ordinary events take only this one, so
 //                a note-on never waits for a render.
@@ -885,16 +885,15 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
             // service - this can execute on any sending thread (see
             // flush_due_deltas). A queued reset has to land before the load
             // rebuilds the synth tables, or it wipes them afterwards.
-            // Under the render lock, from the flush to the end of the load:
-            // the flush can free oscs (a released voice, a reset) that a
-            // render in progress is reading, and the load's bookkeeping
-            // (osc_to_voice, instruments, the clone-on-grow snapshot of
-            // synth[]) must not interleave with a reset the render thread's
-            // own flush runs.
+            // The flush runs under the render lock: it can free oscs (a
+            // released voice, a reset) that a render in progress is reading.
+            // The load itself does not: it takes tens of ms on an ESP32-S3
+            // (a 6-voice DX7 load ~50-70 ms), and a render held off that long
+            // runs the DMA ring dry. The flush is µs.
             amy_grab_render_lock();
             flush_due_deltas();
-            patches_load_patch(e);
             amy_release_render_lock();
+            patches_load_patch(e);
         }
         // Execute any other commands in this event.
         patches_event_has_voices(e, queue);
@@ -2468,16 +2467,16 @@ static void flush_due_deltas() {
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
-    // Under the render lock, so a patch load on another thread can't be
-    // halfway through its bookkeeping while this flush runs a reset. Render
-    // loops already hold it across the whole block (it's recursive for them);
-    // this covers callers that execute deltas on their own.
-    amy_grab_render_lock();
     // Advance the sequencer on AMY (sample) time and play any due sequence
     // events, so sequencing works in any rendering context, real-time or not.
     sequencer_check_and_fill();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
+    // The flush can free oscs, so it runs under the render lock. Render loops
+    // already hold it across the whole block (it's recursive for them); this
+    // covers callers that execute deltas off the render thread (parse.c's
+    // sample-transfer start).
+    amy_grab_render_lock();
     flush_due_deltas();
     amy_release_render_lock();
     AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
