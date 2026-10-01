@@ -250,9 +250,14 @@ void *amy_get_external_hook_context(void) {
 }
 
 output_sample_type * amy_simple_fill_buffer() {
+    // One block under the render lock: no patch load's frees or resets can
+    // run between this block's flush and the end of its mix.
+    amy_grab_render_lock();
     amy_execute_deltas();
     amy_render(0, AMY_OSCS, 0);
-    return amy_fill_buffer();
+    output_sample_type *block = amy_fill_buffer();
+    amy_release_render_lock();
+    return block;
 }
 
 

@@ -367,6 +367,11 @@ void esp_fill_audio_buffer_task() {
 #ifdef ARDUINO_SPEEDTEST
         int64_t _rl_start_t = esp_timer_get_time();
 #endif // ARDUINO_SPEEDTEST
+        // The whole block, flush to mix, under the render lock (released
+        // before the i2s write, so a patch load gets in while we wait on the
+        // DMA). esp_render_task renders its half on the other core inside
+        // this hold without taking the lock itself.
+        amy_grab_render_lock();
         // Get ready to render
         amy_execute_deltas();
 
@@ -375,6 +380,7 @@ void esp_fill_audio_buffer_task() {
 
         // Write to i2s
         output_sample_type *block = amy_fill_buffer();
+        amy_release_render_lock();
         uint32_t busy_us = (uint32_t)(amy_get_us() - t);
 	AMY_PROFILE_STOP(AMY_ESP_FILL_BUFFER)
 
@@ -503,10 +509,13 @@ int16_t *amy_render_audio() {
             xTaskNotifyGive(amy_fill_buffer_handle);  // to esp_fill_audio_buffer_task:!AMY_HAS_I2S
         }
     } else {
-        // No multithread, we have to render here.
+        // No multithread, we have to render here. (amy_update_tasks()
+        // already flushed, under the render lock.)
         int64_t t0 = amy_get_us();
+        amy_grab_render_lock();
         esp_render_on_cores();
         buf = amy_fill_buffer();
+        amy_release_render_lock();
         amy_overload_check((uint32_t)(amy_get_us() - t0));
     }
     return buf;

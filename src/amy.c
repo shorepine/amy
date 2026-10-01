@@ -92,69 +92,101 @@ void amy_profiles_print() {}
 #include "clipping_lookup_table.h"
 
 
-// Set up the mutex for accessing the queue during rendering (for multicore)
+// Two locks, always taken in this order when both are needed:
+//
+//   render lock  held by the render thread for a whole block (flush, render,
+//                mix), and by an ingest thread for the flush it runs before a
+//                patch load. So a load's frees and resets can't run while a
+//                render is reading oscs. Only the flush, not the load: a load
+//                takes tens of ms on an ESP32-S3, far longer than a block.
+//                Recursive for its owner: a render-thread hook or sequenced
+//                message can load a patch mid-block, and the render thread's
+//                own amy_execute_deltas() takes it inside the block's hold.
+//   queue lock   guards the delta queue itself (add_delta_to_queue, the
+//                flush), held briefly. Ordinary events take only this one, so
+//                a note-on never waits for a render.
+//
+// Each platform supplies a plain lock; the recursion is built on top, below,
+// from a per-thread depth count.
+
+#if defined(_MSC_VER)
+#define AMY_TLS __declspec(thread)
+#else
+#define AMY_TLS _Thread_local
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/threading.h>
 #include <emscripten/wasm_worker.h>
-emscripten_lock_t amy_queue_lock = EMSCRIPTEN_LOCK_T_STATIC_INITIALIZER;
-void amy_grab_lock() {
-    emscripten_lock_busyspin_wait_acquire(&amy_queue_lock, 100);
-}
-void amy_release_lock() {
-    emscripten_lock_release(&amy_queue_lock);
-}
-void amy_init_lock() {
-}
+typedef emscripten_lock_t amy_lock_t;
+static void lock_init(amy_lock_t *l) { emscripten_lock_init(l); }
+static void lock_take(amy_lock_t *l) { emscripten_lock_busyspin_wait_acquire(l, 100); }
+static void lock_give(amy_lock_t *l) { emscripten_lock_release(l); }
+#define AMY_THREAD_LOCAL AMY_TLS
 
 #elif defined _WIN32
-CRITICAL_SECTION amy_queue_lock;
-void amy_grab_lock() {
-    EnterCriticalSection(&amy_queue_lock);
-}
-void amy_release_lock() {
-    LeaveCriticalSection(&amy_queue_lock);
-}
-void amy_init_lock() {
-    InitializeCriticalSection(&amy_queue_lock);
-}
-#elif defined _POSIX_THREADS
-pthread_mutex_t amy_queue_lock;
-void amy_grab_lock() {
-    pthread_mutex_lock(&amy_queue_lock);
-}
-void amy_release_lock() {
-    pthread_mutex_unlock(&amy_queue_lock);
-}
-void amy_init_lock() {
-    pthread_mutex_init(&amy_queue_lock, NULL);
-}
-#elif defined ESP_PLATFORM
+typedef CRITICAL_SECTION amy_lock_t;
+static void lock_init(amy_lock_t *l) { InitializeCriticalSection(l); }
+static void lock_take(amy_lock_t *l) { EnterCriticalSection(l); }
+static void lock_give(amy_lock_t *l) { LeaveCriticalSection(l); }
+#define AMY_THREAD_LOCAL AMY_TLS
 
+#elif defined _POSIX_THREADS
+typedef pthread_mutex_t amy_lock_t;
+static void lock_init(amy_lock_t *l) { pthread_mutex_init(l, NULL); }
+static void lock_take(amy_lock_t *l) { pthread_mutex_lock(l); }
+static void lock_give(amy_lock_t *l) { pthread_mutex_unlock(l); }
+#define AMY_THREAD_LOCAL AMY_TLS
+
+#elif defined ESP_PLATFORM
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-SemaphoreHandle_t amy_queue_lock;
+// A FreeRTOS mutex, so a low-priority task holding it is boosted while the
+// render task waits on it.
+typedef SemaphoreHandle_t amy_lock_t;
+static void lock_init(amy_lock_t *l) { *l = xSemaphoreCreateMutex(); }
+static void lock_take(amy_lock_t *l) { xSemaphoreTake(*l, portMAX_DELAY); }
+static void lock_give(amy_lock_t *l) { xSemaphoreGive(*l); }
+#define AMY_THREAD_LOCAL AMY_TLS
 
-void amy_grab_lock() {
-    xSemaphoreTake(amy_queue_lock, portMAX_DELAY);
-}
-void amy_release_lock() {
-    xSemaphoreGive( amy_queue_lock );
-}
-void amy_init_lock() {
-    amy_queue_lock = xSemaphoreCreateMutex();
-}
 #else
+// Single-threaded (or not yet locked) platforms.
+typedef int amy_lock_t;
+static void lock_init(amy_lock_t *l) { (void)l; }
+static void lock_take(amy_lock_t *l) { (void)l; }
+static void lock_give(amy_lock_t *l) { (void)l; }
+// No threads to tell apart, and no promise of thread-local storage.
+#define AMY_THREAD_LOCAL
+#endif
+
+amy_lock_t amy_queue_lock;   // extern in amy.h on Windows and POSIX
+static amy_lock_t amy_render_lock;
+// How deep this thread is in the render lock. Thread-local, so each thread
+// sees only its own nesting and nothing is shared: > 0 means this thread
+// holds the lock.
+static AMY_THREAD_LOCAL int render_lock_depth = 0;
 
 void amy_grab_lock() {
+    lock_take(&amy_queue_lock);
 }
 void amy_release_lock() {
-}
-void amy_init_lock() {
+    lock_give(&amy_queue_lock);
 }
 
-#endif
+void amy_grab_render_lock() {
+    if (render_lock_depth++ > 0)  return;   // already ours
+    lock_take(&amy_render_lock);
+}
+void amy_release_render_lock() {
+    if (--render_lock_depth == 0)
+        lock_give(&amy_render_lock);
+}
+
+void amy_init_lock() {
+    lock_init(&amy_queue_lock);
+    lock_init(&amy_render_lock);
+}
 
 
 
@@ -851,8 +883,16 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
         if (AMY_IS_SET(e->patch_number) || AMY_IS_SET(e->num_voices) || AMY_IS_SET(e->oscs_per_voice)) {
             // Settle pending deltas without running the sequencer tick
             // service - this can execute on any sending thread (see
-            // flush_due_deltas).
+            // flush_due_deltas). A queued reset has to land before the load
+            // rebuilds the synth tables, or it wipes them afterwards.
+            // The flush runs under the render lock: it can free oscs (a
+            // released voice, a reset) that a render in progress is reading.
+            // The load itself does not: it takes tens of ms on an ESP32-S3
+            // (a 6-voice DX7 load ~50-70 ms), and a render held off that long
+            // runs the DMA ring dry. The flush is µs.
+            amy_grab_render_lock();
             flush_due_deltas();
+            amy_release_render_lock();
             patches_load_patch(e);
         }
         // Execute any other commands in this event.
@@ -2413,7 +2453,13 @@ void amy_execute_deltas() {
     sequencer_check_and_fill();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
+    // The flush can free oscs, so it runs under the render lock. Render loops
+    // already hold it across the whole block (it's recursive for them); this
+    // covers callers that execute deltas off the render thread (parse.c's
+    // sample-transfer start).
+    amy_grab_render_lock();
     flush_due_deltas();
+    amy_release_render_lock();
     AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
 
 }
