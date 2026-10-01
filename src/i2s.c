@@ -353,6 +353,16 @@ static int64_t _rl_last_print = 0;
 static int32_t _rl_render_us = 0;
 #endif // ARDUINO_SPEEDTEST
 
+#ifdef AMY_LOCK_TIMING
+// Per print window (500 ms): the longest the fill task waited for the render
+// lock, how many blocks waited at all (> 100 us), the longest block
+// (lock wait + flush + render + mix), and the shortest time the i2s write
+// blocked. That last one is the slack: ~0 means the DMA ring had run dry.
+static uint32_t _lt_wait_max = 0, _lt_waited_blocks = 0, _lt_busy_max = 0;
+static uint32_t _lt_i2s_block_min = UINT32_MAX, _lt_blocks = 0;
+static int64_t _lt_last_print = 0;
+#endif
+
 void esp_fill_audio_buffer_task() {
     while(1) {
         int64_t t;
@@ -371,7 +381,15 @@ void esp_fill_audio_buffer_task() {
         // before the i2s write, so a patch load gets in while we wait on the
         // DMA). esp_render_task renders its half on the other core inside
         // this hold without taking the lock itself.
+#ifdef AMY_LOCK_TIMING
+        int64_t _lt_w0 = amy_get_us();
+#endif
         amy_grab_render_lock();
+#ifdef AMY_LOCK_TIMING
+        uint32_t _lt_wait = (uint32_t)(amy_get_us() - _lt_w0);
+        if (_lt_wait > _lt_wait_max)  _lt_wait_max = _lt_wait;
+        if (_lt_wait > 100)  ++_lt_waited_blocks;
+#endif
         // Get ready to render
         amy_execute_deltas();
 
@@ -410,6 +428,24 @@ void esp_fill_audio_buffer_task() {
             // Wait for update sync.
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // from amy_render_audio:!AMY_HAS_I2S
         }
+#ifdef AMY_LOCK_TIMING
+        {
+            uint32_t _lt_i2s = (uint32_t)(amy_get_us() - t);
+            if (_lt_i2s < _lt_i2s_block_min)  _lt_i2s_block_min = _lt_i2s;
+            if (busy_us > _lt_busy_max)  _lt_busy_max = busy_us;
+            ++_lt_blocks;
+            int64_t _lt_now = amy_get_us();
+            if (_lt_now - _lt_last_print > 500000) {
+                _lt_last_print = _lt_now;
+                fprintf(stderr, "RENDERWAIT ms=%lu blocks=%u block_us=%u wait_max_us=%u waited_blocks=%u busy_max_us=%u i2s_block_min_us=%u\n",
+                        (unsigned long)(_lt_now / 1000), (unsigned)_lt_blocks, (unsigned)AMY_BLOCK_US,
+                        (unsigned)_lt_wait_max, (unsigned)_lt_waited_blocks,
+                        (unsigned)_lt_busy_max, (unsigned)_lt_i2s_block_min);
+                _lt_wait_max = _lt_waited_blocks = _lt_busy_max = _lt_blocks = 0;
+                _lt_i2s_block_min = UINT32_MAX;
+            }
+        }
+#endif
         blocked_us += (uint32_t)(amy_get_us() - t);
 
         // When rendering keeps up, this task spends most of each block parked in the

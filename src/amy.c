@@ -891,10 +891,32 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
             // (osc_to_voice, instruments, the clone-on-grow snapshot of
             // synth[]) must not interleave with a reset the render thread's
             // own flush runs.
+#ifdef AMY_LOCK_TIMING
+            int64_t _lt0 = amy_get_us();
+#endif
             amy_grab_render_lock();
+#ifdef AMY_LOCK_TIMING
+            int64_t _lt1 = amy_get_us();
+#endif
             flush_due_deltas();
+#ifdef AMY_LOCK_TIMING
+            int64_t _lt2 = amy_get_us();
+            // Snapshot the request before the load consumes/rewrites it.
+            int _lt_patch = AMY_IS_SET(e->patch_number) ? (int)e->patch_number : -1;
+            int _lt_voices = AMY_IS_SET(e->num_voices) ? (int)e->num_voices : -1;
+            int _lt_opv = AMY_IS_SET(e->oscs_per_voice) ? (int)e->oscs_per_voice : -1;
+#endif
             patches_load_patch(e);
             amy_release_render_lock();
+#ifdef AMY_LOCK_TIMING
+            int64_t _lt3 = amy_get_us();
+            // wait: blocked on the render lock (a render in progress).
+            // flush: the part main also does at block start. hold: what a
+            // render waiting on this load now waits for.
+            fprintf(stderr, "LOADLOCK patch=%d voices=%d opv=%d wait_us=%d flush_us=%d load_us=%d hold_us=%d\n",
+                    _lt_patch, _lt_voices, _lt_opv,
+                    (int)(_lt1 - _lt0), (int)(_lt2 - _lt1), (int)(_lt3 - _lt2), (int)(_lt3 - _lt1));
+#endif
         }
         // Execute any other commands in this event.
         patches_event_has_voices(e, queue);
