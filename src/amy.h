@@ -816,6 +816,7 @@ struct synthinfo {
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // alloc'd length of breakpoint_times/vals
     uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) dynamically sized.
     float *breakpoint_values[MAX_BREAKPOINT_SETS];  // dynamically sized.
+    SAMPLE *ks_ring;  // Karplus-Strong delay line, alloc'd at the first KS note-on. not in event.
     // Per-note state (set on initialization, does not change during note)
     uint8_t terminate_on_silence;  // Usually yes, not for PCM. not in event.
     const LUT *lut;       // Selected lookup table and size.
@@ -1386,8 +1387,6 @@ extern void set_cv_from_osc(int cv_channel, int osc);
 
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
-extern void ks_init();
-extern void ks_deinit();
 extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
