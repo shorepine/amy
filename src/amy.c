@@ -1201,6 +1201,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
         synth[osc]->breakpoint_values[i] = (float *)breakpoint_area;
         breakpoint_area += sizeof(float) * max_num_breakpoints[i];
     }
+    synth[osc]->ks_ring = NULL;
     reset_osc(osc);
     //fprintf(stderr, "alloc_osc %d (0x%lx) num_breakpoints %d,%d\n", osc, (long)synth[osc], synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
 }
@@ -1208,6 +1209,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
 void free_osc(int osc) {
     if (synth[osc] != NULL) {
         //fprintf(stderr, "free_osc %d (0x%lx)\n", osc, (long)synth[osc]);
+        free(synth[osc]->ks_ring);
         free(synth[osc]);
     }
     synth[osc] = NULL;
@@ -1293,8 +1295,6 @@ int8_t oscs_init() {
     amy_global.total_blocks = 0;
     amy_global.total_samples = 0;
     amy_global.time = 0;
-    if(amy_global.config.ks_oscs>0)
-        ks_init();
     algo_init();
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
@@ -1475,8 +1475,6 @@ void oscs_deinit() {
     instruments_deinit();
     patches_deinit();
     algo_deinit();
-    if(amy_global.config.ks_oscs > 0)
-        ks_deinit();
 }
 
 void osc_note_on(uint16_t osc, float initial_freq) {

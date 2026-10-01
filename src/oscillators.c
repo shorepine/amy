@@ -816,8 +816,6 @@ void partial_note_off(uint16_t osc) {
 
 #define KS_LOWEST_FREQ 55  // A1, the lowest note KS plays
 #define MAX_KS_BUFFER_LEN (AMY_SAMPLE_RATE / KS_LOWEST_FREQ + 1)  // 802 at 44.1 kHz
-SAMPLE ** ks_buffer;
-uint8_t ks_polyphony_index;
 
 
 /* karplus-strong */
@@ -827,17 +825,18 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc]->amp);
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     SAMPLE max_value = 0;
+    SAMPLE *ring = synth[osc]->ks_ring;
     // Outside this range the ring would need more than MAX_KS_BUFFER_LEN
     // samples, or less than one.
-    if(freq >= KS_LOWEST_FREQ && freq < AMY_SAMPLE_RATE) {
+    if(freq >= KS_LOWEST_FREQ && freq < AMY_SAMPLE_RATE && ring != NULL) {
         uint16_t buflen = (uint16_t)(AMY_SAMPLE_RATE / freq);
         if(buflen > MAX_KS_BUFFER_LEN) buflen = MAX_KS_BUFFER_LEN;
         for(uint16_t i = 0; i < AMY_BLOCK_SIZE; i++) {
             uint16_t index = (uint16_t)synth[osc]->phase;
-            SAMPLE sample = ks_buffer[ks_polyphony_index][index];
-            ks_buffer[ks_polyphony_index][index] =                 
+            SAMPLE sample = ring[index];
+            ring[index] =
                 SMULR7(
-                    (ks_buffer[ks_polyphony_index][index] + ks_buffer[ks_polyphony_index][(index + 1) % buflen]),
+                    (ring[index] + ring[(index + 1) % buflen]),
                     half);
             synth[osc]->phase = (PHASOR)((index + 1) % buflen);
             SAMPLE value = SMULR7(sample, amp);
@@ -862,34 +861,34 @@ void ks_note_on(uint16_t osc, float freq) {
     // the osc had: after another wave it is that wave's phasor, far past the
     // ring.
     synth[osc]->phase = 0;
+    // The ring belongs to the osc: allocated at its first KS note-on, freed
+    // by free_osc().
+    SAMPLE *ring = synth[osc]->ks_ring;
+    if(ring == NULL) {
+        ring = (SAMPLE*)malloc_caps(sizeof(SAMPLE)*MAX_KS_BUFFER_LEN, amy_global.config.ram_caps_oscs);
+        if(ring == NULL) {
+            // The osc stays silent: render_ks skips an osc with no ring.
+            amy_oom("ks_note_on: out of memory allocating the ring for osc %d\n", osc);
+            return;
+        }
+        // Zeroed: a pitch drop after the note-on lengthens the loop past
+        // what the burst filled.
+        memset(ring, 0, sizeof(SAMPLE)*MAX_KS_BUFFER_LEN);
+        synth[osc]->ks_ring = ring;
+    }
     // init KS buffer with noise up to max
     SAMPLE sum = 0;
     for(uint16_t i = 0; i < buflen; i++) {
         SAMPLE val = amy_get_random();
-        ks_buffer[ks_polyphony_index][i] = val;
+        ring[i] = val;
         sum += val;
     }
     // Remove dc, to avoid ending up with a dc-offset residual.
     SAMPLE mean = sum / buflen;
     for(uint16_t i = 0; i < buflen; i++) {
-        ks_buffer[ks_polyphony_index][i] -= mean;
+        ring[i] -= mean;
     }
-    ks_polyphony_index++;
-    if(ks_polyphony_index == AMY_KS_OSCS) ks_polyphony_index = 0;
-    //fprintf(stderr, "ks_note_on: osc %d buflen %d poly_index %d\n", osc, buflen, ks_polyphony_index);
-}
-
-
-void ks_init(void) {
-    // 6ms buffer
-    ks_polyphony_index = 0;
-    ks_buffer = (SAMPLE**) malloc(sizeof(SAMPLE*)*AMY_KS_OSCS);
-    for(int i=0;i<AMY_KS_OSCS;i++) ks_buffer[i] = (SAMPLE*)malloc(sizeof(float)*MAX_KS_BUFFER_LEN); 
-}
-
-void ks_deinit(void) {
-    for(int i=0;i<AMY_KS_OSCS;i++) free(ks_buffer[i]);
-    free(ks_buffer);
+    //fprintf(stderr, "ks_note_on: osc %d buflen %d\n", osc, buflen);
 }
 
 // --------- wavetable ----------
