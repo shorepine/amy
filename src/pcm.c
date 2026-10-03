@@ -498,7 +498,10 @@ static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *
     // Per-sample read step within a grain: the pitch, recomputed per block so
     // envelopes/LFOs on freq keep working.
     uint32_t pitch_step_q16 = (uint32_t)((playback_freq / (float)AMY_SAMPLE_RATE) * 65536.0f);
-    SAMPLE amp = F2S(msynth[osc]->amp);
+    // Ramp the gain across the block, as render_pcm does.
+    SAMPLE amp = F2S(msynth[osc]->last_amp);
+    SAMPLE amp_step = SHIFTR(F2S(msynth[osc]->amp) - amp, BLOCK_SIZE_BITS);
+    msynth[osc]->last_amp = msynth[osc]->amp;
     const LUTSAMPLE *table = preset->sample_ram;
     uint32_t length = preset->length;
     // Re-read each block, so 'pS' can be swept while the note is sounding.
@@ -512,6 +515,7 @@ static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *
         i = msynth[osc]->pcm_delay;
         msynth[osc]->pcm_delay = 0;
     }
+    amp += amp_step * i;
     for (; i < AMY_BLOCK_SIZE; i++) {
         if (st->hop_counter == 0)
             pcm_stretch_spawn(st, preset, synth[osc]->wave, looping, loopstart, loopend, search);
@@ -542,6 +546,7 @@ static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *
             break;
         }
         SAMPLE value = buf[i] + MUL4_SS(amp, out);
+        amp += amp_step;
         buf[i] = value;
         if (value < 0) value = -value;
         if (value > max_value) max_value = value;
@@ -716,7 +721,11 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             return 0;
         }
 
-        SAMPLE amp = F2S(msynth[osc]->amp);
+        // msynth amp is the envelope at the end of this block, last_amp where the previous block ended;
+        // ramp between them across the block, as render_lut does, so an envelope change is a slope
+        // rather than a once-per-block step in the gain.
+        SAMPLE amp = F2S(msynth[osc]->last_amp);
+        SAMPLE amp_step = SHIFTR(F2S(msynth[osc]->amp) - amp, BLOCK_SIZE_BITS);
         PHASOR step = F2P((playback_freq / (float)AMY_SAMPLE_RATE) / (float)(1 << (PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS)));
         const LUTSAMPLE* table = preset->sample_ram;
         uint32_t base_index_base = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
@@ -729,6 +738,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             start_i = msynth[osc]->pcm_delay;
             msynth[osc]->pcm_delay = 0;
         }
+        amp += amp_step * start_i;
         for(uint16_t i=start_i; i < AMY_BLOCK_SIZE; i++) {
             SAMPLE frac = S_FRAC_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS);
             LUTSAMPLE b = 0;
@@ -785,12 +795,14 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             }
             SAMPLE sample = L2S(b) + MUL4_SS(L2S(c - b), frac);
             SAMPLE value = buf[i] + MUL4_SS(amp, sample);
+            amp += amp_step;
             buf[i] = value;   
             if (value < 0) value = -value;
             if (value > max_value) max_value = value;  
             phase = P_WRAPPED_SUM(phase, step);
             base_index = base_index_base + INT_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS);
         }
+        msynth[osc]->last_amp = msynth[osc]->amp;
         //synth[osc]->phase = phase;
         synth[osc]->phase = I2P(base_index, PCM_INDEX_BITS) + (S_FRAC_OF_P(phase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS) >> (S_FRAC_BITS - (PCM_INDEX_FRAC_BITS)) ); //  + PCM_INDEX_STEP_EXTRA_BITS
         //fprintf(stderr, "\rtime %.3f osc %d render_pcm7: preset %d len %d base_ix 0x%lx phase 0x%lx sfracofp 0x%lx step 0x%lx synthphase 0x%lx amp %.3f\n",
