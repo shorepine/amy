@@ -588,7 +588,11 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         if(sm[1]==0) { // remove preset
             pcm_unload_preset(sm[0]);
         } else {
-            amy_execute_deltas();
+            // A queued reset must land before the load, or amy_reset_oscs()
+            // unloads the new sample when it plays (pcm_unload_all_presets).
+            // Only the flush: this runs on the sending thread, and advancing
+            // the sequencer here would race the render thread's own tick.
+            amy_settle_deltas();
             int16_t * ram = pcm_load(sm[0], sm[1], sm[2], 1, midinote, sm[4], sm[5]);
             start_receiving_transfer(sm[1]*2, (uint8_t*)ram);
         }
