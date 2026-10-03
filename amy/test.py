@@ -201,6 +201,50 @@ class TestPcmShift(AmyTest):
     amy_send_at(time=500, note=70, vel=1)
 
 
+class TestPcmEnvelopeRamp(AmyTest):
+  """A PCM osc's gain follows its envelope within a block, and keeps playing while silent.
+
+  render_pcm used to apply one gain (the envelope at the end of the block) to the
+  whole block, so an envelope fade was a staircase of steps at block boundaries."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    t = np.arange(int(0.6 * sr)) / sr
+    # A smooth, loud, low-frequency waveform, where a gain step is audible.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+
+    def play(bp0, eg0_type=amy.ENVELOPE_NORMAL, **note_args):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=60)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, eg0_type=eg0_type, bp0=bp0)
+      amy.send(osc=0, note=60, vel=1, **note_args)
+      return amy.render(0.4)[:, 0]
+
+    fade = slice(int(0.045 * sr), int(0.085 * sr))
+    results = []
+    # fit= renders through the time-stretch engine, which applies the gain separately.
+    for name, eg0_type, note_args in (('normal', amy.ENVELOPE_NORMAL, {}), ('linear', amy.ENVELOPE_LINEAR, {}),
+                                      ('exp', amy.ENVELOPE_TRUE_EXPONENTIAL, {}),
+                                      ('fit', amy.ENVELOPE_NORMAL, {'fit': 48})):
+      held = play('0,1,1000,1,0,0', eg0_type, **note_args)
+      # Hold for 50 ms (mid-block), then fade out over 30 ms.
+      gated = play('0,1,50,1,30,0,0,0', eg0_type, **note_args)
+      # The fade must not move the waveform faster than the waveform itself does.
+      results.append((name, np.max(np.abs(np.diff(gated[fade]))) / np.max(np.abs(np.diff(held[fade])))))
+    smooth = all(ratio < 1.2 for _, ratio in results)
+    # Fade out, stay silent, then come back: the sample must have kept playing
+    # in the meantime, so it resumes exactly where the held note is.
+    held = play('0,1,1000,1,0,0')
+    dip = play('0,1,50,1,30,0,120,0,10,1,1000,1,0,0')
+    after = slice(int(0.25 * sr), int(0.3 * sr))
+    kept_playing = np.array_equal(dip[after], held[after])
+    message = self.__class__.__name__ + ': ' + ', '.join(
+        '%s max jump/held %.2f' % result for result in results) + ', kept playing while silent=%s' % kept_playing
+    return smooth and kept_playing, message
+
+
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
 

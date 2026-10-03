@@ -2263,7 +2263,9 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         if (synth[osc]->amp_coefs[COEF_CONST] != 0) {
                     // fill buf with next block_size of samples for specified osc.
             hold_and_modify(osc); // apply bp / mod
-            if(!(msynth[osc]->amp == 0 && msynth[osc]->last_amp == 0)) {
+            // A PCM osc renders even at zero amplitude: its read position is time,
+            // so it must keep moving (and reach the end of the sample) while silent.
+            if(!(msynth[osc]->amp == 0 && msynth[osc]->last_amp == 0) || AMY_WAVE_IS_PCM(synth[osc]->wave)) {
                 if(synth[osc]->wave == NOISE) max_val = render_noise(buf, osc);
                 if(synth[osc]->wave == SAW_DOWN) max_val = render_saw_down(buf, osc);
                 if(synth[osc]->wave == SAW_UP) max_val = render_saw_up(buf, osc);
