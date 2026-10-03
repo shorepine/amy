@@ -1073,6 +1073,7 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
         pmsynth->dist_mix = 1.0f;
         pmsynth->state = 0;
         pmsynth->pcm_delay = 0;
+        pmsynth->pcm_retrigger_amp = 0;
     }
 }
 
@@ -2191,6 +2192,32 @@ void hold_and_modify(uint16_t osc) {
 
     AMY_PROFILE_STOP(HOLD_AND_MODIFY)
 
+}
+
+// A mod source's value for this block, without advancing it: hold_and_modify(osc) already did, and
+// compute_mod_value memoizes it per block.
+static float mod_value_this_block(uint16_t osc, uint16_t which_source) {
+    uint16_t source = synth[osc]->mod_source[which_source];
+    if (AMY_IS_SET(source) && source != osc && synth[source] != NULL)
+        return S2F(compute_mod_value(source));
+    return 0;
+}
+
+// The amplitude hold_and_modify would compute for this osc, sample_offset samples into the current block.
+// Used where a note's envelope clock starts inside a block (a deferred PCM restart).
+float compute_amp(uint16_t osc, uint16_t sample_offset) {
+    float ctrl_inputs[NUM_COMBO_COEFS];
+    ctrl_inputs[COEF_CONST] = 1.0f;
+    ctrl_inputs[COEF_NOTE] = (AMY_IS_SET(synth[osc]->midi_note)) ? logfreq_for_midi_note(synth[osc]->midi_note) : 0;
+    ctrl_inputs[COEF_VEL] = synth[osc]->velocity;
+    ctrl_inputs[COEF_EG0] = S2F(compute_breakpoint_scale(osc, 0, sample_offset));
+    ctrl_inputs[COEF_EG1] = S2F(compute_breakpoint_scale(osc, 1, sample_offset));
+    ctrl_inputs[COEF_MOD0] = mod_value_this_block(osc, 0);
+    ctrl_inputs[COEF_MOD1] = mod_value_this_block(osc, 1);
+    ctrl_inputs[COEF_BEND] = amy_global.pitch_bend;
+    ctrl_inputs[COEF_EXT0] = cv_inputs[0];
+    ctrl_inputs[COEF_EXT1] = cv_inputs[1];
+    return amp_combine_controls(ctrl_inputs, synth[osc]->amp_coefs);
 }
 
 static inline float lgain_of_pan(float pan) {
