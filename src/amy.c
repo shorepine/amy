@@ -890,9 +890,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
             // The load itself does not: it takes tens of ms on an ESP32-S3
             // (a 6-voice DX7 load ~50-70 ms), and a render held off that long
             // runs the DMA ring dry. The flush is µs.
-            amy_grab_render_lock();
-            flush_due_deltas();
-            amy_release_render_lock();
+            amy_settle_deltas();
             patches_load_patch(e);
         }
         // Execute any other commands in this event.
@@ -2445,6 +2443,17 @@ static void flush_due_deltas() {
     amy_release_lock();
 }
 
+// Play the deltas that are due, from any thread, without advancing the
+// sequencer: what ingest calls before an operation that a queued reset must
+// not land after (a patch load rebuilding the synth tables, a sample load
+// that amy_reset_oscs() would unload). Under the render lock, because the
+// flush can free oscs a render in progress is reading.
+void amy_settle_deltas() {
+    amy_grab_render_lock();
+    flush_due_deltas();
+    amy_release_render_lock();
+}
+
 // this takes scheduled deltas and plays them at the right time
 void amy_execute_deltas() {
     AMY_PROFILE_START(AMY_EXECUTE_DELTAS)
@@ -2453,13 +2462,10 @@ void amy_execute_deltas() {
     sequencer_check_and_fill();
     // Make sure any CV-triggered events are added to delta queue
     update_external_cv_in();
-    // The flush can free oscs, so it runs under the render lock. Render loops
-    // already hold it across the whole block (it's recursive for them); this
-    // covers callers that execute deltas off the render thread (parse.c's
-    // sample-transfer start).
-    amy_grab_render_lock();
-    flush_due_deltas();
-    amy_release_render_lock();
+    // Render loops already hold the render lock across the whole block (it's
+    // recursive for them); amy_settle_deltas() takes it anyway, for render
+    // loops that call this before taking it for the render itself.
+    amy_settle_deltas();
     AMY_PROFILE_STOP(AMY_EXECUTE_DELTAS)
 
 }
