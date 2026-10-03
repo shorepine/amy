@@ -816,6 +816,7 @@ struct synthinfo {
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // alloc'd length of breakpoint_times/vals
     uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) dynamically sized.
     float *breakpoint_values[MAX_BREAKPOINT_SETS];  // dynamically sized.
+    SAMPLE *ks_ring;  // Karplus-Strong delay line, alloc'd at the first KS note-on. not in event.
     // Per-note state (set on initialization, does not change during note)
     uint8_t terminate_on_silence;  // Usually yes, not for PCM. not in event.
     const LUT *lut;       // Selected lookup table and size.
@@ -830,6 +831,7 @@ struct synthinfo {
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
     SAMPLE last_two[2];    // For ALGO feedback ops
+    SAMPLE ks_tune_state;  // KS tuning allpass state, cleared at note-on.
     // For filters.  Need 2x because LPF24 uses two instances of filter.
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
@@ -1391,8 +1393,6 @@ extern void set_cv_from_osc(int cv_channel, int osc);
 
 
 extern float render_am_lut(float * buf, float step, float skip, float incoming_amp, float ending_amp, const float* lut, int16_t lut_size, float *mod, float bandwidth);
-extern void ks_init();
-extern void ks_deinit();
 extern void algo_init();
 extern void algo_deinit();
 extern void pcm_init();
@@ -1516,7 +1516,6 @@ extern void partial_note_off(uint16_t osc);
 extern void algo_note_on(uint16_t osc, float freq);
 extern void algo_note_off(uint16_t osc);
 extern void ks_note_on(uint16_t osc, float freq);
-extern void ks_note_off(uint16_t osc);
 extern void sine_mod_trigger(uint16_t osc);
 extern void saw_down_mod_trigger(uint16_t osc);
 extern void saw_up_mod_trigger(uint16_t osc);
