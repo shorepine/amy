@@ -40102,6 +40102,12 @@ static ma_result ma_device_init__webaudio(ma_device* pDevice, const ma_device_co
         ma_audio_worklet_thread_initialized_data* pInitParameters;
         void* pStackBuffer;
 
+        /*
+        Zero-initialize so fields we don't set (e.g. renderSizeHint, added in newer Emscripten) aren't stack
+        garbage. Chrome 153+ validates renderSizeHint and throws on out-of-range values. (AMY issue #1213)
+        */
+        MA_ZERO_OBJECT(&audioContextAttributes);
+
         if (pConfig->performanceProfile == ma_performance_profile_conservative) {
             audioContextAttributes.latencyHint = MA_WEBAUDIO_LATENCY_HINT_PLAYBACK;
         } else {
