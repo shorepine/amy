@@ -1239,6 +1239,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
         synth[osc]->breakpoint_values[i] = (float *)breakpoint_area;
         breakpoint_area += sizeof(float) * max_num_breakpoints[i];
     }
+    synth[osc]->ks_ring = NULL;
     reset_osc(osc);
     //fprintf(stderr, "alloc_osc %d (0x%lx) num_breakpoints %d,%d\n", osc, (long)synth[osc], synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
 }
@@ -1246,6 +1247,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
 void free_osc(int osc) {
     if (synth[osc] != NULL) {
         //fprintf(stderr, "free_osc %d (0x%lx)\n", osc, (long)synth[osc]);
+        free(synth[osc]->ks_ring);
         free(synth[osc]);
     }
     synth[osc] = NULL;
@@ -1331,8 +1333,6 @@ int8_t oscs_init() {
     amy_global.total_blocks = 0;
     amy_global.total_samples = 0;
     amy_global.time = 0;
-    if(amy_global.config.ks_oscs>0)
-        ks_init();
     algo_init();
     patches_init(amy_global.config.max_memory_patches);
     instruments_init(amy_global.config.max_synths);
@@ -1513,8 +1513,6 @@ void oscs_deinit() {
     instruments_deinit();
     patches_deinit();
     algo_deinit();
-    if(amy_global.config.ks_oscs > 0)
-        ks_deinit();
 }
 
 void osc_note_on(uint16_t osc, float initial_freq) {
@@ -2029,7 +2027,6 @@ void play_delta(struct delta *d) {
                       || synth[osc]->wave == PARTIAL)) {
                     //synth[osc]->velocity = 0;
                     switch(synth[osc]->wave) {
-                    case KS: ks_note_off(osc); break;
                     case ALGO: algo_note_off(osc); break;
                     case CUSTOM: custom_note_off(osc); break;
                     case BYO_PARTIALS:
@@ -2055,7 +2052,7 @@ void play_delta(struct delta *d) {
                     default:
                         // ** no_amp_001
                         // osc note off, start release
-                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT KS, ALGO, PARTIAL, PCM, or CUSTOM.
+                        // For now, note_off_clock signals note off BUT ONLY IF IT'S NOT ALGO, PARTIAL, PCM, or CUSTOM.
                         // I'm not crazy about this, but if we apply it in those cases, the default bp0 amp envelope immediately zeros-out
                         // those waves on note-off.
                         AMY_UNSET(synth[osc]->note_on_clock);
