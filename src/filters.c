@@ -732,7 +732,10 @@ AMY_IRAM_ATTR void parametric_eq_process(uint16_t bus, SAMPLE *block) {
             y11 = y10;
             y22 = y21;
             y21 = y20;
-            cblock[i] = y00 - y10 + y20;
+            // dsps_biquad_gen_lpf_f32() returns a negated numerator, so y00 is -LPF.
+            // LPF - BPF + HPF is the near-flat combination (the bands are ~180 deg apart
+            // mid-band); -LPF - BPF + HPF instead puts a ~26 dB notch near 1.1 kHz.
+            cblock[i] = -y00 - y10 + y20;
         }
         eq_delay[c][0][0] = x1;
         eq_delay[c][0][1] = x2;
@@ -811,7 +814,10 @@ AMY_IRAM_ATTR void parametric_eq_process(uint16_t bus, SAMPLE *block) {
             y11 = y10;
             y22 = y21;
             y21 = y20;
-            cblock[i] = y00 - y10 + y20;
+            // dsps_biquad_gen_lpf_f32() returns a negated numerator, so y00 is -LPF.
+            // LPF - BPF + HPF is the near-flat combination (the bands are ~180 deg apart
+            // mid-band); -LPF - BPF + HPF instead puts a ~26 dB notch near 1.1 kHz.
+            cblock[i] = -y00 - y10 + y20;
         }
         eq_delay[c][0][0] = x1;
         eq_delay[c][0][1] = x2;
