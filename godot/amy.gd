@@ -14,6 +14,11 @@ extends Node
 ## Or use wire protocol directly:
 ##   amy.send_raw("v0w0f440l1")
 
+## Emitted after the selected native or web backend is ready for messages.
+signal backend_ready
+## Emitted when the selected backend cannot initialize.
+signal backend_error(message: String)
+
 # ============================================================
 #  Wave types
 # ============================================================
@@ -103,7 +108,9 @@ func _init_native() -> void:
 		_synth = ClassDB.instantiate(&"AmySynth")
 		add_child(_synth)
 	else:
-		push_warning("AmySynth GDExtension not loaded — audio disabled")
+		var message := "AmySynth GDExtension not loaded — audio disabled"
+		push_warning(message)
+		backend_error.emit(message)
 		return
 
 	# Apply config before starting
@@ -132,6 +139,7 @@ func _init_native() -> void:
 	_stream_player.play()
 	_playback = _stream_player.get_stream_playback() as AudioStreamGeneratorPlayback
 	_started = true
+	backend_ready.emit()
 
 func _init_web() -> void:
 	# Pass config to JS bridge before AMY starts
@@ -144,9 +152,12 @@ func _init_web() -> void:
 		if ready:
 			_started = true
 			print("AMY web synth ready")
+			backend_ready.emit()
 			return
 		await get_tree().create_timer(0.1).timeout
-	push_warning("AMY web module failed to load after 10 s")
+	var message := "AMY web module failed to load after 10 s"
+	push_warning(message)
+	backend_error.emit(message)
 
 func _process(_delta: float) -> void:
 	if _started and not _is_web:
