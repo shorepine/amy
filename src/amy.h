@@ -863,6 +863,7 @@ struct mod_synthinfo {
     uint32_t loopstart;  // Used for PCM looping.
     uint32_t loopend;    // Used for PCM looping.
     uint16_t pcm_delay;  // Samples of silence to leave at the head of the note-on block (sample_offset).
+    float pcm_retrigger_amp;  // Gain held on the old waveform while a retrigger waits for its zero crossing.
 };
 
 
@@ -1584,6 +1585,7 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 
 // envelopes
 extern SAMPLE compute_breakpoint_scale(uint16_t osc, uint8_t bp_set, uint16_t sample_offset);
+extern float compute_amp(uint16_t osc, uint16_t sample_offset);
 extern SAMPLE compute_mod_scale(uint16_t osc, uint16_t which_source);
 extern SAMPLE compute_mod_value(uint16_t mod_osc);
 extern void retrigger_mod_source(uint16_t osc);

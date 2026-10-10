@@ -243,6 +243,84 @@ class TestPcmEnvelopeRamp(AmyTest):
     message = self.__class__.__name__ + ': ' + ', '.join(
         '%s max jump/held %.2f' % result for result in results) + ', kept playing while silent=%s' % kept_playing
     return smooth and kept_playing, message
+class TestPcmRetriggerEnvelope(AmyTest):
+  """Retriggering a sounding PCM osc: the new note's envelope must not be applied to the old tail.
+
+  The restart waits for the old waveform's next zero crossing, but the note-on restarts the
+  envelope at once.  A drum faded to silence by its own envelope then jumped back to full
+  gain mid-waveform: a click."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    block = amy.AMY_BLOCK_SIZE
+    t = np.arange(int(0.3 * sr)) / sr
+    # A smooth low-frequency tail, with a short attack starting at zero.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+    gated = '0,1,72,1,30,0,0,0'   # silent by the retrigger
+    partial = '0,1,87,1,30,0,0,0'  # partly faded at the retrigger
+    ungated = '0,1,0,1,0,1,0,0'
+    new_env = '0,1,200,1,30,0,0,0'
+
+    def start(note=36, **kwargs):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=36)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, note=note, **kwargs)
+
+    # The largest sample-to-sample step of an undisturbed note.
+    start(bp0=ungated, vel=1)
+    smooth = np.max(np.abs(np.diff(amy.render(24 * block / sr)[:, 0])))
+    results = []
+    silent_onset_ok = True
+    for label, old_env, next_env, old_vel in (
+        ('silent', gated, new_env, 1), ('partial', partial, new_env, 1),
+        ('ungated', ungated, ungated, 1), ('gated to ungated', gated, ungated, 1),
+        ('ungated to gated', ungated, new_env, 1), ('velocity change', ungated, ungated, 0.5)):
+      start(amp=1)
+      amy.send(osc=0, vel=old_vel, bp0=old_env)
+      first = amy.render(18 * block / sr)[:, 0]
+      amy.send(osc=0, vel=1, bp0=next_env)
+      second = amy.render(6 * block / sr)[:, 0]
+      # From the last sample before the retrigger on.
+      results.append((label, np.max(np.abs(np.diff(np.concatenate((first[-1:], second)))))))
+      if label == 'silent':
+        # A silent tail needs no zero-crossing wait: the retrigger sounds
+        # exactly like a fresh note.
+        silent_onset_ok = np.array_equal(second[:block], first[:block])
+    # The incoming envelope starts silent: the old tail must still play out
+    # (at its own gain) until the restart, not be cut off mid-waveform.
+    start(eg0_type=amy.ENVELOPE_LINEAR, bp0='0,0,20,1,1000,1,0,0', vel=1)
+    first = amy.render(block / sr)[:, 0]
+    amy.send(osc=0, vel=1, bp0='0,0,50,0,20,1,1000,1,0,0')
+    second = amy.render(4 * block / sr)[:, 0]
+    results.append(('silent incoming envelope', np.max(np.abs(np.diff(np.concatenate((first[-1:], second)))))))
+    tail_played = bool(np.any(second[:block]))
+    is_ok = silent_onset_ok and tail_played and all(jump <= 2 * smooth for _, jump in results)
+    message = self.__class__.__name__ + ': undisturbed maxjump=%.5f, ' % smooth + ', '.join(
+        '%s maxjump=%.5f' % result for result in results)
+    # The new envelope's clock starts at the restart, about 8 ms after the
+    # retrigger here.  A 22 ms envelope then still sounds in block 4 and is
+    # silent from block 6 on; timed from the retrigger it ends in block 3.
+    start(bp0=ungated, vel=1)
+    amy.render(18 * block / sr)
+    amy.send(osc=0, bp0='0,1,12,1,10,0,0,0', vel=1)
+    short_note = amy.render(7 * block / sr)[:, 0]
+    clock_ok = bool(np.any(short_note[4 * block:5 * block]) and not np.any(short_note[6 * block:]))
+    # A note-off can arrive before the deferred restart: here the tone plays
+    # two octaves down, so the next crossing is several blocks away.  The
+    # held tail must follow the 1 ms release, not sound on until the crossing.
+    start(note=12, mode=amy.PCM_LOOP_FOREVER, bp0='0,1,1000,1,1,0', vel=1)
+    amy.render(18 * block / sr)
+    amy.send(osc=0, vel=1)
+    amy.render(block / sr)
+    amy.send(osc=0, vel=0)
+    tail = amy.render(8 * block / sr)
+    released = not np.any(tail[2 * block:])
+    return is_ok and clock_ok and released, message + (
+        ', silent tail restarts at once=%s, old tail plays under a silent envelope=%s'
+        ', envelope from restart=%s, released within 2 blocks=%s') % (
+        silent_onset_ok, tail_played, clock_ok, released)
 
 
 class TestPcmPatchChange(AmyTest):
