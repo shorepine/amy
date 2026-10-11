@@ -630,8 +630,12 @@ void pcm_mod_trigger(uint16_t osc) {
 
 void pcm_note_off(uint16_t osc) {
     if(AMY_IS_SET(synth[osc]->preset)) {
-        if (msynth[osc]->state == PCM_PLAY_STOP
-            || msynth[osc]->state == PCM_LOOP_STOP) {
+        // A retrigger waiting for its zero crossing (PCM_LOOP_ONCE_INTERNAL) has its
+        // real mode in next_state; apply the note-off to that, or it would be lost.
+        uint16_t *state = &msynth[osc]->state;
+        if (*state == PCM_LOOP_ONCE_INTERNAL) state = &msynth[osc]->next_state;
+        if (*state == PCM_PLAY_STOP
+            || *state == PCM_LOOP_STOP) {
             // PCM mode where note off causes immediate stop.
             //
             // This used to seek phase past the end of the sample and let
@@ -644,15 +648,15 @@ void pcm_note_off(uint16_t osc) {
             // works for both kinds -- and it no longer needs the preset
             // lookup that the seek needed just to find the sample length.
             synth[osc]->status = SYNTH_OFF;
-        } else if (msynth[osc]->state == PCM_LOOP_FOREVER) {
+        } else if (*state == PCM_LOOP_FOREVER) {
             // Sending one note-off to a LOOP_FOREVER loop downgrades it to a stoppable loop.
-            msynth[osc]->state = PCM_LOOP;
+            *state = PCM_LOOP;
             // Allow the engine to terminate it when it goes to silence (e.g. from envelope).
             synth[osc]->terminate_on_silence = 1;
-        } else if (msynth[osc]->state == PCM_LOOP || msynth[osc]->state == PCM_PLAY) {
+        } else if (*state == PCM_LOOP || *state == PCM_PLAY) {
             // Looping was enabled but after stop we just play through to the end.
             // (sending a second note-off will stop it immediately).
-            msynth[osc]->state = PCM_PLAY_STOP;
+            *state = PCM_PLAY_STOP;
         }
     }
 }

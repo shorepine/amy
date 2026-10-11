@@ -255,6 +255,45 @@ class TestPcmPatchChange(AmyTest):
     amy_send_at(time=500, vel=1)
 
 
+class TestPcmNoteOffDuringRestart(AmyTest):
+  """A note-off that arrives while a retrigger waits for its zero crossing is not lost.
+
+  Retriggering a playing PCM osc defers the restart to the next zero crossing
+  (state PCM_LOOP_ONCE_INTERNAL); pcm_note_off ignored that state, so the new note
+  played on (or looped forever) instead of stopping."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    t = np.arange(int(0.6 * sr)) / sr
+    # 40 Hz: the next zero crossing can be more than a block away.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+
+    def tail(mode, retrigger, after):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=60)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, mode=mode)
+      amy.send(osc=0, note=60, vel=1)
+      # 18 blocks in, the waveform is well inside the 512-frame zero-crossing search window
+      # from its next crossing (~350 frames at 256-frame blocks, 44.1 kHz).
+      amy.render(18 * amy.AMY_BLOCK_SIZE / sr)
+      if retrigger:
+        amy.send(osc=0, note=60, vel=1)
+      amy.send(osc=0, vel=0)
+      out = amy.render(after + 0.1)[:, 0]
+      return np.max(np.abs(out[int(after * sr):]))
+
+    results = []
+    # STOP modes stop at note-off; PCM_LOOP plays out to the end of the sample.
+    for name, mode, after in (('PLAY_STOP', amy.PCM_PLAY_STOP, 0.03), ('LOOP_STOP', amy.PCM_LOOP_STOP, 0.03),
+                              ('LOOP', amy.PCM_LOOP, 0.8)):
+      results.append((name, tail(mode, False, after), tail(mode, True, after)))
+    message = self.__class__.__name__ + ': ' + ', '.join(
+        '%s peak after note-off plain %.4f retriggered %.4f' % result for result in results)
+    return all(plain == 0 and retriggered == 0 for _, plain, retriggered in results), message
+
+
 class TestPcmTriggerPhase(AmyTest):
   """PCM: a trigger_phase (P) sent with a note-on sets the sample start point
      (start_frame / 2^23).   It persist for that osc."""
