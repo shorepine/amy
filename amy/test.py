@@ -265,6 +265,38 @@ class TestPcmTriggerPhase(AmyTest):
     amy_send_at(time=600, osc=0, vel=1)                 # starts at the same point again.
 
 
+class TestPcmRetriggerPastEnd(AmyTest):
+  """A note-on that switches a playing osc to a preset shorter than its play position still plays.
+
+  The zero-crossing search for the deferred restart starts at the old play position,
+  which is past the end of the new preset; it found nothing, returned -1 (loopend
+  0xFFFFFFFF), and the osc reached end-of-sample and stopped without playing the note."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+
+    def sine(seconds, freq):
+      t = np.arange(int(seconds * sr)) / sr
+      return (0.3 * np.sin(2 * np.pi * freq * t) * 32767).astype('<i2').tobytes()
+
+    def short_peak(switch):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(sine(0.6, 40), preset=1024, midinote=60)
+      amy.load_sample_bytes(sine(0.05, 400), preset=1025, midinote=60)
+      if switch:
+        # Playing the long preset, 0.2 s in: past the end of the 0.05 s one.
+        amy.send(osc=0, wave=amy.PCM, preset=1024)
+        amy.send(osc=0, vel=1)
+        amy.render(0.2)
+      amy.send(osc=0, wave=amy.PCM, preset=1025, vel=1)
+      return np.max(np.abs(amy.render(0.04)[:, 0]))
+
+    ratio = short_peak(True) / short_peak(False)
+    message = self.__class__.__name__ + ': switch to shorter preset peak/fresh note peak %.2f' % ratio
+    return bool(ratio > 0.9), message
+
+
 class TestPcmLoop(AmyTest):
   """Basic looping."""
 

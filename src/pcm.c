@@ -590,14 +590,19 @@ void pcm_note_on(uint16_t osc) {
         bool want_stretch = AMY_IS_SET(synth[osc]->fit_ticks)
             && preset->type != AMY_PCM_TYPE_FILE
             && preset->sample_ram != NULL && preset->length > 0;
-        bool fresh_start = true;
+        int zero_crossing = -1;
         if (synth[osc]->status == SYNTH_AUDIBLE && preset->type != AMY_PCM_TYPE_FILE
             && !want_stretch && !synth[osc]->stretch.active) {
             // Restarting a currently-playing (non-file) PCM, delay reonset to next zero crossing to avoid click.
             // (Not for the fit engine: its grains are windowed, so a restart is click-free by construction.)
-            fresh_start = false;
             uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
-            msynth[osc]->loopend = pcm_find_next_zero_crossing(osc, base_index);
+            zero_crossing = pcm_find_next_zero_crossing(osc, base_index);
+        }
+        // No crossing (-1): the play position is at or past the end of the sample (e.g. after a
+        // switch to a shorter preset).  There is no crossing to wait for: start fresh.
+        bool fresh_start = (zero_crossing < 0);
+        if (!fresh_start) {
+            msynth[osc]->loopend = zero_crossing;
             msynth[osc]->loopstart = INT_OF_P(phase, PCM_INDEX_BITS);;
             msynth[osc]->state = PCM_LOOP_ONCE_INTERNAL;
             msynth[osc]->next_state = synth[osc]->mode;
