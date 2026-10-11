@@ -244,6 +244,43 @@ class TestPcmEnvelopeRamp(AmyTest):
         '%s max jump/held %.2f' % result for result in results) + ', kept playing while silent=%s' % kept_playing
     return smooth and kept_playing, message
 
+class TestPcmRetriggerSilentTail(AmyTest):
+  """Retriggering a PCM osc whose envelope has already faded it to silence restarts at once.
+
+  The zero-crossing wait plays the old waveform on, but the note-on has already restarted the
+  envelope, so a silent tail jumped back to the new note's gain mid-waveform: a click."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    block = amy.AMY_BLOCK_SIZE
+    def render_blocks(seconds):
+      return amy.render(int(np.ceil(seconds * sr / block)) * block / sr)[:, 0]
+    t = np.arange(int(0.3 * sr)) / sr
+    # A smooth low-frequency tone with a short attack from zero.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+    gated = '0,1,72,1,30,0,0,0'  # a choked hit: silent from 102 ms
+
+    def start():
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=36)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, note=36, vel=1, bp0=gated)
+
+    start()
+    fresh = render_blocks(0.035)
+    smooth = np.max(np.abs(np.diff(fresh)))
+    start()
+    old = render_blocks(0.11)
+    amy.send(osc=0, vel=1)  # retrigger the same hit
+    retriggered = render_blocks(0.035)
+    jump = np.max(np.abs(np.diff(np.concatenate((old[-1:], retriggered)))))
+    same = bool(np.array_equal(retriggered, fresh))
+    # The old note is silent at the retrigger; the retrigger sounds exactly like the first hit,
+    # with no large discontinuity.
+    is_ok = bool(smooth > 0 and old[-1] == 0 and same and jump <= 2 * smooth)
+    return is_ok, '%s: maxjump %.5f, fresh note maxjump %.5f, same as a fresh note=%s' % (
+        self.__class__.__name__, jump, smooth, same)
 
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
