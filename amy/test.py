@@ -282,6 +282,62 @@ class TestPcmRetriggerSilentTail(AmyTest):
     return is_ok, '%s: maxjump %.5f, fresh note maxjump %.5f, same as a fresh note=%s' % (
         self.__class__.__name__, jump, smooth, same)
 
+class TestPcmRetriggerOnset(AmyTest):
+  """Retriggering a sounding PCM osc starts the new note on its note-on, at any phase of the old one.
+
+  The restart used to wait for the old waveform's next zero crossing, up to 512 source
+  frames away, so its onset moved with the phase of the old note at the note-on.  Now the
+  old note fades out under the new one instead."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    block = amy.AMY_BLOCK_SIZE
+    t = np.arange(int(0.6 * sr)) / sr
+    # 40 Hz: half a period is longer than the old 512-frame search window.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+
+    def start():
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=60)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, note=60, vel=1)
+
+    start()
+    fresh = amy.render(8 * block / sr)[:, 0]
+    smooth = np.max(np.abs(np.diff(fresh)))
+    peak = np.max(np.abs(fresh))
+    on_time, jumps = [], []
+    # Retrigger at six phases of the old waveform, one block apart.
+    for k in range(16, 22):
+      start()
+      before = amy.render(k * block / sr)[:, 0]
+      amy.send(osc=0, vel=1)
+      after = amy.render(6 * block / sr)[:, 0]
+      # Past the 64-frame fade (64 output samples: the sample is at the output rate, so the step
+      # is 1), the output is a fresh note timed from the note-on, sample for sample (constant
+      # gain: key-gate envelope, same velocity); under it, fresh plus a fading tail.
+      on_time.append(bool(np.array_equal(after[64:2 * block], fresh[64:2 * block])
+                          and np.max(np.abs(after[:64] - fresh[:64])) <= peak))
+      jumps.append(np.max(np.abs(np.diff(np.concatenate((before[-1:], after[:2 * block]))))))
+    # A note-on repeated before the first has rendered changes nothing.
+    start()
+    amy.render(16 * block / sr)
+    amy.send(osc=0, vel=1)
+    single = amy.render(6 * block / sr)[:, 0]
+    start()
+    amy.render(16 * block / sr)
+    amy.send(osc=0, vel=1)
+    amy.send(osc=0, vel=1)
+    double = amy.render(6 * block / sr)[:, 0]
+    repeated_ok = bool(np.array_equal(single, double))
+    # The ramp adds at most peak/64 per source frame to the tone's own slew.
+    bound = 2 * smooth + peak / 64
+    is_ok = bool(all(on_time) and max(jumps) <= bound and repeated_ok)
+    return is_ok, '%s: new note on its note-on at all phases=%s, maxjump through the fade %.5f (fresh note %.5f), repeated note-on same as one=%s' % (
+        self.__class__.__name__, all(on_time), max(jumps), smooth, repeated_ok)
+
+
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
 
@@ -1306,7 +1362,7 @@ class TestSynthDrumsChan20(AmyTest):
 
 
 class TestBlueMonday(AmyTest):
-  """Re-initing PCM samples was leading to discontinuity; test new mechanism to delay until zero crossing."""
+  """Re-initing PCM samples was leading to discontinuity; test the restart mechanism (the old note fades out under the new one)."""
 
   def __init__(self):
     super().__init__()

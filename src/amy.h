@@ -382,7 +382,6 @@ enum coefs{
 #define PCM_LOOP 2
 #define PCM_LOOP_STOP 3
 #define PCM_LOOP_FOREVER 4
-#define PCM_LOOP_ONCE_INTERNAL 5  // Special internal state for retriggering wav files at zero crossing
 
 #define AMY_WAVE_IS_PCM(w) ((w) == PCM || (w) == PCM_LEFT || (w) == PCM_RIGHT)
 
@@ -859,10 +858,11 @@ struct mod_synthinfo {
     float dist_drive;   // Combined per block; dist_block reads it once.
     float dist_mix;
     uint16_t state;      // Used for PCM looping state.
-    uint16_t next_state; // Used for PCM looping state.
     uint32_t loopstart;  // Used for PCM looping.
     uint32_t loopend;    // Used for PCM looping.
     uint16_t pcm_delay;  // Samples of silence to leave at the head of the note-on block (sample_offset).
+    PHASOR fade_phase;   // PCM retrigger: where the note being replaced is, while it fades out.
+    PHASOR fade_end;     // PCM retrigger: the position its fade reaches zero at; 0 = no fade running.
 };
 
 
