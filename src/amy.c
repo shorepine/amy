@@ -1076,6 +1076,83 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
     }
 }
 
+// Defaults for the live member of the wave-specific union.  Owns nothing:
+// callers release the old kind's allocations first.
+void wave_kind_set_defaults(struct synthinfo *psynth) {
+    switch (psynth->wave_kind) {
+    case WAVE_KIND_ALGO:
+        psynth->algorithm = 0;
+        for (uint8_t j = 0; j < MAX_ALGO_OPS; j++) AMY_UNSET(psynth->algo_source[j]);
+        break;
+    case WAVE_KIND_PCM:
+        AMY_UNSET(psynth->fit_ticks);
+        AMY_UNSET(psynth->fit_search);
+        psynth->stretch = NULL;
+        break;
+    case WAVE_KIND_KS:
+        psynth->ks_ring = NULL;
+        psynth->ks_tune_state = 0;
+        break;
+    default:
+        break;
+    }
+}
+
+uint8_t wave_kind_of_wave(uint16_t wave) {
+    if (wave == ALGO) return WAVE_KIND_ALGO;
+    if (AMY_WAVE_IS_PCM(wave)) return WAVE_KIND_PCM;
+    if (wave == KS) return WAVE_KIND_KS;
+    return WAVE_KIND_NONE;
+}
+
+// Free what the osc owns outside its own block, leaving the pointers NULL.
+static void osc_release_allocs(struct synthinfo *psynth) {
+    free(psynth->dist);
+    psynth->dist = NULL;
+    if (psynth->wave_kind == WAVE_KIND_KS) {
+        free(psynth->ks_ring);
+        psynth->ks_ring = NULL;
+    } else if (psynth->wave_kind == WAVE_KIND_PCM) {
+        free(psynth->stretch);
+        psynth->stretch = NULL;
+    }
+}
+
+// Make kind the live member of the osc's wave-specific union.  A no-op if it
+// already is; otherwise the old kind's config is dropped (and its ring or
+// stretcher freed), and the new kind starts at its defaults.
+void osc_set_wave_kind(uint16_t osc, uint8_t kind) {
+    struct synthinfo *psynth = synth[osc];
+    if (psynth->wave_kind == kind) return;
+    if (psynth->wave_kind == WAVE_KIND_KS) free(psynth->ks_ring);
+    else if (psynth->wave_kind == WAVE_KIND_PCM) free(psynth->stretch);
+    psynth->wave_kind = kind;
+    wave_kind_set_defaults(psynth);
+}
+
+const osc_dist_t osc_dist_defaults = {
+    .stages = 0,
+    .bits = 16,
+    .rate = 1,
+    .logdrive_coefs = {0},  // [COEF_CONST] = log2(1.0): unity drive.
+    .mix_coefs = {[COEF_CONST] = 1.0f},
+};
+
+// The osc's distortion block, allocated (at its defaults) on first use.
+// NULL on OOM: the caller drops the delta, leaving the osc undistorted.
+osc_dist_t *osc_dist_alloc(uint16_t osc) {
+    if (synth[osc]->dist == NULL) {
+        osc_dist_t *dist = (osc_dist_t *)malloc_caps(sizeof(osc_dist_t), amy_global.config.ram_caps_oscs);
+        if (dist == NULL) {
+            amy_oom("osc_dist_alloc: out of memory for osc %d\n", osc);
+            return NULL;
+        }
+        *dist = osc_dist_defaults;
+        synth[osc]->dist = dist;
+    }
+    return synth[osc]->dist;
+}
+
 void reset_osc_params(struct synthinfo *psynth) {
     // osc params are the things set through the amy_event API
     // Event-derived config
@@ -1101,25 +1178,18 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     AMY_UNSET(psynth->trigger_phase);
     AMY_UNSET(psynth->sample_offset);
-    AMY_UNSET(psynth->fit_ticks);
-    AMY_UNSET(psynth->fit_search);
     AMY_UNSET(psynth->logratio);
     psynth->portamento_alpha = 0;
     psynth->resonance = 0.7f;
     psynth->filter_type = FILTER_NONE;
-    psynth->dist_stages = 0;
-    psynth->dist_bits = 16;
-    psynth->dist_rate = 1;
-    for (int j = 0; j < NUM_COMBO_COEFS; ++j) {
-        psynth->dist_logdrive_coefs[j] = 0;
-        psynth->dist_mix_coefs[j] = 0;
-    }
-    psynth->dist_logdrive_coefs[COEF_CONST] = 0;  // log2(1.0): unity drive.
-    psynth->dist_mix_coefs[COEF_CONST] = 1.0f;
+    // Owned allocations (dist, ks_ring, stretch) are released by
+    // osc_release_allocs() before a reset; here psynth may be uninitialized
+    // (set_event_for_osc's empty_synth), so just drop the references.
+    psynth->dist = NULL;
+    psynth->wave_kind = WAVE_KIND_NONE;
+    wave_kind_set_defaults(psynth);
     AMY_UNSET(psynth->chained_osc);
     for(uint8_t j=0;j<NUM_MOD_SOURCES;j++) AMY_UNSET(psynth->mod_source[j]);
-    psynth->algorithm = 0;
-    for(uint8_t j=0;j<MAX_ALGO_OPS;j++) AMY_UNSET(psynth->algo_source[j]);
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
         // max_num_breakpoints describes the alloc for this synthinfo, and is *not* reset.
         for(uint8_t k=0;k<psynth->max_num_breakpoints[j];k++) {
@@ -1151,12 +1221,13 @@ void reset_osc_state(struct synthinfo *psynth) {
     for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) { psynth->last_scale[j] = 0; }
     psynth->last_two[0] = 0;
     psynth->last_two[1] = 0;
-    memset(&psynth->stretch, 0, sizeof(psynth->stretch));
+    // Runs in the render loop too, so it parks the stretcher rather than
+    // freeing it.
+    if (psynth->wave_kind == WAVE_KIND_PCM && psynth->stretch != NULL)
+        memset(psynth->stretch, 0, sizeof(*psynth->stretch));
     for(int j = 0; j < 2 * FILT_NUM_DELAYS; ++j) psynth->filter_delay[j] = 0;
     psynth->last_filt_norm_bits = 0;
-    psynth->dist_state.hold = 0;
-    psynth->dist_state.hold_count = 0;
-    psynth->dist_state.hpf_yn1 = 0;
+    if (psynth->dist != NULL) memset(&psynth->dist->state, 0, sizeof(psynth->dist->state));
 }
 
 void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynth) {
@@ -1170,6 +1241,7 @@ void reset_osc_by_pointer(struct synthinfo *psynth, struct mod_synthinfo *pmsynt
 void reset_osc(uint16_t i ) {
     // set all the synth state to defaults
     if (synth[i] == NULL) return;
+    osc_release_allocs(synth[i]);
     reset_osc_by_pointer(synth[i], msynth[i]);
     synth[i]->osc = i; // self-reference to make updating oscs easier
 }
@@ -1239,7 +1311,9 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
         synth[osc]->breakpoint_values[i] = (float *)breakpoint_area;
         breakpoint_area += sizeof(float) * max_num_breakpoints[i];
     }
-    synth[osc]->ks_ring = NULL;
+    // Fresh memory: nothing owned yet, so reset_osc() has nothing to free.
+    synth[osc]->dist = NULL;
+    synth[osc]->wave_kind = WAVE_KIND_NONE;
     reset_osc(osc);
     //fprintf(stderr, "alloc_osc %d (0x%lx) num_breakpoints %d,%d\n", osc, (long)synth[osc], synth[osc]->max_num_breakpoints[0], synth[osc]->max_num_breakpoints[1]);
 }
@@ -1247,7 +1321,7 @@ void alloc_osc(int osc, uint8_t *max_num_breakpoints) {
 void free_osc(int osc) {
     if (synth[osc] != NULL) {
         //fprintf(stderr, "free_osc %d (0x%lx)\n", osc, (long)synth[osc]);
-        free(synth[osc]->ks_ring);
+        osc_release_allocs(synth[osc]);
         free(synth[osc]);
     }
     synth[osc] = NULL;
@@ -1384,7 +1458,7 @@ int8_t oscs_init() {
     return 0;
 }
 
-void fprint_combo_coefs(char *name, float *coefs) {
+void fprint_combo_coefs(char *name, const float *coefs) {
     fprintf(stderr, "  %s:", name);
     for (int i=0; i < NUM_COMBO_COEFS; ++i) {
         fprintf(stderr, " %.3f", coefs[i]);
@@ -1394,18 +1468,25 @@ void fprint_combo_coefs(char *name, float *coefs) {
 
 void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     if (synth[i] == NULL)  {fprintf(stderr, "osc %" PRIu16 " not defined\n", i); return; }
+    bool is_algo = (synth[i]->wave_kind == WAVE_KIND_ALGO);
+    uint16_t algo_src[MAX_ALGO_OPS];
+    for (int j = 0; j < MAX_ALGO_OPS; ++j) {
+        if (is_algo) algo_src[j] = synth[i]->algo_source[j];
+        else AMY_UNSET(algo_src[j]);
+    }
     fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 ",%" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
             i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source[0], synth[i]->mod_source[1],
             synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, synth[i]->chained_osc,
-            synth[i]->algorithm,
-            synth[i]->algo_source[0], synth[i]->algo_source[1], synth[i]->algo_source[2], synth[i]->algo_source[3], synth[i]->algo_source[4], synth[i]->algo_source[5] );
+            is_algo ? synth[i]->algorithm : 0,
+            algo_src[0], algo_src[1], algo_src[2], algo_src[3], algo_src[4], algo_src[5] );
     fprint_combo_coefs("amp_coefs", synth[i]->amp_coefs);
     fprint_combo_coefs("lfr_coefs", synth[i]->logfreq_coefs);
     fprint_combo_coefs("flf_coefs", synth[i]->filter_logfreq_coefs);
     fprint_combo_coefs("dut_coefs", synth[i]->duty_coefs);
     fprint_combo_coefs("pan_coefs", synth[i]->pan_coefs);
-    fprint_combo_coefs("dsd_coefs", synth[i]->dist_logdrive_coefs);
-    fprint_combo_coefs("dsm_coefs", synth[i]->dist_mix_coefs);
+    const osc_dist_t *dist = synth[i]->dist ? synth[i]->dist : &osc_dist_defaults;
+    fprint_combo_coefs("dsd_coefs", dist->logdrive_coefs);
+    fprint_combo_coefs("dsm_coefs", dist->mix_coefs);
     if(show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
             fprintf(stderr,"  eg%" PRIu8 " (type %" PRIu8 "): ", j, synth[i]->eg_type[j]);
@@ -1618,6 +1699,55 @@ uint16_t alpha_to_portamento_ms(float alpha) {
     if (PARAM_IS_COMBO_COEF(d->param, FLAG)) \
         synth[d->osc]->FIELD[d->param - FLAG] = d->data.f;
 
+// Apply a DIST_* delta.  An osc keeps no distortion block until a delta
+// moves one of these off its default; one that only restates a default is
+// already true and allocates nothing.
+static void play_dist_delta(struct delta *d) {
+    osc_dist_t *dist = synth[d->osc]->dist;
+    if (dist == NULL) {
+        const osc_dist_t *def = &osc_dist_defaults;
+        bool is_default;
+        if (d->param <= DIST_CRUSH_EN) is_default = (d->data.i == 0);
+        else if (d->param == DIST_BITS) is_default = ((int32_t)d->data.i == def->bits);
+        else if (d->param == DIST_RATE) is_default = ((int32_t)d->data.i == def->rate);
+        else if (d->param < DIST_MIX) is_default = (d->data.f == def->logdrive_coefs[d->param - DIST_LOGDRIVE]);
+        else is_default = (d->data.f == def->mix_coefs[d->param - DIST_MIX]);
+        if (is_default) return;
+        dist = osc_dist_alloc(d->osc);
+        if (dist == NULL) return;
+    }
+    switch (d->param) {
+    case DIST_CLIP_EN:
+        if (d->data.i) dist->stages |= DIST_CLIP;
+        else           dist->stages &= ~DIST_CLIP;
+        break;
+    case DIST_FOLD_EN:
+        if (d->data.i) dist->stages |= DIST_FOLD;
+        else           dist->stages &= ~DIST_FOLD;
+        break;
+    case DIST_CRUSH_EN:
+        if (d->data.i) dist->stages |= DIST_CRUSH;
+        else           dist->stages &= ~DIST_CRUSH;
+        // The crusher is the only stage with state; restart its rate reducer
+        // and DC blocker on toggle so a re-enable can't replay stale state.
+        memset(&dist->state, 0, sizeof(dist->state));
+        break;
+    // Drive and mix are clamped in hold_and_modify instead, where their coefs
+    // are combined; bits and rate have no coef rail, so they clamp here and
+    // dist_block still gets a fully checked config.
+    case DIST_BITS:  // > S_FRAC_BITS: quantization off
+        dist->bits = MAX(1, MIN(24, (int32_t)d->data.i));
+        break;
+    case DIST_RATE:
+        dist->rate = MAX(1, MIN(1024, (int32_t)d->data.i));
+        break;
+    default:
+        if (d->param < DIST_MIX) dist->logdrive_coefs[d->param - DIST_LOGDRIVE] = d->data.f;
+        else dist->mix_coefs[d->param - DIST_MIX] = d->data.f;
+        break;
+    }
+}
+
 // play an delta, now -- tell the audio loop to start making noise
 void play_delta(struct delta *d) {
     AMY_PROFILE_START(PLAY_DELTA)
@@ -1663,6 +1793,10 @@ void play_delta(struct delta *d) {
     }
     if(d->param == WAVE) {
         synth[d->osc]->wave = d->data.i;
+        // A wave with kind-specific config claims the union; any other wave
+        // leaves it alone (nothing reads it).
+        uint8_t kind = wave_kind_of_wave(synth[d->osc]->wave);
+        if (kind != WAVE_KIND_NONE) osc_set_wave_kind(d->osc, kind);
         // todo: delta-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner
         if(synth[d->osc]->wave == SINE) {
@@ -1698,28 +1832,7 @@ void play_delta(struct delta *d) {
         if (synth[d->osc]->filter_type != d->data.i) reset_filter(d->osc);
         synth[d->osc]->filter_type = d->data.i;
     }
-    if (d->param == DIST_CLIP_EN) {
-        if (d->data.i) synth[d->osc]->dist_stages |= DIST_CLIP;
-        else           synth[d->osc]->dist_stages &= ~DIST_CLIP;
-    }
-    if (d->param == DIST_FOLD_EN) {
-        if (d->data.i) synth[d->osc]->dist_stages |= DIST_FOLD;
-        else           synth[d->osc]->dist_stages &= ~DIST_FOLD;
-    }
-    if (d->param == DIST_CRUSH_EN) {
-        if (d->data.i) synth[d->osc]->dist_stages |= DIST_CRUSH;
-        else           synth[d->osc]->dist_stages &= ~DIST_CRUSH;
-        // The crusher is the only stage with state; restart its rate reducer
-        // and DC blocker on toggle so a re-enable can't replay stale state.
-        synth[d->osc]->dist_state.hold = 0;
-        synth[d->osc]->dist_state.hold_count = 0;
-        synth[d->osc]->dist_state.hpf_yn1 = 0;
-    }
-    // Drive and mix are clamped in hold_and_modify instead, where their coefs
-    // are combined; bits and rate have no coef rail, so they clamp here and
-    // dist_block still gets a fully checked config.
-    DELTA_TO_SYNTH_I_CLAMPED(DIST_BITS, dist_bits, 1, 24)  // > S_FRAC_BITS: quantization off
-    DELTA_TO_SYNTH_I_CLAMPED(DIST_RATE, dist_rate, 1, 1024)
+    if (d->param >= DIST_CLIP_EN && d->param < DIST_MIX + NUM_COMBO_COEFS) play_dist_delta(d);
     DELTA_TO_SYNTH_I(NOTE_SOURCE_CHANNEL, s_note_source_channel)
     DELTA_TO_SYNTH_I(EG0_TYPE, eg_type[0])
     DELTA_TO_SYNTH_I(EG1_TYPE, eg_type[1])
@@ -1733,20 +1846,27 @@ void play_delta(struct delta *d) {
             synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
     }
     DELTA_TO_SYNTH_I(SAMPLE_OFFSET, sample_offset)
-    if (d->param == FIT) {
-        // Negative fit turns the feature back off; 0 means "pitch-shift at
-        // original length"; > 0 is a target duration in sequencer ticks.
-        if (d->data.f < 0) AMY_UNSET(synth[d->osc]->fit_ticks);
-        else synth[d->osc]->fit_ticks = d->data.f;
+    if (d->param == FIT || d->param == FIT_SEARCH) {
+        // Unsetting a PCM field on an osc of another kind is already true;
+        // don't let it evict that kind's config.
+        bool is_default = (d->param == FIT) ? (d->data.f < 0) : AMY_IS_UNSET((uint16_t)d->data.i);
+        if (!is_default) osc_set_wave_kind(d->osc, WAVE_KIND_PCM);
+        if (synth[d->osc]->wave_kind == WAVE_KIND_PCM) {
+            if (d->param == FIT) {
+                // Negative fit turns the feature back off; 0 means "pitch-shift at
+                // original length"; > 0 is a target duration in sequencer ticks.
+                if (d->data.f < 0) AMY_UNSET(synth[d->osc]->fit_ticks);
+                else synth[d->osc]->fit_ticks = d->data.f;
+            } else {
+                synth[d->osc]->fit_search = d->data.i;
+            }
+        }
     }
-    DELTA_TO_SYNTH_I(FIT_SEARCH, fit_search)
     DELTA_TO_COEFS(AMP, amp_coefs)
     DELTA_TO_COEFS(FREQ, logfreq_coefs)
     DELTA_TO_COEFS(FILTER_FREQ, filter_logfreq_coefs)
     DELTA_TO_COEFS(DUTY, duty_coefs)
     DELTA_TO_COEFS(PAN, pan_coefs)
-    DELTA_TO_COEFS(DIST_LOGDRIVE, dist_logdrive_coefs)
-    DELTA_TO_COEFS(DIST_MIX, dist_mix_coefs)
 
     // todo, i really should clean this up
     if (PARAM_IS_BP_COEF(d->param)) {
@@ -1865,13 +1985,18 @@ void play_delta(struct delta *d) {
         }
     }
     if(d->param == ALGORITHM) {
+        osc_set_wave_kind(d->osc, WAVE_KIND_ALGO);
         synth[d->osc]->algorithm = d->data.i;
         // This is a DX7-style control osc; ensure eg_types are set
         // but only when ALGO is specified, so user can override later if desired->
         synth[d->osc]->eg_type[0] = ENVELOPE_DX7;
         synth[d->osc]->eg_type[1] = ENVELOPE_TRUE_EXPONENTIAL;
     }
-    if(d->param >= ALGO_SOURCE_START && d->param < ALGO_SOURCE_END) {
+    if(d->param >= ALGO_SOURCE_START && d->param < ALGO_SOURCE_END
+       && (AMY_IS_SET((int16_t)d->data.i) || synth[d->osc]->wave_kind == WAVE_KIND_ALGO)) {
+        // (An unset source on an osc of another kind is already true; don't
+        // let it evict that kind's config.)
+        osc_set_wave_kind(d->osc, WAVE_KIND_ALGO);
         uint16_t which_source = d->param - ALGO_SOURCE_START;
         synth[d->osc]->algo_source[which_source] = d->data.i;
         if(AMY_IS_SET(synth[d->osc]->algo_source[which_source])) {
@@ -2145,12 +2270,12 @@ void hold_and_modify(uint16_t osc) {
     msynth[osc]->filter_logfreq = filter_logfreq;
     msynth[osc]->duty = combine_controls(ctrl_inputs, synth[osc]->duty_coefs);
 
-    if (synth[osc]->dist_stages) {
+    if (synth[osc]->dist != NULL && synth[osc]->dist->stages) {
         // Both clamps live here, so dist_block still receives a checked config
         // once per block and its per-sample loops stay range-check free.
         msynth[osc]->dist_drive = drive_of_logdrive(
-            combine_controls(ctrl_inputs, synth[osc]->dist_logdrive_coefs));
-        float dist_mix = combine_controls(ctrl_inputs, synth[osc]->dist_mix_coefs);
+            combine_controls(ctrl_inputs, synth[osc]->dist->logdrive_coefs));
+        float dist_mix = combine_controls(ctrl_inputs, synth[osc]->dist->mix_coefs);
         if (dist_mix < 0) dist_mix = 0;
         if (dist_mix > 1.0f) dist_mix = 1.0f;
         msynth[osc]->dist_mix = dist_mix;
@@ -2299,7 +2424,7 @@ SAMPLE render_osc_wave(uint16_t osc, uint8_t core, SAMPLE* buf) {
         // Distortion and Filter *always* apply to the entire chain below.
         // apply distortion to osc if set, pre-filter; returns its own max
         // (folding can amplify a quiet release tail).
-        if (synth[osc]->dist_stages) {
+        if (synth[osc]->dist != NULL && synth[osc]->dist->stages) {
             max_val = dist_process(buf, osc);
         }
         // apply filter to osc if set

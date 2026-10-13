@@ -152,7 +152,9 @@ void note_on_mod(uint16_t osc, uint16_t algo_osc) {
 }
 
 void algo_note_off(uint16_t osc) {
-    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
+    // Another kind can own the union if config for it reached this ALGO osc;
+    // then there are no sources.
+    for(uint8_t i=0;i<MAX_ALGO_OPS && synth[osc]->wave_kind == WAVE_KIND_ALGO;i++) {
         if(AMY_IS_SET(synth[osc]->algo_source[i])
            && synth[synth[osc]->algo_source[i]] != NULL) {
             uint16_t o = synth[osc]->algo_source[i];
@@ -168,7 +170,7 @@ void algo_note_off(uint16_t osc) {
 
 void algo_note_on(uint16_t osc, float freq) {
     msynth[osc]->logfreq = logfreq_of_freq(freq);
-    for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
+    for(uint8_t i=0;i<MAX_ALGO_OPS && synth[osc]->wave_kind == WAVE_KIND_ALGO;i++) {
         if(AMY_IS_SET(synth[osc]->algo_source[i])
            && synth[synth[osc]->algo_source[i]] != NULL) {
             note_on_mod(synth[osc]->algo_source[i], osc);
@@ -196,6 +198,7 @@ void algo_init() {
 }
 
 SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
+    if (synth[osc]->wave_kind != WAVE_KIND_ALGO) return 0;  // no algorithm or sources
     struct FmAlgorithm algo = algorithms[synth[osc]->algorithm];
     SAMPLE max_value = 0;
 

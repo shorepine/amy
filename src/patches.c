@@ -758,16 +758,6 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
         }                                                                 \
     }
 
-#define EVENT_FROM_OSC_ARRAY_LOGDRIVE(SYNTH_FIELD, EVENT_FIELD, NUM_ELS)  \
-    for (int i = 0; i < NUM_ELS; ++i) {                                   \
-        if (synth[osc]->SYNTH_FIELD[i] != empty_synth.SYNTH_FIELD[i]) {   \
-            if (i == COEF_CONST)                                          \
-                event->EVENT_FIELD[i] = drive_of_logdrive(synth[osc]->SYNTH_FIELD[i]); \
-            else                                                          \
-                event->EVENT_FIELD[i] = synth[osc]->SYNTH_FIELD[i];       \
-        }                                                                 \
-    }
-
 void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     // Set fields in the event to configure the osc away from default.
     // We assume event has already been cleared.
@@ -792,6 +782,12 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
         empty_synth.breakpoint_values[i] = values + i * MAX_BREAKPOINTS;
    }
     reset_osc_by_pointer(&empty_synth, /* msynth */ NULL);
+    // The wave-specific union compares against the defaults of the kind the
+    // osc holds; fields of any other kind are unset on this osc.
+    empty_synth.wave_kind = synth[osc]->wave_kind;
+    wave_kind_set_defaults(&empty_synth);
+    bool is_pcm_kind = (synth[osc]->wave_kind == WAVE_KIND_PCM);
+    bool is_algo_kind = (synth[osc]->wave_kind == WAVE_KIND_ALGO);
     // Go through parameter fields picking out the ones that are nondefault.
     EVENT_FROM_OSC(wave);
     EVENT_FROM_OSC(preset);
@@ -806,26 +802,42 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
     EVENT_FROM_OSC(feedback);
     EVENT_FROM_OSC(trigger_phase);
     EVENT_FROM_OSC(sample_offset);
-    EVENT_FROM_OSC(fit_ticks);
-    EVENT_FROM_OSC(fit_search);
+    if (is_pcm_kind) {
+        EVENT_FROM_OSC(fit_ticks);
+        EVENT_FROM_OSC(fit_search);
+    }
     EVENT_FROM_OSC_MAPPED(logratio, ratio, exp2f);
     EVENT_FROM_OSC(resonance);
     EVENT_FROM_OSC_MAPPED(portamento_alpha, portamento_ms, alpha_to_portamento_ms);
     EVENT_FROM_OSC_BASEOSC(chained_osc);
     EVENT_FROM_OSC_ARRAY_BASEOSC(mod_source, NUM_MOD_SOURCES);
-    EVENT_FROM_OSC(algorithm);
+    if (is_algo_kind) {
+        EVENT_FROM_OSC(algorithm);
+    }
     EVENT_FROM_OSC(filter_type);
     // Distortion: one enable per stage that is on (a stage that is off is
     // the default, and saying so would put GC0GF0GH0 on every osc), and the
     // drive rail back in linear units, the way it was sent.
-    if (synth[osc]->dist_stages & DIST_CLIP)   event->dist_clip = 1;
-    if (synth[osc]->dist_stages & DIST_FOLD)   event->dist_fold = 1;
-    if (synth[osc]->dist_stages & DIST_CRUSH)  event->dist_crush = 1;
-    EVENT_FROM_OSC(dist_bits);
-    EVENT_FROM_OSC(dist_rate);
-    EVENT_FROM_OSC_ARRAY_LOGDRIVE(dist_logdrive_coefs, dist_drive_coefs, NUM_COMBO_COEFS);
-    EVENT_FROM_OSC_ARRAY2(dist_mix_coefs, dist_mix_coefs, NUM_COMBO_COEFS);
-    EVENT_FROM_OSC_ARRAY_BASEOSC(algo_source, MAX_ALGO_OPS);
+    // An osc with no dist block is at all the defaults: nothing to say.
+    const osc_dist_t *dist = synth[osc]->dist;
+    const osc_dist_t *def = &osc_dist_defaults;
+    if (dist != NULL) {
+        if (dist->stages & DIST_CLIP)   event->dist_clip = 1;
+        if (dist->stages & DIST_FOLD)   event->dist_fold = 1;
+        if (dist->stages & DIST_CRUSH)  event->dist_crush = 1;
+        if (dist->bits != def->bits) event->dist_bits = dist->bits;
+        if (dist->rate != def->rate) event->dist_rate = dist->rate;
+        for (int i = 0; i < NUM_COMBO_COEFS; ++i) {
+            if (dist->logdrive_coefs[i] != def->logdrive_coefs[i])
+                event->dist_drive_coefs[i] = (i == COEF_CONST) ? drive_of_logdrive(dist->logdrive_coefs[i])
+                                                               : dist->logdrive_coefs[i];
+            if (dist->mix_coefs[i] != def->mix_coefs[i])
+                event->dist_mix_coefs[i] = dist->mix_coefs[i];
+        }
+    }
+    if (is_algo_kind) {
+        EVENT_FROM_OSC_ARRAY_BASEOSC(algo_source, MAX_ALGO_OPS);
+    }
     EVENT_FROM_OSC_ARRAY_T(breakpoint_times[0], eg0_times, synth[osc]->max_num_breakpoints[0]);
     EVENT_FROM_OSC_ARRAY2(breakpoint_values[0], eg0_values, synth[osc]->max_num_breakpoints[0]);
     EVENT_FROM_OSC_ARRAY_T(breakpoint_times[1], eg1_times, synth[osc]->max_num_breakpoints[1]);
