@@ -592,9 +592,11 @@ void pcm_note_on(uint16_t osc) {
             && preset->sample_ram != NULL && preset->length > 0;
         bool fresh_start = true;
         if (synth[osc]->status == SYNTH_AUDIBLE && preset->type != AMY_PCM_TYPE_FILE
-            && !want_stretch && !synth[osc]->stretch.active) {
+            && !want_stretch && !synth[osc]->stretch.active && msynth[osc]->amp > AMP_THRESH_PLUS) {
             // Restarting a currently-playing (non-file) PCM, delay reonset to next zero crossing to avoid click.
             // (Not for the fit engine: its grains are windowed, so a restart is click-free by construction.)
+            // Unless the envelope has already faded the old note to silence: the note-on has restarted the
+            // envelope, so waiting would play the silent old waveform back at the new note's gain.  Restart now instead.
             fresh_start = false;
             uint32_t base_index = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
             msynth[osc]->loopend = pcm_find_next_zero_crossing(osc, base_index);
