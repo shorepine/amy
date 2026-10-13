@@ -1544,6 +1544,7 @@ extern SAMPLE dist_block(SAMPLE * block, uint16_t len,
 extern SAMPLE dist_process(SAMPLE * block, uint16_t osc);
 extern void dist_process_bus(uint16_t bus, SAMPLE *busbuf);
 extern void parametric_eq_process(uint16_t bus, SAMPLE *block);
+extern void parametric_eq_update(uint16_t bus);
 extern void reset_filter(uint16_t osc);
 extern void reset_parametric(uint16_t bus);
 extern float dsps_sqrtf_f32_ansi(float f);
