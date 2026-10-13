@@ -87,6 +87,9 @@ jobs:
     - name: Validate GDScript parses
       run: gdparse godot/amy.gd
 
+    - name: Test Godot backend lifecycle signals
+      run: python tests/test_godot_backend_signals.py
+
     - name: Check godot/amy.gd is in sync with amy/__init__.py
       run: |
         if ! git diff --quiet -- godot/amy.gd; then
