@@ -244,6 +244,43 @@ class TestPcmEnvelopeRamp(AmyTest):
         '%s max jump/held %.2f' % result for result in results) + ', kept playing while silent=%s' % kept_playing
     return smooth and kept_playing, message
 
+class TestPcmRetriggerSilentTail(AmyTest):
+  """Retriggering a PCM osc whose envelope has already faded it to silence restarts at once.
+
+  The zero-crossing wait plays the old waveform on, but the note-on has already restarted the
+  envelope, so a silent tail jumped back to the new note's gain mid-waveform: a click."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    block = amy.AMY_BLOCK_SIZE
+    def render_blocks(seconds):
+      return amy.render(int(np.ceil(seconds * sr / block)) * block / sr)[:, 0]
+    t = np.arange(int(0.3 * sr)) / sr
+    # A smooth low-frequency tone with a short attack from zero.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+    gated = '0,1,72,1,30,0,0,0'  # a choked hit: silent from 102 ms
+
+    def start():
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=36)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, note=36, vel=1, bp0=gated)
+
+    start()
+    fresh = render_blocks(0.035)
+    smooth = np.max(np.abs(np.diff(fresh)))
+    start()
+    old = render_blocks(0.11)
+    amy.send(osc=0, vel=1)  # retrigger the same hit
+    retriggered = render_blocks(0.035)
+    jump = np.max(np.abs(np.diff(np.concatenate((old[-1:], retriggered)))))
+    same = bool(np.array_equal(retriggered, fresh))
+    # The old note is silent at the retrigger; the retrigger sounds exactly like the first hit,
+    # with no large discontinuity.
+    is_ok = bool(smooth > 0 and old[-1] == 0 and same and jump <= 2 * smooth)
+    return is_ok, '%s: maxjump %.5f, fresh note maxjump %.5f, same as a fresh note=%s' % (
+        self.__class__.__name__, jump, smooth, same)
 
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
@@ -253,6 +290,45 @@ class TestPcmPatchChange(AmyTest):
     amy_send_at(time=100, vel=1)
     amy_send_at(time=450, preset=10)  # Cowbell
     amy_send_at(time=500, vel=1)
+
+
+class TestPcmNoteOffDuringRestart(AmyTest):
+  """A note-off that arrives while a retrigger waits for its zero crossing is not lost.
+
+  Retriggering a playing PCM osc defers the restart to the next zero crossing
+  (state PCM_LOOP_ONCE_INTERNAL); pcm_note_off ignored that state, so the new note
+  played on (or looped forever) instead of stopping."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    t = np.arange(int(0.6 * sr)) / sr
+    # 40 Hz: the next zero crossing can be more than a block away.
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+
+    def tail(mode, retrigger, after):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=60)
+      amy.send(osc=0, wave=amy.PCM, preset=1024, mode=mode)
+      amy.send(osc=0, note=60, vel=1)
+      # 18 blocks in, the waveform is well inside the 512-frame zero-crossing search window
+      # from its next crossing (~350 frames at 256-frame blocks, 44.1 kHz).
+      amy.render(18 * amy.AMY_BLOCK_SIZE / sr)
+      if retrigger:
+        amy.send(osc=0, note=60, vel=1)
+      amy.send(osc=0, vel=0)
+      out = amy.render(after + 0.1)[:, 0]
+      return np.max(np.abs(out[int(after * sr):]))
+
+    results = []
+    # STOP modes stop at note-off; PCM_LOOP plays out to the end of the sample.
+    for name, mode, after in (('PLAY_STOP', amy.PCM_PLAY_STOP, 0.03), ('LOOP_STOP', amy.PCM_LOOP_STOP, 0.03),
+                              ('LOOP', amy.PCM_LOOP, 0.8)):
+      results.append((name, tail(mode, False, after), tail(mode, True, after)))
+    message = self.__class__.__name__ + ': ' + ', '.join(
+        '%s peak after note-off plain %.4f retriggered %.4f' % result for result in results)
+    return all(plain == 0 and retriggered == 0 for _, plain, retriggered in results), message
 
 
 class TestPcmTriggerPhase(AmyTest):
