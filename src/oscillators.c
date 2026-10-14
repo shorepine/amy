@@ -828,7 +828,8 @@ SAMPLE render_ks(SAMPLE * buf, uint16_t osc) {
     SAMPLE incremental_amp = SHIFTR(F2S(msynth[osc]->amp) - current_amp, BLOCK_SIZE_BITS);
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     SAMPLE max_value = 0;
-    SAMPLE *ring = synth[osc]->ks_ring;
+    // Another kind can own the union if config for it reached this KS osc.
+    SAMPLE *ring = (synth[osc]->wave_kind == WAVE_KIND_KS) ? synth[osc]->ks_ring : NULL;
     // Outside this range the ring would need more than MAX_KS_BUFFER_LEN
     // samples, or less than one.
     if(freq >= KS_LOWEST_FREQ && freq < AMY_SAMPLE_RATE && ring != NULL) {
@@ -941,7 +942,8 @@ void ks_note_on(uint16_t osc, float freq) {
     // ring.
     synth[osc]->phase = 0;
     // The ring belongs to the osc: allocated at its first KS note-on, freed
-    // by free_osc().
+    // by free_osc() (or when another wave kind claims the union).
+    osc_set_wave_kind(osc, WAVE_KIND_KS);
     SAMPLE *ring = synth[osc]->ks_ring;
     if(ring == NULL) {
         ring = (SAMPLE*)malloc_caps(sizeof(SAMPLE)*MAX_KS_BUFFER_LEN, amy_global.config.ram_caps_oscs);

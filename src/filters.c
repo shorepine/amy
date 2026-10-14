@@ -687,14 +687,29 @@ void filters_init(uint16_t bus) {
 // point in dB and +n dB and -n dB mirror.  F runs in direct form 1 and the
 // stored state is the band output scaled down (by 2, or by 8 for the high
 // shelf), so each multiply is one high-word product.
-// Coefficients hold half their value (Q31 in fixed point), so
-// EQ_MULH(x, EQ_COEF(f)) = x * f / 2 in either build.
+// Coefficients hold half their value (Q31 in fixed point, Q15 without a
+// 32x32 -> 64 multiply), so EQ_MULH(x, EQ_COEF(f)) = x * f / 2 in every build.
 #ifdef AMY_USE_FIXEDPOINT
+#if defined(AMY_HAS_MUL64) && !defined(AMY_EQ_MUL32)
 #define EQ_MULH(x, k) ((SAMPLE)(((int64_t)(x) * (int64_t)(k)) >> 32))
 static SAMPLE EQ_COEF(float f) {
     f = MAX(-1.0f, MIN(0.99999994f, f));
     return (SAMPLE)lrintf(f * 2147483648.0f);
 }
+#else
+// ARMv6-M (RP2040) has only MULS, 32x32 -> low 32, so an int64_t product is an
+// __aeabi_lmul call.  With k in Q15, x * k >> 16 splits exactly into x's
+// signed high and unsigned low 16 bits, each product fitting in 32 bits
+// (|x_lo * k| < 2^31): two MULS, the same floor as the 64-bit form, at the
+// cost of Q15 coefs (output within ~-85 dB of it).  A macro, not a function:
+// at -Os (the RP2040 default) an inline function stays a call.  AMY_EQ_MUL32
+// selects this on any host, to check it.
+#define EQ_MULH(x, k) (((x) >> 16) * (k) + ((((x) & 0xffff) * (k)) >> 16))
+static SAMPLE EQ_COEF(float f) {
+    f = MAX(-1.0f, MIN(0.99996948f, f));
+    return (SAMPLE)lrintf(f * 32768.0f);
+}
+#endif
 #else
 #define EQ_MULH(x, k) ((x) * (k))
 static SAMPLE EQ_COEF(float f) { return 0.5f * f; }
@@ -1205,14 +1220,16 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
     // combined from their coef vectors once per block in hold_and_modify.
     // Composing the config here rather than storing one keeps modulated
     // state in msynth, where the rest of the per-block values live.
+    // Only called with synth[osc]->dist set (and stages nonzero).
+    osc_dist_t *dist = synth[osc]->dist;
     const dist_config_t cfg = {
-        .stages = synth[osc]->dist_stages,
+        .stages = dist->stages,
         .drive = msynth[osc]->dist_drive,
-        .bits = synth[osc]->dist_bits,
-        .rate = synth[osc]->dist_rate,
+        .bits = dist->bits,
+        .rate = dist->rate,
         .mix = msynth[osc]->dist_mix,
     };
-    return dist_block(block, AMY_BLOCK_SIZE, &cfg, &synth[osc]->dist_state);
+    return dist_block(block, AMY_BLOCK_SIZE, &cfg, &dist->state);
 }
 
 // Wrap guard: the bus sum is unbounded, and SMULR6's 32x32 fallback caps the

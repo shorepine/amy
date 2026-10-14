@@ -266,9 +266,26 @@ static inline LUTSAMPLE pcm_stretch_read(const LUTSAMPLE *table, uint8_t channel
     return table[idx];
 }
 
+// Is the osc's granular stretcher running?  Only a PCM-kind osc has one.
+static inline bool pcm_stretch_active(uint16_t osc) {
+    return synth[osc]->wave_kind == WAVE_KIND_PCM && synth[osc]->stretch != NULL
+        && synth[osc]->stretch->active;
+}
+
 // Configure the stretcher at note-on.  preset must be in-memory (not FILE).
-static void pcm_stretch_note_on(uint16_t osc, memorypcm_preset_t *preset) {
-    pcm_stretch_t *st = &synth[osc]->stretch;
+// The stretcher is allocated at the osc's first fit note-on and kept (see
+// osc_release_allocs()).  Returns false on OOM: the note plays unstretched.
+static bool pcm_stretch_note_on(uint16_t osc, memorypcm_preset_t *preset) {
+    pcm_stretch_t *st = synth[osc]->stretch;
+    if (st == NULL) {
+        st = (pcm_stretch_t *)malloc_caps(sizeof(pcm_stretch_t), amy_global.config.ram_caps_oscs);
+        if (st == NULL) {
+            amy_oom("pcm_stretch_note_on: out of memory for osc %d\n", osc);
+            return false;
+        }
+        memset(st, 0, sizeof(*st));
+        synth[osc]->stretch = st;
+    }
     uint32_t start_frame = INT_OF_P(synth[osc]->phase, PCM_INDEX_BITS);
     if (start_frame >= preset->length) start_frame = 0;
     uint32_t remaining = preset->length - start_frame;
@@ -299,6 +316,7 @@ static void pcm_stretch_note_on(uint16_t osc, memorypcm_preset_t *preset) {
     st->us_per_tick_ref = (synth[osc]->fit_ticks > 0) ? amy_global.us_per_tick : 0;
     st->ended = 0;
     st->active = 1;
+    return true;
 }
 
 // WSOLA-style spawn alignment: search this many frames either side of the
@@ -419,7 +437,7 @@ static void pcm_stretch_spawn(pcm_stretch_t *st, memorypcm_preset_t *preset, uin
 }
 
 static SAMPLE render_pcm_stretch(SAMPLE *buf, uint16_t osc, memorypcm_preset_t *preset) {
-    pcm_stretch_t *st = &synth[osc]->stretch;
+    pcm_stretch_t *st = synth[osc]->stretch;  // pcm_stretch_active() checked it
     // A tempo change has to reach notes that are ALREADY sounding: fit= locks
     // a note to a number of ticks, and a tick just got longer or shorter, so
     // a note left alone would run on at the old tempo and land off the grid.
@@ -538,6 +556,9 @@ void pcm_note_on(uint16_t osc) {
         }
         // Does this note-on want the granular fit engine?  Only for in-memory
         // presets: it needs random access, which a streamed file can't give.
+        // Normally a no-op: WAVE set the kind.  But config for another kind
+        // can have claimed the union since, and fit is read below.
+        osc_set_wave_kind(osc, WAVE_KIND_PCM);
         bool want_stretch = AMY_IS_SET(synth[osc]->fit_ticks)
             && preset->type != AMY_PCM_TYPE_FILE
             && preset->sample_ram != NULL && preset->length > 0;
@@ -547,7 +568,7 @@ void pcm_note_on(uint16_t osc) {
         bool unrendered = synth[osc]->status == SYNTH_AUDIBLE && synth[osc]->phase == phase;
         if (!unrendered) msynth[osc]->fade_end = 0;
         if (synth[osc]->status == SYNTH_AUDIBLE && !unrendered && preset->type != AMY_PCM_TYPE_FILE
-            && !want_stretch && !synth[osc]->stretch.active && base_index < preset->length
+            && !want_stretch && !pcm_stretch_active(osc) && base_index < preset->length
             && msynth[osc]->amp > AMP_THRESH_PLUS) {
             // Restarting a currently-playing (non-file) PCM: the old note keeps playing from where it
             // is, fading out over PCM_RETRIG_FADE_FRAMES under the new one (render_pcm), to avoid a click.
@@ -570,8 +591,8 @@ void pcm_note_on(uint16_t osc) {
         msynth[osc]->pcm_delay = 0;
         if (AMY_IS_SET(synth[osc]->sample_offset))
             msynth[osc]->pcm_delay = synth[osc]->sample_offset % AMY_BLOCK_SIZE;
-        if (want_stretch) pcm_stretch_note_on(osc, preset);
-        else synth[osc]->stretch.active = 0;
+        if (!(want_stretch && pcm_stretch_note_on(osc, preset)) && synth[osc]->stretch != NULL)
+            synth[osc]->stretch->active = 0;
         // Make sure PCM waveforms are excluded from auto-termination, so we don't cut-off samples with silent gaps.  May be modified by note_off.
         synth[osc]->terminate_on_silence = 0;
     }
@@ -638,7 +659,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         memorypcm_preset_t *preset =
             get_preset_for_preset_number(synth[osc]->preset, &rom_local);
         // fit= notes render through the granular stretch engine instead.
-        if (synth[osc]->stretch.active && preset->type != AMY_PCM_TYPE_FILE
+        if (pcm_stretch_active(osc) && preset->type != AMY_PCM_TYPE_FILE
             && preset->sample_ram != NULL && preset->length > 0) {
             return render_pcm_stretch(buf, osc, preset);
         }
