@@ -1220,14 +1220,16 @@ AMY_IRAM_ATTR SAMPLE dist_process(SAMPLE * block, uint16_t osc) {
     // combined from their coef vectors once per block in hold_and_modify.
     // Composing the config here rather than storing one keeps modulated
     // state in msynth, where the rest of the per-block values live.
+    // Only called with synth[osc]->dist set (and stages nonzero).
+    osc_dist_t *dist = synth[osc]->dist;
     const dist_config_t cfg = {
-        .stages = synth[osc]->dist_stages,
+        .stages = dist->stages,
         .drive = msynth[osc]->dist_drive,
-        .bits = synth[osc]->dist_bits,
-        .rate = synth[osc]->dist_rate,
+        .bits = dist->bits,
+        .rate = dist->rate,
         .mix = msynth[osc]->dist_mix,
     };
-    return dist_block(block, AMY_BLOCK_SIZE, &cfg, &synth[osc]->dist_state);
+    return dist_block(block, AMY_BLOCK_SIZE, &cfg, &dist->state);
 }
 
 // Wrap guard: the bus sum is unbounded, and SMULR6's 32x32 fallback caps the

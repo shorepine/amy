@@ -152,6 +152,12 @@ void note_on_mod(uint16_t osc, uint16_t algo_osc) {
 }
 
 void algo_note_off(uint16_t osc) {
+    // osc note off, start release
+    AMY_UNSET(synth[osc]->note_on_clock);
+    synth[osc]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
+    // Another kind can own the union if config for it reached this ALGO osc;
+    // then there are no sources.
+    if (synth[osc]->wave_kind != WAVE_KIND_ALGO) return;
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(AMY_IS_SET(synth[osc]->algo_source[i])
            && synth[synth[osc]->algo_source[i]] != NULL) {
@@ -160,14 +166,12 @@ void algo_note_off(uint16_t osc) {
             synth[o]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
         }
     }
-    // osc note off, start release
-    AMY_UNSET(synth[osc]->note_on_clock);
-    synth[osc]->note_off_clock = amy_global.total_blocks * AMY_BLOCK_SIZE;
 }
 
 
 void algo_note_on(uint16_t osc, float freq) {
     msynth[osc]->logfreq = logfreq_of_freq(freq);
+    if (synth[osc]->wave_kind != WAVE_KIND_ALGO) return;    
     for(uint8_t i=0;i<MAX_ALGO_OPS;i++) {
         if(AMY_IS_SET(synth[osc]->algo_source[i])
            && synth[synth[osc]->algo_source[i]] != NULL) {
@@ -196,6 +200,7 @@ void algo_init() {
 }
 
 SAMPLE render_algo(SAMPLE* buf, uint16_t osc, uint8_t core) {
+    if (synth[osc]->wave_kind != WAVE_KIND_ALGO) return 0;  // no algorithm or sources
     struct FmAlgorithm algo = algorithms[synth[osc]->algorithm];
     SAMPLE max_value = 0;
 

@@ -774,6 +774,26 @@ typedef struct {
     } grain[PCM_STRETCH_GRAINS];
 } pcm_stretch_t;
 
+// Per-osc distortion config and state.  Most oscs never distort, so this is
+// allocated by the first DIST_* delta that moves it off its defaults
+// (osc_dist_alloc()); synthinfo.dist == NULL means "all defaults, bypassed".
+typedef struct osc_dist {
+    uint8_t stages;  // DIST_ stage bits; 0 = bypassed.
+    uint8_t bits;
+    uint16_t rate;
+    // Drive and mix are combined per block into msynth, so what an osc stores
+    // is the authored coef vectors, not a ready-made dist_config_t.
+    float logdrive_coefs[NUM_COMBO_COEFS];
+    float mix_coefs[NUM_COMBO_COEFS];
+    dist_state_t state;
+} osc_dist_t;
+
+// Which member of synthinfo's wave-specific union is live (wave_kind).
+#define WAVE_KIND_NONE 0
+#define WAVE_KIND_ALGO 1
+#define WAVE_KIND_PCM 2
+#define WAVE_KIND_KS 3
+
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
     uint16_t osc; // self-reference
@@ -793,30 +813,44 @@ struct synthinfo {
     float feedback;
     float trigger_phase;
     uint16_t sample_offset;  // PCM note-on start offset in samples within its block
-    float fit_ticks;  // PCM fit target in sequencer ticks (0 = pitch-shift at original length)
-    uint16_t fit_search;  // PCM fit grain alignment search half-width in frames (0 = off)
     float logratio;
     float portamento_alpha;
     float resonance;
     uint8_t filter_type;
     // Distortion, applied pre-filter.  On a normal osc this is the per-osc
     // timbral stage; on a SILENT chained-osc head it shapes the summed voice.
-    // Drive and mix are combined per block into msynth, so what an osc stores
-    // is the authored coef vectors, not a ready-made dist_config_t.
-    uint8_t dist_stages;
-    uint8_t dist_bits;
-    uint16_t dist_rate;
-    float dist_logdrive_coefs[NUM_COMBO_COEFS];
-    float dist_mix_coefs[NUM_COMBO_COEFS];
+    // NULL until a DIST_* delta moves it off its defaults (osc_dist_alloc()).
+    osc_dist_t *dist;
     uint16_t chained_osc;
     uint16_t mod_source[NUM_MOD_SOURCES];
-    uint8_t algorithm;
-    int16_t algo_source[MAX_ALGO_OPS];  // int16 not uint because -1 specified to indicate no osc 
     uint8_t eg_type[MAX_BREAKPOINT_SETS];  // one of the ENVELOPE_ values
     uint8_t max_num_breakpoints[MAX_BREAKPOINT_SETS];  // alloc'd length of breakpoint_times/vals
     uint32_t *breakpoint_times[MAX_BREAKPOINT_SETS];  // (in samples) dynamically sized.
     float *breakpoint_values[MAX_BREAKPOINT_SETS];  // dynamically sized.
-    SAMPLE *ks_ring;  // Karplus-Strong delay line, alloc'd at the first KS note-on. not in event.
+    // Config and state only one kind of wave uses share storage; wave_kind
+    // says which is live, and osc_set_wave_kind() switches it, releasing
+    // the old kind's allocations and resetting the new kind to defaults.
+    // An osc of another kind reads these as unset (see the accessors in
+    // amy.c), so a WAVE change away keeps them until another kind claims
+    // the space -- the same as when they were separate fields.
+    uint8_t wave_kind;  // WAVE_KIND_*, not in event
+    union {
+        struct {  // WAVE_KIND_ALGO
+            uint8_t algorithm;
+            int16_t algo_source[MAX_ALGO_OPS];  // int16 not uint because -1 specified to indicate no osc
+        };
+        struct {  // WAVE_KIND_PCM
+            float fit_ticks;  // PCM fit target in sequencer ticks (0 = pitch-shift at original length)
+            uint16_t fit_search;  // PCM fit grain alignment search half-width in frames (0 = off)
+            // Granular time-stretch/pitch-shift state (PCM "fit", see pcm.c),
+            // alloc'd at the first fit note-on.  not in event.
+            pcm_stretch_t *stretch;
+        };
+        struct {  // WAVE_KIND_KS
+            SAMPLE *ks_ring;  // Karplus-Strong delay line, alloc'd at the first KS note-on. not in event.
+            SAMPLE ks_tune_state;  // KS tuning allpass state, cleared at note-on.
+        };
+    };
     // Per-note state (set on initialization, does not change during note)
     uint8_t terminate_on_silence;  // Usually yes, not for PCM. not in event.
     const LUT *lut;       // Selected lookup table and size.
@@ -830,16 +864,11 @@ struct synthinfo {
     uint32_t mod_value_clock;  // Only calculate mod_value once per frame (for mod_source).
     SAMPLE mod_value;  // last value returned by this oscillator when acting as a MOD_SOURCE, not in event
     SAMPLE last_scale[MAX_BREAKPOINT_SETS];  // remembers current envelope level, to use as start point in release.
-    SAMPLE last_two[2];    // For ALGO feedback ops
-    SAMPLE ks_tune_state;  // KS tuning allpass state, cleared at note-on.
+    SAMPLE last_two[2];    // FM feedback, noise and PARTIALS state (not one wave kind, so not in the union)
     // For filters.  Need 2x because LPF24 uses two instances of filter.
     SAMPLE filter_delay[2 * FILT_NUM_DELAYS];
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
-    // DIST_CRUSH sample-rate reducer state.
-    dist_state_t dist_state;
-    // Granular time-stretch/pitch-shift state (PCM "fit", see pcm.c).
-    pcm_stretch_t stretch;
 };
 
 // synthinfo, but only the things that mods/env can change. one per osc
@@ -1203,6 +1232,11 @@ int8_t oscs_init();
 void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
 bool ensure_osc_allocd(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
+void osc_set_wave_kind(uint16_t osc, uint8_t kind);
+void wave_kind_set_defaults(struct synthinfo *psynth);
+uint8_t wave_kind_of_wave(uint16_t wave);
+osc_dist_t *osc_dist_alloc(uint16_t osc);
+extern const osc_dist_t osc_dist_defaults;
 void patches_init(int max_memory_patches);
 void patches_deinit();
 void parse_algo_source(char* message, int16_t *vals);

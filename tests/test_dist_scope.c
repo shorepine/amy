@@ -54,7 +54,7 @@ static int same_dist(dist_config_t a, dist_config_t b) {
 // An osc that was never allocated is at its defaults, which for distortion
 // means no stage enabled.
 static uint8_t osc_dist_stages(int osc) {
-    return synth[osc] == NULL ? 0 : synth[osc]->dist_stages;
+    return (synth[osc] == NULL || synth[osc]->dist == NULL) ? 0 : synth[osc]->dist->stages;
 }
 
 static void test_no_osc_means_bus(void) {
@@ -235,7 +235,8 @@ static void test_osc_dist_survives_growth(void) {
         uint16_t osc = voice_to_base_osc[voices[v]];
         if (!(osc_dist_stages(osc) & DIST_CLIP))  all_clip = false;
         if (synth[osc] == NULL
-            || fabsf(synth[osc]->dist_logdrive_coefs[COEF_CONST] - log2f(3.0f)) > 1e-3f)
+            || synth[osc]->dist == NULL
+            || fabsf(synth[osc]->dist->logdrive_coefs[COEF_CONST] - log2f(3.0f)) > 1e-3f)
             all_drive = false;
     }
     CHECK(all_clip, "every voice has the clip stage enabled");
