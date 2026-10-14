@@ -89,3 +89,4 @@ tests/test_dist_scope
 tests/test_note_output
 tests/test_midi_cc_param
 tests/test_midi_cc_output
+tests/test_pcm_memory_preset
