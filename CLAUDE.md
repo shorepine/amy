@@ -32,6 +32,8 @@ The live Python REPL at `docs/tutorial.html` runs MicroPython in the browser wit
 
 The `docs/amy.js` file is a concatenation of the Emscripten build (`build/amy.js`), `src/amy_connector.js`, and `src/amy_api.generated.js`. The JS API file — like `src/patches.generated.js` and `src/pcm_presets.generated.js` — is a committed generated output: regenerate with `make c-api` after changing `amy/__init__.py`, `src/patches.h`, or `src/pcm_tiny.h`; CI's `make check-c-api` fails any PR where they drift.
 
+**Constants count too.** `src/amy_api.generated.js` also embeds every constant from `amy/constants.py`, which the build regenerates from the numeric `#define`s in `src/amy.h`. So adding, removing or changing any such `#define` in `amy.h` means committing **both** the regenerated `amy/constants.py` **and** a regenerated `src/amy_api.generated.js` (`python3 scripts/gen_amy_js_api.py`, or `make c-api`), in the same commit. Before pushing any change to `amy.h`, run `make check-c-api` to catch a stale JS API file.
+
 ## GitHub Auth
 
 - The `bwhitman` account needs `workflow` scope on its token to push changes to `.github/workflows/` files. Run `gh auth refresh -h github.com -s workflow` if pushes are rejected.
