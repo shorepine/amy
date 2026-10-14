@@ -139,6 +139,27 @@ const int16_t *pcm_get_sample_ram_for_preset(uint16_t preset_number, uint32_t *l
     return preset->sample_ram;
 }
 
+// Read back an in-memory PCM preset -- one filled by load_sample or recorded by
+// start_sample -- so an embedder can save it.  Unlike the lookup above there is
+// no ROM fallback: returns NULL unless preset_number is a memory preset (ROM,
+// gamma and file-streamed presets all return NULL).  The returned RAM holds
+// frames * channels interleaved samples and is only valid until the preset is
+// unloaded or reloaded.  Any out-pointer may be NULL.
+const int16_t *pcm_get_memory_preset(uint16_t preset_number, uint32_t *frames, uint8_t *channels,
+                                     uint32_t *samplerate, float *midinote) {
+    for (memorypcm_ll_t *p = memorypcm_ll_start; p != NULL; p = p->next) {
+        if (p->preset_number != preset_number) continue;
+        memorypcm_preset_t *preset = p->preset;
+        if (preset->type != AMY_PCM_TYPE_MEMORY || preset->sample_ram == NULL) return NULL;
+        if (frames != NULL) *frames = preset->length;
+        if (channels != NULL) *channels = preset->channels;
+        if (samplerate != NULL) *samplerate = preset->samplerate;
+        if (midinote != NULL) *midinote = preset->midinote;
+        return preset->sample_ram;
+    }
+    return NULL;
+}
+
 
 // Hann window for the granular time-stretcher, Q15.  At 50% overlap Hann
 // windows sum to exactly 1.0 (COLA), so two overlapping grains reconstruct
