@@ -338,6 +338,48 @@ class TestPcmRetriggerOnset(AmyTest):
         self.__class__.__name__, all(on_time), max(jumps), smooth, repeated_ok)
 
 
+class TestPcmRetriggerGain(AmyTest):
+  """A PCM note-on starts the note at its own gain; a note it retriggers fades at the gain it had.
+
+  Both used to share the block's amp ramp, from the old note's gain to the new one's, so a ghost
+  note after an accent started at the accent's level, and an accent after a ghost at the ghost's.
+  A note-on after a note-off that stopped the osc ramped from the stopped note's gain too."""
+
+  def test(self):
+    sr = amy.AMY_SAMPLE_RATE
+    block = amy.AMY_BLOCK_SIZE
+    t = np.arange(int(0.6 * sr)) / sr
+    sample = 0.3 * np.sin(2 * np.pi * 40 * t) * np.minimum(t / 0.002, 1)
+    payload = (sample * 32767).astype('<i2').tobytes()
+
+    def render(old_vel, new_vel, note_off=False):
+      _amy.stop()
+      _amy.start(0)
+      amy.load_sample_bytes(payload, preset=1024, midinote=60)
+      amy.send(osc=0, wave=amy.PCM, preset=1024)
+      if old_vel:
+        amy.send(osc=0, note=60, vel=old_vel)
+        amy.render(18 * block / sr)
+      if note_off:
+        amy.send(osc=0, vel=0)  # PCM_PLAY_STOP: stops the osc
+      if new_vel:
+        amy.send(osc=0, note=60, vel=new_vel)
+      return amy.render(2 * block / sr)[:, 0]
+
+    # The sample plays at the output rate (step 1), so the 64-frame fade is 64 output samples.
+    fade = np.maximum(0, 64 - np.arange(2 * block)) / 64
+    errors = []
+    for old_vel, new_vel in ((1, 0.25), (0.25, 1)):
+      got = render(old_vel, new_vel)
+      expected = render(0, new_vel) + render(old_vel, 0) * fade
+      errors.append(np.max(np.abs(got - expected)))
+    # A note-on after a note-off that stopped the osc is a fresh note: nothing fades, and it must not
+    # start at the stopped note's gain either.
+    errors.append(np.max(np.abs(render(1, 0.25, note_off=True) - render(0, 0.25))))
+    is_ok = bool(max(errors) <= 2e-4)
+    return is_ok, '%s: max err vs fresh note + old note x fade: ghost after accent %.5f, accent after ghost %.5f; after a note-off %.5f' % (
+        self.__class__.__name__, errors[0], errors[1], errors[2])
+
 class TestPcmPatchChange(AmyTest):
   """There was a bug where switching PCM preset would persist the base note of the preceding preset."""
 
