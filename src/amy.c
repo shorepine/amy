@@ -1074,6 +1074,7 @@ void reset_modosc(struct mod_synthinfo *pmsynth) {
         pmsynth->state = 0;
         pmsynth->pcm_delay = 0;
         pmsynth->fade_end = 0;
+        pmsynth->fade_amp = 0;
     }
 }
 
