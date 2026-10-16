@@ -377,6 +377,27 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
     return 1;
 }
 
+// Whether `slot` fires on this tick; *one_shot says whether firing empties
+// it.  period is read once, so a concurrent clear zeroing it cannot land
+// between the test and the modulo.
+static bool slot_due(int32_t slot, bool *one_shot)
+{
+    uint32_t period = sequences[slot].period;
+    if (period != 0) {
+        *one_shot = false;
+        return amy_global.sequencer_tick_count % period == sequences[slot].tick;
+    }
+    // Absolute tick.  <= rather than ==: the walk runs without the lock, and
+    // a stale link can make it skip an entry for a single tick (see the
+    // thread safety note).  Under ==, a slot skipped on exactly its tick
+    // would sit there forever, holding a slot and never playing.  <= lets it
+    // fire on the next tick instead, matching the play-it-late rule
+    // sequencer_add_wire() uses for a one-off that is already due when it
+    // arrives.
+    *one_shot = true;
+    return sequences[slot].tick <= amy_global.sequencer_tick_count;
+}
+
 static void sequencer_process_tick(void) {
     amy_global.sequencer_tick_count++;
     midi_clock_out_tick();  // no-op unless in AMY_MIDI_SYNC_SEND mode
@@ -397,50 +418,35 @@ static void sequencer_process_tick(void) {
     while (slot != -1 && steps-- > 0) {
         // Read the link BEFORE anything below can unlink this entry.
         int32_t next = sequences[slot].next_active;
-        if (sequences[slot].wire != NULL) {
-            bool hit = false;
-            bool delete = false;
-            if(sequences[slot].period != 0) { // period set
-                uint32_t offset = amy_global.sequencer_tick_count % sequences[slot].period;
-                if (offset == sequences[slot].tick) hit = true;
-            } else {
-                // Test for absolute tick (no period set).  <= rather than ==:
-                // the walk above runs without the lock, and a stale link can
-                // make it skip an entry for a single tick (see the thread
-                // safety note).  Under ==, a slot skipped on exactly its tick
-                // would sit there forever, holding a slot and never playing.
-                // <= lets it fire on the next tick instead, matching the
-                // play-it-late rule sequencer_add_wire() uses for a one-off
-                // that is already due when it arrives.
-                if (sequences[slot].tick <= amy_global.sequencer_tick_count) { hit = true; delete = true; }
+        bool delete;
+        if (sequences[slot].wire != NULL && slot_due(slot, &delete)) {
+            // Take the message out (one-shot) or a copy of it (repeating)
+            // under the lock, so an ingest thread rewriting the slot can't
+            // free the string while we parse it.  Ask again whether it is
+            // due: a clear and re-add can refill this slot with another
+            // event between the unlocked test above and here.
+            char *wire = NULL;
+            amy_grab_lock();
+            if (sequences[slot].wire != NULL && slot_due(slot, &delete)) {
+                if (delete) {
+                    wire = sequences[slot].wire;
+                    sequences[slot].wire = NULL;   // slot_release, but we
+                    sequences[slot].tick = 0;      // keep the string to
+                    sequences[slot].period = 0;    // play it below
+                    active_unlink(slot);
+                    slot_freed(slot);
+                } else {
+                    size_t len = strlen(sequences[slot].wire);
+                    wire = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
+                    if (wire != NULL) memcpy(wire, sequences[slot].wire, len + 1);
+                    else amy_oom("sequencer fire");
+                }
             }
-            if(hit) {
-                // Take the message out (one-shot) or a copy of it (repeating)
-                // under the lock, so an ingest thread rewriting the slot can't
-                // free the string while we parse it.
-                char *wire = NULL;
-                amy_grab_lock();
-                if (sequences[slot].wire != NULL) {
-                    if (delete) {
-                        wire = sequences[slot].wire;
-                        sequences[slot].wire = NULL;   // slot_release, but we
-                        sequences[slot].tick = 0;      // keep the string to
-                        sequences[slot].period = 0;    // play it below
-                        active_unlink(slot);
-                        slot_freed(slot);
-                    } else {
-                        size_t len = strlen(sequences[slot].wire);
-                        wire = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
-                        if (wire != NULL) memcpy(wire, sequences[slot].wire, len + 1);
-                        else amy_oom("sequencer fire");
-                    }
-                }
-                amy_release_lock();
-                if (wire != NULL) {
-                    // Parse and play now; the deltas play back within this block.
-                    amy_play_message(wire);
-                    free(wire);
-                }
+            amy_release_lock();
+            if (wire != NULL) {
+                // Parse and play now; the deltas play back within this block.
+                amy_play_message(wire);
+                free(wire);
             }
         }
         slot = next;
