@@ -50,6 +50,10 @@ int32_t max_sequences = 0;
 // end of the table permanently.  The cost is proportional to what is
 // scheduled now.
 int32_t first_active = -1;
+// Lowest tagged slot that may be free: every slot below it is occupied, so
+// alloc_tagged_slot() starts its search here.  Lowered by every release,
+// reset to 0 with the table.
+static int32_t free_hint = 0;
 // Anonymous (no-tag) entries live past the user-addressable tag range, at
 // indices [max_sequences .. max_sequences+AMY_ANON_SEQUENCE_SLOTS), so a
 // user-supplied tag (bounds-checked against max_sequences) can never reach
@@ -83,6 +87,7 @@ void sequencer_init(int max_sequencer_tags) {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+    free_hint = 0;
     // We are read to go.
     sequencer_recompute();
 }
@@ -101,6 +106,7 @@ void sequencer_reset() {
         sequences[i].next_active = -1;
     }
     first_active = -1;
+    free_hint = 0;
 }
 
 void sequencer_deinit() {
@@ -142,7 +148,8 @@ void sequencer_debug() {
  * ascending list of tags.  Now that several slots can share a tag, the sort
  * key has to be the tag itself, and a new entry is spliced in AFTER every
  * entry with the same tag, so events cumulated onto one tag fire in the
- * order they were added.
+ * order they were added.  sequencer_clear_tag() relies on the same order:
+ * it finds a tag's events as one adjacent run.
  *
  * THREAD SAFETY.  Link mutations happen only under the amy lock --
  * sequencer_add_wire() takes it, sequencer_clear_tag() takes it, the tick
@@ -194,25 +201,44 @@ static void active_unlink(int32_t slot)
         *prev = sequences[slot].next_active;   /* one store, again */
 }
 
-// Empty a slot and take it out of the walk.  Caller holds the amy lock.
-static void slot_release(int32_t slot)
+// Anonymous slots sit past max_sequences, above any hint.  Caller holds the
+// amy lock.
+static void slot_freed(int32_t slot)
+{
+    if (slot < free_hint) free_hint = slot;
+}
+
+// Empty a slot that is already out of the walk.  Caller holds the amy lock.
+static void slot_empty(int32_t slot)
 {
     if (sequences[slot].wire) free(sequences[slot].wire);
     sequences[slot].wire = NULL;
     sequences[slot].tick = 0;
     sequences[slot].period = 0;
+    slot_freed(slot);
+}
+
+// Take a slot out of the walk and empty it.  Caller holds the amy lock.
+static void slot_release(int32_t slot)
+{
     active_unlink(slot);
+    slot_empty(slot);
 }
 
 // Lowest free slot in the tagged region, or -1 if the pool is full.  Lowest
 // rather than round-robin so a "clear the tag, re-add the pattern" cycle --
 // the normal way a sequencer edits itself -- lands on the same slots every
-// time and stays reproducible.  Linear, but adds happen at user rate, not
-// per tick.  Caller holds the amy lock.
+// time and stays reproducible.  Searches from free_hint.  Caller holds the
+// amy lock.
 static int32_t alloc_tagged_slot(void)
 {
-    for (int32_t slot = 0; slot < max_sequences; ++slot)
-        if (sequences[slot].wire == NULL) return slot;
+    for (int32_t slot = free_hint; slot < max_sequences; ++slot) {
+        if (sequences[slot].wire == NULL) {
+            free_hint = slot + 1;
+            return slot;
+        }
+    }
+    free_hint = max_sequences;
     return -1;
 }
 
@@ -229,9 +255,17 @@ void sequencer_clear_tag(uint32_t tag)
         return;
     }
     amy_grab_lock();
-    for (int32_t slot = 0; slot < max_sequences; ++slot)
-        if (sequences[slot].wire != NULL && sequences[slot].tag == tag)
-            slot_release(slot);
+    // The active list holds every occupied slot, sorted by tag with a tag's
+    // events adjacent: walk to the tag's run and unlink it in place.  One
+    // store per unlink, as in active_unlink(), for the unlocked tick walk.
+    int32_t *prev = &first_active;
+    while (*prev != -1 && sequences[*prev].tag < tag)
+        prev = &sequences[*prev].next_active;
+    while (*prev != -1 && sequences[*prev].tag == tag) {
+        int32_t slot = *prev;
+        *prev = sequences[slot].next_active;
+        slot_empty(slot);
+    }
     amy_release_lock();
 }
 
@@ -289,6 +323,9 @@ uint8_t sequencer_add_wire(uint32_t tick, uint32_t period, uint32_t tag, bool ha
             return 0;
         }
     }
+    // Nothing to schedule (a caller's failed copy).  Stored, it would sit in
+    // the walk as a slot that reads as free.
+    if (wire == NULL) return 0;
     if (period == 0 && tick <= amy_global.sequencer_tick_count) {
         // A one-off that is already due or overdue.  Play it NOW rather than
         // dropping it: a caller that reads the tick clock and schedules
@@ -390,6 +427,7 @@ static void sequencer_process_tick(void) {
                         sequences[slot].tick = 0;      // keep the string to
                         sequences[slot].period = 0;    // play it below
                         active_unlink(slot);
+                        slot_freed(slot);
                     } else {
                         size_t len = strlen(sequences[slot].wire);
                         wire = (char *)malloc_caps(len + 1, amy_global.config.ram_caps_events);
