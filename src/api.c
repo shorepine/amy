@@ -136,6 +136,10 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->mode);
     AMY_UNSET(e->patch_number);
     AMY_UNSET(e->trigger_phase);
+    AMY_UNSET(e->unison_count);
+    AMY_UNSET(e->unison_spacing);
+    AMY_UNSET(e->unison_offset);
+    AMY_UNSET(e->unison_blend);
     AMY_UNSET(e->sample_offset);
     AMY_UNSET(e->fit_ticks);
     AMY_UNSET(e->fit_search);

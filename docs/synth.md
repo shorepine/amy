@@ -278,6 +278,22 @@ Oscillators will not become audible until a `velocity` over 0 is set for the osc
  - Internally each cycle is 256 samples; full table length is typically 16384 samples (64 complete cycles).
  - You can load new wavetables using `load_sample` and use your new preset number. Ensure they are 16,384 samples long. Find more on [waveeditonline.com](http://waveeditonline.com).
 
+### Unison
+
+An oscillator can render several detuned copies of its wave into its own output. `unison` (wire code `C`) takes up to four values: count, spacing, offset, blend.
+
+ - `count` (1-8, default 1) is the number of copies.
+ - Copy i plays at the osc's pitch + `offset` + i * `spacing` octaves (both default 0, clamped to +/-4 octaves).
+ - `blend` (0-1, default 1) is the weight of the copy farthest from the osc's pitch; weights fall linearly with a copy's distance from the osc's pitch, so a cluster centred on the note (`offset = -(count - 1) * spacing / 2`) tapers symmetrically. 1 gives every copy the same weight. The weights are power-normalized, so the cluster plays at about the level of one copy.
+ - The copies share the osc's envelope, filter, distortion, pan and modulation; note, pitch bend, portamento and pitch modulation move the whole cluster. At each note-on the copies are spread evenly over one cycle from the osc's phase.
+ - SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE and WAVETABLE render the cluster; other waves ignore it. Switching the osc to PCM, KS or ALGO drops the cluster's phases with that kind's state; switching back to one of these waves picks the cluster up again, since the four parameters persist on the osc.
+
+```python
+# Four saws spread over +/-20 cents (20/1200 octave) around the note, outer copies at 0.8.
+D = 20 / 1200
+amy.send(osc=0, wave=amy.SAW_DOWN, unison=[4, 2 * D / 3, -D, 0.8], note=48, vel=1)
+```
+
 
 ## LFOs & modulators
 

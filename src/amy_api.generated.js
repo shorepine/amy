@@ -77,6 +77,7 @@ var AMY_KW_MAP = {
   cv_trigger: {wire: "ig", type: "L"},
   note_output: {wire: "iG", type: "L"},
   midi_cc_output: {wire: "iC", type: "L"},
+  unison: {wire: "C", type: "L"},
   patch_string: {wire: "u", type: "S"}
 };
 
@@ -154,7 +155,8 @@ var AMY_KW_PRIORITY = {
   cv_trigger: 70,
   note_output: 71,
   midi_cc_output: 72,
-  patch_string: 73
+  unison: 73,
+  patch_string: 74
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];
@@ -310,6 +312,8 @@ var AMY = {
   AMY_MAX_CV_OUT: 4,
   AMY_MAX_CORES: 2,
   AMY_MAX_CHANNELS: 2,
+  AMY_UNISON_MAX: 8,
+  AMY_UNISON_MAX_OCTAVES: 4.0,
   AMY_NCHANS: 2,
   AMY_CORES: 1,
   AMY_MIDI_CHANNEL_DRUMS: 10,
@@ -431,6 +435,7 @@ var AMY = {
   WAVE_KIND_ALGO: 1,
   WAVE_KIND_PCM: 2,
   WAVE_KIND_KS: 3,
+  WAVE_KIND_LUT: 4,
   AMY_AUDIO_IS_NONE: 0,
   AMY_AUDIO_IS_I2S: 1,
   AMY_AUDIO_IS_USB_GADGET: 2,
@@ -522,7 +527,11 @@ var AMY = {
   PARAM_SAMPLE_OFFSET: 231,
   PARAM_FIT: 232,
   PARAM_FIT_SEARCH: 233,
-  PARAM_NO_PARAM: 234
+  PARAM_UNISON_COUNT: 234,
+  PARAM_UNISON_SPACING: 235,
+  PARAM_UNISON_OFFSET: 236,
+  PARAM_UNISON_BLEND: 237,
+  PARAM_NO_PARAM: 238
 };
 
 if (typeof globalThis !== "undefined") {

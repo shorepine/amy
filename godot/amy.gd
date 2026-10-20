@@ -365,6 +365,7 @@ var _KW_MAP: Dictionary = {
 	"cv_trigger":          ["ig", "L"],
 	"note_output":         ["iG", "L"],
 	"midi_cc_output":      ["iC", "L"],
+	"unison":              ["C", "L"],
 	"patch_string":        ["u", "S"],
 }
 
@@ -442,7 +443,8 @@ var _KW_PRIORITY: Dictionary = {
 	"cv_trigger": 70,
 	"note_output": 71,
 	"midi_cc_output": 72,
-	"patch_string": 73,
+	"unison": 73,
+	"patch_string": 74,
 }
 
 ## The control coefficient inputs, in wire order.  Prefer naming these in a
