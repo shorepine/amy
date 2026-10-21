@@ -307,71 +307,175 @@ AMY_IRAM_ATTR PHASOR render_lut_cub(SAMPLE* buf,
 // A unison cluster is unison_count detuned copies of an osc's wave rendered
 // into its own buffer (synthinfo.unison_*).  Copy 0 runs on synth->phase,
 // copies 1..n-1 on synth->unison_phase[].  Only the WAVE_KIND_LUT waves (sine,
-// saw, pulse, triangle, wavetable) render it.
+// saw, pulse, triangle, wavetable) render it.  The copies are dealt into
+// unison_groups contiguous groups, the first count % groups of them one copy
+// larger; each group is the same spread transposed by its interval, and
+// renders from a table chosen for its own sharpest copy.
 typedef struct {
     PHASOR step;
     SAMPLE last_amp;
     SAMPLE amp;
+    const LUT *lut;
+    uint8_t idx;  // the copy's place in the deal, which names its phase
 } unison_copy;
 
 static inline PHASOR *unison_phase(uint16_t osc, uint8_t i) {
     return i ? &synth[osc]->unison_phase[i - 1] : &synth[osc]->phase;
 }
 
-// Spread copies 1..n-1 evenly over one cycle from copy 0, whatever phase
-// copy 0 restarts with.
+// A copy's offset in octaves, bounded: each field is clamped, their sum is not.
+static inline float unison_clamp_offset(float d) {
+    return MAX(-AMY_UNISON_MAX_OCTAVES, MIN(AMY_UNISON_MAX_OCTAVES, d));
+}
+
+// Octaves from the osc's pitch to group g.
+static inline float unison_interval(const struct synthinfo *s, uint8_t g) {
+    switch (g) {
+    case 1: return s->unison_interval1;
+    case 2: return s->unison_interval2;
+    case 3: return s->unison_interval3;
+    default: return 0;
+    }
+}
+
+// Copies in group g when n copies are dealt into the given number of groups.
+static inline uint8_t unison_group_size(uint8_t n, uint8_t groups, uint8_t g) {
+    return n / groups + (g < n % groups ? 1 : 0);
+}
+
+// Offset, in cycles of the shared partial, between a locked group's copy and
+// its root copy: with saw amplitudes 1/k, sum_k cos(2 pi k THETA) / k^2 = 0,
+// so the shared partials add with the power of uncorrelated ones.
+#define UNISON_THETA 0.21132487f  // (1 - 1/sqrt(3)) / 2
+
+// The frequency ratio r of a group locked to the root group: an integer >= 2,
+// or the inverse of one, within 1e-3; 0 when the group is not locked.
+static float unison_locked_ratio(float interval) {
+    float r = exp2f(interval);
+    float big = (r >= 1.0f) ? r : 1.0f / r;
+    float k = roundf(big);
+    return (k >= 2.0f && fabsf(big - k) <= 1e-3f * big) ? r : 0;
+}
+
+static inline SAMPLE amy_get_random(void);
+
+// Start phases from copy 0's phase P, whatever it restarts with.  The root
+// group spreads its m_0 copies evenly over one cycle, P + j / m_0.  A group
+// locked to the root by an integer frequency ratio r (or 1/r) shares exact
+// partials with the root copy of the same in-group index, so it starts at
+// r times that copy's phase plus THETA * min(r, 1): the shared partials add
+// in power, as the weights assume.  Any other group spreads inside itself,
+// staggered by group, P + (j + g / G) / m_g.  With unison_random, copies
+// 1..n-1 instead start at random phases, drawn at every note-on.
 void unison_note_on(uint16_t osc) {
     uint8_t n = synth[osc]->unison_count;
-    float spread = 1.0f / (float)n;
-    for (uint8_t i = 1; i < n; ++i)
-        synth[osc]->unison_phase[i - 1] = P_WRAPPED_SUM(synth[osc]->phase, F2P((float)i * spread));
+    if (synth[osc]->unison_random) {
+        for (uint8_t i = 1; i < n; ++i) {
+            // amy_get_random() can return 0.5 in a float build; wrap it to 0.
+            float p = S2F(amy_get_random()) + 0.5f;
+            p -= floorf(p);
+            synth[osc]->unison_phase[i - 1] = F2P(p);
+        }
+        return;
+    }
+    uint8_t groups = MIN(synth[osc]->unison_groups, n);
+    uint8_t m_0 = unison_group_size(n, groups, 0);
+    float spread = 1.0f / (float)m_0;
+    for (uint8_t j = 1; j < m_0; ++j)
+        synth[osc]->unison_phase[j - 1] = P_WRAPPED_SUM(synth[osc]->phase, F2P((float)j * spread));
+    uint8_t i = m_0;
+    for (uint8_t g = 1; g < groups; ++g) {
+        uint8_t m = unison_group_size(n, groups, g);
+        float r = unison_locked_ratio(unison_interval(synth[osc], g));
+        for (uint8_t j = 0; j < m; ++j, ++i) {
+            if (r > 0) {
+                float phi = r * P2F(*unison_phase(osc, j % m_0)) + UNISON_THETA * MIN(r, 1.0f);
+                synth[osc]->unison_phase[i - 1] = F2P(phi - floorf(phi));
+            } else {
+                synth[osc]->unison_phase[i - 1] = P_WRAPPED_SUM(synth[osc]->phase,
+                                                                F2P(((float)j + (float)g / (float)groups) / (float)m));
+            }
+        }
+    }
 }
 
-// Octaves from the osc's pitch to its highest copy: the table must not alias
-// on the sharpest copy.
+// Octaves from the osc's pitch to the highest copy of group 0, which renders
+// from synth->lut: the table must not alias on its sharpest copy.  The lazy
+// note-on pick uses it; unison_prepare re-picks per block.
 static float unison_top_offset(uint16_t osc) {
     if (!unison_active(synth[osc])) return 0;
-    float last = synth[osc]->unison_offset + (float)(synth[osc]->unison_count - 1) * synth[osc]->unison_spacing;
-    return MAX(synth[osc]->unison_offset, last);
+    uint8_t n = synth[osc]->unison_count;
+    uint8_t m = unison_group_size(n, MIN(synth[osc]->unison_groups, n), 0);
+    float last = synth[osc]->unison_offset + (float)(m - 1) * synth[osc]->unison_spacing;
+    return unison_clamp_offset(MAX(synth[osc]->unison_offset, last));
 }
 
-// Step and amp ramp of each copy for this block; returns the copy count.
-// Copy i plays at logfreq + offset + i * spacing.  Its weight falls linearly
-// with that distance from the osc's pitch, to blend at the farthest copy, and
-// the weights are power-normalized so the cluster's level tracks one copy.
-// Without a cluster this is exactly the osc's own step and amps.
-static uint8_t unison_prepare(uint16_t osc, unison_copy *c, float freq, SAMPLE last_amp, SAMPLE amp) {
+// Step, amp ramp and table of each copy for this block, packed into c[] with
+// the copies at weight 0 left out; returns the count packed.  Copy j of group
+// g plays at logfreq + offset + j * spacing + the group's interval.  Its
+// weight falls linearly with its distance from the
+// group's center, to blend at the farthest copy of the largest group, and the
+// weights are power-normalized so the cluster's level tracks one copy.  Each
+// group renders from the entry of lutset for its own sharpest copy, group 0's
+// stored back to synth->lut (lutset NULL: every group keeps synth->lut).
+// Without a cluster this is exactly the osc's own step, amps and table.
+static uint8_t unison_prepare(uint16_t osc, unison_copy *c, float freq, SAMPLE last_amp, SAMPLE amp, const LUT *lutset) {
     if (!unison_active(synth[osc])) {
         c[0].step = F2P(freq / (float)AMY_SAMPLE_RATE);  // cycles per sec / samples per sec -> cycles per sample
         c[0].last_amp = last_amp;
         c[0].amp = amp;
+        c[0].lut = synth[osc]->lut;
+        c[0].idx = 0;
         return 1;
     }
     uint8_t n = synth[osc]->unison_count;
+    uint8_t groups = MIN(synth[osc]->unison_groups, n);
     float offset = synth[osc]->unison_offset;
     float spacing = synth[osc]->unison_spacing;
-    float span = MAX(fabsf(offset), fabsf(offset + (float)(n - 1) * spacing));
+    // Group 0 is the largest.
+    uint8_t m_max = unison_group_size(n, groups, 0);
+    float span = MAX(fabsf(offset), fabsf(offset + (float)(m_max - 1) * spacing));
     // With no detune there is no span, and every weight is 1.
     float taper = (span > 0) ? (1.0f - synth[osc]->unison_blend) / span : 0;
     float w[AMY_UNISON_MAX];
     float sum = 0;
-    for (uint8_t i = 0; i < n; ++i) {
-        float d = offset + (float)i * spacing;
-        c[i].step = F2P(freq_of_logfreq(msynth[osc]->logfreq + d) / (float)AMY_SAMPLE_RATE);
-        w[i] = 1.0f - taper * fabsf(d);
-        sum += w[i] * w[i];
+    uint8_t i = 0;
+    for (uint8_t g = 0; g < groups; ++g) {
+        uint8_t m = unison_group_size(n, groups, g);
+        float interval = unison_interval(synth[osc], g);
+        const LUT *lut = synth[osc]->lut;
+        if (lutset != NULL) {
+            float top = unison_clamp_offset(interval + MAX(offset, offset + (float)(m - 1) * spacing));
+            lut = choose_from_lutset((float)AMY_SAMPLE_RATE / freq_of_logfreq(msynth[osc]->logfreq + top), lutset);
+            if (g == 0) synth[osc]->lut = lut;
+        }
+        for (uint8_t j = 0; j < m; ++j, ++i) {
+            float d = unison_clamp_offset(offset + (float)j * spacing + interval);
+            c[i].step = F2P(freq_of_logfreq(msynth[osc]->logfreq + d) / (float)AMY_SAMPLE_RATE);
+            c[i].lut = lut;
+            c[i].idx = i;
+            w[i] = 1.0f - taper * fabsf(d - interval);
+            sum += w[i] * w[i];
+        }
     }
     // Blend 0 with no copy at the center zeroes every weight; fall back to
     // equal weights rather than dividing by zero.
     float norm = 1.0f / sqrtf((float)n);
     if (sum > 1e-6f) norm = 1.0f / sqrtf(sum);
     else for (uint8_t i = 0; i < n; ++i) w[i] = 1.0f;
+    // A copy at weight 0 adds nothing; it is not emitted, and its phase
+    // stops until it is.  Copy 0 is always emitted, so the osc's own phase
+    // keeps running.
+    uint8_t emitted = 0;
     for (uint8_t i = 0; i < n; ++i) {
         SAMPLE gain = F2S(w[i] * norm);
-        c[i].last_amp = SMULR7(last_amp, gain);
-        c[i].amp = SMULR7(amp, gain);
+        if (gain == 0 && c[i].idx != 0) continue;
+        c[emitted] = c[i];
+        c[emitted].last_amp = SMULR7(last_amp, gain);
+        c[emitted].amp = SMULR7(amp, gain);
+        ++emitted;
     }
-    return n;
+    return emitted;
 }
 
 /* Audio in */
@@ -487,7 +591,7 @@ AMY_IRAM_ATTR SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square,
     SAMPLE amp = direction * F2S(msynth[osc]->amp);
     SAMPLE last_amp = direction * F2S(msynth[osc]->last_amp);
     unison_copy copies[AMY_UNISON_MAX];
-    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp);
+    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, saw_fxpt_lutset);
     float duty = 0;
     if (is_square) {
         duty = msynth[osc]->duty;
@@ -497,20 +601,20 @@ AMY_IRAM_ATTR SAMPLE render_lpf_lut(SAMPLE* buf, uint16_t osc, int8_t is_square,
     SAMPLE max_value = 0;
     for (uint8_t i = 0; i < n; ++i) {
         // Copy 0 uses the cubic kernel; the detuned copies use the cheaper linear one.
-        PHASOR *phase = unison_phase(osc, i);
+        PHASOR *phase = unison_phase(osc, copies[i].idx);
         PHASOR pwm_phase = *phase;
-        if (i == 0)
-            *phase = render_lut_cub_sized(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, synth[osc]->lut, &max_value);
+        if (copies[i].idx == 0)
+            *phase = render_lut_cub_sized(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, copies[i].lut, &max_value);
         else
-            *phase = render_lut(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, synth[osc]->lut, &max_value);
+            *phase = render_lut(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, copies[i].lut, &max_value);
         if (is_square) {  // For pulse only, add a second delayed negative LUT wave.
             pwm_phase = P_WRAPPED_SUM(pwm_phase, F2P(msynth[osc]->last_duty));
             // Second pulse is given some blockwise-constant FM to maintain phase continuity across blocks.
             PHASOR delta_phase_per_sample = F2P((duty - msynth[osc]->last_duty) / AMY_BLOCK_SIZE);
-            if (i == 0)
-                render_lut_cub_sized(buf, pwm_phase, copies[i].step + delta_phase_per_sample, -copies[i].last_amp, -copies[i].amp, synth[osc]->lut, &max_value);
+            if (copies[i].idx == 0)
+                render_lut_cub_sized(buf, pwm_phase, copies[i].step + delta_phase_per_sample, -copies[i].last_amp, -copies[i].amp, copies[i].lut, &max_value);
             else
-                render_lut(buf, pwm_phase, copies[i].step + delta_phase_per_sample, -copies[i].last_amp, -copies[i].amp, synth[osc]->lut, &max_value);
+                render_lut(buf, pwm_phase, copies[i].step + delta_phase_per_sample, -copies[i].last_amp, -copies[i].amp, copies[i].lut, &max_value);
         }
     }
     if (is_square) msynth[osc]->last_duty = duty;
@@ -639,11 +743,11 @@ SAMPLE render_triangle(SAMPLE* buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     unison_copy copies[AMY_UNISON_MAX];
-    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp);
+    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, triangle_fxpt_lutset);
     SAMPLE max_value = 0;
     for (uint8_t i = 0; i < n; ++i) {
-        PHASOR *phase = unison_phase(osc, i);
-        *phase = render_lut(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, synth[osc]->lut, &max_value);
+        PHASOR *phase = unison_phase(osc, copies[i].idx);
+        *phase = render_lut(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, copies[i].lut, &max_value);
     }
     msynth[osc]->last_amp = msynth[osc]->amp;
     return max_value;
@@ -741,10 +845,10 @@ SAMPLE render_sine(SAMPLE* buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     unison_copy copies[AMY_UNISON_MAX];
-    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp);
+    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, NULL);
     SAMPLE max_value = 0;
     for (uint8_t i = 0; i < n; ++i) {
-        PHASOR *phase = unison_phase(osc, i);
+        PHASOR *phase = unison_phase(osc, copies[i].idx);
         *phase = render_lut_256(buf, *phase, copies[i].step, copies[i].last_amp, copies[i].amp, /* synth[osc]->lut */ &sine_fxpt_lutset[0], &max_value);
     }
     msynth[osc]->last_amp = msynth[osc]->amp;
@@ -800,7 +904,7 @@ static inline int32_t my_mrand48(void) {
 #include "pico/rand.h"
 #endif
 
-// Returns a SAMPLE between -1 and 1.
+// Returns a SAMPLE in [-0.5, 0.5); a float build can also return 0.5.
 inline static SAMPLE amy_get_random() {
 #ifndef AMY_USE_FIXEDPOINT
     return ((float)drand48()) - 0.5f;
@@ -1099,7 +1203,7 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
     unison_copy copies[AMY_UNISON_MAX];
-    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp);
+    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, NULL);
     int16_t wavetable_preset = synth[osc]->preset;
     if (AMY_IS_UNSET(wavetable_preset))
         wavetable_preset = PCM_WAVETABLE_BASE;
@@ -1134,7 +1238,7 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     next_lut.table += WAVETABLE_SAMPLES_PER_CYCLE;
     // If we used last_duty, we could actually smoothly interpolate the waveshape crossfade too (except across table boundaries).
     for (uint8_t i = 0; i < n; ++i) {
-        PHASOR *phase = unison_phase(osc, i);
+        PHASOR *phase = unison_phase(osc, copies[i].idx);
         render_lut(buf, *phase, copies[i].step, SMULR7(copies[i].last_amp, interp_a), SMULR7(copies[i].amp, interp_a), &wavetable_lut, &max_value);
         *phase = render_lut(buf, *phase, copies[i].step, SMULR7(copies[i].last_amp, interp_b), SMULR7(copies[i].amp, interp_b), &next_lut, &max_value);
     }

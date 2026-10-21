@@ -325,6 +325,29 @@ void snprintfloat3dp(char *s, size_t max_len, float val) {
         } \
     }
 
+#define _EPRINT_VALS_9(VAL1, VAL2, VAL3, VAL4, VAL5, VAL6, VAL7, VAL8, VAL9, NAME, WIRECODE)  {      \
+        float vals[] = {VAL1, VAL2, VAL3, VAL4, VAL5, VAL6, VAL7, VAL8, VAL9}; \
+        int n_vals = sizeof(vals) / sizeof(float); \
+        int last_one = -1; \
+        for (int i = 0; i < n_vals; ++i) { \
+            if (AMY_IS_SET(vals[i])) last_one = i; \
+        } \
+        if (last_one >= 0) { \
+            snprintf(s, len - (size_t)(s - s_entry), "%s", wirecode ? WIRECODE : " " NAME ": "); \
+            s += strlen(s); \
+            for (int j = 0; j <= last_one; ++j) {  \
+                if (AMY_IS_SET(vals[j])) { \
+                    snprintfloat3dp(s, len - (size_t)(s - s_entry), vals[j]); \
+                    s += strlen(s); \
+                } \
+                if (j < last_one) { \
+                    snprintf(s, len - (size_t)(s - s_entry), ","); \
+                    s += strlen(s); \
+                } \
+            } \
+        } \
+    }
+
 int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     // Convert an event into a string, either human-readable or wirecode.
     // s must be allocated.  len tells us how big it is.
@@ -354,10 +377,13 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_COEF(pan_coefs, "pan_coefs", "Q");
     _EPRINT_F(feedback, "feedback", "b");
     _EPRINT_F(trigger_phase, "phase", "P");
-    // The count is a uint8, printed through the float list like the chorus fields.
-    _EPRINT_VALS_5(AMY_IS_SET(e->unison_count) ? (float)e->unison_count : AMY_UNSET_FLOAT,
-                   e->unison_spacing, e->unison_offset, e->unison_blend, AMY_UNSET_FLOAT,
-                   "unison_{count,spacing,offset,blend}", "C");
+    // Count, groups and random are uint8s, printed through the float list like the chorus fields.
+    _EPRINT_VALS_9(AMY_IS_SET(e->unison_count) ? (float)e->unison_count : AMY_UNSET_FLOAT,
+                   e->unison_spacing, e->unison_offset, e->unison_blend,
+                   AMY_IS_SET(e->unison_groups) ? (float)e->unison_groups : AMY_UNSET_FLOAT,
+                   e->unison_interval1, e->unison_interval2, e->unison_interval3,
+                   AMY_IS_SET(e->unison_random) ? (float)e->unison_random : AMY_UNSET_FLOAT,
+                   "unison_{count,spacing,offset,blend,groups,interval1,interval2,interval3,random}", "C");
     _EPRINT_I(sample_offset, "sample_offset", "po");
     _EPRINT_F(fit_ticks, "fit", "pF");
     _EPRINT_I(fit_search, "fit_search", "pS");
@@ -517,6 +543,11 @@ bool event_addresses_oscs(amy_event *e) {
     _RET_TRUE_IF_SET(unison_spacing);
     _RET_TRUE_IF_SET(unison_offset);
     _RET_TRUE_IF_SET(unison_blend);
+    _RET_TRUE_IF_SET(unison_groups);
+    _RET_TRUE_IF_SET(unison_interval1);
+    _RET_TRUE_IF_SET(unison_interval2);
+    _RET_TRUE_IF_SET(unison_interval3);
+    _RET_TRUE_IF_SET(unison_random);
     _RET_TRUE_IF_SET(sample_offset);
     _RET_TRUE_IF_SET(fit_ticks);
     _RET_TRUE_IF_SET(fit_search);
@@ -616,6 +647,11 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(unison_spacing, UNISON_SPACING)
       _CASE_F(unison_offset, UNISON_OFFSET)
       _CASE_F(unison_blend, UNISON_BLEND)
+      _CASE_I(unison_groups, UNISON_GROUPS)
+      _CASE_F(unison_interval1, UNISON_INTERVAL1)
+      _CASE_F(unison_interval2, UNISON_INTERVAL2)
+      _CASE_F(unison_interval3, UNISON_INTERVAL3)
+      _CASE_I(unison_random, UNISON_RANDOM)
       _CASE_I(sample_offset, SAMPLE_OFFSET)
       _CASE_F(fit_ticks, FIT)
       _CASE_I(fit_search, FIT_SEARCH)
@@ -819,6 +855,11 @@ void set_event_for_osc(int base_osc, int rel_osc, struct amy_event *event) {
         event->unison_spacing = synth[osc]->unison_spacing;
         event->unison_offset = synth[osc]->unison_offset;
         event->unison_blend = synth[osc]->unison_blend;
+        event->unison_groups = synth[osc]->unison_groups;
+        event->unison_interval1 = synth[osc]->unison_interval1;
+        event->unison_interval2 = synth[osc]->unison_interval2;
+        event->unison_interval3 = synth[osc]->unison_interval3;
+        event->unison_random = synth[osc]->unison_random;
     }
     EVENT_FROM_OSC(sample_offset);
     if (is_pcm_kind) {
