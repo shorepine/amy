@@ -936,6 +936,15 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
     EVENT_TO_DELTA_COEFS(pan_coefs, PAN)
     EVENT_TO_DELTA_F(feedback, FEEDBACK)
     EVENT_TO_DELTA_F(trigger_phase, PHASE)
+    EVENT_TO_DELTA_I(unison_count, UNISON_COUNT)
+    EVENT_TO_DELTA_F(unison_spacing, UNISON_SPACING)
+    EVENT_TO_DELTA_F(unison_offset, UNISON_OFFSET)
+    EVENT_TO_DELTA_F(unison_blend, UNISON_BLEND)
+    EVENT_TO_DELTA_I(unison_groups, UNISON_GROUPS)
+    EVENT_TO_DELTA_F(unison_interval1, UNISON_INTERVAL1)
+    EVENT_TO_DELTA_F(unison_interval2, UNISON_INTERVAL2)
+    EVENT_TO_DELTA_F(unison_interval3, UNISON_INTERVAL3)
+    EVENT_TO_DELTA_I(unison_random, UNISON_RANDOM)
     EVENT_TO_DELTA_I(sample_offset, SAMPLE_OFFSET)
     EVENT_TO_DELTA_F(fit_ticks, FIT)
     EVENT_TO_DELTA_I(fit_search, FIT_SEARCH)
@@ -1095,6 +1104,9 @@ void wave_kind_set_defaults(struct synthinfo *psynth) {
         psynth->ks_ring = NULL;
         psynth->ks_tune_state = 0;
         break;
+    case WAVE_KIND_LUT:
+        for (int j = 0; j < AMY_UNISON_MAX - 1; ++j) psynth->unison_phase[j] = F2P(0);
+        break;
     default:
         break;
     }
@@ -1130,6 +1142,20 @@ void osc_set_wave_kind(uint16_t osc, uint8_t kind) {
     else if (psynth->wave_kind == WAVE_KIND_PCM) free(psynth->stretch);
     psynth->wave_kind = kind;
     wave_kind_set_defaults(psynth);
+}
+
+// The waves the unison cluster renders on (WAVE_KIND_LUT).
+static bool wave_is_lut(uint16_t wave) {
+    return wave == SINE || wave == SAW_UP || wave == SAW_DOWN || wave == PULSE
+        || wave == TRIANGLE || wave == WAVETABLE;
+}
+
+// A LUT wave with a cluster configured claims WAVE_KIND_LUT for the copies'
+// phases, at whichever delta makes both true.
+static void unison_claim_kind(uint16_t osc) {
+    struct synthinfo *psynth = synth[osc];
+    if (wave_is_lut(psynth->wave) && (psynth->unison_count > 1 || psynth->unison_offset != 0))
+        osc_set_wave_kind(osc, WAVE_KIND_LUT);
 }
 
 const osc_dist_t osc_dist_defaults = {
@@ -1179,6 +1205,15 @@ void reset_osc_params(struct synthinfo *psynth) {
     psynth->pan_coefs[COEF_CONST] = 0.5f;
     psynth->feedback = F2S(0); //.996; todo ks feedback is v different from fm feedback
     AMY_UNSET(psynth->trigger_phase);
+    psynth->unison_count = 1;
+    psynth->unison_spacing = 0;
+    psynth->unison_offset = 0;
+    psynth->unison_blend = 1.0f;
+    psynth->unison_groups = 1;
+    psynth->unison_interval1 = 0;
+    psynth->unison_interval2 = 0;
+    psynth->unison_interval3 = 0;
+    psynth->unison_random = 0;
     AMY_UNSET(psynth->sample_offset);
     AMY_UNSET(psynth->logratio);
     psynth->portamento_alpha = 0;
@@ -1215,6 +1250,8 @@ void reset_osc_state(struct synthinfo *psynth) {
     psynth->role = SYNTH_IS_NORMAL;
     psynth->status = SYNTH_OFF;
     psynth->phase = F2P(0);
+    if (psynth->wave_kind == WAVE_KIND_LUT)
+        for (int j = 0; j < AMY_UNISON_MAX - 1; ++j) psynth->unison_phase[j] = F2P(0);
     AMY_UNSET(psynth->render_clock);
     AMY_UNSET(psynth->note_on_clock);
     psynth->note_off_clock = 0;  // Used to check that last event seen by note was off.
@@ -1799,6 +1836,7 @@ void play_delta(struct delta *d) {
         // leaves it alone (nothing reads it).
         uint8_t kind = wave_kind_of_wave(synth[d->osc]->wave);
         if (kind != WAVE_KIND_NONE) osc_set_wave_kind(d->osc, kind);
+        unison_claim_kind(d->osc);
         // todo: delta-only side effect, remove
         // we do this because we need to set up LUTs for FM oscs. it's a TODO to make this cleaner
         if(synth[d->osc]->wave == SINE) {
@@ -1847,6 +1885,21 @@ void play_delta(struct delta *d) {
         if (!AMY_WAVE_IS_PCM(synth[d->osc]->wave))
             synth[d->osc]->phase = F2P(synth[d->osc]->trigger_phase);
     }
+    DELTA_TO_SYNTH_I_CLAMPED(UNISON_COUNT, unison_count, 1, AMY_UNISON_MAX)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_SPACING, unison_spacing, -AMY_UNISON_MAX_OCTAVES, AMY_UNISON_MAX_OCTAVES)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_OFFSET, unison_offset, -AMY_UNISON_MAX_OCTAVES, AMY_UNISON_MAX_OCTAVES)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_BLEND, unison_blend, 0.0f, 1.0f)
+    DELTA_TO_SYNTH_I_CLAMPED(UNISON_GROUPS, unison_groups, 1, AMY_UNISON_GROUPS_MAX)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_INTERVAL1, unison_interval1, -AMY_UNISON_MAX_OCTAVES, AMY_UNISON_MAX_OCTAVES)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_INTERVAL2, unison_interval2, -AMY_UNISON_MAX_OCTAVES, AMY_UNISON_MAX_OCTAVES)
+    DELTA_TO_SYNTH_F_CLAMPED(UNISON_INTERVAL3, unison_interval3, -AMY_UNISON_MAX_OCTAVES, AMY_UNISON_MAX_OCTAVES)
+    DELTA_TO_SYNTH_I_CLAMPED(UNISON_RANDOM, unison_random, 0, 1)
+    if (d->param >= UNISON_COUNT && d->param <= UNISON_RANDOM) unison_claim_kind(d->osc);
+    // A mid-note change of count, groups or an interval respreads the copies
+    // from copy 0, as at note-on, not from where they were left.
+    if ((d->param == UNISON_COUNT || (d->param >= UNISON_GROUPS && d->param <= UNISON_INTERVAL3))
+        && unison_active(synth[d->osc]))
+        unison_note_on(d->osc);
     DELTA_TO_SYNTH_I(SAMPLE_OFFSET, sample_offset)
     if (d->param == FIT || d->param == FIT_SEARCH) {
         // Unsetting a PCM field on an osc of another kind is already true;
@@ -2107,6 +2160,8 @@ void play_delta(struct delta *d) {
                         // PCM handles trigger_phase its own way in pcm_note_on.
                         synth[osc]->phase = F2P(synth[osc]->trigger_phase);
                     }
+                    // The other unison copies spread out from copy 0's phase.
+                    if (unison_active(synth[osc])) unison_note_on(osc);
                     // restart the waveforms
                     // Guess at the initial frequency depending only on const & note.  Envelopes not "developed" yet.
                     float initial_logfreq = synth[osc]->logfreq_coefs[COEF_CONST] + synth[osc]->logfreq_coefs[COEF_NOTE] * note_logfreq;

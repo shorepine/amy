@@ -141,7 +141,7 @@ CTESTS = tests/test_filter_type_switch tests/test_clock_wrap tests/test_sequence
          tests/test_timebase_reset tests/test_osc_free_on_release \
          tests/test_voice_osc_range tests/test_dist_coefs tests/test_dist_scope \
          tests/test_note_output tests/test_midi_cc_param tests/test_midi_cc_output \
-         tests/test_pcm_memory_preset
+         tests/test_pcm_memory_preset tests/test_unison
 
 # Static pattern rules, so these win over the generic %.o: %.c above (which
 # would compile without -Isrc and fail to find amy.h).

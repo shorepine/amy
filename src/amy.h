@@ -172,6 +172,13 @@ extern void amy_set_gamma9001_pcm(const int16_t * data);
 // upper bounds for static arrays.
 #define AMY_MAX_CORES 2          
 #define AMY_MAX_CHANNELS 2
+// Most copies one osc can render as a unison cluster (unison_count).
+#define AMY_UNISON_MAX 8
+// Range of unison_spacing, unison_offset and the group intervals; keeps every
+// copy's step finite.
+#define AMY_UNISON_MAX_OCTAVES 4.0f
+// Most groups a unison cluster deals its copies into (unison_groups).
+#define AMY_UNISON_GROUPS_MAX 4
 
 // Always use 2 channels. Clients that want mono can deinterleave
 #define AMY_NCHANS 2
@@ -520,6 +527,15 @@ enum params{
     SAMPLE_OFFSET,              // PCM note-on start offset in samples within its block
     FIT,                        // PCM time-stretch/pitch-shift target in sequencer ticks
     FIT_SEARCH,                 // PCM fit engine: WSOLA correlation search half-width, in frames
+    UNISON_COUNT,               // Unison cluster (synthinfo.unison_*): copies rendered by the osc
+    UNISON_SPACING,             // octaves between adjacent copies
+    UNISON_OFFSET,              // octaves from the osc's pitch to copy 0
+    UNISON_BLEND,               // weight of the outer copies, 1 = equal
+    UNISON_GROUPS,              // groups the copies are dealt into
+    UNISON_INTERVAL1,           // octaves from the osc's pitch to group 1
+    UNISON_INTERVAL2,           // octaves from the osc's pitch to group 2
+    UNISON_INTERVAL3,           // octaves from the osc's pitch to group 3
+    UNISON_RANDOM,              // 1 = random start phases for copies 1..n-1
     NO_PARAM                    // 210
 };
 // Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
@@ -656,9 +672,23 @@ typedef struct amy_event {
     float feedback;
     float velocity;
     float trigger_phase;
+    // Unison cluster: the unison_count copies are dealt into unison_groups
+    // groups; copy j of group g renders at the osc's pitch + unison_offset
+    // + j * unison_spacing octaves + the group's interval.
+    float unison_spacing;  // octaves between adjacent copies, default 0
+    float unison_offset;  // octaves from the osc's pitch to copy 0, default 0
+    float unison_blend;  // weight of the outer copies, 0..1, default 1 (equal weights)
+    float unison_interval1;  // octaves from the osc's pitch to group 1, default 0
+    float unison_interval2;  // octaves from the osc's pitch to group 2, default 0
+    float unison_interval3;  // octaves from the osc's pitch to group 3, default 0
+    uint8_t unison_random;  // 1 = copies 1..n-1 start at random phases, default 0
     uint16_t sample_offset;  // PCM: start this note-on at a sample offset within its block (0..AMY_BLOCK_SIZE-1)
     float fit_ticks;  // PCM: >0 = time-stretch to this many sequencer ticks; 0 = pitch-shift at original length; <0 = off
     uint16_t fit_search;  // PCM fit engine: grain alignment search half-width in frames (0 = off, unset = PCM_STRETCH_SEARCH)
+    // unison_count and unison_groups (see the unison block above) sit here to
+    // fill fit_search's padding before the next float.
+    uint8_t unison_count;  // 1..AMY_UNISON_MAX copies, default 1
+    uint8_t unison_groups;  // 1..AMY_UNISON_GROUPS_MAX groups, default 1
     float volume;  // event_only; the mixdown volume of `bus` (default bus 0)
     float pitch_bend;  // event_only
     float tempo;  // event_only
@@ -792,6 +822,7 @@ typedef struct osc_dist {
 #define WAVE_KIND_ALGO 1
 #define WAVE_KIND_PCM 2
 #define WAVE_KIND_KS 3
+#define WAVE_KIND_LUT 4
 
 // This is the state of each oscillator, set by the sequencer from deltas
 struct synthinfo {
@@ -811,6 +842,18 @@ struct synthinfo {
     float pan_coefs[NUM_COMBO_COEFS];
     float feedback;
     float trigger_phase;
+    // Unison cluster: copy j of group g renders at the osc's pitch
+    // + unison_offset + j * unison_spacing octaves + the group's interval
+    // (unison_prepare()).
+    uint8_t unison_count;
+    float unison_spacing;
+    float unison_offset;
+    float unison_blend;
+    uint8_t unison_groups;
+    float unison_interval1;
+    float unison_interval2;
+    float unison_interval3;
+    uint8_t unison_random;
     uint16_t sample_offset;  // PCM note-on start offset in samples within its block
     float logratio;
     float portamento_alpha;
@@ -849,6 +892,9 @@ struct synthinfo {
             SAMPLE *ks_ring;  // Karplus-Strong delay line, alloc'd at the first KS note-on. not in event.
             SAMPLE ks_tune_state;  // KS tuning allpass state, cleared at note-on.
         };
+        struct {  // WAVE_KIND_LUT
+            PHASOR unison_phase[AMY_UNISON_MAX - 1];  // Unison copies 1..n-1; copy 0 is phase. not in event.
+        };
     };
     // Per-note state (set on initialization, does not change during note)
     uint8_t terminate_on_silence;  // Usually yes, not for PCM. not in event.
@@ -869,6 +915,12 @@ struct synthinfo {
     // The block-floating-point shift of the filter delay values.
     int last_filt_norm_bits;
 };
+
+// Does the osc render a unison cluster: a LUT-kind osc whose config differs
+// from a single copy at its own pitch?
+static inline bool unison_active(const struct synthinfo *s) {
+    return s->wave_kind == WAVE_KIND_LUT && (s->unison_count > 1 || s->unison_offset != 0);
+}
 
 // synthinfo, but only the things that mods/env can change. one per osc
 struct mod_synthinfo {
@@ -1217,6 +1269,7 @@ void config_reverb(uint16_t bus, float level, float liveness, float damping, flo
 void config_chorus(uint16_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(uint16_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
 void osc_note_on(uint16_t osc, float initial_freq);
+void unison_note_on(uint16_t osc);
 void chorus_note_on(float initial_freq);
 
 float map_60dB_to_01f(float lin);
