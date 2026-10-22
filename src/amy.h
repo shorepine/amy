@@ -892,6 +892,7 @@ struct mod_synthinfo {
     uint16_t pcm_delay;  // Samples of silence to leave at the head of the note-on block (sample_offset).
     PHASOR fade_phase;   // PCM retrigger: where the note being replaced is, while it fades out.
     PHASOR fade_end;     // PCM retrigger: the position its fade reaches zero at; 0 = no fade running.
+    float fade_amp;      // PCM retrigger: the gain the note being replaced had, held while it fades.
 };
 
 

@@ -600,7 +600,13 @@ void pcm_note_on(uint16_t osc) {
             PHASOR fade_end = synth[osc]->phase + I2P(PCM_RETRIG_FADE_FRAMES, PCM_INDEX_BITS);
             if (fade_end > I2P(preset->length, PCM_INDEX_BITS)) fade_end = I2P(preset->length, PCM_INDEX_BITS);
             msynth[osc]->fade_end = fade_end;
+            // The old note fades at the gain it had (held for the fade, not advanced).
+            msynth[osc]->fade_amp = msynth[osc]->last_amp;
         }
+        // The new note starts from its own envelope (hold_and_modify starts a zero last_amp there), not
+        // ramping from the gain of whatever played before: a retriggered note, or one a note-off stopped
+        // (PCM_PLAY_STOP turns the osc off without resetting it).
+        if (!unrendered) msynth[osc]->last_amp = 0;
         synth[osc]->phase = phase;
         msynth[osc]->loopstart = preset->loopstart;
         msynth[osc]->loopend = preset->loopend;
@@ -730,7 +736,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
         if (msynth[osc]->fade_end) {
             // The note this one retriggered, fading out under it (see pcm_note_on): the same table
             // and step, from its own position, gain = (distance left to fade_end) / PCM_RETRIG_FADE_FRAMES,
-            // 1 where it was armed and 0 at the end, through the same amp ramp.  Bounded by the
+            // 1 where it was armed and 0 at the end, at the gain it had (fade_amp).  Bounded by the
             // table as it is now, in case the preset changed under a running fade.
             if (msynth[osc]->fade_end > I2P(sample_length, PCM_INDEX_BITS))
                 msynth[osc]->fade_end = I2P(sample_length, PCM_INDEX_BITS);
@@ -738,7 +744,7 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
             PHASOR fphase = (msynth[osc]->fade_phase - (fbase << PCM_INDEX_FRAC_BITS)) << PCM_INDEX_STEP_EXTRA_BITS;
             uint32_t findex = fbase;
             PHASOR fpos = msynth[osc]->fade_phase;
-            SAMPLE famp = amp;
+            SAMPLE famp = F2S(msynth[osc]->fade_amp);
             for (uint16_t i = 0; i < AMY_BLOCK_SIZE && fpos < msynth[osc]->fade_end; i++) {
                 SAMPLE frac = S_FRAC_OF_P(fphase, PCM_INDEX_BITS - PCM_INDEX_STEP_EXTRA_BITS);
                 LUTSAMPLE b = pcm_stretch_read(table, preset->channels, synth[osc]->wave, findex);
@@ -746,7 +752,6 @@ SAMPLE render_pcm(SAMPLE* buf, uint16_t osc) {
                 SAMPLE sample = L2S(b) + MUL4_SS(L2S(c - b), frac);
                 SAMPLE gain = SHIFTL((SAMPLE)(msynth[osc]->fade_end - fpos), S_FRAC_BITS - PCM_INDEX_FRAC_BITS - PCM_RETRIG_FADE_SHIFT);
                 SAMPLE value = buf[i] + MUL4_SS(famp, MUL0_SS(sample, gain));
-                famp += amp_step;
                 buf[i] = value;
                 if (value < 0) value = -value;
                 if (value > max_value) max_value = value;
