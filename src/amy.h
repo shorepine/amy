@@ -675,11 +675,9 @@ typedef struct amy_event {
     // Unison cluster: the unison_count copies are dealt into unison_groups
     // groups; copy j of group g renders at the osc's pitch + unison_offset
     // + j * unison_spacing octaves + the group's interval.
-    uint8_t unison_count;  // 1..AMY_UNISON_MAX copies, default 1
     float unison_spacing;  // octaves between adjacent copies, default 0
     float unison_offset;  // octaves from the osc's pitch to copy 0, default 0
     float unison_blend;  // weight of the outer copies, 0..1, default 1 (equal weights)
-    uint8_t unison_groups;  // 1..AMY_UNISON_GROUPS_MAX groups, default 1
     float unison_interval1;  // octaves from the osc's pitch to group 1, default 0
     float unison_interval2;  // octaves from the osc's pitch to group 2, default 0
     float unison_interval3;  // octaves from the osc's pitch to group 3, default 0
@@ -687,6 +685,10 @@ typedef struct amy_event {
     uint16_t sample_offset;  // PCM: start this note-on at a sample offset within its block (0..AMY_BLOCK_SIZE-1)
     float fit_ticks;  // PCM: >0 = time-stretch to this many sequencer ticks; 0 = pitch-shift at original length; <0 = off
     uint16_t fit_search;  // PCM fit engine: grain alignment search half-width in frames (0 = off, unset = PCM_STRETCH_SEARCH)
+    // unison_count and unison_groups (see the unison block above) sit here to
+    // fill fit_search's padding before the next float.
+    uint8_t unison_count;  // 1..AMY_UNISON_MAX copies, default 1
+    uint8_t unison_groups;  // 1..AMY_UNISON_GROUPS_MAX groups, default 1
     float volume;  // event_only; the mixdown volume of `bus` (default bus 0)
     float pitch_bend;  // event_only
     float tempo;  // event_only
