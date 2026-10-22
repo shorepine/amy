@@ -1,6 +1,6 @@
 [project]
 name = "amy"
-version = "1.2.201"
+version = "1.2.202"
 description = "AMY synthesizer"
 readme = "README.md"
 dependencies = ['numpy', 'soundfile']
