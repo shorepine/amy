@@ -24,6 +24,7 @@ uint16_t * osc_to_voice = NULL;
 uint16_t *voice_to_base_osc = NULL;
 
 void patches_deinit() {
+    free(memory_patch_deltas);  // patches_init()'s one block; the others point into it
     memory_patch_deltas = NULL;
     memory_patch_oscs = NULL;
     memory_patch_auto = NULL;
