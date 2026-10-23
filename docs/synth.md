@@ -277,6 +277,7 @@ Oscillators will not become audible until a `velocity` over 0 is set for the osc
  - `duty` controls interpolation position across the 64 waveform cycles within one wavetable preset.
  - Internally each cycle is 256 samples; full table length is typically 16384 samples (64 complete cycles).
  - You can load new wavetables using `load_sample` and use your new preset number. Ensure they are 16,384 samples long. Find more on [waveeditonline.com](http://waveeditonline.com).
+ - A table plays one 256-sample cycle at every pitch, so a cycle drawn with overtones to the 127th folds above about F3. `pcm_wavetable_ladder_build(preset)` makes four band-limited copies of a preset's table, cut at 63, 31, 15 and 7 harmonics, and the preset then plays as a set of tables picked by pitch the way the saw is: a note reads the finest table that does not fold at its pitch, the base below about F3, and a unison group picks for its sharpest copy. Build them from a thread other than the audio thread after loading the table (a 64-frame table is a few million multiply-adds) and again after rewriting the table; `pcm_wavetable_ladder_free(preset)` or unloading the preset drops them, and the next block plays from the base table. With no ladder built, nothing changes.
 
 ### Unison
 

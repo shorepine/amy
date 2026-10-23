@@ -1843,6 +1843,9 @@ void play_delta(struct delta *d) {
     }
     if(d->param == WAVE) {
         synth[d->osc]->wave = d->data.i;
+        // The old wave's table (a wavetable's may be a preset's rung) is not the
+        // new wave's; the saw, pulse and triangle pick theirs when it is NULL.
+        synth[d->osc]->lut = NULL;
         // A wave with kind-specific config claims the union; any other wave
         // leaves it alone (nothing reads it).
         uint8_t kind = wave_kind_of_wave(synth[d->osc]->wave);
