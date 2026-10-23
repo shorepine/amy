@@ -144,6 +144,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->unison_interval1);
     AMY_UNSET(e->unison_interval2);
     AMY_UNSET(e->unison_interval3);
+    AMY_UNSET(e->unison_frame_spread);
     AMY_UNSET(e->unison_random);
     AMY_UNSET(e->sample_offset);
     AMY_UNSET(e->fit_ticks);

@@ -281,18 +281,25 @@ Oscillators will not become audible until a `velocity` over 0 is set for the osc
 
 ### Unison
 
-An oscillator can render several detuned copies of its wave into its own output. `unison` (wire code `C`) takes up to nine values: count, spacing, offset, blend, groups, interval1, interval2, interval3, random.
+An oscillator can render several detuned copies of its wave into its own output. `unison` (wire code `C`) takes up to ten values: count, spacing, offset, blend, groups, interval1, interval2, interval3, random, frame_spread.
 
  - `count` (1-8, default 1) is the number of copies.
  - Copy i (from 0) plays at the osc's pitch + `offset` + i * `spacing` octaves (both default 0, clamped to +/-4 octaves).
  - `blend` (0-1, default 1) sets the taper: a copy at its group's own pitch (with one group, the osc's pitch) has weight 1, and weights fall linearly with a copy's distance from that pitch to `blend` at the edge of the largest group, so a cluster centred on the note (`offset = -(count - 1) * spacing / 2`) tapers symmetrically. 1 gives every copy the same weight. The weights are power-normalized, so the cluster plays at about the level of one copy.
  - The copies share the osc's envelope, filter, distortion, pan and modulation; note, pitch bend, portamento and pitch modulation move the whole cluster. At each note-on the copies of group 0 are spread evenly over one cycle from the osc's phase; a group at a whole-number frequency ratio to the root, above or below (an octave, a twelfth, two octaves), starts each copy 0.211 cycle of the shared partial away from the root copy with the same index (their shared partials have exactly the same frequencies, so they would otherwise add or cancel for the whole note; at this offset a saw's shared partials sum to the power of uncorrelated ones); other groups spread inside themselves, staggered by group. This rule is deterministic and renders identically on every note-on; `random` 1 draws the phases of copies 1 onward at each note-on instead, for a stack that does not restart identically. A change of `count`, `groups` or an interval during a note respreads the copies from copy 0 by the same rule, a step in their phases; `spacing`, `offset`, `blend` and `random` do not respread. Saw, pulse and triangle tables are re-picked every block, so they follow any of these changes. A copy other than copy 0 whose weight is 0 is not rendered.
+ - `frame_spread` (0-1, default 0) is for WAVETABLE: the copies of a group fan over that fraction of the table around the osc's own position (`duty`), copy j of m at position (j / (m - 1) - 0.5) of the fan, so a two-copy cluster at 0.5 reads a quarter of the table either side of the osc; a group of one copy sits at the osc's position, as it has no spacing either. A fan that would reach past either end of the table shrinks to the room on that side, so the copies stay evenly spaced around the osc's position and the width follows the room: a fan centred a tenth of the table from the start is a fifth of the table wide at most, and at the very end every copy reads the end frame. Every group fans the same way, the osc's own position still follows `duty` and its modulation, so a scan moves the whole fan, and a change of `frame_spread` takes effect on the next block without respreading the phases. Other waves ignore it.
  - SINE, PULSE, SAW_DOWN, SAW_UP, TRIANGLE and WAVETABLE render the cluster; other waves ignore it. Switching the osc to PCM, KS or ALGO drops the cluster's phases with that kind's state; switching back to one of these waves picks the cluster up again, since the unison parameters persist on the osc.
 
 ```python
 # Four saws spread over +/-20 cents (20/1200 octave) around the note, outer copies at 0.8.
 D = 20 / 1200
 amy.send(osc=0, wave=amy.SAW_DOWN, unison=[4, 2 * D / 3, -D, 0.8], note=48, vel=1)
+```
+
+```python
+# Four wavetable copies over +/-10 cents, each reading its own part of the table: the fan covers 40 % of it around frame 20 of 64.
+D = 10 / 1200
+amy.send(osc=0, wave=amy.WAVETABLE, duty=20 / 63, unison=[4, 2 * D / 3, -D, 1, 1, 0, 0, 0, 0, 0.4], note=48, vel=1)
 ```
 
 `groups` (1-4, default 1) deals the copies in order into that many groups of consecutive copies; when `count` does not divide evenly, the first `count % groups` groups take one copy more. Copy j of each group plays at `offset` + j * `spacing`, so every group carries the same spread, and the group as a whole is transposed: group 0 stays at the osc's pitch, group 1 moves by `interval1`, group 2 by `interval2` and group 3 by `interval3` octaves (all default 0, clamped to +/-4 octaves). `blend` tapers each copy by its distance from its own group's pitch, reaching `blend` at the edge of the largest group. A saw, pulse or triangle group renders from the table chosen for its own highest copy, so an upper group does not alias and the root group keeps its full bandwidth; sine and wavetable groups share the osc's table. More groups than copies deals one copy to each of the first `count` groups. Copies at one pitch (spacing 0 within a group) comb by their start phases instead of adding up, so a stack of distinct pitches is the groups' job. Whatever `offset`, `spacing` and the intervals add up to, a copy's offset from the osc's pitch is bounded to +/-4 octaves.

@@ -5,9 +5,9 @@
 // rung's limit; a note the base table does not fold at renders exactly as
 // without a ladder; a note above that renders exactly as a plain osc on the
 // rung alone; the groups of a cluster pick their own rungs from their
-// sharpest copy; a rebuild follows a rewritten table in place; freeing,
-// unloading and amy_stop drop the rungs; a switch to another wave stops
-// reading them.
+// sharpest copy; copies fanned by frame_spread read their frames from that
+// rung; a rebuild follows a rewritten table in place; freeing, unloading and
+// amy_stop drop the rungs; a switch to another wave stops reading them.
 //
 // Build/run with `make ctest`.
 
@@ -56,6 +56,14 @@ static void load_table(void) {
             buf[f * CYCLE + n] = (int16_t)lroundf(series(n, HARMONICS));
 }
 
+// The same table with frame f scaled by (f + 1) / FRAMES, so frames far apart
+// differ in level and every rung keeps its frame's scale.
+static void load_scaled_table(void) {
+    int16_t *buf = pcm_load(TABLE_PRESET, TABLE_LEN, 44100, 1, 69.0f, 0, 0);
+    for (int f = 0; f < FRAMES; ++f)
+        for (int n = 0; n < CYCLE; ++n)
+            buf[f * CYCLE + n] = (int16_t)lroundf(series(n, HARMONICS) * (float)(f + 1) / (float)FRAMES);
+}
 
 // A copy of rung r as its own preset, so a plain osc can play it alone.
 static void load_rung_as_preset(uint16_t preset, int r) {
@@ -234,6 +242,41 @@ static void test_cluster_groups_pick_their_own_rung(void) {
     CHECK(db < -40.0, "cluster - four oscs is %.1f dB below the four oscs", db);
 }
 
+// Two copies at note 72 -/+ 0.24 fanned by frame_spread 0.4 a fifth of the
+// scaled table either side of duty 0.5, both reading rung 31, as two plain
+// oscs at duty 0.3 and 0.7 on that rung alone, weights 1/sqrt(2), phases 0
+// and 1/2.
+static void test_frame_spread_copies_read_their_rung(void) {
+    printf("a 2-copy cluster at frame_spread 0.4 reads its fanned frames from its rung\n");
+    CHECK(passes(31, midi_hz(71.76f)) && !passes(63, midi_hz(71.76f))
+          && passes(31, midi_hz(72.24f)) && !passes(63, midi_hz(72.24f)),
+          "notes 71.76 and 72.24 want rung 31 at %d Hz", AMY_SAMPLE_RATE);
+    char setup[72];
+    snprintf(setup, sizeof(setup), "v0w%dp%dd0.5C2,0.04,-0.02,1,1,0,0,0,0,0.4Z", WAVETABLE, TABLE_PRESET);
+    start();
+    load_scaled_table();
+    pcm_wavetable_ladder_build(TABLE_PRESET);
+    amy_add_message(setup);
+    amy_add_message("v0n72l1Z");
+    render_blocks(scene_a);
+    amy_stop();
+    start();
+    load_scaled_table();
+    pcm_wavetable_ladder_build(TABLE_PRESET);
+    load_rung_as_preset(101, 1);
+    pcm_wavetable_ladder_free(TABLE_PRESET);
+    char c0[64], c1[64];
+    snprintf(c0, sizeof(c0), "v0w%dp101d0.3a0.70710678P0Z", WAVETABLE);
+    snprintf(c1, sizeof(c1), "v1w%dp101d0.7a0.70710678P0.5Z", WAVETABLE);
+    amy_add_message(c0); amy_add_message(c1);
+    amy_add_message("v0n71.76l1Z"); amy_add_message("v1n72.24l1Z");
+    render_blocks(scene_b);
+    amy_stop();
+    double ref = rms(scene_b), diff = rms_diff(scene_a, scene_b);
+    double db = (diff > 0) ? 20.0 * log10(diff / ref) : -INFINITY;
+    CHECK(ref > 0, "the two oscs render (rms %.1f, cluster rms %.1f)", ref, rms(scene_a));
+    CHECK(db < -40.0, "cluster - two oscs is %.1f dB below the two oscs", db);
+}
 
 static void test_rebuild_free_unload_and_refusals(void) {
     printf("a rebuild writes in place; free and unload drop the rungs; streamed, multichannel and short presets are refused\n");
@@ -315,6 +358,7 @@ int main(void) {
     test_low_note_unchanged();
     test_high_note_reads_its_rung();
     test_cluster_groups_pick_their_own_rung();
+    test_frame_spread_copies_read_their_rung();
     test_rebuild_free_unload_and_refusals();
     test_rom_wavetable();
     test_wave_switch_leaves_the_set();

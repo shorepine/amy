@@ -1,5 +1,6 @@
 // The unison cluster ('C': count, spacing, offset, blend, groups, interval1,
-// interval2, interval3, random) renders detuned copies of an osc's wave
+// interval2, interval3, random, frame_spread) renders detuned copies of an
+// osc's wave
 // inside the osc.  These checks pin the parts of that contract that
 // rendering alone would not: one copy at the osc's own pitch is
 // sample-identical to no cluster at all, one group is sample-identical to the
@@ -453,6 +454,102 @@ static void test_table_per_group(void) {
           two_groups ? two_groups->table_size : 0, one_group ? one_group->table_size : 0);
 }
 
+// frame_spread (the tenth value) fans a WAVETABLE cluster's copies over the
+// table: two copies at 0.4 read a fifth of the table either side of the osc's
+// own position, which two plain wavetable oscs reach through duty.
+static void test_frame_spread_two_copies_are_two_oscs(void) {
+    printf("a 2-copy wavetable cluster at frame_spread 0.4 sounds like two plain wavetable oscs at duty 0.3 and 0.7\n");
+    char cluster_setup[64], a_setup[64], b_setup[64];
+    snprintf(cluster_setup, sizeof(cluster_setup), "v0w%dd0.5C2,0.04,-0.02,1,1,0,0,0,0,0.4Z", WAVETABLE);
+    snprintf(a_setup, sizeof(a_setup), "v0w%dd0.3a0.70710678P0Z", WAVETABLE);
+    snprintf(b_setup, sizeof(b_setup), "v1w%dd0.7a0.70710678P0.5Z", WAVETABLE);
+    const char *cluster[] = {cluster_setup, "v0n60l1Z"};
+    const char *pair[] = {a_setup, b_setup, "v0n59.76l1Z", "v1n60.24l1Z"};
+    check_cluster_matches_oscs(cluster, 2, pair, 4, "wavetable pair");
+    // Two groups an octave apart fan the same way: the octave copies start
+    // at twice their root copy's phase plus THETA, both at 0.21132487 here,
+    // every weight 1/2.
+    char g_setup[64], g0[64], g1[64], g2[64], g3[64];
+    snprintf(g_setup, sizeof(g_setup), "v0w%dd0.5C4,0.04,-0.02,1,2,1,0,0,0,0.4Z", WAVETABLE);
+    snprintf(g0, sizeof(g0), "v0w%dd0.3a0.5P0Z", WAVETABLE);
+    snprintf(g1, sizeof(g1), "v1w%dd0.7a0.5P0.5Z", WAVETABLE);
+    snprintf(g2, sizeof(g2), "v2w%dd0.3a0.5P0.21132487Z", WAVETABLE);
+    snprintf(g3, sizeof(g3), "v3w%dd0.7a0.5P0.21132487Z", WAVETABLE);
+    const char *groups[] = {g_setup, "v0n60l1Z"};
+    const char *four[] = {g0, g1, g2, g3, "v0n59.76l1Z", "v1n60.24l1Z", "v2n71.76l1Z", "v3n72.24l1Z"};
+    check_cluster_matches_oscs(groups, 2, four, 8, "octave groups");
+}
+
+static void test_frame_spread_elsewhere_inert(void) {
+    printf("frame_spread changes nothing on a saw cluster, on one wavetable copy, or past the table's ends\n");
+    const char *saw_plain[] = {"v0w2C2,0.04,-0.02,1Z", "v0n60l1Z"};
+    const char *saw_spread[] = {"v0w2C2,0.04,-0.02,1,1,0,0,0,0,0.5Z", "v0n60l1Z"};
+    render_scene(saw_plain, 2, scene_a);
+    render_scene(saw_spread, 2, scene_b);
+    CHECK(rms(scene_a) > 0, "the saw cluster renders (rms %.1f)", rms(scene_a));
+    CHECK(memcmp(scene_a, scene_b, sizeof(scene_a)) == 0, "saw cluster with frame_spread 0.5 == without");
+    double level;
+    int same = same_with_and_without(WAVETABLE, -1, "C1,0,0,1,1,0,0,0,0,0.5", &level);
+    CHECK(level > 0, "one wavetable copy renders (rms %.1f)", level);
+    CHECK(same, "one wavetable copy with frame_spread 0.5 == no C");
+    char end_setup[64];
+    snprintf(end_setup, sizeof(end_setup), "v0w%dd1C4,0.01,-0.015,1,1,0,0,0,0,1Z", WAVETABLE);
+    const char *at_end[] = {end_setup, "v0n60l1Z"};
+    render_scene(at_end, 2, scene_a);
+    CHECK(rms(scene_a) > 0, "four copies at the last frame with frame_spread 1 render (rms %.1f)", rms(scene_a));
+}
+
+// Near an end the fan shrinks to the room on that side: two copies at duty
+// 0.1 with frame_spread 0.5 would reach 0.15 below the table's start, so
+// they read 0.1 either side instead, which plain oscs reach at duty 0 and 0.2.
+static void test_frame_spread_shrinks_at_the_ends(void) {
+    printf("a 2-copy wavetable cluster at duty 0.1 with frame_spread 0.5 sounds like two plain wavetable oscs at duty 0 and 0.2\n");
+    char cluster_setup[64], a_setup[64], b_setup[64];
+    snprintf(cluster_setup, sizeof(cluster_setup), "v0w%dd0.1C2,0.04,-0.02,1,1,0,0,0,0,0.5Z", WAVETABLE);
+    snprintf(a_setup, sizeof(a_setup), "v0w%dd0a0.70710678P0Z", WAVETABLE);
+    snprintf(b_setup, sizeof(b_setup), "v1w%dd0.2a0.70710678P0.5Z", WAVETABLE);
+    const char *cluster[] = {cluster_setup, "v0n60l1Z"};
+    const char *pair[] = {a_setup, b_setup, "v0n59.76l1Z", "v1n60.24l1Z"};
+    check_cluster_matches_oscs(cluster, 2, pair, 4, "wavetable pair at the start");
+    // The same room from the other end: duty 0.9 reads 0.8 and 1.
+    snprintf(cluster_setup, sizeof(cluster_setup), "v0w%dd0.9C2,0.04,-0.02,1,1,0,0,0,0,0.5Z", WAVETABLE);
+    snprintf(a_setup, sizeof(a_setup), "v0w%dd0.8a0.70710678P0Z", WAVETABLE);
+    snprintf(b_setup, sizeof(b_setup), "v1w%dd1a0.70710678P0.5Z", WAVETABLE);
+    check_cluster_matches_oscs(cluster, 2, pair, 4, "wavetable pair at the end");
+    // At the very end there is no room: four copies at duty 1 all read the
+    // last frame, as four plain oscs there do (weights 1/2, phases j/4).
+    char end_setup[64], e0[64], e1[64], e2[64], e3[64];
+    snprintf(end_setup, sizeof(end_setup), "v0w%dd1C4,0.01,-0.015,1,1,0,0,0,0,1Z", WAVETABLE);
+    snprintf(e0, sizeof(e0), "v0w%dd1a0.5P0Z", WAVETABLE);
+    snprintf(e1, sizeof(e1), "v1w%dd1a0.5P0.25Z", WAVETABLE);
+    snprintf(e2, sizeof(e2), "v2w%dd1a0.5P0.5Z", WAVETABLE);
+    snprintf(e3, sizeof(e3), "v3w%dd1a0.5P0.75Z", WAVETABLE);
+    const char *at_end[] = {end_setup, "v0n60l1Z"};
+    const char *four[] = {e0, e1, e2, e3, "v0n59.82l1Z", "v1n59.94l1Z", "v2n60.06l1Z", "v3n60.18l1Z"};
+    check_cluster_matches_oscs(at_end, 2, four, 8, "four oscs at the last frame");
+}
+
+static void test_frame_spread_clamps(void) {
+    printf("frame_spread clamps to 0..1 and reads back\n");
+    start();
+    char m0[48], m1[48], m2[48];
+    snprintf(m0, sizeof(m0), "v0w%dC2,0,0,1,1,0,0,0,0,5Z", WAVETABLE);
+    snprintf(m1, sizeof(m1), "v1w%dC2,0,0,1,1,0,0,0,0,-1Z", WAVETABLE);
+    snprintf(m2, sizeof(m2), "v2w%dC2,0,0,1,1,0,0,0,0,0.25Z", WAVETABLE);
+    amy_add_message(m0);
+    amy_add_message(m1);
+    amy_add_message(m2);
+    amy_execute_deltas();
+    amy_event e0 = read_back(0), e1 = read_back(1), e2 = read_back(2);
+    CHECK(e0.unison_frame_spread == 1.0f, "frame_spread 5 reads back %f", e0.unison_frame_spread);
+    CHECK(e1.unison_frame_spread == 0.0f, "frame_spread -1 reads back %f", e1.unison_frame_spread);
+    CHECK(e2.unison_frame_spread == 0.25f, "frame_spread 0.25 reads back %f", e2.unison_frame_spread);
+    char wire[MAX_MESSAGE_LEN];
+    sprint_event(&e2, wire, sizeof(wire), /* wirecode= */ true);
+    CHECK(strstr(wire, "C2,0,0,1,1,0,0,0,0,0.25") != NULL, "wire form \"%s\"", wire);
+    amy_stop();
+}
+
 int main(void) {
     alarm(60);
     test_single_copy_is_plain();
@@ -472,6 +569,10 @@ int main(void) {
     test_groups_wire_round_trip();
     test_table_per_group();
     test_table_repicked_mid_note();
+    test_frame_spread_two_copies_are_two_oscs();
+    test_frame_spread_elsewhere_inert();
+    test_frame_spread_shrinks_at_the_ends();
+    test_frame_spread_clamps();
     printf(failures ? "FAILURES: %d\n" : "all ok\n", failures);
     return failures ? 1 : 0;
 }

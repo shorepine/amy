@@ -536,6 +536,7 @@ enum params{
     UNISON_INTERVAL2,           // octaves from the osc's pitch to group 2
     UNISON_INTERVAL3,           // octaves from the osc's pitch to group 3
     UNISON_RANDOM,              // 1 = random start phases for copies 1..n-1
+    UNISON_FRAME_SPREAD,        // WAVETABLE: the fraction of the table a group's copies fan over
     NO_PARAM                    // 210
 };
 // Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
@@ -681,6 +682,7 @@ typedef struct amy_event {
     float unison_interval1;  // octaves from the osc's pitch to group 1, default 0
     float unison_interval2;  // octaves from the osc's pitch to group 2, default 0
     float unison_interval3;  // octaves from the osc's pitch to group 3, default 0
+    float unison_frame_spread;  // WAVETABLE: fraction of the table a group's copies fan over, 0..1, default 0
     uint8_t unison_random;  // 1 = copies 1..n-1 start at random phases, default 0
     uint16_t sample_offset;  // PCM: start this note-on at a sample offset within its block (0..AMY_BLOCK_SIZE-1)
     float fit_ticks;  // PCM: >0 = time-stretch to this many sequencer ticks; 0 = pitch-shift at original length; <0 = off
@@ -853,6 +855,7 @@ struct synthinfo {
     float unison_interval1;
     float unison_interval2;
     float unison_interval3;
+    float unison_frame_spread;
     uint8_t unison_random;
     uint16_t sample_offset;  // PCM note-on start offset in samples within its block
     float logratio;
