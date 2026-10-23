@@ -92,3 +92,4 @@ tests/test_midi_cc_output
 tests/test_pcm_memory_preset
 tests/test_unison
 tests/test_wave_switch
+tests/test_wavetable_ladder

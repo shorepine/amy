@@ -31,6 +31,10 @@ typedef struct {
     float midinote;   // fractional, so a sample's tuning correction can live in the preset
     uint32_t samplerate;
     float log2sr;
+#ifdef AMY_WAVETABLE
+    int16_t *wt_rungs;                            // the band-limited copies of a wavetable, rung after rung; NULL until built
+    LUT wt_set[AMY_WAVETABLE_LADDER_RUNGS + 2];   // the table and its rungs as a lutset, zeroed until built
+#endif
 } memorypcm_preset_t;
 
 // linked list of memorypcm presets
@@ -167,15 +171,80 @@ const int16_t *pcm_get_memory_preset(uint16_t preset_number, uint32_t *frames, u
 // render path is all fixed point).
 static int16_t stretch_win[PCM_STRETCH_GRAIN];
 
+// Wavetable pitch ladders (contract in amy.h). A rung is a table of the
+// preset's length, each frame the frame's Fourier series cut at the rung's
+// limit with the mean kept; the rungs sit one after another in one
+// allocation. The lutset holds the base table at 127, then the rungs at their
+// limits, then a zeroed terminator. Build and free change the set under the
+// render lock, so a block reads the whole set or none; a rebuild writes the
+// rungs in place.
+#ifdef AMY_WAVETABLE
+#define WAVETABLE_LADDER_MAX_LIMIT 63
+static const uint8_t wavetable_ladder_limits[AMY_WAVETABLE_LADDER_RUNGS] = { 63, 31, 15, 7 };
+// cos(2 pi n / 256), filled by pcm_init. Float, so a rung matches the series
+// to 1 LSB; the sine LUT is int16 in fixed-point builds.
+static float wavetable_ladder_cos[WAVETABLE_SAMPLES_PER_CYCLE];
+// The ROM wavetables have no preset object; their rungs and sets live here
+// (pcm_wavetable_samples of them, the sample header's count, capped).
+#define WAVETABLE_LADDER_ROM_MAX 8
+static int16_t *rom_wt_rungs[WAVETABLE_LADDER_ROM_MAX];
+static LUT rom_wt_set[WAVETABLE_LADDER_ROM_MAX][AMY_WAVETABLE_LADDER_RUNGS + 2];
+
+// The rungs pointer and set of a preset: a memory preset's own, a ROM
+// wavetable's static ones, else NULL (file and gamma presets, non-wavetable ROM).
+static int wavetable_ladder_slots(uint16_t preset_number, int16_t ***rungs, LUT **set) {
+    memorypcm_ll_t *p = memorypcm_ll_start;
+    while (p != NULL) {
+        if (p->preset_number == preset_number) {
+            if (p->preset->type != AMY_PCM_TYPE_MEMORY) return 0;
+            *rungs = &p->preset->wt_rungs; *set = p->preset->wt_set;
+            return 1;
+        }
+        p = p->next;
+    }
+    if (preset_number >= pcm_wavetable_base && preset_number < pcm_wavetable_base + pcm_wavetable_samples
+        && preset_number - pcm_wavetable_base < WAVETABLE_LADDER_ROM_MAX) {
+        *rungs = &rom_wt_rungs[preset_number - pcm_wavetable_base];
+        *set = rom_wt_set[preset_number - pcm_wavetable_base];
+        return 1;
+    }
+    return 0;
+}
+
+// Take the set back and free the rungs, if there are any.
+static void wavetable_ladder_retract(int16_t **rungs, LUT *set) {
+    if (*rungs == NULL) return;
+    amy_grab_render_lock();
+    memset(set, 0, sizeof(LUT) * (AMY_WAVETABLE_LADDER_RUNGS + 2));
+    free(*rungs);
+    *rungs = NULL;
+    amy_release_render_lock();
+}
+
+static void wavetable_ladder_drop(memorypcm_preset_t *preset) {
+    if (preset->type == AMY_PCM_TYPE_MEMORY) wavetable_ladder_retract(&preset->wt_rungs, preset->wt_set);
+}
+#else
+#define wavetable_ladder_drop(preset) ((void)0)
+#endif
+
 void pcm_init() {
     memorypcm_ll_start = NULL;
     for (int i = 0; i < PCM_STRETCH_GRAIN; ++i) {
         float w = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / (float)PCM_STRETCH_GRAIN));
         stretch_win[i] = (int16_t)(w * 32767.0f);
     }
+#ifdef AMY_WAVETABLE
+    for (int n = 0; n < WAVETABLE_SAMPLES_PER_CYCLE; ++n)
+        wavetable_ladder_cos[n] = cosf(2.0f * (float)M_PI * (float)n / (float)WAVETABLE_SAMPLES_PER_CYCLE);
+#endif
 }
 void pcm_deinit() {
     pcm_unload_all_presets();
+#ifdef AMY_WAVETABLE
+    for (int i = 0; i < WAVETABLE_LADDER_ROM_MAX; ++i)
+        wavetable_ladder_retract(&rom_wt_rungs[i], rom_wt_set[i]);
+#endif
 }
 
 // How many bits used for fractional part of PCM table index.
@@ -939,6 +1008,10 @@ int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate,
     memory_preset->file_handle = 0;
     memory_preset->type = AMY_PCM_TYPE_MEMORY;
     memory_preset->sample_ram = (int16_t *)(((uint8_t *)memory_preset) + sizeof(memorypcm_preset_t));
+#ifdef AMY_WAVETABLE
+    memory_preset->wt_rungs = NULL;
+    memset(memory_preset->wt_set, 0, sizeof(memory_preset->wt_set));
+#endif
     if(loopend == 0) {  // loop whole sample
         memory_preset->loopend = memory_preset->length-1;
     } else {
@@ -955,6 +1028,7 @@ void pcm_unload_preset(uint16_t preset_number) {
         if((*preset_pointer)->preset_number == preset_number) {
             memorypcm_ll_t *next = (*preset_pointer)->next;
             fclose_if_file((*preset_pointer)->preset);
+            wavetable_ladder_drop((*preset_pointer)->preset);
             // free the memory we allocated
             free((*preset_pointer));
             // close up the list
@@ -972,9 +1046,89 @@ void pcm_unload_all_presets() {
     while(preset_pointer != NULL) {
         memorypcm_ll_t *next_pointer = preset_pointer->next;
         fclose_if_file(preset_pointer->preset);
+        wavetable_ladder_drop(preset_pointer->preset);
         free(preset_pointer);
         // Go to the next one
         preset_pointer = next_pointer;
     }
     memorypcm_ll_start = NULL;
 }
+
+#ifdef AMY_WAVETABLE
+// One frame: coefficients of harmonics 0..limit, then the series back at 256
+// points. 2 * limit * 256 multiply-adds; the one table serves cos and sin
+// through the index wrap.
+static void wavetable_ladder_frame(const int16_t *in, int16_t *out, uint8_t limit) {
+    const int N = WAVETABLE_SAMPLES_PER_CYCLE;
+    float a[WAVETABLE_LADDER_MAX_LIMIT + 1], b[WAVETABLE_LADDER_MAX_LIMIT + 1];
+    for (int k = 0; k <= limit; ++k) {
+        float ca = 0, sb = 0;
+        int idx = 0;
+        for (int n = 0; n < N; ++n) {
+            ca += (float)in[n] * wavetable_ladder_cos[idx];
+            sb += (float)in[n] * wavetable_ladder_cos[(idx + 3 * N / 4) & (N - 1)];  // sin = cos a quarter turn back
+            idx = (idx + k) & (N - 1);
+        }
+        a[k] = ca; b[k] = sb;
+    }
+    for (int n = 0; n < N; ++n) {
+        float y = a[0] / (float)N;
+        int idx = 0;
+        for (int k = 1; k <= limit; ++k) {
+            idx = (idx + n) & (N - 1);
+            y += (2.0f / (float)N) * (a[k] * wavetable_ladder_cos[idx] + b[k] * wavetable_ladder_cos[(idx + 3 * N / 4) & (N - 1)]);
+        }
+        int v = (int)lroundf(y);
+        out[n] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+    }
+}
+
+// One rung: every frame of the table cut at the rung's limit.
+static void wavetable_ladder_rung(const int16_t *base, int16_t *rung, uint32_t cycles, uint8_t limit) {
+    for (uint32_t c = 0; c < cycles; ++c)
+        wavetable_ladder_frame(base + c * WAVETABLE_SAMPLES_PER_CYCLE, rung + c * WAVETABLE_SAMPLES_PER_CYCLE, limit);
+}
+
+int pcm_wavetable_ladder_build(uint16_t preset_number) {
+    int16_t **rungs; LUT *set;
+    if (!wavetable_ladder_slots(preset_number, &rungs, &set)) return 0;
+    memorypcm_preset_t rom_local;
+    memorypcm_preset_t *preset = get_preset_for_preset_number(preset_number, &rom_local);
+    if (preset == NULL || preset->channels != 1 || preset->sample_ram == NULL
+        || preset->length < 2 * WAVETABLE_SAMPLES_PER_CYCLE) return 0;
+    uint32_t cycles = preset->length / WAVETABLE_SAMPLES_PER_CYCLE;
+    uint32_t rung_length = cycles * WAVETABLE_SAMPLES_PER_CYCLE;
+    int16_t *table = *rungs;   // a rebuild writes the published rungs in place
+    if (table == NULL) {
+        table = (int16_t *)malloc_caps(AMY_WAVETABLE_LADDER_RUNGS * rung_length * sizeof(int16_t),
+                                       amy_global.config.ram_caps_sample);
+        if (table == NULL) return 0;
+    }
+    for (int r = 0; r < AMY_WAVETABLE_LADDER_RUNGS; ++r)
+        wavetable_ladder_rung(preset->sample_ram, table + r * rung_length, cycles, wavetable_ladder_limits[r]);
+    if (*rungs == NULL) {
+        LUT entry = { preset->sample_ram, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 127, 1.0f };
+        amy_grab_render_lock();
+        set[0] = entry;
+        for (int r = 0; r < AMY_WAVETABLE_LADDER_RUNGS; ++r) {
+            entry.table = table + r * rung_length;
+            entry.highest_harmonic = wavetable_ladder_limits[r];
+            set[1 + r] = entry;
+        }
+        *rungs = table;
+        amy_release_render_lock();
+    }
+    return 1;
+}
+
+void pcm_wavetable_ladder_free(uint16_t preset_number) {
+    int16_t **rungs; LUT *set;
+    if (wavetable_ladder_slots(preset_number, &rungs, &set)) wavetable_ladder_retract(rungs, set);
+}
+
+const LUT *pcm_wavetable_lutset(uint16_t preset_number) {
+    int16_t **rungs; LUT *set;
+    if (!wavetable_ladder_slots(preset_number, &rungs, &set)) return NULL;
+    return (set[0].table_size > 0) ? set : NULL;
+}
+#endif
