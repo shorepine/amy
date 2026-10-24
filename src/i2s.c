@@ -101,11 +101,12 @@ amy_err_t esp32_setup_i2s(void) {
     }
 // PCM5101 DAC works at either 32 bit or (default) 16 bit
 // PCM1808 ADC needs I2S_32BIT to work
+// Both use Philips framing (MSB one BCK after WS), their I2S format with FMT low
 #define I2S_32BIT
 #ifdef I2S_32BIT
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AMY_SAMPLE_RATE),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
             .mclk = (amy_global.config.i2s_mclk == -1)? I2S_GPIO_UNUSED : amy_global.config.i2s_mclk,
             .bclk = amy_global.config.i2s_bclk,
@@ -122,7 +123,7 @@ amy_err_t esp32_setup_i2s(void) {
 #else // 16 bit I2S
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AMY_SAMPLE_RATE),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
         .gpio_cfg = {
             .mclk = (amy_global.config.i2s_mclk == -1)? I2S_GPIO_UNUSED : amy_global.config.i2s_mclk,
             .bclk = amy_global.config.i2s_bclk,
