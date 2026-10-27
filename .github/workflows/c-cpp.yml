@@ -49,6 +49,14 @@ jobs:
     - name: Check for implicit float-to-double promotion
       run: make check-double-promotion
 
+    - name: Install the Cortex-M4F cross compiler
+      run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+    # Without AMY_DEBUG, no double precision at all: built for a single-precision
+    # FPU, no object may need a software-double routine or a double math function.
+    - name: Check a release build needs no double precision
+      run: make check-single-precision
+
   web:
     # Build the emscripten / WASM target (`make web`) so breaks there are caught.
     # The other CI jobs build the MCU targets and run the Python tests but never

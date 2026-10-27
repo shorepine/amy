@@ -24,9 +24,11 @@ typedef struct cv_trigger {
 // Root of linked list of configured triggers.
 cv_trigger_t *cv_trigger_root = NULL;
 
+#ifdef AMY_DEBUG
 void cv_trigger_print(cv_trigger_t *cv_trig) {
     fprintf(stderr, "cv_trigger: cv %d thresh %.2f reset %.2f pitch %d scale %.2f offs %.2f state %d msg %s\n", cv_trig->trigger_cv, (double)cv_trig->thresh_trigger, (double)cv_trig->thresh_reset, cv_trig->pitch_cv, (double)cv_trig->pitch_scale, (double)cv_trig->pitch_offset, cv_trig->state, cv_trig->message_template);
 }
+#endif
 
 void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset, uint8_t pitch_cv, float pitch_scale, float pitch_offset, char *message_template) {
     // Prevent references outside known CV index range.
@@ -54,6 +56,7 @@ void cv_trigger_new(uint8_t trigger_cv, float thresh_trigger, float thresh_reset
     cv_trigger_root = result;
 }
 
+#ifdef AMY_DEBUG
 void cv_trigger_debug(void) {
     fprintf(stderr, "cv_trigger_debug:\n");
     cv_trigger_t *cv_trig =  cv_trigger_root;
@@ -62,6 +65,9 @@ void cv_trigger_debug(void) {
         cv_trig = cv_trig->next;
     }
 }
+#else
+void cv_trigger_debug(void) {}  // a stub without AMY_DEBUG (see show_debug)
+#endif
 
 void cv_trigger_free(cv_trigger_t **p_cv_trig) {
     // Close up linked list.
