@@ -81,7 +81,18 @@ void amy_profiles_print() {}
 
 
 // Use the tiny built-in PCM set by default across platforms.
-#ifdef GAMMA9001
+#if defined(AMY_NO_BUILTIN_PCM)
+// No built-in samples, for targets short of flash (saves ~100 KB, ~265 KB
+// with AMY_WAVETABLE). With pcm_samples 0, AMY skips
+// pcm_init and doesn't render PCM oscillators at all.
+#define PCM_AMY_SAMPLE_RATE 22050
+const int16_t pcm[1] PROGMEM = {0};
+const uint16_t pcm_samples = 0;
+const uint16_t pcm_wavetable_base = 0;
+const uint16_t pcm_wavetable_samples = 0;
+const uint32_t pcm_wavetable_len = 0;
+const pcm_map_t pcm_map[1] PROGMEM = {{0, 0, 0, 0, 0}};
+#elif defined(GAMMA9001)
 // The Gamma9001 builds (Tulip, AMYboard, web) bake the full TR-808 bank as
 // their ROM set; the other Gamma9001 banks stream from gamma9001_pcm (pcm.c).
 #include "pcm_gamma808.h"
