@@ -64,7 +64,7 @@ EMSCRIPTEN_OPTIONS = -s WASM=1 --bind \
 -s ASYNCIFY -s ASYNCIFY_STACK_SIZE=128000
 PYTHON = python3
 
-.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api check-double-promotion
+.PHONY: default all clean amy-module test ctest web deploy-web godot-api c-api check-c-api check-double-promotion check-single-precision
 
 default: $(TARGET)
 all: default
@@ -99,6 +99,13 @@ DOUBLE_CHECK_SOURCES = $(filter-out src/libminiaudio-audio.c,$(filter %.c,$(SOUR
 check-double-promotion:
 	$(CC) -fsyntax-only -Werror=double-promotion $(CFLAGS) $(DOUBLE_CHECK_SOURCES)
 	$(CC) -fsyntax-only -Werror=double-promotion $(CFLAGS) -DAMY_DEBUG $(DOUBLE_CHECK_SOURCES)
+
+# Stronger: without AMY_DEBUG (whose debug dumps print floats), AMY needs no
+# double precision at all, explicit casts included. Builds each source for a
+# Cortex-M4F and fails if one calls a software-double routine or a double math
+# function. Needs arm-none-eabi-gcc (apt: gcc-arm-none-eabi libnewlib-arm-none-eabi).
+check-single-precision:
+	$(PYTHON) scripts/check_single_precision.py -DAMY_WAVETABLE $(filter-out src/linux_midi.c,$(DOUBLE_CHECK_SOURCES))
 
 HEADERS = $(wildcard src/*.h)
 HEADERS_BUILD := $(filter-out src/patches.h,$(HEADERS))

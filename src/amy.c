@@ -1497,6 +1497,7 @@ int8_t oscs_init() {
     return 0;
 }
 
+#ifdef AMY_DEBUG
 void fprint_combo_coefs(char *name, const float *coefs) {
     fprintf(stderr, "  %s:", name);
     for (int i=0; i < NUM_COMBO_COEFS; ++i) {
@@ -1597,6 +1598,16 @@ void show_debug(uint8_t type) {
         fprintf(stderr, "\n");
     }
 }
+#else
+// Without AMY_DEBUG the debug dumps are stubs. They print floats, and a float
+// passed to printf is a double: on single-precision-FPU targets that links
+// software-double code, and needs a C library whose printf has %f.
+void print_osc_debug(uint16_t i, bool show_eg) { (void)i; (void)show_eg; }
+void show_debug(uint8_t type) {
+    (void)type;
+    fprintf(stderr, "show_debug: AMY was built without AMY_DEBUG\n");
+}
+#endif // AMY_DEBUG
 
 void oscs_deinit() {
     cv_from_osc_deinit();
@@ -2078,7 +2089,11 @@ void play_delta(struct delta *d) {
     if(d->param == TEMPO) {
         // Reject zero/negative/NaN tempo: sequencer_recompute divides by it.
         if (d->data.f > 0) { amy_global.tempo = d->data.f; sequencer_recompute(); }
-        else fprintf(stderr, "bad tempo %f ignored\n", (double)d->data.f);
+        else {
+            char t[24];
+            amy_snprint_float(t, sizeof(t), d->data.f, 6, false);
+            fprintf(stderr, "bad tempo %s ignored\n", t);
+        }
     }
     if(d->param == EQ_L) amy_global.bus[bus]->eq.eq[0] = F2S(powf(10, d->data.f / 20.0f));
     if(d->param == EQ_M) amy_global.bus[bus]->eq.eq[1] = F2S(powf(10, d->data.f / 20.0f));
@@ -2591,11 +2606,13 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
         }
     }
 
+#ifdef AMY_DEBUG  // debug_flag is set by show_debug
     if (amy_global.debug_flag) {
         amy_global.debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core][0 /* bus */], AMY_BLOCK_SIZE);
         fprintf(stderr, "time %" PRIu32 " core %d bus 0 max_max=%.3f post-eq max=%.3f\n", amy_global.total_samples, core, (double)S2F(max_max), (double)S2F(smax));
     }
+#endif
 
     AMY_PROFILE_STOP(AMY_RENDER)
 

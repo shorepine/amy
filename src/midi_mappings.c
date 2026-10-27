@@ -292,10 +292,12 @@ struct midi_mapping default_note_mapping = {
 };
 
 
+#ifdef AMY_DEBUG
 void midi_mapping_print(struct midi_mapping *mapping) {
     fprintf(stderr, "mapping 0x%lx chan %d type %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
             (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, (double)mapping->min_val, (double)mapping->max_val, (double)mapping->offset_val, mapping->message_template);
 }
+#endif
 
 struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
     if (!mapping_channel_ok(channel))  return NULL;
@@ -323,6 +325,7 @@ struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_l
     return result;
 }
 
+#ifdef AMY_DEBUG
 void midi_mapping_debug(void) {
     fprintf(stderr, "midi_mapping_debug:\n");
     for (int channel = 0; channel < num_mapping_channels + 1; ++channel) {
@@ -343,6 +346,9 @@ void midi_mapping_debug(void) {
         }
     }
 }
+#else
+void midi_mapping_debug(void) {}  // a stub without AMY_DEBUG (see show_debug)
+#endif
 
 void midi_mapping_free(struct midi_mapping **p_mapping) {
     // Close up the linked list.
