@@ -197,23 +197,15 @@ void add_deltas_to_queue_with_baseosc(struct delta *d, int base_osc, uint16_t os
 void snprintcodefloat(char *s, size_t max_len, char *code, float val) {
     // Skip trailing zeros (and decimal point) when printing a float.
     float testval = val;
-    char fmt[7]; // = "%s%.0f";
-    fmt[0] = '%';
-    fmt[1] = 's';
-    fmt[2] = '%';
-    fmt[3] = '.';
-    fmt[4] = '0';
-    fmt[5] = 'f';
-    fmt[6] = 0;
-    for (int dp = 0; dp < 3; ++dp) {
-        if (testval == roundf(testval)) {
-            snprintf(s, max_len, fmt, code, val);
-            return;
-        }
+    int dp = 0;
+    while (dp < 3 && testval != roundf(testval)) {
         testval *= 10.0f;
-        ++fmt[4];  // increase the DP digit
+        ++dp;
     }
-    snprintf(s, max_len, fmt, code, val);
+    size_t code_len = strlen(code);
+    if (code_len >= max_len) code_len = max_len ? max_len - 1 : 0;
+    if (max_len) memcpy(s, code, code_len);
+    amy_snprint_float(s + code_len, max_len - code_len, val, dp, false);
 }
 
 void snprintfloat3dp(char *s, size_t max_len, float val) {

@@ -494,7 +494,7 @@ SAMPLE render_audio_in(SAMPLE * buf, uint16_t osc, uint8_t channel) {
         buf[c++] = SMULR7(L2S(amy_in_block[i]), F2S(msynth[osc]->amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
-    return F2S(1.0); //max_value;
+    return F2S(1.0f); //max_value;
 }
 
 SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel) {
@@ -503,7 +503,7 @@ SAMPLE render_external_audio_in(SAMPLE *buf, uint16_t osc, uint8_t channel) {
         buf[c++] = SMULR7(L2S(amy_external_in_block[i]), F2S(msynth[osc]->amp));
     }
     // We have to return something for max_value or else the zero-amp reaper will come along. 
-    return F2S(1.0); //max_value;
+    return F2S(1.0f); //max_value;
 }
 
 
@@ -1219,7 +1219,7 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
                        MIN(cycles_this_table - 1,
                            (cycles_this_table - 1) * msynth[osc]->duty));
     // always need both this wavetable and the next one.
-    int cycle = MIN((int)floor(interp),
+    int cycle = MIN((int)floorf(interp),
                     cycles_this_table - 2);
     // fractional part, normally < 1.0, but == 1.0 for very end of table.
     interp = interp - cycle;

@@ -37,6 +37,18 @@ jobs:
         AMY_TEST_THRESHOLD_DB: "-70.0"
       run: make test
 
+  double-promotion:
+    # AMY stays in single precision: fail if a float is implicitly widened to
+    # double (an unsuffixed literal, a double math function, a float passed to
+    # printf), which costs software-double calls on single-precision FPUs.
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for implicit float-to-double promotion
+      run: make check-double-promotion
+
   web:
     # Build the emscripten / WASM target (`make web`) so breaks there are caught.
     # The other CI jobs build the MCU targets and run the Python tests but never
