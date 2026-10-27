@@ -69,16 +69,16 @@ int8_t dsps_biquad_gen_lpf_f32(SAMPLE *coeffs, float f, float qFactor)
     // Where exactly are those poles?  Impose minima on (1 - r) and w0.
     float r = -99, ww = 0;
     if (false && a2 > 0) { 
-        printf("before: r %f a %f %f %f\n", sqrtf(a2 / a0), a0, a1, a2);
+        printf("before: r %f a %f %f %f\n", (double)sqrtf(a2 / a0), (double)a0, (double)a1, (double)a2);
         // Limit how close complex poles can get to the unit circle.
         r = MIN(0.99f, sqrtf(a2 / a0));
         float alphadash = (1 - r * r) / (1 + r * r);
         float cosww = c / sqrtf(1 - alphadash * alphadash);
-        if (fabs(cosww) < 1.0) {
+        if (fabsf(cosww) < 1.0f) {
             ww = acosf(cosww);
             a1 = a0 * (-2 * r * cosf(ww));
             a2 = a0 * r * r;
-            printf(" after: r %f a %f %f %f\n", r, a0, a1, a2);
+            printf(" after: r %f a %f %f %f\n", (double)r, (double)a0, (double)a1, (double)a2);
         }
     }
 
@@ -844,7 +844,7 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
     AMY_PROFILE_START(HPF_BUF)
 
     // Implement a dc-blocking HPF with a pole at (decay + 0j) and a zero at (1 + 0j).
-    SAMPLE pole = F2S(0.99);
+    SAMPLE pole = F2S(0.99f);
     SAMPLE xn1 = state[0];
     SAMPLE yn1 = state[1];
     for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
@@ -877,8 +877,8 @@ void check_overflow(SAMPLE* block, int osc, char *msg) {
     }
     if (maxdiff > F2S(0.2f))
         fprintf(stderr, "Overflow at timeframe %.3f max=%.3f maxdiff=%.3f osc=%d msg=%s\n",
-                (float)(amy_global.total_blocks*AMY_BLOCK_SIZE) / AMY_SAMPLE_RATE,
-                S2F(max), S2F(maxdiff), osc, msg);
+                (double)((float)(amy_global.total_blocks*AMY_BLOCK_SIZE) / AMY_SAMPLE_RATE),
+                (double)S2F(max), (double)S2F(maxdiff), osc, msg);
 
 #endif // AMY_DEBUG
 }

@@ -302,12 +302,12 @@ void example_drums(uint32_t start, int loops) {
             int x = pattern[i];
             if(x & bd) {
                 e.osc = 0;
-                e.velocity = 4.0 * volume;
+                e.velocity = 4.0f * volume;
                 amy_add_event(&e);
             }
             if(x & snare) {
                 e.osc = 1;
-                e.velocity = 1.5 * volume;
+                e.velocity = 1.5f * volume;
                 amy_add_event(&e);
             }
             if(x & hat) {
@@ -328,7 +328,7 @@ void example_drums(uint32_t start, int loops) {
 
             e.osc = 5;
             if(bassline[i]>0) {
-                e.velocity = 0.5 * volume;
+                e.velocity = 0.5f * volume;
                 e.midi_note = bassline[i] - 12;
             } else {
                 e.velocity = 0;

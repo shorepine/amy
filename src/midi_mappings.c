@@ -294,7 +294,7 @@ struct midi_mapping default_note_mapping = {
 
 void midi_mapping_print(struct midi_mapping *mapping) {
     fprintf(stderr, "mapping 0x%lx chan %d type %d code 0x%x log %d min %.1f max %.1f offs %.1f msg %s\n",
-            (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, mapping->min_val, mapping->max_val, mapping->offset_val, mapping->message_template);
+            (unsigned long)mapping, mapping->channel, mapping->type, mapping->code, mapping->is_log, (double)mapping->min_val, (double)mapping->max_val, (double)mapping->offset_val, mapping->message_template);
 }
 
 struct midi_mapping *midi_mapping_init(int channel, int type, int code, int is_log, float min_val, float max_val, float offset_val, const char *message_template, int message_len) {
@@ -645,7 +645,7 @@ void substitute_midi_special_values(char *dest, const char *src, int channel, in
         ++src;  // skip over the '%'
         dest[0] = '\0';
         if (src[0] == 'v') {
-            sprintf(dest, "%.3f", value);
+            amy_snprint_float(dest, (size_t)n_remain + 1, value, 3, false);
         } else if (src[0] == 'V') {
             sprintf(dest, "%d", (int)value);
         } else if (src[0] == 'i') {

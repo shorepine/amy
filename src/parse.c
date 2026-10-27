@@ -45,6 +45,74 @@ float atoff(const char *s) {
     return whole + frac;
 }
 
+// The text of a float, as snprintf(s, n, "%.*f", decimals, (double)v) writes it, but without
+// double arithmetic or a float-capable printf: single-precision-FPU targets (ESP32-S3, RP2350,
+// Cortex-M4F, ...) do doubles in software, and small C libraries often leave %f out of printf.
+// decimals is 0..9; trim drops trailing zeros and a bare point ("1.500" -> "1.5", "2.000" -> "2"),
+// AMY's stand-in for %g (no exponent form: atoff() can't read one). Returns what snprintf would.
+// The float's bits are turned into digits with integers: its value is m * 2^e2 with m < 2^24, so
+// the integer part fits in 128 bits and, as anything below 2^-31 shows as 0 at nine decimals, the
+// fraction in 64. Rounding is to nearest, exact ties to even, as the C library rounds.
+int amy_snprint_float(char *s, size_t n, float v, int decimals, bool trim) {
+    union { float f; uint32_t u; } x = { .f = v };
+    uint32_t m = x.u & 0x7FFFFFu, limb[4] = {0, 0, 0, 0};
+    int ex = (int)((x.u >> 23) & 0xFFu), e2, sh = 0, len = 0, nd = 0, i, up;
+    uint64_t rem = 0, mask = 0;
+    char out[64], dig[10], ip[40];
+    if (decimals < 0) decimals = 0;
+    if (decimals > 9) decimals = 9;
+    if (x.u >> 31) out[len++] = '-';
+    if (ex == 0xFF) {
+        const char *t = m ? "nan" : "inf";
+        while (*t) out[len++] = *t++;
+    } else {
+        if (ex) m |= 1u << 23;
+        e2 = ex ? ex - 150 : -149;               // v = m * 2^e2
+        if (e2 >= 0) {                           // integer: m << e2 (e2 <= 104), in four 32-bit limbs
+            uint64_t w = (uint64_t)m << (e2 % 32);
+            limb[e2 / 32] = (uint32_t)w;
+            if (e2 / 32 < 3) limb[e2 / 32 + 1] = (uint32_t)(w >> 32);
+        } else if (e2 >= -55) {
+            sh = -e2;
+            limb[0] = sh < 24 ? m >> sh : 0;
+            mask = ((uint64_t)1 << sh) - 1;
+            rem = m & mask;
+        }
+        for (i = 0; i <= decimals; i++) {        // the decimals, and one more to round with
+            rem *= 10;
+            dig[i] = sh ? (char)(rem >> sh) : 0;
+            rem &= mask;
+        }
+        up = dig[decimals] > 5 || (dig[decimals] == 5 && (rem || ((decimals ? dig[decimals - 1] : (char)limb[0]) & 1)));
+        if (up) {
+            for (i = decimals - 1; i >= 0 && ++dig[i] == 10; i--) dig[i] = 0;
+            if (i < 0) for (i = 0; i < 4 && ++limb[i] == 0; i++) ;   // carry into the integer part
+        }
+        do {                                     // the integer part's digits, by long division by 10
+            uint64_t r = 0;
+            for (i = 3; i >= 0; i--) {
+                uint64_t cur = (r << 32) | limb[i];
+                limb[i] = (uint32_t)(cur / 10);
+                r = cur % 10;
+            }
+            ip[nd++] = (char)('0' + r);
+        } while (limb[0] | limb[1] | limb[2] | limb[3]);
+        while (nd) out[len++] = ip[--nd];
+        if (trim) while (decimals > 0 && dig[decimals - 1] == 0) decimals--;
+        if (decimals > 0) {
+            out[len++] = '.';
+            for (i = 0; i < decimals; i++) out[len++] = (char)('0' + dig[i]);
+        }
+    }
+    out[len] = '\0';
+    if (n) {
+        size_t k = (size_t)len < n - 1 ? (size_t)len : n - 1;
+        memcpy(s, out, k);
+        s[k] = '\0';
+    }
+    return len;
+}
+
 
 #define PARSE_LIST_STRSPN1(var) _Generic((var), \
     float:    " -0123456789,.", \

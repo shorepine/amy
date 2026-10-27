@@ -1500,7 +1500,7 @@ int8_t oscs_init() {
 void fprint_combo_coefs(char *name, const float *coefs) {
     fprintf(stderr, "  %s:", name);
     for (int i=0; i < NUM_COMBO_COEFS; ++i) {
-        fprintf(stderr, " %.3f", coefs[i]);
+        fprintf(stderr, " %.3f", (double)coefs[i]);
     }
     fprintf(stderr, "\n");
 }
@@ -1515,7 +1515,7 @@ void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
     }
     fprintf(stderr,"osc %" PRIu16 ": status %" PRIu8 " role %" PRIu8 " wave %" PRIu16 " mode %" PRIu16 " mod_source %" PRIu16 ",%" PRIu16 " velocity %f logratio %f feedback %f filtype %" PRIu8 " resonance %f portamento_alpha %f chained %" PRIu16 " algo %" PRIu8 " algo_source %" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 ",%" PRIu16 "  \n",
             i, synth[i]->status, synth[i]->role, synth[i]->wave, synth[i]->mode, synth[i]->mod_source[0], synth[i]->mod_source[1],
-            synth[i]->velocity, synth[i]->logratio, synth[i]->feedback, synth[i]->filter_type, synth[i]->resonance, synth[i]->portamento_alpha, synth[i]->chained_osc,
+            (double)synth[i]->velocity, (double)synth[i]->logratio, (double)synth[i]->feedback, synth[i]->filter_type, (double)synth[i]->resonance, (double)synth[i]->portamento_alpha, synth[i]->chained_osc,
             is_algo ? synth[i]->algorithm : 0,
             algo_src[0], algo_src[1], algo_src[2], algo_src[3], algo_src[4], algo_src[5] );
     fprint_combo_coefs("amp_coefs", synth[i]->amp_coefs);
@@ -1530,11 +1530,11 @@ void print_osc_debug(uint16_t i /* osc */, bool show_eg) {
         for(uint8_t j=0;j<MAX_BREAKPOINT_SETS;j++) {
             fprintf(stderr,"  eg%" PRIu8 " (type %" PRIu8 "): ", j, synth[i]->eg_type[j]);
             for(uint8_t k=0;k<synth[i]->max_num_breakpoints[j];k++) {
-                fprintf(stderr,"%" PRIi32 ": %f ", synth[i]->breakpoint_times[j][k], synth[i]->breakpoint_values[j][k]);
+                fprintf(stderr,"%" PRIi32 ": %f ", synth[i]->breakpoint_times[j][k], (double)synth[i]->breakpoint_values[j][k]);
             }
             fprintf(stderr,"\n");
         }
-        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f state %" PRIu16 "\n", i, msynth[i]->amp, msynth[i]->logfreq, msynth[i]->duty, msynth[i]->filter_logfreq, msynth[i]->resonance, msynth[i]->feedback, msynth[i]->pan, msynth[i]->state);
+        fprintf(stderr,"mod osc %" PRIu16 ": amp: %f, logfreq %f duty %f filter_logfreq %f resonance %f fb/bw %f pan %f state %" PRIu16 "\n", i, (double)msynth[i]->amp, (double)msynth[i]->logfreq, (double)msynth[i]->duty, (double)msynth[i]->filter_logfreq, (double)msynth[i]->resonance, (double)msynth[i]->feedback, (double)msynth[i]->pan, msynth[i]->state);
     }
 }
 
@@ -1552,7 +1552,7 @@ void show_debug(uint8_t type) {
         uint16_t q = amy_global.delta_qsize;
         if(q > 25) q = 25;
         for(uint16_t i=0;i<q;i++) {
-            fprintf(stderr,"%" PRIu16 " time %" PRIu32 " osc %" PRIu16 " param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, ptr->data.f, ptr->data.i);
+            fprintf(stderr,"%" PRIu16 " time %" PRIu32 " osc %" PRIu16 " param %d - %f %" PRIu32 "\n", i, ptr->time, ptr->osc, ptr->param, (double)ptr->data.f, ptr->data.i);
             ptr = ptr->next;
         }
         fprintf(stderr, "deltas_queue len %" PRIi32 ", free len %" PRIi32 "\n", delta_list_len(amy_global.delta_queue), delta_num_free());
@@ -1565,8 +1565,8 @@ void show_debug(uint8_t type) {
         // max_buses is, which reads past the end of a build with fewer.
         fprintf(stderr, "global: volume");
         for (int bus = 0; bus < amy_global.config.max_buses; ++bus)
-            fprintf(stderr, " %.3f", amy_global.volume[bus]);
-        fprintf(stderr, " bend %f bus 0 eq: %f %f %f \n", amy_global.pitch_bend, S2F(amy_global.bus[0]->eq.eq[0]), S2F(amy_global.bus[0]->eq.eq[1]), S2F(amy_global.bus[0]->eq.eq[2]));
+            fprintf(stderr, " %.3f", (double)amy_global.volume[bus]);
+        fprintf(stderr, " bend %f bus 0 eq: %f %f %f \n", (double)amy_global.pitch_bend, (double)S2F(amy_global.bus[0]->eq.eq[0]), (double)S2F(amy_global.bus[0]->eq.eq[1]), (double)S2F(amy_global.bus[0]->eq.eq[2]));
         for(uint16_t i=0;i<10 /* AMY_OSCS */;i++) {
             print_osc_debug(i, (type > 3) /* show_eg */);
         }
@@ -2078,11 +2078,11 @@ void play_delta(struct delta *d) {
     if(d->param == TEMPO) {
         // Reject zero/negative/NaN tempo: sequencer_recompute divides by it.
         if (d->data.f > 0) { amy_global.tempo = d->data.f; sequencer_recompute(); }
-        else fprintf(stderr, "bad tempo %f ignored\n", d->data.f);
+        else fprintf(stderr, "bad tempo %f ignored\n", (double)d->data.f);
     }
-    if(d->param == EQ_L) amy_global.bus[bus]->eq.eq[0] = F2S(powf(10, d->data.f / 20.0));
-    if(d->param == EQ_M) amy_global.bus[bus]->eq.eq[1] = F2S(powf(10, d->data.f / 20.0));
-    if(d->param == EQ_H) amy_global.bus[bus]->eq.eq[2] = F2S(powf(10, d->data.f / 20.0));
+    if(d->param == EQ_L) amy_global.bus[bus]->eq.eq[0] = F2S(powf(10, d->data.f / 20.0f));
+    if(d->param == EQ_M) amy_global.bus[bus]->eq.eq[1] = F2S(powf(10, d->data.f / 20.0f));
+    if(d->param == EQ_H) amy_global.bus[bus]->eq.eq[2] = F2S(powf(10, d->data.f / 20.0f));
     if(d->param == EQ_L || d->param == EQ_M || d->param == EQ_H) parametric_eq_update(bus);
     if(d->param == ECHO_LEVEL) config_echo(bus, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     if(d->param == ECHO_DELAY_MS) config_echo(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
@@ -2269,7 +2269,7 @@ float amp_combine_controls(float *controls, float *coefs) {
         float val = controls[i];
         if (i == COEF_CONST)  {val = coef; coef = 1.0f;}   // coef[CONST] is always 1.0f, so swap them.  We're going to map the val.
         if (i != COEF_MOD0 && i != COEF_MOD1) {
-            val = map_60dB_to_01f(MAX(0, val)) - 1.0;    // const, vel, eg0, eg1 get log-compressed.
+            val = map_60dB_to_01f(MAX(0, val)) - 1.0f;    // const, vel, eg0, eg1 get log-compressed.
             // make 0 mean "no amp" and 1 mean "regular (full) amp".
         }
         result += coef * val;
@@ -2594,7 +2594,7 @@ AMY_IRAM_ATTR void amy_render(uint16_t start, uint16_t end, uint8_t core) {
     if (amy_global.debug_flag) {
         amy_global.debug_flag = 0;  // Only do this once each time debug_flag is set.
         SAMPLE smax = scan_max(fbl[core][0 /* bus */], AMY_BLOCK_SIZE);
-        fprintf(stderr, "time %" PRIu32 " core %d bus 0 max_max=%.3f post-eq max=%.3f\n", amy_global.total_samples, core, S2F(max_max), S2F(smax));
+        fprintf(stderr, "time %" PRIu32 " core %d bus 0 max_max=%.3f post-eq max=%.3f\n", amy_global.total_samples, core, (double)S2F(max_max), (double)S2F(smax));
     }
 
     AMY_PROFILE_STOP(AMY_RENDER)

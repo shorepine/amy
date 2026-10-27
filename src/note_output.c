@@ -335,6 +335,17 @@ void note_output_reset(void) {
     note_outputs_len = 0;
 }
 
+// v with six significant digits and no trailing zeros, as %g writes it for
+// values from 1e-4 to 1e6, without passing a float to printf.
+static void float_g(char *s, float v) {
+    float a = fabsf(v);
+    int decimals = 5;
+    if (a == 0.0f) decimals = 0;
+    for (; a >= 10.0f && decimals > 0; a *= 0.1f) --decimals;
+    for (; a > 0.0f && a < 1.0f && decimals < 9; a *= 10.0f) ++decimals;
+    amy_snprint_float(s, 24, v, decimals, true);
+}
+
 // The wire command that reconstructs this synth's note output, for
 // amy_dump_state -- a note output that did not survive a state round
 // trip would be a synth that came back silently pointed at oscillators.
@@ -344,8 +355,12 @@ int note_output_emit_command(uint8_t synth, char *buf, size_t len) {
     if (n->mode == NOTE_OUTPUT_MIDI_OUT)
         return snprintf(buf, len, "i%diG%d,%d,%d", synth, n->mode,
                         n->midi_channel, n->forward_midi_in);
-    return snprintf(buf, len, "i%diG%d,%d,%d,%d,%g,%g,%g", synth, n->mode,
+    char f[3][24];
+    float_g(f[0], n->pitch_scale);
+    float_g(f[1], n->pitch_offset);
+    float_g(f[2], n->gate_volts);
+    return snprintf(buf, len, "i%diG%d,%d,%d,%d,%s,%s,%s", synth, n->mode,
                     n->pitch_cv, n->gate_cv,
                     AMY_IS_SET(n->vel_cv) ? n->vel_cv : 0,
-                    n->pitch_scale, n->pitch_offset, n->gate_volts);
+                    f[0], f[1], f[2]);
 }

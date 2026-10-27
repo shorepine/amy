@@ -578,8 +578,8 @@ extern uint64_t profile_start_us;
     if(profiles[tag].calls) {\
         fprintf(stderr,"%40s: %10"PRIu32" calls %10"PRIu64"us total [%6.2f%% wall %6.2f%% render] %9"PRIu64"us per call\n", \
         profile_tag_name(tag), profiles[tag].calls, profiles[tag].us_total, \
-        ((float)(profiles[tag].us_total) / (float)(amy_get_us() - profile_start_us))*100.0, \
-        ((float)(profiles[tag].us_total) / (float)(profiles[AMY_RENDER].us_total))*100.0, \
+        (double)((float)(profiles[tag].us_total) / (float)(amy_get_us() - profile_start_us) * 100.0f), \
+        (double)((float)(profiles[tag].us_total) / (float)(profiles[AMY_RENDER].us_total) * 100.0f), \
         (profiles[tag].us_total)/profiles[tag].calls);\
     }
 
@@ -1282,6 +1282,7 @@ SAMPLE cos_lut(SAMPLE x);
 
 
 float atoff(const char *s);
+int amy_snprint_float(char *s, size_t n, float v, int decimals, bool trim);  // parse.c: no doubles, no %f
 int8_t oscs_init();
 void alloc_osc(int osc, uint8_t *max_num_breakpoints_per_bpset_or_null);
 void free_osc(int osc);
