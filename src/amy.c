@@ -2852,9 +2852,8 @@ int16_t * amy_fill_buffer() {
             int16_t sample;
 
             // TODO -- the esp stuff here could sit outside of AMY
-            // For some reason, have to drop a bit to stop hard wrapping on esp?
-            // Not applied on ESP32-P4: see https://github.com/shorepine/amy/issues/1169
-#if (defined(ESP_PLATFORM) && !defined(CONFIG_IDF_TARGET_ESP32P4)) || defined(__IMXRT1062__)
+            // Teensy 4.x: drop a bit to stop hard wrapping through AudioOutputPT8211 (#425); the cause there is not known.
+#if defined(__IMXRT1062__)
             uintval >>= 1;
 #endif
             if (positive) {
