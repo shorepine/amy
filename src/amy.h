@@ -1621,13 +1621,16 @@ extern void custom_mod_trigger(uint16_t osc);
 extern int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, float midinote, uint32_t loopstart, uint32_t loopend);
 #ifdef AMY_WAVETABLE
 // Wavetable pitch ladders (docs/synth.md, WAVETABLE). build computes all of a
-// preset's rungs (a 64-frame table is a few million multiply-adds) and returns
-// 0 when nothing was built; called again, it rewrites them in place from the
-// current table. Call build and free from a thread other than the render
-// thread, one at a time per preset, not while that preset is being loaded or
-// unloaded (build reads the table unlocked), and without the queue lock: each
-// takes the render lock to publish or take back the set, so a block reads all
-// of it or none. Unloading the preset frees its rungs the same way.
+// preset's rungs (a 64-frame table takes about 90 ms on a 240 MHz ESP32-S3) on
+// about 2 KB of the calling thread's stack and returns 0 when nothing was
+// built; called again, it rewrites them in place from the current table, so a
+// block rendered meanwhile may read a rung half rewritten (publishing and
+// taking back the set are the atomic steps). Call build and free from a thread
+// other than the render thread, one at a time per preset, not while that preset
+// is being loaded or unloaded (build reads the table unlocked), and without the
+// queue lock: each takes the render lock to publish or take back the set, so a
+// block reads all of it or none. Unloading the preset frees its rungs the same
+// way.
 #define AMY_WAVETABLE_LADDER_RUNGS 4
 extern int pcm_wavetable_ladder_build(uint16_t preset_number);
 extern void pcm_wavetable_ladder_free(uint16_t preset_number);
