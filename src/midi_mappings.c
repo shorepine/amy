@@ -117,6 +117,7 @@ static const param_field_t param_fields[] = {
     PFIELD(UNISON_INTERVAL1, 1,               PF_F,   PF_OSC, unison_interval1),
     PFIELD(UNISON_INTERVAL2, 1,               PF_F,   PF_OSC, unison_interval2),
     PFIELD(UNISON_INTERVAL3, 1,               PF_F,   PF_OSC, unison_interval3),
+    PFIELD(UNISON_FRAME_SPREAD, 1,            PF_F,   PF_OSC, unison_frame_spread),
     PFIELD(UNISON_RANDOM,    1,               PF_U8,  PF_OSC, unison_random),
     PFIELD(TEMPO,            1,               PF_F,   PF_BUS, tempo),
     PFIELD(VOLUME,           1,               PF_F,   PF_BUS, volume),
