@@ -6,8 +6,9 @@
 // without a ladder; a note above that renders exactly as a plain osc on the
 // rung alone; the groups of a cluster pick their own rungs from their
 // sharpest copy; a rebuild follows a rewritten table in place; freeing,
-// unloading and amy_stop drop the rungs; a switch to another wave stops
-// reading them.
+// unloading and amy_stop drop the rungs; zW builds and frees them, refuses a
+// preset a z load is still filling, and a load over a ROM wavetable drops
+// that table's; a switch to another wave stops reading them.
 //
 // Build/run with `make ctest`.
 
@@ -263,9 +264,55 @@ static void test_rebuild_free_unload_and_refusals(void) {
     memset(stereo, 0, 2 * CYCLE * 2 * sizeof(int16_t));
     int16_t *tiny = pcm_load(103, CYCLE, 44100, 1, 69.0f, 0, 0);
     memset(tiny, 0, CYCLE * sizeof(int16_t));
+    int16_t *half = pcm_load(104, TABLE_LEN / 2, 44100, 1, 69.0f, 0, 0);
+    memset(half, 0, TABLE_LEN / 2 * sizeof(int16_t));
     CHECK(pcm_wavetable_ladder_build(102) == 0 && pcm_wavetable_ladder_build(103) == 0
-          && pcm_wavetable_ladder_build(999) == 0,
-          "a stereo preset, one shorter than two cycles and a missing one are refused");
+          && pcm_wavetable_ladder_build(104) == 0 && pcm_wavetable_ladder_build(999) == 0,
+          "a stereo preset, one of one cycle, one of 32 frames and a missing one are refused");
+    amy_stop();
+}
+
+// The wire form, and the two loads a build must not outlive: a z load still
+// filling the preset, and new data loaded on a ROM wavetable's number.
+static void test_wire(void) {
+    printf("zW builds and frees; a load in progress is refused; a load over a ROM wavetable drops its rungs\n");
+    char msg[48];
+    start();
+    load_table();
+    snprintf(msg, sizeof msg, "zW%dZ", TABLE_PRESET);
+    amy_add_message(msg);
+    CHECK(pcm_wavetable_lutset(TABLE_PRESET) != NULL, "zW%d builds the set", TABLE_PRESET);
+    snprintf(msg, sizeof msg, "zW%d,0Z", TABLE_PRESET);
+    amy_add_message(msg);
+    CHECK(pcm_wavetable_lutset(TABLE_PRESET) == NULL, "zW%d,0 frees it", TABLE_PRESET);
+    // The header allocates the preset and starts the transfer; no data follows.
+    snprintf(msg, sizeof msg, "z%d,%d,44100,69,0,0Z", TABLE_PRESET, TABLE_LEN);
+    amy_add_message(msg);
+    snprintf(msg, sizeof msg, "zW%dZ", TABLE_PRESET);
+    amy_add_message(msg);
+    CHECK(pcm_wavetable_lutset(TABLE_PRESET) == NULL, "zW is refused while the load is in progress");
+    amy_stop();
+    // A reset sent just before the zW lands first (it unloads the preset), so
+    // nothing is built from a table the reset is about to free.
+    start();
+    load_table();
+    snprintf(msg, sizeof msg, "S%dZ", RESET_ALL_OSCS);
+    amy_add_message(msg);
+    snprintf(msg, sizeof msg, "zW%dZ", TABLE_PRESET);
+    amy_add_message(msg);
+    CHECK(pcm_get_memory_preset(TABLE_PRESET, NULL, NULL, NULL, NULL) == NULL && pcm_wavetable_lutset(TABLE_PRESET) == NULL,
+          "a reset queued before zW unloads the preset first, and zW builds nothing");
+    amy_stop();
+    start();
+    snprintf(msg, sizeof msg, "zW%dZ", pcm_wavetable_base);
+    amy_add_message(msg);
+    CHECK(pcm_wavetable_lutset(pcm_wavetable_base) != NULL, "zW builds a ROM wavetable's set");
+    int16_t *buf = pcm_load(pcm_wavetable_base, TABLE_LEN, 44100, 1, 69.0f, 0, 0);
+    memset(buf, 0, TABLE_LEN * sizeof(int16_t));
+    CHECK(pcm_wavetable_lutset(pcm_wavetable_base) == NULL, "the table loaded on its number has no set");
+    pcm_unload_preset(pcm_wavetable_base);
+    CHECK(pcm_wavetable_lutset(pcm_wavetable_base) == NULL,
+          "after the unload the ROM table has no rungs from before the load");
     amy_stop();
 }
 
@@ -317,6 +364,7 @@ int main(void) {
     test_cluster_groups_pick_their_own_rung();
     test_rebuild_free_unload_and_refusals();
     test_rom_wavetable();
+    test_wire();
     test_wave_switch_leaves_the_set();
     if (failures) { printf("%d FAILED\n", failures); return 1; }
     printf("all ok\n");

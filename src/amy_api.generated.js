@@ -70,6 +70,7 @@ var AMY_KW_MAP = {
   num_partials: {wire: "p", type: "I"},
   start_sample: {wire: "zS", type: "L"},
   stop_sample: {wire: "zO", type: "I"},
+  wavetable_ladder: {wire: "zW", type: "L"},
   bus: {wire: "y", type: "I"},
   mode: {wire: "ww", type: "I"},
   midi_cc: {wire: "ic", type: "L"},
@@ -148,15 +149,16 @@ var AMY_KW_PRIORITY = {
   num_partials: 63,
   start_sample: 64,
   stop_sample: 65,
-  bus: 66,
-  mode: 67,
-  midi_cc: 68,
-  midi_note_cmd: 69,
-  cv_trigger: 70,
-  note_output: 71,
-  midi_cc_output: 72,
-  unison: 73,
-  patch_string: 74
+  wavetable_ladder: 66,
+  bus: 67,
+  mode: 68,
+  midi_cc: 69,
+  midi_note_cmd: 70,
+  cv_trigger: 71,
+  note_output: 72,
+  midi_cc_output: 73,
+  unison: 74,
+  patch_string: 75
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];

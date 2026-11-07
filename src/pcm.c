@@ -181,6 +181,7 @@ static int16_t stretch_win[PCM_STRETCH_GRAIN];
 // whole set or none; a rebuild writes the rungs in place.
 #ifdef AMY_WAVETABLE
 #define WAVETABLE_LADDER_MAX_LIMIT 63   // caps every entry of wavetable_ladder_limits
+#define WAVETABLE_LADDER_TABLE_LENGTH (64 * WAVETABLE_SAMPLES_PER_CYCLE)   // the wavetable format, 16,384 samples
 _Static_assert(2 * WAVETABLE_LADDER_MAX_LIMIT < WAVETABLE_SAMPLES_PER_CYCLE / 2,
                "WAVETABLE_LADDER_MAX_LIMIT: a kept bin k and its partner 128 - k would overlap");
 static const uint8_t wavetable_ladder_limits[AMY_WAVETABLE_LADDER_RUNGS] = { 63, 31, 15, 7 };
@@ -229,8 +230,14 @@ static void wavetable_ladder_retract(int16_t **rungs, LUT *set) {
 static void wavetable_ladder_drop(memorypcm_preset_t *preset) {
     if (preset->type == AMY_PCM_TYPE_MEMORY) wavetable_ladder_retract(&preset->wt_rungs, preset->wt_set);
 }
+
+// New data loaded on a built-in wavetable's number drops that table's rungs
+// too, as loading over a memory preset drops its own. Called after the
+// unload, when no memory preset holds the number, so free finds the ROM slot.
+#define wavetable_ladder_drop_rom(preset_number) pcm_wavetable_ladder_free(preset_number)
 #else
 #define wavetable_ladder_drop(preset) ((void)0)
+#define wavetable_ladder_drop_rom(preset_number) ((void)0)
 #endif
 
 void pcm_init() {
@@ -940,6 +947,7 @@ int pcm_load_file() {
     char * filename = amy_global.transfer_filename;
 
     pcm_unload_preset(preset_number);
+    wavetable_ladder_drop_rom(preset_number);
     if (filename == NULL || filename[0] == '\0') {
         return 0;
     }
@@ -1000,6 +1008,7 @@ int pcm_load_file() {
 int16_t * pcm_load(uint16_t preset_number, uint32_t length, uint32_t samplerate, uint8_t channels, float midinote, uint32_t loopstart, uint32_t loopend) {
     // if preset was already a memorypcm, we need to unload it
     pcm_unload_preset(preset_number); // this is a no-op if preset doesn't exist or is a const pcm
+    wavetable_ladder_drop_rom(preset_number);
     // now alloc a new LL entry and preset (the old LL entry is removed with pcm_unload_preset)
     memorypcm_ll_t *new_preset_pointer = malloc_caps(sizeof(memorypcm_ll_t) + sizeof(memorypcm_preset_t) + length * channels * sizeof(int16_t),
 						     amy_global.config.ram_caps_sample);
@@ -1174,23 +1183,54 @@ static void wavetable_ladder_rungs(const int16_t *base, int16_t *table, uint32_t
 
 int pcm_wavetable_ladder_build(uint16_t preset_number) {
     int16_t **rungs; LUT *set;
-    if (!wavetable_ladder_slots(preset_number, &rungs, &set)) return 0;
+    if (!wavetable_ladder_slots(preset_number, &rungs, &set)) {
+        fprintf(stderr, "wavetable ladder: preset %d is not a memory or built-in wavetable preset\n", preset_number);
+        return 0;
+    }
     memorypcm_preset_t rom_local;
     memorypcm_preset_t *preset = get_preset_for_preset_number(preset_number, &rom_local);
     if (preset == NULL || preset->channels != 1 || preset->sample_ram == NULL
-        || preset->length < 2 * WAVETABLE_SAMPLES_PER_CYCLE) return 0;
+        || preset->length != WAVETABLE_LADDER_TABLE_LENGTH) {
+        fprintf(stderr, "wavetable ladder: preset %d is not a mono table of %d samples\n",
+                preset_number, WAVETABLE_LADDER_TABLE_LENGTH);
+        return 0;
+    }
+    // A z load into this preset is still writing the table.
+    if (amy_global.transfer_flag != AMY_TRANSFER_TYPE_NONE
+        && amy_global.transfer_storage == (uint8_t *)preset->sample_ram) {
+        fprintf(stderr, "wavetable ladder: preset %d is still being loaded\n", preset_number);
+        return 0;
+    }
     uint32_t cycles = preset->length / WAVETABLE_SAMPLES_PER_CYCLE;
     uint32_t rung_length = cycles * WAVETABLE_SAMPLES_PER_CYCLE;
+    const int16_t *base = preset->sample_ram;
     int16_t *table = *rungs;   // a rebuild writes the published rungs in place
-    if (table == NULL) {
+    int is_new = (table == NULL);
+    if (is_new) {
         table = (int16_t *)malloc_caps(AMY_WAVETABLE_LADDER_RUNGS * rung_length * sizeof(int16_t),
                                        amy_global.config.ram_caps_sample);
-        if (table == NULL) return 0;
+        if (table == NULL) {
+            fprintf(stderr, "wavetable ladder: no RAM for preset %d's rungs\n", preset_number);
+            return 0;
+        }
     }
-    wavetable_ladder_rungs(preset->sample_ram, table, rung_length, cycles);
-    if (*rungs == NULL) {
-        LUT entry = { preset->sample_ram, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 127, 1.0f };
-        amy_grab_render_lock();
+    wavetable_ladder_rungs(base, table, rung_length, cycles);
+    // The table was read unlocked, and an unload or reload meanwhile frees the
+    // preset with its slots: look it up again and compare pointers before
+    // touching any of them.
+    amy_grab_render_lock();
+    int16_t **rungs_now; LUT *set_now;
+    memorypcm_preset_t now_local;
+    memorypcm_preset_t *now = wavetable_ladder_slots(preset_number, &rungs_now, &set_now)
+                              ? get_preset_for_preset_number(preset_number, &now_local) : NULL;
+    if (now == NULL || now->sample_ram != base || rungs_now != rungs || (!is_new && *rungs != table)) {
+        amy_release_render_lock();
+        if (is_new) free(table);
+        fprintf(stderr, "wavetable ladder: preset %d was unloaded or reloaded during the build\n", preset_number);
+        return 0;
+    }
+    if (is_new) {
+        LUT entry = { base, WAVETABLE_SAMPLES_PER_CYCLE, WAVETABLE_LOG2_SAMPLES_PER_CYCLE, 127, 1.0f };
         set[0] = entry;
         for (int r = 0; r < AMY_WAVETABLE_LADDER_RUNGS; ++r) {
             entry.table = table + r * rung_length;
@@ -1198,8 +1238,8 @@ int pcm_wavetable_ladder_build(uint16_t preset_number) {
             set[1 + r] = entry;
         }
         *rungs = table;
-        amy_release_render_lock();
     }
+    amy_release_render_lock();
     return 1;
 }
 
