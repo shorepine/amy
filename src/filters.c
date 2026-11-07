@@ -211,6 +211,19 @@ int8_t dsps_biquad_gen_notch_f32(SAMPLE *coeffs, float f, float qFactor)
 #define FILT_MUL_SS(a, b) SMULR6(a, b)
 #endif
 
+// FILT_MUL_SS for a coefficient fixed across a loop.  SMUL64R's shift does not land
+// on a word boundary, so it needs both words of the product and shifts to join them.
+// Moving that shift into the coefficient, once, leaves just the high word, with the
+// same result as long as the shifted coefficient fits, which is |a| < 0.5.
+#ifdef AMY_HAS_MUL64
+#define FILT_MULH(a, b) ((SAMPLE)(((int64_t)(a) * (int64_t)(b)) >> 32))
+#ifndef USE_ROUNDING_IN_SMUL64
+#define FILT_HAS_MULH
+#define FILT_MULH_FITS(a) ((a) >= -(1 << (S_FRAC_BITS - 1)) && (a) < (1 << (S_FRAC_BITS - 1)))
+#define FILT_MULH_COEF(a) ((SAMPLE)((uint32_t)(a) << (32 - S_FRAC_BITS)))
+#endif
+#endif
+
 // One sample through n first-order allpass stages sharing coefficient a;
 // w[0..n-1] are the per-stage memories.  Transposed direct form II of
 // H(z) = (a + z^-1)/(1 + a z^-1) with one state word per stage, so six stages
@@ -295,6 +308,20 @@ int8_t dsps_biquad_f32_ansi_commuted(const SAMPLE *input, SAMPLE *output, int le
     return 0;
 }
 
+// Each loop below is written once and expanded for both multiplies.
+#define BIQUAD_SPLIT_FB_LOOP(MUL) \
+    for (int i = 0 ; i < len ; i++) { \
+        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS); \
+        SAMPLE w0 = MUL(b0, x0) + MUL(b1, x1) + MUL(b2, x2); \
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2; \
+        y0 = y0 - MUL(e, y1) + MUL(f, y2); \
+        x2 = x1; \
+        x1 = x0; \
+        y2 = y1; \
+        y1 = y0; \
+        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS); \
+    }
+
 int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w) {
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -302,19 +329,22 @@ int8_t dsps_biquad_f32_ansi_split_fb(const SAMPLE *input, SAMPLE *output, int le
     SAMPLE x2 = w[1];
     SAMPLE y1 = w[2];
     SAMPLE y2 = w[3];
+    SAMPLE b0 = coef[0], b1 = coef[1], b2 = coef[2];
     SAMPLE e = F2S(2.0f) + coef[3];  // So coef[3] = -2 + e
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
-    for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0 = SHIFTL(input[i], FILTER_SCALEUP_BITS);
-        SAMPLE w0 = FILT_MUL_SS(coef[0], x0) + FILT_MUL_SS(coef[1], x1) + FILT_MUL_SS(coef[2], x2);
-        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
-        y0 = y0 - FILT_MUL_SS(e, y1) + FILT_MUL_SS(f, y2);
-        x2 = x1;
-        x1 = x0;
-        y2 = y1;
-        y1 = y0;
-        output[i] = SHIFTR(y0, FILTER_SCALEUP_BITS);
+#ifdef FILT_HAS_MULH
+    if (FILT_MULH_FITS(b0) && FILT_MULH_FITS(b1) && FILT_MULH_FITS(b2) && FILT_MULH_FITS(e) && FILT_MULH_FITS(f)) {
+        b0 = FILT_MULH_COEF(b0);
+        b1 = FILT_MULH_COEF(b1);
+        b2 = FILT_MULH_COEF(b2);
+        e = FILT_MULH_COEF(e);
+        f = FILT_MULH_COEF(f);
+        BIQUAD_SPLIT_FB_LOOP(FILT_MULH);
+    } else
+#endif
+    {
+        BIQUAD_SPLIT_FB_LOOP(FILT_MUL_SS);
     }
     w[0] = x1;
     w[1] = x2;
@@ -588,6 +618,29 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_once_fixedzeros(const SAMPLE 
     return max_out;
 }
 
+#define BIQUAD_SPLIT_FB_TWICE_LOOP(MUL) \
+    for (int i = 0 ; i < len ; i++) { \
+        SAMPLE x0, w0, v0; \
+        x0 = MUL(a, input[i]); \
+        w0 = x0 + SHIFTL(x1, 1) + x2; \
+        v0 = w0 + SHIFTL(v1, 1) - v2; \
+        v0 = v0 - MUL(e, v1) + MUL(f, v2); \
+        w0 = v0 + SHIFTL(v1, 1) + v2; \
+        w0 = MUL(a, w0); \
+        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2; \
+        y0 = y0 - MUL(e, y1) + MUL(f, y2); \
+        x2 = x1; \
+        x1 = x0; \
+        v2 = v1; \
+        v1 = v0; \
+        y2 = y1; \
+        y1 = y0; \
+        output[i] = y0; \
+        if (y0 < 0) y0 = -y0; \
+        if (y0 > max_out) \
+            max_out = y0; \
+    }
+
 AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice_fixedzeros(const SAMPLE *input, SAMPLE *output, int len, SAMPLE *coef, SAMPLE *w, SAMPLE max_val_unused) {
     AMY_PROFILE_START(DSPS_BIQUAD_F32_ANSI_SPLIT_FB)
     // Rewrite the feeedback coefficients as a1 = -2 + e and a2 = 1 - f
@@ -602,26 +655,16 @@ AMY_IRAM_ATTR SAMPLE dsps_biquad_f32_ansi_split_fb_twice_fixedzeros(const SAMPLE
     SAMPLE f = F2S(1.0f) - coef[4];  // So coef[4] = 1 - f
     //fprintf(stderr, "e=%f (%d) f=%f\n", S2F(e), (e < F2S(0.0625)), S2F(f));
     SAMPLE max_out = 0;
-    for (int i = 0 ; i < len ; i++) {
-        SAMPLE x0, w0, v0;
-        x0 = FILT_MUL_SS(a, input[i]);
-        w0 = x0 + SHIFTL(x1, 1) + x2;
-        v0 = w0 + SHIFTL(v1, 1) - v2;
-        v0 = v0 - FILT_MUL_SS(e, v1) + FILT_MUL_SS(f, v2);
-        w0 = v0 + SHIFTL(v1, 1) + v2;
-        w0 = FILT_MUL_SS(a, w0);
-        SAMPLE y0 = w0 + SHIFTL(y1, 1) - y2;
-        y0 = y0 - FILT_MUL_SS(e, y1) + FILT_MUL_SS(f, y2);
-        x2 = x1;
-        x1 = x0;
-        v2 = v1;
-        v1 = v0;
-        y2 = y1;
-        y1 = y0;
-        output[i] = y0;
-        if (y0 < 0) y0 = -y0;
-        if (y0 > max_out)
-            max_out = y0;
+#ifdef FILT_HAS_MULH
+    if (FILT_MULH_FITS(a) && FILT_MULH_FITS(e) && FILT_MULH_FITS(f)) {
+        a = FILT_MULH_COEF(a);
+        e = FILT_MULH_COEF(e);
+        f = FILT_MULH_COEF(f);
+        BIQUAD_SPLIT_FB_TWICE_LOOP(FILT_MULH);
+    } else
+#endif
+    {
+        BIQUAD_SPLIT_FB_TWICE_LOOP(FILT_MUL_SS);
     }
     w[0] = x1;
     w[1] = x2;
@@ -694,7 +737,7 @@ void filters_init(uint16_t bus) {
 // 32x32 -> 64 multiply), so EQ_MULH(x, EQ_COEF(f)) = x * f / 2 in every build.
 #ifdef AMY_USE_FIXEDPOINT
 #if defined(AMY_HAS_MUL64) && !defined(AMY_EQ_MUL32)
-#define EQ_MULH(x, k) ((SAMPLE)(((int64_t)(x) * (int64_t)(k)) >> 32))
+#define EQ_MULH(x, k) FILT_MULH(x, k)
 static SAMPLE EQ_COEF(float f) {
     f = MAX(-1.0f, MIN(0.99999994f, f));
     return (SAMPLE)lrintf(f * 2147483648.0f);
