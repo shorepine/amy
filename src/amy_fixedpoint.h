@@ -95,6 +95,7 @@
 #define S_FRAC_OF_S(s, b) ((s) * (1 << (b)) - floorf((s) * (1 << (b))))
 
 #define MUL0_SS(a, b) ((a) * (b))
+#define MUL1_SS(a, b) ((a) * (b))
 #define MUL4_SS(a, b) ((a) * (b))
 #define MUL5A_SS(a, b) ((a) * (b))
 #define MUL6A_SS(a, b) ((a) * (b))
@@ -318,6 +319,9 @@ static inline SAMPLE SMULR7(SAMPLE a, SAMPLE b) {
 
 // Multiply two SAMPLE values when the result will always be [-1.0, 1.0).
 #define MUL0_SS(a, b) FXMUL_TEMPLATE(a, b, 8, 7, S_FRAC_BITS)  // 8+7 = 15, so additional 8 bits shift right on output to make 23 req'd total.
+
+// Multiply two SAMPLE values when the result will always be [-2.0, 2.0).
+#define MUL1_SS(a, b) FXMUL_TEMPLATE(a, b, 9, 7, S_FRAC_BITS)  // 9+7 = 16, so result is >>1, leaving 1 bit integer part.
 
 // Multiply two SAMPLE values when the result will always be [-16.0, 16.0).
 #define MUL4_SS(a, b)  FXMUL_TEMPLATE(a, b, 10, 9, S_FRAC_BITS)  // 10+9 = 19, so result is >>4, leaving 4 bits integer part.
