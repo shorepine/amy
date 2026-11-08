@@ -91,7 +91,7 @@ const LUT *choose_from_lutset(float period, const LUT *lutset) {
             INTERP_PART
 
 #define INTERP_LINEAR \
-            sample = b + MUL0_SS(c - b, frac);
+            sample = b + MUL1_SS(c - b, frac);  /* c - b reaches 2.0 across a full-scale edge */
 
 // Miller's optimization -
 // https://github.com/pure-data/pure-data/blob/db777311d808bb3ba728b94ab067f8d333b7d0c2/src/d_array.c#L831C1-L833C76
