@@ -1188,8 +1188,8 @@ void wavetable_note_on(uint16_t osc, float freq) {
 
 // Structure of waveeditonlie wavetables.
 //const int CYCLES_PER_WAVETABLE = 64;
-const int WAVETABLE_SAMPLES_PER_CYCLE = 256;
-const int WAVETABLE_LOG2_SAMPLES_PER_CYCLE = 8;
+_Static_assert((1 << WAVETABLE_LOG2_SAMPLES_PER_CYCLE) == WAVETABLE_SAMPLES_PER_CYCLE,
+               "WAVETABLE_LOG2_SAMPLES_PER_CYCLE (amy.h) is the log2 of WAVETABLE_SAMPLES_PER_CYCLE");
 
 #ifdef GAMMA9001
 #define PCM_WAVETABLE_BASE 19
@@ -1202,13 +1202,23 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     float freq = freq_of_logfreq(msynth[osc]->logfreq);
     SAMPLE amp = F2S(msynth[osc]->amp);
     SAMPLE last_amp = F2S(msynth[osc]->last_amp);
-    unison_copy copies[AMY_UNISON_MAX];
-    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, NULL);
     int16_t wavetable_preset = synth[osc]->preset;
     if (AMY_IS_UNSET(wavetable_preset))
         wavetable_preset = PCM_WAVETABLE_BASE;
     uint32_t sample_length;
     const int16_t *wavetable_samples = pcm_get_sample_ram_for_preset(wavetable_preset, &sample_length);
+    // A preset with rungs built is a lutset: pick the table for the osc's own
+    // sharpest copy every block (pitch may move), and let unison_prepare pick
+    // per group from the same set, as the saw does.
+    const LUT *lutset = pcm_wavetable_lutset(wavetable_preset);
+    synth[osc]->lut = (lutset != NULL)
+        ? choose_from_lutset((float)AMY_SAMPLE_RATE / freq_of_logfreq(msynth[osc]->logfreq + unison_top_offset(osc)), lutset)
+        : NULL;
+    unison_copy copies[AMY_UNISON_MAX];
+    uint8_t n = unison_prepare(osc, copies, freq, last_amp, amp, lutset);
+    // The copies hold their tables now; the osc keeps no pointer into a
+    // preset's set past this block.
+    synth[osc]->lut = NULL;
     if (wavetable_samples == NULL || sample_length < (2 * WAVETABLE_SAMPLES_PER_CYCLE)) {
         // We need at least two cycles to have something to crossfade.
         return 0;
@@ -1238,6 +1248,10 @@ SAMPLE render_wavetable(SAMPLE* buf, uint16_t osc) {
     next_lut.table += WAVETABLE_SAMPLES_PER_CYCLE;
     // If we used last_duty, we could actually smoothly interpolate the waveshape crossfade too (except across table boundaries).
     for (uint8_t i = 0; i < n; ++i) {
+        if (copies[i].lut != NULL) {   // the copy's rung, else the base table
+            wavetable_lut.table = copies[i].lut->table + cycle * WAVETABLE_SAMPLES_PER_CYCLE;
+            next_lut.table = wavetable_lut.table + WAVETABLE_SAMPLES_PER_CYCLE;
+        }
         PHASOR *phase = unison_phase(osc, copies[i].idx);
         render_lut(buf, *phase, copies[i].step, SMULR7(copies[i].last_amp, interp_a), SMULR7(copies[i].amp, interp_a), &wavetable_lut, &max_value);
         *phase = render_lut(buf, *phase, copies[i].step, SMULR7(copies[i].last_amp, interp_b), SMULR7(copies[i].amp, interp_b), &next_lut, &max_value);
