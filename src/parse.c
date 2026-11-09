@@ -876,10 +876,10 @@ int amy_parse_message(char * message, amy_event *e) {
             }
             case 'b': e->feedback = atoff(arg); break;
             case 'c': e->chained_osc = atoi(arg); break;
-            // unison cluster: count, spacing, offset, blend, groups, interval1, interval2, interval3, random
+            // unison cluster: count, spacing, offset, blend, groups, interval1, interval2, interval3, random, frame_spread
             case 'C': {
-                float unison_params[9];
-                parse_list_float(arg, unison_params, 9, AMY_UNSET_FLOAT);
+                float unison_params[10];
+                parse_list_float(arg, unison_params, 10, AMY_UNSET_FLOAT);
                 if (AMY_IS_SET(unison_params[0])) e->unison_count = (uint8_t)MAX(0, MIN(unison_params[0], AMY_UNISON_MAX));
                 e->unison_spacing = unison_params[1];
                 e->unison_offset = unison_params[2];
@@ -889,6 +889,7 @@ int amy_parse_message(char * message, amy_event *e) {
                 e->unison_interval2 = unison_params[6];
                 e->unison_interval3 = unison_params[7];
                 if (AMY_IS_SET(unison_params[8])) e->unison_random = (uint8_t)MAX(0, MIN(unison_params[8], 1));
+                e->unison_frame_spread = unison_params[9];
                 break;
             }
             case 'd': parse_coef_message(arg, e->duty_coefs);break;
