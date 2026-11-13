@@ -1712,6 +1712,10 @@ void patches_load_patch(amy_event *e) {
         #else
         if(voices[v]%2==1) osc_start = 0;
         #endif
+        // The halves only matter when two tasks render them (esp_render_on_cores).
+        // With one render task, pack voices from osc 0, leaving the top oscs free for
+        // oscs a sketch addresses directly.
+        if (!amy_global.config.platform.multicore) osc_start = 0;
 
         for(uint16_t i = 0; !found && i < AMY_OSCS; i++) {
             uint16_t base_osc = (osc_start + i) % AMY_OSCS;
