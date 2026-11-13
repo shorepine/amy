@@ -499,7 +499,9 @@ TaskHandle_t midi_handle;
 int8_t esp_get_uart(int8_t index) {
     if(index==0) return UART_NUM_0;
     if(index==1) return UART_NUM_1;
+#if SOC_UART_NUM > 2  // e.g. the ESP32-C3 has only UART0 and UART1
     if(index==2) return UART_NUM_2;
+#endif
     return -1;
 }
 #if defined (AMYBOARD) || defined(AMYBOARD_ARDUINO)
