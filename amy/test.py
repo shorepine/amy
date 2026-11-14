@@ -2031,7 +2031,7 @@ class TestBuses(AmyTest):
 class TestFxLowCut(AmyTest):
   """fx_lowcut keeps a bus's chorus, echo and reverb out of its low end and leaves the dry signal alone."""
 
-  def _render(self, note, fx_level, lowcut=0, off_at=(), seconds=1.0):
+  def _render(self, note, fx_level, lowcut=0, off_at=(), on_again=0, seconds=1.0):
     _amy.stop()
     _amy.start(0)
     _reset_test_clock()
@@ -2042,6 +2042,8 @@ class TestFxLowCut(AmyTest):
     amy_send_at(time=20, synth=1, note=note, vel=1)
     for time in off_at:
       amy_send_at(time=time, bus=1, fx_lowcut=0)
+    if on_again:
+      amy_send_at(time=on_again, bus=1, fx_lowcut=lowcut)
     amy_send_at(time=500, synth=1, vel=0)
     return _finish_test_clock(seconds)
 
@@ -2072,6 +2074,14 @@ class TestFxLowCut(AmyTest):
       problems.append('switching off stepped the bus by %.2f of what the cut held back' % step)
     if np.any(back[-2048:]):
       problems.append('the bus differs after the cut has stopped')
+    # Switched on again half way through that fade: no step either, and it ends as a cut that stayed on.
+    stayed = self._render(33, 1, lowcut=200, seconds=1.6)
+    again = self._render(33, 1, lowcut=200, off_at=(100,), on_again=220, seconds=1.6) - stayed
+    step = np.max(np.abs(np.diff(again, axis=0))) / np.max(np.abs(again))
+    if step > 0.05:
+      problems.append('switching on inside the fade stepped the bus by %.2f' % step)
+    if np.any(again[-2048:]):
+      problems.append('the bus differs from a cut that stayed on')
     # A set cut reads back.
     amy.send(bus=1, fx_lowcut=200)
     amy.render(0.01)

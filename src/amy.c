@@ -540,17 +540,7 @@ void config_fx_lowcut(uint16_t bus, float hz) {
         fx_dry_block = malloc_caps(AMY_BLOCK_SIZE * AMY_MAX_CHANNELS * sizeof(SAMPLE), amy_global.config.ram_caps_fbl);
         if (fx_dry_block == NULL) hz = 0;   // On OOM leave it off, as config_reverb does.
     }
-    // A running cut keeps its state when moved, and set to 0 it fades to the uncut effects over a
-    // quarter second before it stops, so neither clicks.
-    if (lc->hz == 0 && !lc->closing) memset(lc->state, 0, sizeof(lc->state));
-    if (hz > 0) {
-        lc->closing = 0;
-        fx_lowcut_coefs(hz, &lc->pole, &lc->gain);
-    } else if (lc->hz > 0) {
-        lc->closing = AMY_SAMPLE_RATE / AMY_BLOCK_SIZE / 4;
-        lc->open_step = F2S(1.0f / (lc->closing * AMY_BLOCK_SIZE));
-    }
-    lc->hz = hz;
+    fx_lowcut_set(lc, hz);
 }
 
 
@@ -571,7 +561,7 @@ void bus_reset(uint16_t bus) {
     }
 
     config_fx_lowcut(bus, 0);
-    amy_global.bus[bus]->fx_lowcut.closing = 0;
+    amy_global.bus[bus]->fx_lowcut.fade = 0;
     if (AMY_HAS_CHORUS) config_chorus(bus, CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if (AMY_HAS_REVERB) config_reverb(bus, REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
     if (AMY_HAS_ECHO)   config_echo(bus, S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
@@ -2791,7 +2781,7 @@ int16_t * amy_fill_buffer() {
             parametric_eq_process(bus, fbl[0][bus]);
         }
         // fx_lowcut: keep the bus as it stands before chorus, echo and reverb.
-        bool fx_lowcut = amy_global.bus[bus]->fx_lowcut.hz > 0 || amy_global.bus[bus]->fx_lowcut.closing;
+        bool fx_lowcut = amy_global.bus[bus]->fx_lowcut.hz > 0 || amy_global.bus[bus]->fx_lowcut.fade;
         if (fx_lowcut)
             memcpy(fx_dry_block, fbl[0][bus], AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(SAMPLE));
         if(AMY_HAS_CHORUS) {
@@ -2829,10 +2819,7 @@ int16_t * amy_fill_buffer() {
         }
         if (fx_lowcut) {
             // ... and high-pass what they added to it.
-            for (int16_t c = 0; c < AMY_NCHANS; ++c)
-                bus_fx_lowcut(fbl[0][bus] + c * AMY_BLOCK_SIZE, fx_dry_block + c * AMY_BLOCK_SIZE,
-                              &amy_global.bus[bus]->fx_lowcut, c);
-            if (amy_global.bus[bus]->fx_lowcut.closing) amy_global.bus[bus]->fx_lowcut.closing--;
+            bus_fx_lowcut(fbl[0][bus], fx_dry_block, &amy_global.bus[bus]->fx_lowcut);
         }
         if(amy_global.config.amy_external_bus_postprocess_hook != NULL) {
             amy_global.config.amy_external_bus_postprocess_hook(bus, fbl[0][bus], AMY_BLOCK_SIZE);

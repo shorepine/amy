@@ -913,36 +913,59 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
 // 12 dB/octave, 3 dB down at `hz`.  Each has its zero exactly at DC and
 // amplifies its own rounding noise by 1/(1-p) only; a direct-form biquad with
 // both poles this close to 1 squares that.
-void fx_lowcut_coefs(float hz, SAMPLE *pole, SAMPLE *gain) {
-    // Two sections are 3 dB down at hz when each one's corner is hz * sqrt(sqrt(2) - 1).
-    float t = tanf((float)M_PI * hz * 0.6435943f / AMY_SAMPLE_RATE);
-    float p = (1.0f - t) / (1.0f + t);
-    *pole = F2S(p);
-    *gain = F2S((1.0f + p) * 0.5f);   // unity at Nyquist
+// Exact on every build: SMULR6's 12-bit operands cannot hold a pole this close to 1.
+#define FX_LOWCUT_MUL(a, b) ((SAMPLE)(((int64_t)(a) * (int64_t)(b)) >> S_FRAC_BITS))
+// Switching the cut off, or back on before that has finished, crossfades between the cut and the
+// uncut effects over this many blocks (a quarter second), so it does not click.
+#define FX_LOWCUT_FADE (AMY_SAMPLE_RATE / AMY_BLOCK_SIZE / 4)
+
+void fx_lowcut_set(fx_lowcut_state_t *lc, float hz) {
+    if (hz > 0) {
+        if (lc->fade == 0) {
+            // From off: a cleared high-pass passes its input, so it starts without a step.
+            memset(lc->state, 0, sizeof(lc->state));
+            lc->fade = FX_LOWCUT_FADE;
+        }
+        // Two sections are 3 dB down at hz when each one's (prewarped) corner is sqrt(sqrt(2) - 1) of it.
+        // A running cut keeps its state when moved.
+        float t = 0.6435943f * tanf((float)M_PI * hz / AMY_SAMPLE_RATE);
+        float p = (1.0f - t) / (1.0f + t);
+        lc->pole = F2S(p);
+        lc->gain = F2S((1.0f + p) * 0.5f);   // unity at Nyquist
+    }
+    lc->hz = hz;
 }
 
-void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc, int chan) {
+void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc) {
     SAMPLE pole = lc->pole, gain = lc->gain;
-    SAMPLE x1a = lc->state[chan][0][0], y1a = lc->state[chan][0][1];
-    SAMPLE x1b = lc->state[chan][1][0], y1b = lc->state[chan][1][1];
-    // While switching off, `open` runs up to 1: all of the effects again.
-    SAMPLE open_step = lc->closing ? lc->open_step : 0;
-    SAMPLE open = lc->closing ? F2S(1.0f) - lc->closing * AMY_BLOCK_SIZE * open_step : 0;
-    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
-        SAMPLE x = buf[i] - dry[i];
-        SAMPLE ya = FILT_MUL_SS(gain, x - x1a) + FILT_MUL_SS(pole, y1a);
-        x1a = x;
-        y1a = ya;
-        SAMPLE yb = FILT_MUL_SS(gain, ya - x1b) + FILT_MUL_SS(pole, y1b);
-        x1b = ya;
-        y1b = yb;
-        buf[i] = dry[i] + yb + FILT_MUL_SS(open, x - yb);
-        open += open_step;
+    // `open` is the share of the uncut effects: 0 with the cut on, and on its way while `fade` is.
+    uint16_t target = lc->hz > 0 ? FX_LOWCUT_FADE : 0;
+    SAMPLE open_step = F2S(1.0f / (FX_LOWCUT_FADE * AMY_BLOCK_SIZE));
+    SAMPLE open_start = (FX_LOWCUT_FADE - lc->fade) * AMY_BLOCK_SIZE * open_step;
+    if (lc->fade == target) open_step = 0;
+    else if (lc->fade < target) open_step = -open_step;
+    for (int chan = 0; chan < AMY_NCHANS; ++chan, buf += AMY_BLOCK_SIZE, dry += AMY_BLOCK_SIZE) {
+        SAMPLE x1a = lc->state[chan][0][0], y1a = lc->state[chan][0][1];
+        SAMPLE x1b = lc->state[chan][1][0], y1b = lc->state[chan][1][1];
+        SAMPLE open = open_start;
+        for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+            SAMPLE x = buf[i] - dry[i];
+            SAMPLE ya = FX_LOWCUT_MUL(gain, x - x1a) + FX_LOWCUT_MUL(pole, y1a);
+            x1a = x;
+            y1a = ya;
+            SAMPLE yb = FX_LOWCUT_MUL(gain, ya - x1b) + FX_LOWCUT_MUL(pole, y1b);
+            x1b = ya;
+            y1b = yb;
+            buf[i] = dry[i] + yb + FX_LOWCUT_MUL(open, x - yb);
+            open += open_step;
+        }
+        lc->state[chan][0][0] = x1a;
+        lc->state[chan][0][1] = y1a;
+        lc->state[chan][1][0] = x1b;
+        lc->state[chan][1][1] = y1b;
     }
-    lc->state[chan][0][0] = x1a;
-    lc->state[chan][0][1] = y1a;
-    lc->state[chan][1][0] = x1b;
-    lc->state[chan][1][1] = y1b;
+    if (lc->fade < target) lc->fade++;
+    else if (lc->fade > target) lc->fade--;
 }
 
 void check_overflow(SAMPLE* block, int osc, char *msg) {

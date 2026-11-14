@@ -1138,8 +1138,7 @@ typedef struct echo_config {
 // filters.c): two first-order sections per channel, each {x[n-1], y[n-1]}.
 typedef struct fx_lowcut_state {
     float hz;      // 3 dB point of the 12 dB/octave slope.  0 = off.
-    uint16_t closing;  // Blocks left of the fade to the uncut effects after hz went to 0.
-    SAMPLE open_step;  // Per-sample step of that fade.
+    uint16_t fade; // Crossfade between the uncut effects (0, and the stage is off) and the cut ones.
     SAMPLE pole;   // of each section
     SAMPLE gain;   // of each section, so the passband is unity
     SAMPLE state[AMY_MAX_CHANNELS][2][2];
@@ -1283,8 +1282,8 @@ void config_reverb(uint16_t bus, float level, float liveness, float damping, flo
 void config_chorus(uint16_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(uint16_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
 void config_fx_lowcut(uint16_t bus, float hz);
-void fx_lowcut_coefs(float hz, SAMPLE *pole, SAMPLE *gain);
-void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc, int chan);
+void fx_lowcut_set(fx_lowcut_state_t *lc, float hz);
+void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc);
 void osc_note_on(uint16_t osc, float initial_freq);
 void unison_note_on(uint16_t osc);
 void chorus_note_on(float initial_freq);
