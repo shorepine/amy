@@ -550,6 +550,12 @@ void bus_reset(uint16_t bus) {
 }
 
 
+// Bus volume is supposed to max out at 10, so scale by 0.1.
+#define BUS_VOLUME_SCALE(volume) MUL4_SS(F2S(0.1f), F2S(volume))
+// volume_scale of a bus that has not rendered since start or reset: its first block takes its
+// volume as it stands rather than ramping to it.
+#define BUS_VOLUME_UNSET F2S(-128.0f)
+
 void buses_reset() {
     for (int i = 0; i < amy_global.config.max_buses; ++i) {
         bus_reset(i);
@@ -579,14 +585,19 @@ int8_t global_init(amy_config_t c) {
                                              amy_global.config.ram_caps_synth);
     amy_global.volume_scale = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * amy_global.config.max_buses,
                                                     amy_global.config.ram_caps_synth);
+    amy_global.volume_step = (SAMPLE *)malloc_caps(sizeof(SAMPLE) * amy_global.config.max_buses,
+                                                   amy_global.config.ram_caps_synth);
     amy_global.bus = (bus_state_t **)malloc_caps(sizeof(bus_state_t *) * amy_global.config.max_buses,
                                                  amy_global.config.ram_caps_synth);
-    if (amy_global.volume == NULL || amy_global.volume_scale == NULL || amy_global.bus == NULL) {
+    if (amy_global.volume == NULL || amy_global.volume_scale == NULL || amy_global.volume_step == NULL
+        || amy_global.bus == NULL) {
         fprintf(stderr, "unable to alloc %d buses\n", amy_global.config.max_buses);
         return -1;
     }
-    for (int bus = 0; bus < amy_global.config.max_buses; ++bus)
+    for (int bus = 0; bus < amy_global.config.max_buses; ++bus) {
         amy_global.volume[bus] = 1.0f;
+        amy_global.volume_scale[bus] = BUS_VOLUME_UNSET;
+    }
     amy_global.pitch_bend = 0;
     amy_global.latency_ms = 0;
     amy_global.tempo = 108.0;
@@ -631,10 +642,12 @@ void global_deinit(void) {
     for (int bus = 0; bus < amy_global.config.max_buses; ++bus)  filters_deinit(bus);
     free(amy_global.bus[0]);  // One allocation for every bus_state; bus[i] points into it.
     free(amy_global.bus);
+    free(amy_global.volume_step);
     free(amy_global.volume_scale);
     free(amy_global.volume);
     amy_global.bus = NULL;
     amy_global.volume_scale = NULL;
+    amy_global.volume_step = NULL;
     amy_global.volume = NULL;
 }
 
@@ -1304,8 +1317,10 @@ void amy_reset_oscs() {
     for(uint16_t i=0;i<AMY_OSCS + amy_global.config.max_buses;i++) free_osc(i);
     //for(uint16_t i=0;i<AMY_OSCS + amy_global.config.max_buses;i++) reset_osc(i);
     // also reset filters and volume
-    for (int bus = 0; bus < amy_global.config.max_buses; ++bus)
+    for (int bus = 0; bus < amy_global.config.max_buses; ++bus) {
         amy_global.volume[bus] = 1.0f;
+        amy_global.volume_scale[bus] = BUS_VOLUME_UNSET;
+    }
     my_srand48(517730);
     buses_reset();
     // Reset patches
@@ -2810,17 +2825,22 @@ int16_t * amy_fill_buffer() {
         }, bus, fbl[0][bus], AMY_BLOCK_SIZE, AMY_NCHANS);
         #endif
     }  // end of per-bus FX
-    // global volume is supposed to max out at 10, so scale by 0.1.
+    // Each bus's gain moves from where the last block left it to its volume across this block:
+    // one step at the block edge is a click under a sounding note.
     SAMPLE *volume_scale = amy_global.volume_scale;  // max_buses long, allocated at start.
-    for (int bus = 0; bus <= amy_global.highest_bus; ++bus)
-        volume_scale[bus] = MUL4_SS(F2S(0.1f), F2S(amy_global.volume[bus]));
+    SAMPLE *volume_step = amy_global.volume_step;
+    for (int bus = 0; bus <= amy_global.highest_bus; ++bus) {
+        SAMPLE target = BUS_VOLUME_SCALE(amy_global.volume[bus]);
+        volume_step[bus] = (volume_scale[bus] == BUS_VOLUME_UNSET) ? 0 : (target - volume_scale[bus]) / AMY_BLOCK_SIZE;
+        volume_scale[bus] = target;
+    }
     for(int16_t i=0; i < AMY_BLOCK_SIZE; ++i) {
         for (int16_t c=0; c < AMY_NCHANS; ++c) {
 
             SAMPLE fsample = 0;
             for (int bus = 0; bus <= amy_global.highest_bus; ++bus) {
                 // Convert the mixed sample into the int16 range, applying overall gain.
-                fsample += MUL8_SS(volume_scale[bus], fbl[0][bus][i + c * AMY_BLOCK_SIZE]);
+                fsample += MUL8_SS(volume_scale[bus] - (AMY_BLOCK_SIZE - i) * volume_step[bus], fbl[0][bus][i + c * AMY_BLOCK_SIZE]);
             }
 
             // One-pole high-pass filter to remove large low-frequency excursions from

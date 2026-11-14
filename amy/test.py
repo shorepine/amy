@@ -2028,6 +2028,67 @@ class TestBuses(AmyTest):
     amy_send_at(time=700, synth=2, note=70, vel=5)
 
 
+class TestBusVolumeRamp(AmyTest):
+  """A bus volume change under a sounding note is a ramp across one block, not a step at its edge."""
+
+  def _render(self, volume_to=None, volume_from=None):
+    _amy.stop()
+    _amy.start(0)
+    _reset_test_clock()
+    amy_send_at(time=0, synth=1, num_voices=1, oscs_per_voice=1, bus=1)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, bp0='0,1,10000,1,50,0')
+    if volume_from is not None:
+      amy_send_at(time=0, bus=1, volume=volume_from)
+    amy_send_at(time=0, synth=1, osc=0, freq=55, vel=0.3)
+    if volume_to is not None:
+      amy_send_at(time=300, bus=1, volume=volume_to)
+    return _finish_test_clock(0.6)
+
+  def test(self):
+    name = self.__class__.__name__
+    problems = []
+    steady = self._render()
+    own_step = np.max(np.abs(np.diff(steady, axis=0)))
+    changed = int(0.3 * amy.AMY_SAMPLE_RATE)
+    after = slice(changed + 2 * amy.AMY_BLOCK_SIZE, changed + 2 * amy.AMY_BLOCK_SIZE + 4096)
+    steps = []
+    for volume_from, volume_to in ((None, 0.2), (0.2, 1)):
+      moved = self._render(volume_to, volume_from)
+      # The largest sample-to-sample step is about the steady note's own, on both channels (a step
+      # at the block edge is 20 times that) ...
+      steps.append(np.max(np.abs(np.diff(moved, axis=0))) / own_step)
+      if steps[-1] > 1.5:
+        problems.append('%s -> %s stepped the output: %.1fx the note\'s own largest step'
+                        % (volume_from, volume_to, steps[-1]))
+      # ... and two blocks later the bus is at its new volume.  (About 14 dB for 0.2: the bus gain
+      # keeps 11 fractional bits.)
+      ratio = dB(rms(moved[after])) - dB(rms(steady[after]))
+      if abs(ratio - 20 * np.log10(volume_to)) > 0.3:
+        problems.append('%s -> %s is %.2f dB from the steady note two blocks on' % (volume_from, volume_to, ratio))
+    # A bus's first block takes its volume as it stands: muted from the start is silent from the start.
+    if np.any(self._render(volume_from=0)):
+      problems.append('a bus muted before its first block made a sound')
+    # The same for a bus first used while others are already running ...
+    amy_send_at(time=700, synth=2, num_voices=1, oscs_per_voice=1, bus=2)
+    amy_send_at(time=700, bus=2, volume=0)
+    amy_send_at(time=700, synth=2, osc=0, wave=amy.SINE, freq=55, vel=0.3)
+    amy_send_at(time=700, bus=1, volume=0)
+    if np.any(_finish_test_clock(1.0)[int(0.69 * amy.AMY_SAMPLE_RATE):]):
+      problems.append('a bus first used later, muted, made a sound')
+    # ... and after a reset: the note that follows starts at full volume, not on a ramp up from the mute.
+    amy_send_at(time=1100, reset=amy.RESET_ALL_OSCS)
+    amy_send_at(time=1100, synth=1, num_voices=1, oscs_per_voice=1, bus=1)
+    amy_send_at(time=1100, synth=1, osc=0, wave=amy.SINE, bp0='0,1,10000,1,50,0')
+    amy_send_at(time=1100, synth=1, osc=0, freq=55, vel=0.3)
+    after_reset = _finish_test_clock(1.4)[int(1.1 * amy.AMY_SAMPLE_RATE):, 0]
+    first = lambda x: x[np.flatnonzero(x)[0]:][:128]   # the note's first 128 samples
+    onset = rms(first(after_reset)) / rms(first(steady[:, 0]))
+    if abs(onset - 1) > 0.05:
+      problems.append('the first note after a reset started at %.2f of its level' % onset)
+    message = ('%-32s:' % name) + (' largest step %.2fx / %.2fx the steady note\'s' % tuple(steps))
+    return not problems, message + ''.join(' / ' + p for p in problems)
+
+
 class TestZeroFreqModPhase(AmyTest):
   """Test that we can set a constant value for mod_osc via its phase."""
 
