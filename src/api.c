@@ -212,6 +212,7 @@ void amy_clear_event(amy_event *e) {
     AMY_UNSET(e->echo_max_delay_ms);
     AMY_UNSET(e->echo_feedback);
     AMY_UNSET(e->echo_filter_coef);
+    AMY_UNSET(e->fx_lowcut_hz);
     AMY_UNSET(e->chorus_level);
     AMY_UNSET(e->chorus_max_delay);
     AMY_UNSET(e->chorus_lfo_freq);

@@ -78,6 +78,7 @@ var AMY_KW_MAP = {
   note_output: {wire: "iG", type: "L"},
   midi_cc_output: {wire: "iC", type: "L"},
   unison: {wire: "C", type: "L"},
+  fx_lowcut: {wire: "J", type: "F"},
   patch_string: {wire: "u", type: "S"}
 };
 
@@ -156,7 +157,8 @@ var AMY_KW_PRIORITY = {
   note_output: 71,
   midi_cc_output: 72,
   unison: 73,
-  patch_string: 74
+  fx_lowcut: 74,
+  patch_string: 75
 };
 
 var AMY_COEF_FIELDS = ["const", "note", "vel", "eg0", "eg1", "mod0", "bend", "ext0", "ext1", "mod1"];
@@ -537,7 +539,8 @@ var AMY = {
   PARAM_UNISON_INTERVAL2: 240,
   PARAM_UNISON_INTERVAL3: 241,
   PARAM_UNISON_RANDOM: 242,
-  PARAM_NO_PARAM: 243
+  PARAM_FX_LOWCUT_HZ: 243,
+  PARAM_NO_PARAM: 244
 };
 
 if (typeof globalThis !== "undefined") {

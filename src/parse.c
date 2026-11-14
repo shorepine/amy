@@ -912,7 +912,7 @@ int amy_parse_message(char * message, amy_event *e) {
             case 'i': pos += amy_parse_synth_layer_message(arg, e); break;  // Skip over second cmd letter, if any, or entire MIDI CC code string.
             case 'I': e->ratio = atoff(arg); break;
             case 'j': e->tempo = atoff(arg); break;
-            /* J available */
+            case 'J': e->fx_lowcut_hz = atoff(arg); break;
             // chorus.level
             case 'k': if(AMY_HAS_CHORUS) {
                 float chorus_params[4];
