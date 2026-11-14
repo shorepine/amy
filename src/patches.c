@@ -445,6 +445,7 @@ int sprint_event(amy_event *e, char *s, size_t len, bool wirecode) {
     _EPRINT_VALS_5(e->echo_level, e->echo_delay_ms, e->echo_max_delay_ms, e->echo_feedback, e->echo_filter_coef, "echo_{level,delay,max,fb,filt}", "M");
     _EPRINT_VALS_5(e->chorus_level, e->chorus_max_delay, e->chorus_lfo_freq, e->chorus_depth, AMY_UNSET_FLOAT, "chorus_{level,delay,lfo,depth}", "k");
     _EPRINT_VALS_5(e->reverb_level, e->reverb_liveness, e->reverb_damping, e->reverb_xover_hz, AMY_UNSET_FLOAT, "reverb_{level,live,damp,xover}", "h");
+    _EPRINT_F(fx_lowcut_hz, "fx_lowcut_hz", "J");
 
     if (wirecode && (s - s_entry) > 0) { snprintf(s, len - (size_t)(s - s_entry), "Z"); s += strlen(s); }
 
@@ -486,6 +487,7 @@ bool event_addresses_bus(amy_event *e) {
     _RET_TRUE_IF_5_F_SET(echo_level, echo_delay_ms, echo_max_delay_ms, echo_feedback, echo_filter_coef);
     _RET_TRUE_IF_5_F_SET(chorus_level, chorus_max_delay, chorus_lfo_freq, chorus_depth, chorus_depth);
     _RET_TRUE_IF_5_F_SET(reverb_level, reverb_liveness, reverb_damping, reverb_xover_hz, reverb_xover_hz);
+    _RET_TRUE_IF_SET(fx_lowcut_hz);
     // Distortion addresses a bus only when the event names no osc; naming one
     // makes the same fields osc-scope (see event_addresses_oscs).
     // Not _RET_TRUE_IF_5_F_SET: the int fields' unset sentinels cast to
@@ -672,6 +674,7 @@ struct delta *deltas_to_event(struct delta *queue, struct amy_event *event) {
       _CASE_F(echo_delay_ms, ECHO_DELAY_MS)
       _CASE_F(echo_feedback, ECHO_FEEDBACK)
       _CASE_F(echo_filter_coef, ECHO_FILTER_COEF)
+      _CASE_F(fx_lowcut_hz, FX_LOWCUT_HZ)
       _CASE_F(chorus_max_delay, CHORUS_MAX_DELAY)
       _CASE_F(chorus_level, CHORUS_LEVEL)
       _CASE_F(chorus_lfo_freq, CHORUS_LFO_FREQ)
@@ -928,6 +931,9 @@ void set_event_for_bus_fx(amy_event *event, uint16_t bus, global_state_t *state)
         event->echo_max_delay_ms = state->bus[bus]->echo.max_delay_samples * 1000.f / AMY_SAMPLE_RATE;
     event->echo_feedback = S2F(state->bus[bus]->echo.feedback);
     event->echo_filter_coef = S2F(state->bus[bus]->echo.filter_coef);
+    // Off is the default, and saying so would put a command on every bus line.
+    if (state->bus[bus]->fx_lowcut.hz > 0)
+        event->fx_lowcut_hz = state->bus[bus]->fx_lowcut.hz;
     // Distortion, which shares its event fields with the per-osc stage: this
     // event names no osc, and that is what makes the commands read back as
     // bus-scope.  A bus with no stage enabled has nothing to restore, and

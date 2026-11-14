@@ -902,6 +902,49 @@ void hpf_buf(SAMPLE *buf, SAMPLE *state) {
 
 }
 
+// fx_lowcut: keep a bus's chorus, echo and reverb out of its low end.  Each
+// of them adds its output onto the bus (delay.c), so `buf` after them minus
+// `dry` before them is what they contributed, one feeding the next included.
+// That difference is high-passed and put back on `dry`: below the cutoff the
+// bus is the dry signal, and what the effects generate down there themselves
+// (chorus sidebands, feedback build-up, rounding DC) goes with the rest.
+//
+// The filter is two first-order sections in series, y = g*(x - x1) + p*y1:
+// 12 dB/octave, 3 dB down at `hz`.  Each has its zero exactly at DC and
+// amplifies its own rounding noise by 1/(1-p) only; a direct-form biquad with
+// both poles this close to 1 squares that.
+void fx_lowcut_coefs(float hz, SAMPLE *pole, SAMPLE *gain) {
+    // Two sections are 3 dB down at hz when each one's corner is hz * sqrt(sqrt(2) - 1).
+    float t = tanf((float)M_PI * hz * 0.6435943f / AMY_SAMPLE_RATE);
+    float p = (1.0f - t) / (1.0f + t);
+    *pole = F2S(p);
+    *gain = F2S((1.0f + p) * 0.5f);   // unity at Nyquist
+}
+
+void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc, int chan) {
+    SAMPLE pole = lc->pole, gain = lc->gain;
+    SAMPLE x1a = lc->state[chan][0][0], y1a = lc->state[chan][0][1];
+    SAMPLE x1b = lc->state[chan][1][0], y1b = lc->state[chan][1][1];
+    // While switching off, `open` runs up to 1: all of the effects again.
+    SAMPLE open_step = lc->closing ? lc->open_step : 0;
+    SAMPLE open = lc->closing ? F2S(1.0f) - lc->closing * AMY_BLOCK_SIZE * open_step : 0;
+    for (uint16_t i = 0; i < AMY_BLOCK_SIZE; ++i) {
+        SAMPLE x = buf[i] - dry[i];
+        SAMPLE ya = FILT_MUL_SS(gain, x - x1a) + FILT_MUL_SS(pole, y1a);
+        x1a = x;
+        y1a = ya;
+        SAMPLE yb = FILT_MUL_SS(gain, ya - x1b) + FILT_MUL_SS(pole, y1b);
+        x1b = ya;
+        y1b = yb;
+        buf[i] = dry[i] + yb + FILT_MUL_SS(open, x - yb);
+        open += open_step;
+    }
+    lc->state[chan][0][0] = x1a;
+    lc->state[chan][0][1] = y1a;
+    lc->state[chan][1][0] = x1b;
+    lc->state[chan][1][1] = y1b;
+}
+
 void check_overflow(SAMPLE* block, int osc, char *msg) {
     // Search for overflow in a sample buffer as an unusually large sample-to-sample delta.
 #ifdef AMY_DEBUG
