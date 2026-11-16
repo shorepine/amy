@@ -2861,6 +2861,12 @@ int16_t * amy_fill_buffer() {
             } else {
               sample = -uintval;
             }
+#ifdef ESP_PLATFORM
+            // PCM510x DACs (AMYboard, Tulip) go into analog mute after ~1024 all-zero
+            // samples, which makes the noise floor audibly gate on and off.  Never emit
+            // exact zero: 1 LSB is inaudible and keeps the DAC awake.
+            if (sample == 0) sample = 1;
+#endif
             if(AMY_NCHANS == 1) {
 #ifdef ESP_PLATFORM
                     // esp32's i2s driver has this bug
