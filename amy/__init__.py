@@ -259,7 +259,7 @@ _KW_MAP_LIST = [   # Order matters because patch_string must come last.
     ('synth_level', 'iVF'),
     ('to_synth', 'itI'), ('grab_midi_notes', 'imI'),  ('note_source_channel', 'iMI'), ('synth_delay', 'idI'),
     ('preset', 'pI'), ('num_partials', 'pI'), # note aliasing
-    ('start_sample', 'zSL'), ('stop_sample', 'zOI'),
+    ('start_sample', 'zSL'), ('stop_sample', 'zOI'), ('wavetable_ladder', 'zWL'),
     ('bus', 'yI'), ('mode', 'wwI'),
     ('midi_cc', 'icL'), ('midi_note_cmd', 'ioL'), ('cv_trigger', 'igL'),
     ('note_output', 'iGL'),

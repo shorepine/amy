@@ -1853,6 +1853,9 @@ void play_delta(struct delta *d) {
         }
     }
     if(d->param == WAVE) {
+        // A switch to another wave drops the old wave's table; the saw, pulse
+        // and triangle pick theirs when it is NULL.
+        if (synth[d->osc]->wave != d->data.i) synth[d->osc]->lut = NULL;
         synth[d->osc]->wave = d->data.i;
         // A wave with kind-specific config claims the union; any other wave
         // leaves it alone (nothing reads it).

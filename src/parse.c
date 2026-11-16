@@ -718,6 +718,22 @@ uint16_t amy_parse_transfer_layer_message(char *message) {
         stop_receiving_sample();
         return 1;
     }
+#ifdef AMY_WAVETABLE
+    else if (cmd == 'W') {
+        // zW: wavetable pitch ladder. zW<preset> builds the preset's rungs,
+        // zW<preset>,0 frees them. The build runs here, on the thread parsing
+        // the message (pcm_wavetable_ladder_build in amy.h).
+        uint16_t vals[2];
+        parse_list_uint16_t(message, vals, 2, AMY_UNSET_VALUE(vals[0]));
+        // A queued reset must land first, as for the z load: played during
+        // the build, it would unload the preset being read.
+        amy_settle_deltas();
+        if (AMY_IS_UNSET(vals[0])) fprintf(stderr, "zW needs a preset number\n");
+        else if (AMY_IS_SET(vals[1]) && vals[1] == 0) pcm_wavetable_ladder_free(vals[0]);
+        else pcm_wavetable_ladder_build(vals[0]);
+        return 1;
+    }
+#endif
     else if (cmd == 'D') {
         // zD: Dump data over MIDI sysex.
         //   zD[Z]              — dump all active instrument state + global effects.

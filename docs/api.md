@@ -362,6 +362,7 @@ These per-oscillator parameters use [CtrlCoefs](synth.md) notation
 | `zF`   | **TODO**| `disk_sample` | uint,string,uint | Set a PCM preset to play live from a WAV filename on AMY host disk. Params: preset number, filename, midinote. See `hooks` for reading files on host disk. **Only one file sample can be played at once per preset number. Use multiple presets if you want polyphony from a single sample.** |
 | `zS`   | **TODO**| `start_sample` | uint x 6 | Start sampling to a stereo PCM preset from source. Params: preset number, source, max length in frames, midinote, loopstart, loopend. source = 1 is AMY mixed output. source = 2 is AUDIO_IN0 + 1.  Will sample until max length is reached, `stop_sample` is issued, or a new `start_sample` is issued. | 
 | `zO`   | **TODO**| `stop_sample` | uint | Stop sampling. Does nothing if no sampling active. param ignored. | 
+| `zW`   | **TODO**| `wavetable_ladder` | uint[,uint] | Build the band-limited copies of a wavetable preset (`zW<preset>`), or free them (`zW<preset>,0`). The preset is a built-in wavetable or a mono memory preset of 16,384 samples whose load has finished; others are refused with a log message. The build runs on the thread that parses the message, about 90 ms for a 64-frame table on a 240 MHz ESP32-S3, and takes about 128 KB per table. See [synth.md](synth.md). Requires `AMY_WAVETABLE`. |
 
 ### Sampler timing and time-stretch (experimental)
 
