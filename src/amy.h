@@ -1186,8 +1186,10 @@ typedef struct global_state {
     // Buses
     bus_state_t **bus;  // max_buses entries, allocated at amy_start.
 
-    // Per-bus output gain, recomputed each block from volume[]; max_buses entries.
+    // Per-bus output gain, max_buses entries: where the last block ended, and the step per
+    // sample that takes this block to volume[], so a volume change is not a step in the output.
     SAMPLE *volume_scale;
+    SAMPLE *volume_step;
 
     // Smoothed microseconds per render execution.
     uint32_t render_us;
