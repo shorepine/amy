@@ -536,6 +536,7 @@ enum params{
     UNISON_INTERVAL2,           // octaves from the osc's pitch to group 2
     UNISON_INTERVAL3,           // octaves from the osc's pitch to group 3
     UNISON_RANDOM,              // 1 = random start phases for copies 1..n-1
+    FX_LOWCUT_HZ,               // Per-bus (bus in delta.osc): low cut on what chorus/echo/reverb add
     NO_PARAM                    // 210
 };
 // Before there were two mod sources there was just MOD_SOURCE; it names slot 0.
@@ -750,6 +751,7 @@ typedef struct amy_event {
     float echo_max_delay_ms;
     float echo_feedback;
     float echo_filter_coef;
+    float fx_lowcut_hz;
     float chorus_level;
     float chorus_max_delay;
     float chorus_lfo_freq;
@@ -1132,6 +1134,16 @@ typedef struct echo_config {
 } echo_config_t;
 
 
+// Low cut on what a bus's chorus, echo and reverb add (bus_fx_lowcut in
+// filters.c): two first-order sections per channel, each {x[n-1], y[n-1]}.
+typedef struct fx_lowcut_state {
+    float hz;      // 3 dB point of the 12 dB/octave slope.  0 = off.
+    uint16_t fade; // Crossfade between the uncut effects (0, and the stage is off) and the cut ones.
+    SAMPLE pole;   // of each section
+    SAMPLE gain;   // of each section, so the passband is unity
+    SAMPLE state[AMY_MAX_CHANNELS][2][2];
+} fx_lowcut_state_t;
+
 // Per-bus parameters
 typedef struct bus_state {
     // State of fixed dc-blocking HPF
@@ -1143,6 +1155,7 @@ typedef struct bus_state {
     // dist_block's contract.
     dist_config_t dist;
     dist_state_t dist_state[AMY_MAX_CHANNELS];
+    fx_lowcut_state_t fx_lowcut;
 } bus_state_t;
 
 // global synth state
@@ -1268,6 +1281,9 @@ uint16_t amy_validate_bus(int bus);
 void config_reverb(uint16_t bus, float level, float liveness, float damping, float xover_hz);
 void config_chorus(uint16_t bus, float level, uint16_t max_delay, float lfo_freq, float depth);
 void config_echo(uint16_t bus, float level, float delay_ms, float max_delay_ms, float feedback, float filter_coef);
+void config_fx_lowcut(uint16_t bus, float hz);
+void fx_lowcut_set(fx_lowcut_state_t *lc, float hz);
+void bus_fx_lowcut(SAMPLE *buf, const SAMPLE *dry, fx_lowcut_state_t *lc);
 void osc_note_on(uint16_t osc, float initial_freq);
 void unison_note_on(uint16_t osc);
 void chorus_note_on(float initial_freq);

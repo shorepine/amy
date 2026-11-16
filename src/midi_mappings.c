@@ -128,6 +128,7 @@ static const param_field_t param_fields[] = {
     PFIELD(ECHO_MAX_DELAY_MS,1,               PF_F,   PF_BUS, echo_max_delay_ms),
     PFIELD(ECHO_FEEDBACK,    1,               PF_F,   PF_BUS, echo_feedback),
     PFIELD(ECHO_FILTER_COEF, 1,               PF_F,   PF_BUS, echo_filter_coef),
+    PFIELD(FX_LOWCUT_HZ,     1,               PF_F,   PF_BUS, fx_lowcut_hz),
     PFIELD(CHORUS_LEVEL,     1,               PF_F,   PF_BUS, chorus_level),
     PFIELD(CHORUS_MAX_DELAY, 1,               PF_F,   PF_BUS, chorus_max_delay),
     PFIELD(CHORUS_LFO_FREQ,  1,               PF_F,   PF_BUS, chorus_lfo_freq),

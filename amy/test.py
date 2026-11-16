@@ -2028,6 +2028,69 @@ class TestBuses(AmyTest):
     amy_send_at(time=700, synth=2, note=70, vel=5)
 
 
+class TestFxLowCut(AmyTest):
+  """fx_lowcut keeps a bus's chorus, echo and reverb out of its low end and leaves the dry signal alone."""
+
+  def _render(self, note, fx_level, lowcut=0, off_at=(), on_again=0, seconds=1.0):
+    _amy.stop()
+    _amy.start(0)
+    _reset_test_clock()
+    amy_send_at(time=0, synth=1, num_voices=1, oscs_per_voice=1, bus=1)
+    amy_send_at(time=0, synth=1, osc=0, wave=amy.SINE, bp0='20,1,10000,1,50,0')
+    amy_send_at(time=0, bus=1, reverb=fx_level, echo='%s,125,,0.4' % fx_level, chorus=fx_level,
+                fx_lowcut=lowcut)
+    amy_send_at(time=20, synth=1, note=note, vel=1)
+    for time in off_at:
+      amy_send_at(time=time, bus=1, fx_lowcut=0)
+    if on_again:
+      amy_send_at(time=on_again, bus=1, fx_lowcut=lowcut)
+    amy_send_at(time=500, synth=1, vel=0)
+    return _finish_test_clock(seconds)
+
+  def _added_db(self, note, lowcut):
+    """Level of what the effects add to a sine at `note`: the bus with them minus the bus without."""
+    return dB(rms(self._render(note, 1, lowcut) - self._render(note, 0)))
+
+  def test(self):
+    name = self.__class__.__name__
+    problems = []
+    # With no effect on, the bus is the same sample for sample.
+    if not np.array_equal(self._render(33, 0), self._render(33, 0, lowcut=200)):
+      problems.append('changed a bus whose effects are off')
+    # 55 Hz under a 200 Hz cutoff: two first-order sections, 3 dB down at 200 Hz, give 16 dB.
+    low = self._added_db(33, 0) - self._added_db(33, 200)
+    if abs(low - 16.2) > 1.5:
+      problems.append('55 Hz of the effects dropped %.1f dB, expected 16.2' % low)
+    # 2 kHz is clear of it.
+    high = self._added_db(96, 0) - self._added_db(96, 200)
+    if abs(high) > 0.5:
+      problems.append('2 kHz of the effects changed by %.2f dB' % high)
+    # Switched off under a held note (and told so twice): the lows come back without a step, and
+    # once the stage has stopped the bus is the one that never had a cut.
+    never = self._render(33, 1, seconds=1.6)
+    back = self._render(33, 1, lowcut=200, off_at=(100, 150), seconds=1.6) - never
+    step = np.max(np.abs(np.diff(back, axis=0))) / np.max(np.abs(back))
+    if step > 0.05:
+      problems.append('switching off stepped the bus by %.2f of what the cut held back' % step)
+    if np.any(back[-2048:]):
+      problems.append('the bus differs after the cut has stopped')
+    # Switched on again half way through that fade: no step either, and it ends as a cut that stayed on.
+    stayed = self._render(33, 1, lowcut=200, seconds=1.6)
+    again = self._render(33, 1, lowcut=200, off_at=(100,), on_again=220, seconds=1.6) - stayed
+    step = np.max(np.abs(np.diff(again, axis=0))) / np.max(np.abs(again))
+    if step > 0.05:
+      problems.append('switching on inside the fade stepped the bus by %.2f' % step)
+    if np.any(again[-2048:]):
+      problems.append('the bus differs from a cut that stayed on')
+    # A set cut reads back.
+    amy.send(bus=1, fx_lowcut=200)
+    amy.render(0.01)
+    if 'J200' not in amy.dump_state():
+      problems.append('not in dump_state')
+    message = ('%-32s:' % name) + (' effects at 55 Hz -%.1f dB, at 2 kHz %+.2f dB' % (low, high))
+    return not problems, message + ''.join(' / ' + p for p in problems)
+
+
 class TestZeroFreqModPhase(AmyTest):
   """Test that we can set a constant value for mod_osc via its phase."""
 

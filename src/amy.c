@@ -528,6 +528,22 @@ void config_eq(uint16_t bus, SAMPLE eq_l, SAMPLE eq_m, SAMPLE eq_h) {
 }
 
 
+// fx_lowcut: what the bus's chorus, echo and reverb add is high-passed at
+// `hz`, 0 = off (bus_fx_lowcut in filters.c).
+static SAMPLE *fx_dry_block = NULL;   // The bus before those FX, while they run; one for all buses.
+
+void config_fx_lowcut(uint16_t bus, float hz) {
+    fx_lowcut_state_t *lc = &amy_global.bus[bus]->fx_lowcut;
+    if (!(hz > 0)) hz = 0;
+    if (hz > AMY_SAMPLE_RATE / 4.0f) hz = AMY_SAMPLE_RATE / 4.0f;
+    if (hz > 0 && fx_dry_block == NULL) {
+        fx_dry_block = malloc_caps(AMY_BLOCK_SIZE * AMY_MAX_CHANNELS * sizeof(SAMPLE), amy_global.config.ram_caps_fbl);
+        if (fx_dry_block == NULL) hz = 0;   // On OOM leave it off, as config_reverb does.
+    }
+    fx_lowcut_set(lc, hz);
+}
+
+
 void bus_reset(uint16_t bus) {
     config_eq(bus, F2S(1.0f), F2S(1.0f), F2S(1.0f));
     filters_init(bus);
@@ -544,6 +560,8 @@ void bus_reset(uint16_t bus) {
         amy_global.bus[bus]->dist_state[c].hpf_yn1 = 0;
     }
 
+    config_fx_lowcut(bus, 0);
+    amy_global.bus[bus]->fx_lowcut.fade = 0;
     if (AMY_HAS_CHORUS) config_chorus(bus, CHORUS_DEFAULT_LEVEL, CHORUS_DEFAULT_MAX_DELAY, CHORUS_DEFAULT_LFO_FREQ, CHORUS_DEFAULT_MOD_DEPTH);
     if (AMY_HAS_REVERB) config_reverb(bus, REVERB_DEFAULT_LEVEL, REVERB_DEFAULT_LIVENESS, REVERB_DEFAULT_DAMPING, REVERB_DEFAULT_XOVER_HZ);
     if (AMY_HAS_ECHO)   config_echo(bus, S2F(ECHO_DEFAULT_LEVEL), ECHO_DEFAULT_DELAY_MS, ECHO_DEFAULT_MAX_DELAY_MS, S2F(ECHO_DEFAULT_FEEDBACK), S2F(ECHO_DEFAULT_FILTER_COEF));
@@ -629,6 +647,8 @@ int8_t global_init(amy_config_t c) {
 
 void global_deinit(void) {
     for (int bus = 0; bus < amy_global.config.max_buses; ++bus)  filters_deinit(bus);
+    free(fx_dry_block);
+    fx_dry_block = NULL;
     free(amy_global.bus[0]);  // One allocation for every bus_state; bus[i] points into it.
     free(amy_global.bus);
     free(amy_global.volume_scale);
@@ -851,6 +871,7 @@ void amy_event_to_deltas_queue(amy_event *e, uint16_t base_osc, uint16_t oscs_pe
         EVENT_TO_DELTA_F(echo_delay_ms, ECHO_DELAY_MS)
         EVENT_TO_DELTA_F(echo_feedback, ECHO_FEEDBACK)
         EVENT_TO_DELTA_F(echo_filter_coef, ECHO_FILTER_COEF)
+        EVENT_TO_DELTA_F(fx_lowcut_hz, FX_LOWCUT_HZ)
         EVENT_TO_DELTA_F(chorus_max_delay, CHORUS_MAX_DELAY)   // set MAX_DELAY first
         EVENT_TO_DELTA_F(chorus_level, CHORUS_LEVEL)
         EVENT_TO_DELTA_F(chorus_lfo_freq, CHORUS_LFO_FREQ)
@@ -2123,6 +2144,7 @@ void play_delta(struct delta *d) {
     if(d->param == REVERB_LIVENESS) config_reverb(bus, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT);
     if(d->param == REVERB_DAMPING) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f, AMY_UNSET_FLOAT);
     if(d->param == REVERB_XOVER_HZ) config_reverb(bus, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, AMY_UNSET_FLOAT, d->data.f);
+    if(d->param == FX_LOWCUT_HZ) config_fx_lowcut(bus, d->data.f);
     // Per-bus distortion: same range rules as the per-osc stage (clamped here
     // so dist_process_bus doesn't range-check per block).
     if(d->param == BUS_DIST_CLIP_EN) {
@@ -2758,6 +2780,10 @@ int16_t * amy_fill_buffer() {
         if (amy_global.bus[bus]->eq.eq[0] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[1] != F2S(1.0f) || amy_global.bus[bus]->eq.eq[2] != F2S(1.0f)) {
             parametric_eq_process(bus, fbl[0][bus]);
         }
+        // fx_lowcut: keep the bus as it stands before chorus, echo and reverb.
+        bool fx_lowcut = amy_global.bus[bus]->fx_lowcut.hz > 0 || amy_global.bus[bus]->fx_lowcut.fade;
+        if (fx_lowcut)
+            memcpy(fx_dry_block, fbl[0][bus], AMY_BLOCK_SIZE * AMY_NCHANS * sizeof(SAMPLE));
         if(AMY_HAS_CHORUS) {
             // apply per-bus chorus.
             if(amy_global.bus[bus]->chorus.level > 0 && amy_global.bus[bus]->chorus.chorus_delay_lines[0] != NULL) {
@@ -2790,6 +2816,10 @@ int16_t * amy_fill_buffer() {
                     stereo_reverb(amy_global.bus[bus]->reverb.rev, fbl[0][bus], fbl[0][bus] + AMY_BLOCK_SIZE, fbl[0][bus], fbl[0][bus] + AMY_BLOCK_SIZE, AMY_BLOCK_SIZE, amy_global.bus[bus]->reverb.level);
                 }
             }
+        }
+        if (fx_lowcut) {
+            // ... and high-pass what they added to it.
+            bus_fx_lowcut(fbl[0][bus], fx_dry_block, &amy_global.bus[bus]->fx_lowcut);
         }
         if(amy_global.config.amy_external_bus_postprocess_hook != NULL) {
             amy_global.config.amy_external_bus_postprocess_hook(bus, fbl[0][bus], AMY_BLOCK_SIZE);
