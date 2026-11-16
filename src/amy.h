@@ -1665,7 +1665,8 @@ extern SAMPLE scan_max(SAMPLE* block, int len);
 #endif
 #endif
 #define AMY_RENDER_TASK_COREID (0)
-#define AMY_FILL_BUFFER_TASK_COREID (1)
+// Single-core chips (ESP32-C3, -C6, -H2, -S2) have no core 1: pinning a task there fails at boot.
+#define AMY_FILL_BUFFER_TASK_COREID ((portNUM_PROCESSORS) > 1 ? 1 : 0)
 #define AMY_RENDER_TASK_STACK_SIZE (12 * 1024) // 8
 #define AMY_FILL_BUFFER_TASK_STACK_SIZE (16 * 1024) // 16
 #define AMY_RENDER_TASK_NAME      "amy_r_task"
